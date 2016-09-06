@@ -70,20 +70,20 @@ Here is a list of all available options. You're going to be using a subset of th
 
 ### Examples
 
-1. Generate a C# SDK from an APIKey.
+Generate a C# SDK from an APIKey.
 
 ```
 apimatic generate fromkey --api-key <your key> --platform cs_portable_net_lib --output ./SDKs
 ```
 
-2. Generate a Python SDK from user credentials and an API description file.
+Generate a Python SDK from user credentials and an API description file.
 
 ```
 apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --name TestSDK --file ./data/calculator.json --platform python_generic_lib --output ./SDKs
 ```
 
-3. Generate a Ruby SDK from user credentials and an API description URL.
+Generate a Ruby SDK from user credentials and an API description URL.
 
 ```
 apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
