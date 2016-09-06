@@ -1,5 +1,7 @@
 # APIMatic CLI
 
+[![Build Status](https://travis-ci.org/apimatic/apimatic-cli.svg?branch=master)](https://travis-ci.org/apimatic/apimatic-cli)
+
 ### Overview
 
 This command line tool serves as a wrapper over APIMatic's Python SDK allowing API providers to generate deployment ready SDKs of their APIs for ten platforms using a single one line command. The following functions are supported:
