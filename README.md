@@ -64,8 +64,8 @@ Here is a list of all available options. You're going to be using a subset of th
 --name                       The name of the generated SDK.
 --email                      The email address of the user's APIMatic account.
 --password                   The password of the user's APIMatic account.
---url                        The URL of the API Description.
---file                       The path of the APIDescription file.
+--url                        The URL of the API description.
+--file                       The path of the API description file.
 ```
 
 ### Examples
@@ -76,14 +76,14 @@ Here is a list of all available options. You're going to be using a subset of th
 apimatic generate fromkey --api-key <your key> --platform cs_portable_net_lib --output ./SDKs
 ```
 
-2. Generate a Python SDK from user credentials and an APIDescription file.
+2. Generate a Python SDK from user credentials and an API description file.
 
 ```
 apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --name TestSDK --file ./data/calculator.json --platform python_generic_lib --output ./SDKs
 ```
 
-3. Generate a Ruby SDK from user credentials and an APIDescription URL.
+3. Generate a Ruby SDK from user credentials and an API description URL.
 
 ```
 apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
