@@ -8,8 +8,7 @@ class Utilities:
         response = requests.get(url)
         headers = cgi.parse_header(response.headers['content-disposition'])[1]
         file_name = headers['filename']
-        if not os.path.exists(output_path):
-            cls.create_directories(output_path)
+        cls.create_directories(output_path)
         with open(os.path.join(output_path, file_name), 'wb') as f:
             f.write(response.content)
         return file_name
