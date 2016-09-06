@@ -19,11 +19,11 @@ class ArgumentAdder:
         },
         '--email': {
              'required': True, 
-             'help': 'The email address used to log in on the APIMatic website.'
+             'help': 'Your APIMatic account email address.'
         },
         '--password': {
             'required': True, 
-            'help': 'The password used to log in on the APIMatic website.'
+            'help': 'Your APIMatic account password.'
         },
         '--url': {
             'help': 'The URL of the API description.'
@@ -38,8 +38,8 @@ class ArgumentAdder:
             'metavar': 'PLATFORM'
         },
         '--output': {
-            'default': './output', 
-            'help': 'The path of the folder in which to put the downloaded files.'
+            'default': './downloads', 
+            'help': 'The path of the folder in which to download files. Default is ./downloads.'
         },
         '--name': {
             'required': True,
@@ -52,21 +52,19 @@ class ArgumentAdder:
         options = ArgumentAdder.arguments.get(argument)
         if options != None:
             obj.add_argument(argument, **options)
+
+    @classmethod
+    def add_arguments(cls, obj, *arguments):
+        for argument in arguments:
+            ArgumentAdder.add_argument(obj, argument)
     
     @classmethod
     def add_auth(cls, parser):
-        group = parser.add_argument_group('Credentials', 'The credentials of you APIMatic account.')
-        for name in ['--email', '--password']:
-            ArgumentAdder.add_argument(group, name)
+        group = parser.add_argument_group('Credentials', 'The credentials of your APIMatic account.')
+        ArgumentAdder.add_arguments(group, '--email', '--password')
 
     @classmethod
     def add_input(cls, parser):
-        group = parser.add_mutually_exclusive_group(required=True)
-        for name in ['--url', '--file']:
-            ArgumentAdder.add_argument(group, name)
-
-    @classmethod
-    def add_arguments(cls, parser, *arguments):
-        for argument in arguments:
-            ArgumentAdder.add_argument(parser, argument)
+        mgroup = parser.add_mutually_exclusive_group(required=True)
+        ArgumentAdder.add_arguments(mgroup, '--url', '--file')
 
