@@ -19,8 +19,8 @@ pip install --upgrade apimatic
 Alternatively, you can clone this repository and run this tool as a Python application. From the command line, type:
 
 ```
-git clone blahblah
-cd blahblah
+git clone https://github.com/apimatic/apimatic-cli.git
+cd apmiatic-cli
 pip install -r requirements.txt
 ```
 
