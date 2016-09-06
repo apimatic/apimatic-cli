@@ -74,3 +74,7 @@ celerybeat-schedule
 .venv/
 venv/
 ENV/
+
+# Output folders
+SDKs/
+output/
