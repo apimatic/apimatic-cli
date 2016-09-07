@@ -61,5 +61,5 @@ class TestSDKGenerator(unittest.TestCase):
 
     def tearDown(self):
         if os.path.exists(TestSDKGenerator.output_path):
-            time.sleep(2)
             shutil.rmtree(TestSDKGenerator.output_path)
+        time.sleep(2)

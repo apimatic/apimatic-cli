@@ -20,6 +20,7 @@ def main(args=None):
     subparsers = parser.add_subparsers(dest='command')
     subparsers.required = True
 
+    # Add generator parsers
     gen_parser = subparsers.add_parser('generate', help='Generate an SDK.')
     gen_subparsers = gen_parser.add_subparsers(dest='auth')
     gen_subparsers.required = True
@@ -34,6 +35,20 @@ def main(args=None):
     ArgumentAdder.add_input(genfromurl_parser)
     ArgumentAdder.add_arguments(genfromurl_parser, '--platform', '--output')
     genfromurl_parser.set_defaults(func=apimaticcli.SDKGenerator.from_user)
+
+    # Add validation parsers
+    val_parser = subparsers.add_parser('validate', help='Validate an API description.')
+    val_subparsers = val_parser.add_subparsers(dest='auth')
+    val_subparsers.required = True
+
+    valfromkey_parser = val_subparsers.add_parser('fromkey', help='Validate an API description using an API key.')
+    ArgumentAdder.add_argument(valfromkey_parser, '--api-key')
+    valfromkey_parser.set_defaults(func=apimaticcli.APIValidator.from_key)
+
+    valfromurl_parser = val_subparsers.add_parser('fromuser', help='Validate an API description using user account credentials.')
+    ArgumentAdder.add_auth(valfromurl_parser)
+    ArgumentAdder.add_input(valfromurl_parser)
+    valfromurl_parser.set_defaults(func=apimaticcli.APIValidator.from_user)
 
     args = parser.parse_args(args)
     args.func(args)

@@ -11,9 +11,9 @@ class SDKGenerator:
     @classmethod
     def from_key(cls, args):
         try:     
-            sdk_path = cls.code_gen.get_generate_from_key(args.api_key, args.platform)
+            sdk_path = cls.code_gen.generate_from_key(args.api_key, args.platform)
         except APIException as e:
-            print("\nUnable to generate SDK from API.")
+            print("\nUnable to generate SDK from API. HTTP response code: " + str(e.response_code))
             sys.exit(1)
 
         cls.download_sdk(sdk_path, args.output)
@@ -23,22 +23,24 @@ class SDKGenerator:
         Configuration.basic_auth_user_name = args.email
         Configuration.basic_auth_password = args.password
 
-        if hasattr(args, 'url'):
+        if hasattr(args, 'url') and args.url != None:
             try:
-                sdk_path = cls.code_gen.get_generate_from_url(args.name, args.platform, args.url)
+                sdk_path = cls.code_gen.generate_from_url(args.name, args.platform, args.url)
+            except APIException as e:
+                print("\nUnable to generate SDK from API. HTTP response code: " + str(e.response_code))
+                sys.exit(1)
+        elif hasattr(args, 'file') and args.file != None:
+            try:
+                with open(args.file, "rb") as file:
+                    sdk_path = cls.code_gen.generate_from_file(args.name, args.platform, file)
+            except IOError as e:
+                print("\nUnable to open API description file: " + str(e))
+                sys.exit(1)
             except APIException as e:
                 print("\nUnable to generate SDK from API. HTTP response code: " + str(e.response_code))
                 sys.exit(1)
         else:
-            try:
-                with open(args.file, "rb") as file:
-                    sdk_path = cls.code_gen.create_generate_from_file(args.name, args.platform, file)
-            except IOError as e:
-                print("\nUnable to open file: " + str(e))
-                sys.exit(1)
-            except APIException as e:
-                print("\nUnable to generate SDK from API. HTTP response code: " + str(e.response_code))
-                sys.exit(1)
+            raise ValueError('Either the URL or the FILE argument is required.')
 
         cls.download_sdk(sdk_path, args.output)
 

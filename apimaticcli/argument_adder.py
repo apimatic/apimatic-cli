@@ -15,7 +15,7 @@ class ArgumentAdder:
     arguments = {
         '--api-key': {
             'required': True, 
-            'help': "The key of the API from APIMatic."
+            'help': "The API integration key from APIMatic."
         },
         '--email': {
              'required': True, 

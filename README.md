@@ -4,21 +4,30 @@
 
 ### Overview
 
-This command line tool serves as a wrapper over APIMatic's Python SDK allowing API providers to generate deployment ready SDKs of their APIs for ten platforms using a single one line command. The following functions are supported:
+This command line tool serves as a wrapper over APIMatic's Python SDK allowing API providers to generate deployment ready SDKs of their APIs for ten platforms using a single command. The following functions are supported:
 
  * Generate an SDK
  * Validate an API description
- * Transform an API description 
+ * Transform an API description (not yet implemented)
 
 
 ### Installation
 
-The quick way is to install this tool as a package from pip.
+The quickest way is to install this tool as a package from pip:
 ```
 pip install --upgrade apimatic
 ```
 
-Alternatively, you can clone this repository and run this tool as a Python application. From the command line, type:
+If you prefer not to use pip, you can install it manually as well:
+
+```
+git clone https://github.com/apimatic/apimatic-cli.git
+cd apmiatic-cli
+python setup.py test
+python setup.py install
+```
+
+Alternatively, you can run this tool without installation:
 
 ```
 git clone https://github.com/apimatic/apimatic-cli.git
@@ -26,25 +35,26 @@ cd apmiatic-cli
 pip install -r requirements.txt
 ```
 
-It's recommended to use a [virtual enviroment](http://docs.python-guide.org/en/latest/dev/virtualenvs/) if you choose to go this way.
+It's highly recommended to use a [virtual enviroment](http://docs.python-guide.org/en/latest/dev/virtualenvs/) if you choose to go this way.
 
 
 ### Usage
 
-If you installed using pip, you can simply invoke the tools by typing:
+If you installed using pip, you can simply invoke the tool by typing:
 
 ```
 apimatic -h
 ```
 
-Otherwise, if you cloned the repository, make sure you're in the root folder of the repository and type:
+Otherwise, if you chose not to install, make sure you're in the root folder of the repository and type:
 
 ```
 python -m apimaticcli -h
 ```
+
 To use this tool, you have to provide two positional arguments:
-* command (generate, validate or transform)
-* authentication type (fromkey, fromuser)
+* command (generate or validate)
+* authentication type (fromkey or fromuser)
 
 For information about further required or optional arguments, you can type -h as follows:
 
@@ -72,22 +82,42 @@ Here is a list of all available options. You're going to be using a subset of th
 
 ### Examples
 
-Generate a C# SDK from an API key:
+Generate a C# SDK using an API integretation key:
 
 ```
 apimatic generate fromkey --api-key <your key> --platform cs_portable_net_lib --output ./SDKs
 ```
 
-Generate a Python SDK from user credentials and an API description file:
+Generate a Python SDK using user credentials and an API description file:
 
 ```
 apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --name TestSDK --file ./data/calculator.json --platform python_generic_lib --output ./SDKs
 ```
 
-Generate a Ruby SDK from user credentials and an API description URL:
+Generate a Ruby SDK using user credentials and an API description URL:
 
 ```
 apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---name TestSDK --url http://www.somewebsite.com/description.json --platform ruby_generic_lib  --output ./SDKs
+--name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib  --output ./SDKs
+```
+
+Validate an API description using an API integration key:
+
+```
+apimatic validate fromkey --api-key <your key>
+```
+
+Validate an API description using user credentials and an API description file:
+
+```
+apimatic validate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+--file ./data/calculator.json
+```
+
+Validate an API description using user credentials and an API description URL:
+
+```
+apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+--url http://www.somewebsite.com/apidescription.json
 ```
