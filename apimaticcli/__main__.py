@@ -7,7 +7,6 @@ if __package__ is None and not hasattr(sys, 'frozen'):
 
 import argparse
 import apimaticcli
-from .argument_adder import ArgumentAdder
 
 def main(args=None):
     if args is None:
@@ -25,14 +24,14 @@ def main(args=None):
     gen_subparsers.required = True
 
     genfromkey_parser = gen_subparsers.add_parser('fromkey', help='Generate an SDK using an API key.')
-    ArgumentAdder.add_arguments(genfromkey_parser, '--api-key', '--platform', '--output')
+    apimaticcli.ArgumentAdder.add_arguments(genfromkey_parser, '--api-key', '--platform', '--output')
     genfromkey_parser.set_defaults(func=apimaticcli.SDKGenerator.from_key)
 
     genfromurl_parser = gen_subparsers.add_parser('fromuser', help='Generate an SDK using user account credentials.')
-    ArgumentAdder.add_auth(genfromurl_parser)
-    ArgumentAdder.add_argument(genfromurl_parser, '--name')
-    ArgumentAdder.add_input(genfromurl_parser)
-    ArgumentAdder.add_arguments(genfromurl_parser, '--platform', '--output')
+    apimaticcli.ArgumentAdder.add_auth(genfromurl_parser)
+    apimaticcli.ArgumentAdder.add_argument(genfromurl_parser, '--name')
+    apimaticcli.ArgumentAdder.add_input(genfromurl_parser)
+    apimaticcli.ArgumentAdder.add_arguments(genfromurl_parser, '--platform', '--output')
     genfromurl_parser.set_defaults(func=apimaticcli.SDKGenerator.from_user)
 
     # Add validation parsers
@@ -41,12 +40,12 @@ def main(args=None):
     val_subparsers.required = True
 
     valfromkey_parser = val_subparsers.add_parser('fromkey', help='Validate an API description using an API key.')
-    ArgumentAdder.add_argument(valfromkey_parser, '--api-key')
+    apimaticcli.ArgumentAdder.add_argument(valfromkey_parser, '--api-key')
     valfromkey_parser.set_defaults(func=apimaticcli.APIValidator.from_key)
 
     valfromurl_parser = val_subparsers.add_parser('fromuser', help='Validate an API description using user account credentials.')
-    ArgumentAdder.add_auth(valfromurl_parser)
-    ArgumentAdder.add_input(valfromurl_parser)
+    apimaticcli.ArgumentAdder.add_auth(valfromurl_parser)
+    apimaticcli.ArgumentAdder.add_input(valfromurl_parser)
     valfromurl_parser.set_defaults(func=apimaticcli.APIValidator.from_user)
 
     # Parse arguments and call subparser function
