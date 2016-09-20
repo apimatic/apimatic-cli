@@ -15,7 +15,7 @@ This command line tool serves as a wrapper over APIMatic's Python SDK allowing A
 
 The quickest way is to install this tool as a package from pip:
 ```
-pip install --upgrade apimatic
+pip install --upgrade apimatic-cli
 ```
 
 If you prefer not to use pip, you can install it manually as well:
@@ -43,7 +43,7 @@ It's highly recommended to use a [virtual enviroment](http://docs.python-guide.o
 If you installed using pip, you can simply invoke the tool by typing:
 
 ```
-apimatic -h
+apimatic-cli -h
 ```
 
 Otherwise, if you chose not to install, make sure you're in the root folder of the repository and type:
@@ -59,7 +59,7 @@ To use this tool, you have to provide two positional arguments:
 For information about further required or optional arguments, you can type -h as follows:
 
 ```
-apimatic generate fromkey -h
+apimatic-cli generate fromkey -h
 ```
 
 ### Options
@@ -85,39 +85,39 @@ Here is a list of all available options. You're going to be using a subset of th
 Generate a C# SDK using an API integretation key:
 
 ```
-apimatic generate fromkey --api-key <your key> --platform cs_portable_net_lib --output ./SDKs
+apimatic-cli generate fromkey --api-key <your key> --platform cs_portable_net_lib --output ./SDKs
 ```
 
 Generate a Python SDK using user credentials and an API description file:
 
 ```
-apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --name TestSDK --file ./data/calculator.json --platform python_generic_lib --output ./SDKs
 ```
 
 Generate a Ruby SDK using user credentials and an API description URL:
 
 ```
-apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib  --output ./SDKs
 ```
 
 Validate an API description using an API integration key:
 
 ```
-apimatic validate fromkey --api-key <your key>
+apimatic-cli validate fromkey --api-key <your key>
 ```
 
 Validate an API description using user credentials and an API description file:
 
 ```
-apimatic validate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+apimatic-cli validate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --file ./data/calculator.json
 ```
 
 Validate an API description using user credentials and an API description URL:
 
 ```
-apimatic generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --url http://www.somewebsite.com/apidescription.json
 ```
