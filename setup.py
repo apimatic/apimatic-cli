@@ -18,7 +18,7 @@ setup(
     test_suite = 'nose.collector',
     entry_points={
         'console_scripts': [
-            'apimatic = apimaticcli.__main__:main'
+            'apimatic-cli = apimaticcli.__main__:main'
         ]
     }
 )

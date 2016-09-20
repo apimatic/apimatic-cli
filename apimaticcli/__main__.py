@@ -10,7 +10,6 @@ import apimaticcli
 from .argument_adder import ArgumentAdder
 
 def main(args=None):
-    
     if args is None:
         args = sys.argv[1:]
 
@@ -50,6 +49,7 @@ def main(args=None):
     ArgumentAdder.add_input(valfromurl_parser)
     valfromurl_parser.set_defaults(func=apimaticcli.APIValidator.from_user)
 
+    # Parse arguments and call subparser function
     args = parser.parse_args(args)
     args.func(args)
 
