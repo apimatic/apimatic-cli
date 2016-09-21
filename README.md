@@ -6,9 +6,9 @@
 
 This command line tool serves as a wrapper over APIMatic's Python SDK allowing API providers to generate deployment ready SDKs of their APIs for ten platforms using a single command. The following functions are supported:
 
- * Generate an SDK
- * Validate an API description
- * Transform an API description (not yet implemented)
+* Generate an SDK
+* Validate an API description
+* Transform an API description (not yet implemented)
 
 
 ### Installation
@@ -53,6 +53,7 @@ python -m apimaticcli -h
 ```
 
 To use this tool, you have to provide two positional arguments:
+
 * command (generate or validate)
 * authentication type (fromkey or fromuser)
 
