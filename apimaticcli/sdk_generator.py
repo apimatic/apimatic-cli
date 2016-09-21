@@ -1,12 +1,12 @@
 import os
+import re
 import sys
 
-from .apimaticlib import *
 from .utilities import Utilities
+from .apimaticlib.api_matic_client import *
 
 class SDKGenerator:
     code_gen = APIMaticClient().generator
-    base_url = 'https://apimatic.io/'
 
     @classmethod
     def from_key(cls, args):
@@ -48,7 +48,8 @@ class SDKGenerator:
     def download_sdk(cls, sdk_path, output):
         output_path = os.path.abspath(output.rstrip('/'))
         try:
-            filename = Utilities.download_file(cls.base_url + sdk_path, output_path)
+            base_download_url = re.match('^https?://[^/]+', Configuration.BASE_URI).group(0)
+            filename = Utilities.download_file(base_download_url + sdk_path, output_path)
             print("\nSDK downloaded to: {} as {}".format(output, filename))
         except Exception as e:
             print("Unable to dowload SDK: " + str(e))

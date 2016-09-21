@@ -1,6 +1,6 @@
 import sys
 
-from .apimaticlib import *
+from .apimaticlib.api_matic_client import *
 
 class APIValidator:
     api_validator = APIMaticClient().validator
@@ -19,6 +19,7 @@ class APIValidator:
     def from_user(cls, args):
         Configuration.basic_auth_user_name = args.email
         Configuration.basic_auth_password = args.password
+
         if hasattr(args, 'url') and args.url != None:
             try:
                 summary = cls.api_validator.validate_from_url(args.url)

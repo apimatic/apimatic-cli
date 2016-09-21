@@ -57,6 +57,9 @@ class ArgumentAdder:
         '--name': {
             'required': True,
             'help': 'The name of the SDK.'
+        },
+        '--api': {
+            'help': 'The base URL of the APIMatic API.'
         }
     }
 
