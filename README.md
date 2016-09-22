@@ -140,5 +140,5 @@ apimatic-cli transform fromuser --email <your APIMatic account email> --password
 Transform an APIMatic API description to Swagger v2.0 (YAML) format using user credentials and an API description URL:
 ```
 apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---url http://www.somewebsite.com/apidescription.wadl --format SwaggerYaml
+--url http://www.somewebsite.com/apidescription.json --format SwaggerYaml
 ```
