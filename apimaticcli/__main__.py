@@ -25,15 +25,15 @@ def main(args=None):
     gen_subparsers.required = True
 
     genfromkey_parser = gen_subparsers.add_parser('fromkey', help='Generate an SDK using an API key.')
-    cli.ArgumentAdder.add_arguments(genfromkey_parser, '--api-key', '--platform', '--output')
+    cli.ArgumentAdder.add_arguments(genfromkey_parser, '--api-key', '--platform', '--download-to')
     genfromkey_parser.set_defaults(func=cli.SDKGenerator.from_key)
 
-    genfromurl_parser = gen_subparsers.add_parser('fromuser', help='Generate an SDK using user account credentials.')
-    cli.ArgumentAdder.add_auth(genfromurl_parser)
-    cli.ArgumentAdder.add_argument(genfromurl_parser, '--name')
-    cli.ArgumentAdder.add_input(genfromurl_parser)
-    cli.ArgumentAdder.add_arguments(genfromurl_parser, '--platform', '--output')
-    genfromurl_parser.set_defaults(func=cli.SDKGenerator.from_user)
+    genfromuser_parser = gen_subparsers.add_parser('fromuser', help='Generate an SDK using user account credentials.')
+    cli.ArgumentAdder.add_auth(genfromuser_parser)
+    cli.ArgumentAdder.add_argument(genfromuser_parser, '--name')
+    cli.ArgumentAdder.add_input(genfromuser_parser)
+    cli.ArgumentAdder.add_arguments(genfromuser_parser, '--platform', '--download-to')
+    genfromuser_parser.set_defaults(func=cli.SDKGenerator.from_user)
 
     # Add validation parsers
     val_parser = subparsers.add_parser('validate', help='Validate an API description.')
@@ -44,10 +44,25 @@ def main(args=None):
     cli.ArgumentAdder.add_argument(valfromkey_parser, '--api-key')
     valfromkey_parser.set_defaults(func=cli.APIValidator.from_key)
 
-    valfromurl_parser = val_subparsers.add_parser('fromuser', help='Validate an API description using user account credentials.')
-    cli.ArgumentAdder.add_auth(valfromurl_parser)
-    cli.ArgumentAdder.add_input(valfromurl_parser)
-    valfromurl_parser.set_defaults(func=cli.APIValidator.from_user)
+    valfromuser_parser = val_subparsers.add_parser('fromuser', help='Validate an API description using user account credentials.')
+    cli.ArgumentAdder.add_auth(valfromuser_parser)
+    cli.ArgumentAdder.add_input(valfromuser_parser)
+    valfromuser_parser.set_defaults(func=cli.APIValidator.from_user)
+
+    # Add transformation parsers
+    tra_parser = subparsers.add_parser('transform', help='Transform an API description.')
+    tra_subparsers = tra_parser.add_subparsers(dest='auth')
+    tra_subparsers.required = True
+
+    trafromkey_parser = tra_subparsers.add_parser('fromkey', help='Transform an API description using an API key.')
+    cli.ArgumentAdder.add_arguments(trafromkey_parser, '--api-key', '--format', '--download-to', '--save-as')
+    trafromkey_parser.set_defaults(func=cli.APITransformer.from_key)
+
+    trafromuser_parser = tra_subparsers.add_parser('fromuser', help='Transform an API description using user account credentials.')
+    cli.ArgumentAdder.add_auth(trafromuser_parser)
+    cli.ArgumentAdder.add_input(trafromuser_parser)
+    cli.ArgumentAdder.add_arguments(trafromuser_parser, '--format', '--download-to', '--save-as')
+    trafromuser_parser.set_defaults(func=cli.APITransformer.from_user)
 
     # Parse arguments and call subparser function
     args = parser.parse_args(args)
@@ -55,7 +70,7 @@ def main(args=None):
     args.func(args)
 
 def parse_global(args):
-    if hasattr(args, 'api') and args.api != None:
+    if args.api != None:
         cli.apimaticlib.Configuration.BASE_URI = args.api
 
 
