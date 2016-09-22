@@ -15,13 +15,13 @@ class TestAPITransformer(unittest.TestCase):
         arguments.api_key = os.environ['APIMATIC_KEY']
         arguments.format = 'WADL2009'
         arguments.download_to = TestAPITransformer.output_path
-        arguments.save_as = "test.wadl"
+        arguments.download_as = "test.wadl"
 
         APITransformer.from_key(arguments)
 
         files = os.listdir(TestAPITransformer.output_path)
         self.assertEqual(len(files), 1)
-        self.assertEqual(files[0], arguments.save_as)
+        self.assertEqual(files[0], arguments.download_as)
         file_size = os.stat(os.path.join(TestAPITransformer.output_path, files[0])).st_size
         self.assertGreater(file_size, 0)
 

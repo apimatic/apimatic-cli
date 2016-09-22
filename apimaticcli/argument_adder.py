@@ -84,7 +84,7 @@ class ArgumentAdder:
             'help': 'The desired output format of the API description. Options are: ' + ', '.join(output_formats),
             'metavar': 'FORMAT'
         },
-        '--save-as': {
+        '--download-as': {
             'default': None,
             'help': 'The name of the converted API description.'
         }
