@@ -137,7 +137,7 @@ apimatic-cli transform fromuser --email <your APIMatic account email> --password
 --file ./data/calculator.raml --format APIMATIC
 ```
 
-Transform a WADL (W3C - 2006) API description to Swagger v2.0 (YAML) format using user credentials and an API description URL:
+Transform a APIMatic API description to Swagger v2.0 (YAML) format using user credentials and an API description URL:
 ```
 apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --url http://www.somewebsite.com/apidescription.wadl --format SwaggerYaml
