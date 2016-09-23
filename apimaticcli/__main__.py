@@ -55,13 +55,13 @@ def main(args=None):
     tra_subparsers.required = True
 
     trafromkey_parser = tra_subparsers.add_parser('fromkey', help='Transform an API description using an API key.')
-    cli.ArgumentAdder.add_arguments(trafromkey_parser, '--api-key', '--format', '--download-to', '--save-as')
+    cli.ArgumentAdder.add_arguments(trafromkey_parser, '--api-key', '--format', '--download-to', '--download-as')
     trafromkey_parser.set_defaults(func=cli.APITransformer.from_key)
 
     trafromuser_parser = tra_subparsers.add_parser('fromuser', help='Transform an API description using user account credentials.')
     cli.ArgumentAdder.add_auth(trafromuser_parser)
     cli.ArgumentAdder.add_input(trafromuser_parser)
-    cli.ArgumentAdder.add_arguments(trafromuser_parser, '--format', '--download-to', '--save-as')
+    cli.ArgumentAdder.add_arguments(trafromuser_parser, '--format', '--download-to', '--download-as')
     trafromuser_parser.set_defaults(func=cli.APITransformer.from_user)
 
     # Parse arguments and call subparser function
