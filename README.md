@@ -119,20 +119,20 @@ apimatic-cli validate fromuser --email <your APIMatic account email> --password 
 Validate an API description using user credentials and an API description URL:
 
 ```
-apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --url http://www.somewebsite.com/apidescription.json
+apimatic-cli validate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --url http://www.somewebsite.com/apidescription.json
 ```
 
-Transform a Swagger v2.0 (JSON) API description to API Blueprint 1A format:
+Transform an API description to API Blueprint 1A format using an API integretation key:
 ```
 apimatic-cli transform fromkey --api-key <your key> --format APIBluePrint
 ```
 
-Transform a RAML (0.8) API description to APIMatic format using user credentials and an API description file:
+Transform an API description to APIMatic format using user credentials and an API description file:
 ```
 apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> --file ./data/calculator.raml --format APIMATIC
 ```
 
-Transform an APIMatic API description to Swagger v2.0 (YAML) format using user credentials and an API description URL:
+Transform an API description to Swagger v2.0 (YAML) format using user credentials and an API description URL:
 ```
 apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> --url http://www.somewebsite.com/apidescription.json --format SwaggerYaml
 ```
