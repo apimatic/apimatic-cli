@@ -39,7 +39,6 @@ class TestAPITransformer(unittest.TestCase):
         file_size = os.stat(os.path.join(TestAPITransformer.output_path, files[0])).st_size
         self.assertGreater(file_size, 0)
 
-    @unittest.skip("Waiting on CGAAS team to change URL parameter name.")
     def test_from_user_url(self):
         arguments = Helper.get_namespace()
         arguments.email = os.environ['APIMATIC_EMAIL']
