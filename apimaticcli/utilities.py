@@ -26,9 +26,24 @@ class Utilities:
         headers = cgi.parse_header(response.headers['content-disposition'])[1]
         file_name = headers['filename']
         cls.create_directories(output_path)
-        with open(os.path.join(output_path, file_name), 'wb') as f:
-            f.write(response.content)
+        cls.write_file(output_path, file_name, response.content)
         return file_name
+
+    @classmethod
+    def write_file(cls, path, name, content):
+        """Writes a file.
+
+        Give an output path, a file name and content data,
+        this functions writes a file in wb mode.
+
+        Args:
+            path: The path of the folder in which to create
+                the file.
+            name: The name of the file to create.
+            content: The data to write into the file.
+        """
+        with open(os.path.join(path, name), 'wb') as f:
+            f.write(content)
 
     @classmethod
     def create_directories(cls, path):

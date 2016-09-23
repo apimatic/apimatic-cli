@@ -8,7 +8,7 @@ This command line tool serves as a wrapper over APIMatic's Python SDK allowing A
 
 * Generate an SDK
 * Validate an API description
-* Transform an API description (not yet implemented)
+* Transform an API description
 
 
 ### Installation
@@ -54,7 +54,7 @@ python -m apimaticcli -h
 
 To use this tool, you have to provide two positional arguments:
 
-* command (generate or validate)
+* command (generate, validate or transform)
 * authentication type (fromkey or fromuser)
 
 For information about further required or optional arguments, you can type -h as follows:
@@ -73,12 +73,15 @@ Here is a list of all available options. You're going to be using a subset of th
                              cs_portable_net_lib, java_eclipse_jre_lib, java_gradle_android_lib, 
                              objc_cocoa_touch_ios_lib, angular_javascript_lib, ruby_generic_lib,
                              python_generic_lib, php_generic_lib, node_javascript_lib, go_generic_lib
---output                     The path of the folder in which to download the SDK.
+--download-to                The path of the folder in which to download the file.
 --name                       The name of the generated SDK.
 --email                      The email address of the user's APIMatic account.
 --password                   The password of the user's APIMatic account.
 --url                        The URL of the API description.
 --file                       The path of the API description file.
+--format                     The format to convert the API description to. It can be one of:
+                             APIBluePrint, Swagger10, Swagger20, SwaggerYaml, WADL2009, RAML, APIMATIC
+--download-as                The name (and extension) of the converted API description file.
 ```
 
 ### Examples
@@ -121,4 +124,21 @@ Validate an API description using user credentials and an API description URL:
 ```
 apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
 --url http://www.somewebsite.com/apidescription.json
+```
+
+Transform a Swagger v2.0 (JSON) API description to API Blueprint 1A format:
+```
+apimatic-cli transform fromkey --api-key <your key> --format APIBluePrint
+```
+
+Transform a RAML (0.8) API description to APIMatic format using user credentials and an API description file:
+```
+apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+--file ./data/calculator.raml --format APIMATIC
+```
+
+Transform an APIMatic API description to Swagger v2.0 (YAML) format using user credentials and an API description URL:
+```
+apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
+--url http://www.somewebsite.com/apidescription.json --format SwaggerYaml
 ```

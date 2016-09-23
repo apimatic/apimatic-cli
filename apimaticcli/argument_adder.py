@@ -5,14 +5,18 @@ class ArgumentAdder:
     arguments to argument parsers of the argparse library.
 
     Attributes:
-        platforms: The supported platforms for SDK generation.
-            The user is allowed to input one of these values as
-            the input of the --platform argument.
+        sdk_platforms: The supported platforms for SDK generation.
+            The user is only allowed to input one of these values
+            as the input of the --platform argument.
+        output_formats: The supported output formats for API
+            description conversions/transformations. The user is
+            only allowed to input one of these values as the
+            input of the --format argument.
         arguments: A dictionary of command line arguments this
             program uses and their configurations.
     """
 
-    platforms = [
+    sdk_platforms = [
         'cs_portable_net_lib', 
         'java_eclipse_jre_lib',
         'java_gradle_android_lib',
@@ -23,6 +27,16 @@ class ArgumentAdder:
         'php_generic_lib',
         'node_javascript_lib',
         'go_generic_lib'
+    ]
+
+    output_formats = [
+        'APIBluePrint',
+        'Swagger10',
+        'Swagger20',
+        'SwaggerYaml',
+        'WADL2009',
+        'RAML',
+        'APIMATIC'
     ]
 
     arguments = {
@@ -39,18 +53,20 @@ class ArgumentAdder:
             'help': 'Your APIMatic account password.'
         },
         '--url': {
+            'default': None,
             'help': 'The URL of the API description.'
         },
         '--file': {
+            'default': None,
             'help': 'The path of the API description.'
         },
         '--platform': {
             'required': True, 
-            'choices': platforms, 
-            'help': 'The platform for which the SDK needs to be generated. Options are: ' + ', '.join(platforms), 
+            'choices': sdk_platforms,
+            'help': 'The platform for which the SDK needs to be generated. Options are: ' + ', '.join(sdk_platforms),
             'metavar': 'PLATFORM'
         },
-        '--output': {
+        '--download-to': {
             'default': './downloads', 
             'help': 'The path of the folder in which to download files. Default is ./downloads.'
         },
@@ -59,7 +75,18 @@ class ArgumentAdder:
             'help': 'The name of the SDK.'
         },
         '--api': {
+            'default': None,
             'help': 'The base URL of the APIMatic API.'
+        },
+        '--format': {
+            'required': True,
+            'choices': output_formats,
+            'help': 'The desired output format of the API description. Options are: ' + ', '.join(output_formats),
+            'metavar': 'FORMAT'
+        },
+        '--download-as': {
+            'default': None,
+            'help': 'The name of the converted API description.'
         }
     }
 

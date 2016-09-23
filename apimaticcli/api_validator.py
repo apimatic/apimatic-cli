@@ -20,13 +20,13 @@ class APIValidator:
         Configuration.basic_auth_user_name = args.email
         Configuration.basic_auth_password = args.password
 
-        if hasattr(args, 'url') and args.url != None:
+        if args.url != None:
             try:
                 summary = cls.api_validator.validate_from_url(args.url)
             except APIException as e:
                 print("\nUnable to validatate API description. HTTP response code: " + str(e.response_code))
                 sys.exit(1)
-        elif hasattr(args, 'file') and args.file != None:
+        elif args.file != None:
             try:
                 with open(args.file, "rb") as file:
                     summary = cls.api_validator.validate_from_file(file)

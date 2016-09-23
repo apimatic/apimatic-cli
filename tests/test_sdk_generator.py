@@ -1,21 +1,20 @@
 import time
-import shutil
 import unittest
-import argparse
+
+from helper import *
 from apimaticcli.sdk_generator import *
 
 class TestSDKGenerator(unittest.TestCase):
     output_path = './SDKs'
 
     def setUp(self):
-        if os.path.exists(TestSDKGenerator.output_path):
-            shutil.rmtree(TestSDKGenerator.output_path)
+        Helper.delete_folder(TestSDKGenerator.output_path)
 
     def test_from_key(self):
-        arguments = argparse.Namespace
+        arguments = Helper.get_namespace()
         arguments.api_key = os.environ['APIMATIC_KEY']
         arguments.platform = 'cs_portable_net_lib'
-        arguments.output = TestSDKGenerator.output_path
+        arguments.download_to = TestSDKGenerator.output_path
 
         SDKGenerator.from_key(arguments)
 
@@ -26,12 +25,12 @@ class TestSDKGenerator(unittest.TestCase):
         self.assertGreater(file_size, 0)
 
     def test_from_user_url(self):
-        arguments = argparse.Namespace
+        arguments = Helper.get_namespace()
         arguments.email = os.environ['APIMATIC_EMAIL']
         arguments.password = os.environ['APIMATIC_PASSWORD']
         arguments.name = 'Duuuudes'
         arguments.platform = 'cs_portable_net_lib'
-        arguments.output = TestSDKGenerator.output_path
+        arguments.download_to = TestSDKGenerator.output_path
         arguments.url = 'https://raw.githubusercontent.com/DudeSolutions/DudeReportApi/4e4a9feee81be01dd61b4eedc7eaf93e2a92d0b4/apiary.apib'
 
         SDKGenerator.from_user(arguments)
@@ -43,12 +42,12 @@ class TestSDKGenerator(unittest.TestCase):
         self.assertGreater(file_size, 0)
 
     def test_from_user_file(self):
-        arguments = argparse.Namespace
+        arguments = Helper.get_namespace()
         arguments.email = os.environ['APIMATIC_EMAIL']
         arguments.password = os.environ['APIMATIC_PASSWORD']
         arguments.name = 'Calculator'
         arguments.platform = 'cs_portable_net_lib'
-        arguments.output = TestSDKGenerator.output_path
+        arguments.download_to = TestSDKGenerator.output_path
         arguments.file = './tests/data/calculator.json'
 
         SDKGenerator.from_user(arguments)
@@ -60,6 +59,5 @@ class TestSDKGenerator(unittest.TestCase):
         self.assertGreater(file_size, 0)        
 
     def tearDown(self):
-        if os.path.exists(TestSDKGenerator.output_path):
-            shutil.rmtree(TestSDKGenerator.output_path)
         time.sleep(2)
+        Helper.delete_folder(TestSDKGenerator.output_path)
