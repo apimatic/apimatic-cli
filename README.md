@@ -103,7 +103,8 @@ Generate a Ruby SDK using user credentials and an API description URL:
 
 ```
 apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib  --download-to ./SDKs
+--name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib  
+--download-to ./SDKs 
 ```
 
 Validate an API description using an API integration key:
