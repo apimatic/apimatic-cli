@@ -95,16 +95,13 @@ apimatic-cli generate fromkey --api-key <your key> --platform cs_portable_net_li
 Generate a Python SDK using user credentials and an API description file:
 
 ```
-apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---name TestSDK --file ./data/calculator.json --platform python_generic_lib --download-to ./SDKs
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --name TestSDK --file ./data/calculator.json --platform python_generic_lib --download-to ./SDKs
 ```
 
 Generate a Ruby SDK using user credentials and an API description URL:
 
 ```
-apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib  
---download-to ./SDKs 
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib --download-to ./SDKs 
 ```
 
 Validate an API description using an API integration key:
@@ -116,15 +113,13 @@ apimatic-cli validate fromkey --api-key <your key>
 Validate an API description using user credentials and an API description file:
 
 ```
-apimatic-cli validate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---file ./data/calculator.json
+apimatic-cli validate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --file ./data/calculator.json
 ```
 
 Validate an API description using user credentials and an API description URL:
 
 ```
-apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---url http://www.somewebsite.com/apidescription.json
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --url http://www.somewebsite.com/apidescription.json
 ```
 
 Transform a Swagger v2.0 (JSON) API description to API Blueprint 1A format:
@@ -134,12 +129,10 @@ apimatic-cli transform fromkey --api-key <your key> --format APIBluePrint
 
 Transform a RAML (0.8) API description to APIMatic format using user credentials and an API description file:
 ```
-apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---file ./data/calculator.raml --format APIMATIC
+apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> --file ./data/calculator.raml --format APIMATIC
 ```
 
 Transform an APIMatic API description to Swagger v2.0 (YAML) format using user credentials and an API description URL:
 ```
-apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> 
---url http://www.somewebsite.com/apidescription.json --format SwaggerYaml
+apimatic-cli transform fromuser --email <your APIMatic account email> --password <your APIMatic account password> --url http://www.somewebsite.com/apidescription.json --format SwaggerYaml
 ```
