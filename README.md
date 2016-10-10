@@ -81,7 +81,8 @@ Here is a list of all available options. You're going to be using a subset of th
 --file                       The path of the API description file.
 --format                     The format to convert the API description to. It can be one of:
                              APIBluePrint, Swagger10, Swagger20, SwaggerYaml, WADL2009, RAML, APIMATIC
---download-as                The name (and extension) of the converted API description file.
+--download-as                The name (and extension) of the downloaded file.
+--skip-unzip                 Unzipping of downloaded SDKs is skipped if this option is used.
 ```
 
 ### Examples
@@ -92,16 +93,16 @@ Generate a C# SDK using an API integretation key:
 apimatic-cli generate fromkey --api-key <your key> --platform cs_portable_net_lib --download-to ./SDKs
 ```
 
-Generate a Python SDK using user credentials and an API description file:
+Generate a Python SDK using user credentials and an API description file and skip unzipping:
 
 ```
-apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --name TestSDK --file ./data/calculator.json --platform python_generic_lib --download-to ./SDKs
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --name TestSDK --file ./data/calculator.json --platform python_generic_lib --download-to ./SDKs --skip-unzip
 ```
 
-Generate a Ruby SDK using user credentials and an API description URL:
+Generate a Ruby SDK using user credentials and an API description URL and rename the downloaded SDK:
 
 ```
-apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib --download-to ./SDKs 
+apimatic-cli generate fromuser --email <your APIMatic account email> --password <your APIMatic account password> --name TestSDK --url http://www.somewebsite.com/apidescription.json --platform ruby_generic_lib --download-to ./SDKs  --download-as CustomName
 ```
 
 Validate an API description using an API integration key:

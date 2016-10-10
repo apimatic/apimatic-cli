@@ -6,7 +6,7 @@ class Utilities:
     """A class for utility functions."""
 
     @classmethod
-    def download_file(cls, url, output_path):
+    def download_file(cls, url, output_path, file_name = None):
         """Downloads a file.
 
         Given a URL and an output path, downloads the file 
@@ -18,13 +18,15 @@ class Utilities:
             url: The URL of the file to download.
             outpath_path: The path of the folder where to save 
                 the file.
+            file_name: The name of the downloaded file.
 
         Returns:
             The file name of the downloaded file.
         """
         response = requests.get(url)
-        headers = cgi.parse_header(response.headers['content-disposition'])[1]
-        file_name = headers['filename']
+        if file_name == None:
+            headers = cgi.parse_header(response.headers['content-disposition'])[1]
+            file_name = headers['filename']
         cls.create_directories(output_path)
         cls.write_file(output_path, file_name, response.content)
         return file_name

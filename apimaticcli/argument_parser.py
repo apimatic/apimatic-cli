@@ -29,14 +29,14 @@ class ArgumentParser:
         gen_subparsers.required = True
 
         genfromkey_parser = gen_subparsers.add_parser('fromkey', help='Generate an SDK using an API key.')
-        ArgumentAdder.add_arguments(genfromkey_parser, '--api-key', '--platform', '--download-to')
+        ArgumentAdder.add_arguments(genfromkey_parser, '--api-key', '--platform', '--download-to', '--download-as', '--skip-unzip')
         genfromkey_parser.set_defaults(func=SDKGenerator.from_key)
 
         genfromuser_parser = gen_subparsers.add_parser('fromuser', help='Generate an SDK using user account credentials.')
         ArgumentAdder.add_auth(genfromuser_parser)
         ArgumentAdder.add_argument(genfromuser_parser, '--name')
         ArgumentAdder.add_input(genfromuser_parser)
-        ArgumentAdder.add_arguments(genfromuser_parser, '--platform', '--download-to')
+        ArgumentAdder.add_arguments(genfromuser_parser, '--platform', '--download-to', '--download-as', '--skip-unzip')
         genfromuser_parser.set_defaults(func=SDKGenerator.from_user)
 
         # Add validation parsers

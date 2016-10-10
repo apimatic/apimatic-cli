@@ -86,7 +86,11 @@ class ArgumentAdder:
         },
         '--download-as': {
             'default': None,
-            'help': 'The name of the converted API description.'
+            'help': 'The name of the downloaded file.'
+        },
+        '--skip-unzip': {
+            'action': 'store_true',
+            'help': 'Can be used to skip unzipping of the downloaded SDK.'
         }
     }
 
