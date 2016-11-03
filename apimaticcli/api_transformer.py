@@ -59,7 +59,7 @@ class APITransformer:
         file_name = args.download_as or ('converted.' + cls.extensions[args.format])
         try:
             Utilities.create_directories(output_path)
-            Utilities.write_file(output_path, file_name, response.encode('ascii'))
+            Utilities.write_file(output_path, file_name, response.encode('utf-8'))
             print("\nConverted API description saved to: {} as {}".format(output_path, file_name))
         except IOError as e:
             print("Unable to transform API description: " + str(e))
