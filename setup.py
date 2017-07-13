@@ -9,7 +9,7 @@ except(IOError, ImportError):
 
 setup(
     name='apimatic-cli',
-    version='2.1',
+    version='2.2',
     description='A command line interface for APIMatic.',
     long_description=long_description,
     author='Shahid Khaliq',
