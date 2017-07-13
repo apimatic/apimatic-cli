@@ -2,6 +2,9 @@ from setuptools import setup, find_packages
 
 # Convert markdown README to rst format for PyPI.
 try:
+    # run pip install pypandoc AND
+    # install the pypandoc program itself
+    # the package only uses the program.
     import pypandoc
     long_description = pypandoc.convert('README.md', 'rst')
 except(IOError, ImportError):
