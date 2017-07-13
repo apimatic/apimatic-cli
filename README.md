@@ -1,5 +1,6 @@
 # APIMatic CLI
 
+[![PyPI version](https://badge.fury.io/py/apimatic-cli.svg)](https://badge.fury.io/py/apimatic-cli)
 [![Build Status](https://travis-ci.org/apimatic/apimatic-cli.svg?branch=master)](https://travis-ci.org/apimatic/apimatic-cli)
 
 ### Overview
