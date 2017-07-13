@@ -7,6 +7,7 @@ class TestUtilities(unittest.TestCase):
         if os.path.exists('./temp'):
             shutil.rmtree('./temp')
 
+    @unittest.skip("Needs a different URL.")
     def test_download_file(self):
         url = 'https://dl.dropboxusercontent.com/u/31838656/binary.png'
         output_path = os.path.abspath('./temp/SDK')

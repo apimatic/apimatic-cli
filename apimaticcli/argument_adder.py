@@ -1,7 +1,7 @@
 class ArgumentAdder:
     """Adds arguments to parsers.
 
-    This class serves as an abstraction of logic for adding 
+    This class serves as an abstraction of logic for adding
     arguments to argument parsers of the argparse library.
 
     Attributes:
@@ -17,7 +17,7 @@ class ArgumentAdder:
     """
 
     sdk_platforms = [
-        'cs_portable_net_lib', 
+        'cs_portable_net_lib',
         'java_eclipse_jre_lib',
         'java_gradle_android_lib',
         'objc_cocoa_touch_ios_lib',
@@ -30,27 +30,37 @@ class ArgumentAdder:
     ]
 
     output_formats = [
+        'APIMATIC',
         'APIBluePrint',
         'Swagger10',
         'Swagger20',
         'SwaggerYaml',
-        'WADL2009',
+        'OpenApi3Json',
+        'OpenApi3Yaml',
         'RAML',
-        'APIMATIC'
+        'RAML10',
+        'Postman10',
+        'Postman20',
+        'WADL2009',
+        'WSDL'
     ]
 
     arguments = {
         '--api-key': {
-            'required': True, 
+            'required': True,
             'help': "The API integration key from APIMatic."
         },
         '--email': {
-             'required': True, 
-             'help': 'Your APIMatic account email address.'
+            'required': True,
+            'help': 'Your APIMatic account email address.'
         },
         '--password': {
-            'required': True, 
+            'required': True,
             'help': 'Your APIMatic account password.'
+        },
+        '--auth-key': {
+            'required': True,
+            'help': 'Your APIMatic account authentication key.'
         },
         '--url': {
             'default': None,
@@ -61,13 +71,13 @@ class ArgumentAdder:
             'help': 'The path of the API description.'
         },
         '--platform': {
-            'required': True, 
+            'required': True,
             'choices': sdk_platforms,
             'help': 'The platform for which the SDK needs to be generated. Options are: ' + ', '.join(sdk_platforms),
             'metavar': 'PLATFORM'
         },
         '--download-to': {
-            'default': './downloads', 
+            'default': './downloads',
             'help': 'The path of the folder in which to download files. Default is ./downloads.'
         },
         '--name': {
@@ -124,7 +134,7 @@ class ArgumentAdder:
         """
         for argument in arguments:
             ArgumentAdder.add_argument(obj, argument)
-    
+
     @classmethod
     def add_auth(cls, parser):
         """Adds authentication arguments.
@@ -135,7 +145,7 @@ class ArgumentAdder:
         password.
 
         Args:
-            parser: The parser to add the authentication 
+            parser: The parser to add the authentication
                 arguments to.
         """
         group = parser.add_argument_group('Credentials', 'The credentials of your APIMatic account.')
@@ -145,15 +155,14 @@ class ArgumentAdder:
     def add_input(cls, parser):
         """Adds input arguments.
 
-        Takes a parser oject and adds a mutually exclusive group 
-        of input arguments to it. These mutually exclusive 
+        Takes a parser oject and adds a mutually exclusive group
+        of input arguments to it. These mutually exclusive
         arguments are the file and url arguments. The user is only
         allowed to provide one of these to the program.
 
         Args:
-            parser: The parser to add the input 
+            parser: The parser to add the input
                 arguments to.
         """
         mgroup = parser.add_mutually_exclusive_group(required=True)
         ArgumentAdder.add_arguments(mgroup, '--url', '--file')
-

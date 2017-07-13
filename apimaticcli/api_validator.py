@@ -1,9 +1,12 @@
 import sys
 
-from .apimaticlib.api_matic_client import *
+from .utilities import Utilities
+from .apimatic.configuration import Configuration
+from .apimatic.apimatic_client import ApimaticClient
+from .apimatic.exceptions.api_exception import APIException
 
 class APIValidator:
-    api_validator = APIMaticClient().validator
+    api_validator = ApimaticClient().validator
 
     @classmethod
     def from_key(cls, args):
@@ -17,8 +20,7 @@ class APIValidator:
 
     @classmethod
     def from_user(cls, args):
-        Configuration.basic_auth_user_name = args.email
-        Configuration.basic_auth_password = args.password
+        Configuration.authorization = Utilities.generate_auth_header(args)
 
         if args.url != None:
             try:
@@ -57,4 +59,3 @@ class APIValidator:
         except Exception as e:
             print("\nUnable to process summary: " + str(e))
             sys.exit(1)
-

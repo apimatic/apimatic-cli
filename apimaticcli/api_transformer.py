@@ -2,10 +2,12 @@ import os
 import sys
 
 from .utilities import Utilities
-from .apimaticlib.api_matic_client import *
+from .apimatic.configuration import Configuration
+from .apimatic.apimatic_client import ApimaticClient
+from .apimatic.exceptions.api_exception import APIException
 
 class APITransformer:
-    api_transformer = APIMaticClient().transformer
+    api_transformer = ApimaticClient().transformer
 
     extensions = {
         'APIBluePrint': 'apib',
@@ -19,7 +21,7 @@ class APITransformer:
 
     @classmethod
     def from_key(cls, args):
-        try:     
+        try:
             response = cls.api_transformer.transform_from_key(args.api_key, args.format)
         except APIException as e:
             print("\nUnable to transform API description. HTTP response code: " + str(e.response_code))
@@ -29,8 +31,7 @@ class APITransformer:
 
     @classmethod
     def from_user(cls, args):
-        Configuration.basic_auth_user_name = args.email
-        Configuration.basic_auth_password = args.password
+        Configuration.authorization = Utilities.generate_auth_header(args)
 
         if args.url != None:
             try:
