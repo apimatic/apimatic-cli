@@ -18,6 +18,7 @@ class ArgumentAdder:
 
     sdk_platforms = [
         'cs_portable_net_lib',
+        'cs_net_standard_lib',
         'java_eclipse_jre_lib',
         'java_gradle_android_lib',
         'objc_cocoa_touch_ios_lib',
