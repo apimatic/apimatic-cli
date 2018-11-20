@@ -21,7 +21,7 @@ class Configuration(object):
     array_serialization = "indexed"
 
     # The base Uri for API calls
-    base_uri = 'https://apimatic.io/api'
+    base_uri = 'https://www.apimatic.io/api'
 
     # TODO: Set an appropriate value
     authorization = "TODO: Replace"
