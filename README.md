@@ -68,6 +68,7 @@ apimatic-cli generate fromapikey -h
 Here is a list of all available options. You're going to be using a subset of these depending on the positional arguments you use.
 ```
 -h or --help                 Displays the help text and exists.
+--api 					     The URL of the APIMatic API.
 --api-key                    The API key of the API description obtained from APIMatic.
 --platform                   The platform for which the SDK needs to be generated. It can be one of:
                              cs_portable_net_lib, java_eclipse_jre_lib, java_gradle_android_lib,
@@ -84,6 +85,20 @@ Here is a list of all available options. You're going to be using a subset of th
                              APIBluePrint, Swagger10, Swagger20, SwaggerYaml, WADL2009, RAML, APIMATIC
 --download-as                The name (and extension) of the downloaded file.
 --skip-unzip                 Unzipping of downloaded SDKs is skipped if this option is used.
+```
+
+### On-Premises
+
+> If you are using APIMatic On Premises only the fromuser with file command would work
+> You'd need to provide the api route using the --api flag
+> The default password and email would work 
+
+Example - Generate a Python SDK using user credentials and an API description file and skip unzipping on premises
+
+```
+
+apimatic-cli generate fromuser --api <your API url e.g http://localhost:12345> --email admin@example.com --password admin --name TestSDK --file ./data/calculator.json --platform python_generic_lib --download-to ./SDKs --skip-unzip
+
 ```
 
 ### Examples
