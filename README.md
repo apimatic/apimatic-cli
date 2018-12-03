@@ -89,7 +89,7 @@ Here is a list of all available options. You're going to be using a subset of th
 
 ### On-Premises
 
-If you are using APIMatic On Premises only the fromuser with file command would work. You'd need to provide the api route using the `--api` flag as shown in the example below.
+If you are using APIMatic On Premises only the `fromuser` with `--file` command would work. You'd need to provide the api route using the `--api` flag as shown in the example below.
 
 > The default password and email in the example below do not need to be changed
 
