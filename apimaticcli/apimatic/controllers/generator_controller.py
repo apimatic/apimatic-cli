@@ -47,7 +47,8 @@ class GeneratorController(BaseController):
         _query_parameters = {
             'name': name,
             'descriptionUrl': description_url,
-            'template': template
+            'template': template,
+            'dl':1
         }
         _query_builder = APIHelper.append_url_with_query_parameters(_query_builder,
             _query_parameters, Configuration.array_serialization)
@@ -56,7 +57,7 @@ class GeneratorController(BaseController):
         # Prepare and execute request
         _request = self.http_client.get(_query_url)
         CustomHeaderAuth.apply(_request)
-        _context = self.execute_request(_request)
+        _context = self.execute_request(_request, binary= True)
         self.validate_response(_context)
 
         # Return appropriate type
@@ -92,7 +93,8 @@ class GeneratorController(BaseController):
         _query_builder += '/codegen'
         _query_parameters = {
             'name': name,
-            'template': template
+            'template': template,
+            'dl':1
         }
         _query_builder = APIHelper.append_url_with_query_parameters(_query_builder,
             _query_parameters, Configuration.array_serialization)
@@ -106,7 +108,7 @@ class GeneratorController(BaseController):
         # Prepare and execute request
         _request = self.http_client.post(_query_url, files=_files)
         CustomHeaderAuth.apply(_request)
-        _context = self.execute_request(_request)
+        _context = self.execute_request(_request, binary= True)
         self.validate_response(_context)
 
         # Return appropriate type
@@ -140,7 +142,8 @@ class GeneratorController(BaseController):
         _query_builder += '/codegen'
         _query_parameters = {
             'apikey': apikey,
-            'template': template
+            'template': template,
+            'dl':1
         }
         _query_builder = APIHelper.append_url_with_query_parameters(_query_builder,
             _query_parameters, Configuration.array_serialization)
@@ -148,7 +151,7 @@ class GeneratorController(BaseController):
 
         # Prepare and execute request
         _request = self.http_client.get(_query_url)
-        _context = self.execute_request(_request)
+        _context = self.execute_request(_request, binary= True)
         self.validate_response(_context)
 
         # Return appropriate type
