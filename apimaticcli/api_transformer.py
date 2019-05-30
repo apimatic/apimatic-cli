@@ -11,12 +11,18 @@ class APITransformer:
 
     extensions = {
         'APIBluePrint': 'apib',
+        'APIMATIC': 'json',
+        'OpenApi3Json': 'json',
+        'OpenApi3Yaml': 'yaml',
+        'Postman10': 'json',
+        'Postman20': 'json',
+        'RAML': 'raml',
+        'RAML10': 'raml',
         'Swagger10': 'json',
         'Swagger20': 'json',
         'SwaggerYaml': 'yaml',
         'WADL2009': 'wadl',
-        'RAML': 'raml',
-        'APIMATIC': 'json'
+        'WSDL': 'wsdl',
     }
 
     @classmethod
