@@ -46,14 +46,20 @@ class APIValidator:
     @classmethod
     def process_summary(cls, summary):
         try:
+            error_count = len(summary.errors) if summary.errors is not None else 0
+            warning_count = len(summary.warnings) if summary.warnings is not None else 0
+            message_count = len(summary.messages) if summary.messages is not None else 0
             print("\nSummary details: {} error(s), {} warning(s) and {} information message(s).\n".
-                format(str(len(summary.errors)), str(len(summary.warnings)), str(len(summary.messages))))
-            for error in summary.errors:
-                print("Validation error: {}".format(error))
-            for warning in summary.warnings:
-                print("Validation warning: {}".format(warning))
-            for message in summary.messages:
-                print("Validation message: {}".format(message))
+                format(str(error_count), str(warning_count), str(message_count)))
+            if summary.errors is not None:
+                for error in summary.errors:
+                    print("Validation error: {}".format(error))
+            if summary.warnings is not None:
+                for warning in summary.warnings:
+                    print("Validation warning: {}".format(warning))
+            if summary.messages is not None:
+                for message in summary.messages:
+                    print("Validation message: {}".format(message))
             if summary.success != True:
                 sys.exit(1)
         except Exception as e:
