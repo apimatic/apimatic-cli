@@ -23,7 +23,7 @@ If you prefer not to use pip, you can install it manually as well:
 
 ```
 git clone https://github.com/apimatic/apimatic-cli.git
-cd apmiatic-cli
+cd apimatic-cli
 python setup.py install
 ```
 
@@ -31,7 +31,7 @@ Alternatively, you can run this tool without installation:
 
 ```
 git clone https://github.com/apimatic/apimatic-cli.git
-cd apmiatic-cli
+cd apimatic-cli
 pip install -r requirements.txt
 ```
 
