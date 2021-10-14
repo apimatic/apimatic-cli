@@ -25,7 +25,7 @@
     "typescript": "^3.9.10"
   },
   "engines": {
-    "node": ">=8.0.0"
+    "node": ">=10.4.0"
   },
   "files": [
     "/bin",
@@ -51,7 +51,7 @@
       "@oclif/plugin-help"
     ]
   },
-  "repository": "apimatic/apimatic-cli",
+  "repository": "git://github.com/apimatic/apimatic-cli.git",
   "scripts": {
     "postpack": "rimraf oclif.manifest.json",
     "posttest": "eslint . --ext .ts --config .eslintrc",
@@ -61,6 +61,7 @@
   },
   "types": "lib/index.d.ts",
   "dependencies": {
+    "@apimatic/apimatic-sdk-for-js": "git+https://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:x-oauth-basic@github.com/apimatic/apimatic-sdk-for-js.git",
     "@oclif/command": "^1.8.0",
     "@oclif/config": "^1.17.0",
     "@oclif/plugin-help": "^3.2.3",
