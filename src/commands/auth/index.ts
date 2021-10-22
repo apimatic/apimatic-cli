@@ -12,6 +12,7 @@ export default class Auth extends Command {
   async run() {
     return this.log(`This command can be used to invoke subcommands related to authentication
     apimatic auth:login --help
-    apimatic auth:logout --help`);
+    apimatic auth:logout --help
+    apimatic auth:status --help`);
   }
 }
