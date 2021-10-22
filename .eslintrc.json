@@ -19,5 +19,8 @@
         "quotes": ["error", "double"],
         "comma-dangle": ["error","never"],
         "space-before-function-paren": ["error", "never"]
-    }
+    },
+    "globals": {
+        "NodeJS": true
+      }
 }
