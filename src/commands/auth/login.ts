@@ -1,7 +1,7 @@
 import { flags, Command } from "@oclif/command";
 import { cli } from "cli-ux";
 
-import { LoginClient } from "../../utils/client";
+import { CLIClient } from "../../utils/client";
 
 export default class Login extends Command {
   static description = "Login to your APIMAtic account";
@@ -26,11 +26,11 @@ You have successfully logged into APIMAtic
     });
 
     try {
-      const client = LoginClient.getInstance();
+      const client = CLIClient.getInstance();
       const response = await client.login(email, password, this.config.configDir);
 
       this.log(response);
-    } catch (error: unknown) {
+    } catch (error) {
       this.error(error as string);
     }
   }
