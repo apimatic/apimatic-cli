@@ -9,11 +9,6 @@ export class CLIClient {
   public static client: Client;
 
   /**
-   * The CLIClient's constructor should always be private to prevent direct
-   * construction calls with the `new` operator.
-   */
-
-  /**
    * The static method that controls the access to the CLIClient instance.
    *
    * This implementation let you subclass the CLIClient class while keeping
@@ -32,7 +27,12 @@ export class CLIClient {
    * executed on its instance.
    */
   public async login(email: string, token: string, configDir: string): Promise<string> {
-    const storedCredentials = await getCredentials(configDir);
+    let storedCredentials = await getCredentials(configDir);
+
+    if (!storedCredentials) {
+      // If no config file or no credentials exist in the config file
+      storedCredentials = { email: "", token: "" };
+    }
 
     if (storedCredentials.email !== email || storedCredentials.token !== token) {
       try {
@@ -46,7 +46,7 @@ export class CLIClient {
 
         return "Logged In";
       } catch (error) {
-        return JSON.stringify(error);
+        throw new Error(JSON.stringify(error));
       }
     } else {
       return "Already logged In";
@@ -70,19 +70,28 @@ export class CLIClient {
 
   public async status(configDir: string): Promise<string> {
     try {
-      const credentials = await getCredentials(configDir);
+      let storedCredentials = await getCredentials(configDir);
 
-      return credentials.email !== "" && credentials.token !== ""
-        ? `Currently logged in as ${credentials.email}`
+      if (!storedCredentials) {
+        // If no config file or no credentials exist in the config file
+        storedCredentials = { email: "", token: "" };
+      }
+
+      return storedCredentials.email !== "" && storedCredentials.token !== ""
+        ? `Currently logged in as ${storedCredentials.email}`
         : "Not Logged In";
     } catch (error: any) {
-      throw new Error(error as string);
+      throw new Error(JSON.stringify(error));
     }
   }
 
   public async getClient(configDir: string): Promise<Client> {
-    const storedCredentials = await getCredentials(configDir);
+    let storedCredentials = await getCredentials(configDir);
 
+    if (!storedCredentials) {
+      // If no config file or no credentials exist in the config file
+      storedCredentials = { email: "", token: "" };
+    }
     if (storedCredentials.email !== "" && storedCredentials.token !== "") {
       return new Client({
         timeout: 0,

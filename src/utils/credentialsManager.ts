@@ -9,13 +9,13 @@ type Credentials = {
  * @param {string} configDir
  * //Function to get credentials
  */
-export function getCredentials(configDir: string): Promise<Credentials> {
+export function getCredentials(configDir: string): Promise<Credentials | null> {
   return new Promise((resolve, reject) => {
     fs.readFile(`${configDir}/config.json`, "utf8", (err: any, data: string) => {
       if (err) {
-        err.code === "ENOENT" ? resolve({ email: "", token: "" }) : reject(err);
+        err.code === "ENOENT" ? resolve(null) : reject(err);
       }
-      data ? resolve(JSON.parse(data)) : resolve({ email: "", token: "" });
+      data ? resolve(JSON.parse(data)) : resolve(null);
     });
   });
 }
