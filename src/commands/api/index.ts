@@ -11,6 +11,6 @@ export default class Api extends Command {
 
   async run() {
     return this.log(`This command can be used to inquire about all commands related to your APIs
-    For Example: apimatic api:transform --help`);
+For Example: apimatic api:transform --help`);
   }
 }

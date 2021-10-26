@@ -4,12 +4,19 @@ import {
   FileWrapper,
   ApiError,
   ContentType,
-  ExportFormats
+  ExportFormats,
+  Transformation,
+  ApiResponse
 } from "@apimatic/apimatic-sdk-for-js";
 import { flags, Command } from "@oclif/command";
 
 import { CLIClient } from "../../utils/client";
 
+interface TransformationIdFlags {
+  file: string;
+  url: string;
+  format: string;
+}
 export default class Transform extends Command {
   static description = "Transform your API specification to your supported formats";
 
@@ -39,45 +46,64 @@ File has been successfully transformed into OpenApi3Json
       ],
       description: "Format into which specification should be converted to"
     }),
-    file: flags.string({ description: "Path to the specification file" }),
-    url: flags.string({ description: "URL to the specification file" }),
+    file: flags.string({ default: "", description: "Path to the specification file" }),
+    url: flags.string({ default: "", description: "URL to the specification file" }),
     destination: flags.string({ default: "./", description: "Path to output the transformed file" }),
     authKey: flags.string({ description: "Override current authKey by providing authKey in the command" })
   };
 
-  async run() {
-    const { flags } = this.parse(Transform);
+  getTransformationId = async (flags: TransformationIdFlags, transformationController: TransformationController) => {
+    let generation: ApiResponse<Transformation>;
 
-    try {
-      const client = await CLIClient.getInstance().getClient(this.config.configDir);
-      const transformationController = new TransformationController(client);
+    if (!flags.file && !flags.url) {
+      throw new Error("Please provide a specification file");
+    } else if (flags.file) {
       const contentType = "multipart/form-data" as ContentType.EnumMultipartformdata;
       const file = new FileWrapper(fs.createReadStream(`${flags.file}`));
+      generation = await transformationController.transformviaFile(contentType, file, flags.format as ExportFormats);
+      return generation.result.id;
+    } else if (flags.url) {
+      const url = flags.url;
+      generation = await transformationController.transformviaURL(url, flags.format as ExportFormats);
+      return generation.result.id;
+    }
+  };
 
-      const generation = await transformationController.transformviaFile(
-        contentType,
-        file,
-        flags.format as ExportFormats
-      );
+  async run() {
+    const { flags } = this.parse(Transform);
+    const destinationFormat = flags.format.toLowerCase().includes("yaml") ? "yml" : "json";
 
-      const transformationId = generation.result.id;
+    try {
+      let transformedFileData: NodeJS.ReadableStream | Blob;
+      const client = await CLIClient.getInstance().getClient(this.config.configDir);
+      const transformationController = new TransformationController(client);
 
-      const { result } = await transformationController.downloadTransformedFile(transformationId);
+      const transformationId = await this.getTransformationId(flags, transformationController);
 
-      if ((result as NodeJS.ReadableStream).readable) {
-        const writeStream = fs.createWriteStream(`C:/Users/13bes/Downloads/Transformed_${flags.format}.json`);
-        (result as NodeJS.ReadableStream).pipe(writeStream);
+      if (transformationId) {
+        const { result } = await transformationController.downloadTransformedFile(transformationId);
+        transformedFileData = result;
+      } else {
+        throw new Error("Invalid Transformation Id from the API");
+      }
+
+      if ((transformedFileData as NodeJS.ReadableStream).readable) {
+        const writeStream = fs.createWriteStream(
+          `${flags.destination}/Transformed_${flags.format}.${destinationFormat}`
+        );
+        (transformedFileData as NodeJS.ReadableStream).pipe(writeStream);
         writeStream.on("close", () => {
-          console.log("Finished stream");
+          this.log(
+            `Success! Your file is located at ${flags.destination}/Transformed_${flags.format}.${destinationFormat}`
+          );
         });
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       if (error instanceof ApiError) {
-        const errors = error.result;
-        // const { statusCode, headers } = error;
-        this.error(errors);
+        const { statusCode, result } = error;
+        this.error(`Error: ${result}
+        StatusCode: ${statusCode}`);
       } else {
-        this.log("Not APIError", JSON.stringify(error));
         this.error(error as Error);
       }
     }
