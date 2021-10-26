@@ -18,6 +18,17 @@
         "semi": ["error", "always"],
         "quotes": ["error", "double"],
         "comma-dangle": ["error","never"],
-        "space-before-function-paren": ["error", "never"]
-    }
+        "space-before-function-paren": ["error", {
+            "anonymous": "never",
+            "named": "never",
+            "asyncArrow": "always"
+        }],
+        "prefer-const": ["error", {
+            "destructuring": "any",
+            "ignoreReadBeforeAssign": true
+        }]
+    },
+    "globals": {
+        "NodeJS": true
+      }
 }

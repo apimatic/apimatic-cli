@@ -11,7 +11,7 @@ export default class Login extends Command {
 Please enter your registered email: apimatic-user@gmail.com
 Please enter your password: *********
 
-You have successfully logged into APIMAtic
+You have successfully logged into APIMatic
 `
   ];
 
@@ -26,8 +26,8 @@ You have successfully logged into APIMAtic
     });
 
     try {
-      const client = CLIClient.getInstance();
-      const response = await client.login(email, password, this.config.configDir);
+      const client: CLIClient = CLIClient.getInstance();
+      const response: string = await client.login(email, password, this.config.configDir);
 
       this.log(response);
     } catch (error) {
