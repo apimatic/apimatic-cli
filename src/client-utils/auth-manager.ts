@@ -1,15 +1,15 @@
 import * as fs from "fs";
 
-type Credentials = {
+export type AuthInfo = {
   email: string;
   token: string;
 };
 /**
  *
- * @param {string} configDir
+ * @param {string} configDir <- Directory with user configuration
  * //Function to get credentials
  */
-export function getCredentials(configDir: string): Promise<Credentials | null> {
+export function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
   return new Promise((resolve, reject) => {
     fs.readFile(`${configDir}/config.json`, "utf8", (err: any, data: string) => {
       if (err) {
@@ -22,11 +22,11 @@ export function getCredentials(configDir: string): Promise<Credentials | null> {
 
 /**
  *
- * @param {Credentials} credentials
- * @param {string} configDir
+ * @param {AuthInfo} credentials
+ * @param {string} configDir <- Directory with user configuration
  * //Function to set credentials.
  */
-export function setCredentials(credentials: Credentials, configDir: string) {
+export function setAuthInfo(credentials: AuthInfo, configDir: string) {
   fs.writeFile(`${configDir}/config.json`, JSON.stringify(credentials), (err: any) => {
     if (err) {
       return err;

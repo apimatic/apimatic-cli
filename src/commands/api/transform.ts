@@ -6,16 +6,21 @@ import {
   ContentType,
   ExportFormats,
   Transformation,
-  ApiResponse
+  ApiResponse,
+  Client
 } from "@apimatic/apimatic-sdk-for-js";
 import { flags, Command } from "@oclif/command";
 
-import { CLIClient } from "../../utils/client";
+import { SDKClient } from "../../client-utils/sdk-client";
 
 type TransformationIdFlags = {
   file: string;
   url: string;
   format: string;
+};
+
+type TransformationData = {
+  result: NodeJS.ReadableStream | Blob;
 };
 export default class Transform extends Command {
   static description = "Transform your API specification to your supported formats";
@@ -71,29 +76,25 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
 
   async run() {
     const { flags } = this.parse(Transform);
-    const destinationFormat = flags.format.toLowerCase().includes("yaml") ? "yml" : "json";
+    const destinationFormat: string = flags.format.toLowerCase().includes("yaml") ? "yml" : "json";
+    const destinationFilePath: string = `${flags.destination}/Transformed_${flags.format}.${destinationFormat}`;
 
     try {
-      const client = await CLIClient.getInstance().getClient(this.config.configDir);
-      const transformationController = new TransformationController(client);
+      const client: Client = await SDKClient.getInstance().getClient(this.config.configDir);
+      const transformationController: TransformationController = new TransformationController(client);
 
       const transformationId: string = await this.getTransformationId(flags, transformationController);
 
-      const { result } = await transformationController.downloadTransformedFile(transformationId);
-      const transformedFileData: NodeJS.ReadableStream | Blob = result;
+      const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
 
-      if ((transformedFileData as NodeJS.ReadableStream).readable) {
-        const writeStream = fs.createWriteStream(
-          `${flags.destination}/Transformed_${flags.format}.${destinationFormat}`
-        );
-        (transformedFileData as NodeJS.ReadableStream).pipe(writeStream);
+      if ((result as NodeJS.ReadableStream).readable) {
+        const writeStream = fs.createWriteStream(destinationFilePath);
+        (result as NodeJS.ReadableStream).pipe(writeStream);
         writeStream.on("close", () => {
-          this.log(
-            `Success! Your file is located at ${flags.destination}/Transformed_${flags.format}.${destinationFormat}`
-          );
+          this.log(`Success! Your file is located at ${destinationFilePath}`);
         });
       } else {
-        throw new Error("Couldn't transformation download file");
+        throw new Error("Couldn't download transformation file");
       }
     } catch (error: any) {
       if (error instanceof ApiError) {

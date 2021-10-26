@@ -1,7 +1,7 @@
 import { flags, Command } from "@oclif/command";
 import { cli } from "cli-ux";
 
-import { CLIClient } from "../../utils/client";
+import { SDKClient } from "../../client-utils/sdk-client";
 
 export default class Login extends Command {
   static description = "Login to your APIMAtic account";
@@ -22,11 +22,11 @@ You have successfully logged into APIMatic
   async run() {
     const email: string = await cli.prompt("Please enter your registered email");
     const password: string = await cli.prompt("Please enter your password", {
-      type: "hide"
+      type: "mask"
     });
 
     try {
-      const client: CLIClient = CLIClient.getInstance();
+      const client: SDKClient = SDKClient.getInstance();
       const response: string = await client.login(email, password, this.config.configDir);
 
       this.log(response);
