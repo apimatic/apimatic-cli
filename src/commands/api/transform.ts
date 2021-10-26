@@ -22,7 +22,7 @@ export default class Transform extends Command {
 
   static examples = [
     `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json"
-File has been successfully transformed into OpenApi3Json
+Success! Your file is located at D:/Transformed_OpenApi3Json.json
 `
   ];
 
@@ -49,7 +49,7 @@ File has been successfully transformed into OpenApi3Json
     file: flags.string({ default: "", description: "Path to the specification file" }),
     url: flags.string({ default: "", description: "URL to the specification file" }),
     destination: flags.string({ default: "./", description: "Path to output the transformed file" }),
-    authKey: flags.string({ description: "Override current authKey by providing authKey in the command" })
+    "auth-key": flags.string({ description: "Override current authKey by providing authentication key in the command" })
   };
 
   getTransformationId = async (flags: TransformationIdFlags, transformationController: TransformationController) => {
