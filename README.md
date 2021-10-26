@@ -44,7 +44,11 @@ USAGE
 # Commands
 <!-- commands -->
 * [`apimatic api`](#apimatic-api)
+* [`apimatic api:transform`](#apimatic-apitransform)
 * [`apimatic auth`](#apimatic-auth)
+* [`apimatic auth:login`](#apimatic-authlogin)
+* [`apimatic auth:logout`](#apimatic-authlogout)
+* [`apimatic auth:status`](#apimatic-authstatus)
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic hello [FILE]`](#apimatic-hello-file)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
@@ -66,9 +70,45 @@ EXAMPLE
 
 _See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/api/index.ts)_
 
+## `apimatic api:transform`
+
+Transform your API specification to your supported formats
+
+```
+USAGE
+  $ apimatic api:transform
+
+OPTIONS
+  -h, --help
+      show CLI help
+
+  --authKey=authKey
+      Override current authKey by providing authKey in the command
+
+  --destination=destination
+      [default: ./] Path to output the transformed file
+
+  --file=file
+      Path to the specification file
+
+  --format=(OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postma
+  n10|Postman20)
+      Format into which specification should be converted to
+
+  --url=url
+      URL to the specification file
+
+EXAMPLE
+  $ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json"
+  File has been successfully transformed into OpenApi3Json
+```
+
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/api/transform.ts)_
+
+
 ## `apimatic auth`
 
-describe the command here
+This command can be used to invoke subcommands related to authentication
 
 ```
 USAGE
@@ -82,6 +122,63 @@ EXAMPLE
 ```
 
 _See code: [src/commands/auth/index.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/index.ts)_
+
+## `apimatic auth:login`
+
+Login to your APIMAtic account
+
+```
+USAGE
+  $ apimatic auth:login
+
+OPTIONS
+  -h, --help  show CLI help
+
+EXAMPLE
+  $ apimatic auth:login
+  Please enter your registered email: apimatic-user@gmail.com
+  Please enter your password: *********
+
+  You have successfully logged into APIMAtic
+```
+
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/login.ts)_
+
+## `apimatic auth:logout`
+
+Login to your APIMAtic account
+
+```
+USAGE
+  $ apimatic auth:logout
+
+OPTIONS
+  -h, --help  show CLI help
+
+EXAMPLE
+  $ apimatic auth:logout
+  Logged out
+```
+
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/logout.ts)_
+
+## `apimatic auth:status`
+
+Login to your APIMAtic account
+
+```
+USAGE
+  $ apimatic auth:status
+
+OPTIONS
+  -h, --help  show CLI help
+
+EXAMPLE
+  $ apimatic auth:status
+  Currently logged in as apimatic-client@gmail.com
+```
+
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 

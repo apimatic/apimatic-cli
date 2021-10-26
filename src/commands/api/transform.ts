@@ -12,11 +12,11 @@ import { flags, Command } from "@oclif/command";
 
 import { CLIClient } from "../../utils/client";
 
-interface TransformationIdFlags {
+type TransformationIdFlags = {
   file: string;
   url: string;
   format: string;
-}
+};
 export default class Transform extends Command {
   static description = "Transform your API specification to your supported formats";
 
@@ -55,9 +55,7 @@ File has been successfully transformed into OpenApi3Json
   getTransformationId = async (flags: TransformationIdFlags, transformationController: TransformationController) => {
     let generation: ApiResponse<Transformation>;
 
-    if (!flags.file && !flags.url) {
-      throw new Error("Please provide a specification file");
-    } else if (flags.file) {
+    if (flags.file) {
       const contentType = "multipart/form-data" as ContentType.EnumMultipartformdata;
       const file = new FileWrapper(fs.createReadStream(`${flags.file}`));
       generation = await transformationController.transformviaFile(contentType, file, flags.format as ExportFormats);
@@ -66,6 +64,8 @@ File has been successfully transformed into OpenApi3Json
       const url = flags.url;
       generation = await transformationController.transformviaURL(url, flags.format as ExportFormats);
       return generation.result.id;
+    } else {
+      throw new Error("Please provide a specification file");
     }
   };
 
@@ -74,18 +74,13 @@ File has been successfully transformed into OpenApi3Json
     const destinationFormat = flags.format.toLowerCase().includes("yaml") ? "yml" : "json";
 
     try {
-      let transformedFileData: NodeJS.ReadableStream | Blob;
       const client = await CLIClient.getInstance().getClient(this.config.configDir);
       const transformationController = new TransformationController(client);
 
-      const transformationId = await this.getTransformationId(flags, transformationController);
+      const transformationId: string = await this.getTransformationId(flags, transformationController);
 
-      if (transformationId) {
-        const { result } = await transformationController.downloadTransformedFile(transformationId);
-        transformedFileData = result;
-      } else {
-        throw new Error("Invalid Transformation Id from the API");
-      }
+      const { result } = await transformationController.downloadTransformedFile(transformationId);
+      const transformedFileData: NodeJS.ReadableStream | Blob = result;
 
       if ((transformedFileData as NodeJS.ReadableStream).readable) {
         const writeStream = fs.createWriteStream(
@@ -97,6 +92,8 @@ File has been successfully transformed into OpenApi3Json
             `Success! Your file is located at ${flags.destination}/Transformed_${flags.format}.${destinationFormat}`
           );
         });
+      } else {
+        throw new Error("Couldn't transformation download file");
       }
     } catch (error: any) {
       if (error instanceof ApiError) {
