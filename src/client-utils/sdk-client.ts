@@ -110,7 +110,13 @@ export class SDKClient {
     }
   }
 
-  public async getClient(configDir: string): Promise<Client> {
+  public async getClient(overrideAuthKey: string | null, configDir: string): Promise<Client> {
+    if (overrideAuthKey) {
+      return new Client({
+        timeout: 0,
+        authorization: `X-Auth-Key ${overrideAuthKey}`
+      });
+    }
     let storedAuthInfo: AuthInfo | null = await getAuthInfo(configDir);
 
     if (!storedAuthInfo) {

@@ -85,7 +85,8 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
     const destinationFilePath: string = `${flags.destination}/Transformed_${flags.format}.${destinationFormat}`;
 
     try {
-      const client: Client = await SDKClient.getInstance().getClient(this.config.configDir);
+      const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
+      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const transformationController: TransformationController = new TransformationController(client);
 
       const transformationId: string = await this.getTransformationId(flags, transformationController);
