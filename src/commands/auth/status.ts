@@ -2,8 +2,8 @@ import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
 
-export default class Login extends Command {
-  static description = "Login to your APIMAtic account";
+export default class Status extends Command {
+  static description = "Check current logged in account";
 
   static examples = [
     `$ apimatic auth:status

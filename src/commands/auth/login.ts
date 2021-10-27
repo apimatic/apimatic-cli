@@ -22,7 +22,7 @@ You have successfully logged into APIMatic
   async run() {
     const email: string = await cli.prompt("Please enter your registered email");
     const password: string = await cli.prompt("Please enter your password", {
-      type: "mask"
+      type: "hide"
     });
 
     try {

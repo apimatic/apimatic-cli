@@ -13,7 +13,7 @@ type Credentials = {
 };
 export class SDKClient {
   private static instance: SDKClient;
-  private static authAPI = "https://www.apimatic.io/api/account/authkey";
+  private static authAPI = "https://apimaticio-test.azurewebsites.net/api/account/authkey";
   public static client: Client;
 
   /**
@@ -40,7 +40,7 @@ export class SDKClient {
 
     // If no config file or no credentials exist in the config file
     if (!storedAuthInfo) {
-      storedAuthInfo = { email: "", token: "" };
+      storedAuthInfo = { email: "", authKey: "" };
     }
 
     const credentials: Credentials = { email, password };
@@ -48,10 +48,11 @@ export class SDKClient {
 
     if (storedAuthInfo.email !== email) {
       try {
+        console.log(authKey);
         setAuthInfo(
           {
             email,
-            token: authKey
+            authKey
           },
           configDir
         );
@@ -62,13 +63,14 @@ export class SDKClient {
         throw new Error(error);
       }
     } else {
-      if (authKey === storedAuthInfo.token) {
+      if (authKey === storedAuthInfo.authKey) {
         return "Already logged in";
       }
+      console.log(authKey);
       setAuthInfo(
         {
           email,
-          token: authKey
+          authKey
         },
         configDir
       );
@@ -81,7 +83,7 @@ export class SDKClient {
       setAuthInfo(
         {
           email: "",
-          token: ""
+          authKey: ""
         },
         configDir
       );
@@ -97,11 +99,11 @@ export class SDKClient {
 
       if (!storedAuthInfo) {
         // If no config file or no credentials exist in the config file
-        storedAuthInfo = { email: "", token: "" };
+        storedAuthInfo = { email: "", authKey: "" };
       }
 
-      return storedAuthInfo.email !== "" && storedAuthInfo.token !== ""
-        ? `Currently logged in as ${storedAuthInfo.email}`
+      return storedAuthInfo.email !== "" && storedAuthInfo.authKey !== ""
+        ? `Currently logged in as ${storedAuthInfo.email} with ${storedAuthInfo.authKey}`
         : "Not Logged In";
     } catch (error: any) {
       throw new Error(JSON.stringify(error));
@@ -113,13 +115,12 @@ export class SDKClient {
 
     if (!storedAuthInfo) {
       // If no config file or no credentials exist in the config file
-      storedAuthInfo = { email: "", token: "" };
+      storedAuthInfo = { email: "", authKey: "" };
     }
-    if (storedAuthInfo.email !== "" && storedAuthInfo.token !== "") {
+    if (storedAuthInfo.email !== "" && storedAuthInfo.authKey !== "") {
       return new Client({
         timeout: 0,
-        email: storedAuthInfo.email,
-        password: storedAuthInfo.token
+        authorization: `X-Auth-Key ${storedAuthInfo.authKey}`
       });
     } else {
       throw new Error("Please login first or provide an authKey");
@@ -127,16 +128,15 @@ export class SDKClient {
   }
 
   private async getAuthKey(credentials: Credentials): Promise<string> {
-    const config = {
-      headers: {
-        Authorization: `Basic ${base64.encode(`${credentials.email}:${credentials.password}`)}`
-      }
-    };
-
     try {
+      const config = {
+        headers: {
+          Authorization: `Basic ${base64.encode(`${credentials.email}:${credentials.password}`)}`
+        }
+      };
       const response: AxiosResponse = await axios.get(SDKClient.authAPI, config);
-      const token: string = response.data.EncryptedValue;
-      return token;
+      const authKey: string = response.data.EncryptedValue;
+      return authKey;
     } catch (error: any) {
       throw new Error(error);
     }

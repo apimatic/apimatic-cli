@@ -7,7 +7,8 @@ import {
   ExportFormats,
   Transformation,
   ApiResponse,
-  Client
+  Client,
+  TransformViaUrlRequest
 } from "@apimatic/apimatic-sdk-for-js";
 import { flags, Command } from "@oclif/command";
 
@@ -49,6 +50,7 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
         "Postman10",
         "Postman20"
       ],
+      required: true,
       description: "Format into which specification should be converted to"
     }),
     file: flags.string({ default: "", description: "Path to the specification file" }),
@@ -66,8 +68,11 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
       generation = await transformationController.transformviaFile(contentType, file, flags.format as ExportFormats);
       return generation.result.id;
     } else if (flags.url) {
-      const url = flags.url;
-      generation = await transformationController.transformviaURL(url, flags.format as ExportFormats);
+      const body: TransformViaUrlRequest = {
+        url: flags.url,
+        exportFormat: flags.format as ExportFormats
+      };
+      generation = await transformationController.transformviaURL(body);
       return generation.result.id;
     } else {
       throw new Error("Please provide a specification file");
@@ -102,7 +107,8 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
         this.error(`Error: ${result}
         StatusCode: ${statusCode}`);
       } else {
-        this.error(error as Error);
+        this.log(JSON.stringify(error));
+        this.error("Not APIError: ", error as Error);
       }
     }
   }

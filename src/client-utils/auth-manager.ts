@@ -2,7 +2,7 @@ import * as fs from "fs";
 
 export type AuthInfo = {
   email: string;
-  token: string;
+  authKey: string;
 };
 /**
  *
