@@ -63,22 +63,22 @@ export default class SdkGenerate extends Command {
   ];
 
   getSDKGenerationId = async (
-    flags: GenerationIdParams,
+    { file, url, platform }: GenerationIdParams,
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
     let generation: ApiResponse<UserCodeGeneration>;
-    const platform = this.getPlatform(flags.platform) as Platforms;
+    const sdkPlatform = this.getSDKPlatform(platform) as Platforms;
 
     // If spec file is provided
-    if (flags.file) {
-      const file = new FileWrapper(fs.createReadStream(flags.file));
-      generation = await sdkGenerationController.generateSDKViaFile(file, platform);
+    if (file) {
+      const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+      generation = await sdkGenerationController.generateSDKViaFile(fileDescriptor, sdkPlatform);
       return generation.result.id;
-    } else if (flags.url) {
+    } else if (url) {
       // If url to spec file is provided
       const body: GenerateSdkViaUrlRequest = {
-        url: flags.url,
-        template: platform
+        url: url,
+        template: sdkPlatform
       };
       generation = await sdkGenerationController.generateSDKViaURL(body);
       return generation.result.id;
@@ -88,7 +88,7 @@ export default class SdkGenerate extends Command {
   };
 
   // Get valid platform from user's input, convert simple platform to valid Platforms enum value
-  getPlatform = (platform: string) => {
+  getSDKPlatform = (platform: string) => {
     if (Object.keys(SimplePlatforms).includes(platform)) {
       return SimplePlatforms[platform as keyof typeof SimplePlatforms];
     } else if (Object.values(Platforms).includes(platform as Platforms)) {
