@@ -1,8 +1,6 @@
 import * as fs from "fs";
 import * as unzipper from "unzipper";
 
-// import * as zlib from "zlib";
-
 import {
   ApiResponse,
   Client,
@@ -15,10 +13,17 @@ import {
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-type GenerationIdFlags = {
+type GenerationIdParams = {
   file: string;
   url: string;
   platform: Platforms;
+};
+
+type DownloadSDKParams = {
+  codeGenId: string;
+  unzip: boolean;
+  zippedSDKPath: string;
+  sdkFolderPath: string;
 };
 export default class SdkGenerate extends Command {
   static description = "Generate SDKs for your APIs";
@@ -47,6 +52,7 @@ export default class SdkGenerate extends Command {
     url: flags.string({ default: "", description: "URL to specification file to generate SDK for" }),
     destination: flags.string({ default: "./", description: "Path to download the generated SDK to" }),
     download: flags.boolean({ char: "d", default: false, description: "Download the SDK after generation" }),
+    unzip: flags.boolean({ default: true, description: "Unzip the downloaded SDK or not" }),
     "auth-key": flags.string({
       default: "",
       description: "Override current auth-key by providing authentication key in the command"
@@ -55,18 +61,18 @@ export default class SdkGenerate extends Command {
 
   static examples = [
     `$ apimatic sdk:generate --platform="CS_NET_STANDARD_LIB" --file="./specs/sample.json"
-    Your SDK has been generated with id: 234kdk3jada223uio4
+    Your SDK has been generated with id: 1324abcd
 `
   ];
 
   getSDKGenerationId = async (
-    flags: GenerationIdFlags,
+    flags: GenerationIdParams,
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
     let generation: ApiResponse<UserCodeGeneration>;
 
     if (flags.file) {
-      const file = new FileWrapper(fs.createReadStream("C:/Users/13bes/Downloads/Sample.json"));
+      const file = new FileWrapper(fs.createReadStream(flags.file));
       const template = flags.platform;
       generation = await sdkGenerationController.generateSDKviaFile(file, template);
       return generation.result.id;
@@ -83,9 +89,7 @@ export default class SdkGenerate extends Command {
   };
 
   downloadGeneratedSDK = async (
-    codeGenId: string,
-    zippedSDKPath: string,
-    sdkFolderPath: string,
+    { codeGenId, zippedSDKPath, sdkFolderPath, unzip }: DownloadSDKParams,
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.getDownloadSDK(
@@ -96,8 +100,17 @@ export default class SdkGenerate extends Command {
       (result as NodeJS.ReadableStream).pipe(writeStream);
 
       writeStream.on("close", () => {
-        const readStream: fs.ReadStream = fs.createReadStream(zippedSDKPath);
-        readStream.pipe(unzipper.Extract({ path: sdkFolderPath }));
+        if (unzip) {
+          const readStream: fs.ReadStream = fs.createReadStream(zippedSDKPath);
+          readStream.pipe(unzipper.Extract({ path: sdkFolderPath }));
+          readStream.on("close", () => {
+            fs.unlink(zippedSDKPath, (error: NodeJS.ErrnoException | null) => {
+              if (error) {
+                throw new Error(error.code);
+              }
+            });
+          });
+        }
       });
     } else {
       throw new Error("Couldn't download the SDK");
@@ -122,8 +135,14 @@ export default class SdkGenerate extends Command {
 
       // If user wanted to download the SDK as well
       if (flags.download) {
+        const sdkDownloadParams: DownloadSDKParams = {
+          codeGenId,
+          zippedSDKPath,
+          sdkFolderPath,
+          unzip: flags.unzip
+        };
         this.log("Downloading your SDK, please wait...");
-        await this.downloadGeneratedSDK(codeGenId, zippedSDKPath, sdkFolderPath, sdkGenerationController);
+        await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
         this.log(`Success! Your SDK is located at ${sdkFolderPath}`);
       }
     } catch (error: any) {
