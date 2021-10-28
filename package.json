@@ -15,6 +15,7 @@
         "@types/chai": "^4.2.22",
         "@types/mocha": "^5.2.7",
         "@types/node": "^10.17.60",
+        "@types/unzipper": "^0.10.4",
         "@typescript-eslint/eslint-plugin": "^5.0.0",
         "@typescript-eslint/parser": "^5.0.0",
         "chai": "^4.3.4",
@@ -82,6 +83,7 @@
         "@oclif/plugin-not-found": "^1.2.4",
         "axios": "^0.24.0",
         "base-64": "^1.0.0",
-        "tslib": "^1.14.1"
+        "tslib": "^1.14.1",
+        "unzipper": "^0.10.11"
     }
 }

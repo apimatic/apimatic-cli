@@ -1,4 +1,8 @@
 import * as fs from "fs";
+import * as unzipper from "unzipper";
+
+// import * as zlib from "zlib";
+
 import {
   ApiResponse,
   Client,
@@ -80,15 +84,38 @@ File has been successfully transformed into OpenApi3Json
 
   async run() {
     const { flags } = this.parse(SdkGenerate);
+    const destinationPath: string = `D:/Transformed_${flags.platform}`;
+    const destinationFilePath: string = `D:/Transformed_${flags.platform}.zip`;
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-    const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-    const sdkGenerationController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(
-      client
-    );
     try {
-      const getSDKGenerationId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
-      this.log(getSDKGenerationId);
+      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+      const sdkGenerationController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(
+        client
+      );
+      // Get generation id for the specification and platform
+      const sdkGenerationId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
+      this.log(`Your SDK has been generated with id: ${sdkGenerationId}`);
+
+      // If user wanted to download the SDK as well
+      if (flags.download) {
+        this.log("Downloading your SDK, please wait...");
+        const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.getDownloadSDK(
+          sdkGenerationId
+        );
+        if ((result as NodeJS.ReadableStream).readable) {
+          const writeStream = fs.createWriteStream(destinationFilePath);
+          (result as NodeJS.ReadableStream).pipe(writeStream);
+
+          writeStream.on("close", () => {
+            const readStream: fs.ReadStream = fs.createReadStream(destinationFilePath);
+            readStream.pipe(unzipper.Extract({ path: destinationPath }));
+            this.log(`Success! Your SDK is located at ${destinationPath}`);
+          });
+        } else {
+          throw new Error("Couldn't download the SDK");
+        }
+      }
     } catch (error: any) {
       this.log(JSON.stringify(error));
       this.error(error);
