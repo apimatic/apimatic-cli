@@ -72,7 +72,7 @@ export default class SdkGenerate extends Command {
     // If spec file is provided
     if (flags.file) {
       const file = new FileWrapper(fs.createReadStream(flags.file));
-      generation = await sdkGenerationController.generateSDKviaFile(file, platform);
+      generation = await sdkGenerationController.generateSDKViaFile(file, platform);
       return generation.result.id;
     } else if (flags.url) {
       // If url to spec file is provided
@@ -80,7 +80,7 @@ export default class SdkGenerate extends Command {
         url: flags.url,
         template: platform
       };
-      generation = await sdkGenerationController.generateSDKviaURL(body);
+      generation = await sdkGenerationController.generateSDKViaURL(body);
       return generation.result.id;
     } else {
       throw new Error("Please provide a specification file");
@@ -104,9 +104,7 @@ export default class SdkGenerate extends Command {
     { codeGenId, zippedSDKPath, sdkFolderPath, unzip }: DownloadSDKParams,
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
-    const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.getDownloadSDK(
-      codeGenId
-    );
+    const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
     if ((result as NodeJS.ReadableStream).readable) {
       const writeStream = fs.createWriteStream(zippedSDKPath);
       (result as NodeJS.ReadableStream).pipe(writeStream);
