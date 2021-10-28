@@ -16,7 +16,7 @@ import { SDKClient } from "../../client-utils/sdk-client";
 type GenerationIdParams = {
   file: string;
   url: string;
-  platform: Platforms;
+  platform: string;
 };
 
 type DownloadSDKParams = {
@@ -25,26 +25,23 @@ type DownloadSDKParams = {
   zippedSDKPath: string;
   sdkFolderPath: string;
 };
+
+enum SimplePlatforms {
+  CSHARP = "CS_NET_STANDARD_LIB",
+  JAVA = "JAVA_ECLIPSE_JRE_LIB",
+  PHP = "PHP_GENERIC_LIB",
+  PYTHON = "PYTHON_GENERIC_LIB",
+  RUBY = "RUBY_GENERIC_LIB",
+  TYPESCRIPT = "ANGULAR_JAVASCRIPT_LIB"
+}
+
 export default class SdkGenerate extends Command {
   static description = "Generate SDKs for your APIs";
 
   static flags = {
     help: flags.help({ char: "h" }),
-    platform: flags.enum({
-      options: [
-        Platforms.CSNETSTANDARDLIB,
-        Platforms.CSPORTABLENETLIB,
-        Platforms.CSUNIVERSALWINDOWSPLATFORMLIB,
-        Platforms.JAVAGRADLEANDROIDLIB,
-        Platforms.OBJCCOCOATOUCHIOSLIB,
-        Platforms.JAVAECLIPSEJRELIB,
-        Platforms.PHPGENERICLIB,
-        Platforms.PYTHONGENERICLIB,
-        Platforms.RUBYGENERICLIB,
-        Platforms.ANGULARJAVASCRIPTLIB,
-        Platforms.NODEJAVASCRIPTLIB,
-        Platforms.GOGENERICLIB
-      ],
+    platform: flags.string({
+      parse: (input) => input.toUpperCase(),
       required: true,
       description: "Platform for which the SDK should be generated for"
     }),
@@ -70,16 +67,18 @@ export default class SdkGenerate extends Command {
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
     let generation: ApiResponse<UserCodeGeneration>;
+    const platform = this.getPlatform(flags.platform) as Platforms;
 
+    // If spec file is provided
     if (flags.file) {
       const file = new FileWrapper(fs.createReadStream(flags.file));
-      const template = flags.platform;
-      generation = await sdkGenerationController.generateSDKviaFile(file, template);
+      generation = await sdkGenerationController.generateSDKviaFile(file, platform);
       return generation.result.id;
     } else if (flags.url) {
+      // If url to spec file is provided
       const body: GenerateSdkViaUrlRequest = {
         url: flags.url,
-        template: flags.platform
+        template: platform
       };
       generation = await sdkGenerationController.generateSDKviaURL(body);
       return generation.result.id;
@@ -88,6 +87,19 @@ export default class SdkGenerate extends Command {
     }
   };
 
+  // Get valid platform from user's input, convert simple platform to valid Platforms enum value
+  getPlatform = (platform: string) => {
+    if (Object.keys(SimplePlatforms).includes(platform)) {
+      return SimplePlatforms[platform as keyof typeof SimplePlatforms];
+    } else if (Object.values(Platforms).includes(platform as Platforms)) {
+      return platform as Platforms;
+    } else {
+      const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join(",");
+      throw new Error(`Please provide a valid platform i.e. ${platforms}`);
+    }
+  };
+
+  // Download Platform
   downloadGeneratedSDK = async (
     { codeGenId, zippedSDKPath, sdkFolderPath, unzip }: DownloadSDKParams,
     sdkGenerationController: CodeGenerationExternalApisController
@@ -120,8 +132,8 @@ export default class SdkGenerate extends Command {
   async run() {
     const { flags } = this.parse(SdkGenerate);
 
-    const sdkFolderPath: string = `${flags.destination}/Transformed_${flags.platform}`;
-    const zippedSDKPath: string = `${flags.destination}/Transformed_${flags.platform}.zip`;
+    const sdkFolderPath: string = `${flags.destination}/Generated_${flags.platform}`;
+    const zippedSDKPath: string = `${flags.destination}/Generated_${flags.platform}.zip`;
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
     try {
