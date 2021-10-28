@@ -84,20 +84,20 @@ export default class SdkGenerate extends Command {
 
   downloadGeneratedSDK = async (
     codeGenId: string,
-    destinationFilePath: string,
-    destinationFolderPath: string,
+    zippedSDKPath: string,
+    sdkFolderPath: string,
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.getDownloadSDK(
       codeGenId
     );
     if ((result as NodeJS.ReadableStream).readable) {
-      const writeStream = fs.createWriteStream(destinationFilePath);
+      const writeStream = fs.createWriteStream(zippedSDKPath);
       (result as NodeJS.ReadableStream).pipe(writeStream);
 
       writeStream.on("close", () => {
-        const readStream: fs.ReadStream = fs.createReadStream(destinationFilePath);
-        readStream.pipe(unzipper.Extract({ path: destinationFolderPath }));
+        const readStream: fs.ReadStream = fs.createReadStream(zippedSDKPath);
+        readStream.pipe(unzipper.Extract({ path: sdkFolderPath }));
       });
     } else {
       throw new Error("Couldn't download the SDK");
@@ -107,8 +107,8 @@ export default class SdkGenerate extends Command {
   async run() {
     const { flags } = this.parse(SdkGenerate);
 
-    const destinationFolderPath: string = `${flags.destination}/Transformed_${flags.platform}`;
-    const destinationFilePath: string = `${flags.destination}/Transformed_${flags.platform}.zip`;
+    const sdkFolderPath: string = `${flags.destination}/Transformed_${flags.platform}`;
+    const zippedSDKPath: string = `${flags.destination}/Transformed_${flags.platform}.zip`;
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
     try {
@@ -123,8 +123,8 @@ export default class SdkGenerate extends Command {
       // If user wanted to download the SDK as well
       if (flags.download) {
         this.log("Downloading your SDK, please wait...");
-        await this.downloadGeneratedSDK(codeGenId, destinationFilePath, destinationFolderPath, sdkGenerationController);
-        this.log(`Success! Your SDK is located at ${destinationFolderPath}`);
+        await this.downloadGeneratedSDK(codeGenId, zippedSDKPath, sdkFolderPath, sdkGenerationController);
+        this.log(`Success! Your SDK is located at ${sdkFolderPath}`);
       }
     } catch (error: any) {
       this.log(JSON.stringify(error));
