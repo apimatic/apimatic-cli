@@ -59,18 +59,25 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
     "auth-key": flags.string({ description: "Override current authKey by providing authentication key in the command" })
   };
 
-  getTransformationId = async (flags: TransformationIdFlags, transformationController: TransformationController) => {
+  getTransformationId = async (
+    { file, url, format }: TransformationIdFlags,
+    transformationController: TransformationController
+  ) => {
     let generation: ApiResponse<Transformation>;
 
-    if (flags.file) {
+    if (file) {
       const contentType = "multipart/form-data" as ContentType.EnumMultipartformdata;
-      const file = new FileWrapper(fs.createReadStream(`${flags.file}`));
-      generation = await transformationController.transformViaFile(contentType, file, flags.format as ExportFormats);
+      const fileDescriptor = new FileWrapper(fs.createReadStream(`${file}`));
+      generation = await transformationController.transformViaFile(
+        contentType,
+        fileDescriptor,
+        format as ExportFormats
+      );
       return generation.result.id;
-    } else if (flags.url) {
+    } else if (url) {
       const body: TransformViaUrlRequest = {
-        url: flags.url,
-        exportFormat: flags.format as ExportFormats
+        url: url,
+        exportFormat: format as ExportFormats
       };
       generation = await transformationController.transformViaURL(body);
       return generation.result.id;
