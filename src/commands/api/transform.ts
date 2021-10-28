@@ -65,14 +65,14 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
     if (flags.file) {
       const contentType = "multipart/form-data" as ContentType.EnumMultipartformdata;
       const file = new FileWrapper(fs.createReadStream(`${flags.file}`));
-      generation = await transformationController.transformviaFile(contentType, file, flags.format as ExportFormats);
+      generation = await transformationController.transformViaFile(contentType, file, flags.format as ExportFormats);
       return generation.result.id;
     } else if (flags.url) {
       const body: TransformViaUrlRequest = {
         url: flags.url,
         exportFormat: flags.format as ExportFormats
       };
-      generation = await transformationController.transformviaURL(body);
+      generation = await transformationController.transformViaURL(body);
       return generation.result.id;
     } else {
       throw new Error("Please provide a specification file");
