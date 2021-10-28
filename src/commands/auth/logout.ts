@@ -1,6 +1,6 @@
 import { flags, Command } from "@oclif/command";
 
-import { CLIClient } from "../../utils/client";
+import { SDKClient } from "../../client-utils/sdk-client";
 
 export default class Login extends Command {
   static description = "Login to your APIMAtic account";
@@ -17,7 +17,7 @@ Logged out
 
   async run() {
     try {
-      const client = CLIClient.getInstance();
+      const client = SDKClient.getInstance();
       const response = await client.logout(this.config.configDir);
 
       this.log(response);
