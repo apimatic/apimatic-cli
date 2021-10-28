@@ -107,8 +107,8 @@ export default class SdkGenerate extends Command {
   async run() {
     const { flags } = this.parse(SdkGenerate);
 
-    const destinationFolderPath: string = `D:/Transformed_${flags.platform}`;
-    const destinationFilePath: string = `D:/Transformed_${flags.platform}.zip`;
+    const destinationFolderPath: string = `${flags.destination}/Transformed_${flags.platform}`;
+    const destinationFilePath: string = `${flags.destination}/Transformed_${flags.platform}.zip`;
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
     try {
