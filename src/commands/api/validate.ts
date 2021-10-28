@@ -32,16 +32,19 @@ Specification file provided is valid
     "auth-key": flags.string({ description: "Override current authKey by providing authKey in the command" })
   };
 
-  getValidation = async (flags: GetValidationParams, apiValidationController: APIValidationExternalApisController) => {
+  getValidation = async (
+    { file, url }: GetValidationParams,
+    apiValidationController: APIValidationExternalApisController
+  ) => {
     let validation: ApiResponse<ApiValidationSummary>;
 
-    if (flags.file) {
-      const file = new FileWrapper(fs.createReadStream(flags.file));
-      validation = await apiValidationController.validateAPIViaFile(file);
+    if (file) {
+      const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+      validation = await apiValidationController.validateAPIViaFile(fileDescriptor);
 
       return validation.result;
-    } else if (flags.url) {
-      validation = await apiValidationController.validateAPIViaURL(flags.url);
+    } else if (url) {
+      validation = await apiValidationController.validateAPIViaURL(url);
       return validation.result;
     } else {
       throw new Error("Please provide a specification file");
