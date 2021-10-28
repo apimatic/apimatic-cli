@@ -41,7 +41,7 @@ export default class SdkGenerate extends Command {
         Platforms.GOGENERICLIB
       ],
       required: true,
-      description: "Platform for which SDK should be generated for"
+      description: "Platform for which the SDK should be generated for"
     }),
     file: flags.string({ default: "", description: "Path to specification file to generate SDK for" }),
     url: flags.string({ default: "", description: "URL to specification file to generate SDK for" }),
@@ -55,7 +55,7 @@ export default class SdkGenerate extends Command {
 
   static examples = [
     `$ apimatic sdk:generate --platform="CS_NET_STANDARD_LIB" --file="./specs/sample.json"
-File has been successfully transformed into OpenApi3Json
+    Your SDK has been generated with id: 234kdk3jada223uio4
 `
   ];
 
@@ -82,9 +82,32 @@ File has been successfully transformed into OpenApi3Json
     }
   };
 
+  downloadGeneratedSDK = async (
+    codeGenId: string,
+    destinationFilePath: string,
+    destinationFolderPath: string,
+    sdkGenerationController: CodeGenerationExternalApisController
+  ) => {
+    const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.getDownloadSDK(
+      codeGenId
+    );
+    if ((result as NodeJS.ReadableStream).readable) {
+      const writeStream = fs.createWriteStream(destinationFilePath);
+      (result as NodeJS.ReadableStream).pipe(writeStream);
+
+      writeStream.on("close", () => {
+        const readStream: fs.ReadStream = fs.createReadStream(destinationFilePath);
+        readStream.pipe(unzipper.Extract({ path: destinationFolderPath }));
+      });
+    } else {
+      throw new Error("Couldn't download the SDK");
+    }
+  };
+
   async run() {
     const { flags } = this.parse(SdkGenerate);
-    const destinationPath: string = `D:/Transformed_${flags.platform}`;
+
+    const destinationFolderPath: string = `D:/Transformed_${flags.platform}`;
     const destinationFilePath: string = `D:/Transformed_${flags.platform}.zip`;
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
@@ -94,27 +117,14 @@ File has been successfully transformed into OpenApi3Json
         client
       );
       // Get generation id for the specification and platform
-      const sdkGenerationId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
-      this.log(`Your SDK has been generated with id: ${sdkGenerationId}`);
+      const codeGenId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
+      this.log(`Your SDK has been generated with id: ${codeGenId}`);
 
       // If user wanted to download the SDK as well
       if (flags.download) {
         this.log("Downloading your SDK, please wait...");
-        const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.getDownloadSDK(
-          sdkGenerationId
-        );
-        if ((result as NodeJS.ReadableStream).readable) {
-          const writeStream = fs.createWriteStream(destinationFilePath);
-          (result as NodeJS.ReadableStream).pipe(writeStream);
-
-          writeStream.on("close", () => {
-            const readStream: fs.ReadStream = fs.createReadStream(destinationFilePath);
-            readStream.pipe(unzipper.Extract({ path: destinationPath }));
-            this.log(`Success! Your SDK is located at ${destinationPath}`);
-          });
-        } else {
-          throw new Error("Couldn't download the SDK");
-        }
+        await this.downloadGeneratedSDK(codeGenId, destinationFilePath, destinationFolderPath, sdkGenerationController);
+        this.log(`Success! Your SDK is located at ${destinationFolderPath}`);
       }
     } catch (error: any) {
       this.log(JSON.stringify(error));
