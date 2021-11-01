@@ -1,6 +1,7 @@
 import * as fs from "fs";
-import * as unzipper from "unzipper";
+import cli from "cli-ux";
 
+import { writeZipUsingReadableStream, unzipFile, deleteFile } from "../../utils/utils";
 import {
   ApiResponse,
   Client,
@@ -36,8 +37,6 @@ enum SimplePlatforms {
 }
 
 export default class SdkGenerate extends Command {
-  static description = "Generate SDKs for your APIs";
-
   static flags = {
     help: flags.help({ char: "h" }),
     platform: flags.string({
@@ -106,22 +105,11 @@ export default class SdkGenerate extends Command {
   ) => {
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
     if ((result as NodeJS.ReadableStream).readable) {
-      const writeStream = fs.createWriteStream(zippedSDKPath);
-      (result as NodeJS.ReadableStream).pipe(writeStream);
-
-      writeStream.on("close", () => {
-        if (unzip) {
-          const readStream: fs.ReadStream = fs.createReadStream(zippedSDKPath);
-          readStream.pipe(unzipper.Extract({ path: sdkFolderPath }));
-          readStream.on("close", () => {
-            fs.unlink(zippedSDKPath, (error: NodeJS.ErrnoException | null) => {
-              if (error) {
-                throw new Error(error.code);
-              }
-            });
-          });
-        }
-      });
+      await writeZipUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
+      if (unzip) {
+        await unzipFile(zippedSDKPath, sdkFolderPath);
+        await deleteFile(zippedSDKPath);
+      }
     } else {
       throw new Error("Couldn't download the SDK");
     }
@@ -140,8 +128,9 @@ export default class SdkGenerate extends Command {
         client
       );
       // Get generation id for the specification and platform
+      cli.action.start("Fetching your SDK", "generating", { stdout: true });
       const codeGenId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
-      this.log(`Your SDK has been generated with id: ${codeGenId}`);
+      cli.action.stop(`\nYour SDK has been generated with id: ${codeGenId}`);
 
       // If user wanted to download the SDK as well
       if (flags.download) {
@@ -151,9 +140,10 @@ export default class SdkGenerate extends Command {
           sdkFolderPath,
           unzip: flags.unzip
         };
-        this.log("Downloading your SDK, please wait...");
+        cli.action.type = "simple";
+        cli.action.start("Downloading your SDK, please wait...", "saving", { stdout: true });
         await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
-        this.log(`Success! Your SDK is located at ${sdkFolderPath}`);
+        cli.action.stop(`\nSuccess! Your SDK is located at ${sdkFolderPath}`);
       }
     } catch (error: any) {
       this.log(JSON.stringify(error));
