@@ -51,6 +51,15 @@ Specification file provided is valid
     }
   };
 
+  printValidationMessages = (warnings: string[], errors: string[]) => {
+    warnings.forEach((warning) => {
+      this.log(`Warning: ${warning}`);
+    });
+    errors.forEach((error) => {
+      this.log(`Error: ${error}`);
+    });
+  };
+
   async run() {
     const { flags } = this.parse(Validate);
 
@@ -62,10 +71,16 @@ Specification file provided is valid
         client
       );
 
-      const { success }: ApiValidationSummary = await this.getValidation(flags, apiValidationController);
+      const { success, warnings, errors }: ApiValidationSummary = await this.getValidation(
+        flags,
+        apiValidationController
+      );
+
+      this.printValidationMessages(warnings, errors);
+
       this.log(`${success ? "Specification file provided is valid" : "Specification is invalid"}`);
     } catch (error: any) {
-      this.error(error);
+      this.log(JSON.parse(error.body).message);
     }
   }
 }
