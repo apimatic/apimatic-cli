@@ -2,7 +2,6 @@ import * as fs from "fs";
 import {
   TransformationController,
   FileWrapper,
-  ApiError,
   ContentType,
   ExportFormats,
   Transformation,
@@ -13,6 +12,7 @@ import {
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
+import { writeFileUsingReadableStream } from "../../utils/utils";
 
 type TransformationIdFlags = {
   file: string;
@@ -73,17 +73,26 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
         fileDescriptor,
         format as ExportFormats
       );
-      return generation.result.id;
+      return generation.result;
     } else if (url) {
       const body: TransformViaUrlRequest = {
         url: url,
         exportFormat: format as ExportFormats
       };
       generation = await transformationController.transformViaURL(body);
-      return generation.result.id;
+      return generation.result;
     } else {
       throw new Error("Please provide a specification file");
     }
+  };
+
+  printValidationMessages = (warnings: string[], errors: string[]) => {
+    warnings.forEach((warning) => {
+      this.log(`Warning: ${warning}`);
+    });
+    errors.forEach((error) => {
+      this.log(`Error: ${error}`);
+    });
   };
 
   async run() {
@@ -96,28 +105,26 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const transformationController: TransformationController = new TransformationController(client);
 
-      const transformationId: string = await this.getTransformationId(flags, transformationController);
+      const { id, apiValidationSummary }: Transformation = await this.getTransformationId(
+        flags,
+        transformationController
+      );
+      const warnings: string[] = apiValidationSummary?.warnings || [];
+      const errors: string[] = apiValidationSummary?.errors || [];
 
-      const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
+      this.printValidationMessages(warnings, errors);
+
+      const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
 
       if ((result as NodeJS.ReadableStream).readable) {
-        const writeStream = fs.createWriteStream(destinationFilePath);
-        (result as NodeJS.ReadableStream).pipe(writeStream);
-        writeStream.on("close", () => {
-          this.log(`Success! Your file is located at ${destinationFilePath}`);
-        });
+        await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
+        this.log(`Success! Your file is located at ${destinationFilePath}`);
       } else {
         throw new Error("Couldn't download transformation file");
       }
     } catch (error: any) {
-      if (error instanceof ApiError) {
-        const { statusCode, result } = error;
-        this.error(`Error: ${result}
-        StatusCode: ${statusCode}`);
-      } else {
-        this.log(JSON.stringify(error));
-        this.error("Not APIError: ", error as Error);
-      }
+      this.log(JSON.stringify(error));
+      this.error(error.body);
     }
   }
 }

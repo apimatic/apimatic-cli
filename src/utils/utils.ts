@@ -26,7 +26,7 @@ export const deleteFile = (filePath: string) => {
   });
 };
 
-export const writeZipUsingReadableStream = (stream: NodeJS.ReadableStream, destinationPath: string) => {
+export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, destinationPath: string) => {
   return new Promise((resolve, reject) => {
     const writeStream = fs.createWriteStream(destinationPath);
     stream.pipe(writeStream);
