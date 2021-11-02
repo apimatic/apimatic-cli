@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import cli from "cli-ux";
 
-import { writeZipUsingReadableStream, unzipFile, deleteFile } from "../../utils/utils";
 import {
   ApiResponse,
   Client,
@@ -13,6 +12,8 @@ import {
 } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
+
+import { writeFileUsingReadableStream, unzipFile, deleteFile } from "../../utils/utils";
 
 type GenerationIdParams = {
   file: string;
@@ -105,7 +106,7 @@ export default class SdkGenerate extends Command {
   ) => {
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
     if ((result as NodeJS.ReadableStream).readable) {
-      await writeZipUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
+      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
       if (unzip) {
         await unzipFile(zippedSDKPath, sdkFolderPath);
         await deleteFile(zippedSDKPath);
@@ -140,7 +141,6 @@ export default class SdkGenerate extends Command {
           sdkFolderPath,
           unzip: flags.unzip
         };
-        cli.action.type = "simple";
         cli.action.start("Downloading your SDK, please wait...", "saving", { stdout: true });
         await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
         cli.action.stop(`\nSuccess! Your SDK is located at ${sdkFolderPath}`);
