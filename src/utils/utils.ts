@@ -1,3 +1,4 @@
+import archiver = require("archiver");
 import * as fs from "fs";
 import * as unzipper from "unzipper";
 
@@ -37,4 +38,29 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
       resolve("Zipped");
     });
   });
+};
+
+/**
+ * Packages local files into a ZIP archive
+ *
+ * @param {docsPortalFolderPath} path to portal directory.
+ * @param {destinationZipPath} path to generated zip
+ * return {string}
+ */
+export const zipDirectory = async (sourcePath: string, destinationPath: string) => {
+  const zipPath = `${destinationPath}/target.zip`;
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver("zip");
+
+  archive.on("error", (err) => {
+    throw err;
+  });
+
+  archive.pipe(output);
+
+  // append files from a sub-directory, putting its contents at the root of archive
+  archive.directory(sourcePath, false);
+
+  await archive.finalize();
+  return zipPath;
 };

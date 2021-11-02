@@ -1,35 +1,23 @@
 import * as fs from "fs";
-import * as archiver from "archiver";
 import { ApiResponse, Client, DocsPortalManagementController, FileWrapper } from "@apimatic/apimatic-sdk-for-js";
 import cli from "cli-ux";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { writeZipUsingReadableStream, unzipFile, deleteFile } from "../../utils/utils";
+import { writeZipUsingReadableStream, unzipFile, deleteFile, zipDirectory } from "../../utils/utils";
 
 type GeneratePortalParams = {
   zippedBuildFilePath: string;
   destinationPath: string;
-  name: string;
   docsPortalController: DocsPortalManagementController;
 };
 
-type File = {
-  name: string;
-  path: string;
-};
-
 export default class PortalGenerate extends Command {
-  static description = "Generate SDKs for your APIs";
+  static description = "Generate static docs portal on premise";
 
   static flags = {
     help: flags.help({ char: "h" }),
-    platform: flags.string({
-      parse: (input) => input.toUpperCase(),
-      required: true,
-      description: "Platform for which the SDK should be generated for"
-    }),
-    file: flags.string({ default: "", description: "Path to specification file to generate SDK for" }),
-    destination: flags.string({ default: "./", description: "Path to download the generated SDK to" }),
+    folder: flags.string({ default: "", description: "Path to the folder to generate portal with" }),
+    destination: flags.string({ default: "./", description: "Path to download the generated portal to" }),
     "auth-key": flags.string({
       default: "",
       description: "Override current auth-key by providing authentication key in the command"
@@ -37,20 +25,15 @@ export default class PortalGenerate extends Command {
   };
 
   static examples = [
-    `$ apimatic sdk:generate --platform="CS_NET_STANDARD_LIB" --file="./specs/sample.json"
-    Your SDK has been generated with id: 1324abcd
+    `$ apimatic portal:generate --folder="./portal/"
+Your portal has been generated at D:/
 `
   ];
 
   // Download Docs Portal
-  downloadDocsPortal = async ({
-    zippedBuildFilePath,
-    destinationPath,
-    name,
-    docsPortalController
-  }: GeneratePortalParams) => {
-    const zippedPortalPath: string = `${destinationPath}/${name}_portal.zip`;
-    const portalPath: string = `${destinationPath}/${name}_portal`;
+  downloadDocsPortal = async ({ zippedBuildFilePath, destinationPath, docsPortalController }: GeneratePortalParams) => {
+    const zippedPortalPath: string = `${destinationPath}/generated_portal.zip`;
+    const portalPath: string = `${destinationPath}/generated_portal`;
 
     const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
@@ -66,53 +49,10 @@ export default class PortalGenerate extends Command {
     }
   };
 
-  /**
-   * Returns array of file names from specified directory
-   *
-   * @param {dir} directory of source files.
-   * return {array}
-   */
-  getDirectoryList = (dir: string) => {
-    const fileArray: File[] = [];
-    const files: string[] = fs.readdirSync(dir);
-
-    files.forEach((fileName) => {
-      const file = { name: fileName, path: dir };
-      fileArray.push(file);
-    });
-    return fileArray;
-  };
-
-  /**
-   * Packages local files into a ZIP archive
-   *
-   * @param {docsPortalFolderPath} path to portal directory.
-   * @param {destinationZipPath} path to generated zip
-   * return {string}
-   */
-  zipBuildFileDirectory = async (docsPortalFolderPath: string, destinationZipFolderPath: string) => {
-    const zipPath = `${destinationZipFolderPath}/target.zip`;
-    const output = fs.createWriteStream(zipPath);
-    const archive = archiver("zip");
-
-    archive.on("error", (err) => {
-      throw err;
-    });
-
-    archive.pipe(output);
-
-    // append files from a sub-directory, putting its contents at the root of archive
-    archive.directory(docsPortalFolderPath, false);
-
-    await archive.finalize();
-    this.log("Finalized archive");
-    return zipPath;
-  };
-
   async run() {
     const { flags } = this.parse(PortalGenerate);
 
-    const portalFolderPath: string = flags.file;
+    const portalFolderPath: string = flags.folder;
     const generatedPortalFolderPath: string = flags.destination;
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
@@ -120,11 +60,10 @@ export default class PortalGenerate extends Command {
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
 
-      const zippedBuildFilePath = await this.zipBuildFileDirectory(portalFolderPath, generatedPortalFolderPath);
+      const zippedBuildFilePath = await zipDirectory(portalFolderPath, generatedPortalFolderPath);
       const generatePortalParams: GeneratePortalParams = {
         zippedBuildFilePath,
         destinationPath: flags.destination,
-        name: flags.platform,
         docsPortalController
       };
       cli.action.start("Downloading your portal, please wait...", "saving", { stdout: true });
