@@ -2,7 +2,6 @@ import * as fs from "fs";
 import {
   TransformationController,
   FileWrapper,
-  ContentType,
   ExportFormats,
   Transformation,
   ApiResponse,
@@ -64,15 +63,9 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
     transformationController: TransformationController
   ) => {
     let generation: ApiResponse<Transformation>;
-
     if (file) {
-      const contentType = "multipart/form-data" as ContentType.EnumMultipartformdata;
-      const fileDescriptor = new FileWrapper(fs.createReadStream(`${file}`));
-      generation = await transformationController.transformViaFile(
-        contentType,
-        fileDescriptor,
-        format as ExportFormats
-      );
+      const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+      generation = await transformationController.transformViaFile(fileDescriptor, format as ExportFormats);
       return generation.result;
     } else if (url) {
       const body: TransformViaUrlRequest = {
@@ -123,8 +116,7 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
         throw new Error("Couldn't download transformation file");
       }
     } catch (error: any) {
-      this.log(JSON.stringify(error));
-      this.error(error.body);
+      this.error(JSON.stringify(error.result.errors[0]));
     }
   }
 }
