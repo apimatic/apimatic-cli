@@ -48,6 +48,10 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
  * return {string}
  */
 export const zipDirectory = async (sourcePath: string, destinationPath: string) => {
+  // Check if the directory exists for the user or not
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error("Folder to zip doesn't exist");
+  }
   const zipPath = `${destinationPath}/target.zip`;
   const output = fs.createWriteStream(zipPath);
   const archive = archiver("zip");

@@ -35,6 +35,11 @@ Your portal has been generated at D:/
     const zippedPortalPath: string = `${destinationPath}/generated_portal.zip`;
     const portalPath: string = `${destinationPath}/generated_portal`;
 
+    // Check if the build file exists for the user or not
+    if (!fs.existsSync(zippedBuildFilePath)) {
+      throw new Error("Build File doesn't exist");
+    }
+
     const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
       await docsPortalController.generateOnPremPortalViaBuildInput(file);
@@ -69,12 +74,8 @@ Your portal has been generated at D:/
       cli.action.start("Downloading your portal, please wait...", "saving", { stdout: true });
       const generatedPortalPath = await this.downloadDocsPortal(generatePortalParams);
       cli.action.stop(`\nYour portal has been generated at ${generatedPortalPath}`);
-
-      // console.log(result);
-      // console.log(httpResponse);
     } catch (error: any) {
-      this.log(JSON.stringify(error.statusCode));
-      // this.error(`${JSON.stringify(error?.body)}`);
+      this.error(error);
     }
   }
 }
