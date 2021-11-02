@@ -1,8 +1,10 @@
 import * as fs from "fs";
-import { ApiResponse, Client, DocsPortalManagementController, FileWrapper } from "@apimatic/apimatic-sdk-for-js";
 import cli from "cli-ux";
+
+import { ApiResponse, Client, DocsPortalManagementController, FileWrapper } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
+
 import { writeFileUsingReadableStream, unzipFile, deleteFile, zipDirectory } from "../../utils/utils";
 
 type GeneratePortalParams = {
@@ -50,7 +52,7 @@ Your portal has been generated at D:/
       await deleteFile(zippedBuildFilePath);
       return portalPath;
     } else {
-      throw new Error("Couldn't download the SDK");
+      throw new Error("Couldn't download the portal");
     }
   };
 
