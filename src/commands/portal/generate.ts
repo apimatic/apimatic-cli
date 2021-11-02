@@ -3,7 +3,7 @@ import { ApiResponse, Client, DocsPortalManagementController, FileWrapper } from
 import cli from "cli-ux";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { writeZipUsingReadableStream, unzipFile, deleteFile, zipDirectory } from "../../utils/utils";
+import { writeFileUsingReadableStream, unzipFile, deleteFile, zipDirectory } from "../../utils/utils";
 
 type GeneratePortalParams = {
   zippedBuildFilePath: string;
@@ -39,7 +39,7 @@ Your portal has been generated at D:/
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
       await docsPortalController.generateOnPremPortalViaBuildInput(file);
     if ((result as NodeJS.ReadableStream).readable) {
-      await writeZipUsingReadableStream(result as NodeJS.ReadableStream, zippedPortalPath);
+      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedPortalPath);
       await unzipFile(zippedPortalPath, portalPath);
       await deleteFile(zippedPortalPath);
       await deleteFile(zippedBuildFilePath);
