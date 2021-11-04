@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import cli from "cli-ux";
 
 import {
   ApiResponse,
@@ -13,7 +12,14 @@ import {
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import { writeFileUsingReadableStream, unzipFile, deleteFile } from "../../utils/utils";
+import {
+  writeFileUsingReadableStream,
+  unzipFile,
+  deleteFile,
+  stopProgress,
+  startProgress,
+  replaceHTML
+} from "../../utils/utils";
 
 type GenerationIdParams = {
   file: string;
@@ -68,12 +74,16 @@ export default class SdkGenerate extends Command {
   ) => {
     let generation: ApiResponse<UserCodeGeneration>;
     const sdkPlatform = this.getSDKPlatform(platform) as Platforms;
+    startProgress("Generating SDK");
 
+    if (!fs.existsSync(file)) {
+      throw new Error(`Specification file doesn't exist at ${file}`);
+    }
     // If spec file is provided
+
     if (file) {
       const fileDescriptor = new FileWrapper(fs.createReadStream(file));
       generation = await sdkGenerationController.generateSDKViaFile(fileDescriptor, sdkPlatform);
-      return generation.result.id;
     } else if (url) {
       // If url to spec file is provided
       const body: GenerateSdkViaUrlRequest = {
@@ -81,10 +91,12 @@ export default class SdkGenerate extends Command {
         template: sdkPlatform
       };
       generation = await sdkGenerationController.generateSDKViaURL(body);
-      return generation.result.id;
     } else {
+      stopProgress();
       throw new Error("Please provide a specification file");
     }
+    stopProgress();
+    return generation.result.id;
   };
 
   // Get valid platform from user's input, convert simple platform to valid Platforms enum value
@@ -104,9 +116,12 @@ export default class SdkGenerate extends Command {
     { codeGenId, zippedSDKPath, sdkFolderPath, unzip }: DownloadSDKParams,
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
+    startProgress("Downloading SDK");
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
     if ((result as NodeJS.ReadableStream).readable) {
       await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
+      stopProgress();
+
       if (unzip) {
         await unzipFile(zippedSDKPath, sdkFolderPath);
         await deleteFile(zippedSDKPath);
@@ -129,9 +144,7 @@ export default class SdkGenerate extends Command {
         client
       );
       // Get generation id for the specification and platform
-      cli.action.start("Fetching your SDK", "generating", { stdout: true });
       const codeGenId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
-      cli.action.stop(`\nYour SDK has been generated with id: ${codeGenId}`);
 
       // If user wanted to download the SDK as well
       if (flags.download) {
@@ -141,13 +154,16 @@ export default class SdkGenerate extends Command {
           sdkFolderPath,
           unzip: flags.unzip
         };
-        cli.action.start("Downloading your SDK, please wait...", "saving", { stdout: true });
         await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
-        cli.action.stop(`\nSuccess! Your SDK is located at ${sdkFolderPath}`);
+        this.log(`\nSuccess! Your SDK is located at ${sdkFolderPath}`);
       }
     } catch (error: any) {
-      this.log(JSON.stringify(error));
-      this.error(error);
+      stopProgress();
+      if (error.result && error.result.message) {
+        this.error(replaceHTML(`${JSON.parse(error.result.message).Errors[0]}`));
+      } else {
+        this.error(error);
+      }
     }
   }
 }
