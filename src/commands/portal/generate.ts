@@ -1,11 +1,14 @@
 import * as fs from "fs";
+import * as FormData from "form-data";
 import cli from "cli-ux";
 
-import { ApiResponse, Client, DocsPortalManagementController, FileWrapper } from "@apimatic/apimatic-sdk-for-js";
+import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import { writeFileUsingReadableStream, unzipFile, deleteFile, zipDirectory } from "../../utils/utils";
+import { unzipFile, deleteFile, zipDirectory } from "../../utils/utils";
+import axios, { AxiosResponse } from "@apimatic/core/node_modules/axios";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 
 type GeneratePortalParams = {
   zippedBuildFilePath: string;
@@ -32,28 +35,54 @@ Your portal has been generated at D:/
 `
   ];
 
+  // TODO: Remove after SDK is patched
+  downloadPortalAxios = async (zippedBuildFilePath: string) => {
+    const formData = new FormData();
+    const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+    console.log(authInfo ? authInfo.authKey : "");
+    formData.append("file", fs.createReadStream(zippedBuildFilePath));
+    const config = {
+      headers: {
+        Authorization: authInfo ? `X-Auth-Key ${authInfo.authKey.trim()}` : "",
+        "Content-Type": "multipart/form-data",
+        ...formData.getHeaders()
+      },
+      responseType: "arraybuffer"
+    };
+    const { data }: AxiosResponse = await axios.post(
+      "https://apimaticio-test.azurewebsites.net/api/portal",
+      formData,
+      config
+    );
+    return data;
+  };
+
   // Download Docs Portal
-  downloadDocsPortal = async ({ zippedBuildFilePath, destinationPath, docsPortalController }: GeneratePortalParams) => {
+  downloadDocsPortal = async ({ zippedBuildFilePath, destinationPath }: GeneratePortalParams) => {
     const zippedPortalPath: string = `${destinationPath}/generated_portal.zip`;
     const portalPath: string = `${destinationPath}/generated_portal`;
 
     // Check if the build file exists for the user or not
     if (!fs.existsSync(zippedBuildFilePath)) {
-      throw new Error("Build File doesn't exist");
+      throw new Error("Build file doesn't exist");
     }
+    // const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
+    // const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
+    //   await docsPortalController.generateOnPremPortalViaBuildInput(file);
 
-    const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
-    const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
-      await docsPortalController.generateOnPremPortalViaBuildInput(file);
-    if ((result as NodeJS.ReadableStream).readable) {
-      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedPortalPath);
-      await unzipFile(zippedPortalPath, portalPath);
-      await deleteFile(zippedPortalPath);
-      await deleteFile(zippedBuildFilePath);
-      return portalPath;
-    } else {
-      throw new Error("Couldn't download the portal");
-    }
+    // TODO: ***Critical*** Convert it back to SDK call once it is patched
+    const data = await this.downloadPortalAxios(zippedBuildFilePath);
+
+    fs.writeFileSync(zippedPortalPath, data);
+    // if ((data as NodeJS.ReadableStream).readable) {
+    //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
+    await unzipFile(zippedPortalPath, portalPath);
+    await deleteFile(zippedPortalPath);
+    await deleteFile(zippedBuildFilePath);
+    return portalPath;
+    // } else {
+    //   throw new Error("Couldn't download the portal");
+    // }
   };
 
   async run() {
@@ -73,11 +102,25 @@ Your portal has been generated at D:/
         destinationPath: flags.destination,
         docsPortalController
       };
+
       cli.action.start("Downloading your portal, please wait...", "saving", { stdout: true });
       const generatedPortalPath = await this.downloadDocsPortal(generatePortalParams);
       cli.action.stop(`\nYour portal has been generated at ${generatedPortalPath}`);
     } catch (error: any) {
-      this.error(error);
+      const response = error.response.data ? error.response.data : error.response;
+
+      if (JSON.parse(response.toString())) {
+        const nested = JSON.parse(response.toString());
+
+        if (nested.error) {
+          return this.error(nested.error);
+        } else if (nested.message) {
+          return this.error(nested.message);
+        }
+      } else if (error.response.data) {
+        return this.error(response.toString());
+      }
+      this.error(new Error(error.response));
     }
   }
 }

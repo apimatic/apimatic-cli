@@ -1,5 +1,7 @@
-import archiver = require("archiver");
 import * as fs from "fs";
+import cli from "cli-ux";
+
+import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 
 export const unzipFile = (source: string, destination: string) => {
@@ -33,7 +35,7 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
     stream.pipe(writeStream);
     writeStream.on("close", (error: Error) => {
       if (error) {
-        reject(new Error("Couldn't zip the stream"));
+        return reject(new Error("Couldn't zip the stream"));
       }
       resolve("Zipped");
     });
@@ -67,4 +69,40 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string) 
 
   await archive.finalize();
   return zipPath;
+};
+
+type ProgressBar = {
+  start: () => {};
+  stop: () => {};
+  update: (progress: number) => {};
+};
+
+let progressBar: ProgressBar;
+
+export const startProgress = (title: string) => {
+  progressBar = cli.progress({
+    format: `${title} | {bar}`,
+    barCompleteChar: "\u2588",
+    barIncompleteChar: "\u2591"
+  });
+  progressBar.start();
+  const total = 100;
+  let count = 0;
+
+  const iv = setInterval(() => {
+    count++;
+    progressBar.update(count);
+    if (count === total) {
+      clearInterval(iv);
+    }
+  }, 50);
+};
+
+export const stopProgress = () => {
+  progressBar.update(100);
+  progressBar.stop();
+};
+
+export const replaceHTML = (string: string) => {
+  return string.replace(/<[^>]*>?/gm, "");
 };
