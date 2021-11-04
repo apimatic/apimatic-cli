@@ -48,7 +48,6 @@ export class SDKClient {
 
     if (storedAuthInfo.email !== email) {
       try {
-        console.log(authKey);
         setAuthInfo(
           {
             email,
@@ -57,16 +56,14 @@ export class SDKClient {
           configDir
         );
 
-        return "Logged In";
+        return "Logged in";
       } catch (error: any) {
-        console.log(error);
         throw new Error(error);
       }
     } else {
       if (authKey === storedAuthInfo.authKey) {
         return "Already logged in";
       }
-      console.log(authKey);
       setAuthInfo(
         {
           email,
@@ -103,8 +100,8 @@ export class SDKClient {
       }
 
       return storedAuthInfo.email !== "" && storedAuthInfo.authKey !== ""
-        ? `Currently logged in as ${storedAuthInfo.email} with ${storedAuthInfo.authKey}`
-        : "Not Logged In";
+        ? `Currently logged in as ${storedAuthInfo.email}`
+        : "Not Logged in";
     } catch (error: any) {
       throw new Error(JSON.stringify(error));
     }

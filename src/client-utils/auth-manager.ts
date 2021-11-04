@@ -13,9 +13,9 @@ export function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
   return new Promise((resolve, reject) => {
     fs.readFile(`${configDir}/config.json`, "utf8", (err: any, data: string) => {
       if (err) {
-        err.code === "ENOENT" ? resolve(null) : reject(err);
+        return err.code === "ENOENT" ? resolve(null) : reject(err);
       }
-      data ? resolve(JSON.parse(data)) : resolve(null);
+      return data ? resolve(JSON.parse(data)) : resolve(null);
     });
   });
 }

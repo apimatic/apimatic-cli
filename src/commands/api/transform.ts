@@ -1,4 +1,5 @@
 import * as fs from "fs";
+
 import {
   TransformationController,
   FileWrapper,
@@ -11,12 +12,18 @@ import {
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
-import { writeFileUsingReadableStream } from "../../utils/utils";
+import { startProgress, stopProgress, writeFileUsingReadableStream } from "../../utils/utils";
 
-type TransformationIdFlags = {
+type TransformationIdParams = {
   file: string;
   url: string;
   format: string;
+};
+
+type DownloadTransformationParams = {
+  id: string;
+  destinationFilePath: string;
+  transformationController: TransformationController;
 };
 
 type TransformationData = {
@@ -27,7 +34,7 @@ export default class Transform extends Command {
 
   static examples = [
     `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json"
-Success! Your file is located at D:/Transformed_OpenApi3Json.json
+Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
 `
   ];
 
@@ -59,7 +66,7 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
   };
 
   getTransformationId = async (
-    { file, url, format }: TransformationIdFlags,
+    { file, url, format }: TransformationIdParams,
     transformationController: TransformationController
   ) => {
     let generation: ApiResponse<Transformation>;
@@ -76,6 +83,22 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
       return generation.result;
     } else {
       throw new Error("Please provide a specification file");
+    }
+  };
+
+  downloadTransformationFile = async ({
+    id,
+    destinationFilePath,
+    transformationController
+  }: DownloadTransformationParams) => {
+    startProgress("Downloading Transformed File");
+    const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
+    stopProgress();
+
+    if ((result as NodeJS.ReadableStream).readable) {
+      return await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
+    } else {
+      throw new Error("Couldn't download transformation file");
     }
   };
 
@@ -107,14 +130,8 @@ Success! Your file is located at D:/Transformed_OpenApi3Json.json
 
       this.printValidationMessages(warnings, errors);
 
-      const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
-
-      if ((result as NodeJS.ReadableStream).readable) {
-        await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
-        this.log(`Success! Your file is located at ${destinationFilePath}`);
-      } else {
-        throw new Error("Couldn't download transformation file");
-      }
+      await this.downloadTransformationFile({ id, destinationFilePath, transformationController });
+      this.log(`Success! Your transformed file is located at ${destinationFilePath}`);
     } catch (error: any) {
       this.error(JSON.stringify(error.result.errors[0]));
     }

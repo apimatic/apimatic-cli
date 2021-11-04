@@ -1,4 +1,5 @@
 import * as fs from "fs";
+
 import {
   ApiResponse,
   APIValidationExternalApisController,
@@ -9,6 +10,7 @@ import {
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
+import { startProgress, stopProgress } from "../../utils/utils";
 
 type GetValidationParams = {
   file: string;
@@ -38,17 +40,20 @@ Specification file provided is valid
   ) => {
     let validation: ApiResponse<ApiValidationSummary>;
 
+    if (!fs.existsSync(file)) {
+      throw new Error("Specification file doesn't exist");
+    }
+    startProgress("Validating");
     if (file) {
       const fileDescriptor = new FileWrapper(fs.createReadStream(file));
       validation = await apiValidationController.validateAPIViaFile(fileDescriptor);
-
-      return validation.result;
     } else if (url) {
       validation = await apiValidationController.validateAPIViaURL(url);
-      return validation.result;
     } else {
       throw new Error("Please provide a specification file");
     }
+    stopProgress();
+    return validation.result;
   };
 
   printValidationMessages = (warnings: string[], errors: string[]) => {
@@ -75,12 +80,15 @@ Specification file provided is valid
         flags,
         apiValidationController
       );
-
       this.printValidationMessages(warnings, errors);
 
       this.log(`${success ? "Specification file provided is valid" : "Specification is invalid"}`);
     } catch (error: any) {
-      this.log(JSON.parse(error.body).message);
+      if (error.result && error.result.modelState) {
+        this.error(JSON.stringify(error.result.modelState["exception Error"][0]));
+      } else {
+        this.error(error);
+      }
     }
   }
 }
