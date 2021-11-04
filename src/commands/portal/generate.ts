@@ -6,7 +6,7 @@ import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-f
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import { unzipFile, deleteFile, zipDirectory } from "../../utils/utils";
+import { unzipFile, deleteFile, zipDirectory, replaceHTML } from "../../utils/utils";
 import axios, { AxiosResponse } from "@apimatic/core/node_modules/axios";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 
@@ -110,15 +110,15 @@ Your portal has been generated at D:/
       const response = error.response.data ? error.response.data : error.response;
 
       if (JSON.parse(response.toString())) {
-        const nested = JSON.parse(response.toString());
+        const nestedErrors = JSON.parse(response.toString());
 
-        if (nested.error) {
-          return this.error(nested.error);
-        } else if (nested.message) {
-          return this.error(nested.message);
+        if (nestedErrors.error) {
+          return this.error(replaceHTML(nestedErrors.error));
+        } else if (nestedErrors.message) {
+          return this.error(replaceHTML(nestedErrors.message));
         }
       } else if (error.response.data) {
-        return this.error(response.toString());
+        return this.error(replaceHTML(response.toString()));
       }
       this.error(new Error(error.response));
     }
