@@ -1,18 +1,18 @@
 import * as fs from "fs";
 import * as FormData from "form-data";
-import cli from "cli-ux";
+import * as path from "path";
 
 import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import { unzipFile, deleteFile, zipDirectory, replaceHTML } from "../../utils/utils";
+import { unzipFile, deleteFile, zipDirectory, replaceHTML, stopProgress, startProgress } from "../../utils/utils";
 import axios, { AxiosResponse } from "@apimatic/core/node_modules/axios";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 
 type GeneratePortalParams = {
   zippedBuildFilePath: string;
-  destinationPath: string;
+  generatedPortalFolderPath: string;
   docsPortalController: DocsPortalManagementController;
 };
 
@@ -39,7 +39,6 @@ Your portal has been generated at D:/
   downloadPortalAxios = async (zippedBuildFilePath: string) => {
     const formData = new FormData();
     const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
-    console.log(authInfo ? authInfo.authKey : "");
     formData.append("file", fs.createReadStream(zippedBuildFilePath));
     const config = {
       headers: {
@@ -58,27 +57,30 @@ Your portal has been generated at D:/
   };
 
   // Download Docs Portal
-  downloadDocsPortal = async ({ zippedBuildFilePath, destinationPath }: GeneratePortalParams) => {
-    const zippedPortalPath: string = `${destinationPath}/generated_portal.zip`;
-    const portalPath: string = `${destinationPath}/generated_portal`;
+  downloadDocsPortal = async ({ zippedBuildFilePath, generatedPortalFolderPath }: GeneratePortalParams) => {
+    const zippedPortalPath: string = path.join(generatedPortalFolderPath, "generated_portal.zip");
+    const portalPath: string = path.join(generatedPortalFolderPath, "generated_portal");
+
+    startProgress("Downloading portal");
 
     // Check if the build file exists for the user or not
     if (!fs.existsSync(zippedBuildFilePath)) {
       throw new Error("Build file doesn't exist");
     }
+    // TODO: ***CRITICAL*** Convert it back to SDK call once it is patched
+    const data = await this.downloadPortalAxios(zippedBuildFilePath);
+    fs.writeFileSync(zippedPortalPath, data);
+
     // const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
     // const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
     //   await docsPortalController.generateOnPremPortalViaBuildInput(file);
-
-    // TODO: ***Critical*** Convert it back to SDK call once it is patched
-    const data = await this.downloadPortalAxios(zippedBuildFilePath);
-
-    fs.writeFileSync(zippedPortalPath, data);
     // if ((data as NodeJS.ReadableStream).readable) {
     //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
     await unzipFile(zippedPortalPath, portalPath);
     await deleteFile(zippedPortalPath);
     await deleteFile(zippedBuildFilePath);
+
+    stopProgress();
     return portalPath;
     // } else {
     //   throw new Error("Couldn't download the portal");
@@ -99,16 +101,15 @@ Your portal has been generated at D:/
       const zippedBuildFilePath = await zipDirectory(portalFolderPath, generatedPortalFolderPath);
       const generatePortalParams: GeneratePortalParams = {
         zippedBuildFilePath,
-        destinationPath: flags.destination,
+        generatedPortalFolderPath,
         docsPortalController
       };
 
-      cli.action.start("Downloading your portal, please wait...", "saving", { stdout: true });
-      const generatedPortalPath = await this.downloadDocsPortal(generatePortalParams);
-      cli.action.stop(`\nYour portal has been generated at ${generatedPortalPath}`);
+      const generatedPortalPath: string = await this.downloadDocsPortal(generatePortalParams);
+
+      this.log(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error: any) {
       const response = error.response.data ? error.response.data : error.response;
-
       if (JSON.parse(response.toString())) {
         const nestedErrors = JSON.parse(response.toString());
 

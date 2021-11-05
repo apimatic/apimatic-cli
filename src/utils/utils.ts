@@ -1,8 +1,8 @@
 import * as fs from "fs";
-import cli from "cli-ux";
-
+import * as path from "path";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
+import cli from "cli-ux";
 
 export const unzipFile = (source: string, destination: string) => {
   return new Promise((resolve, reject) => {
@@ -54,7 +54,7 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string) 
   if (!fs.existsSync(sourcePath)) {
     throw new Error("Folder to zip doesn't exist");
   }
-  const zipPath = `${destinationPath}/target.zip`;
+  const zipPath = path.join(destinationPath, "target.zip");
   const output = fs.createWriteStream(zipPath);
   const archive = archiver("zip");
 
@@ -92,7 +92,7 @@ export const startProgress = (title: string) => {
   const iv = setInterval(() => {
     count++;
     progressBar.update(count);
-    if (count === total) {
+    if (count === total - 1) {
       clearInterval(iv);
     }
   }, 50);
