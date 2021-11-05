@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as path from "path";
 
 import {
   TransformationController,
@@ -12,7 +13,7 @@ import {
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
-import { startProgress, stopProgress, writeFileUsingReadableStream } from "../../utils/utils";
+import { replaceHTML, startProgress, stopProgress, writeFileUsingReadableStream } from "../../utils/utils";
 
 type TransformationIdParams = {
   file: string;
@@ -73,17 +74,16 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
     if (file) {
       const fileDescriptor = new FileWrapper(fs.createReadStream(file));
       generation = await transformationController.transformViaFile(fileDescriptor, format as ExportFormats);
-      return generation.result;
     } else if (url) {
       const body: TransformViaUrlRequest = {
         url: url,
         exportFormat: format as ExportFormats
       };
       generation = await transformationController.transformViaURL(body);
-      return generation.result;
     } else {
       throw new Error("Please provide a specification file");
     }
+    return generation.result;
   };
 
   downloadTransformationFile = async ({
@@ -104,7 +104,7 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
 
   printValidationMessages = (warnings: string[], errors: string[]) => {
     warnings.forEach((warning) => {
-      this.log(`Warning: ${warning}`);
+      this.warn(warning);
     });
     errors.forEach((error) => {
       this.log(`Error: ${error}`);
@@ -114,7 +114,12 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
   async run() {
     const { flags } = this.parse(Transform);
     const destinationFormat: string = flags.format.toLowerCase().includes("yaml") ? "yml" : "json";
-    const destinationFilePath: string = `${flags.destination}/Transformed_${flags.format}.${destinationFormat}`;
+    const destinationFilePath: string = path.join(
+      flags.destination,
+      "Transformed_",
+      flags.format,
+      `.${destinationFormat}`
+    );
 
     try {
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
@@ -133,7 +138,13 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
       await this.downloadTransformationFile({ id, destinationFilePath, transformationController });
       this.log(`Success! Your transformed file is located at ${destinationFilePath}`);
     } catch (error: any) {
-      this.error(JSON.stringify(error.result.errors[0]));
+      if (error.result && error.result.errors) {
+        this.error(replaceHTML(error.result.errors[0]));
+      } else if (error.body) {
+        this.error(error.body);
+      } else {
+        this.error(error.message);
+      }
     }
   }
 }
