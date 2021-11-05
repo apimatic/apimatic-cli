@@ -98,9 +98,12 @@ export const startProgress = (title: string) => {
   }, 50);
 };
 
-export const stopProgress = () => {
+export const stopProgress = (isError: boolean = false) => {
+  if (isError) {
+    return progressBar.stop();
+  }
   progressBar.update(100);
-  progressBar.stop();
+  return progressBar.stop();
 };
 
 export const replaceHTML = (string: string) => {
