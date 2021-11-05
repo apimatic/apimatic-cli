@@ -84,6 +84,8 @@ Specification file provided is valid
     } catch (error: any) {
       if (error.result && error.result.modelState) {
         this.error(replaceHTML(error.result.modelState["exception Error"][0]));
+      } else if (error.body) {
+        this.error(error.body);
       } else {
         this.error(error.message);
       }
