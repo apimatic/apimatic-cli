@@ -536,26 +536,6 @@ EXAMPLES
 
 _See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v0.3.0/src/commands/autocomplete/index.ts)_
 
-## `apimatic hello [FILE]`
-
-describe the command here
-
-```
-USAGE
-  $ apimatic hello [FILE]
-
-OPTIONS
-  -f, --force
-  -h, --help       show CLI help
-  -n, --name=name  name to print
-
-EXAMPLE
-  $ apimatic hello
-  hello world from ./src/hello.ts!
-```
-
-_See code: [src/commands/hello.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/hello.ts)_
-
 ## `apimatic help [COMMAND]`
 
 display help for apimatic
