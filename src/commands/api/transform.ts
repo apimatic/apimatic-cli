@@ -96,10 +96,11 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
     stopProgress();
 
     if ((result as NodeJS.ReadableStream).readable) {
-      return await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
+      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
     } else {
-      throw new Error("Couldn't download transformation file");
+      throw new Error("Couldn't save transformation file");
     }
+    return destinationFilePath;
   };
 
   printValidationMessages = (warnings: string[], errors: string[]) => {
@@ -116,9 +117,7 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
     const destinationFormat: string = flags.format.toLowerCase().includes("yaml") ? "yml" : "json";
     const destinationFilePath: string = path.join(
       flags.destination,
-      "Transformed_",
-      flags.format,
-      `.${destinationFormat}`
+      `Transformed_${flags.format}.${destinationFormat}`
     );
 
     try {
@@ -135,8 +134,8 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
 
       this.printValidationMessages(warnings, errors);
 
-      await this.downloadTransformationFile({ id, destinationFilePath, transformationController });
-      this.log(`Success! Your transformed file is located at ${destinationFilePath}`);
+      const saveFile = await this.downloadTransformationFile({ id, destinationFilePath, transformationController });
+      this.log(`Success! Your transformed file is located at ${saveFile}`);
     } catch (error: any) {
       if (error.result && error.result.errors) {
         this.error(replaceHTML(error.result.errors[0]));
