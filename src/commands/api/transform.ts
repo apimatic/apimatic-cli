@@ -147,10 +147,10 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
         // TODO: Hopefully, this type-cast won't be necessary when the SDK is
         // updated to throw the right exception type for this status code.
         const result = error.result as Record<string, unknown> | undefined;
-        if (result && 'errors' in result && Array.isArray(result.errors)) {
+        if (result && "errors" in result && Array.isArray(result.errors)) {
           // TODO: Why only the first error is logged?
-          this.error(replaceHTML((result.errors)[0]));
-        } else if (typeof error.body === 'string') {
+          this.error(replaceHTML(result.errors[0]));
+        } else if (typeof error.body === "string") {
           // TODO: Body can also be a stream. I've ignored that case but we need
           // to check whether that can happen here and if it does, handle that.
           this.error(error.body);

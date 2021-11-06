@@ -125,6 +125,4 @@ export const replaceHTML = (string: string) => {
 };
 
 export const isApiError = (value: unknown): value is ApiError =>
-  typeof value === 'object' &&
-  value != null &&
-  value.constructor.name === ApiError.prototype.constructor.name;
+  typeof value === "object" && value != null && value.constructor.name === ApiError.prototype.constructor.name;
