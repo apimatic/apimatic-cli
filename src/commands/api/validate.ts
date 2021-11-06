@@ -1,4 +1,6 @@
 import * as fs from "fs";
+import cli from "cli-ux";
+
 import {
   ApiResponse,
   APIValidationExternalApisController,
@@ -9,6 +11,7 @@ import {
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
+import { replaceHTML } from "../../utils/utils";
 
 type GetValidationParams = {
   file: string;
@@ -38,25 +41,25 @@ Specification file provided is valid
   ) => {
     let validation: ApiResponse<ApiValidationSummary>;
 
+    cli.action.start("Validating specification file");
     if (file) {
       const fileDescriptor = new FileWrapper(fs.createReadStream(file));
       validation = await apiValidationController.validateAPIViaFile(fileDescriptor);
-
-      return validation.result;
     } else if (url) {
       validation = await apiValidationController.validateAPIViaURL(url);
-      return validation.result;
     } else {
       throw new Error("Please provide a specification file");
     }
+    cli.action.stop();
+    return validation.result;
   };
 
   printValidationMessages = (warnings: string[], errors: string[]) => {
     warnings.forEach((warning) => {
-      this.log(`Warning: ${warning}`);
+      this.warn(`${replaceHTML(warning)}`);
     });
     errors.forEach((error) => {
-      this.log(`Error: ${error}`);
+      this.log(`Error: ${replaceHTML(error)}`);
     });
   };
 
@@ -75,12 +78,17 @@ Specification file provided is valid
         flags,
         apiValidationController
       );
-
       this.printValidationMessages(warnings, errors);
 
-      this.log(`${success ? "Specification file provided is valid" : "Specification is invalid"}`);
+      success ? this.log("Specification file provided is valid") : this.error("Specification file provided is invalid");
     } catch (error: any) {
-      this.log(JSON.parse(error.body).message);
+      if (error.result && error.result.modelState) {
+        this.error(replaceHTML(error.result.modelState["exception Error"][0]));
+      } else if (error.body) {
+        this.error(error.body);
+      } else {
+        this.error(error.message);
+      }
     }
   }
 }
