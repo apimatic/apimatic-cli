@@ -24,6 +24,8 @@
         "eslint-config-prettier": "^8.3.0",
         "eslint-plugin-import": "^2.25.2",
         "globby": "^10.0.2",
+        "husky": "^7.0.4",
+        "lint-staged": "^11.2.6",
         "mocha": "^5.2.0",
         "nyc": "^14.1.1",
         "prettier": "^2.4.1",
@@ -70,7 +72,8 @@
         "prettier": "prettier \"src/**/*.{js,ts}\"",
         "format": "prettier --write \"src/**/*.{js,ts}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
-        "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet"
+        "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
+        "prepare": "husky install"
     },
     "types": "lib/index.d.ts",
     "dependencies": {
@@ -86,5 +89,9 @@
         "form-data": "^4.0.0",
         "tslib": "^1.14.1",
         "unzipper": "^0.10.11"
+    },
+    "lint-staged": {
+        "*.js": "eslint --cache --fix",
+        "*.{js,ts}": "prettier --write"
     }
 }
