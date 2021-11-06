@@ -5,10 +5,9 @@ import * as path from "path";
 import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
-
 import { unzipFile, deleteFile, zipDirectory, replaceHTML, stopProgress, startProgress } from "../../utils/utils";
-import axios, { AxiosResponse } from "@apimatic/core/node_modules/axios";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 
 type GeneratePortalParams = {
   zippedBuildFilePath: string;
@@ -40,7 +39,7 @@ Your portal has been generated at D:/
     const formData = new FormData();
     const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
     formData.append("file", fs.createReadStream(zippedBuildFilePath));
-    const config = {
+    const config: AxiosRequestConfig = {
       headers: {
         Authorization: authInfo ? `X-Auth-Key ${authInfo.authKey.trim()}` : "",
         "Content-Type": "multipart/form-data",
@@ -109,6 +108,8 @@ Your portal has been generated at D:/
 
       this.log(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error: any) {
+      // TODO: Remove "any" type and do proper error handling. A lot of cases
+      // are being missed right now.
       const response = error.response.data ? error.response.data : error.response;
       if (JSON.parse(response.toString())) {
         const nestedErrors = JSON.parse(response.toString());

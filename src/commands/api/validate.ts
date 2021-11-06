@@ -82,6 +82,8 @@ Specification file provided is valid
 
       success ? this.log("Specification file provided is valid") : this.error("Specification file provided is invalid");
     } catch (error: any) {
+      // TODO: Fix any and put proper error handling here. A lot of bugs are
+      // being ignored, thanks to the "any" type.
       if (error.result && error.result.modelState) {
         this.error(replaceHTML(error.result.modelState["exception Error"][0]));
       } else if (error.body) {

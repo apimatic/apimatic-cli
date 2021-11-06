@@ -12,7 +12,7 @@ export type AuthInfo = {
  */
 export function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
   return new Promise((resolve, reject) => {
-    fs.readFile(path.join(configDir, "config.json"), "utf8", (err: any, data: string) => {
+    fs.readFile(path.join(configDir, "config.json"), "utf8", (err, data) => {
       if (err) {
         return err.code === "ENOENT" ? resolve(null) : reject(err);
       }
@@ -28,7 +28,7 @@ export function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
  * //Function to set credentials.
  */
 export function setAuthInfo(credentials: AuthInfo, configDir: string) {
-  fs.writeFile(path.join(configDir, "config.json"), JSON.stringify(credentials), (err: any) => {
+  fs.writeFile(path.join(configDir, "config.json"), JSON.stringify(credentials), (err) => {
     if (err) {
       return err;
     }

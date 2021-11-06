@@ -3,6 +3,7 @@ import * as path from "path";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import cli from "cli-ux";
+import { ApiError } from "@apimatic/core";
 
 export const unzipFile = (source: string, destination: string) => {
   return new Promise((resolve, reject) => {
@@ -72,13 +73,23 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string) 
 };
 
 type ProgressBar = {
-  start: () => {};
-  stop: () => {};
-  update: (progress: number) => {};
+  start: () => void;
+  stop: () => void;
+  update: (progress: number) => void;
 };
 
+// TODO: Instead of making progressBar a static, you should have "startProgress"
+// return the instance of the progress bar created, the same way "cli.progress"
+// method does.
 let progressBar: ProgressBar;
 
+// TODO: I didn't mean to say that we should create a fake progress bar when we
+// set the requirements to include progress bar. You should get the download or
+// upload progress by tracking how much of the steam has been read/written and
+// compare that with the remaining size of the stream (in case of upload, you
+// get size from the file size and in case of download, you get it from the
+// content-type header). In case the progress can not be calculated, show a
+// spinner.
 export const startProgress = (title: string) => {
   progressBar = cli.progress({
     format: `${title} | {bar}`,
@@ -98,7 +109,7 @@ export const startProgress = (title: string) => {
   }, 50);
 };
 
-export const stopProgress = (isError: boolean = false) => {
+export const stopProgress = (isError = false) => {
   if (isError) {
     return progressBar.stop();
   }
@@ -106,6 +117,14 @@ export const stopProgress = (isError: boolean = false) => {
   return progressBar.stop();
 };
 
+// TODO: Don't use regex to handle HTML. Better to use a proper HTML parser to
+// strip HTML from the text. Or use a library that returns text stripped of HTML
+// directly.
 export const replaceHTML = (string: string) => {
   return string.replace(/<[^>]*>?/gm, "");
 };
+
+export const isApiError = (value: unknown): value is ApiError =>
+  typeof value === 'object' &&
+  value != null &&
+  value.constructor.name === ApiError.prototype.constructor.name;

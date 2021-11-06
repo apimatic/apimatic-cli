@@ -47,19 +47,15 @@ export class SDKClient {
     const authKey: string = await this.getAuthKey(credentials);
 
     if (storedAuthInfo.email !== email) {
-      try {
-        setAuthInfo(
-          {
-            email,
-            authKey
-          },
-          configDir
-        );
+      setAuthInfo(
+        {
+          email,
+          authKey
+        },
+        configDir
+      );
 
-        return "Logged in";
-      } catch (error: any) {
-        throw new Error(error);
-      }
+      return "Logged in";
     } else {
       if (authKey === storedAuthInfo.authKey) {
         return "Already logged in";
@@ -76,18 +72,14 @@ export class SDKClient {
   }
 
   public async logout(configDir: string): Promise<string> {
-    try {
-      setAuthInfo(
-        {
-          email: "",
-          authKey: ""
-        },
-        configDir
-      );
-      return "Logged out";
-    } catch (error: unknown) {
-      throw new Error(error as string);
-    }
+    setAuthInfo(
+      {
+        email: "",
+        authKey: ""
+      },
+      configDir
+    );
+    return "Logged out";
   }
 
   public async status(configDir: string): Promise<string> {
@@ -102,7 +94,8 @@ export class SDKClient {
       return storedAuthInfo.email !== "" && storedAuthInfo.authKey !== ""
         ? `Currently logged in as ${storedAuthInfo.email}`
         : "Not Logged in";
-    } catch (error: any) {
+    } catch (error) {
+      // TODO: Do proper handling instead of printing the error as JSON
       throw new Error(JSON.stringify(error));
     }
   }
@@ -131,17 +124,13 @@ export class SDKClient {
   }
 
   private async getAuthKey(credentials: Credentials): Promise<string> {
-    try {
-      const config = {
-        headers: {
-          Authorization: `Basic ${base64.encode(`${credentials.email}:${credentials.password}`)}`
-        }
-      };
-      const response: AxiosResponse = await axios.get(SDKClient.authAPI, config);
-      const authKey: string = response.data.EncryptedValue;
-      return authKey;
-    } catch (error: any) {
-      throw new Error(error);
-    }
+    const config = {
+      headers: {
+        Authorization: `Basic ${base64.encode(`${credentials.email}:${credentials.password}`)}`
+      }
+    };
+    const response: AxiosResponse = await axios.get(SDKClient.authAPI, config);
+    const authKey: string = response.data.EncryptedValue;
+    return authKey;
   }
 }

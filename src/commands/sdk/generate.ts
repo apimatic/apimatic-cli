@@ -134,8 +134,8 @@ export default class SdkGenerate extends Command {
   async run() {
     const { flags } = this.parse(SdkGenerate);
 
-    const sdkFolderPath: string = `${flags.destination}/Generated_${flags.platform}`;
-    const zippedSDKPath: string = `${flags.destination}/Generated_${flags.platform}.zip`;
+    const sdkFolderPath = `${flags.destination}/Generated_${flags.platform}`;
+    const zippedSDKPath = `${flags.destination}/Generated_${flags.platform}.zip`;
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
     try {
@@ -158,6 +158,8 @@ export default class SdkGenerate extends Command {
         this.log(`\nSuccess! Your SDK is located at ${sdkFolderPath}`);
       }
     } catch (error: any) {
+      // TODO: Remove the "any" type and do proper error-handling here. A lot of
+      // cases are being missed in the code because we used "any".
       stopProgress();
       if (error.result && error.result.message) {
         this.error(replaceHTML(`${JSON.parse(error.result.message).Errors[0]}`));
