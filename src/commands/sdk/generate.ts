@@ -119,6 +119,12 @@ export default class SdkGenerate extends Command {
     startProgress("Downloading SDK");
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
     if ((result as NodeJS.ReadableStream).readable) {
+      // TODO: You don't need to write the stream to a file before passing it to
+      // the unzipping library. The unzipping library works on streams so you
+      // can just pass the result stream to it to unzip. Otherwise, we're doing
+      // the extra work of writing the stream to the file and creating a new
+      // stream from that file to unzip. I hope my suggestion works; I haven't
+      // tried this myself so fingers crossed.
       await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
       stopProgress();
 

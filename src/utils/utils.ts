@@ -1,3 +1,4 @@
+// TODO: Use fs-extra. See comment below.
 import * as fs from "fs";
 import * as path from "path";
 import * as archiver from "archiver";
@@ -19,6 +20,11 @@ export const unzipFile = (source: string, destination: string) => {
   });
 };
 
+// TODO: You don't need to wrap the file operations with Promises yourself.
+// There's a popular library called fs-extra
+// (https://www.npmjs.com/package/fs-extra) that provides Promisified variants
+// of the file system methods. You should use that instead of using the Node.js
+// "fs" library. The same goes for other file system calls in this code base.
 export const deleteFile = (filePath: string) => {
   return new Promise((resolve, reject) => {
     fs.unlink(filePath, (error: NodeJS.ErrnoException | null) => {
@@ -120,9 +126,17 @@ export const stopProgress = (isError = false) => {
 // TODO: Don't use regex to handle HTML. Better to use a proper HTML parser to
 // strip HTML from the text. Or use a library that returns text stripped of HTML
 // directly.
+// PS: Bonus points if you actually figure out how to show formatted
+// text on terminal using the HTML tags here instead of just stripping them
+// away. Note that this is kind of a pipe dream for me 😁
 export const replaceHTML = (string: string) => {
   return string.replace(/<[^>]*>?/gm, "");
 };
 
+/**
+ * Checks whether the value is an instance of SDK's ApiError
+ * @param value Value of unknown type
+ * @returns True if value is instance of ApiError
+ */
 export const isApiError = (value: unknown): value is ApiError =>
   typeof value === "object" && value != null && value.constructor.name === ApiError.prototype.constructor.name;
