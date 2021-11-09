@@ -72,8 +72,7 @@
         "prettier": "prettier \"src/**/*.{js,ts}\"",
         "format": "prettier --write \"src/**/*.{js,ts}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
-        "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
-        "prepare": "husky install"
+        "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet"
     },
     "types": "lib/index.d.ts",
     "dependencies": {
