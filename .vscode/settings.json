@@ -22,5 +22,6 @@
     "transformvia",
     "unzipper",
     "WADL"
-  ]
+  ],
+  "typescript.tsdk": "node_modules\\typescript\\lib"
 }

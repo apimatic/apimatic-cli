@@ -163,7 +163,7 @@ export default class SdkGenerate extends Command {
         await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
         this.log(`\nSuccess! Your SDK is located at ${sdkFolderPath}`);
       }
-    } catch (error: any) {
+    } catch (error) {
       // TODO: Remove the "any" type and do proper error-handling here. A lot of
       // cases are being missed in the code because we used "any".
       stopProgress();

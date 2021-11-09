@@ -107,7 +107,7 @@ Your portal has been generated at D:/
       const generatedPortalPath: string = await this.downloadDocsPortal(generatePortalParams);
 
       this.log(`Your portal has been generated at ${generatedPortalPath}`);
-    } catch (error: any) {
+    } catch (error) {
       // TODO: Remove "any" type and do proper error handling. A lot of cases
       // are being missed right now.
       const response = error.response.data ? error.response.data : error.response;
