@@ -38,10 +38,10 @@ Specification file provided is valid
 
   static flags = {
     help: flags.help({ char: "h" }),
-    file: flags.string({ default: "", description: "Path to the specification file" }),
-    url: flags.string({ default: "", description: "URL to the specification file" }),
-    // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }),
-    "auth-key": flags.string({ description: "Override current authKey by providing authKey in the command" })
+    file: flags.string({ default: "", description: "specification file to validate" }),
+    url: flags.string({ default: "", description: "URL to the specification file to validate" }),
+    // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
+    "auth-key": flags.string({ description: "override current auth-key" })
   };
 
   getValidation = async (
@@ -83,7 +83,7 @@ Specification file provided is valid
         client
       );
 
-      const { success, warnings, errors, messages }: ApiValidationSummary = await this.getValidation(
+      const { success, warnings, errors }: ApiValidationSummary = await this.getValidation(
         flags,
         apiValidationController
       );

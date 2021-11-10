@@ -36,7 +36,7 @@ export default class Transform extends Command {
   static description = "Transform your API specification to your supported formats";
 
   static examples = [
-    `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json"
+    `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
 Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
 `
   ];
@@ -60,12 +60,12 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
         "Postman20"
       ],
       required: true,
-      description: "Format into which specification should be converted to"
+      description: "transformation format"
     }),
-    file: flags.string({ default: "", description: "Path to the specification file" }),
-    url: flags.string({ default: "", description: "URL to the specification file" }),
-    destination: flags.string({ default: "./", description: "Path to output the transformed file" }),
-    "auth-key": flags.string({ description: "Override current authKey by providing authentication key in the command" })
+    file: flags.string({ default: "", description: "specification file to transform" }),
+    url: flags.string({ default: "", description: "URL to the specification file to transform" }),
+    destination: flags.string({ default: "./", description: "path to transformed file" }),
+    "auth-key": flags.string({ description: "override current auth-key" })
   };
 
   getTransformationId = async (

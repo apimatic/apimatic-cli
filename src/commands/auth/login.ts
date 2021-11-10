@@ -17,7 +17,7 @@ You have successfully logged into APIMatic
 
   static flags = {
     help: flags.help({ char: "h" }),
-    "auth-key": flags.string({ default: "", description: "Set authentication key for all endpoints" })
+    "auth-key": flags.string({ default: "", description: "Set authentication key for all commands" })
   };
 
   async run() {

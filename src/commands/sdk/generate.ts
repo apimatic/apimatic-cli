@@ -24,7 +24,7 @@ type GenerationIdParams = {
 
 type DownloadSDKParams = {
   codeGenId: string;
-  unzip: boolean;
+  zip: boolean;
   zippedSDKPath: string;
   sdkFolderPath: string;
 };
@@ -48,21 +48,21 @@ export default class SdkGenerate extends Command {
     platform: flags.string({
       parse: (input) => input.toUpperCase(),
       required: true,
-      description: "Platform for which the SDK should be generated for"
+      description: "language platform for sdk"
     }),
     file: flags.string({
       parse: (input) => path.resolve(input),
       default: "",
-      description: "Path to specification file to generate SDK for"
+      description: "file to generate SDK with"
     }),
-    url: flags.string({ default: "", description: "URL to specification file to generate SDK for" }),
+    url: flags.string({ default: "", description: "url of api specification to generate SDK with" }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
       default: "./",
-      description: "Path to download the generated SDK to"
+      description: "path to downloaded SDK (when used with download flag)"
     }),
-    download: flags.boolean({ char: "d", default: false, description: "Download the SDK after generation" }),
-    "no-unzip": flags.boolean({ default: false, description: "Unzip the downloaded SDK or not" }),
+    download: flags.boolean({ char: "d", default: false, description: "download the SDK" }),
+    zip: flags.boolean({ default: false, description: "zip the SDK" }),
     "auth-key": flags.string({
       default: "",
       description: "Override current auth-key by providing authentication key in the command"
@@ -115,13 +115,13 @@ export default class SdkGenerate extends Command {
 
   // Download Platform
   downloadGeneratedSDK = async (
-    { codeGenId, zippedSDKPath, sdkFolderPath, unzip }: DownloadSDKParams,
+    { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
     sdkGenerationController: CodeGenerationExternalApisController
   ) => {
     startProgress("Downloading SDK");
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
     if ((result as NodeJS.ReadableStream).readable) {
-      if (unzip) {
+      if (!zip) {
         await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
       } else {
         await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
@@ -134,13 +134,13 @@ export default class SdkGenerate extends Command {
 
   async run() {
     const { flags } = this.parse(SdkGenerate);
+    const zip = flags.zip;
     try {
       if (!fs.existsSync(path.resolve(flags.destination))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
       } else if (!fs.existsSync(path.resolve(flags.file))) {
         throw new Error(`Specification file ${flags.file} does not exist`);
       }
-      const unzip = !flags["no-unzip"]; // Convert to unzip flag, because default for unzip is true and user can't pass false from command line
       const sdkFolderPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}`);
       const zippedSDKPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}.zip`);
 
@@ -159,7 +159,7 @@ export default class SdkGenerate extends Command {
           codeGenId,
           zippedSDKPath,
           sdkFolderPath,
-          unzip
+          zip
         };
         await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
         this.log(`Success! Your SDK is located at ${sdkFolderPath}`);

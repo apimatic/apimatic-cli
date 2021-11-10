@@ -14,7 +14,7 @@ type GeneratePortalParams = {
   generatedPortalFolderPath: string;
   docsPortalController: DocsPortalManagementController;
   overrideAuthKey: string | null;
-  unzip: boolean;
+  zip: boolean;
 };
 
 export default class PortalGenerate extends Command {
@@ -32,7 +32,7 @@ export default class PortalGenerate extends Command {
       default: "./",
       description: "path to downloaded portal"
     }),
-    "no-unzip": flags.boolean({ default: false, description: "keep the portal zipped" }),
+    zip: flags.boolean({ default: false, description: "zip the portal" }),
     "auth-key": flags.string({
       default: "",
       description: "override current auth-key"
@@ -40,7 +40,7 @@ export default class PortalGenerate extends Command {
   };
 
   static examples = [
-    `$ apimatic portal:generate --folder="./portal/"
+    `$ apimatic portal:generate --folder="./portal/" --destination="D:/"
 Your portal has been generated at D:/
 `
   ];
@@ -71,7 +71,7 @@ Your portal has been generated at D:/
     zippedBuildFilePath,
     generatedPortalFolderPath,
     overrideAuthKey,
-    unzip
+    zip
   }: GeneratePortalParams) => {
     const zippedPortalPath: string = path.join(generatedPortalFolderPath, "generated_portal.zip");
     const portalPath: string = path.join(generatedPortalFolderPath, "generated_portal");
@@ -84,6 +84,8 @@ Your portal has been generated at D:/
     }
     // TODO: ***CRITICAL*** Remove this call once the SDK is patched
     const data: ArrayBuffer = await this.downloadPortalAxios(zippedBuildFilePath, overrideAuthKey);
+
+    await deleteFile(zippedBuildFilePath);
     fs.writeFileSync(zippedPortalPath, data);
 
     // TODO: Uncomment this code block when the SDK is patched
@@ -92,8 +94,7 @@ Your portal has been generated at D:/
     //   await docsPortalController.generateOnPremPortalViaBuildInput(file);
     // if ((data as NodeJS.ReadableStream).readable) {
     //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
-    await deleteFile(zippedBuildFilePath);
-    if (unzip) {
+    if (!zip) {
       await unzipFile(fs.createReadStream(zippedPortalPath), portalPath);
       await deleteFile(zippedPortalPath);
     }
@@ -107,9 +108,9 @@ Your portal has been generated at D:/
 
   async run() {
     const { flags } = this.parse(PortalGenerate);
+    const zip = flags.zip;
     const portalFolderPath: string = flags.folder;
     const generatedPortalFolderPath: string = flags.destination;
-    const unzip = !flags["no-unzip"]; // Convert to unzip flag, because default for unzip is true and user can't pass false from command line
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
     try {
@@ -127,7 +128,7 @@ Your portal has been generated at D:/
         generatedPortalFolderPath,
         docsPortalController,
         overrideAuthKey,
-        unzip
+        zip
       };
 
       const generatedPortalPath: string = await this.downloadDocsPortal(generatePortalParams);
