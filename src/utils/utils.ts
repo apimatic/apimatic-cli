@@ -5,12 +5,10 @@ import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import cli from "cli-ux";
 
-export const unzipFile = (source: string, destination: string) => {
+export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
-    const readStream: fs.ReadStream = fs.createReadStream(source);
-
-    readStream.pipe(unzipper.Extract({ path: destination }));
-    readStream.on("close", (error: Error) => {
+    stream.pipe(unzipper.Extract({ path: destination }));
+    stream.on("close", (error: Error) => {
       if (error) {
         reject(new Error("Couldn't extract the zip"));
       }

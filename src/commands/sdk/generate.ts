@@ -14,14 +14,7 @@ import {
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import {
-  writeFileUsingReadableStream,
-  unzipFile,
-  deleteFile,
-  stopProgress,
-  startProgress,
-  replaceHTML
-} from "../../utils/utils";
+import { writeFileUsingReadableStream, unzipFile, stopProgress, startProgress, replaceHTML } from "../../utils/utils";
 
 type GenerationIdParams = {
   file: string;
@@ -46,7 +39,7 @@ enum SimplePlatforms {
   PHP = "PHP_GENERIC_LIB",
   PYTHON = "PYTHON_GENERIC_LIB",
   RUBY = "RUBY_GENERIC_LIB",
-  TYPESCRIPT = "NODE_JAVASCRIPT_LIB"
+  TYPESCRIPT = "TS_GENERIC_LIB"
 }
 
 export default class SdkGenerate extends Command {
@@ -128,19 +121,12 @@ export default class SdkGenerate extends Command {
     startProgress("Downloading SDK");
     const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
     if ((result as NodeJS.ReadableStream).readable) {
-      // TODO: You don't need to write the stream to a file before passing it to
-      // the unzipping library. The unzipping library works on streams so you
-      // can just pass the result stream to it to unzip. Otherwise, we're doing
-      // the extra work of writing the stream to the file and creating a new
-      // stream from that file to unzip. I hope my suggestion works; I haven't
-      // tried this myself so fingers crossed.
-      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
-      stopProgress();
-
       if (unzip) {
-        await unzipFile(zippedSDKPath, sdkFolderPath);
-        await deleteFile(zippedSDKPath);
+        await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
+      } else {
+        await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
       }
+      stopProgress();
     } else {
       throw new Error("Couldn't download the SDK");
     }
@@ -154,7 +140,7 @@ export default class SdkGenerate extends Command {
       } else if (!fs.existsSync(path.resolve(flags.file))) {
         throw new Error(`Specification file ${flags.file} does not exist`);
       }
-      const unzip = !flags["no-unzip"];
+      const unzip = !flags["no-unzip"]; // Convert to unzip flag, because default for unzip is true and user can't pass false from command line
       const sdkFolderPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}`);
       const zippedSDKPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}.zip`);
 
