@@ -16,20 +16,31 @@ You have successfully logged into APIMatic
   ];
 
   static flags = {
-    help: flags.help({ char: "h" })
+    help: flags.help({ char: "h" }),
+    "auth-key": flags.string({ default: "", description: "Set authentication key for all endpoints" })
   };
 
   async run() {
-    const email: string = await cli.prompt("Please enter your registered email");
-    const password: string = await cli.prompt("Please enter your password", {
-      type: "hide"
-    });
-
+    const { flags } = this.parse(Login);
+    const configDir: string = this.config.configDir;
     try {
       const client: SDKClient = SDKClient.getInstance();
-      const response: string = await client.login(email, password, this.config.configDir);
 
-      this.log(response);
+      // If user is setting auth key
+      if (flags["auth-key"]) {
+        const response = client.setAuthKey(flags["auth-key"], configDir);
+        return this.log(response);
+      } else {
+        // If user logs in with email and password
+        const email: string = await cli.prompt("Please enter your registered email");
+        const password: string = await cli.prompt("Please enter your password", {
+          type: "hide"
+        });
+
+        const response: string = await client.login(email, password, configDir);
+
+        this.log(response);
+      }
     } catch (error) {
       this.error((error as Error).message);
     }

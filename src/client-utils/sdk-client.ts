@@ -91,9 +91,11 @@ export class SDKClient {
         storedAuthInfo = { email: "", authKey: "" };
       }
 
-      return storedAuthInfo.email !== "" && storedAuthInfo.authKey !== ""
-        ? `Currently logged in as ${storedAuthInfo.email}`
-        : "Not logged in";
+      return storedAuthInfo.email === "" && storedAuthInfo.authKey === ""
+        ? "Not logged in"
+        : storedAuthInfo.email === "" && storedAuthInfo.authKey !== ""
+        ? "Logged in with authentication key"
+        : `Currently logged in as ${storedAuthInfo.email}`;
     } catch (error) {
       throw error as Error;
     }
@@ -132,4 +134,14 @@ export class SDKClient {
     const authKey: string = response.data.EncryptedValue;
     return authKey;
   }
+  public setAuthKey = (authKey: string, configDir: string) => {
+    setAuthInfo(
+      {
+        email: "",
+        authKey
+      },
+      configDir
+    );
+    return "Authentication key successfully set";
+  };
 }
