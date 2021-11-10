@@ -2,6 +2,7 @@ import * as fs from "fs";
 import cli from "cli-ux";
 
 import {
+  ApiError,
   ApiResponse,
   APIValidationExternalApisController,
   ApiValidationSummary,
@@ -18,8 +19,16 @@ type GetValidationParams = {
   url: string;
 };
 
+type APIValidateError = {
+  modelState: {
+    "exception Error": string[];
+  };
+};
+type AuthorizationError = {
+  body: string;
+};
 export default class Validate extends Command {
-  static description = "Validate your API specification to your supported formats";
+  static description = "Validate your API specification to supported formats";
 
   static examples = [
     `$ apimatic api:validate --file="./specs/sample.json"
@@ -31,7 +40,7 @@ Specification file provided is valid
     help: flags.help({ char: "h" }),
     file: flags.string({ default: "", description: "Path to the specification file" }),
     url: flags.string({ default: "", description: "URL to the specification file" }),
-    docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }),
+    // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }),
     "auth-key": flags.string({ description: "Override current authKey by providing authKey in the command" })
   };
 
@@ -74,7 +83,7 @@ Specification file provided is valid
         client
       );
 
-      const { success, warnings, errors }: ApiValidationSummary = await this.getValidation(
+      const { success, warnings, errors, messages }: ApiValidationSummary = await this.getValidation(
         flags,
         apiValidationController
       );
@@ -82,14 +91,18 @@ Specification file provided is valid
 
       success ? this.log("Specification file provided is valid") : this.error("Specification file provided is invalid");
     } catch (error) {
-      // TODO: Fix any and put proper error handling here. A lot of bugs are
-      // being ignored, thanks to the "any" type.
-      if (error.result && error.result.modelState) {
-        this.error(replaceHTML(error.result.modelState["exception Error"][0]));
-      } else if (error.body) {
-        this.error(error.body);
+      if ((error as ApiError).result) {
+        const apiError = error as ApiError;
+        const result = apiError.result as APIValidateError;
+        if (result.modelState["exception Error"] && apiError.statusCode === 400) {
+          this.error(replaceHTML(result.modelState["exception Error"][0]));
+        } else if ((error as AuthorizationError).body && apiError.statusCode === 401) {
+          this.error((error as AuthorizationError).body);
+        } else {
+          this.error((error as Error).message);
+        }
       } else {
-        this.error(error.message);
+        this.error(`Unknown error:  ${(error as Error).message}`);
       }
     }
   }

@@ -8,12 +8,13 @@ import {
   Transformation,
   ApiResponse,
   Client,
-  TransformViaUrlRequest
+  TransformViaUrlRequest,
+  ApiError
 } from "@apimatic/apimatic-sdk-for-js";
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
-import { isApiError, replaceHTML, startProgress, stopProgress, writeFileUsingReadableStream } from "../../utils/utils";
+import { replaceHTML, startProgress, stopProgress, writeFileUsingReadableStream } from "../../utils/utils";
 
 type TransformationIdParams = {
   file: string;
@@ -30,6 +31,7 @@ type DownloadTransformationParams = {
 type TransformationData = {
   result: NodeJS.ReadableStream | Blob;
 };
+
 export default class Transform extends Command {
   static description = "Transform your API specification to your supported formats";
 
@@ -134,33 +136,30 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
 
       this.printValidationMessages(warnings, errors);
 
-      const saveFile = await this.downloadTransformationFile({ id, destinationFilePath, transformationController });
+      const saveFile: string = await this.downloadTransformationFile({
+        id,
+        destinationFilePath,
+        transformationController
+      });
       this.log(`Success! Your transformed file is located at ${saveFile}`);
     } catch (error) {
-      if (isApiError(error)) {
-        // TODO: Status code checks are missing. Either check for subtypes of
-        // ApiError (when we add sub-types) or check the status codes so that we're
-        // handling all known error cases. For example, the code below has the
-        // flaw that it does not check for the status code but assumes validation
-        // messages will be returned.
+      if (error as ApiError) {
+        const apiError = error as ApiError;
 
         // TODO: Hopefully, this type-cast won't be necessary when the SDK is
         // updated to throw the right exception type for this status code.
-        const result = error.result as Record<string, unknown> | undefined;
-        if (result && "errors" in result && Array.isArray(result.errors)) {
-          // TODO: Why only the first error is logged?
-          this.error(replaceHTML(result.errors[0]));
-        } else if (typeof error.body === "string") {
-          // TODO: Body can also be a stream. I've ignored that case but we need
-          // to check whether that can happen here and if it does, handle that.
-          this.error(error.body);
-        } else {
-          this.error(error.message);
+        const result = apiError.result as Record<string, unknown> | undefined;
+        if (apiError.statusCode === 422 && result && "errors" in result && Array.isArray(result.errors)) {
+          this.error(replaceHTML(`${result.errors}`));
+        } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
+          this.error(apiError.body);
+        } else if (apiError.statusCode === 500) {
+          this.error(apiError.message);
         }
       } else {
         // TODO: We need a standard error message in the CLI when there is an
         // unknown error case.
-        this.error("Unknown error: " + error);
+        this.error(`Unknown error:  ${(error as Error).message}`);
       }
     }
   }

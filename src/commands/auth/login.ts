@@ -31,7 +31,7 @@ You have successfully logged into APIMatic
 
       this.log(response);
     } catch (error) {
-      this.error(error as string);
+      this.error((error as Error).message);
     }
   }
 }

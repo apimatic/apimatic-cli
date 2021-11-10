@@ -93,10 +93,9 @@ export class SDKClient {
 
       return storedAuthInfo.email !== "" && storedAuthInfo.authKey !== ""
         ? `Currently logged in as ${storedAuthInfo.email}`
-        : "Not Logged in";
+        : "Not logged in";
     } catch (error) {
-      // TODO: Do proper handling instead of printing the error as JSON
-      throw new Error(JSON.stringify(error));
+      throw error as Error;
     }
   }
 

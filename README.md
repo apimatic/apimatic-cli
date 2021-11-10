@@ -106,7 +106,7 @@ _See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/
 
 ## `apimatic api:transform`
 
-Transform your API specification to your supported formats
+Transform your API specification to supported formats
 
 ```
 USAGE
@@ -141,7 +141,7 @@ _See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-
 
 ## `apimatic api:validate`
 
-Validate your API specification to your supported formats
+Validate your API specification to supported formats
 
 ```
 USAGE
@@ -384,7 +384,7 @@ _See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/
 
 ## `apimatic api:transform`
 
-Transform your API specification to your supported formats
+Transform your API specification to supported formats
 
 ```
 USAGE
@@ -598,7 +598,7 @@ _See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/
 
 ## `apimatic api:transform`
 
-Transform your API specification to your supported formats
+Transform your API specification to supported formats
 
 ```
 USAGE

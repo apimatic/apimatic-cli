@@ -4,7 +4,6 @@ import * as path from "path";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import cli from "cli-ux";
-import { ApiError } from "@apimatic/core";
 
 export const unzipFile = (source: string, destination: string) => {
   return new Promise((resolve, reject) => {
@@ -117,7 +116,7 @@ export const startProgress = (title: string) => {
 
 export const stopProgress = (isError = false) => {
   if (isError) {
-    return progressBar.stop();
+    return progressBar ? progressBar.stop() : null;
   }
   progressBar.update(100);
   return progressBar.stop();
@@ -132,11 +131,3 @@ export const stopProgress = (isError = false) => {
 export const replaceHTML = (string: string) => {
   return string.replace(/<[^>]*>?/gm, "");
 };
-
-/**
- * Checks whether the value is an instance of SDK's ApiError
- * @param value Value of unknown type
- * @returns True if value is instance of ApiError
- */
-export const isApiError = (value: unknown): value is ApiError =>
-  typeof value === "object" && value != null && value.constructor.name === ApiError.prototype.constructor.name;

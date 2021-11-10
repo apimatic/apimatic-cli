@@ -1,6 +1,8 @@
 import * as fs from "fs";
+import * as path from "path";
 
 import {
+  ApiError,
   ApiResponse,
   Client,
   CodeGenerationExternalApisController,
@@ -34,13 +36,17 @@ type DownloadSDKParams = {
   sdkFolderPath: string;
 };
 
+type SDKGenerateUnprocessableError = {
+  message: string;
+};
+
 enum SimplePlatforms {
   CSHARP = "CS_NET_STANDARD_LIB",
   JAVA = "JAVA_ECLIPSE_JRE_LIB",
   PHP = "PHP_GENERIC_LIB",
   PYTHON = "PYTHON_GENERIC_LIB",
   RUBY = "RUBY_GENERIC_LIB",
-  TYPESCRIPT = "ANGULAR_JAVASCRIPT_LIB"
+  TYPESCRIPT = "NODE_JAVASCRIPT_LIB"
 }
 
 export default class SdkGenerate extends Command {
@@ -51,11 +57,19 @@ export default class SdkGenerate extends Command {
       required: true,
       description: "Platform for which the SDK should be generated for"
     }),
-    file: flags.string({ default: "", description: "Path to specification file to generate SDK for" }),
+    file: flags.string({
+      parse: (input) => path.resolve(input),
+      default: "",
+      description: "Path to specification file to generate SDK for"
+    }),
     url: flags.string({ default: "", description: "URL to specification file to generate SDK for" }),
-    destination: flags.string({ default: "./", description: "Path to download the generated SDK to" }),
+    destination: flags.string({
+      parse: (input) => path.resolve(input),
+      default: "./",
+      description: "Path to download the generated SDK to"
+    }),
     download: flags.boolean({ char: "d", default: false, description: "Download the SDK after generation" }),
-    unzip: flags.boolean({ default: true, description: "Unzip the downloaded SDK or not" }),
+    "no-unzip": flags.boolean({ default: false, description: "Unzip the downloaded SDK or not" }),
     "auth-key": flags.string({
       default: "",
       description: "Override current auth-key by providing authentication key in the command"
@@ -74,12 +88,8 @@ export default class SdkGenerate extends Command {
   ) => {
     let generation: ApiResponse<UserCodeGeneration>;
     const sdkPlatform = this.getSDKPlatform(platform) as Platforms;
-    startProgress("Generating SDK");
 
-    if (!fs.existsSync(file)) {
-      throw new Error(`Specification file doesn't exist at ${file}`);
-    }
-    // If spec file is provided
+    startProgress("Generating SDK");
 
     if (file) {
       const fileDescriptor = new FileWrapper(fs.createReadStream(file));
@@ -92,7 +102,6 @@ export default class SdkGenerate extends Command {
       };
       generation = await sdkGenerationController.generateSDKViaURL(body);
     } else {
-      stopProgress();
       throw new Error("Please provide a specification file");
     }
     stopProgress();
@@ -139,12 +148,17 @@ export default class SdkGenerate extends Command {
 
   async run() {
     const { flags } = this.parse(SdkGenerate);
-
-    const sdkFolderPath = `${flags.destination}/Generated_${flags.platform}`;
-    const zippedSDKPath = `${flags.destination}/Generated_${flags.platform}.zip`;
-
-    const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
     try {
+      if (!fs.existsSync(path.resolve(flags.destination))) {
+        throw new Error(`Destination path ${flags.destination} does not exist`);
+      } else if (!fs.existsSync(path.resolve(flags.file))) {
+        throw new Error(`Specification file ${flags.file} does not exist`);
+      }
+      const unzip = !flags["no-unzip"];
+      const sdkFolderPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}`);
+      const zippedSDKPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}.zip`);
+
+      const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const sdkGenerationController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(
         client
@@ -152,25 +166,35 @@ export default class SdkGenerate extends Command {
       // Get generation id for the specification and platform
       const codeGenId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
 
+      this.log(`Your SDK has been generated with id: ${codeGenId}`);
       // If user wanted to download the SDK as well
       if (flags.download) {
         const sdkDownloadParams: DownloadSDKParams = {
           codeGenId,
           zippedSDKPath,
           sdkFolderPath,
-          unzip: flags.unzip
+          unzip
         };
         await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
-        this.log(`\nSuccess! Your SDK is located at ${sdkFolderPath}`);
+        this.log(`Success! Your SDK is located at ${sdkFolderPath}`);
       }
     } catch (error) {
-      // TODO: Remove the "any" type and do proper error-handling here. A lot of
-      // cases are being missed in the code because we used "any".
-      stopProgress();
-      if (error.result && error.result.message) {
-        this.error(replaceHTML(`${JSON.parse(error.result.message).Errors[0]}`));
+      stopProgress(true);
+      if ((error as ApiError).result) {
+        const apiError = error as ApiError;
+        const result = apiError.result as SDKGenerateUnprocessableError;
+        if (apiError.statusCode > 400 && apiError.statusCode < 500 && typeof JSON.parse(result.message) === "object") {
+          const errors = JSON.parse(result.message);
+          if (Array.isArray(errors.Errors) && apiError.statusCode === 400) {
+            this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
+          }
+        } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
+          this.error(apiError.body);
+        } else {
+          this.error(replaceHTML("Unknown error: " + result.message));
+        }
       } else {
-        this.error(error);
+        this.error(`Unknown error:  ${(error as Error).message}`);
       }
     }
   }
