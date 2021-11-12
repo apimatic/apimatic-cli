@@ -1,10 +1,9 @@
-// TODO: Use fs-extra. See comment below.
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import * as path from "path";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import cli from "cli-ux";
-
+import * as stripTags from "striptags";
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
     stream.pipe(unzipper.Extract({ path: destination }));
@@ -17,20 +16,8 @@ export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) =>
   });
 };
 
-// TODO: You don't need to wrap the file operations with Promises yourself.
-// There's a popular library called fs-extra
-// (https://www.npmjs.com/package/fs-extra) that provides Promisified variants
-// of the file system methods. You should use that instead of using the Node.js
-// "fs" library. The same goes for other file system calls in this code base.
-export const deleteFile = (filePath: string) => {
-  return new Promise((resolve, reject) => {
-    fs.unlink(filePath, (error: NodeJS.ErrnoException | null) => {
-      if (error) {
-        reject(new Error(error.code));
-      }
-      resolve("Deleted");
-    });
-  });
+export const deleteFile = async (filePath: string) => {
+  return await fs.remove(filePath);
 };
 
 export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, destinationPath: string) => {
@@ -55,9 +42,8 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
  */
 export const zipDirectory = async (sourcePath: string, destinationPath: string) => {
   // Check if the directory exists for the user or not
-  if (!fs.existsSync(sourcePath)) {
-    throw new Error("Folder to zip doesn't exist");
-  }
+  await fs.ensureDir(sourcePath);
+
   const zipPath = path.join(destinationPath, "target.zip");
   const output = fs.createWriteStream(zipPath);
   const archive = archiver("zip");
@@ -120,12 +106,6 @@ export const stopProgress = (isError = false) => {
   return progressBar.stop();
 };
 
-// TODO: Don't use regex to handle HTML. Better to use a proper HTML parser to
-// strip HTML from the text. Or use a library that returns text stripped of HTML
-// directly.
-// PS: Bonus points if you actually figure out how to show formatted
-// text on terminal using the HTML tags here instead of just stripping them
-// away. Note that this is kind of a pipe dream for me 😁
 export const replaceHTML = (string: string) => {
-  return string.replace(/<[^>]*>?/gm, "");
+  return stripTags(string);
 };

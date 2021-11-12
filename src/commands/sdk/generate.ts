@@ -48,30 +48,34 @@ export default class SdkGenerate extends Command {
     platform: flags.string({
       parse: (input) => input.toUpperCase(),
       required: true,
-      description: "language platform for sdk"
+      description: `language platform for sdk
+Simple: CSHARP|JAVA|PYTHON|RUBY|TYPESCRIPT
+Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LIB|
+        JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|
+        TS_GENERIC_LIB`
     }),
     file: flags.string({
       parse: (input) => path.resolve(input),
       default: "",
       description: "file to generate SDK with"
     }),
-    url: flags.string({ default: "", description: "url of api specification to generate SDK with" }),
+    url: flags.string({ default: "", description: "url to api specification to generate SDK with" }),
+    download: flags.boolean({ char: "d", default: false, description: "download the SDK" }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
       default: "./",
-      description: "path to downloaded SDK (when used with download flag)"
+      description: "path to downloaded SDK (used with download flag)"
     }),
-    download: flags.boolean({ char: "d", default: false, description: "download the SDK" }),
-    zip: flags.boolean({ default: false, description: "zip the SDK" }),
+    zip: flags.boolean({ default: false, description: "zip the SDK (used with download flag)" }),
     "auth-key": flags.string({
       default: "",
-      description: "Override current auth-key by providing authentication key in the command"
+      description: "override current auth-key"
     })
   };
 
   static examples = [
-    `$ apimatic sdk:generate --platform="CS_NET_STANDARD_LIB" --file="./specs/sample.json"
-    Your SDK has been generated with id: 1324abcd
+    `$ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"
+SDK generated successfully
 `
   ];
 
@@ -152,7 +156,7 @@ export default class SdkGenerate extends Command {
       // Get generation id for the specification and platform
       const codeGenId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
 
-      this.log(`Your SDK has been generated with id: ${codeGenId}`);
+      this.log("SDK generated successfully");
       // If user wanted to download the SDK as well
       if (flags.download) {
         const sdkDownloadParams: DownloadSDKParams = {

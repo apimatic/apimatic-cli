@@ -1,10 +1,12 @@
 import { flags, Command } from "@oclif/command";
+import { AxiosError } from "axios";
 import { cli } from "cli-ux";
 
 import { SDKClient } from "../../client-utils/sdk-client";
+import { replaceHTML } from "../../utils/utils";
 
 export default class Login extends Command {
-  static description = "Login to your APIMAtic account";
+  static description = "login to your APIMAtic account";
 
   static examples = [
     `$ apimatic auth:login
@@ -42,6 +44,20 @@ You have successfully logged into APIMatic
         this.log(response);
       }
     } catch (error) {
+      if (error && (error as AxiosError).response) {
+        const apiError = error as AxiosError;
+        const apiResponse = apiError.response;
+
+        if (apiResponse) {
+          const responseData = apiResponse.data;
+
+          if (apiResponse.status === 403 && responseData) {
+            return this.error(replaceHTML(responseData));
+          } else {
+            return this.error(apiError.message);
+          }
+        }
+      }
       this.error((error as Error).message);
     }
   }

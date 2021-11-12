@@ -114,7 +114,7 @@ export class SDKClient {
       // If no config file or no credentials exist in the config file
       storedAuthInfo = { email: "", authKey: "" };
     }
-    if (storedAuthInfo.email !== "" && storedAuthInfo.authKey !== "") {
+    if (storedAuthInfo.authKey !== "") {
       return new Client({
         timeout: 0,
         authorization: `X-Auth-Key ${storedAuthInfo.authKey}`

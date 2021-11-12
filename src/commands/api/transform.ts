@@ -32,6 +32,21 @@ type TransformationData = {
   result: NodeJS.ReadableStream | Blob;
 };
 
+const DestinationFormats = {
+  OPENAPI3JSON: "json",
+  OPENAPI3YAML: "yaml",
+  APIMATIC: "json",
+  WADL2009: "xml",
+  WADL2006: "xml",
+  WSDL: "xml",
+  SWAGGER10: "json",
+  SWAGGER20: "json",
+  SWAGGERYAML: "yaml",
+  RAML: "yaml",
+  RAML10: "yaml",
+  POSTMAN10: "json",
+  POSTMAN20: "json"
+};
 export default class Transform extends Command {
   static description = "Transform your API specification to your supported formats";
 
@@ -43,24 +58,12 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
 
   static flags = {
     help: flags.help({ char: "h" }),
-    format: flags.enum({
-      options: [
-        "OpenApi3Json",
-        "OpenApi3Yaml",
-        "APIMATIC",
-        "WADL2009",
-        "WADL2006",
-        "WSDL",
-        "Swagger10",
-        "Swagger20",
-        "SwaggerYaml",
-        "RAML",
-        "RAML10",
-        "Postman10",
-        "Postman20"
-      ],
+    format: flags.string({
+      parse: (input) => input.toUpperCase(),
       required: true,
-      description: "transformation format"
+      description: `transformation format
+(OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
+Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     }),
     file: flags.string({ default: "", description: "specification file to transform" }),
     url: flags.string({ default: "", description: "URL to the specification file to transform" }),
@@ -104,23 +107,30 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
     }
     return destinationFilePath;
   };
+  // Get valid platform from user's input, convert simple platform to valid Platforms enum value
+  getValidFormat = (format: string) => {
+    if (Object.keys(ExportFormats).join(",").toUpperCase().includes(format)) {
+      return ExportFormats[format as keyof typeof ExportFormats];
+    } else {
+      const formats = Object.keys(ExportFormats).join(",");
+      throw new Error(`Please provide a valid platform i.e. ${formats}`);
+    }
+  };
 
-  printValidationMessages = (warnings: string[], errors: string[]) => {
+  printValidationMessages = (warnings: string[], errors: string) => {
     warnings.forEach((warning) => {
-      this.warn(warning);
+      this.warn(replaceHTML(warning));
     });
-    errors.forEach((error) => {
-      this.log(`Error: ${error}`);
-    });
+    if (errors) {
+      this.error(replaceHTML(errors));
+    }
   };
 
   async run() {
     const { flags } = this.parse(Transform);
-    const destinationFormat: string = flags.format.toLowerCase().includes("yaml") ? "yml" : "json";
-    const destinationFilePath: string = path.join(
-      flags.destination,
-      `Transformed_${flags.format}.${destinationFormat}`
-    );
+    const format = this.getValidFormat(flags.format);
+    const destinationFormat: string = DestinationFormats[format as keyof typeof DestinationFormats];
+    const destinationFilePath: string = path.join(flags.destination, `Transformed_${format}.${destinationFormat}`);
 
     try {
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
@@ -132,7 +142,7 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
         transformationController
       );
       const warnings: string[] = apiValidationSummary?.warnings || [];
-      const errors: string[] = apiValidationSummary?.errors || [];
+      const errors: string = apiValidationSummary?.errors.join("\n") || "";
 
       this.printValidationMessages(warnings, errors);
 
