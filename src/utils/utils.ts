@@ -109,3 +109,12 @@ export const stopProgress = (isError = false) => {
 export const replaceHTML = (string: string) => {
   return stripTags(string);
 };
+
+export const isJSONParsable = (json: string) => {
+  try {
+    JSON.parse(json);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};

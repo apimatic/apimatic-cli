@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import * as path from "path";
 
 export type AuthInfo = {
@@ -10,15 +10,9 @@ export type AuthInfo = {
  * @param {string} configDir <- Directory with user configuration
  * //Function to get credentials
  */
-export function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
-  return new Promise((resolve, reject) => {
-    fs.readFile(path.join(configDir, "config.json"), "utf8", (err, data) => {
-      if (err) {
-        return err.code === "ENOENT" ? resolve(null) : reject(err);
-      }
-      return data ? resolve(JSON.parse(data)) : resolve(null);
-    });
-  });
+export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
+  const data: AuthInfo | null = JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
+  return data;
 }
 
 /**
@@ -27,11 +21,6 @@ export function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
  * @param {string} configDir <- Directory with user configuration
  * //Function to set credentials.
  */
-export function setAuthInfo(credentials: AuthInfo, configDir: string) {
-  fs.writeFile(path.join(configDir, "config.json"), JSON.stringify(credentials), (err) => {
-    if (err) {
-      return err;
-    }
-    return "Success!";
-  });
+export async function setAuthInfo(credentials: AuthInfo, configDir: string): Promise<void> {
+  return await fs.writeFile(path.join(configDir, "config.json"), JSON.stringify(credentials));
 }

@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import * as path from "path";
 
 import {
@@ -9,7 +9,8 @@ import {
   ApiResponse,
   Client,
   TransformViaUrlRequest,
-  ApiError
+  ApiError,
+  ApiValidationSummary
 } from "@apimatic/apimatic-sdk-for-js";
 import { flags, Command } from "@oclif/command";
 
@@ -47,6 +48,52 @@ const DestinationFormats = {
   POSTMAN10: "json",
   POSTMAN20: "json"
 };
+
+async function getTransformationId(
+  { file, url, format }: TransformationIdParams,
+  transformationController: TransformationController
+): Promise<Transformation> {
+  let generation: ApiResponse<Transformation>;
+  if (file) {
+    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+    generation = await transformationController.transformViaFile(fileDescriptor, format as ExportFormats);
+  } else if (url) {
+    const body: TransformViaUrlRequest = {
+      url: url,
+      exportFormat: format as ExportFormats
+    };
+    generation = await transformationController.transformViaURL(body);
+  } else {
+    throw new Error("Please provide a specification file");
+  }
+  return generation.result;
+}
+
+async function downloadTransformationFile({
+  id,
+  destinationFilePath,
+  transformationController
+}: DownloadTransformationParams): Promise<string> {
+  startProgress("Downloading Transformed File");
+  const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
+  stopProgress();
+
+  if ((result as NodeJS.ReadableStream).readable) {
+    await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
+  } else {
+    throw new Error("Couldn't save transformation file");
+  }
+  return destinationFilePath;
+}
+// Get valid platform from user's input, convert simple platform to valid Platforms enum value
+function getValidFormat(format: string) {
+  if (Object.keys(ExportFormats).join(",").toUpperCase().includes(format)) {
+    return ExportFormats[format as keyof typeof ExportFormats];
+  } else {
+    const formats = Object.keys(ExportFormats).join(",");
+    throw new Error(`Please provide a valid platform i.e. ${formats}`);
+  }
+}
 export default class Transform extends Command {
   static description = "Transform your API specification to your supported formats";
 
@@ -71,89 +118,43 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     "auth-key": flags.string({ description: "override current auth-key" })
   };
 
-  getTransformationId = async (
-    { file, url, format }: TransformationIdParams,
-    transformationController: TransformationController
-  ) => {
-    let generation: ApiResponse<Transformation>;
-    if (file) {
-      const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-      generation = await transformationController.transformViaFile(fileDescriptor, format as ExportFormats);
-    } else if (url) {
-      const body: TransformViaUrlRequest = {
-        url: url,
-        exportFormat: format as ExportFormats
-      };
-      generation = await transformationController.transformViaURL(body);
-    } else {
-      throw new Error("Please provide a specification file");
-    }
-    return generation.result;
-  };
+  printValidationMessages = (apiValidationSummary: ApiValidationSummary | undefined) => {
+    const warnings: string[] = apiValidationSummary?.warnings || [];
+    const errors: string = apiValidationSummary?.errors.join("\n") || "";
 
-  downloadTransformationFile = async ({
-    id,
-    destinationFilePath,
-    transformationController
-  }: DownloadTransformationParams) => {
-    startProgress("Downloading Transformed File");
-    const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
-    stopProgress();
-
-    if ((result as NodeJS.ReadableStream).readable) {
-      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
-    } else {
-      throw new Error("Couldn't save transformation file");
-    }
-    return destinationFilePath;
-  };
-  // Get valid platform from user's input, convert simple platform to valid Platforms enum value
-  getValidFormat = (format: string) => {
-    if (Object.keys(ExportFormats).join(",").toUpperCase().includes(format)) {
-      return ExportFormats[format as keyof typeof ExportFormats];
-    } else {
-      const formats = Object.keys(ExportFormats).join(",");
-      throw new Error(`Please provide a valid platform i.e. ${formats}`);
-    }
-  };
-
-  printValidationMessages = (warnings: string[], errors: string) => {
     warnings.forEach((warning) => {
       this.warn(replaceHTML(warning));
     });
-    if (errors) {
+    if (apiValidationSummary && apiValidationSummary.errors.length > 0) {
       this.error(replaceHTML(errors));
     }
   };
-
   async run() {
     const { flags } = this.parse(Transform);
-    const format = this.getValidFormat(flags.format);
+    const format = getValidFormat(flags.format);
     const destinationFormat: string = DestinationFormats[format as keyof typeof DestinationFormats];
     const destinationFilePath: string = path.join(flags.destination, `Transformed_${format}.${destinationFormat}`);
 
     try {
+      if (flags.file && !(await fs.pathExists(flags.file))) {
+        throw new Error(`Transformation file: ${flags.file} does not exist`);
+      }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const transformationController: TransformationController = new TransformationController(client);
 
-      const { id, apiValidationSummary }: Transformation = await this.getTransformationId(
-        flags,
-        transformationController
-      );
-      const warnings: string[] = apiValidationSummary?.warnings || [];
-      const errors: string = apiValidationSummary?.errors.join("\n") || "";
+      const { id, apiValidationSummary }: Transformation = await getTransformationId(flags, transformationController);
 
-      this.printValidationMessages(warnings, errors);
+      this.printValidationMessages(apiValidationSummary);
 
-      const saveFile: string = await this.downloadTransformationFile({
+      const savedTransformationFile: string = await downloadTransformationFile({
         id,
         destinationFilePath,
         transformationController
       });
-      this.log(`Success! Your transformed file is located at ${saveFile}`);
+      this.log(`Success! Your transformed file is located at ${savedTransformationFile}`);
     } catch (error) {
-      if (error as ApiError) {
+      if ((error as ApiError).result) {
         const apiError = error as ApiError;
 
         // TODO: Hopefully, this type-cast won't be necessary when the SDK is
@@ -169,7 +170,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
       } else {
         // TODO: We need a standard error message in the CLI when there is an
         // unknown error case.
-        this.error(`Unknown error:  ${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }

@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import cli from "cli-ux";
 
 import {
@@ -27,6 +27,25 @@ type APIValidateError = {
 type AuthorizationError = {
   body: string;
 };
+
+async function getValidation(
+  { file, url }: GetValidationParams,
+  apiValidationController: APIValidationExternalApisController
+): Promise<ApiValidationSummary> {
+  let validation: ApiResponse<ApiValidationSummary>;
+
+  cli.action.start("Validating specification file");
+  if (file) {
+    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+    validation = await apiValidationController.validateAPIViaFile(fileDescriptor);
+  } else if (url) {
+    validation = await apiValidationController.validateAPIViaURL(url);
+  } else {
+    throw new Error("Please provide a specification file");
+  }
+  cli.action.stop();
+  return validation.result;
+}
 export default class Validate extends Command {
   static description = "Validate your API specification to supported formats";
 
@@ -44,32 +63,14 @@ Specification file provided is valid
     "auth-key": flags.string({ description: "override current auth-key" })
   };
 
-  getValidation = async (
-    { file, url }: GetValidationParams,
-    apiValidationController: APIValidationExternalApisController
-  ) => {
-    let validation: ApiResponse<ApiValidationSummary>;
+  printValidationMessages = ({ warnings, errors }: ApiValidationSummary) => {
+    warnings = warnings || [];
+    const singleLineError: string = errors.length > 0 ? errors.join("\n") : "";
 
-    cli.action.start("Validating specification file");
-    if (file) {
-      const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-      validation = await apiValidationController.validateAPIViaFile(fileDescriptor);
-    } else if (url) {
-      validation = await apiValidationController.validateAPIViaURL(url);
-    } else {
-      throw new Error("Please provide a specification file");
-    }
-    cli.action.stop();
-    return validation.result;
-  };
-
-  printValidationMessages = (warnings: string[], errors: string[]) => {
     warnings.forEach((warning) => {
       this.warn(`${replaceHTML(warning)}`);
     });
-    errors.forEach((error) => {
-      this.log(`Error: ${replaceHTML(error)}`);
-    });
+    this.error(replaceHTML(singleLineError));
   };
 
   async run() {
@@ -83,13 +84,12 @@ Specification file provided is valid
         client
       );
 
-      const { success, warnings, errors }: ApiValidationSummary = await this.getValidation(
-        flags,
-        apiValidationController
-      );
-      this.printValidationMessages(warnings, errors);
+      const validationSummary: ApiValidationSummary = await getValidation(flags, apiValidationController);
+      this.printValidationMessages(validationSummary);
 
-      success ? this.log("Specification file provided is valid") : this.error("Specification file provided is invalid");
+      validationSummary.success
+        ? this.log("Specification file provided is valid")
+        : this.error("Specification file provided is invalid");
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
@@ -102,7 +102,7 @@ Specification file provided is valid
           this.error((error as Error).message);
         }
       } else {
-        this.error(`Unknown error:  ${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }

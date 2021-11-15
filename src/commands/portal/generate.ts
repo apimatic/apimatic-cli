@@ -1,11 +1,19 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import * as FormData from "form-data";
 import * as path from "path";
 
 import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { unzipFile, deleteFile, zipDirectory, replaceHTML, stopProgress, startProgress } from "../../utils/utils";
+import {
+  unzipFile,
+  deleteFile,
+  zipDirectory,
+  replaceHTML,
+  stopProgress,
+  startProgress,
+  isJSONParsable
+} from "../../utils/utils";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
@@ -79,14 +87,14 @@ Your portal has been generated at D:/
     startProgress("Downloading portal");
 
     // Check if the build file exists for the user or not
-    if (!fs.existsSync(zippedBuildFilePath)) {
+    if (!(await fs.pathExists(zippedBuildFilePath))) {
       throw new Error("Build file doesn't exist");
     }
     // TODO: ***CRITICAL*** Remove this call once the SDK is patched
     const data: ArrayBuffer = await this.downloadPortalAxios(zippedBuildFilePath, overrideAuthKey);
 
     await deleteFile(zippedBuildFilePath);
-    fs.writeFileSync(zippedPortalPath, data);
+    await fs.writeFile(zippedPortalPath, data);
 
     // TODO: Uncomment this code block when the SDK is patched
     // const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
@@ -114,9 +122,9 @@ Your portal has been generated at D:/
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
     try {
-      if (!fs.existsSync(flags.destination)) {
+      if (!(await fs.pathExists(flags.destination))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
-      } else if (!fs.existsSync(flags.folder)) {
+      } else if (!(await fs.pathExists(flags.folder))) {
         throw new Error(`Portal build folder ${flags.folder} does not exist`);
       }
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
@@ -142,18 +150,18 @@ Your portal has been generated at D:/
         const apiResponse = apiError.response;
 
         if (apiResponse) {
-          const responseData = apiResponse.data;
+          const responseData = apiResponse.data.toString();
 
-          if (apiResponse.status === 422 && responseData.length > 0 && JSON.parse(responseData.toString())) {
-            const nestedErrors = JSON.parse(responseData.toString());
+          if (apiResponse.status === 422 && responseData.length > 0 && isJSONParsable(responseData)) {
+            const nestedErrors = JSON.parse(responseData);
 
             if (nestedErrors.error) {
               return this.error(replaceHTML(nestedErrors.error));
             } else if (nestedErrors.message) {
               return this.error(replaceHTML(nestedErrors.message));
             }
-          } else if (apiResponse.status === 401 && responseData.length > 0) {
-            this.error(replaceHTML(responseData.toString()));
+          } else if (apiResponse.status === 401 && responseData.length > 0 && isJSONParsable(responseData)) {
+            this.error(replaceHTML(responseData));
           } else if (apiResponse.status === 403 && apiResponse.statusText) {
             return this.error(replaceHTML(apiResponse.statusText));
           } else {

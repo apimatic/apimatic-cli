@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import * as path from "path";
 
 import {
@@ -42,6 +42,63 @@ enum SimplePlatforms {
   TYPESCRIPT = "TS_GENERIC_LIB"
 }
 
+async function getSDKGenerationId(
+  { file, url, platform }: GenerationIdParams,
+  sdkGenerationController: CodeGenerationExternalApisController
+): Promise<string> {
+  let generation: ApiResponse<UserCodeGeneration>;
+  const sdkPlatform = getSDKPlatform(platform) as Platforms;
+
+  startProgress("Generating SDK");
+
+  if (file) {
+    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+    generation = await sdkGenerationController.generateSDKViaFile(fileDescriptor, sdkPlatform);
+  } else if (url) {
+    // If url to spec file is provided
+    const body: GenerateSdkViaUrlRequest = {
+      url: url,
+      template: sdkPlatform
+    };
+    generation = await sdkGenerationController.generateSDKViaURL(body);
+  } else {
+    throw new Error("Please provide a specification file");
+  }
+  stopProgress();
+  return generation.result.id;
+}
+
+// Get valid platform from user's input, convert simple platform to valid Platforms enum value
+function getSDKPlatform(platform: string): Platforms | SimplePlatforms {
+  if (Object.keys(SimplePlatforms).includes(platform)) {
+    return SimplePlatforms[platform as keyof typeof SimplePlatforms];
+  } else if (Object.values(Platforms).includes(platform as Platforms)) {
+    return platform as Platforms;
+  } else {
+    const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join(",");
+    throw new Error(`Please provide a valid platform i.e. ${platforms}`);
+  }
+}
+
+// Download Platform
+async function downloadGeneratedSDK(
+  { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
+  sdkGenerationController: CodeGenerationExternalApisController
+): Promise<void> {
+  startProgress("Downloading SDK");
+  const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
+  if ((result as NodeJS.ReadableStream).readable) {
+    if (!zip) {
+      await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
+    } else {
+      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
+    }
+    stopProgress();
+  } else {
+    throw new Error("Couldn't download the SDK");
+  }
+}
+
 export default class SdkGenerate extends Command {
   static flags = {
     help: flags.help({ char: "h" }),
@@ -79,70 +136,13 @@ SDK generated successfully
 `
   ];
 
-  getSDKGenerationId = async (
-    { file, url, platform }: GenerationIdParams,
-    sdkGenerationController: CodeGenerationExternalApisController
-  ) => {
-    let generation: ApiResponse<UserCodeGeneration>;
-    const sdkPlatform = this.getSDKPlatform(platform) as Platforms;
-
-    startProgress("Generating SDK");
-
-    if (file) {
-      const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-      generation = await sdkGenerationController.generateSDKViaFile(fileDescriptor, sdkPlatform);
-    } else if (url) {
-      // If url to spec file is provided
-      const body: GenerateSdkViaUrlRequest = {
-        url: url,
-        template: sdkPlatform
-      };
-      generation = await sdkGenerationController.generateSDKViaURL(body);
-    } else {
-      throw new Error("Please provide a specification file");
-    }
-    stopProgress();
-    return generation.result.id;
-  };
-
-  // Get valid platform from user's input, convert simple platform to valid Platforms enum value
-  getSDKPlatform = (platform: string) => {
-    if (Object.keys(SimplePlatforms).includes(platform)) {
-      return SimplePlatforms[platform as keyof typeof SimplePlatforms];
-    } else if (Object.values(Platforms).includes(platform as Platforms)) {
-      return platform as Platforms;
-    } else {
-      const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join(",");
-      throw new Error(`Please provide a valid platform i.e. ${platforms}`);
-    }
-  };
-
-  // Download Platform
-  downloadGeneratedSDK = async (
-    { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
-    sdkGenerationController: CodeGenerationExternalApisController
-  ) => {
-    startProgress("Downloading SDK");
-    const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
-    if ((result as NodeJS.ReadableStream).readable) {
-      if (!zip) {
-        await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
-      } else {
-        await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
-      }
-      stopProgress();
-    } else {
-      throw new Error("Couldn't download the SDK");
-    }
-  };
-
   async run() {
     const { flags } = this.parse(SdkGenerate);
     const zip = flags.zip;
     try {
-      if (!fs.existsSync(path.resolve(flags.destination))) {
+      if (!(await fs.pathExists(path.resolve(flags.destination)))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
-      } else if (!fs.existsSync(path.resolve(flags.file))) {
+      } else if (!(await fs.pathExists(path.resolve(flags.file)))) {
         throw new Error(`Specification file ${flags.file} does not exist`);
       }
       const sdkFolderPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}`);
@@ -154,7 +154,7 @@ SDK generated successfully
         client
       );
       // Get generation id for the specification and platform
-      const codeGenId: string = await this.getSDKGenerationId(flags, sdkGenerationController);
+      const codeGenId: string = await getSDKGenerationId(flags, sdkGenerationController);
 
       this.log("SDK generated successfully");
       // If user wanted to download the SDK as well
@@ -165,7 +165,7 @@ SDK generated successfully
           sdkFolderPath,
           zip
         };
-        await this.downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
+        await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
         this.log(`Success! Your SDK is located at ${sdkFolderPath}`);
       }
     } catch (error) {
