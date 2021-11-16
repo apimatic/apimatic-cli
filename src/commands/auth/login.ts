@@ -6,7 +6,7 @@ import { SDKClient } from "../../client-utils/sdk-client";
 import { replaceHTML } from "../../utils/utils";
 
 export default class Login extends Command {
-  static description = "login to your APIMAtic account";
+  static description = "login to your APIMatic account";
 
   static examples = [
     `$ apimatic auth:login
@@ -18,7 +18,6 @@ You have successfully logged into APIMatic
   ];
 
   static flags = {
-    help: flags.help({ char: "h" }),
     "auth-key": flags.string({ default: "", description: "Set authentication key for all commands" })
   };
 

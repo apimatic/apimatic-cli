@@ -1,4 +1,4 @@
-import { flags, Command } from "@oclif/command";
+import { Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
 
@@ -10,10 +10,6 @@ export default class Status extends Command {
 Currently logged in as apimatic-client@gmail.com
 `
   ];
-
-  static flags = {
-    help: flags.help({ char: "h" })
-  };
 
   async run() {
     try {
