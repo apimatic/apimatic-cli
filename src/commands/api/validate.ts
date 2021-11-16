@@ -47,7 +47,7 @@ async function getValidation(
   return validation.result;
 }
 export default class Validate extends Command {
-  static description = "Validate your API specification to supported formats";
+  static description = "Validates the provided API specification file for any syntactical and semantic errors";
 
   static examples = [
     `$ apimatic api:validate --file="./specs/sample.json"
@@ -57,7 +57,7 @@ Specification file provided is valid
 
   static flags = {
     help: flags.help({ char: "h" }),
-    file: flags.string({ default: "", description: "specification file to validate" }),
+    file: flags.string({ default: "", description: "path to the API specification file to validate" }),
     url: flags.string({ default: "", description: "URL to the specification file to validate" }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
     "auth-key": flags.string({ description: "override current auth-key" })

@@ -2,8 +2,10 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
-import cli from "cli-ux";
 import * as stripTags from "striptags";
+
+import cli from "cli-ux";
+
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
     stream.pipe(unzipper.Extract({ path: destination }));

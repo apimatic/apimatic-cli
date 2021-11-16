@@ -114,9 +114,9 @@ Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LI
     file: flags.string({
       parse: (input) => path.resolve(input),
       default: "",
-      description: "file to generate SDK with"
+      description: "path to the API specification to generate SDK"
     }),
-    url: flags.string({ default: "", description: "url to api specification to generate SDK with" }),
+    url: flags.string({ default: "", description: "URL to the API specification to generate SDK" }),
     download: flags.boolean({ char: "d", default: false, description: "download the SDK" }),
     destination: flags.string({
       parse: (input) => path.resolve(input),

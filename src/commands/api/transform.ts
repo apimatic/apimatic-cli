@@ -17,6 +17,11 @@ import { flags, Command } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { replaceHTML, startProgress, stopProgress, writeFileUsingReadableStream } from "../../utils/utils";
 
+type AuthenticationError = {
+  statusCode: number;
+  body: string;
+};
+
 type TransformationIdParams = {
   file: string;
   url: string;
@@ -95,7 +100,8 @@ function getValidFormat(format: string) {
   }
 }
 export default class Transform extends Command {
-  static description = "Transform your API specification to your supported formats";
+  static description =
+    "Transforms your API specification any supported format of your choice from amongst [10+ different formats](https://www.apimatic.io/transformer/#supported-formats).";
 
   static examples = [
     `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
@@ -108,12 +114,12 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
     format: flags.string({
       parse: (input) => input.toUpperCase(),
       required: true,
-      description: `transformation format
+      description: `specification format to transform API specification into.
 (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
 Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     }),
-    file: flags.string({ default: "", description: "specification file to transform" }),
-    url: flags.string({ default: "", description: "URL to the specification file to transform" }),
+    file: flags.string({ default: "", description: "path to the API specification file to transform" }),
+    url: flags.string({ default: "", description: "URL to the API specification file to transform" }),
     destination: flags.string({ default: "./", description: "path to transformed file" }),
     "auth-key": flags.string({ description: "override current auth-key" })
   };
@@ -167,9 +173,13 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
         } else if (apiError.statusCode === 500) {
           this.error(apiError.message);
         }
+      } else if (
+        (error as AuthenticationError).statusCode === 401 &&
+        (error as AuthenticationError).body &&
+        typeof (error as AuthenticationError).body === "string"
+      ) {
+        this.error((error as AuthenticationError).body);
       } else {
-        // TODO: We need a standard error message in the CLI when there is an
-        // unknown error case.
         this.error(`${(error as Error).message}`);
       }
     }

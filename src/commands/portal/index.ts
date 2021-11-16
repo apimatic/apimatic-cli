@@ -1,7 +1,7 @@
 import { Command, flags } from "@oclif/command";
 
 export default class SDK extends Command {
-  static description = "This command can be used to invoke subcommands related to your docs portal";
+  static description = "iInvokes subcommands related to the API Portal.";
 
   static examples = ["$apimatic portal --help"];
 
@@ -10,7 +10,7 @@ export default class SDK extends Command {
   };
 
   async run() {
-    return this.log(`This command can be used to invoke subcommands related to your docs portal
+    return this.log(`invokes subcommands related to the API Portal.
     apimatic portal:generate --help`);
   }
 }

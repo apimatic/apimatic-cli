@@ -1,7 +1,7 @@
 import { Command, flags } from "@oclif/command";
 
 export default class SDK extends Command {
-  static description = "This command can be used to invoke subcommands related to your sdks";
+  static description = "invokes subcommands related to your SDKs.";
 
   static examples = ["$apimatic sdk --help"];
 
@@ -10,7 +10,7 @@ export default class SDK extends Command {
   };
 
   async run() {
-    return this.log(`This command can be used to invoke subcommands related to your sdks
+    return this.log(`invokes subcommands related to your SDKs.
     apimatic sdk:generate --help`);
   }
 }

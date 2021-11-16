@@ -33,12 +33,12 @@ export default class PortalGenerate extends Command {
     folder: flags.string({
       parse: (input) => path.resolve(input),
       default: "",
-      description: "folder to generate portal with"
+      description: "folder to generate the portal with"
     }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
       default: "./",
-      description: "path to downloaded portal"
+      description: "path to the downloaded portal"
     }),
     zip: flags.boolean({ default: false, description: "zip the portal" }),
     "auth-key": flags.string({

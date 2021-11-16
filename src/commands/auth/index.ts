@@ -1,7 +1,7 @@
 import { Command, flags } from "@oclif/command";
 
 export default class Auth extends Command {
-  static description = "This command can be used to invoke subcommands related to authentication";
+  static description = "invokes subcommands related to authentication.";
 
   static examples = ["$ apimatic auth --help"];
 
@@ -10,7 +10,7 @@ export default class Auth extends Command {
   };
 
   async run() {
-    return this.log(`This command can be used to invoke subcommands related to authentication
+    return this.log(`invokes subcommands related to authentication.
     apimatic auth:login --help
     apimatic auth:logout --help
     apimatic auth:status --help`);
