@@ -64,13 +64,13 @@ Specification file provided is valid
   };
 
   printValidationMessages = ({ warnings, errors }: ApiValidationSummary) => {
-    warnings = warnings || [];
-    const singleLineError: string = errors.length > 0 ? errors.join("\n") : "";
-
     warnings.forEach((warning) => {
       this.warn(`${replaceHTML(warning)}`);
     });
-    this.error(replaceHTML(singleLineError));
+    if (errors.length > 0) {
+      const singleLineError: string = errors.join("\n");
+      this.error(replaceHTML(singleLineError));
+    }
   };
 
   async run() {
