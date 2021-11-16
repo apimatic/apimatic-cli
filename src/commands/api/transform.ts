@@ -100,8 +100,7 @@ function getValidFormat(format: string) {
   }
 }
 export default class Transform extends Command {
-  static description =
-    "Transforms your API specification any supported format of your choice from amongst [10+ different formats](https://www.apimatic.io/transformer/#supported-formats).";
+  static description = `Transforms your API specification any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).`;
 
   static examples = [
     `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
@@ -114,7 +113,7 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
     format: flags.string({
       parse: (input) => input.toUpperCase(),
       required: true,
-      description: `specification format to transform API specification into.
+      description: `specification format to transform API specification into
 (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
 Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     }),
