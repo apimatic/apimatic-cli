@@ -143,6 +143,8 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     try {
       if (flags.file && !(await fs.pathExists(flags.file))) {
         throw new Error(`Transformation file: ${flags.file} does not exist`);
+      } else if (!(await fs.pathExists(flags.destination))) {
+        throw new Error(`Destination path: ${flags.destination} does not exist`);
       }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
