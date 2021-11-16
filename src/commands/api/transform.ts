@@ -168,6 +168,8 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
         const result = apiError.result as Record<string, unknown> | undefined;
         if (apiError.statusCode === 422 && result && "errors" in result && Array.isArray(result.errors)) {
           this.error(replaceHTML(`${result.errors}`));
+        } else if (apiError.statusCode === 422 && apiError.body && typeof apiError.body === "string") {
+          this.error(JSON.parse(apiError.body)["dto.FileUrl"][0]);
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
           this.error(apiError.body);
         } else if (apiError.statusCode === 500) {
