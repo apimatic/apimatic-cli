@@ -77,6 +77,9 @@ Specification file provided is valid
     const { flags } = this.parse(Validate);
 
     try {
+      if (flags.file && !(await fs.pathExists(flags.file))) {
+        throw new Error(`Validation file: ${flags.file} does not exist`);
+      }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
 
