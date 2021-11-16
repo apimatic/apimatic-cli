@@ -11,8 +11,12 @@ export type AuthInfo = {
  * //Function to get credentials
  */
 export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
-  const data: AuthInfo | null = JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
-  return data;
+  try {
+    const data: AuthInfo | null = JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
+    return data;
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
