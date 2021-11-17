@@ -92,8 +92,8 @@ async function downloadTransformationFile({
 }
 // Get valid platform from user's input, convert simple platform to valid Platforms enum value
 function getValidFormat(format: string) {
-  if (Object.keys(ExportFormats).join(",").toUpperCase().includes(format.toUpperCase())) {
-    return ExportFormats[format.toUpperCase() as keyof typeof ExportFormats];
+  if (Object.keys(ExportFormats).find((exportFormat) => exportFormat === format)) {
+    return ExportFormats[format as keyof typeof ExportFormats];
   } else {
     const formats = Object.keys(ExportFormats).join(",");
     throw new Error(`Please provide a valid platform i.e. ${formats}`);
@@ -111,6 +111,7 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
   static flags = {
     help: flags.help({ char: "h" }),
     format: flags.string({
+      parse: (format: string) => getValidFormat(format.toUpperCase()),
       required: true,
       description: `specification format to transform API specification into
 (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
@@ -135,7 +136,6 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
   };
   async run() {
     const { flags } = this.parse(Transform);
-    flags.format = getValidFormat(flags.format);
     const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
     const destinationFilePath: string = path.join(
       flags.destination,
