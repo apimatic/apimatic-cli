@@ -14,7 +14,14 @@ import {
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import { writeFileUsingReadableStream, unzipFile, stopProgress, startProgress, replaceHTML } from "../../utils/utils";
+import {
+  writeFileUsingReadableStream,
+  unzipFile,
+  stopProgress,
+  startProgress,
+  replaceHTML,
+  isJSONParsable
+} from "../../utils/utils";
 
 type GenerationIdParams = {
   file: string;
@@ -173,18 +180,32 @@ SDK generated successfully
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as SDKGenerateUnprocessableError;
-        if (apiError.statusCode > 400 && apiError.statusCode < 500 && typeof JSON.parse(result.message) === "object") {
+        if (apiError.statusCode === 400 && isJSONParsable(result.message)) {
           const errors = JSON.parse(result.message);
           if (Array.isArray(errors.Errors) && apiError.statusCode === 400) {
             this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
           }
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
           this.error(apiError.body);
+        } else if (
+          apiError.statusCode === 500 &&
+          apiError.body &&
+          typeof apiError.body === "string" &&
+          isJSONParsable(apiError.body)
+        ) {
+          this.error(JSON.parse(apiError.body).message);
+        } else if (
+          apiError.statusCode === 422 &&
+          apiError.body &&
+          typeof apiError.body === "string" &&
+          isJSONParsable(apiError.body)
+        ) {
+          this.error(JSON.parse(apiError.body)["dto.Url"][0]);
         } else {
-          this.error(replaceHTML("Unknown error: " + result.message));
+          this.error(replaceHTML(result.message));
         }
       } else {
-        this.error(`Unknown error:  ${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }

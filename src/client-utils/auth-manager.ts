@@ -26,5 +26,5 @@ export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
  * //Function to set credentials.
  */
 export async function setAuthInfo(credentials: AuthInfo, configDir: string): Promise<void> {
-  return await fs.writeFile(path.join(configDir, "config.json"), JSON.stringify(credentials));
+  return await fs.writeFile(path.join(configDir, "config.json"), JSON.stringify(credentials), { flag: "w" });
 }

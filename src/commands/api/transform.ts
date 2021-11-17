@@ -39,19 +39,19 @@ type TransformationData = {
 };
 
 const DestinationFormats = {
-  OPENAPI3JSON: "json",
-  OPENAPI3YAML: "yaml",
+  OpenApi3Json: "json",
+  OpenApi3Yaml: "yaml",
   APIMATIC: "json",
   WADL2009: "xml",
   WADL2006: "xml",
   WSDL: "xml",
-  SWAGGER10: "json",
-  SWAGGER20: "json",
-  SWAGGERYAML: "yaml",
+  Swagger10: "json",
+  Swagger20: "json",
+  SwaggerYaml: "yaml",
   RAML: "yaml",
   RAML10: "yaml",
-  POSTMAN10: "json",
-  POSTMAN20: "json"
+  Postman10: "json",
+  Postman20: "json"
 };
 
 async function getTransformationId(
@@ -92,8 +92,8 @@ async function downloadTransformationFile({
 }
 // Get valid platform from user's input, convert simple platform to valid Platforms enum value
 function getValidFormat(format: string) {
-  if (Object.keys(ExportFormats).join(",").toUpperCase().includes(format)) {
-    return ExportFormats[format as keyof typeof ExportFormats];
+  if (Object.keys(ExportFormats).join(",").toUpperCase().includes(format.toUpperCase())) {
+    return ExportFormats[format.toUpperCase() as keyof typeof ExportFormats];
   } else {
     const formats = Object.keys(ExportFormats).join(",");
     throw new Error(`Please provide a valid platform i.e. ${formats}`);
@@ -111,7 +111,6 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
   static flags = {
     help: flags.help({ char: "h" }),
     format: flags.string({
-      parse: (input) => input.toUpperCase(),
       required: true,
       description: `specification format to transform API specification into
 (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
@@ -136,9 +135,12 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
   };
   async run() {
     const { flags } = this.parse(Transform);
-    const format = getValidFormat(flags.format);
-    const destinationFormat: string = DestinationFormats[format as keyof typeof DestinationFormats];
-    const destinationFilePath: string = path.join(flags.destination, `Transformed_${format}.${destinationFormat}`);
+    flags.format = getValidFormat(flags.format);
+    const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
+    const destinationFilePath: string = path.join(
+      flags.destination,
+      `Transformed_${flags.format}.${destinationFormat}`
+    );
 
     try {
       if (flags.file && !(await fs.pathExists(flags.file))) {
