@@ -113,7 +113,7 @@ export default class SdkGenerate extends Command {
       parse: (input) => input.toUpperCase(),
       required: true,
       description: `language platform for sdk
-Simple: CSHARP|JAVA|PYTHON|RUBY|TYPESCRIPT
+Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT
 Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LIB|
         JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|
         TS_GENERIC_LIB`
