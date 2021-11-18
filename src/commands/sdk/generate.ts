@@ -173,7 +173,7 @@ SDK generated successfully
           zip
         };
         await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
-        this.log(`Success! Your SDK is located at ${sdkFolderPath}`);
+        this.log(`Success! Your SDK is located at ${sdkFolderPath}${flags.zip ? ".zip" : ""}`);
       }
     } catch (error) {
       stopProgress(true);

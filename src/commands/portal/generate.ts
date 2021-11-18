@@ -141,7 +141,7 @@ Your portal has been generated at D:/
 
       const generatedPortalPath: string = await this.downloadDocsPortal(generatePortalParams);
 
-      this.log(`Your portal has been generated at ${generatedPortalPath}`);
+      this.log(`Your portal has been generated at ${generatedPortalPath}${flags.zip ? ".zip" : ""}`);
     } catch (error) {
       stopProgress(true);
 
@@ -169,7 +169,7 @@ Your portal has been generated at D:/
           }
         }
       } else {
-        this.error(`Unknown error:  ${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }
