@@ -15,7 +15,13 @@ import {
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
-import { replaceHTML, startProgress, stopProgress, writeFileUsingReadableStream } from "../../utils/utils";
+import {
+  getFileNameFromPath,
+  replaceHTML,
+  startProgress,
+  stopProgress,
+  writeFileUsingReadableStream
+} from "../../utils/utils";
 
 type AuthenticationError = {
   statusCode: number;
@@ -135,10 +141,11 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
   };
   async run() {
     const { flags } = this.parse(Transform);
+    const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
     const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
     const destinationFilePath: string = path.join(
       flags.destination,
-      `transformed_${flags.format}.${destinationFormat}`
+      `${fileName}_${flags.format}.${destinationFormat}`
     );
 
     try {
@@ -160,7 +167,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
         destinationFilePath,
         transformationController
       });
-      this.log(`Success! Your transformed file is located at ${savedTransformationFile.toLowerCase()}`);
+      this.log(`Success! Your transformed file is located at ${savedTransformationFile}`);
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;

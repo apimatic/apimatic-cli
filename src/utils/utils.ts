@@ -120,3 +120,7 @@ export const isJSONParsable = (json: string) => {
     return false;
   }
 };
+
+export const getFileNameFromPath = (filePath: string) => {
+  return path.basename(filePath).split(".")[0];
+};

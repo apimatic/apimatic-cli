@@ -45,14 +45,11 @@ USAGE
 
 ## `apimatic api`
 
-This command can be used to inquire about all commands related to your APIs
+lists all commands related to the APIMatic API.
 
 ```
 USAGE
   $ apimatic api
-
-OPTIONS
-  -h, --help  show CLI help
 
 EXAMPLE
   $ apimatic api --help
@@ -62,31 +59,23 @@ _See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/
 
 ## `apimatic api:transform`
 
-Transform your API specification to your supported formats
+Transforms your API specification any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).
 
 ```
 USAGE
   $ apimatic api:transform
 
 OPTIONS
-  -h, --help
-      show CLI help
+  -h, --help                 show CLI help
+  --auth-key=auth-key        override current auth-key
+  --destination=destination  [default: D:\Code\Backend\apimatic-cli\src\commands\api] path to transformed file
+  --file=file                path to the API specification file to transform
 
-  --auth-key=auth-key
-      override current auth-key
+  --format=format            (required) specification format to transform API specification into
+                             (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
+                             Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)
 
-  --destination=destination
-      [default: ./] path to transformed file
-
-  --file=file
-      specification file to transform
-
-  --format=(OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postma
-  n10|Postman20)
-      (required) transformation format
-
-  --url=url
-      URL to the specification file to transform
+  --url=url                  URL to the API specification file to transform
 
 EXAMPLE
   $ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
@@ -97,7 +86,7 @@ _See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-
 
 ## `apimatic api:validate`
 
-Validate your API specification to supported formats
+Validates the provided API specification file for any syntactical and semantic errors
 
 ```
 USAGE
@@ -106,7 +95,7 @@ USAGE
 OPTIONS
   -h, --help           show CLI help
   --auth-key=auth-key  override current auth-key
-  --file=file          specification file to validate
+  --file=file          path to the API specification file to validate
   --url=url            URL to the specification file to validate
 
 EXAMPLE
@@ -118,14 +107,11 @@ _See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-c
 
 ## `apimatic auth`
 
-This command can be used to invoke subcommands related to authentication
+invokes subcommands related to authentication.
 
 ```
 USAGE
   $ apimatic auth
-
-OPTIONS
-  -h, --help  show CLI help
 
 EXAMPLE
   $ apimatic auth --help
@@ -135,14 +121,13 @@ _See code: [src/commands/auth/index.ts](https://github.com/apimatic/apimatic-cli
 
 ## `apimatic auth:login`
 
-login to your APIMAtic account
+login to your APIMatic account
 
 ```
 USAGE
   $ apimatic auth:login
 
 OPTIONS
-  -h, --help           show CLI help
   --auth-key=auth-key  Set authentication key for all commands
 
 EXAMPLE
@@ -157,14 +142,11 @@ _See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli
 
 ## `apimatic auth:logout`
 
-logout of your APIMAtic account
+logout of APIMatic
 
 ```
 USAGE
   $ apimatic auth:logout
-
-OPTIONS
-  -h, --help  show CLI help
 
 EXAMPLE
   $ apimatic auth:logout
@@ -175,14 +157,11 @@ _See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cl
 
 ## `apimatic auth:status`
 
-check current logged in account
+checks current logged-in account
 
 ```
 USAGE
   $ apimatic auth:status
-
-OPTIONS
-  -h, --help  show CLI help
 
 EXAMPLE
   $ apimatic auth:status
@@ -229,18 +208,15 @@ OPTIONS
   --all  see all commands in CLI
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.3/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.4/src/commands/help.ts)_
 
 ## `apimatic portal`
 
-This command can be used to invoke subcommands related to your docs portal
+invokes subcommands related to the API Portal.
 
 ```
 USAGE
   $ apimatic portal
-
-OPTIONS
-  -h, --help  show CLI help
 
 EXAMPLE
   $apimatic portal --help
@@ -259,8 +235,8 @@ USAGE
 OPTIONS
   -h, --help                 show CLI help
   --auth-key=auth-key        override current auth-key
-  --destination=destination  [default: ./] path to downloaded portal
-  --folder=folder            folder to generate portal with
+  --destination=destination  [default: ./] path to the downloaded portal
+  --folder=folder            folder to generate the portal with
   --zip                      zip the portal
 
 EXAMPLE
@@ -272,14 +248,11 @@ _See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimati
 
 ## `apimatic sdk`
 
-This command can be used to invoke subcommands related to your sdks
+invokes subcommands related to your SDKs.
 
 ```
 USAGE
   $ apimatic sdk
-
-OPTIONS
-  -h, --help  show CLI help
 
 EXAMPLE
   $apimatic sdk --help
@@ -294,34 +267,24 @@ USAGE
   $ apimatic sdk:generate
 
 OPTIONS
-  -d, --download
-      download the SDK
+  -h, --help                 show CLI help
+  --auth-key=auth-key        override current auth-key
+  --destination=destination  [default: ./] path to downloaded SDK (used with download flag)
+  --file=file                path to the API specification to generate SDK
 
-  -h, --help
-      show CLI help
+  --platform=platform        (required) language platform for sdk
+                             Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT
+                             Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LIB|
+                             JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|
+                             TS_GENERIC_LIB
 
-  --auth-key=auth-key
-      override current auth-key
+  --url=url                  URL to the API specification to generate SDK
 
-  --destination=destination
-      [default: ./] path to downloaded SDK (used with download flag)
-
-  --file=file
-      file to generate SDK with
-
-  --platform=(CSHARP|JAVA|PHP|PYTHON|RUBY|TYPESCRIPT|CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFO
-  RM_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|TS_GENERIC_LIB)
-      (required) language platform for sdk
-
-  --url=url
-      url to api specification to generate SDK with
-
-  --zip
-      zip the SDK (used with download flag)
+  --zip                      zip the SDK (used with download flag)
 
 EXAMPLE
   $ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"
-       Your SDK has been generated with id: 1324abcd
+  SDK generated successfully
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/sdk/generate.ts)_

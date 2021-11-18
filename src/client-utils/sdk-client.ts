@@ -56,10 +56,9 @@ export class SDKClient {
       );
 
       return "Logged in";
+    } else if (authKey === storedAuthInfo.authKey) {
+      return "Already logged in";
     } else {
-      if (authKey === storedAuthInfo.authKey) {
-        return "Already logged in";
-      }
       setAuthInfo(
         {
           email,

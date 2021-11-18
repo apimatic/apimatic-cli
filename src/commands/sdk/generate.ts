@@ -20,7 +20,8 @@ import {
   stopProgress,
   startProgress,
   replaceHTML,
-  isJSONParsable
+  isJSONParsable,
+  getFileNameFromPath
 } from "../../utils/utils";
 
 type GenerationIdParams = {
@@ -91,16 +92,19 @@ function getSDKPlatform(platform: string): Platforms | SimplePlatforms {
 async function downloadGeneratedSDK(
   { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
   sdkGenerationController: CodeGenerationExternalApisController
-): Promise<void> {
+): Promise<string> {
   startProgress("Downloading SDK");
   const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
   if ((result as NodeJS.ReadableStream).readable) {
     if (!zip) {
       await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
+      stopProgress();
+      return sdkFolderPath;
     } else {
       await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
+      stopProgress();
+      return zippedSDKPath;
     }
-    stopProgress();
   } else {
     throw new Error("Couldn't download the SDK");
   }
@@ -124,7 +128,6 @@ Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LI
       description: "path to the API specification to generate SDK"
     }),
     url: flags.string({ default: "", description: "URL to the API specification to generate SDK" }),
-    download: flags.boolean({ char: "d", default: false, description: "download the SDK" }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
       default: "./",
@@ -152,8 +155,9 @@ SDK generated successfully
       } else if (!(await fs.pathExists(path.resolve(flags.file)))) {
         throw new Error(`Specification file ${flags.file} does not exist`);
       }
-      const sdkFolderPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}`);
-      const zippedSDKPath: string = path.join(flags.destination, `Generated_SDK_${flags.platform}.zip`);
+      const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
+      const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());
+      const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toUpperCase());
 
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
@@ -163,18 +167,15 @@ SDK generated successfully
       // Get generation id for the specification and platform
       const codeGenId: string = await getSDKGenerationId(flags, sdkGenerationController);
 
-      this.log("SDK generated successfully");
       // If user wanted to download the SDK as well
-      if (flags.download) {
-        const sdkDownloadParams: DownloadSDKParams = {
-          codeGenId,
-          zippedSDKPath,
-          sdkFolderPath,
-          zip
-        };
-        await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
-        this.log(`Success! Your SDK is located at ${sdkFolderPath}${flags.zip ? ".zip" : ""}`);
-      }
+      const sdkDownloadParams: DownloadSDKParams = {
+        codeGenId,
+        zippedSDKPath,
+        sdkFolderPath,
+        zip
+      };
+      const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
+      this.log(`Success! Your SDK is located at ${sdkPath}`);
     } catch (error) {
       stopProgress(true);
       if ((error as ApiError).result) {
