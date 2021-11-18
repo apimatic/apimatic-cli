@@ -145,7 +145,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
     const destinationFilePath: string = path.join(
       flags.destination,
-      `${fileName}_${flags.format}.${destinationFormat}`
+      `${fileName}_${flags.format}.${destinationFormat}`.toLowerCase()
     );
 
     try {

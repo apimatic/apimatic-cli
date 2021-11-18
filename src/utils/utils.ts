@@ -8,6 +8,9 @@ import cli from "cli-ux";
 
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
+    if (fs.existsSync(destination)) {
+      throw new Error(`${destination} already exists`);
+    }
     stream.pipe(unzipper.Extract({ path: destination }));
     stream.on("close", (error: Error) => {
       if (error) {
@@ -24,6 +27,9 @@ export const deleteFile = async (filePath: string) => {
 
 export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, destinationPath: string) => {
   return new Promise((resolve, reject) => {
+    if (fs.existsSync(destinationPath)) {
+      throw new Error(`${destinationPath} already exists`);
+    }
     const writeStream = fs.createWriteStream(destinationPath);
     stream.pipe(writeStream);
     writeStream.on("close", (error: Error) => {
