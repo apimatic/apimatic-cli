@@ -1,7 +1,7 @@
 import { Command } from "@oclif/command";
 
 export default class SDK extends Command {
-  static description = "iInvokes subcommands related to the API Portal.";
+  static description = "invokes subcommands related to the API Portal.";
 
   static examples = ["$apimatic portal --help"];
 

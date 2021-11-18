@@ -2,7 +2,7 @@ import * as base64 from "base-64";
 import axios, { AxiosResponse } from "axios";
 import { Client } from "@apimatic/apimatic-sdk-for-js";
 import { setAuthInfo, getAuthInfo, AuthInfo } from "./auth-manager";
-
+import { baseURL } from "../config/env";
 /**
  * The Singleton class defines the `getInstance` method that lets clients access
  * the unique singleton instance.
@@ -13,7 +13,7 @@ type Credentials = {
 };
 export class SDKClient {
   private static instance: SDKClient;
-  private static authAPI = "https://apimaticio-test.azurewebsites.net/api/account/authkey";
+  private static authAPI = `${baseURL}/account/authkey`;
   public static client: Client;
 
   /**

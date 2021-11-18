@@ -26,7 +26,7 @@ export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
  * //Function to set credentials.
  */
 export async function setAuthInfo(credentials: AuthInfo, configDir: string): Promise<void> {
-  
+ 
   const configFilePath = path.join(configDir, "config.json");
 
   if(!fs.existsSync(configFilePath))

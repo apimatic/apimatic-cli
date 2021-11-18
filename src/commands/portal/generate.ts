@@ -5,6 +5,7 @@ import * as path from "path";
 import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
+import { baseURL } from "../../config/env";
 import {
   unzipFile,
   deleteFile,
@@ -66,11 +67,7 @@ Your portal has been generated at D:/
       },
       responseType: "arraybuffer"
     };
-    const { data }: AxiosResponse = await axios.post(
-      "https://apimaticio-test.azurewebsites.net/api/portal",
-      formData,
-      config
-    );
+    const { data }: AxiosResponse = await axios.post(`${baseURL}/portal`, formData, config);
     return data;
   };
 
@@ -141,7 +138,7 @@ Your portal has been generated at D:/
 
       const generatedPortalPath: string = await this.downloadDocsPortal(generatePortalParams);
 
-      this.log(`Your portal has been generated at ${generatedPortalPath}`);
+      this.log(`Your portal has been generated at ${generatedPortalPath}${flags.zip ? ".zip" : ""}`);
     } catch (error) {
       stopProgress(true);
 
@@ -169,7 +166,7 @@ Your portal has been generated at D:/
           }
         }
       } else {
-        this.error(`Unknown error:  ${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }

@@ -14,7 +14,14 @@ import {
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import { writeFileUsingReadableStream, unzipFile, stopProgress, startProgress, replaceHTML } from "../../utils/utils";
+import {
+  writeFileUsingReadableStream,
+  unzipFile,
+  stopProgress,
+  startProgress,
+  replaceHTML,
+  isJSONParsable
+} from "../../utils/utils";
 
 type GenerationIdParams = {
   file: string;
@@ -75,7 +82,7 @@ function getSDKPlatform(platform: string): Platforms | SimplePlatforms {
   } else if (Object.values(Platforms).includes(platform as Platforms)) {
     return platform as Platforms;
   } else {
-    const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join(",");
+    const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join("|");
     throw new Error(`Please provide a valid platform i.e. ${platforms}`);
   }
 }
@@ -106,7 +113,7 @@ export default class SdkGenerate extends Command {
       parse: (input) => input.toUpperCase(),
       required: true,
       description: `language platform for sdk
-Simple: CSHARP|JAVA|PYTHON|RUBY|TYPESCRIPT
+Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT
 Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LIB|
         JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|
         TS_GENERIC_LIB`
@@ -166,25 +173,39 @@ SDK generated successfully
           zip
         };
         await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
-        this.log(`Success! Your SDK is located at ${sdkFolderPath}`);
+        this.log(`Success! Your SDK is located at ${sdkFolderPath}${flags.zip ? ".zip" : ""}`);
       }
     } catch (error) {
       stopProgress(true);
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as SDKGenerateUnprocessableError;
-        if (apiError.statusCode > 400 && apiError.statusCode < 500 && typeof JSON.parse(result.message) === "object") {
+        if (apiError.statusCode === 400 && isJSONParsable(result.message)) {
           const errors = JSON.parse(result.message);
           if (Array.isArray(errors.Errors) && apiError.statusCode === 400) {
             this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
           }
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
           this.error(apiError.body);
+        } else if (
+          apiError.statusCode === 500 &&
+          apiError.body &&
+          typeof apiError.body === "string" &&
+          isJSONParsable(apiError.body)
+        ) {
+          this.error(JSON.parse(apiError.body).message);
+        } else if (
+          apiError.statusCode === 422 &&
+          apiError.body &&
+          typeof apiError.body === "string" &&
+          isJSONParsable(apiError.body)
+        ) {
+          this.error(JSON.parse(apiError.body)["dto.Url"][0]);
         } else {
-          this.error(replaceHTML("Unknown error: " + result.message));
+          this.error(replaceHTML(result.message));
         }
       } else {
-        this.error(`Unknown error:  ${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }
