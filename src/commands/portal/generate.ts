@@ -5,6 +5,7 @@ import * as path from "path";
 import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
+import { baseURL } from "../../config/env";
 import {
   unzipFile,
   deleteFile,
@@ -66,11 +67,7 @@ Your portal has been generated at D:/
       },
       responseType: "arraybuffer"
     };
-    const { data }: AxiosResponse = await axios.post(
-      "https://apimaticio-test.azurewebsites.net/api/portal",
-      formData,
-      config
-    );
+    const { data }: AxiosResponse = await axios.post(`${baseURL}/portal`, formData, config);
     return data;
   };
 
