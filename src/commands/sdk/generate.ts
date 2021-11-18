@@ -82,7 +82,7 @@ function getSDKPlatform(platform: string): Platforms | SimplePlatforms {
   } else if (Object.values(Platforms).includes(platform as Platforms)) {
     return platform as Platforms;
   } else {
-    const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join(",");
+    const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join("|");
     throw new Error(`Please provide a valid platform i.e. ${platforms}`);
   }
 }

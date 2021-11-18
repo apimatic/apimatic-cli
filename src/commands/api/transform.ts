@@ -43,7 +43,6 @@ const DestinationFormats = {
   OpenApi3Yaml: "yaml",
   APIMATIC: "json",
   WADL2009: "xml",
-  WADL2006: "xml",
   WSDL: "xml",
   Swagger10: "json",
   Swagger20: "json",
@@ -95,7 +94,7 @@ function getValidFormat(format: string) {
   if (Object.keys(ExportFormats).find((exportFormat) => exportFormat === format)) {
     return ExportFormats[format as keyof typeof ExportFormats];
   } else {
-    const formats = Object.keys(ExportFormats).join(",");
+    const formats = Object.keys(ExportFormats).join("|");
     throw new Error(`Please provide a valid platform i.e. ${formats}`);
   }
 }
@@ -119,7 +118,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     }),
     file: flags.string({ default: "", description: "path to the API specification file to transform" }),
     url: flags.string({ default: "", description: "URL to the API specification file to transform" }),
-    destination: flags.string({ default: "./", description: "path to transformed file" }),
+    destination: flags.string({ default: __dirname, description: "path to transformed file" }),
     "auth-key": flags.string({ description: "override current auth-key" })
   };
 
@@ -139,7 +138,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
     const destinationFilePath: string = path.join(
       flags.destination,
-      `Transformed_${flags.format}.${destinationFormat}`
+      `transformed_${flags.format}.${destinationFormat}`
     );
 
     try {
@@ -161,7 +160,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
         destinationFilePath,
         transformationController
       });
-      this.log(`Success! Your transformed file is located at ${savedTransformationFile}`);
+      this.log(`Success! Your transformed file is located at ${savedTransformationFile.toLowerCase()}`);
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
