@@ -1,5 +1,6 @@
 import * as fs from "fs-extra";
 import * as path from "path";
+import cli from "cli-ux";
 
 import {
   ApiError,
@@ -17,8 +18,6 @@ import { SDKClient } from "../../client-utils/sdk-client";
 import {
   writeFileUsingReadableStream,
   unzipFile,
-  stopProgress,
-  startProgress,
   replaceHTML,
   isJSONParsable,
   getFileNameFromPath
@@ -54,11 +53,10 @@ async function getSDKGenerationId(
   { file, url, platform }: GenerationIdParams,
   sdkGenerationController: CodeGenerationExternalApisController
 ): Promise<string> {
+  cli.action.start("Generating SDK");
+
   let generation: ApiResponse<UserCodeGeneration>;
   const sdkPlatform = getSDKPlatform(platform) as Platforms;
-
-  startProgress("Generating SDK");
-
   if (file) {
     const fileDescriptor = new FileWrapper(fs.createReadStream(file));
     generation = await sdkGenerationController.generateSDKViaFile(fileDescriptor, sdkPlatform);
@@ -72,7 +70,7 @@ async function getSDKGenerationId(
   } else {
     throw new Error("Please provide a specification file");
   }
-  stopProgress();
+  cli.action.stop();
   return generation.result.id;
 }
 
@@ -93,16 +91,16 @@ async function downloadGeneratedSDK(
   { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
   sdkGenerationController: CodeGenerationExternalApisController
 ): Promise<string> {
-  startProgress("Downloading SDK");
+  cli.action.start("Downloading SDK");
   const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
   if ((result as NodeJS.ReadableStream).readable) {
     if (!zip) {
       await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
-      stopProgress();
+      cli.action.stop();
       return sdkFolderPath;
     } else {
       await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
-      stopProgress();
+      cli.action.stop();
       return zippedSDKPath;
     }
   } else {
@@ -177,7 +175,7 @@ SDK generated successfully
       const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
       this.log(`Success! Your SDK is located at ${sdkPath}`);
     } catch (error) {
-      stopProgress(true);
+      cli.action.stop();
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as SDKGenerateUnprocessableError;

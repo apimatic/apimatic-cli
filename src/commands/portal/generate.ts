@@ -1,20 +1,13 @@
 import * as fs from "fs-extra";
 import * as FormData from "form-data";
 import * as path from "path";
+import cli from "cli-ux";
 
 import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { baseURL } from "../../config/env";
-import {
-  unzipFile,
-  deleteFile,
-  zipDirectory,
-  replaceHTML,
-  stopProgress,
-  startProgress,
-  isJSONParsable
-} from "../../utils/utils";
+import { unzipFile, deleteFile, zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
@@ -81,7 +74,7 @@ Your portal has been generated at D:/
     const zippedPortalPath: string = path.join(generatedPortalFolderPath, "generated_portal.zip");
     const portalPath: string = path.join(generatedPortalFolderPath, "generated_portal");
 
-    startProgress("Downloading portal");
+    cli.action.start("Downloading portal");
 
     // Check if the build file exists for the user or not
     if (!(await fs.pathExists(zippedBuildFilePath))) {
@@ -104,7 +97,7 @@ Your portal has been generated at D:/
       await deleteFile(zippedPortalPath);
     }
 
-    stopProgress();
+    cli.action.stop();
     return portalPath;
     // } else {
     //   throw new Error("Couldn't download the portal");
@@ -140,7 +133,7 @@ Your portal has been generated at D:/
 
       this.log(`Your portal has been generated at ${generatedPortalPath}${flags.zip ? ".zip" : ""}`);
     } catch (error) {
-      stopProgress(true);
+      cli.action.stop();
 
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;

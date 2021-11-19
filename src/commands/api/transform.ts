@@ -1,5 +1,6 @@
 import * as fs from "fs-extra";
 import * as path from "path";
+import cli from "cli-ux";
 
 import {
   TransformationController,
@@ -15,13 +16,7 @@ import {
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
-import {
-  getFileNameFromPath,
-  replaceHTML,
-  startProgress,
-  stopProgress,
-  writeFileUsingReadableStream
-} from "../../utils/utils";
+import { getFileNameFromPath, replaceHTML, writeFileUsingReadableStream } from "../../utils/utils";
 
 type AuthenticationError = {
   statusCode: number;
@@ -63,6 +58,8 @@ async function getTransformationId(
   { file, url, format }: TransformationIdParams,
   transformationController: TransformationController
 ): Promise<Transformation> {
+  cli.action.start("Transforming API specification");
+
   let generation: ApiResponse<Transformation>;
   if (file) {
     const fileDescriptor = new FileWrapper(fs.createReadStream(file));
@@ -76,6 +73,7 @@ async function getTransformationId(
   } else {
     throw new Error("Please provide a specification file");
   }
+  cli.action.stop();
   return generation.result;
 }
 
@@ -84,15 +82,16 @@ async function downloadTransformationFile({
   destinationFilePath,
   transformationController
 }: DownloadTransformationParams): Promise<string> {
-  startProgress("Downloading Transformed File");
+  cli.action.start("Downloading Transformed file");
+
   const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
-  stopProgress();
 
   if ((result as NodeJS.ReadableStream).readable) {
     await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
   } else {
     throw new Error("Couldn't save transformation file");
   }
+  cli.action.stop();
   return destinationFilePath;
 }
 // Get valid platform from user's input, convert simple platform to valid Platforms enum value
@@ -169,6 +168,8 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
       });
       this.log(`Success! Your transformed file is located at ${savedTransformationFile}`);
     } catch (error) {
+      cli.action.stop();
+
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
 
