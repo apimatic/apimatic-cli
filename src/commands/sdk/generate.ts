@@ -155,13 +155,20 @@ SDK generated successfully
       }
       const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
       const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());
-      const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toUpperCase());
+      const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toLowerCase());
+
+      if (fs.existsSync(zippedSDKPath) && zip) {
+        throw new Error(`Can't generate SDK to path ${zippedSDKPath}, because it already exists`);
+      } else if (fs.existsSync(sdkFolderPath) && !zip) {
+        throw new Error(`Can't generate SDK to path ${sdkFolderPath}, because it already exists`);
+      }
 
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const sdkGenerationController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(
         client
       );
+
       // Get generation id for the specification and platform
       const codeGenId: string = await getSDKGenerationId(flags, sdkGenerationController);
 

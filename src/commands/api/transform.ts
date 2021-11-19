@@ -147,6 +147,10 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
       `${fileName}_${flags.format}.${destinationFormat}`.toLowerCase()
     );
 
+    if (fs.existsSync(destinationFilePath)) {
+      throw new Error(`Can't download transformed file to path ${destinationFilePath}, because it already exists`);
+    }
+
     try {
       if (flags.file && !(await fs.pathExists(flags.file))) {
         throw new Error(`Transformation file: ${flags.file} does not exist`);
