@@ -5,6 +5,16 @@ export default class SDK extends Command {
 
   static examples = ["$apimatic portal --help"];
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  async run() {}
+  async run() {
+    this.log(`invokes subcommands related to the API Portal.
+
+USAGE
+  $ apimatic portal
+
+EXAMPLE
+  $apimatic portal --help
+
+COMMANDS
+  portal:generate  Generate static docs portal on premise`);
+  }
 }

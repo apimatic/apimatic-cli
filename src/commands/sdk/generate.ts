@@ -109,6 +109,7 @@ async function downloadGeneratedSDK(
 }
 
 export default class SdkGenerate extends Command {
+  static description = "Generate SDK for your APIs";
   static flags = {
     platform: flags.string({
       parse: (input) => input.toUpperCase(),
