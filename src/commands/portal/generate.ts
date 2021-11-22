@@ -23,7 +23,6 @@ export default class PortalGenerate extends Command {
   static description = "Generate static docs portal on premise";
 
   static flags = {
-    help: flags.help({ char: "h" }),
     folder: flags.string({
       parse: (input) => path.resolve(input),
       default: "",

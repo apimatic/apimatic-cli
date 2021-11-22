@@ -56,7 +56,6 @@ Specification file provided is valid
   ];
 
   static flags = {
-    help: flags.help({ char: "h" }),
     file: flags.string({ default: "", description: "path to the API specification file to validate" }),
     url: flags.string({ default: "", description: "URL to the specification file to validate" }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec

@@ -104,7 +104,7 @@ function getValidFormat(format: string) {
   }
 }
 export default class Transform extends Command {
-  static description = `Transforms your API specification any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).`;
+  static description = `Transforms your API specification to any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).`;
 
   static examples = [
     `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
@@ -113,7 +113,6 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
   ];
 
   static flags = {
-    help: flags.help({ char: "h" }),
     format: flags.string({
       parse: (format: string) => getValidFormat(format.toUpperCase()),
       required: true,

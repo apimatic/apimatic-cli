@@ -110,7 +110,6 @@ async function downloadGeneratedSDK(
 
 export default class SdkGenerate extends Command {
   static flags = {
-    help: flags.help({ char: "h" }),
     platform: flags.string({
       parse: (input) => input.toUpperCase(),
       required: true,
