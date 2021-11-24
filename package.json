@@ -65,6 +65,7 @@
     },
     "repository": "git://github.com/apimatic/apimatic-cli.git",
     "scripts": {
+        "build": "tsc -b",
         "postpack": "rimraf oclif.manifest.json",
         "posttest": "eslint . --ext .ts --config .eslintrc",
         "prepack": "rimraf lib && tsc -b && oclif-dev manifest && oclif-dev readme",

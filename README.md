@@ -59,14 +59,13 @@ _See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/
 
 ## `apimatic api:transform`
 
-Transforms your API specification any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).
+Transforms your API specification to any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).
 
 ```
 USAGE
   $ apimatic api:transform
 
 OPTIONS
-  -h, --help                 show CLI help
   --auth-key=auth-key        override current auth-key
   --destination=destination  [default: D:\Code\Backend\apimatic-cli\src\commands\api] path to transformed file
   --file=file                path to the API specification file to transform
@@ -93,7 +92,6 @@ USAGE
   $ apimatic api:validate
 
 OPTIONS
-  -h, --help           show CLI help
   --auth-key=auth-key  override current auth-key
   --file=file          path to the API specification file to validate
   --url=url            URL to the specification file to validate
@@ -233,7 +231,6 @@ USAGE
   $ apimatic portal:generate
 
 OPTIONS
-  -h, --help                 show CLI help
   --auth-key=auth-key        override current auth-key
   --destination=destination  [default: ./] path to the downloaded portal
   --folder=folder            folder to generate the portal with
@@ -262,12 +259,13 @@ _See code: [src/commands/sdk/index.ts](https://github.com/apimatic/apimatic-cli/
 
 ## `apimatic sdk:generate`
 
+Generate SDK for your APIs
+
 ```
 USAGE
   $ apimatic sdk:generate
 
 OPTIONS
-  -h, --help                 show CLI help
   --auth-key=auth-key        override current auth-key
   --destination=destination  [default: ./] path to downloaded SDK (used with download flag)
   --file=file                path to the API specification to generate SDK
