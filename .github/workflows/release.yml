@@ -2,30 +2,41 @@ name: Release
 
 on:
   push:
-    branches: [alpha]
+    branches: [ alpha ]
 
 jobs:
   release:
-    name: Release
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        node: [ '12', '13', '14' ]
+    name: Release with Node version ${{ matrix.node }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Setup Node.js
-      uses: actions/setup-node@v1
-      with:
-        node-version: 12.x
-    - name: Install dependencies
-      run: |
-        git config --global url."https://${{ secrets.ACCESS_TOKEN }}@github.com/".insteadOf ssh://git@github.com/
-        npm install
-    - name: Install semantic-release extra plugins
-      run: npm install -D @semantic-release/changelog @semantic-release/git
-    - name: Build
-      run: npm run build
-    - name: Release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: npx semantic-release
+      - name: Checkout CLI
+        uses: actions/checkout@v2
+        with:
+          repository: apimatic/apimatic-cli
+          token: ${{ secrets.ACCESS_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: cli
+
+      - name: setup node
+        uses: actions/setup-node@v2
+
+      - name: Install dependencies
+        working-directory: cli
+        run: |
+          git config --global url."https://${{ secrets.ACCESS_TOKEN }}@github.com/".insteadOf https://github.com/
+          npm install
+          npm install --save-dev @semantic-release/changelog @semantic-release/git
+      - name: Check Build
+        working-directory: 'cli'
+        run: npm run build
+
+      - name: Release
+        working-directory: cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
