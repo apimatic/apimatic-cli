@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: ['v3']
+    branches: [alpha]
 
 jobs:
   release:
@@ -16,6 +16,8 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: 12.x
+    - name: Replace Git URL from SSH to https
+      run: git config --global url."https://${{ secrets.ACCESS }}@github.com/".insteadOf ssh://git@github.com/
     - name: Install dependencies
       run: npx ci
     - name: Install semantic-release extra plugins
