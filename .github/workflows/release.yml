@@ -16,10 +16,10 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: 12.x
-    - name: Replace Git URL from SSH to https
-      run: git config --global url."https://${{ secrets.ACCESS }}@github.com/".insteadOf ssh://git@github.com/
     - name: Install dependencies
-      run: npx ci
+      run: |
+        git config --global url."https://${{ secrets.ACCESS_TOKEN }}@github.com/".insteadOf ssh://git@github.com/
+        npm install
     - name: Install semantic-release extra plugins
       run: npm install -D @semantic-release/changelog @semantic-release/git
     - name: Build
