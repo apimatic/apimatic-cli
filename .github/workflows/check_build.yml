@@ -9,8 +9,6 @@ on:
     branches: [ v3 ]
   pull_request:
     branches: [ v3 ]
-  create:
-    tags: [ v3 ]
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -44,8 +42,3 @@ jobs:
       - name: Check Build
         working-directory: 'cli'
         run: npm run build
-
-      - name: Publish to npm
-      - uses: JS-DevTools/npm-publish@v1
-        with:
-          token: ${{ secrets.NPM_TOKEN }}

@@ -175,3 +175,6 @@ $RECYCLE.BIN/
 
 lib/
 tmp/
+
+# Lock files
+package-lock.json
