@@ -8,6 +8,8 @@
     },
     "bugs": "https://github.com/apimatic/apimatic-cli/issues",
     "devDependencies": {
+        "@commitlint/cli": "^15.0.0",
+        "@commitlint/config-conventional": "^15.0.0",
         "@oclif/dev-cli": "^1.26.0",
         "@oclif/test": "^1.2.8",
         "@types/archiver": "^5.1.1",

@@ -35,12 +35,17 @@ jobs:
       - name: setup node
         uses: actions/setup-node@v2
 
-      - name: install dependencies
+      - name: Install dependencies
         working-directory: cli
         run: |
           git config --global url."https://${{ secrets.ACCESS_TOKEN }}@github.com/".insteadOf https://github.com/
           npm install
 
-      - name: install dependencies
+      - name: Check Build
         working-directory: 'cli'
         run: npm run build
+
+      - name: Publish to npm
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
