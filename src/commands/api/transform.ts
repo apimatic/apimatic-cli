@@ -2,107 +2,19 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import cli from "cli-ux";
 
-import {
-  TransformationController,
-  FileWrapper,
-  ExportFormats,
-  Transformation,
-  ApiResponse,
-  Client,
-  TransformViaUrlRequest,
-  ApiError,
-  ApiValidationSummary
-} from "@apimatic/apimatic-sdk-for-js";
+import { TransformationController, Transformation, Client, ApiError } from "@apimatic/apimatic-sdk-for-js";
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
-import { getFileNameFromPath, replaceHTML, writeFileUsingReadableStream } from "../../utils/utils";
+import { getFileNameFromPath, replaceHTML } from "../../utils/utils";
+import { AuthenticationError, DestinationFormats } from "../../types/api/transform";
+import {
+  getValidFormat,
+  getTransformationId,
+  downloadTransformationFile,
+  printValidationMessages
+} from "../../controllers/api/transform";
 
-type AuthenticationError = {
-  statusCode: number;
-  body: string;
-};
-
-type TransformationIdParams = {
-  file: string;
-  url: string;
-  format: string;
-};
-
-type DownloadTransformationParams = {
-  id: string;
-  destinationFilePath: string;
-  transformationController: TransformationController;
-};
-
-type TransformationData = {
-  result: NodeJS.ReadableStream | Blob;
-};
-
-const DestinationFormats = {
-  OpenApi3Json: "json",
-  OpenApi3Yaml: "yaml",
-  APIMATIC: "json",
-  WADL2009: "xml",
-  WSDL: "xml",
-  Swagger10: "json",
-  Swagger20: "json",
-  SwaggerYaml: "yaml",
-  RAML: "yaml",
-  RAML10: "yaml",
-  Postman10: "json",
-  Postman20: "json"
-};
-
-async function getTransformationId(
-  { file, url, format }: TransformationIdParams,
-  transformationController: TransformationController
-): Promise<Transformation> {
-  cli.action.start("Transforming API specification");
-
-  let generation: ApiResponse<Transformation>;
-  if (file) {
-    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-    generation = await transformationController.transformViaFile(fileDescriptor, format as ExportFormats);
-  } else if (url) {
-    const body: TransformViaUrlRequest = {
-      url: url,
-      exportFormat: format as ExportFormats
-    };
-    generation = await transformationController.transformViaURL(body);
-  } else {
-    throw new Error("Please provide a specification file");
-  }
-  cli.action.stop();
-  return generation.result;
-}
-
-async function downloadTransformationFile({
-  id,
-  destinationFilePath,
-  transformationController
-}: DownloadTransformationParams): Promise<string> {
-  cli.action.start("Downloading Transformed file");
-
-  const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
-
-  if ((result as NodeJS.ReadableStream).readable) {
-    await writeFileUsingReadableStream(result as NodeJS.ReadableStream, destinationFilePath);
-  } else {
-    throw new Error("Couldn't save transformation file");
-  }
-  cli.action.stop();
-  return destinationFilePath;
-}
-// Get valid platform from user's input, convert simple platform to valid Platforms enum value
-function getValidFormat(format: string) {
-  if (Object.keys(ExportFormats).find((exportFormat) => exportFormat === format)) {
-    return ExportFormats[format as keyof typeof ExportFormats];
-  } else {
-    const formats = Object.keys(ExportFormats).join("|");
-    throw new Error(`Please provide a valid platform i.e. ${formats}`);
-  }
-}
 export default class Transform extends Command {
   static description = `Transforms your API specification to any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).`;
 
@@ -126,17 +38,6 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     "auth-key": flags.string({ description: "override current auth-key" })
   };
 
-  printValidationMessages = (apiValidationSummary: ApiValidationSummary | undefined) => {
-    const warnings: string[] = apiValidationSummary?.warnings || [];
-    const errors: string = apiValidationSummary?.errors.join("\n") || "";
-
-    warnings.forEach((warning) => {
-      this.warn(replaceHTML(warning));
-    });
-    if (apiValidationSummary && apiValidationSummary.errors.length > 0) {
-      this.error(replaceHTML(errors));
-    }
-  };
   async run() {
     const { flags } = this.parse(Transform);
     const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
@@ -162,7 +63,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
 
       const { id, apiValidationSummary }: Transformation = await getTransformationId(flags, transformationController);
 
-      this.printValidationMessages(apiValidationSummary);
+      printValidationMessages(apiValidationSummary, this.warn, this.error);
 
       const savedTransformationFile: string = await downloadTransformationFile({
         id,

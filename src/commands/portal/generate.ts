@@ -1,23 +1,15 @@
 import * as fs from "fs-extra";
-import * as FormData from "form-data";
 import * as path from "path";
 import cli from "cli-ux";
 
-import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
-import { SDKClient } from "../../client-utils/sdk-client";
-import { baseURL } from "../../config/env";
-import { unzipFile, deleteFile, zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
-import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
 
-type GeneratePortalParams = {
-  zippedBuildFilePath: string;
-  generatedPortalFolderPath: string;
-  docsPortalController: DocsPortalManagementController;
-  overrideAuthKey: string | null;
-  zip: boolean;
-};
+import { AxiosError } from "axios";
+import { SDKClient } from "../../client-utils/sdk-client";
+import { GeneratePortalParams } from "../../types/portal/generate";
+import { downloadDocsPortal } from "../../controllers/portal/generate";
+import { zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
 
 export default class PortalGenerate extends Command {
   static description = "Generate static docs portal on premise";
@@ -46,63 +38,6 @@ Your portal has been generated at D:/
 `
   ];
 
-  // TODO: Remove after SDK is patched
-  downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey: string | null) => {
-    const formData = new FormData();
-    const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
-    formData.append("file", fs.createReadStream(zippedBuildFilePath));
-    const config: AxiosRequestConfig = {
-      headers: {
-        Authorization: authInfo ? `X-Auth-Key ${overrideAuthKey || authInfo.authKey.trim()}` : "",
-        "Content-Type": "multipart/form-data",
-        ...formData.getHeaders()
-      },
-      responseType: "arraybuffer"
-    };
-    const { data }: AxiosResponse = await axios.post(`${baseURL}/portal`, formData, config);
-    return data;
-  };
-
-  // Download Docs Portal
-  downloadDocsPortal = async ({
-    zippedBuildFilePath,
-    generatedPortalFolderPath,
-    overrideAuthKey,
-    zip
-  }: GeneratePortalParams) => {
-    const zippedPortalPath: string = path.join(generatedPortalFolderPath, "generated_portal.zip");
-    const portalPath: string = path.join(generatedPortalFolderPath, "generated_portal");
-
-    cli.action.start("Downloading portal");
-
-    // Check if the build file exists for the user or not
-    if (!(await fs.pathExists(zippedBuildFilePath))) {
-      throw new Error("Build file doesn't exist");
-    }
-    // TODO: ***CRITICAL*** Remove this call once the SDK is patched
-    const data: ArrayBuffer = await this.downloadPortalAxios(zippedBuildFilePath, overrideAuthKey);
-
-    await deleteFile(zippedBuildFilePath);
-    await fs.writeFile(zippedPortalPath, data);
-
-    // TODO: Uncomment this code block when the SDK is patched
-    // const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
-    // const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
-    //   await docsPortalController.generateOnPremPortalViaBuildInput(file);
-    // if ((data as NodeJS.ReadableStream).readable) {
-    //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
-    if (!zip) {
-      await unzipFile(fs.createReadStream(zippedPortalPath), portalPath);
-      await deleteFile(zippedPortalPath);
-    }
-
-    cli.action.stop();
-    return portalPath;
-    // } else {
-    //   throw new Error("Couldn't download the portal");
-    // }
-  };
-
   async run() {
     const { flags } = this.parse(PortalGenerate);
     const zip = flags.zip;
@@ -128,9 +63,9 @@ Your portal has been generated at D:/
         zip
       };
 
-      const generatedPortalPath: string = await this.downloadDocsPortal(generatePortalParams);
+      const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams, this.config.configDir);
 
-      this.log(`Your portal has been generated at ${generatedPortalPath}${flags.zip ? ".zip" : ""}`);
+      this.log(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error) {
       cli.action.stop();
 

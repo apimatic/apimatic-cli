@@ -1,51 +1,19 @@
 import * as fs from "fs-extra";
-import cli from "cli-ux";
 
 import {
   ApiError,
-  ApiResponse,
   APIValidationExternalApisController,
   ApiValidationSummary,
-  Client,
-  FileWrapper
+  Client
 } from "@apimatic/apimatic-sdk-for-js";
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
 import { replaceHTML } from "../../utils/utils";
+import { APIValidateError, AuthorizationError } from "../../types/api/validate";
+import { printValidationMessages } from "../../controllers/api/transform";
+import { getValidation } from "../../controllers/api/validate";
 
-type GetValidationParams = {
-  file: string;
-  url: string;
-};
-
-type APIValidateError = {
-  modelState: {
-    "exception Error": string[];
-  };
-};
-type AuthorizationError = {
-  body: string;
-};
-
-async function getValidation(
-  { file, url }: GetValidationParams,
-  apiValidationController: APIValidationExternalApisController
-): Promise<ApiValidationSummary> {
-  let validation: ApiResponse<ApiValidationSummary>;
-
-  cli.action.start("Validating specification file");
-  if (file) {
-    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-    validation = await apiValidationController.validateAPIViaFile(fileDescriptor);
-  } else if (url) {
-    validation = await apiValidationController.validateAPIViaURL(url);
-  } else {
-    throw new Error("Please provide a specification file");
-  }
-  cli.action.stop();
-  return validation.result;
-}
 export default class Validate extends Command {
   static description = "Validates the provided API specification file for any syntactical and semantic errors";
 
@@ -60,16 +28,6 @@ Specification file provided is valid
     url: flags.string({ default: "", description: "URL to the specification file to validate" }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
     "auth-key": flags.string({ description: "override current auth-key" })
-  };
-
-  printValidationMessages = ({ warnings, errors }: ApiValidationSummary) => {
-    warnings.forEach((warning) => {
-      this.warn(`${replaceHTML(warning)}`);
-    });
-    if (errors.length > 0) {
-      const singleLineError: string = errors.join("\n");
-      this.error(replaceHTML(singleLineError));
-    }
   };
 
   async run() {
@@ -87,7 +45,7 @@ Specification file provided is valid
       );
 
       const validationSummary: ApiValidationSummary = await getValidation(flags, apiValidationController);
-      this.printValidationMessages(validationSummary);
+      printValidationMessages(validationSummary, this.warn, this.error);
 
       validationSummary.success
         ? this.log("Specification file provided is valid")

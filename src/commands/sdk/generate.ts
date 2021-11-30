@@ -2,111 +2,13 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import cli from "cli-ux";
 
-import {
-  ApiError,
-  ApiResponse,
-  Client,
-  CodeGenerationExternalApisController,
-  FileWrapper,
-  GenerateSdkViaUrlRequest,
-  Platforms,
-  UserCodeGeneration
-} from "@apimatic/apimatic-sdk-for-js";
+import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/apimatic-sdk-for-js";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
-import {
-  writeFileUsingReadableStream,
-  unzipFile,
-  replaceHTML,
-  isJSONParsable,
-  getFileNameFromPath
-} from "../../utils/utils";
-
-type GenerationIdParams = {
-  file: string;
-  url: string;
-  platform: string;
-};
-
-type DownloadSDKParams = {
-  codeGenId: string;
-  zip: boolean;
-  zippedSDKPath: string;
-  sdkFolderPath: string;
-};
-
-type SDKGenerateUnprocessableError = {
-  message: string;
-};
-
-enum SimplePlatforms {
-  CSHARP = "CS_NET_STANDARD_LIB",
-  JAVA = "JAVA_ECLIPSE_JRE_LIB",
-  PHP = "PHP_GENERIC_LIB",
-  PYTHON = "PYTHON_GENERIC_LIB",
-  RUBY = "RUBY_GENERIC_LIB",
-  TYPESCRIPT = "TS_GENERIC_LIB"
-}
-
-async function getSDKGenerationId(
-  { file, url, platform }: GenerationIdParams,
-  sdkGenerationController: CodeGenerationExternalApisController
-): Promise<string> {
-  cli.action.start("Generating SDK");
-
-  let generation: ApiResponse<UserCodeGeneration>;
-  const sdkPlatform = getSDKPlatform(platform) as Platforms;
-  if (file) {
-    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-    generation = await sdkGenerationController.generateSDKViaFile(fileDescriptor, sdkPlatform);
-  } else if (url) {
-    // If url to spec file is provided
-    const body: GenerateSdkViaUrlRequest = {
-      url: url,
-      template: sdkPlatform
-    };
-    generation = await sdkGenerationController.generateSDKViaURL(body);
-  } else {
-    throw new Error("Please provide a specification file");
-  }
-  cli.action.stop();
-  return generation.result.id;
-}
-
-// Get valid platform from user's input, convert simple platform to valid Platforms enum value
-function getSDKPlatform(platform: string): Platforms | SimplePlatforms {
-  if (Object.keys(SimplePlatforms).includes(platform)) {
-    return SimplePlatforms[platform as keyof typeof SimplePlatforms];
-  } else if (Object.values(Platforms).includes(platform as Platforms)) {
-    return platform as Platforms;
-  } else {
-    const platforms = Object.keys(SimplePlatforms).concat(Object.values(Platforms)).join("|");
-    throw new Error(`Please provide a valid platform i.e. ${platforms}`);
-  }
-}
-
-// Download Platform
-async function downloadGeneratedSDK(
-  { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
-  sdkGenerationController: CodeGenerationExternalApisController
-): Promise<string> {
-  cli.action.start("Downloading SDK");
-  const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
-  if ((result as NodeJS.ReadableStream).readable) {
-    if (!zip) {
-      await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
-      cli.action.stop();
-      return sdkFolderPath;
-    } else {
-      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
-      cli.action.stop();
-      return zippedSDKPath;
-    }
-  } else {
-    throw new Error("Couldn't download the SDK");
-  }
-}
+import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils";
+import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate";
+import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate";
 
 export default class SdkGenerate extends Command {
   static description = "Generate SDK for your APIs";
