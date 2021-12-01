@@ -1,4 +1,4 @@
-import { DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
+import { DocsPortalManagementController } from "@apimatic/js-sdk";
 
 export type GeneratePortalParams = {
   zippedBuildFilePath: string;

@@ -2,7 +2,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import cli from "cli-ux";
 
-import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/apimatic-sdk-for-js";
+import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/js-sdk";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 

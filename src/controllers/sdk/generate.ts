@@ -6,7 +6,7 @@ import {
   UserCodeGeneration,
   Platforms,
   GenerateSdkViaUrlRequest
-} from "@apimatic/apimatic-sdk-for-js";
+} from "@apimatic/js-sdk";
 import { ApiResponse, FileWrapper } from "@apimatic/core";
 import { GenerationIdParams, SimplePlatforms, DownloadSDKParams } from "../../types/sdk/generate";
 import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils";

@@ -3,7 +3,7 @@ import * as path from "path";
 import cli from "cli-ux";
 
 import { Command, flags } from "@oclif/command";
-import { Client, DocsPortalManagementController } from "@apimatic/apimatic-sdk-for-js";
+import { Client, DocsPortalManagementController } from "@apimatic/js-sdk";
 
 import { AxiosError } from "axios";
 import { SDKClient } from "../../client-utils/sdk-client";

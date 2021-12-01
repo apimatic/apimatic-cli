@@ -2,7 +2,7 @@ import cli from "cli-ux";
 import * as fs from "fs-extra";
 import Command from "@oclif/command";
 
-import { APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/apimatic-sdk-for-js";
+import { APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/js-sdk";
 import { ApiResponse, FileWrapper } from "@apimatic/core";
 import { GetValidationParams } from "../../types/api/validate";
 import { replaceHTML } from "../../utils/utils";

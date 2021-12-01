@@ -2,7 +2,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import cli from "cli-ux";
 
-import { TransformationController, Transformation, Client, ApiError } from "@apimatic/apimatic-sdk-for-js";
+import { TransformationController, Transformation, Client, ApiError } from "@apimatic/js-sdk";
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";

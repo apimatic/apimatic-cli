@@ -1,6 +1,6 @@
 import * as base64 from "base-64";
 import axios, { AxiosResponse } from "axios";
-import { Client } from "@apimatic/apimatic-sdk-for-js";
+import { Client } from "@apimatic/js-sdk";
 import { setAuthInfo, getAuthInfo, AuthInfo } from "./auth-manager";
 import { baseURL } from "../config/env";
 /**
