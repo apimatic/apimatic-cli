@@ -1,3 +1,10 @@
+## [1.0.1-alpha.3](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.2...v1.0.1-alpha.3) (2021-12-01)
+
+
+### Bug Fixes
+
+* **sdk package:** get sdk package from npm ([4c8e178](https://github.com/apimatic/apimatic-cli/commit/4c8e1787eb21f04d81cab95b5a58e3133a61f7af))
+
 ## [1.0.1-alpha.2](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.1...v1.0.1-alpha.2) (2021-11-30)
 
 
