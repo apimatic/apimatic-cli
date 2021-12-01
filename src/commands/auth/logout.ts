@@ -3,7 +3,7 @@ import { Command } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
 export default class Login extends Command {
-  static description = "logout of APIMatic";
+  static description = "Clear local login credentials";
 
   static examples = [
     `$ apimatic auth:logout

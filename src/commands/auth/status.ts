@@ -3,7 +3,7 @@ import { Command } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
 export default class Status extends Command {
-  static description = "checks current logged-in account";
+  static description = "View current authentication state";
 
   static examples = [
     `$ apimatic auth:status

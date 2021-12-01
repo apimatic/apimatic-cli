@@ -16,11 +16,14 @@ import {
 } from "../../controllers/api/transform";
 
 export default class Transform extends Command {
-  static description = `Transforms your API specification to any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).`;
+  static description = `Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.`;
 
   static examples = [
     `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
 Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
+`,
+    `$ apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"
+Success! Your transformed file is located at D:/swagger_raml.yaml
 `
   ];
 
@@ -33,9 +36,13 @@ Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
 Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     }),
     file: flags.string({ default: "", description: "path to the API specification file to transform" }),
-    url: flags.string({ default: "", description: "URL to the API specification file to transform" }),
-    destination: flags.string({ default: __dirname, description: "path to transformed file" }),
-    "auth-key": flags.string({ description: "override current auth-key" })
+    url: flags.string({
+      default: "",
+      description:
+        "URL to the API specification file to transform. Can be used in place of the --file option if the API specification is publicly available."
+    }),
+    destination: flags.string({ default: "./", description: "directory to download transformed file to" }),
+    "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
   };
 
   async run() {

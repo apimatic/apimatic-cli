@@ -1,13 +1,10 @@
 @apimatic/cli
 =============
-
 The official CLI for APIMatic.
-
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 [![Version](https://img.shields.io/npm/v/@apimatic/cli.svg)](https://npmjs.org/package/@apimatic/cli)
 [![Downloads/week](https://img.shields.io/npm/dw/@apimatic/cli.svg)](https://npmjs.org/package/@apimatic/cli)
 [![License](https://img.shields.io/npm/l/@apimatic/cli.svg)](https://github.com/apimatic/apimatic-cli/blob/master/package.json)
-
 <!-- toc -->
 * [Usage](#usage)
 * [Commands](#commands)
@@ -19,14 +16,13 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)
-@apimatic/cli/1.0.1-alpha.3 linux-x64 node-v14.18.1
+@apimatic/cli/1.0.1-alpha.1 linux-x64 node-v14.18.1
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
 ...
 ```
 <!-- usagestop -->
-
 # Commands
 <!-- commands -->
 * [`apimatic api`](#apimatic-api)
@@ -42,251 +38,182 @@ USAGE
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
 * [`apimatic sdk`](#apimatic-sdk)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
-
 ## `apimatic api`
-
-lists all commands related to the APIMatic API.
-
+Manage APIs
 ```
 USAGE
   $ apimatic api
-
 EXAMPLE
   $ apimatic api --help
 ```
-
-_See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/api/index.ts)_
-
+_See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/api/index.ts)_
 ## `apimatic api:transform`
-
-Transforms your API specification to any supported format of your choice from amongst[10+ different formats](https://www.apimatic.io/transformer/#supported-formats).
-
+Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.
 ```
 USAGE
   $ apimatic api:transform
-
 OPTIONS
-  --auth-key=auth-key        override current auth-key
-
-  --destination=destination  [default: /home/runner/work/apimatic-cli/apimatic-cli/cli/src/commands/api] path to
-                             transformed file
-
+  --auth-key=auth-key        override current authentication state with an authentication key
+  --destination=destination  [default: ./] directory to download transformed file to
   --file=file                path to the API specification file to transform
-
-  --format=format            (required) specification format to transform API specification into
-                             (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
-                             Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)
-
-  --url=url                  URL to the API specification file to transform
-
-EXAMPLE
+  --format=format            (required) format to transform API specification to
+                             (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WSDL|
+                             Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20|APIBluePrint|GraphQlSchema)
+  --url=url                  URL to the API specification file to transform. Can be used in place of the --file option if the API specification is publicly available.
+EXAMPLES
   $ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
   Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
+  $ apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"
+  Success! Your transformed file is located at D:\swagger_raml.yaml
 ```
-
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/api/transform.ts)_
-
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/api/transform.ts)_
 ## `apimatic api:validate`
-
-Validates the provided API specification file for any syntactical and semantic errors
-
+Validate the syntactic and semantic correctness of an API specification
 ```
 USAGE
   $ apimatic api:validate
-
 OPTIONS
-  --auth-key=auth-key  override current auth-key
+  --auth-key=auth-key  override current authentication state with an authentication key
   --file=file          path to the API specification file to validate
-  --url=url            URL to the specification file to validate
-
-EXAMPLE
+  --url=url            URL to the specification file to validate. Can be used in place of the --file option if the API specification is publicly available.
+EXAMPLES
   $ apimatic api:validate --file="./specs/sample.json"
   Specification file provided is valid
+  $ apimatic api:validate --url=https://petstore.swagger.io/v2/swagger.json
+  Specification file provided is valid
 ```
-
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/api/validate.ts)_
-
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/api/validate.ts)_
 ## `apimatic auth`
-
-invokes subcommands related to authentication.
-
+Manage this CLI's authentication state.
 ```
 USAGE
   $ apimatic auth
-
 EXAMPLE
   $ apimatic auth --help
 ```
-
-_See code: [src/commands/auth/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/auth/index.ts)_
-
+_See code: [src/commands/auth/index.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/index.ts)_
 ## `apimatic auth:login`
-
-login to your APIMatic account
-
+Login using your APIMatic credentials or an API Key
 ```
 USAGE
   $ apimatic auth:login
-
 OPTIONS
   --auth-key=auth-key  Set authentication key for all commands
-
-EXAMPLE
+EXAMPLES
   $ apimatic auth:login
   Please enter your registered email: apimatic-user@gmail.com
   Please enter your password: *********
-
   You have successfully logged into APIMatic
+
+  $ apimatic auth:login --auth-key=xxxx
+Authentication key successfully set
 ```
-
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/auth/login.ts)_
-
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/login.ts)_
 ## `apimatic auth:logout`
-
-logout of APIMatic
-
+Clear local Login credentials
 ```
 USAGE
   $ apimatic auth:logout
-
 EXAMPLE
   $ apimatic auth:logout
   Logged out
 ```
-
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/auth/logout.ts)_
-
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/logout.ts)_
 ## `apimatic auth:status`
-
-checks current logged-in account
-
+View current Authentication state
 ```
 USAGE
   $ apimatic auth:status
-
 EXAMPLE
   $ apimatic auth:status
   Currently logged in as apimatic-client@gmail.com
 ```
-
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/auth/status.ts)_
-
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/auth/status.ts)_
 ## `apimatic autocomplete [SHELL]`
-
-display autocomplete installation instructions
-
+Display autocomplete installation instructions
 ```
 USAGE
   $ apimatic autocomplete [SHELL]
-
 ARGUMENTS
   SHELL  shell type
-
 OPTIONS
   -r, --refresh-cache  Refresh cache (ignores displaying instructions)
-
 EXAMPLES
   $ apimatic autocomplete
   $ apimatic autocomplete bash
   $ apimatic autocomplete zsh
   $ apimatic autocomplete --refresh-cache
 ```
-
 _See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v0.3.0/src/commands/autocomplete/index.ts)_
-
 ## `apimatic help [COMMAND]`
-
-display help for apimatic
-
+Display help for apimatic
 ```
 USAGE
   $ apimatic help [COMMAND]
-
 ARGUMENTS
   COMMAND  command to show help for
-
 OPTIONS
   --all  see all commands in CLI
 ```
-
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.9/src/commands/help.ts)_
-
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.4/src/commands/help.ts)_
 ## `apimatic portal`
-
-invokes subcommands related to the API Portal.
-
+Manage API Documentation Portals
 ```
 USAGE
   $ apimatic portal
-
 EXAMPLE
   $apimatic portal --help
 ```
-
-_See code: [src/commands/portal/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/portal/index.ts)_
-
+_See code: [src/commands/portal/index.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/portal/index.ts)_
 ## `apimatic portal:generate`
-
-Generate static docs portal on premise
-
+Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://portal-api-docs.apimatic.io/#/http/generating-api-portal/build-file)
 ```
 USAGE
   $ apimatic portal:generate
-
 OPTIONS
-  --auth-key=auth-key        override current auth-key
-  --destination=destination  [default: ./] path to the downloaded portal
-  --folder=folder            folder to generate the portal with
-  --zip                      zip the portal
-
+  --auth-key=auth-key        override current authentication state with an authentication key
+  --destination=destination  [default: ./] directory to download the generated portal to
+  --folder=folder            path to the input directory containing API specifications and config files
+  --zip                      download the generated portal as a .zip archive
 EXAMPLE
   $ apimatic portal:generate --folder="./portal/" --destination="D:/"
   Your portal has been generated at D:/
 ```
-
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/portal/generate.ts)_
-
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/portal/generate.ts)_
 ## `apimatic sdk`
-
-invokes subcommands related to your SDKs.
-
+Generate and manage SDKs for APIs
 ```
 USAGE
   $ apimatic sdk
-
 EXAMPLE
   $apimatic sdk --help
 ```
-
-_See code: [src/commands/sdk/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/sdk/index.ts)_
-
+_See code: [src/commands/sdk/index.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/sdk/index.ts)_
 ## `apimatic sdk:generate`
-
-Generate SDK for your APIs
-
+Generate SDKs for an API
 ```
 USAGE
   $ apimatic sdk:generate
-
 OPTIONS
-  --auth-key=auth-key        override current auth-key
-  --destination=destination  [default: ./] path to downloaded SDK (used with download flag)
-  --file=file                path to the API specification to generate SDK
-
+  --auth-key=auth-key        override current authentication state with an authentication key
+  --destination=destination  [default: ./] directory to download the generated SDK to
+  --file=file                path to the API specification to generate SDKs for
   --platform=platform        (required) language platform for sdk
                              Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT
                              Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LIB|
                              JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|
                              TS_GENERIC_LIB
-
-  --url=url                  URL to the API specification to generate SDK
-
-  --zip                      zip the SDK (used with download flag)
-
+  --url=url                  URL to the API specification to generate SDKs for. Can be used in place of the --file option if the API specification is publicly available.
+  --zip                      download the generated portal as a .zip archive
 EXAMPLE
   $ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"
-  SDK generated successfully
+  Generating SDK... done
+  Downloading SDK... done
+  Success! Your SDK is located at swagger_sdk_csharp
+  $ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json
+Generating SDK... done
+Downloading SDK... done
+Success! Your SDK is located at swagger_sdk_csharp
 ```
-
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.3/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0/src/commands/sdk/generate.ts)_
 <!-- commandsstop -->

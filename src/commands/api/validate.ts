@@ -10,19 +10,26 @@ import { printValidationMessages } from "../../controllers/api/transform";
 import { getValidation } from "../../controllers/api/validate";
 
 export default class Validate extends Command {
-  static description = "Validates the provided API specification file for any syntactical and semantic errors";
+  static description = "Validate the syntactic and semantic correctness of an API specification";
 
   static examples = [
     `$ apimatic api:validate --file="./specs/sample.json"
+Specification file provided is valid
+`,
+    `$ apimatic api:validate --url=https://petstore.swagger.io/v2/swagger.json
 Specification file provided is valid
 `
   ];
 
   static flags = {
-    file: flags.string({ default: "", description: "path to the API specification file to validate" }),
-    url: flags.string({ default: "", description: "URL to the specification file to validate" }),
+    file: flags.string({ default: "", description: "Path to the API specification file to validate" }),
+    url: flags.string({
+      default: "",
+      description:
+        "URL to the specification file to validate. Can be used in place of the --file option if the API specification is publicly available."
+    }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
-    "auth-key": flags.string({ description: "override current auth-key" })
+    "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
   };
 
   async run() {

@@ -12,23 +12,24 @@ import { downloadDocsPortal } from "../../controllers/portal/generate";
 import { zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
 
 export default class PortalGenerate extends Command {
-  static description = "Generate static docs portal on premise";
+  static description =
+    "Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://portal-api-docs.apimatic.io/#/http/generating-api-portal/build-file)";
 
   static flags = {
     folder: flags.string({
       parse: (input) => path.resolve(input),
       default: "",
-      description: "folder to generate the portal with"
+      description: "path to the input directory containing API specifications and config files"
     }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
       default: "./",
       description: "path to the downloaded portal"
     }),
-    zip: flags.boolean({ default: false, description: "zip the portal" }),
+    zip: flags.boolean({ default: false, description: "download the generated portal as a .zip archive" }),
     "auth-key": flags.string({
       default: "",
-      description: "override current auth-key"
+      description: "override current authentication state with an authentication key"
     })
   };
 

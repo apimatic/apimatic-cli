@@ -25,24 +25,34 @@ Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LI
     file: flags.string({
       parse: (input) => path.resolve(input),
       default: "",
-      description: "path to the API specification to generate SDK"
+      description: "path to the API specification to generate SDKs for"
     }),
-    url: flags.string({ default: "", description: "URL to the API specification to generate SDK" }),
+    url: flags.string({
+      default: "",
+      description:
+        "URL to the API specification to generate SDKs for. Can be used in place of the --file option if the API specification is publicly available."
+    }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
       default: "./",
-      description: "path to downloaded SDK (used with download flag)"
+      description: "directory to download the generated SDK to"
     }),
-    zip: flags.boolean({ default: false, description: "zip the SDK (used with download flag)" }),
+    zip: flags.boolean({ default: false, description: "download the generated SDK as a .zip archive" }),
     "auth-key": flags.string({
       default: "",
-      description: "override current auth-key"
+      description: "override current authentication state with an authentication key"
     })
   };
 
   static examples = [
     `$ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"
-SDK generated successfully
+Generating SDK... done
+Downloading SDK... done
+Success! Your SDK is located at swagger_sdk_csharp`,
+    `$ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json
+Generating SDK... done
+Downloading SDK... done
+Success! Your SDK is located at swagger_sdk_csharp
 `
   ];
 
