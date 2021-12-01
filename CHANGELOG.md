@@ -1,3 +1,10 @@
+## [1.0.1-alpha.4](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.3...v1.0.1-alpha.4) (2021-12-01)
+
+
+### Bug Fixes
+
+* **documentation:** improve messages for each command ([a2c0bfb](https://github.com/apimatic/apimatic-cli/commit/a2c0bfbd5c1867302cf27170dc3b2d3ca5bd64ca))
+
 ## [1.0.1-alpha.3](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.2...v1.0.1-alpha.3) (2021-12-01)
 
 
