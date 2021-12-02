@@ -35,13 +35,21 @@ Success! Your transformed file is located at D:/swagger_raml.yaml
 (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
 Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     }),
-    file: flags.string({ default: "", description: "path to the API specification file to transform" }),
+    file: flags.string({
+      parse: (input) => path.resolve(input),
+      default: "",
+      description: "path to the API specification file to transform"
+    }),
     url: flags.string({
       default: "",
       description:
         "URL to the API specification file to transform. Can be used in place of the --file option if the API specification is publicly available."
     }),
-    destination: flags.string({ default: "./", description: "directory to download transformed file to" }),
+    destination: flags.string({
+      parse: (input) => path.resolve(input),
+      default: path.resolve("./"),
+      description: "directory to download transformed file to"
+    }),
     force: flags.boolean({ char: "f", default: false, description: "overwrite if same file exist in the destination" }),
     "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
   };

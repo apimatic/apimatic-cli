@@ -34,7 +34,7 @@ Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LI
     }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
-      default: "./",
+      default: path.resolve("./"),
       description: "directory to download the generated SDK to"
     }),
     force: flags.boolean({

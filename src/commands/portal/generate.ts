@@ -23,7 +23,7 @@ export default class PortalGenerate extends Command {
     }),
     destination: flags.string({
       parse: (input) => path.resolve(input),
-      default: "./",
+      default: path.resolve("./"),
       description: "path to the downloaded portal"
     }),
     force: flags.boolean({ char: "f", default: false, description: "overwrite if a portal exists in the destination" }),
