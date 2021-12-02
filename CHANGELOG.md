@@ -1,3 +1,10 @@
+## [1.0.1-alpha.6](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.5...v1.0.1-alpha.6) (2021-12-02)
+
+
+### Bug Fixes
+
+* **path:** resolve paths to absolute ([f68bdde](https://github.com/apimatic/apimatic-cli/commit/f68bdde7e8c927602ea87e07d0e558b699082154))
+
 ## [1.0.1-alpha.5](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.4...v1.0.1-alpha.5) (2021-12-02)
 
 

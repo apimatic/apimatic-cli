@@ -16,7 +16,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)
-@apimatic/cli/1.0.1-alpha.5 linux-x64 node-v16.13.0
+@apimatic/cli/1.0.1-alpha.6 linux-x64 node-v16.13.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -51,7 +51,7 @@ EXAMPLE
   $ apimatic api --help
 ```
 
-_See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/api/index.ts)_
+_See code: [src/commands/api/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/api/index.ts)_
 
 ## `apimatic api:transform`
 
@@ -64,7 +64,10 @@ USAGE
 OPTIONS
   -f, --force                overwrite if same file exist in the destination
   --auth-key=auth-key        override current authentication state with an authentication key
-  --destination=destination  [default: ./] directory to download transformed file to
+
+  --destination=destination  [default: /home/runner/work/apimatic-cli/apimatic-cli/cli] directory to download
+                             transformed file to
+
   --file=file                path to the API specification file to transform
 
   --format=format            (required) specification format to transform API specification into
@@ -82,7 +85,7 @@ EXAMPLES
   Success! Your transformed file is located at D:/swagger_raml.yaml
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/api/transform.ts)_
 
 ## `apimatic api:validate`
 
@@ -107,7 +110,7 @@ EXAMPLES
   Specification file provided is valid
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/api/validate.ts)_
 
 ## `apimatic auth`
 
@@ -121,7 +124,7 @@ EXAMPLE
   $ apimatic auth --help
 ```
 
-_See code: [src/commands/auth/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/auth/index.ts)_
+_See code: [src/commands/auth/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/auth/index.ts)_
 
 ## `apimatic auth:login`
 
@@ -145,7 +148,7 @@ EXAMPLES
   Authentication key successfully set
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/auth/login.ts)_
 
 ## `apimatic auth:logout`
 
@@ -160,7 +163,7 @@ EXAMPLE
   Logged out
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/auth/logout.ts)_
 
 ## `apimatic auth:status`
 
@@ -175,7 +178,7 @@ EXAMPLE
   Currently logged in as apimatic-client@gmail.com
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -229,7 +232,7 @@ EXAMPLE
   $apimatic portal --help
 ```
 
-_See code: [src/commands/portal/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/portal/index.ts)_
+_See code: [src/commands/portal/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/portal/index.ts)_
 
 ## `apimatic portal:generate`
 
@@ -242,7 +245,7 @@ USAGE
 OPTIONS
   -f, --force                overwrite if a portal exists in the destination
   --auth-key=auth-key        override current authentication state with an authentication key
-  --destination=destination  [default: ./] path to the downloaded portal
+  --destination=destination  [default: /home/runner/work/apimatic-cli/apimatic-cli/cli] path to the downloaded portal
   --folder=folder            path to the input directory containing API specifications and config files
   --zip                      download the generated portal as a .zip archive
 
@@ -251,7 +254,7 @@ EXAMPLE
   Your portal has been generated at D:/
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/portal/generate.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/portal/generate.ts)_
 
 ## `apimatic sdk`
 
@@ -265,7 +268,7 @@ EXAMPLE
   $apimatic sdk --help
 ```
 
-_See code: [src/commands/sdk/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/sdk/index.ts)_
+_See code: [src/commands/sdk/index.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/sdk/index.ts)_
 
 ## `apimatic sdk:generate`
 
@@ -278,7 +281,10 @@ USAGE
 OPTIONS
   -f, --force                overwrite if an SDK already exists in the destination
   --auth-key=auth-key        override current authentication state with an authentication key
-  --destination=destination  [default: ./] directory to download the generated SDK to
+
+  --destination=destination  [default: /home/runner/work/apimatic-cli/apimatic-cli/cli] directory to download the
+                             generated SDK to
+
   --file=file                path to the API specification to generate SDKs for
 
   --platform=platform        (required) language platform for sdk
@@ -303,5 +309,5 @@ EXAMPLES
   Success! Your SDK is located at swagger_sdk_csharp
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.5/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.6/src/commands/sdk/generate.ts)_
 <!-- commandsstop -->
