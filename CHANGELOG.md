@@ -1,3 +1,10 @@
+## [1.0.1-alpha.5](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.4...v1.0.1-alpha.5) (2021-12-02)
+
+
+### Bug Fixes
+
+* **feature:** add force flag and change sdk version and package ([38db116](https://github.com/apimatic/apimatic-cli/commit/38db116b65b94f01a15c7c2d6351401a60ee1393))
+
 ## [1.0.1-alpha.4](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.3...v1.0.1-alpha.4) (2021-12-01)
 
 
