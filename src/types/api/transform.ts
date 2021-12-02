@@ -1,4 +1,4 @@
-import { TransformationController } from "@apimatic/js-sdk";
+import { TransformationController } from "@apimatic/sdk";
 
 export type AuthenticationError = {
   statusCode: number;

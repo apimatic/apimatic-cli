@@ -10,7 +10,7 @@ import {
   Transformation,
   TransformationController,
   TransformViaUrlRequest
-} from "@apimatic/js-sdk";
+} from "@apimatic/sdk";
 import { DownloadTransformationParams, TransformationData, TransformationIdParams } from "../../types/api/transform";
 import { replaceHTML, writeFileUsingReadableStream } from "../../utils/utils";
 

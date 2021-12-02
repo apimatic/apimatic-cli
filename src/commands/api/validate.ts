@@ -1,6 +1,6 @@
 import * as fs from "fs-extra";
 
-import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/js-sdk";
+import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";

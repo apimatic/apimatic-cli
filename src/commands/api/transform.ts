@@ -2,7 +2,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import cli from "cli-ux";
 
-import { TransformationController, Transformation, Client, ApiError } from "@apimatic/js-sdk";
+import { TransformationController, Transformation, Client, ApiError } from "@apimatic/sdk";
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
@@ -42,6 +42,7 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
         "URL to the API specification file to transform. Can be used in place of the --file option if the API specification is publicly available."
     }),
     destination: flags.string({ default: "./", description: "directory to download transformed file to" }),
+    force: flags.boolean({ char: "f", default: false, description: "overwrite if same file exist in the destination" }),
     "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
   };
 
@@ -54,11 +55,13 @@ Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
       `${fileName}_${flags.format}.${destinationFormat}`.toLowerCase()
     );
 
-    if (fs.existsSync(destinationFilePath)) {
+    // Check if destination file already exist and throw error if force flag is not set
+    if (fs.existsSync(destinationFilePath) && !flags.force) {
       throw new Error(`Can't download transformed file to path ${destinationFilePath}, because it already exists`);
     }
 
     try {
+      // Check if paths provided are valid
       if (flags.file && !(await fs.pathExists(flags.file))) {
         throw new Error(`Transformation file: ${flags.file} does not exist`);
       } else if (!(await fs.pathExists(flags.destination))) {

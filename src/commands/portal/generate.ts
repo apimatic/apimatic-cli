@@ -3,7 +3,7 @@ import * as path from "path";
 import cli from "cli-ux";
 
 import { Command, flags } from "@oclif/command";
-import { Client, DocsPortalManagementController } from "@apimatic/js-sdk";
+import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 
 import { AxiosError } from "axios";
 import { SDKClient } from "../../client-utils/sdk-client";
@@ -26,6 +26,7 @@ export default class PortalGenerate extends Command {
       default: "./",
       description: "path to the downloaded portal"
     }),
+    force: flags.boolean({ char: "f", default: false, description: "overwrite if a portal exists in the destination" }),
     zip: flags.boolean({ default: false, description: "download the generated portal as a .zip archive" }),
     "auth-key": flags.string({
       default: "",
@@ -42,10 +43,18 @@ Your portal has been generated at D:/
   async run() {
     const { flags } = this.parse(PortalGenerate);
     const zip = flags.zip;
-    const portalFolderPath: string = flags.folder;
-    const generatedPortalFolderPath: string = flags.destination;
+    const sourceFolderPath: string = flags.folder;
+    const portalFolderPath: string = path.join(flags.destination, "generated_portal");
+    const zippedPortalPath: string = path.join(flags.destination, "generated_portal.zip");
 
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
+
+    // Check if at destination, portal already exists and throw error if force flag is not set for both zip and extracted
+    if (fs.existsSync(portalFolderPath) && !flags.force && !zip) {
+      throw new Error(`Can't download portal to path ${portalFolderPath}, because it already exists`);
+    } else if (fs.existsSync(zippedPortalPath) && !flags.force && zip) {
+      throw new Error(`Can't download portal to path ${zippedPortalPath}, because it already exists`);
+    }
     try {
       if (!(await fs.pathExists(flags.destination))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
@@ -55,10 +64,12 @@ Your portal has been generated at D:/
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
 
-      const zippedBuildFilePath = await zipDirectory(portalFolderPath, generatedPortalFolderPath);
+      const zippedBuildFilePath = await zipDirectory(sourceFolderPath, flags.destination);
+
       const generatePortalParams: GeneratePortalParams = {
         zippedBuildFilePath,
-        generatedPortalFolderPath,
+        portalFolderPath,
+        zippedPortalPath,
         docsPortalController,
         overrideAuthKey,
         zip

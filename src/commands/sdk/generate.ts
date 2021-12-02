@@ -2,7 +2,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import cli from "cli-ux";
 
-import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/js-sdk";
+import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 
@@ -37,6 +37,11 @@ Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LI
       default: "./",
       description: "directory to download the generated SDK to"
     }),
+    force: flags.boolean({
+      char: "f",
+      default: false,
+      description: "overwrite if an SDK already exists in the destination"
+    }),
     zip: flags.boolean({ default: false, description: "download the generated SDK as a .zip archive" }),
     "auth-key": flags.string({
       default: "",
@@ -59,20 +64,22 @@ Success! Your SDK is located at swagger_sdk_csharp
   async run() {
     const { flags } = this.parse(SdkGenerate);
     const zip = flags.zip;
+    const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
+    const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());
+    const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toLowerCase());
+
+    // Check if at destination, SDK already exists and throw error if force flag is not set for both zip and extracted
+    if (fs.existsSync(sdkFolderPath) && !flags.force && !zip) {
+      throw new Error(`Can't download SDK to path ${sdkFolderPath}, because it already exists`);
+    } else if (fs.existsSync(zippedSDKPath) && !flags.force && zip) {
+      throw new Error(`Can't download SDK to path ${zippedSDKPath}, because it already exists`);
+    }
+
     try {
       if (!(await fs.pathExists(path.resolve(flags.destination)))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
       } else if (!(await fs.pathExists(path.resolve(flags.file)))) {
         throw new Error(`Specification file ${flags.file} does not exist`);
-      }
-      const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
-      const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());
-      const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toLowerCase());
-
-      if (fs.existsSync(zippedSDKPath) && zip) {
-        throw new Error(`Can't generate SDK to path ${zippedSDKPath}, because it already exists`);
-      } else if (fs.existsSync(sdkFolderPath) && !zip) {
-        throw new Error(`Can't generate SDK to path ${sdkFolderPath}, because it already exists`);
       }
 
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;

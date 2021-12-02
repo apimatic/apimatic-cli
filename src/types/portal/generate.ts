@@ -1,8 +1,9 @@
-import { DocsPortalManagementController } from "@apimatic/js-sdk";
+import { DocsPortalManagementController } from "@apimatic/sdk";
 
 export type GeneratePortalParams = {
   zippedBuildFilePath: string;
-  generatedPortalFolderPath: string;
+  portalFolderPath: string;
+  zippedPortalPath: string;
   docsPortalController: DocsPortalManagementController;
   overrideAuthKey: string | null;
   zip: boolean;

@@ -1,6 +1,5 @@
 import * as fs from "fs-extra";
 import * as FormData from "form-data";
-import * as path from "path";
 import cli from "cli-ux";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { baseURL } from "../../config/env";
@@ -28,12 +27,9 @@ const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey:
 
 // Download Docs Portal
 export const downloadDocsPortal = async (
-  { zippedBuildFilePath, generatedPortalFolderPath, overrideAuthKey, zip }: GeneratePortalParams,
+  { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
   configDir: string
 ) => {
-  const zippedPortalPath: string = path.join(generatedPortalFolderPath, "generated_portal.zip");
-  const portalPath: string = path.join(generatedPortalFolderPath, "generated_portal");
-
   cli.action.start("Downloading portal");
 
   // Check if the build file exists for the user or not
@@ -53,12 +49,12 @@ export const downloadDocsPortal = async (
   // if ((data as NodeJS.ReadableStream).readable) {
   //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
   if (!zip) {
-    await unzipFile(fs.createReadStream(zippedPortalPath), portalPath);
+    await unzipFile(fs.createReadStream(zippedPortalPath), portalFolderPath);
     await deleteFile(zippedPortalPath);
   }
 
   cli.action.stop();
-  return zip ? zippedPortalPath : portalPath;
+  return zip ? zippedPortalPath : portalFolderPath;
   // } else {
   //   throw new Error("Couldn't download the portal");
   // }
