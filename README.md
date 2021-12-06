@@ -19,7 +19,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)
-@apimatic/cli/1.0.1-alpha.9 linux-x64 node-v16.13.0
+@apimatic/cli/1.0.1-alpha.10 linux-x64 node-v16.13.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -71,7 +71,7 @@ EXAMPLES
   Success! Your transformed file is located at D:/swagger_raml.yaml
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.10/src/commands/api/transform.ts)_
 
 ## `apimatic api:validate`
 
@@ -96,7 +96,7 @@ EXAMPLES
   Specification file provided is valid
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.10/src/commands/api/validate.ts)_
 
 ## `apimatic auth:login`
 
@@ -120,7 +120,7 @@ EXAMPLES
   Authentication key successfully set
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.10/src/commands/auth/login.ts)_
 
 ## `apimatic auth:logout`
 
@@ -135,7 +135,7 @@ EXAMPLE
   Logged out
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.10/src/commands/auth/logout.ts)_
 
 ## `apimatic auth:status`
 
@@ -150,7 +150,7 @@ EXAMPLE
   Currently logged in as apimatic-client@gmail.com
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.10/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -212,7 +212,7 @@ EXAMPLE
   Your portal has been generated at D:/
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/portal/generate.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.10/src/commands/portal/generate.ts)_
 
 ## `apimatic sdk:generate`
 
@@ -254,5 +254,5 @@ EXAMPLES
   Success! Your SDK is located at swagger_sdk_csharp
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.10/src/commands/sdk/generate.ts)_
 <!-- commandsstop -->

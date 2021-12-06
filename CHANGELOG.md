@@ -1,3 +1,10 @@
+## [1.0.1-alpha.10](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.9...v1.0.1-alpha.10) (2021-12-06)
+
+
+### Bug Fixes
+
+* **types:** Add graphql type in destination format of schema ([019aed3](https://github.com/apimatic/apimatic-cli/commit/019aed39c8a9cb8425f2d46d1b9b58f6b8c69475))
+
 ## [1.0.1-alpha.9](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.8...v1.0.1-alpha.9) (2021-12-06)
 
 
