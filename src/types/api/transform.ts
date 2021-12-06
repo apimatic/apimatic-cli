@@ -33,5 +33,6 @@ export const DestinationFormats = {
   RAML: "yaml",
   RAML10: "yaml",
   Postman10: "json",
-  Postman20: "json"
+  Postman20: "json",
+  GraphQlSchema: "json"
 };
