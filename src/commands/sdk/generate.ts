@@ -1,6 +1,5 @@
 import * as fs from "fs-extra";
 import * as path from "path";
-import cli from "cli-ux";
 
 import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
 import { Command, flags } from "@oclif/command";
@@ -54,7 +53,8 @@ Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LI
 Generating SDK... done
 Downloading SDK... done
 Success! Your SDK is located at swagger_sdk_csharp`,
-    `$ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json
+    `
+$ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json
 Generating SDK... done
 Downloading SDK... done
 Success! Your SDK is located at swagger_sdk_csharp
@@ -101,7 +101,6 @@ Success! Your SDK is located at swagger_sdk_csharp
       const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
       this.log(`Success! Your SDK is located at ${sdkPath}`);
     } catch (error) {
-      cli.action.stop();
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as SDKGenerateUnprocessableError;

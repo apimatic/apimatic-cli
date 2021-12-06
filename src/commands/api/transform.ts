@@ -1,8 +1,7 @@
 import * as fs from "fs-extra";
 import * as path from "path";
-import cli from "cli-ux";
 
-import { TransformationController, Transformation, Client, ApiError } from "@apimatic/sdk";
+import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
 import { flags, Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
@@ -15,6 +14,7 @@ import {
   printValidationMessages
 } from "../../controllers/api/transform";
 
+const formats: string = Object.keys(ExportFormats).join("|");
 export default class Transform extends Command {
   static description = `Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.`;
 
@@ -32,8 +32,7 @@ Success! Your transformed file is located at D:/swagger_raml.yaml
       parse: (format: string) => getValidFormat(format.toUpperCase()),
       required: true,
       description: `specification format to transform API specification into
-(OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WSDL|Swagger10|
-Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
+${formats}`
     }),
     file: flags.string({
       parse: (input) => path.resolve(input),
@@ -90,8 +89,6 @@ Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
       });
       this.log(`Success! Your transformed file is located at ${savedTransformationFile}`);
     } catch (error) {
-      cli.action.stop();
-
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
 
