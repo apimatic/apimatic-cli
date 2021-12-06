@@ -1,3 +1,10 @@
+## [1.0.1-alpha.8](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.7...v1.0.1-alpha.8) (2021-12-06)
+
+
+### Bug Fixes
+
+* **package:** change version in package file ([903c619](https://github.com/apimatic/apimatic-cli/commit/903c6196ef5e37fbffd8d6b744d6eedcdd7167f5))
+
 ## [1.0.1-alpha.7](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.6...v1.0.1-alpha.7) (2021-12-06)
 
 
