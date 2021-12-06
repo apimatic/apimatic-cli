@@ -1,3 +1,10 @@
+## [1.0.1-alpha.7](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.6...v1.0.1-alpha.7) (2021-12-06)
+
+
+### Bug Fixes
+
+* **readme & bug fix:** update readme, fix bugs ([141f1a9](https://github.com/apimatic/apimatic-cli/commit/141f1a9ad53b80fdb91d39ca87f61b6cdfc7d700))
+
 ## [1.0.1-alpha.6](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.5...v1.0.1-alpha.6) (2021-12-02)
 
 
