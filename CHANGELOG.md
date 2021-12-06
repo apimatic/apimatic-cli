@@ -1,3 +1,10 @@
+## [1.0.1-alpha.9](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.8...v1.0.1-alpha.9) (2021-12-06)
+
+
+### Bug Fixes
+
+* **sdk & transform:** Fix bugs related to content and corner cases in transform and sdk generate ([e08ba51](https://github.com/apimatic/apimatic-cli/commit/e08ba51d6fc98e991f06f910702fd6b106868fbc))
+
 ## [1.0.1-alpha.8](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.7...v1.0.1-alpha.8) (2021-12-06)
 
 

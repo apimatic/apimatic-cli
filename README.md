@@ -19,7 +19,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)
-@apimatic/cli/1.0.1-alpha.8 linux-x64 node-v16.13.0
+@apimatic/cli/1.0.1-alpha.9 linux-x64 node-v16.13.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -57,8 +57,8 @@ OPTIONS
   --file=file                path to the API specification file to transform
 
   --format=format            (required) specification format to transform API specification into
-                             (OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WSDL|Swagger10|
-                             Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)
+                             APIMATIC|WADL2009|WSDL|SWAGGER10|SWAGGER20|SWAGGERYAML|OAS3|OPENAPI3YAML|APIBLUEPRINT|RAML|
+                             RAML10|POSTMAN10|POSTMAN20|GRAPHQLSCHEMA
 
   --url=url                  URL to the API specification file to transform. Can be used in place of the --file option
                              if the API specification is publicly available.
@@ -71,7 +71,7 @@ EXAMPLES
   Success! Your transformed file is located at D:/swagger_raml.yaml
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.8/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/api/transform.ts)_
 
 ## `apimatic api:validate`
 
@@ -96,7 +96,7 @@ EXAMPLES
   Specification file provided is valid
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.8/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/api/validate.ts)_
 
 ## `apimatic auth:login`
 
@@ -120,7 +120,7 @@ EXAMPLES
   Authentication key successfully set
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.8/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/auth/login.ts)_
 
 ## `apimatic auth:logout`
 
@@ -135,7 +135,7 @@ EXAMPLE
   Logged out
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.8/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/auth/logout.ts)_
 
 ## `apimatic auth:status`
 
@@ -150,7 +150,7 @@ EXAMPLE
   Currently logged in as apimatic-client@gmail.com
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.8/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -190,7 +190,7 @@ OPTIONS
   --all  see all commands in CLI
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.10/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.12/src/commands/help.ts)_
 
 ## `apimatic portal:generate`
 
@@ -212,7 +212,7 @@ EXAMPLE
   Your portal has been generated at D:/
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.8/src/commands/portal/generate.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/portal/generate.ts)_
 
 ## `apimatic sdk:generate`
 
@@ -247,11 +247,12 @@ EXAMPLES
   Generating SDK... done
   Downloading SDK... done
   Success! Your SDK is located at swagger_sdk_csharp
+
   $ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json
   Generating SDK... done
   Downloading SDK... done
   Success! Your SDK is located at swagger_sdk_csharp
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.8/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.9/src/commands/sdk/generate.ts)_
 <!-- commandsstop -->
