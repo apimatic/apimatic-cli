@@ -1,6 +1,5 @@
 import * as fs from "fs-extra";
 import * as path from "path";
-import cli from "cli-ux";
 
 import { Command, flags } from "@oclif/command";
 import { Client, DocsPortalManagementController } from "@apimatic/sdk";
@@ -18,7 +17,7 @@ export default class PortalGenerate extends Command {
   static flags = {
     folder: flags.string({
       parse: (input) => path.resolve(input),
-      default: "",
+      default: "./",
       description: "path to the input directory containing API specifications and config files"
     }),
     destination: flags.string({
@@ -47,7 +46,7 @@ Your portal has been generated at D:/
     const portalFolderPath: string = path.join(flags.destination, "generated_portal");
     const zippedPortalPath: string = path.join(flags.destination, "generated_portal.zip");
 
-    const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
+    const overrideAuthKey: string | null = flags["auth-key"] ? flags["auth-key"] : null;
 
     // Check if at destination, portal already exists and throw error if force flag is not set for both zip and extracted
     if (fs.existsSync(portalFolderPath) && !flags.force && !zip) {
@@ -79,8 +78,6 @@ Your portal has been generated at D:/
 
       this.log(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error) {
-      cli.action.stop();
-
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
         const apiResponse = apiError.response;
@@ -96,7 +93,7 @@ Your portal has been generated at D:/
             } else if (nestedErrors.message) {
               return this.error(replaceHTML(nestedErrors.message));
             }
-          } else if (apiResponse.status === 401 && responseData.length > 0 && isJSONParsable(responseData)) {
+          } else if (apiResponse.status === 401 && responseData.length > 0) {
             this.error(replaceHTML(responseData));
           } else if (apiResponse.status === 403 && apiResponse.statusText) {
             return this.error(replaceHTML(apiResponse.statusText));

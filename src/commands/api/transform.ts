@@ -32,8 +32,8 @@ Success! Your transformed file is located at D:/swagger_raml.yaml
       parse: (format: string) => getValidFormat(format.toUpperCase()),
       required: true,
       description: `specification format to transform API specification into
-(OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WADL2006|WSDL|
-Swagger10|Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
+(OpenApi3Json|OpenApi3Yaml|APIMATIC|WADL2009|WSDL|Swagger10|
+Swagger20|SwaggerYaml|RAML|RAML10|Postman10|Postman20)`
     }),
     file: flags.string({
       parse: (input) => path.resolve(input),
