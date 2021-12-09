@@ -7,7 +7,7 @@ import { replaceHTML, isJSONParsable } from "../../utils/utils";
 import { publishDocsPortal } from "../../controllers/portal/publish";
 
 export default class PortalPublish extends Command {
-  static description = "Publish your embedded/hosted portals";
+  static description = "Re-Publish your embedded/hosted portals";
 
   static flags = {
     "api-entity": flags.string({
