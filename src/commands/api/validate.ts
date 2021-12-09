@@ -1,10 +1,9 @@
 import * as fs from "fs-extra";
 
 import { flags, Command } from "@oclif/command";
-import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
+import { ApiError, ApiValidationSummary } from "@apimatic/sdk";
 
 import { loggers } from "../../types/utils";
-import { SDKClient } from "../../client-utils/sdk-client";
 import { getValidation } from "../../controllers/api/validate";
 import { printValidationMessages, replaceHTML } from "../../utils/utils";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate";
@@ -29,6 +28,7 @@ Specification file provided is valid
         "URL to the specification file to validate. Can be used in place of the --file option if the API specification is publicly available."
     }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
+    "api-entity": flags.string({ description: "Unique API Entity Id for the API to perform validation for" }),
     "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
   };
 
@@ -39,14 +39,8 @@ Specification file provided is valid
       if (flags.file && !(await fs.pathExists(flags.file))) {
         throw new Error(`Validation file: ${flags.file} does not exist`);
       }
-      const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
 
-      const apiValidationController: APIValidationExternalApisController = new APIValidationExternalApisController(
-        client
-      );
-
-      const validationSummary: ApiValidationSummary = await getValidation(flags, apiValidationController);
+      const validationSummary: ApiValidationSummary = await getValidation(flags, this.config.configDir);
       const logFunctions: loggers = {
         log: this.log,
         warn: this.warn,
@@ -69,7 +63,11 @@ Specification file provided is valid
           this.error((error as Error).message);
         }
       } else {
-        this.error(`${(error as Error).message}`);
+        if ((error as ApiError).statusCode === 404) {
+          this.error("Couldn't find the API Entity specified");
+        } else {
+          this.error(`${(error as Error).message}`);
+        }
       }
     }
   }
