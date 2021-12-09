@@ -1,3 +1,10 @@
+# [0.0.0-alpha.3](https://github.com/apimatic/apimatic-cli/compare/v0.0.0-alpha.2...v0.0.0-alpha.3) (2021-12-09)
+
+
+### Bug Fixes
+
+* **refactor:** move print validation logic to utils file as common function and pretty the code ([05dbe41](https://github.com/apimatic/apimatic-cli/commit/05dbe41c875c70e4a2e6183e647c6fea1e10ad83))
+
 # [0.0.0-alpha.2](https://github.com/apimatic/apimatic-cli/compare/v0.0.0-alpha.1...v0.0.0-alpha.2) (2021-12-08)
 
 
