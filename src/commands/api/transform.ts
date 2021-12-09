@@ -1,18 +1,15 @@
-import * as fs from "fs-extra";
 import * as path from "path";
+import * as fs from "fs-extra";
 
-import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
 import { flags, Command } from "@oclif/command";
+import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
 
+import { loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
+import { printValidationMessages } from "../../utils/utils";
 import { getFileNameFromPath, replaceHTML } from "../../utils/utils";
 import { AuthenticationError, DestinationFormats } from "../../types/api/transform";
-import {
-  getValidFormat,
-  getTransformationId,
-  downloadTransformationFile,
-  printValidationMessages
-} from "../../controllers/api/transform";
+import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform";
 
 const formats: string = Object.keys(ExportFormats).join("|");
 export default class Transform extends Command {
@@ -80,7 +77,12 @@ ${formats}`
 
       const { id, apiValidationSummary }: Transformation = await getTransformationId(flags, transformationController);
 
-      printValidationMessages(apiValidationSummary, this.warn, this.error);
+      const logFunctions: loggers = {
+        log: this.log,
+        warn: this.warn,
+        error: this.error
+      };
+      printValidationMessages(apiValidationSummary, logFunctions);
 
       const savedTransformationFile: string = await downloadTransformationFile({
         id,

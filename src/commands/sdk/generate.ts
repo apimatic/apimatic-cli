@@ -1,13 +1,13 @@
-import * as fs from "fs-extra";
 import * as path from "path";
+import * as fs from "fs-extra";
 
-import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
 import { Command, flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
+import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
 
 import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils";
-import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate";
 import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate";
+import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate";
 
 export default class SdkGenerate extends Command {
   static description = "Generate SDK for your APIs";
