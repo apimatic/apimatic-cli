@@ -1,3 +1,33 @@
+# [0.0.0-alpha.3](https://github.com/apimatic/apimatic-cli/compare/v0.0.0-alpha.2...v0.0.0-alpha.3) (2021-12-09)
+
+
+### Bug Fixes
+
+* **refactor:** move print validation logic to utils file as common function and pretty the code ([05dbe41](https://github.com/apimatic/apimatic-cli/commit/05dbe41c875c70e4a2e6183e647c6fea1e10ad83))
+
+# [0.0.0-alpha.2](https://github.com/apimatic/apimatic-cli/compare/v0.0.0-alpha.1...v0.0.0-alpha.2) (2021-12-08)
+
+
+### Bug Fixes
+
+* **documentation:** improve messages for each command ([a2c0bfb](https://github.com/apimatic/apimatic-cli/commit/a2c0bfbd5c1867302cf27170dc3b2d3ca5bd64ca))
+* **feature:** add force flag and change sdk version and package ([38db116](https://github.com/apimatic/apimatic-cli/commit/38db116b65b94f01a15c7c2d6351401a60ee1393))
+* **package:** change version in package file ([903c619](https://github.com/apimatic/apimatic-cli/commit/903c6196ef5e37fbffd8d6b744d6eedcdd7167f5))
+* **path:** resolve paths to absolute ([f68bdde](https://github.com/apimatic/apimatic-cli/commit/f68bdde7e8c927602ea87e07d0e558b699082154))
+* **readme & bug fix:** update readme, fix bugs ([141f1a9](https://github.com/apimatic/apimatic-cli/commit/141f1a9ad53b80fdb91d39ca87f61b6cdfc7d700))
+* **refactor:** refactor code ([d7cb486](https://github.com/apimatic/apimatic-cli/commit/d7cb4863bcfd44f297f0525e0c7eae7ecef12695))
+* **sdk & transform:** Fix bugs related to content and corner cases in transform and sdk generate ([e08ba51](https://github.com/apimatic/apimatic-cli/commit/e08ba51d6fc98e991f06f910702fd6b106868fbc))
+* **sdk package:** get sdk package from npm ([4c8e178](https://github.com/apimatic/apimatic-cli/commit/4c8e1787eb21f04d81cab95b5a58e3133a61f7af))
+* **types:** Add graphql type in destination format of schema ([019aed3](https://github.com/apimatic/apimatic-cli/commit/019aed39c8a9cb8425f2d46d1b9b58f6b8c69475))
+* **version:** update sdk and cli versions ([75cc181](https://github.com/apimatic/apimatic-cli/commit/75cc18146f2ec198ca7e82189f2d16281dce80f8))
+
+## [1.0.1-alpha.10](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.9...v1.0.1-alpha.10) (2021-12-06)
+
+
+### Bug Fixes
+
+* **types:** Add graphql type in destination format of schema ([019aed3](https://github.com/apimatic/apimatic-cli/commit/019aed39c8a9cb8425f2d46d1b9b58f6b8c69475))
+
 ## [1.0.1-alpha.9](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.8...v1.0.1-alpha.9) (2021-12-06)
 
 

@@ -1,13 +1,13 @@
 import * as fs from "fs-extra";
 
-import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 import { flags, Command } from "@oclif/command";
+import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
+import { loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { replaceHTML } from "../../utils/utils";
-import { APIValidateError, AuthorizationError } from "../../types/api/validate";
-import { printValidationMessages } from "../../controllers/api/transform";
 import { getValidation } from "../../controllers/api/validate";
+import { printValidationMessages, replaceHTML } from "../../utils/utils";
+import { APIValidateError, AuthorizationError } from "../../types/api/validate";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
@@ -47,7 +47,12 @@ Specification file provided is valid
       );
 
       const validationSummary: ApiValidationSummary = await getValidation(flags, apiValidationController);
-      printValidationMessages(validationSummary, this.warn, this.error);
+      const logFunctions: loggers = {
+        log: this.log,
+        warn: this.warn,
+        error: this.error
+      };
+      printValidationMessages(validationSummary, logFunctions);
 
       validationSummary.success
         ? this.log("Specification file provided is valid")

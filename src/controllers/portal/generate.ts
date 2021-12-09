@@ -1,10 +1,11 @@
+import cli from "cli-ux";
 import * as fs from "fs-extra";
 import * as FormData from "form-data";
-import cli from "cli-ux";
-import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
+
 import { baseURL } from "../../config/env";
-import { GeneratePortalParams } from "../../types/portal/generate";
 import { deleteFile, unzipFile } from "../../utils/utils";
+import { GeneratePortalParams } from "../../types/portal/generate";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 
@@ -16,7 +17,6 @@ const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey:
   const config: AxiosRequestConfig = {
     headers: {
       Authorization: authInfo ? `X-Auth-Key ${overrideAuthKey || authInfo.authKey.trim()}` : "",
-      "Content-Type": "multipart/form-data",
       ...formData.getHeaders()
     },
     responseType: "arraybuffer"

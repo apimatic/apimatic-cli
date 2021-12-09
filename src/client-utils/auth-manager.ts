@@ -1,5 +1,5 @@
-import * as fs from "fs-extra";
 import * as path from "path";
+import * as fs from "fs-extra";
 
 export type AuthInfo = {
   email: string;
@@ -26,11 +26,9 @@ export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
  * //Function to set credentials.
  */
 export async function setAuthInfo(credentials: AuthInfo, configDir: string): Promise<void> {
- 
   const configFilePath = path.join(configDir, "config.json");
 
-  if(!fs.existsSync(configFilePath))
-    fs.createFileSync(configFilePath)
+  if (!fs.existsSync(configFilePath)) fs.createFileSync(configFilePath);
 
   return await fs.writeFile(configFilePath, JSON.stringify(credentials));
 }

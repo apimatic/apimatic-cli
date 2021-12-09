@@ -1,9 +1,9 @@
-import { flags, Command } from "@oclif/command";
-import { AxiosError } from "axios";
 import { cli } from "cli-ux";
+import { AxiosError } from "axios";
+import { flags, Command } from "@oclif/command";
 
-import { SDKClient } from "../../client-utils/sdk-client";
 import { replaceHTML } from "../../utils/utils";
+import { SDKClient } from "../../client-utils/sdk-client";
 
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";

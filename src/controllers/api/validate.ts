@@ -1,11 +1,9 @@
 import cli from "cli-ux";
 import * as fs from "fs-extra";
-import Command from "@oclif/command";
 
-import { APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
 import { ApiResponse, FileWrapper } from "@apimatic/core";
 import { GetValidationParams } from "../../types/api/validate";
-import { replaceHTML } from "../../utils/utils";
+import { APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
 
 export const getValidation = async (
   { file, url }: GetValidationParams,
@@ -24,18 +22,4 @@ export const getValidation = async (
   }
   cli.action.stop();
   return validation.result;
-};
-
-export const printValidationMessages = (
-  { warnings, errors }: ApiValidationSummary,
-  warn: Command["warn"],
-  error: Command["error"]
-) => {
-  warnings.forEach((warning) => {
-    warn(`${replaceHTML(warning)}`);
-  });
-  if (errors.length > 0) {
-    const singleLineError: string = errors.join("\n");
-    error(replaceHTML(singleLineError));
-  }
 };

@@ -1,10 +1,11 @@
-import * as fs from "fs-extra";
+import cli from "cli-ux";
 import * as path from "path";
+import * as fs from "fs-extra";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import * as stripTags from "striptags";
 
-import cli from "cli-ux";
+import { loggers, ValidationMessages } from "../types/utils";
 
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
@@ -123,4 +124,23 @@ export const isJSONParsable = (json: string) => {
 
 export const getFileNameFromPath = (filePath: string) => {
   return path.basename(filePath).split(".")[0];
+};
+
+export const printValidationMessages = (
+  { warnings, errors, messages }: ValidationMessages,
+  { log, warn, error }: loggers
+) => {
+  warnings = warnings || [];
+  messages = messages || [];
+  const singleError: string = errors.join("\n") || "";
+
+  messages.forEach((message) => {
+    log(`Info: ${replaceHTML(message)}`);
+  });
+  warnings.forEach((warning) => {
+    warn(replaceHTML(warning));
+  });
+  if (errors.length > 0) {
+    error(replaceHTML(singleError));
+  }
 };
