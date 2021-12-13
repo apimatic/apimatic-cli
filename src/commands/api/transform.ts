@@ -7,7 +7,7 @@ import { TransformationController, Transformation, Client, ApiError, ExportForma
 import { loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { printValidationMessages } from "../../utils/utils";
-import { getFileNameFromPath, replaceHTML } from "../../utils/utils";
+import { getFileNameFromFlags, replaceHTML } from "../../utils/utils";
 import { AuthenticationError, DestinationFormats } from "../../types/api/transform";
 import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform";
 
@@ -52,7 +52,7 @@ ${formats}`
 
   async run() {
     const { flags } = this.parse(Transform);
-    const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
+    const fileName = getFileNameFromFlags(flags);
     const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
     const destinationFilePath: string = path.join(
       flags.destination,

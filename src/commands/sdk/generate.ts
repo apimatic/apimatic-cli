@@ -2,10 +2,9 @@ import * as path from "path";
 import * as fs from "fs-extra";
 
 import { Command, flags } from "@oclif/command";
-import { SDKClient } from "../../client-utils/sdk-client";
-import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
+import { ApiError } from "@apimatic/sdk";
 
-import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils";
+import { replaceHTML, isJSONParsable, getFileNameFromFlags } from "../../utils/utils";
 import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate";
 import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate";
 
@@ -42,6 +41,7 @@ Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LI
       description: "overwrite if an SDK already exists in the destination"
     }),
     zip: flags.boolean({ default: false, description: "download the generated SDK as a .zip archive" }),
+    "api-entity": flags.string({ description: "Unique API Entity Id for the API to generate SDK for" }),
     "auth-key": flags.string({
       default: "",
       description: "override current authentication state with an authentication key"
@@ -63,42 +63,34 @@ Success! Your SDK is located at swagger_sdk_csharp
 
   async run() {
     const { flags } = this.parse(SdkGenerate);
-    const zip = flags.zip;
-    const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
+    const fileName = getFileNameFromFlags(flags);
     const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());
     const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toLowerCase());
 
     // Check if at destination, SDK already exists and throw error if force flag is not set for both zip and extracted
-    if (fs.existsSync(sdkFolderPath) && !flags.force && !zip) {
+    if (fs.existsSync(sdkFolderPath) && !flags.force && !flags.zip) {
       throw new Error(`Can't download SDK to path ${sdkFolderPath}, because it already exists`);
-    } else if (fs.existsSync(zippedSDKPath) && !flags.force && zip) {
+    } else if (fs.existsSync(zippedSDKPath) && !flags.force && flags.zip) {
       throw new Error(`Can't download SDK to path ${zippedSDKPath}, because it already exists`);
     }
 
     try {
       if (!(await fs.pathExists(path.resolve(flags.destination)))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
-      } else if (!(await fs.pathExists(path.resolve(flags.file)))) {
+      } else if (!(await fs.pathExists(path.resolve(flags.file))) && !flags["api-entity"]) {
         throw new Error(`Specification file ${flags.file} does not exist`);
       }
-
-      const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-      const sdkGenerationController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(
-        client
-      );
-
       // Get generation id for the specification and platform
-      const codeGenId: string = await getSDKGenerationId(flags, sdkGenerationController);
+      const codeGenId: string = await getSDKGenerationId(flags, this.config.configDir);
 
       // If user wanted to download the SDK as well
       const sdkDownloadParams: DownloadSDKParams = {
         codeGenId,
         zippedSDKPath,
         sdkFolderPath,
-        zip
+        ...flags
       };
-      const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, sdkGenerationController);
+      const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, this.config.configDir);
       this.log(`Success! Your SDK is located at ${sdkPath}`);
     } catch (error) {
       if ((error as ApiError).result) {
@@ -129,7 +121,11 @@ Success! Your SDK is located at swagger_sdk_csharp
           this.error(replaceHTML(result.message));
         }
       } else {
-        this.error(`${(error as Error).message}`);
+        if ((error as ApiError).statusCode === 404) {
+          this.error("Couldn't find the API Entity specified");
+        } else {
+          this.error(`${(error as Error).message}`);
+        }
       }
     }
   }

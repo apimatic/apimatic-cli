@@ -2,6 +2,8 @@ export type GenerationIdParams = {
   file: string;
   url: string;
   platform: string;
+  "api-entity": string | undefined;
+  "auth-key": string;
 };
 
 export type DownloadSDKParams = {
@@ -9,6 +11,8 @@ export type DownloadSDKParams = {
   zip: boolean;
   zippedSDKPath: string;
   sdkFolderPath: string;
+  "api-entity": string | undefined;
+  "auth-key": string;
 };
 
 export type SDKGenerateUnprocessableError = {

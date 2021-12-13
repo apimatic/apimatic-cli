@@ -19,7 +19,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)
-@apimatic/cli/0.0.0-alpha.3 linux-x64 node-v16.13.0
+@apimatic/cli/0.0.0-alpha.3 win32-x64 node-v14.17.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -29,6 +29,7 @@ USAGE
 
 # Commands
 <!-- commands -->
+* [`apimatic api:import`](#apimatic-apiimport)
 * [`apimatic api:transform`](#apimatic-apitransform)
 * [`apimatic api:validate`](#apimatic-apivalidate)
 * [`apimatic auth:login`](#apimatic-authlogin)
@@ -37,7 +38,31 @@ USAGE
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
+* [`apimatic portal:publish`](#apimatic-portalpublish)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
+* [`apimatic sdk:list`](#apimatic-sdklist)
+
+## `apimatic api:import`
+
+Import your API specification into APIMatic
+
+```
+USAGE
+  $ apimatic api:import
+
+OPTIONS
+  --auth-key=auth-key  override current authentication state with an authentication key
+  --file=file          Path to the API specification file to import
+
+  --url=url            URL to the specification file to import. Can be used in place of the --file option if the API
+                       specification is publicly available.
+
+EXAMPLE
+  $ apimatic api:import --file="./specs/sample.json"
+  Your API has been successfully imported into APIMatic with ID: 123nhjkh123
+```
+
+_See code: [src/commands/api/import.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/import.ts)_
 
 ## `apimatic api:transform`
 
@@ -50,10 +75,7 @@ USAGE
 OPTIONS
   -f, --force                overwrite if same file exist in the destination
   --auth-key=auth-key        override current authentication state with an authentication key
-
-  --destination=destination  [default: /home/runner/work/apimatic-cli/apimatic-cli/cli] directory to download
-                             transformed file to
-
+  --destination=destination  [default: D:\Code\Backend\apimatic-cli] directory to download transformed file to
   --file=file                path to the API specification file to transform
 
   --format=format            (required) specification format to transform API specification into
@@ -82,11 +104,12 @@ USAGE
   $ apimatic api:validate
 
 OPTIONS
-  --auth-key=auth-key  override current authentication state with an authentication key
-  --file=file          Path to the API specification file to validate
+  --api-entity=api-entity  Unique API Entity Id for the API to perform validation for
+  --auth-key=auth-key      override current authentication state with an authentication key
+  --file=file              path to the API specification file to validate
 
-  --url=url            URL to the specification file to validate. Can be used in place of the --file option if the API
-                       specification is publicly available.
+  --url=url                URL to the specification file to validate. Can be used in place of the --file option if the
+                           API specification is publicly available.
 
 EXAMPLES
   $ apimatic api:validate --file="./specs/sample.json"
@@ -190,7 +213,7 @@ OPTIONS
   --all  see all commands in CLI
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.14/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.10/src/commands/help.ts)_
 
 ## `apimatic portal:generate`
 
@@ -203,7 +226,7 @@ USAGE
 OPTIONS
   -f, --force                overwrite if a portal exists in the destination
   --auth-key=auth-key        override current authentication state with an authentication key
-  --destination=destination  [default: /home/runner/work/apimatic-cli/apimatic-cli/cli] path to the downloaded portal
+  --destination=destination  [default: D:\Code\Backend\apimatic-cli] path to the downloaded portal
   --folder=folder            [default: ./] path to the input directory containing API specifications and config files
   --zip                      download the generated portal as a .zip archive
 
@@ -213,6 +236,25 @@ EXAMPLE
 ```
 
 _See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/generate.ts)_
+
+## `apimatic portal:publish`
+
+Re-Publish your embedded/hosted portals
+
+```
+USAGE
+  $ apimatic portal:publish
+
+OPTIONS
+  --api-entity=api-entity  (required) API Entity Id to publish the portal for
+  --auth-key=auth-key      override current authentication state with an authentication key
+
+EXAMPLE
+  $ apimatic portal:publish --api-entity="asd121ss1s1""
+  Your portal has been published successfully.
+```
+
+_See code: [src/commands/portal/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/publish.ts)_
 
 ## `apimatic sdk:generate`
 
@@ -224,11 +266,9 @@ USAGE
 
 OPTIONS
   -f, --force                overwrite if an SDK already exists in the destination
+  --api-entity=api-entity    Unique API Entity Id for the API to generate SDK for
   --auth-key=auth-key        override current authentication state with an authentication key
-
-  --destination=destination  [default: /home/runner/work/apimatic-cli/apimatic-cli/cli] directory to download the
-                             generated SDK to
-
+  --destination=destination  [default: D:\Code\Backend\apimatic-cli] directory to download the generated SDK to
   --file=file                path to the API specification to generate SDKs for
 
   --platform=platform        (required) language platform for sdk
@@ -255,4 +295,20 @@ EXAMPLES
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/sdk/generate.ts)_
+
+## `apimatic sdk:list`
+
+List all the SDKs generated by you.
+
+```
+USAGE
+  $ apimatic sdk:list
+
+OPTIONS
+  --api-entity=api-entity  API Entity Id to list SDK generations for
+  --auth-key=auth-key      Override current authentication state with an authentication key
+  --external               List all the SDKs generated externally with file or url
+```
+
+_See code: [src/commands/sdk/list.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/sdk/list.ts)_
 <!-- commandsstop -->

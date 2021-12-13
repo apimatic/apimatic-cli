@@ -5,7 +5,7 @@ import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import * as stripTags from "striptags";
 
-import { loggers, ValidationMessages } from "../types/utils";
+import { loggers, Paths, ValidationMessages } from "../types/utils";
 
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
@@ -122,8 +122,12 @@ export const isJSONParsable = (json: string) => {
   }
 };
 
-export const getFileNameFromPath = (filePath: string) => {
-  return path.basename(filePath).split(".")[0];
+export const getFileNameFromFlags = ({ file, url, "api-entity": apiEntityId }: Paths) => {
+  return apiEntityId
+    ? path.basename(apiEntityId).split(".")[0]
+    : file
+    ? path.basename(file).split(".")[0]
+    : path.basename(url).split(".")[0];
 };
 
 export const printValidationMessages = (

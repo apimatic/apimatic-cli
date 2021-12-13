@@ -9,3 +9,9 @@ export type loggers = {
   warn: (message: string) => void;
   error: (message: string) => void;
 };
+
+export type Paths = {
+  file: string;
+  url: string;
+  "api-entity"?: string | undefined;
+};

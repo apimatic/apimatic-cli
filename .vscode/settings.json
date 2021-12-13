@@ -1,9 +1,11 @@
 {
   "cSpell.words": [
     "ANGULARJAVASCRIPTLIB",
+    "commitlint",
     "CSNETSTANDARDLIB",
     "CSPORTABLENETLIB",
     "CSUNIVERSALWINDOWSPLATFORMLIB",
+    "globby",
     "GOGENERICLIB",
     "HTTPCURLV",
     "JAVAECLIPSEJRELIB",
@@ -19,6 +21,7 @@
     "PYTHONGENERICLIB",
     "RAML",
     "RUBYGENERICLIB",
+    "striptags",
     "transformvia",
     "unzipper",
     "WADL"

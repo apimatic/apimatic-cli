@@ -21,14 +21,14 @@ Specification file provided is valid
   ];
 
   static flags = {
-    file: flags.string({ default: "", description: "Path to the API specification file to validate" }),
+    file: flags.string({ default: "", description: "path to the API specification file to validate" }),
     url: flags.string({
       default: "",
       description:
         "URL to the specification file to validate. Can be used in place of the --file option if the API specification is publicly available."
     }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
-    "api-entity": flags.string({ description: "Unique API Entity Id for the API to perform validation for" }),
+    "api-entity": flags.string({ description: "unique API Entity Id for the API to perform validation for" }),
     "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
   };
 

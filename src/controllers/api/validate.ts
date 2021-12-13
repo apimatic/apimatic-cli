@@ -24,10 +24,10 @@ export const getValidation = async (
   cli.action.start("Validating specification file");
 
   apiEntityId
-    ? console.log(`Using API entity ${apiEntityId}`)
+    ? console.log(`Using API entity ID: ${apiEntityId}`)
     : file
     ? console.log(`Using file at ${file}`)
-    : console.log(`Using URL ${url}`);
+    : console.log(`Using URL: ${url}`);
 
   if (apiEntityId) {
     validation = await internalAPIController.validateAPI(apiEntityId);
