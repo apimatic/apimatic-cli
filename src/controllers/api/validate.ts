@@ -10,6 +10,7 @@ import {
   Client
 } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
+import { getAPIEntity } from "../../client-utils/auth-manager";
 
 export const getValidation = async (
   { file, url, "api-entity": apiEntityId, "auth-key": authKey }: GetValidationParams,
@@ -21,13 +22,22 @@ export const getValidation = async (
   const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, configDir);
   const externalAPIController: APIValidationExternalApisController = new APIValidationExternalApisController(client);
   const internalAPIController: APIValidationImportedApisController = new APIValidationImportedApisController(client);
+
   cli.action.start("Validating specification file");
 
+  const storedAPIEntityId = await getAPIEntity(configDir);
+
+  if (!apiEntityId && !storedAPIEntityId && !url && !file) {
+    throw new Error("Please provide a specification file or API Entity ID");
+  }
+
   apiEntityId
-    ? console.log(`Using API entity ID: ${apiEntityId}`)
+    ? console.log(`Using API Entity ID: ${apiEntityId}`)
     : file
     ? console.log(`Using file at ${file}`)
-    : console.log(`Using URL: ${url}`);
+    : url
+    ? console.log(`Using URL: ${url}`)
+    : console.log(`Using stored API Entity ID: ${storedAPIEntityId}`);
 
   if (apiEntityId) {
     validation = await internalAPIController.validateAPI(apiEntityId);
@@ -37,7 +47,7 @@ export const getValidation = async (
   } else if (url) {
     validation = await externalAPIController.validateAPIViaURL(url);
   } else {
-    throw new Error("Please provide a specification file");
+    validation = await internalAPIController.validateAPI(`${storedAPIEntityId}`);
   }
   cli.action.stop();
   return validation.result;

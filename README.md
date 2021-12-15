@@ -30,6 +30,7 @@ USAGE
 # Commands
 <!-- commands -->
 * [`apimatic api:import`](#apimatic-apiimport)
+* [`apimatic api:set`](#apimatic-apiset)
 * [`apimatic api:transform`](#apimatic-apitransform)
 * [`apimatic api:validate`](#apimatic-apivalidate)
 * [`apimatic auth:login`](#apimatic-authlogin)
@@ -63,6 +64,21 @@ EXAMPLE
 ```
 
 _See code: [src/commands/api/import.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/import.ts)_
+
+## `apimatic api:set`
+
+Set a single API Entity Id globally for all the API Entity related commands
+
+```
+USAGE
+  $ apimatic api:set
+
+OPTIONS
+  --api-entity=api-entity  API Entity ID of the API
+  --status                 Show the status of the API Entity
+```
+
+_See code: [src/commands/api/set.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/set.ts)_
 
 ## `apimatic api:transform`
 
@@ -104,7 +120,7 @@ USAGE
   $ apimatic api:validate
 
 OPTIONS
-  --api-entity=api-entity  Unique API Entity Id for the API to perform validation for
+  --api-entity=api-entity  unique API Entity Id for the API to perform validation for
   --auth-key=auth-key      override current authentication state with an authentication key
   --file=file              path to the API specification file to validate
 

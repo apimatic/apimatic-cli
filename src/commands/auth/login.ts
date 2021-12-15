@@ -28,22 +28,19 @@ Authentication key successfully set`
     const configDir: string = this.config.configDir;
     try {
       const client: SDKClient = SDKClient.getInstance();
+      let email = "";
+      let password = "";
 
-      // If user is setting auth key
-      if (flags["auth-key"]) {
-        const response = client.setAuthKey(flags["auth-key"], configDir);
-        return this.log(response);
-      } else {
-        // If user logs in with email and password
-        const email: string = await cli.prompt("Please enter your registered email");
-        const password: string = await cli.prompt("Please enter your password", {
+      // If user logs in with email and password
+      if (!flags["auth-key"]) {
+        email = await cli.prompt("Please enter your registered email");
+        password = await cli.prompt("Please enter your password", {
           type: "hide"
         });
-
-        const response: string = await client.login(email, password, configDir);
-
-        this.log(response);
       }
+      const response: string = await client.login({ email, password, ...flags }, configDir);
+
+      this.log(response);
     } catch (error) {
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;

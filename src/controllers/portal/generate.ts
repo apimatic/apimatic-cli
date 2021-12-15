@@ -16,7 +16,7 @@ const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey:
   formData.append("file", fs.createReadStream(zippedBuildFilePath));
   const config: AxiosRequestConfig = {
     headers: {
-      Authorization: authInfo ? `X-Auth-Key ${overrideAuthKey || authInfo.authKey.trim()}` : "",
+      Authorization: authInfo || overrideAuthKey ? `X-Auth-Key ${authInfo?.authKey.trim() || overrideAuthKey}` : "",
       ...formData.getHeaders()
     },
     responseType: "arraybuffer"

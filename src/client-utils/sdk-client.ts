@@ -1,9 +1,11 @@
+import cli from "cli-ux";
 import * as base64 from "base-64";
 import axios, { AxiosResponse } from "axios";
 
 import { Client } from "@apimatic/sdk";
 import { baseURL } from "../config/env";
 import { setAuthInfo, getAuthInfo, AuthInfo } from "./auth-manager";
+import { LoginParams } from "../types/auth/login";
 /**
  * The Singleton class defines the `getInstance` method that lets clients access
  * the unique singleton instance.
@@ -36,39 +38,42 @@ export class SDKClient {
    * executed on its instance.
    */
 
-  public async login(email: string, password: string, configDir: string): Promise<string> {
-    let storedAuthInfo: AuthInfo | null = await getAuthInfo(configDir);
+  public async login({ email, password, "auth-key": loginAuthKey }: LoginParams, configDir: string): Promise<string> {
+    cli.action.start("Logging in");
+    let response: string;
 
-    // If no config file or no credentials exist in the config file
-    if (!storedAuthInfo) {
-      storedAuthInfo = { email: "", authKey: "" };
-    }
-
-    const credentials: Credentials = { email, password };
-    const authKey: string = await this.getAuthKey(credentials);
-
-    if (storedAuthInfo.email !== email) {
-      setAuthInfo(
-        {
-          email,
-          authKey
-        },
-        configDir
-      );
-
-      return "Logged in";
-    } else if (authKey === storedAuthInfo.authKey) {
-      return "Already logged in";
+    // If logged in with Auth Key
+    if (loginAuthKey) {
+      response = this.setOnlyAuthKey(loginAuthKey, configDir);
     } else {
-      setAuthInfo(
-        {
-          email,
-          authKey
-        },
-        configDir
-      );
-      return "Logged in";
+      // If logged in with email and password
+      let storedAuthInfo: AuthInfo | null = await getAuthInfo(configDir);
+
+      // If no config file or no credentials exist in the config file
+      if (!storedAuthInfo) {
+        storedAuthInfo = { email: "", authKey: "" };
+      }
+
+      const credentials: Credentials = { email, password };
+      const authKey: string = await this.getAuthKey(credentials);
+
+      if (storedAuthInfo.email === email && storedAuthInfo.authKey === authKey) {
+        response = "Already logged in";
+      } else {
+        setAuthInfo(
+          {
+            email,
+            authKey
+          },
+          configDir
+        );
+        response = `Logged in as ${email}`;
+      }
     }
+
+    cli.action.stop();
+
+    return response;
   }
 
   public async logout(configDir: string): Promise<string> {
@@ -134,7 +139,7 @@ export class SDKClient {
     const authKey: string = response.data.EncryptedValue;
     return authKey;
   }
-  public setAuthKey = (authKey: string, configDir: string) => {
+  private setOnlyAuthKey = (authKey: string, configDir: string) => {
     setAuthInfo(
       {
         email: "",

@@ -14,25 +14,35 @@ import { ApiResponse, FileWrapper } from "@apimatic/core";
 import { GenerationIdParams, SimplePlatforms, DownloadSDKParams } from "../../types/sdk/generate";
 import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
+import { getAPIEntity } from "../../client-utils/auth-manager";
 
 export const getSDKGenerationId = async (
   { file, url, platform, "auth-key": authKey, "api-entity": apiEntityId }: GenerationIdParams,
   configDir: string
 ): Promise<string> => {
-  cli.action.start("Generating SDK");
   const overrideAuthKey = authKey ? authKey : null;
   const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, configDir);
   const externalSDKController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(client);
   const importedSDKController: CodeGenerationImportedApisController = new CodeGenerationImportedApisController(client);
 
-  apiEntityId
-    ? console.log(`Using API entity ID: ${apiEntityId}`)
-    : file
-    ? console.log(`Using file at ${file}`)
-    : console.log(`Using URL: ${url}`);
-
   let generation: ApiResponse<UserCodeGeneration> | ApiResponse<APIEntityCodeGeneration>;
   const sdkPlatform = getSDKPlatform(platform) as Platforms;
+
+  const storedAPIEntityId = await getAPIEntity(configDir);
+
+  if (!apiEntityId && !storedAPIEntityId && !url && !file) {
+    throw new Error("Please provide a specification file or API Entity ID");
+  }
+
+  apiEntityId
+    ? console.log(`Using API Entity ID: ${apiEntityId}`)
+    : file
+    ? console.log(`Using file at ${file}`)
+    : url
+    ? console.log(`Using URL: ${url}`)
+    : console.log(`Using stored API Entity ID: ${storedAPIEntityId}`);
+
+  cli.action.start("Generating SDK");
 
   if (apiEntityId) {
     generation = await importedSDKController.generateSDK(apiEntityId, sdkPlatform);
@@ -42,12 +52,12 @@ export const getSDKGenerationId = async (
   } else if (url) {
     // If url to spec file is provided
     const body: GenerateSdkViaUrlRequest = {
-      url: url,
+      url,
       template: sdkPlatform
     };
     generation = await externalSDKController.generateSDKViaURL(body);
   } else {
-    throw new Error("Please provide a specification file or API Entity ID");
+    generation = await importedSDKController.generateSDK(`${storedAPIEntityId}`, sdkPlatform);
   }
   cli.action.stop();
   return generation.result.id;
@@ -77,6 +87,9 @@ export const downloadGeneratedSDK = async (
   const externalSDKController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(client);
   const importedSDKController: CodeGenerationImportedApisController = new CodeGenerationImportedApisController(client);
   let response: ApiResponse<NodeJS.ReadableStream | Blob>;
+
+  // Override input entity id or use the stored one
+  apiEntityId = apiEntityId || (await getAPIEntity(configDir));
 
   if (apiEntityId) {
     response = await importedSDKController.downloadSDK(apiEntityId, codeGenId);
