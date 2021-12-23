@@ -5,8 +5,10 @@ import { Command, flags } from "@oclif/command";
 import { ApiError } from "@apimatic/sdk";
 
 import { replaceHTML, isJSONParsable, getFileNameFromFlags } from "../../utils/utils";
-import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate";
-import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate";
+import { getSDKGenerationId } from "../../controllers/sdk/generate";
+import { SDKGenerateUnprocessableError } from "../../types/sdk/generate";
+import { downloadGeneratedSDK } from "../../controllers/sdk/download";
+import { DownloadSDKParams } from "../../types/sdk/download";
 
 export default class SdkGenerate extends Command {
   static description = "Generate SDK for your APIs";

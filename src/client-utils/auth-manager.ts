@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as fs from "fs-extra";
+import { setAPIParams } from "../types/api/set";
 
 export type AuthInfo = {
   email: string;
@@ -59,9 +60,12 @@ export async function getAPIEntity(configDir: string): Promise<string | undefine
  * @param {string} apiEntityId <- API entity ID
  * //Function to set API Entity Id
  */
-export async function setAPIEntity(apiEntityId: string | undefined, configDir: string): Promise<string> {
+export async function setAPIEntity(
+  { "api-entity": apiEntityId, clear }: setAPIParams,
+  configDir: string
+): Promise<string> {
   try {
-    if (!apiEntityId) {
+    if (!apiEntityId && !clear) {
       throw new Error("Please provide an API Entity ID to set");
     }
     const configFilePath = path.join(configDir, "config.json");
@@ -74,7 +78,7 @@ export async function setAPIEntity(apiEntityId: string | undefined, configDir: s
     // Write API entity ID to config file
     await fs.writeFile(configFilePath, JSON.stringify(entityData));
 
-    return "API Entity ID has been set successfully";
+    return clear ? "API Entity has been cleared" : "API Entity has been set successfully";
   } catch (error) {
     throw new Error((error as Error).message);
   }

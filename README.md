@@ -40,6 +40,7 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
 * [`apimatic portal:publish`](#apimatic-portalpublish)
+* [`apimatic sdk:download`](#apimatic-sdkdownload)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
 * [`apimatic sdk:list`](#apimatic-sdklist)
 
@@ -52,11 +53,17 @@ USAGE
   $ apimatic api:import
 
 OPTIONS
-  --auth-key=auth-key  override current authentication state with an authentication key
-  --file=file          Path to the API specification file to import
+  --api-entity=api-entity  API Entity ID of the API to be replaced
+  --api-group=api-group    API group ID to create a new version for
+  --auth-key=auth-key      override current authentication state with an authentication key
+  --file=file              Path to the API specification file to import
+  --fork                   create a new version of currently imported API
+  --replace                replace the currently imported API with the new one
 
-  --url=url            URL to the specification file to import. Can be used in place of the --file option if the API
-                       specification is publicly available.
+  --url=url                URL to the specification file to import. Can be used in place of the --file option if the API
+                           specification is publicly available.
+
+  --version=version        version of the API to import
 
 EXAMPLE
   $ apimatic api:import --file="./specs/sample.json"
@@ -75,7 +82,8 @@ USAGE
 
 OPTIONS
   --api-entity=api-entity  API Entity ID of the API
-  --status                 Show the status of the API Entity
+  --clear                  clear the stored API Entity
+  --status                 show currently set API Entity
 ```
 
 _See code: [src/commands/api/set.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/set.ts)_
@@ -271,6 +279,24 @@ EXAMPLE
 ```
 
 _See code: [src/commands/portal/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/publish.ts)_
+
+## `apimatic sdk:download`
+
+Download a SDK with its code generation ID
+
+```
+USAGE
+  $ apimatic sdk:download
+
+OPTIONS
+  --api-entity=api-entity    API Entity ID of the API
+  --auth-key=auth-key        override current authentication state with an authentication key
+  --codegen-id=codegen-id    (required) code generation Id of the SDK
+  --destination=destination  [default: D:\Code\Backend\apimatic-cli] directory to download the generated SDK to
+  --zip                      download the generated SDK as a .zip archive
+```
+
+_See code: [src/commands/sdk/download.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/sdk/download.ts)_
 
 ## `apimatic sdk:generate`
 
