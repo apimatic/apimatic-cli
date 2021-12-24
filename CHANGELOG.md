@@ -1,3 +1,10 @@
+## [1.0.2-alpha.2](https://github.com/apimatic/apimatic-cli/compare/v1.0.2-alpha.1...v1.0.2-alpha.2) (2021-12-24)
+
+
+### Bug Fixes
+
+* **portal:** override authkey not working if user is never logged in ever ([fb5d188](https://github.com/apimatic/apimatic-cli/commit/fb5d1884e7dc12917387903e5292e50367190162))
+
 ## [1.0.1-alpha.11](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.10...v1.0.1-alpha.11) (2021-12-24)
 
 
