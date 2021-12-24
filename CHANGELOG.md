@@ -1,3 +1,17 @@
+## [1.0.1-alpha.11](https://github.com/apimatic/apimatic-cli/compare/v1.0.1-alpha.10...v1.0.1-alpha.11) (2021-12-24)
+
+
+### Bug Fixes
+
+* **portal:** bug in when generating portal before logging in ever with authkey ([82043f8](https://github.com/apimatic/apimatic-cli/commit/82043f8fb6658c153bdf168ef1e02801ffccdea2))
+
+# [0.0.0-alpha.4](https://github.com/apimatic/apimatic-cli/compare/v0.0.0-alpha.3...v0.0.0-alpha.4) (2021-12-15)
+
+
+### Bug Fixes
+
+* **portal:** override auth key not working for first time user ([a30e224](https://github.com/apimatic/apimatic-cli/commit/a30e224bd192e0951ec2716c31749df8c7df0b0b))
+
 # [0.0.0-alpha.3](https://github.com/apimatic/apimatic-cli/compare/v0.0.0-alpha.2...v0.0.0-alpha.3) (2021-12-09)
 
 
