@@ -1,40 +1,38 @@
-import * as path from "path";
-
-import { Command, flags } from "@oclif/command";
-import { downloadGeneratedSDK } from "../../controllers/sdk/download";
-import { isJSONParsable, replaceHTML } from "../../utils/utils";
 import { ApiError } from "@apimatic/sdk";
+import { Command, flags } from "@oclif/command";
+import { unPublishDocsPortal } from "../../controllers/portal/unpublish";
 import { SDKGenerateUnprocessableError } from "../../types/sdk/generate";
+import { isJSONParsable, replaceHTML } from "../../utils/utils";
 
-export default class SdkDownload extends Command {
-  static description = "Download a SDK with its code generation ID";
+export default class PortalUnpublish extends Command {
+  static description = "Un-publish your published portals";
+
+  static examples = [
+    `$ apimatic portal:unpublish --api-entity="asd121ss1s1""
+Your portal has been un-published.
+`
+  ];
 
   static flags = {
-    destination: flags.string({
-      parse: (input) => path.resolve(input),
-      default: path.resolve("./"),
-      description: "directory to download the generated SDK to"
+    "api-entity": flags.string({
+      required: true,
+      description: "API Entity Id of portal to un-publish"
     }),
-    zip: flags.boolean({ default: false, description: "download the generated SDK as a .zip archive" }),
-    force: flags.boolean({
-      char: "f",
-      default: false,
-      description: "overwrite if an SDK already exists in the destination"
-    }),
-    "codegen-id": flags.string({ required: true, description: "code generation Id of the SDK" }),
-    "api-entity": flags.string({ description: "API Entity ID of the API" }),
     "auth-key": flags.string({
       default: "",
       description: "override current authentication state with an authentication key"
     })
   };
 
+  static args = [{ name: "file" }];
+
   async run() {
-    const { flags } = this.parse(SdkDownload);
+    const { flags } = this.parse(PortalUnpublish);
 
     try {
-      const sdkPath: string = await downloadGeneratedSDK(flags, this.config.configDir);
-      this.log(`Success! Your SDK is located at ${sdkPath}`);
+      await unPublishDocsPortal(flags, this.config.configDir);
+
+      this.log(`Your portal has been un-published.`);
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
@@ -65,9 +63,7 @@ export default class SdkDownload extends Command {
         }
       } else {
         if ((error as ApiError).statusCode === 404) {
-          this.error(
-            "Couldn't find the API Entity or CodeGen Id or CodeGen Id doesn't exist for provided API Entity specified"
-          );
+          this.error("Couldn't find portal for the API Entity specified");
         } else {
           this.error(`${(error as Error).message}`);
         }

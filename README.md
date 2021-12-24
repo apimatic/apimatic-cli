@@ -40,6 +40,7 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
 * [`apimatic portal:publish`](#apimatic-portalpublish)
+* [`apimatic portal:unpublish [FILE]`](#apimatic-portalunpublish-file)
 * [`apimatic sdk:download`](#apimatic-sdkdownload)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
 * [`apimatic sdk:list`](#apimatic-sdklist)
@@ -57,7 +58,6 @@ OPTIONS
   --api-group=api-group    API group ID to create a new version for
   --auth-key=auth-key      override current authentication state with an authentication key
   --file=file              Path to the API specification file to import
-  --fork                   create a new version of currently imported API
   --replace                replace the currently imported API with the new one
 
   --url=url                URL to the specification file to import. Can be used in place of the --file option if the API
@@ -280,6 +280,22 @@ EXAMPLE
 
 _See code: [src/commands/portal/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/publish.ts)_
 
+## `apimatic portal:unpublish [FILE]`
+
+describe the command here
+
+```
+USAGE
+  $ apimatic portal:unpublish [FILE]
+
+OPTIONS
+  -f, --force
+  -h, --help       show CLI help
+  -n, --name=name  name to print
+```
+
+_See code: [src/commands/portal/unpublish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/unpublish.ts)_
+
 ## `apimatic sdk:download`
 
 Download a SDK with its code generation ID
@@ -289,6 +305,7 @@ USAGE
   $ apimatic sdk:download
 
 OPTIONS
+  -f, --force                overwrite if an SDK already exists in the destination
   --api-entity=api-entity    API Entity ID of the API
   --auth-key=auth-key        override current authentication state with an authentication key
   --codegen-id=codegen-id    (required) code generation Id of the SDK

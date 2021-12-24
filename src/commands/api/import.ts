@@ -24,24 +24,22 @@ Your API has been successfully imported into APIMatic with ID: 123nhjkh123
       description:
         "URL to the specification file to import. Can be used in place of the --file option if the API specification is publicly available."
     }),
-    fork: flags.boolean({
-      default: false,
-      description: "create a new version of currently imported API"
-    }),
     replace: flags.boolean({
-      default: false,
+      dependsOn: ["api-entity"],
       description: "replace the currently imported API with the new one"
     }),
     version: flags.string({
-      default: "",
+      dependsOn: ["api-group"],
       description: "version of the API to import"
     }),
     "api-entity": flags.string({
       default: "",
+      dependsOn: ["replace"],
       description: "API Entity ID of the API to be replaced"
     }),
     "api-group": flags.string({
       default: "",
+      dependsOn: ["version"],
       description: "API group ID to create a new version for"
     }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
@@ -54,11 +52,6 @@ Your API has been successfully imported into APIMatic with ID: 123nhjkh123
     try {
       if (flags.file && !(await fs.pathExists(flags.file))) {
         throw new Error(`Import file: ${flags.file} does not exist`);
-      }
-      if (flags.fork && (!flags["api-group"] || !flags.version)) {
-        this.error("--api-group is required when using --fork");
-      } else if (flags.replace && !flags["api-entity"]) {
-        this.error("--api-entity is required when using --replace");
       }
 
       const summary: ApiEntity | undefined = await importAPISpec(flags, this.config.configDir);

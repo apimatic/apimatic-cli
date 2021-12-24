@@ -1,4 +1,6 @@
 import cli from "cli-ux";
+import * as path from "path";
+import * as fs from "fs-extra";
 
 import {
   ApiResponse,
@@ -13,7 +15,14 @@ import { DownloadSDKParams } from "../../types/sdk/download";
 
 // Download Platform
 export const downloadGeneratedSDK = async (
-  { codeGenId, zippedSDKPath, sdkFolderPath, zip, "api-entity": apiEntityId, "auth-key": authKey }: DownloadSDKParams,
+  {
+    "codegen-id": codeGenId,
+    zip,
+    "api-entity": apiEntityId,
+    "auth-key": authKey,
+    destination,
+    force
+  }: DownloadSDKParams,
   configDir: string
 ): Promise<string> => {
   cli.action.start("Downloading SDK");
@@ -34,13 +43,27 @@ export const downloadGeneratedSDK = async (
   }
   if ((response.result as NodeJS.ReadableStream).readable) {
     if (!zip) {
-      await unzipFile(response.result as NodeJS.ReadableStream, sdkFolderPath);
+      const sdkDestinationPath = path.join(
+        destination,
+        response.headers["content-disposition"].split("=")[1].split(".zip")[0].replace(/['"]+/g, "")
+      );
+      if (fs.existsSync(sdkDestinationPath) && !force) {
+        throw new Error(`Can't download SDK to path ${sdkDestinationPath}, because it already exists`);
+      }
+      await unzipFile(response.result as NodeJS.ReadableStream, sdkDestinationPath);
       cli.action.stop();
-      return sdkFolderPath;
+      return sdkDestinationPath;
     } else {
-      await writeFileUsingReadableStream(response.result as NodeJS.ReadableStream, zippedSDKPath);
+      const sdkDestinationPath = path.join(
+        destination,
+        response.headers["content-disposition"].split("=")[1].replace(/['"]+/g, "")
+      );
+      if (fs.existsSync(sdkDestinationPath) && !force) {
+        throw new Error(`Can't download SDK to path ${sdkDestinationPath}, because it already exists`);
+      }
+      await writeFileUsingReadableStream(response.result as NodeJS.ReadableStream, sdkDestinationPath);
       cli.action.stop();
-      return zippedSDKPath;
+      return sdkDestinationPath;
     }
   } else {
     throw new Error("Couldn't download the SDK");

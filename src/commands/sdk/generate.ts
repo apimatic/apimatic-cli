@@ -4,7 +4,7 @@ import * as fs from "fs-extra";
 import { Command, flags } from "@oclif/command";
 import { ApiError } from "@apimatic/sdk";
 
-import { replaceHTML, isJSONParsable, getFileNameFromFlags } from "../../utils/utils";
+import { replaceHTML, isJSONParsable } from "../../utils/utils";
 import { getSDKGenerationId } from "../../controllers/sdk/generate";
 import { SDKGenerateUnprocessableError } from "../../types/sdk/generate";
 import { downloadGeneratedSDK } from "../../controllers/sdk/download";
@@ -65,16 +65,6 @@ Success! Your SDK is located at swagger_sdk_csharp
 
   async run() {
     const { flags } = this.parse(SdkGenerate);
-    const fileName = getFileNameFromFlags(flags);
-    const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());
-    const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toLowerCase());
-
-    // Check if at destination, SDK already exists and throw error if force flag is not set for both zip and extracted
-    if (fs.existsSync(sdkFolderPath) && !flags.force && !flags.zip) {
-      throw new Error(`Can't download SDK to path ${sdkFolderPath}, because it already exists`);
-    } else if (fs.existsSync(zippedSDKPath) && !flags.force && flags.zip) {
-      throw new Error(`Can't download SDK to path ${zippedSDKPath}, because it already exists`);
-    }
 
     try {
       if (!(await fs.pathExists(path.resolve(flags.destination)))) {
@@ -87,9 +77,7 @@ Success! Your SDK is located at swagger_sdk_csharp
 
       // If user wanted to download the SDK as well
       const sdkDownloadParams: DownloadSDKParams = {
-        codeGenId,
-        zippedSDKPath,
-        sdkFolderPath,
+        "codegen-id": codeGenId,
         ...flags
       };
       const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, this.config.configDir);

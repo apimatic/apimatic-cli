@@ -20,7 +20,6 @@ export const importAPISpec = async (
   {
     file,
     url,
-    fork,
     replace,
     version,
     "auth-key": authKey,
@@ -37,7 +36,7 @@ export const importAPISpec = async (
   let response: ApiResponse<ApiEntity> | null = null;
   if (file) {
     const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-    if (fork && apiGroupId) {
+    if (apiGroupId && version) {
       response = await apisManagementController.importNewAPIVersionViaFile(
         apiGroupId,
         Accept["EnumApplicationjson" as keyof typeof Accept],
@@ -54,7 +53,7 @@ export const importAPISpec = async (
       response = await apisManagementController.importAPIViaFile(fileDescriptor);
     }
   } else if (url) {
-    if (fork && apiGroupId) {
+    if (apiGroupId && version) {
       response = await apisManagementController.importNewAPIVersionViaURL(
         apiGroupId,
         Accept["EnumApplicationjson" as keyof typeof Accept],
