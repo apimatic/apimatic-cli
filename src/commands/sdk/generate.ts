@@ -8,6 +8,7 @@ import { ApiError, Client, CodeGenerationExternalApisController } from "@apimati
 import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils";
 import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate";
 import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate";
+import { AuthenticationError } from "../../types/utils";
 
 export default class SdkGenerate extends Command {
   static description = "Generate SDK for your APIs";
@@ -110,7 +111,7 @@ Success! Your SDK is located at swagger_sdk_csharp
             this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
           }
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error(apiError.body);
+          this.error("You are not authorized to perform this action");
         } else if (
           apiError.statusCode === 500 &&
           apiError.body &&
@@ -128,6 +129,14 @@ Success! Your SDK is located at swagger_sdk_csharp
         } else {
           this.error(replaceHTML(result.message));
         }
+      } else if ((error as AuthenticationError).statusCode === 401) {
+        this.error("You are not authorized to perform this action");
+      } else if (
+        (error as AuthenticationError).statusCode === 402 &&
+        (error as AuthenticationError).body &&
+        typeof (error as AuthenticationError).body === "string"
+      ) {
+        this.error(replaceHTML((error as AuthenticationError).body));
       } else {
         this.error(`${(error as Error).message}`);
       }

@@ -9,3 +9,8 @@ export type loggers = {
   warn: (message: string) => void;
   error: (message: string) => void;
 };
+
+export type AuthenticationError = {
+  statusCode: number;
+  body: string;
+};

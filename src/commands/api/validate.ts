@@ -3,7 +3,7 @@ import * as fs from "fs-extra";
 import { flags, Command } from "@oclif/command";
 import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
-import { loggers } from "../../types/utils";
+import { AuthenticationError, loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { getValidation } from "../../controllers/api/validate";
 import { printValidationMessages, replaceHTML } from "../../utils/utils";
@@ -64,10 +64,18 @@ Specification file provided is valid
         if (result.modelState["exception Error"] && apiError.statusCode === 400) {
           this.error(replaceHTML(result.modelState["exception Error"][0]));
         } else if ((error as AuthorizationError).body && apiError.statusCode === 401) {
-          this.error((error as AuthorizationError).body);
+          this.error("You are not authorized to perform this action");
         } else {
           this.error((error as Error).message);
         }
+      } else if ((error as AuthenticationError).statusCode === 401) {
+        this.error("You are not authorized to perform this action");
+      } else if (
+        (error as AuthenticationError).statusCode === 402 &&
+        (error as AuthenticationError).body &&
+        typeof (error as AuthenticationError).body === "string"
+      ) {
+        this.error((error as AuthenticationError).body);
       } else {
         this.error(`${(error as Error).message}`);
       }
