@@ -1,3 +1,10 @@
+# [1.1.0-alpha.1](https://github.com/apimatic/apimatic-cli/compare/v1.0.2-alpha.2...v1.1.0-alpha.1) (2022-01-05)
+
+
+### Features
+
+* **environment:** now cli will use production environment, make subscription messages more readable ([7868f76](https://github.com/apimatic/apimatic-cli/commit/7868f76f36af65f1bf774711c888d5d365a9094a))
+
 ## [1.0.2-alpha.2](https://github.com/apimatic/apimatic-cli/compare/v1.0.2-alpha.1...v1.0.2-alpha.2) (2021-12-24)
 
 
