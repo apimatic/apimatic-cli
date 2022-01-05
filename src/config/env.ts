@@ -1,1 +1,1 @@
-export const baseURL = "https://apimaticio-test.azurewebsites.net/api";
+export const baseURL = "https://www.apimatic.io/api";

@@ -7,6 +7,7 @@ import { AxiosError } from "axios";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
 import { zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
+import { AuthenticationError } from "../../types/utils";
 
 export default class PortalGenerate extends Command {
   static description =
@@ -89,13 +90,21 @@ Your portal has been generated at D:/
               return this.error(replaceHTML(nestedErrors.message));
             }
           } else if (apiResponse.status === 401 && responseData.length > 0) {
-            this.error(replaceHTML(responseData));
+            this.error("You are not authorized to perform this action");
           } else if (apiResponse.status === 403 && apiResponse.statusText) {
-            return this.error(replaceHTML(apiResponse.statusText));
+            return this.error("Your subscription does not allow on premise portal generation");
           } else {
             return this.error(apiError.message);
           }
         }
+      } else if ((error as AuthenticationError).statusCode === 401) {
+        this.error("You are not authorized to perform this action");
+      } else if (
+        (error as AuthenticationError).statusCode === 402 &&
+        (error as AuthenticationError).body &&
+        typeof (error as AuthenticationError).body === "string"
+      ) {
+        this.error((error as AuthenticationError).body);
       } else {
         this.error(`${(error as Error).message}`);
       }

@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "0.0.0-alpha.3",
+    "version": "1.0.1-alpha.11",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run"
@@ -36,16 +36,14 @@
         "build": "tsc -b",
         "postpack": "rimraf oclif.manifest.json",
         "posttest": "eslint . --ext .ts --config .eslintrc",
-        "prepack": "rimraf lib && tsc -b && oclif-dev manifest && oclif-dev readme",
         "test": "nyc --extension .ts mocha --forbid-only \"test/**/*.test.ts\"",
-        "version": "oclif-dev readme && git add README.md",
         "prettier": "prettier \"src/**/*.{js,ts}\"",
         "format": "prettier --write \"src/**/*.{js,ts}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.0.1-alpha.9",
+        "@apimatic/sdk": "^0.0.1-alpha.10",
         "@oclif/command": "^1.8.0",
         "@oclif/config": "^1.17.0",
         "@oclif/plugin-autocomplete": "^0.3.0",

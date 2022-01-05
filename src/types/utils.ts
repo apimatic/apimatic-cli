@@ -10,8 +10,7 @@ export type loggers = {
   error: (message: string) => void;
 };
 
-export type Paths = {
-  file: string;
-  url: string;
-  "api-entity"?: string | undefined;
+export type AuthenticationError = {
+  statusCode: number;
+  body: string;
 };

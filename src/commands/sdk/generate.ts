@@ -7,6 +7,7 @@ import { ApiError } from "@apimatic/sdk";
 import { replaceHTML, isJSONParsable } from "../../utils/utils";
 import { getSDKGenerationId } from "../../controllers/sdk/generate";
 import { SDKGenerateUnprocessableError } from "../../types/sdk/generate";
+import { AuthenticationError } from "../../types/utils";
 import { downloadGeneratedSDK } from "../../controllers/sdk/download";
 import { DownloadSDKParams } from "../../types/sdk/download";
 
@@ -92,7 +93,7 @@ Success! Your SDK is located at swagger_sdk_csharp
             this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
           }
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error(apiError.body);
+          this.error("You are not authorized to perform this action");
         } else if (
           apiError.statusCode === 500 &&
           apiError.body &&
@@ -110,6 +111,14 @@ Success! Your SDK is located at swagger_sdk_csharp
         } else {
           this.error(replaceHTML(result.message));
         }
+      } else if ((error as AuthenticationError).statusCode === 401) {
+        this.error("You are not authorized to perform this action");
+      } else if (
+        (error as AuthenticationError).statusCode === 402 &&
+        (error as AuthenticationError).body &&
+        typeof (error as AuthenticationError).body === "string"
+      ) {
+        this.error(replaceHTML((error as AuthenticationError).body));
       } else {
         if ((error as ApiError).statusCode === 404) {
           this.error("Couldn't find the API Entity specified");

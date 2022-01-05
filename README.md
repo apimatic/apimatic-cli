@@ -15,7 +15,7 @@ The official CLI for APIMatic.
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g @apimatic/cli
+$ npm install -g @apimatic/cli@1.0.1-alpha.3
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)

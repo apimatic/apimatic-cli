@@ -1,10 +1,5 @@
 import { TransformationController } from "@apimatic/sdk";
 
-export type AuthenticationError = {
-  statusCode: number;
-  body: string;
-};
-
 export type TransformationIdParams = {
   file: string;
   url: string;

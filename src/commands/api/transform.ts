@@ -4,11 +4,11 @@ import * as fs from "fs-extra";
 import { flags, Command } from "@oclif/command";
 import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
 
-import { loggers } from "../../types/utils";
+import { AuthenticationError, loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { printValidationMessages } from "../../utils/utils";
 import { getFileNameFromFlags, replaceHTML } from "../../utils/utils";
-import { AuthenticationError, DestinationFormats } from "../../types/api/transform";
+import { DestinationFormats } from "../../types/api/transform";
 import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform";
 
 const formats: string = Object.keys(ExportFormats).join("|");
@@ -102,12 +102,14 @@ ${formats}`
         } else if (apiError.statusCode === 422 && apiError.body && typeof apiError.body === "string") {
           this.error(JSON.parse(apiError.body)["dto.FileUrl"][0]);
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error(apiError.body);
+          this.error("You are not authorized to perform this action");
         } else if (apiError.statusCode === 500) {
           this.error(apiError.message);
         }
+      } else if ((error as AuthenticationError).statusCode === 401) {
+        this.error("You are not authorized to perform this action");
       } else if (
-        (error as AuthenticationError).statusCode === 401 &&
+        (error as AuthenticationError).statusCode === 402 &&
         (error as AuthenticationError).body &&
         typeof (error as AuthenticationError).body === "string"
       ) {
