@@ -1,0 +1,19 @@
+name: Latest-Tag
+
+on:
+  workflow_dispatch
+
+jobs:
+  latest-tag:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [ '14' ]
+    name: Latest tag with Node version ${{ matrix.node }}
+    steps:
+      - name: Release
+        working-directory: cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm dist-tag add @apimatic/cli@${{LATEST_VERSION}} latest
