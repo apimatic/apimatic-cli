@@ -2,10 +2,8 @@ import * as path from "path";
 import * as fs from "fs-extra";
 
 import { Command, flags } from "@oclif/command";
-import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 
 import { AxiosError } from "axios";
-import { SDKClient } from "../../client-utils/sdk-client";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
 import { zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
@@ -60,16 +58,13 @@ Your portal has been generated at D:/
       } else if (!(await fs.pathExists(flags.folder))) {
         throw new Error(`Portal build folder ${flags.folder} does not exist`);
       }
-      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-      const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
 
-      const zippedBuildFilePath = await zipDirectory(sourceFolderPath, flags.destination);
+      const zippedBuildFilePath: string = await zipDirectory(sourceFolderPath, flags.destination);
 
       const generatePortalParams: GeneratePortalParams = {
         zippedBuildFilePath,
         portalFolderPath,
         zippedPortalPath,
-        docsPortalController,
         overrideAuthKey,
         zip
       };

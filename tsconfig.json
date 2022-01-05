@@ -9,6 +9,7 @@
     "strict": true,
     "target": "es2017",
     "composite": true,
+    "maxNodeModuleJsDepth": 5,
     "lib": ["es2018", "dom"]
   },
   "include": [

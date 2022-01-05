@@ -40,6 +40,7 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
 * [`apimatic portal:publish`](#apimatic-portalpublish)
+* [`apimatic portal:serve [FILE]`](#apimatic-portalserve-file)
 * [`apimatic portal:unpublish [FILE]`](#apimatic-portalunpublish-file)
 * [`apimatic sdk:download`](#apimatic-sdkdownload)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
@@ -280,18 +281,37 @@ EXAMPLE
 
 _See code: [src/commands/portal/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/publish.ts)_
 
-## `apimatic portal:unpublish [FILE]`
+## `apimatic portal:serve [FILE]`
 
 describe the command here
+
+```
+USAGE
+  $ apimatic portal:serve [FILE]
+
+OPTIONS
+  -f, --force
+  -h, --help       show CLI help
+  -n, --name=name  name to print
+```
+
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/serve.ts)_
+
+## `apimatic portal:unpublish [FILE]`
+
+Un-publish your published portals
 
 ```
 USAGE
   $ apimatic portal:unpublish [FILE]
 
 OPTIONS
-  -f, --force
-  -h, --help       show CLI help
-  -n, --name=name  name to print
+  --api-entity=api-entity  (required) API Entity Id of portal to un-publish
+  --auth-key=auth-key      override current authentication state with an authentication key
+
+EXAMPLE
+  $ apimatic portal:unpublish --api-entity="asd121ss1s1""
+  Your portal has been un-published.
 ```
 
 _See code: [src/commands/portal/unpublish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/unpublish.ts)_

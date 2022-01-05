@@ -43,6 +43,8 @@ export const downloadDocsPortal = async (
   await fs.writeFile(zippedPortalPath, data);
 
   // TODO: Uncomment this code block when the SDK is patched
+  // const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, configDir);
+  // const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
   // const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
   // const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
   //   await docsPortalController.generateOnPremPortalViaBuildInput(file);
