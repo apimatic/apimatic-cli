@@ -15,17 +15,17 @@ export default class PortalServe extends Command {
       required: true,
       description: "Path to portal folder to serve locally"
     }),
-    port: flags.integer({ default: 8888, description: "Port to serve portal on" })
+    port: flags.integer({ default: 8000, description: "Port to serve portal on" })
   };
 
   async run() {
     const { flags } = this.parse(PortalServe);
     const tempFolder: string = path.join(this.config.configDir, "temp");
     const folders: PortalFolders = { main: flags.folder, temp: tempFolder };
-    // const port = flags.port;
+    const port = flags.port;
 
     try {
-      await serveSourceFolder(folders, this.config.configDir);
+      await serveSourceFolder({ folders, configDir: this.config.configDir, port });
     } catch (error) {
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
