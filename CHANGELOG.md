@@ -1,3 +1,10 @@
+# [1.1.0-alpha.2](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.1...v1.1.0-alpha.2) (2022-01-06)
+
+
+### Bug Fixes
+
+* **help inconsistent:** fix help being inconsistent with actual platforms supported in sdk generate ([23b6e6d](https://github.com/apimatic/apimatic-cli/commit/23b6e6da15a073afa71962458c825ba54bcd5f50))
+
 # [1.1.0-alpha.1](https://github.com/apimatic/apimatic-cli/compare/v1.0.2-alpha.2...v1.1.0-alpha.1) (2022-01-05)
 
 
