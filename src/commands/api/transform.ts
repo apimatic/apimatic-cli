@@ -47,6 +47,7 @@ ${formats}`
       description: "directory to download transformed file to"
     }),
     force: flags.boolean({ char: "f", default: false, description: "overwrite if same file exist in the destination" }),
+    "api-entity": flags.string({ description: "unique API Entity Id for the API to perform validation for" }),
     "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
   };
 
@@ -60,7 +61,7 @@ ${formats}`
     );
 
     // Check if destination file already exist and throw error if force flag is not set
-    if (fs.existsSync(destinationFilePath) && !flags.force) {
+    if ((await fs.pathExists(destinationFilePath)) && !flags.force) {
       throw new Error(`Can't download transformed file to path ${destinationFilePath}, because it already exists`);
     }
 

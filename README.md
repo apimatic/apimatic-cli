@@ -15,11 +15,11 @@ The official CLI for APIMatic.
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g @apimatic/cli@1.0.1-alpha.3
+$ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)
-@apimatic/cli/0.0.0-alpha.3 win32-x64 node-v14.17.0
+@apimatic/cli/1.0.1-alpha.11 win32-x64 node-v14.17.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -40,7 +40,8 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
 * [`apimatic portal:publish`](#apimatic-portalpublish)
-* [`apimatic portal:serve [FILE]`](#apimatic-portalserve-file)
+* [`apimatic portal:scaffold`](#apimatic-portalscaffold)
+* [`apimatic portal:serve`](#apimatic-portalserve)
 * [`apimatic portal:unpublish [FILE]`](#apimatic-portalunpublish-file)
 * [`apimatic sdk:download`](#apimatic-sdkdownload)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
@@ -71,7 +72,7 @@ EXAMPLE
   Your API has been successfully imported into APIMatic with ID: 123nhjkh123
 ```
 
-_See code: [src/commands/api/import.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/import.ts)_
+_See code: [src/commands/api/import.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/api/import.ts)_
 
 ## `apimatic api:set`
 
@@ -87,7 +88,7 @@ OPTIONS
   --status                 show currently set API Entity
 ```
 
-_See code: [src/commands/api/set.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/set.ts)_
+_See code: [src/commands/api/set.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/api/set.ts)_
 
 ## `apimatic api:transform`
 
@@ -99,6 +100,7 @@ USAGE
 
 OPTIONS
   -f, --force                overwrite if same file exist in the destination
+  --api-entity=api-entity    unique API Entity Id for the API to perform validation for
   --auth-key=auth-key        override current authentication state with an authentication key
   --destination=destination  [default: D:\Code\Backend\apimatic-cli] directory to download transformed file to
   --file=file                path to the API specification file to transform
@@ -118,7 +120,7 @@ EXAMPLES
   Success! Your transformed file is located at D:/swagger_raml.yaml
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/api/transform.ts)_
 
 ## `apimatic api:validate`
 
@@ -144,7 +146,7 @@ EXAMPLES
   Specification file provided is valid
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/api/validate.ts)_
 
 ## `apimatic auth:login`
 
@@ -168,7 +170,7 @@ EXAMPLES
   Authentication key successfully set
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/auth/login.ts)_
 
 ## `apimatic auth:logout`
 
@@ -183,7 +185,7 @@ EXAMPLE
   Logged out
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/auth/logout.ts)_
 
 ## `apimatic auth:status`
 
@@ -198,7 +200,7 @@ EXAMPLE
   Currently logged in as apimatic-client@gmail.com
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -260,7 +262,7 @@ EXAMPLE
   Your portal has been generated at D:/
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/generate.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/generate.ts)_
 
 ## `apimatic portal:publish`
 
@@ -279,23 +281,37 @@ EXAMPLE
   Your portal has been published successfully.
 ```
 
-_See code: [src/commands/portal/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/publish.ts)_
+_See code: [src/commands/portal/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/publish.ts)_
 
-## `apimatic portal:serve [FILE]`
+## `apimatic portal:scaffold`
 
-describe the command here
+Auto-create files needed to generate static portals with
 
 ```
 USAGE
-  $ apimatic portal:serve [FILE]
+  $ apimatic portal:scaffold
 
 OPTIONS
-  -f, --force
-  -h, --help       show CLI help
-  -n, --name=name  name to print
+  --folder=folder  (required) [default: D:\Code\Backend\apimatic-cli] Path to folder to scaffold portal source files
+  --port=port      [default: 8000] Port to serve portal on
 ```
 
-_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/serve.ts)_
+_See code: [src/commands/portal/scaffold.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/scaffold.ts)_
+
+## `apimatic portal:serve`
+
+Serve your portal locally to see what it looks like in real time
+
+```
+USAGE
+  $ apimatic portal:serve
+
+OPTIONS
+  --folder=folder  (required) [default: D:\Code\Backend\apimatic-cli] Path to portal folder to serve locally
+  --port=port      [default: 8000] Port to serve portal on
+```
+
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/serve.ts)_
 
 ## `apimatic portal:unpublish [FILE]`
 
@@ -314,7 +330,7 @@ EXAMPLE
   Your portal has been un-published.
 ```
 
-_See code: [src/commands/portal/unpublish.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/unpublish.ts)_
+_See code: [src/commands/portal/unpublish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/unpublish.ts)_
 
 ## `apimatic sdk:download`
 
@@ -333,7 +349,7 @@ OPTIONS
   --zip                      download the generated SDK as a .zip archive
 ```
 
-_See code: [src/commands/sdk/download.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/sdk/download.ts)_
+_See code: [src/commands/sdk/download.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/sdk/download.ts)_
 
 ## `apimatic sdk:generate`
 
@@ -352,9 +368,8 @@ OPTIONS
 
   --platform=platform        (required) language platform for sdk
                              Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT
-                             Legacy: CS_NET_STANDARD_LIB|CS_PORTABLE_NET_LIB|CS_UNIVERSAL_WINDOWS_PLATFORM_LIB|
-                             JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|
-                             TS_GENERIC_LIB
+                             Legacy: CS_NET_STANDARD_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GE
+                             NERIC_LIB|TS_GENERIC_LIB
 
   --url=url                  URL to the API specification to generate SDKs for. Can be used in place of the --file
                              option if the API specification is publicly available.
@@ -373,7 +388,7 @@ EXAMPLES
   Success! Your SDK is located at swagger_sdk_csharp
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/sdk/generate.ts)_
 
 ## `apimatic sdk:list`
 
@@ -389,5 +404,5 @@ OPTIONS
   --external               List all the SDKs generated externally with file or url
 ```
 
-_See code: [src/commands/sdk/list.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/sdk/list.ts)_
+_See code: [src/commands/sdk/list.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/sdk/list.ts)_
 <!-- commandsstop -->

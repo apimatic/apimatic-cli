@@ -7,14 +7,14 @@ import * as stripTags from "striptags";
 
 import { loggers, Paths, ValidationMessages } from "../types/utils";
 
-export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
+export const unzipFile = (stream: NodeJS.ReadableStream, destination: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     stream.pipe(unzipper.Extract({ path: destination }));
     stream.on("close", (error: Error) => {
       if (error) {
         reject(new Error("Couldn't extract the zip"));
       }
-      resolve("Extracted");
+      resolve();
     });
   });
 };
@@ -44,10 +44,19 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
  * return {string}
  */
 export const zipDirectory = async (sourcePath: string, destinationPath: string) => {
+  cli.action.start("Zipping folder");
+
+  if (sourcePath === destinationPath) {
+    throw new Error("Source and destination paths can't be the same");
+  }
   // Check if the directory exists for the user or not
   await fs.ensureDir(sourcePath);
 
   const zipPath = path.join(destinationPath, "target.zip");
+
+  if (await fs.pathExists(zipPath)) {
+    await deleteFile(zipPath);
+  }
   const output = fs.createWriteStream(zipPath);
   const archive = archiver("zip");
 
@@ -61,6 +70,7 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string) 
   archive.directory(sourcePath, false);
 
   await archive.finalize();
+  cli.action.stop();
   return zipPath;
 };
 
