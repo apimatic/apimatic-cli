@@ -3,7 +3,7 @@ export type GetImportParams = {
   url: string;
   replace: boolean;
   version: string | undefined;
-  "api-group": string;
-  "api-entity": string;
+  "api-group": string | undefined;
+  "api-entity": string | undefined;
   "auth-key": string | undefined;
 };

@@ -33,12 +33,10 @@ Your API has been successfully imported into APIMatic with ID: 123nhjkh123
       description: "version of the API to import"
     }),
     "api-entity": flags.string({
-      default: "",
       dependsOn: ["replace"],
       description: "API Entity ID of the API to be replaced"
     }),
     "api-group": flags.string({
-      default: "",
       dependsOn: ["version"],
       description: "API group ID to create a new version for"
     }),
