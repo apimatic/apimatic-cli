@@ -71,7 +71,11 @@ Your API has been successfully imported into APIMatic with ID: 123nhjkh123
           this.error((error as Error).message);
         }
       } else {
-        this.error(`${replaceHTML((error as Error).message)}`);
+        if ((error as ApiError).statusCode === 409 && (error as ApiError).body) {
+          this.error(replaceHTML(`${(error as ApiError).body}`));
+        } else {
+          this.error(`${replaceHTML((error as Error).message)}`);
+        }
       }
     }
   }
