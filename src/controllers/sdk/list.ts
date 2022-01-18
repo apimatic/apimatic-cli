@@ -38,5 +38,6 @@ export const getSdkList = async (
       )
     ];
   }
+
   return generations;
 };

@@ -1,5 +1,7 @@
-import { CodeGeneration } from "../../types/sdk/list";
+import { cli } from "cli-ux";
 import { Command, flags } from "@oclif/command";
+
+import { CodeGeneration } from "../../types/sdk/list";
 import { getSdkList } from "../../controllers/sdk/list";
 
 export default class SdkList extends Command {
@@ -21,6 +23,27 @@ export default class SdkList extends Command {
 
     const sdkList: CodeGeneration[] = await getSdkList(flags, this.config.configDir);
 
-    this.log(sdkList.join("\n"));
+    sdkList.length
+      ? cli.table(
+          sdkList,
+          {
+            "codegen-id": {
+              minWidth: 15,
+              get: (row: CodeGeneration) => row.id
+            },
+            template: {
+              minWidth: 10,
+              get: (row: CodeGeneration) => row.template
+            },
+            "api-entity": {
+              minWidth: 10,
+              get: (row: CodeGeneration) => row["api-entity"]
+            }
+          },
+          {
+            printLine: this.log
+          }
+        )
+      : this.log("No SDKs found");
   }
 }
