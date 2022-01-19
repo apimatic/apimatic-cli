@@ -73,6 +73,8 @@ Your API has been successfully imported into APIMatic with ID: 123nhjkh123
       } else {
         if ((error as ApiError).statusCode === 409 && (error as ApiError).body) {
           this.error(replaceHTML(`${(error as ApiError).body}`));
+        } else if ((error as ApiError).statusCode === 404 && (error as ApiError).body) {
+          this.error("Couldn't find the API entity");
         } else {
           this.error(`${replaceHTML((error as Error).message)}`);
         }

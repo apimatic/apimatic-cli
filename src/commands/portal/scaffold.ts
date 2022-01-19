@@ -1,8 +1,8 @@
 import * as path from "path";
-
-import { Command, flags } from "@oclif/command";
-import { isJSONParsable, replaceHTML } from "../../utils/utils";
 import { AxiosError } from "axios";
+import { Command, flags } from "@oclif/command";
+
+import { isJSONParsable, replaceHTML } from "../../utils/utils";
 import { portalScaffold } from "../../controllers/portal/scaffold";
 
 export default class PortalScaffold extends Command {
@@ -13,8 +13,7 @@ export default class PortalScaffold extends Command {
       default: path.resolve("./"),
       required: true,
       description: "Path to folder to scaffold portal source files"
-    }),
-    port: flags.integer({ default: 8000, description: "Port to serve portal on" })
+    })
   };
 
   async run() {
