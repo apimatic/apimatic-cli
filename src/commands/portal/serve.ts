@@ -9,6 +9,15 @@ import { AxiosError } from "axios";
 export default class PortalServe extends Command {
   static description = "Serve your portal locally to see what it looks like in real time";
 
+  static examples = [
+    `$ apimatic portal:serve --folder="./portal/" --port=3000
+Serving portal at http://localhost:3000
+`,
+    `$ apimatic portal:serve --folder="./portal/"
+Serving portal at http://localhost:8000
+`
+  ];
+
   static flags = {
     folder: flags.string({
       default: path.resolve("./"),

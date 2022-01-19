@@ -8,6 +8,11 @@ import { portalScaffold } from "../../controllers/portal/scaffold";
 export default class PortalScaffold extends Command {
   static description = "Auto-create files needed to generate static portals with";
 
+  static examples = [
+    `$ apimatic portal:scaffold --folder="D:/"
+Portal scaffold completed at D:/
+`
+  ];
   static flags = {
     folder: flags.string({
       default: path.resolve("./"),
