@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as fs from "fs-extra";
+import { log } from "../../utils/log";
 
 import { flags, Command } from "@oclif/command";
 import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
@@ -83,14 +84,14 @@ ${formats}`
         warn: this.warn,
         error: this.error
       };
-      printValidationMessages(apiValidationSummary, logFunctions);
+      printValidationMessages(apiValidationSummary);
 
       const savedTransformationFile: string = await downloadTransformationFile({
         id,
         destinationFilePath,
         transformationController
       });
-      this.log(`Success! Your transformed file is located at ${savedTransformationFile}`);
+      log.success(`Success! Your transformed file is located at ${savedTransformationFile}`);
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
@@ -99,24 +100,24 @@ ${formats}`
         // updated to throw the right exception type for this status code.
         const result = apiError.result as Record<string, unknown> | undefined;
         if (apiError.statusCode === 422 && result && "errors" in result && Array.isArray(result.errors)) {
-          this.error(replaceHTML(`${result.errors}`));
+          log.error(replaceHTML(`${result.errors}`));
         } else if (apiError.statusCode === 422 && apiError.body && typeof apiError.body === "string") {
-          this.error(JSON.parse(apiError.body)["dto.FileUrl"][0]);
+          log.error(JSON.parse(apiError.body)["dto.FileUrl"][0]);
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error("You are not authorized to perform this action");
+          log.error("You are not authorized to perform this action");
         } else if (apiError.statusCode === 500) {
-          this.error(apiError.message);
+          log.error(apiError.message);
         }
       } else if ((error as AuthenticationError).statusCode === 401) {
-        this.error("You are not authorized to perform this action");
+        log.error("You are not authorized to perform this action");
       } else if (
         (error as AuthenticationError).statusCode === 402 &&
         (error as AuthenticationError).body &&
         typeof (error as AuthenticationError).body === "string"
       ) {
-        this.error((error as AuthenticationError).body);
+        log.error((error as AuthenticationError).body);
       } else {
-        this.error(`${(error as Error).message}`);
+        log.error(`${(error as Error).message}`);
       }
     }
   }

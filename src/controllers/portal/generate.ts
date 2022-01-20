@@ -17,6 +17,7 @@ const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey:
   const config: AxiosRequestConfig = {
     headers: {
       Authorization: authInfo || overrideAuthKey ? `X-Auth-Key ${authInfo?.authKey.trim() || overrideAuthKey}` : "",
+      "User-Agent": "APIMatic CLI",
       ...formData.getHeaders()
     },
     responseType: "arraybuffer"

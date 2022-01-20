@@ -1,3 +1,4 @@
+import { log } from "../../utils/log";
 import { Command } from "@oclif/command";
 
 import { SDKClient } from "../../client-utils/sdk-client";
@@ -16,9 +17,9 @@ Currently logged in as apimatic-client@gmail.com
       const client = SDKClient.getInstance();
       const response = await client.status(this.config.configDir);
 
-      this.log(response);
+      log.success(response);
     } catch (error) {
-      this.error(error as string);
+      log.error(error as string);
     }
   }
 }

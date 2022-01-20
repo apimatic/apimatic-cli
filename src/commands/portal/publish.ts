@@ -1,3 +1,4 @@
+import { log } from "../../utils/log";
 import { Command, flags } from "@oclif/command";
 import { ApiError, Client, DocsPortalManagementController } from "@apimatic/sdk";
 
@@ -34,7 +35,7 @@ Your portal has been published successfully.
 
       await publishDocsPortal(docsPortalController, flags["api-entity"]);
 
-      this.log(`Your portal has been re-published successfully.`);
+      log.success(`Your portal has been re-published successfully.`);
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
@@ -42,32 +43,32 @@ Your portal has been published successfully.
         if (apiError.statusCode === 400 && isJSONParsable(result.message)) {
           const errors = JSON.parse(result.message);
           if (Array.isArray(errors.Errors) && apiError.statusCode === 400) {
-            this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
+            log.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
           }
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error(apiError.body);
+          log.error(apiError.body);
         } else if (
           apiError.statusCode === 500 &&
           apiError.body &&
           typeof apiError.body === "string" &&
           isJSONParsable(apiError.body)
         ) {
-          this.error(JSON.parse(apiError.body).message);
+          log.error(JSON.parse(apiError.body).message);
         } else if (
           apiError.statusCode === 422 &&
           apiError.body &&
           typeof apiError.body === "string" &&
           isJSONParsable(apiError.body)
         ) {
-          this.error(JSON.parse(apiError.body)["dto.Url"][0]);
+          log.error(JSON.parse(apiError.body)["dto.Url"][0]);
         } else {
-          this.error(replaceHTML(result.message));
+          log.error(replaceHTML(result.message));
         }
       } else {
         if ((error as ApiError).statusCode === 404) {
-          this.error("Couldn't find portal for the API Entity specified");
+          log.error("Couldn't find portal for the API Entity specified");
         } else {
-          this.error(`${(error as Error).message}`);
+          log.error(`${(error as Error).message}`);
         }
       }
     }

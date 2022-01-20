@@ -1,3 +1,10 @@
+# [1.1.0-alpha.3](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.2...v1.1.0-alpha.3) (2022-01-19)
+
+
+### Features
+
+* **usage tracking:** update sdk to send cli user agent for tracking ([768c60b](https://github.com/apimatic/apimatic-cli/commit/768c60b14a7fac3b824d4178697971ecf9d431b2))
+
 # [1.1.0-alpha.2](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.1...v1.1.0-alpha.2) (2022-01-06)
 
 

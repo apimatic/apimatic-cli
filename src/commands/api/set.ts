@@ -1,3 +1,4 @@
+import { log } from "../../utils/log";
 import { Command, flags } from "@oclif/command";
 import { getAPIEntity, setAPIEntity } from "../../client-utils/auth-manager";
 
@@ -20,13 +21,13 @@ export default class ApiSet extends Command {
     try {
       if (!flags.status) {
         const response = await setAPIEntity(flags, this.config.configDir);
-        this.log(response);
+        log.success(response);
       } else {
         const apiEntityId: string | undefined = await getAPIEntity(this.config.configDir);
-        this.log(apiEntityId ? `API Entity currently set is ${apiEntityId}` : "No API Entity set");
+        log.success(apiEntityId ? `API Entity currently set is ${apiEntityId}` : "No API Entity set");
       }
     } catch (error) {
-      this.error((error as Error).message);
+      log.error((error as Error).message);
     }
   }
 }

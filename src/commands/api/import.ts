@@ -3,10 +3,10 @@ import * as fs from "fs-extra";
 import { flags, Command } from "@oclif/command";
 import { ApiEntity, ApiError } from "@apimatic/sdk";
 
-import { replaceHTML } from "../../utils/utils";
+import { printValidationMessages, replaceHTML } from "../../utils/utils";
 import { importAPISpec } from "../../controllers/api/import";
-import { printValidationMessages } from "../../controllers/api/import";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate";
+import { log } from "../../utils/log";
 
 export default class Import extends Command {
   static description = "Import your API specification into APIMatic";
@@ -54,9 +54,9 @@ Your API has been successfully imported into APIMatic with ID: 123nhjkh123
 
       const summary: ApiEntity | undefined = await importAPISpec(flags, this.config.configDir);
 
-      if (summary) printValidationMessages(summary.metaData.importValidationSummary, this.warn, this.error);
+      if (summary) printValidationMessages(summary.metaData.importValidationSummary);
 
-      this.log(
+      log.success(
         `Your API has been successfully imported into APIMatic with ID: ${summary ? summary.id : flags["api-entity"]}`
       );
     } catch (error) {
@@ -64,19 +64,19 @@ Your API has been successfully imported into APIMatic with ID: 123nhjkh123
         const apiError = error as ApiError;
         const result = apiError.result as APIValidateError;
         if (result.modelState["exception Error"] && apiError.statusCode === 400) {
-          this.error(replaceHTML(result.modelState["exception Error"][0]));
+          log.error(replaceHTML(result.modelState["exception Error"][0]));
         } else if ((error as AuthorizationError).body && apiError.statusCode === 401) {
-          this.error((error as AuthorizationError).body);
+          log.error((error as AuthorizationError).body);
         } else {
-          this.error((error as Error).message);
+          log.error((error as Error).message);
         }
       } else {
         if ((error as ApiError).statusCode === 409 && (error as ApiError).body) {
-          this.error(replaceHTML(`${(error as ApiError).body}`));
+          log.error(replaceHTML(`${(error as ApiError).body}`));
         } else if ((error as ApiError).statusCode === 404 && (error as ApiError).body) {
-          this.error("Couldn't find the API entity");
+          log.error("Couldn't find the API entity");
         } else {
-          this.error(`${replaceHTML((error as Error).message)}`);
+          log.error(`${replaceHTML((error as Error).message)}`);
         }
       }
     }

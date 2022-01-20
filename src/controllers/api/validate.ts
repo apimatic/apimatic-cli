@@ -11,6 +11,7 @@ import {
 } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { getAPIEntity } from "../../client-utils/auth-manager";
+import { log } from "../../utils/log";
 
 export const getValidation = async (
   { file, url, "api-entity": apiEntityId, "auth-key": authKey }: GetValidationParams,
@@ -32,12 +33,12 @@ export const getValidation = async (
   }
 
   apiEntityId
-    ? console.log(`Using API Entity ID: ${apiEntityId}`)
+    ? log.info(`Using API Entity ID: ${apiEntityId}`)
     : file
-    ? console.log(`Using file at ${file}`)
+    ? log.info(`Using file at ${file}`)
     : url
-    ? console.log(`Using URL: ${url}`)
-    : console.log(`Using stored API Entity ID: ${storedAPIEntityId}`);
+    ? log.info(`Using URL: ${url}`)
+    : log.info(`Using stored API Entity ID: ${storedAPIEntityId}`);
 
   if (apiEntityId) {
     validation = await internalAPIController.validateAPI(apiEntityId);

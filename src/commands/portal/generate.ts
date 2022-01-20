@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as fs from "fs-extra";
+import { log } from "../../utils/log";
 
 import { Command, flags } from "@oclif/command";
 
@@ -72,7 +73,7 @@ Your portal has been generated at D:/
 
       const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams, this.config.configDir);
 
-      this.log(`Your portal has been generated at ${generatedPortalPath}`);
+      log.success(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error) {
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
@@ -85,28 +86,28 @@ Your portal has been generated at D:/
             const nestedErrors = JSON.parse(responseData);
 
             if (nestedErrors.error) {
-              return this.error(replaceHTML(nestedErrors.error));
+              return log.error(replaceHTML(nestedErrors.error));
             } else if (nestedErrors.message) {
-              return this.error(replaceHTML(nestedErrors.message));
+              return log.error(replaceHTML(nestedErrors.message));
             }
           } else if (apiResponse.status === 401 && responseData.length > 0) {
-            this.error("You are not authorized to perform this action");
+            log.error("You are not authorized to perform this action");
           } else if (apiResponse.status === 403 && apiResponse.statusText) {
-            return this.error("Your subscription does not allow on premise portal generation");
+            return log.error("Your subscription does not allow on premise portal generation");
           } else {
-            return this.error(apiError.message);
+            return log.error(apiError.message);
           }
         }
       } else if ((error as AuthenticationError).statusCode === 401) {
-        this.error("You are not authorized to perform this action");
+        log.error("You are not authorized to perform this action");
       } else if (
         (error as AuthenticationError).statusCode === 402 &&
         (error as AuthenticationError).body &&
         typeof (error as AuthenticationError).body === "string"
       ) {
-        this.error((error as AuthenticationError).body);
+        log.error((error as AuthenticationError).body);
       } else {
-        this.error(`${(error as Error).message}`);
+        log.error(`${(error as Error).message}`);
       }
     }
   }

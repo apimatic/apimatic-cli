@@ -1,9 +1,10 @@
 import * as fs from "fs-extra";
+import { log } from "../../utils/log";
 
 import { flags, Command } from "@oclif/command";
 import { ApiError, ApiValidationSummary } from "@apimatic/sdk";
 
-import { AuthenticationError, loggers } from "../../types/utils";
+import { AuthenticationError } from "../../types/utils";
 import { getValidation } from "../../controllers/api/validate";
 import { printValidationMessages, replaceHTML } from "../../utils/utils";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate";
@@ -41,40 +42,35 @@ Specification file provided is valid
       }
 
       const validationSummary: ApiValidationSummary = await getValidation(flags, this.config.configDir);
-      const logFunctions: loggers = {
-        log: this.log,
-        warn: this.warn,
-        error: this.error
-      };
-      printValidationMessages(validationSummary, logFunctions);
+      printValidationMessages(validationSummary);
 
       validationSummary.success
-        ? this.log("Specification file provided is valid")
-        : this.error("Specification file provided is invalid");
+        ? log.success("Specification file provided is valid")
+        : log.error("Specification file provided is invalid");
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as APIValidateError;
         if (result.modelState["exception Error"] && apiError.statusCode === 400) {
-          this.error(replaceHTML(result.modelState["exception Error"][0]));
+          log.error(replaceHTML(result.modelState["exception Error"][0]));
         } else if ((error as AuthorizationError).body && apiError.statusCode === 401) {
-          this.error("You are not authorized to perform this action");
+          log.error("You are not authorized to perform this action");
         } else {
-          this.error((error as Error).message);
+          log.error((error as Error).message);
         }
       } else if ((error as AuthenticationError).statusCode === 401) {
-        this.error("You are not authorized to perform this action");
+        log.error("You are not authorized to perform this action");
       } else if (
         (error as AuthenticationError).statusCode === 402 &&
         (error as AuthenticationError).body &&
         typeof (error as AuthenticationError).body === "string"
       ) {
-        this.error((error as AuthenticationError).body);
+        log.error((error as AuthenticationError).body);
       } else {
         if ((error as ApiError).statusCode === 404) {
-          this.error("Couldn't find the API Entity specified");
+          log.error("Couldn't find the API Entity specified");
         } else {
-          this.error(`${(error as Error).message}`);
+          log.error(`${(error as Error).message}`);
         }
       }
     }

@@ -4,6 +4,7 @@ import { flags, Command } from "@oclif/command";
 
 import { replaceHTML } from "../../utils/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
+import { log } from "../../utils/log";
 
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";
@@ -40,7 +41,7 @@ Authentication key successfully set`
       }
       const response: string = await client.login({ email, password, ...flags }, configDir);
 
-      this.log(response);
+      log.success(response);
     } catch (error) {
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
@@ -50,13 +51,13 @@ Authentication key successfully set`
           const responseData = apiResponse.data;
 
           if (apiResponse.status === 403 && responseData) {
-            return this.error(replaceHTML(responseData));
+            return log.error(replaceHTML(responseData));
           } else {
-            return this.error(apiError.message);
+            return log.error(apiError.message);
           }
         }
       }
-      this.error((error as Error).message);
+      log.error((error as Error).message);
     }
   }
 }

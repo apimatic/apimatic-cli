@@ -1,4 +1,5 @@
 import { cli } from "cli-ux";
+import { log } from "../../utils/log";
 import { Command, flags } from "@oclif/command";
 
 import { CodeGeneration } from "../../types/sdk/list";
@@ -44,6 +45,6 @@ export default class SdkList extends Command {
             printLine: this.log
           }
         )
-      : this.log("No SDKs found");
+      : log.info("No SDKs found");
   }
 }

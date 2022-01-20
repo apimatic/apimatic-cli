@@ -1,4 +1,5 @@
 import * as path from "path";
+import { log } from "../../utils/log";
 
 import { Command, flags } from "@oclif/command";
 import { downloadGeneratedSDK } from "../../controllers/sdk/download";
@@ -34,7 +35,7 @@ export default class SdkDownload extends Command {
 
     try {
       const sdkPath: string = await downloadGeneratedSDK(flags, this.config.configDir);
-      this.log(`Success! Your SDK is located at ${sdkPath}`);
+      log.success(`Success! Your SDK is located at ${sdkPath}`);
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
@@ -42,34 +43,34 @@ export default class SdkDownload extends Command {
         if (apiError.statusCode === 400 && isJSONParsable(result.message)) {
           const errors = JSON.parse(result.message);
           if (Array.isArray(errors.Errors) && apiError.statusCode === 400) {
-            this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
+            log.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
           }
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error(apiError.body);
+          log.error(apiError.body);
         } else if (
           apiError.statusCode === 500 &&
           apiError.body &&
           typeof apiError.body === "string" &&
           isJSONParsable(apiError.body)
         ) {
-          this.error(JSON.parse(apiError.body).message);
+          log.error(JSON.parse(apiError.body).message);
         } else if (
           apiError.statusCode === 422 &&
           apiError.body &&
           typeof apiError.body === "string" &&
           isJSONParsable(apiError.body)
         ) {
-          this.error(JSON.parse(apiError.body)["dto.Url"][0]);
+          log.error(JSON.parse(apiError.body)["dto.Url"][0]);
         } else {
-          this.error(replaceHTML(result.message));
+          log.error(replaceHTML(result.message));
         }
       } else {
         if ((error as ApiError).statusCode === 404) {
-          this.error(
+          log.error(
             "Couldn't find the API Entity or CodeGen Id or CodeGen Id doesn't exist for provided API Entity specified"
           );
         } else {
-          this.error(`${(error as Error).message}`);
+          log.error(`${(error as Error).message}`);
         }
       }
     }

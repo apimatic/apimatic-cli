@@ -1,19 +1,8 @@
 import cli from "cli-ux";
 import * as fs from "fs-extra";
-import Command from "@oclif/command";
 
-import {
-  Accept,
-  Accept2,
-  ApiEntity,
-  ApiResponse,
-  ApisManagementController,
-  Client,
-  FileWrapper,
-  ImportValidationSummary
-} from "@apimatic/sdk";
+import { Accept, Accept2, ApiEntity, ApiResponse, ApisManagementController, Client, FileWrapper } from "@apimatic/sdk";
 import { GetImportParams } from "../../types/api/import";
-import { replaceHTML } from "../../utils/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
 
 export const importAPISpec = async (
@@ -69,18 +58,4 @@ export const importAPISpec = async (
   }
   cli.action.stop();
   return response?.result;
-};
-
-export const printValidationMessages = (
-  { warnings, errors }: ImportValidationSummary,
-  warn: Command["warn"],
-  error: Command["error"]
-) => {
-  warnings.forEach((warning) => {
-    warn(`${replaceHTML(warning)}`);
-  });
-  if (errors.length > 0) {
-    const singleLineError: string = errors.join("\n");
-    error(replaceHTML(singleLineError));
-  }
 };

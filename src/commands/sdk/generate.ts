@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as fs from "fs-extra";
+import { log } from "../../utils/log";
 
 import { Command, flags } from "@oclif/command";
 import { ApiError } from "@apimatic/sdk";
@@ -80,7 +81,7 @@ Success! Your SDK is located at swagger_sdk_csharp
         ...flags
       };
       const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, this.config.configDir);
-      this.log(`Success! Your SDK is located at ${sdkPath}`);
+      log.success(`Success! Your SDK is located at ${sdkPath}`);
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
@@ -88,40 +89,40 @@ Success! Your SDK is located at swagger_sdk_csharp
         if (apiError.statusCode === 400 && isJSONParsable(result.message)) {
           const errors = JSON.parse(result.message);
           if (Array.isArray(errors.Errors) && apiError.statusCode === 400) {
-            this.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
+            log.error(replaceHTML(`${JSON.parse(result.message).Errors[0]}`));
           }
         } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error("You are not authorized to perform this action");
+          log.error("You are not authorized to perform this action");
         } else if (
           apiError.statusCode === 500 &&
           apiError.body &&
           typeof apiError.body === "string" &&
           isJSONParsable(apiError.body)
         ) {
-          this.error(JSON.parse(apiError.body).message);
+          log.error(JSON.parse(apiError.body).message);
         } else if (
           apiError.statusCode === 422 &&
           apiError.body &&
           typeof apiError.body === "string" &&
           isJSONParsable(apiError.body)
         ) {
-          this.error(JSON.parse(apiError.body)["dto.Url"][0]);
+          log.error(JSON.parse(apiError.body)["dto.Url"][0]);
         } else {
-          this.error(replaceHTML(result.message));
+          log.error(replaceHTML(result.message));
         }
       } else if ((error as AuthenticationError).statusCode === 401) {
-        this.error("You are not authorized to perform this action");
+        log.error("You are not authorized to perform this action");
       } else if (
         (error as AuthenticationError).statusCode === 402 &&
         (error as AuthenticationError).body &&
         typeof (error as AuthenticationError).body === "string"
       ) {
-        this.error(replaceHTML((error as AuthenticationError).body));
+        log.error(replaceHTML((error as AuthenticationError).body));
       } else {
         if ((error as ApiError).statusCode === 404) {
-          this.error("Couldn't find the API Entity specified");
+          log.error("Couldn't find the API Entity specified");
         } else {
-          this.error(`${(error as Error).message}`);
+          log.error(`${(error as Error).message}`);
         }
       }
     }

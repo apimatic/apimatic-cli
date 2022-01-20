@@ -5,6 +5,7 @@ import { serveSourceFolder } from "../../controllers/portal/serve";
 import { PortalFolders } from "../../types/portal/serve";
 import { isJSONParsable, replaceHTML } from "../../utils/utils";
 import { AxiosError } from "axios";
+import { log } from "../../utils/log";
 
 export default class PortalServe extends Command {
   static description = "Serve your portal locally to see what it looks like in real time";
@@ -47,20 +48,20 @@ Serving portal at http://localhost:8000
             const nestedErrors = JSON.parse(responseData);
 
             if (nestedErrors.error) {
-              return this.error(replaceHTML(nestedErrors.error));
+              return log.error(replaceHTML(nestedErrors.error));
             } else if (nestedErrors.message) {
-              return this.error(replaceHTML(nestedErrors.message));
+              return log.error(replaceHTML(nestedErrors.message));
             }
           } else if (apiResponse.status === 401 && responseData.length > 0) {
-            this.error(replaceHTML(responseData));
+            log.error(replaceHTML(responseData));
           } else if (apiResponse.status === 403 && apiResponse.statusText) {
-            return this.error(replaceHTML(apiResponse.statusText));
+            return log.error(replaceHTML(apiResponse.statusText));
           } else {
-            return this.error(apiError.message);
+            return log.error(apiError.message);
           }
         }
       } else {
-        this.error(`${(error as Error).message}`);
+        log.error(`${(error as Error).message}`);
       }
     }
   }

@@ -5,7 +5,8 @@ import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import * as stripTags from "striptags";
 
-import { loggers, Paths, ValidationMessages } from "../types/utils";
+import { Paths, ValidationMessages } from "../types/utils";
+import { log } from "./log";
 
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -140,21 +141,17 @@ export const getFileNameFromFlags = ({ file, url, "api-entity": apiEntityId }: P
     : path.basename(url).split(".")[0];
 };
 
-export const printValidationMessages = (
-  { warnings, errors, messages }: ValidationMessages,
-  { log, warn, error }: loggers
-) => {
+export const printValidationMessages = ({ warnings, errors, messages }: ValidationMessages) => {
   warnings = warnings || [];
   messages = messages || [];
-  const singleError: string = errors.join("\n") || "";
 
   messages.forEach((message) => {
-    log(`Info: ${replaceHTML(message)}`);
+    log.info(`${replaceHTML(message)}`);
   });
   warnings.forEach((warning) => {
-    warn(replaceHTML(warning));
+    log.warn(replaceHTML(warning));
   });
-  if (errors.length > 0) {
-    error(replaceHTML(singleError));
-  }
+  errors.forEach((error) => {
+    log.error(replaceHTML(error));
+  });
 };
