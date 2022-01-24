@@ -10,6 +10,11 @@ import { SDKGenerateUnprocessableError } from "../../types/sdk/generate";
 export default class SdkDownload extends Command {
   static description = "Download a SDK with its code generation ID";
 
+  static examples = [
+    `$ apimatic sdk:download --codegen-id="12378912hd893" --api-entity="asdkljj3920dj9j"
+Your portal has been generated at D:/
+`
+  ];
   static flags = {
     destination: flags.string({
       parse: (input) => path.resolve(input),

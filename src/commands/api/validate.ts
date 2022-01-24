@@ -18,6 +18,9 @@ Specification file provided is valid
 `,
     `$ apimatic api:validate --url=https://petstore.swagger.io/v2/swagger.json
 Specification file provided is valid
+`,
+    `$ apimatic api:validate --api-entity 123nhjkh123
+Specification file provided is valid
 `
   ];
 

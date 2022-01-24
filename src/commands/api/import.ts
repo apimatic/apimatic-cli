@@ -14,6 +14,12 @@ export default class Import extends Command {
   static examples = [
     `$ apimatic api:import --file="./specs/sample.json"
 Your API has been successfully imported into APIMatic with ID: 123nhjkh123
+`,
+    `$ apimatic api:import --file="./specs/sample.json" --api-entity=123nhjkh123 --replace
+Your API has been successfully imported into APIMatic with ID: 123nhjkh123
+`,
+    `$ apimatic api:import --file="./specs/sample.json" --api-group=123nhjkh123 --version 1.1.1
+Your API has been successfully imported into APIMatic with ID: 123nhjkh123
 `
   ];
 

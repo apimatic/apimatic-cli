@@ -4,7 +4,17 @@ import { getAPIEntity, setAPIEntity } from "../../client-utils/auth-manager";
 
 export default class ApiSet extends Command {
   static description = "Set a single API Entity Id globally for all the API Entity related commands";
-
+  static examples = [
+    `$ apimatic api:set --api-entity="123nhjkh123"
+API Entity has been set successfully
+  `,
+    `$ apimatic api:set --status"
+API Entity currently set is 123nhjkh123
+  `,
+    `$ apimatic api:set --clear"
+API Entity has been cleared
+`
+  ];
   static flags = {
     status: flags.boolean({
       default: false,

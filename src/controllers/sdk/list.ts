@@ -21,7 +21,6 @@ export const getSdkList = async (
 
   if (external) {
     const externalGenerations: UserCodeGeneration[] = (await sdkExternalController.listAllCodeGenerations()).result;
-
     generations = [
       ...externalGenerations.map(({ id, template, inputFile }) => ({ id, template, inputFile }), ...generations)
     ];
