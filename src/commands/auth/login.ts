@@ -1,6 +1,7 @@
 import { cli } from "cli-ux";
 import { AxiosError } from "axios";
-import { flags, Command } from "@oclif/command";
+import { flags } from "@oclif/command";
+import Command from "../../base";
 
 import { replaceHTML } from "../../utils/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
@@ -45,6 +46,8 @@ Authentication key successfully set`
         this.log(response);
       }
     } catch (error) {
+      cli.action.stop("failed");
+
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
         const apiResponse = apiError.response;

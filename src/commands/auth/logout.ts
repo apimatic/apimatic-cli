@@ -1,4 +1,5 @@
-import { Command } from "@oclif/command";
+import cli from "cli-ux";
+import Command from "../../base";
 
 import { SDKClient } from "../../client-utils/sdk-client";
 
@@ -18,6 +19,8 @@ Logged out
 
       this.log(response);
     } catch (error) {
+      cli.action.stop("failed");
+
       this.error(error as string);
     }
   }

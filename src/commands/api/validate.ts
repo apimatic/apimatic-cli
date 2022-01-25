@@ -1,6 +1,8 @@
+import cli from "cli-ux";
 import * as fs from "fs-extra";
 
-import { flags, Command } from "@oclif/command";
+import { flags } from "@oclif/command";
+import Command from "../../base";
 import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils";
@@ -58,6 +60,8 @@ Specification file provided is valid
         ? this.log("Specification file provided is valid")
         : this.error("Specification file provided is invalid");
     } catch (error) {
+      cli.action.stop("failed");
+
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as APIValidateError;

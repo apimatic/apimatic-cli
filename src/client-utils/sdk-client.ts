@@ -1,3 +1,4 @@
+import cli from "cli-ux";
 import * as base64 from "base-64";
 import axios, { AxiosResponse } from "axios";
 
@@ -97,6 +98,8 @@ export class SDKClient {
         ? "Logged in with authentication key"
         : `Currently logged in as ${storedAuthInfo.email}`;
     } catch (error) {
+      cli.action.stop("failed");
+
       throw error as Error;
     }
   }

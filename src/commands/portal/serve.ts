@@ -1,11 +1,13 @@
+import cli from "cli-ux";
 import * as path from "path";
+import * as fs from "fs-extra";
 
-import { Command, flags } from "@oclif/command";
+import Command from "../../base";
+import { flags } from "@oclif/command";
 import { serveSourceFolder } from "../../controllers/portal/serve";
 import { PortalFolders } from "../../types/portal/serve";
 import { isJSONParsable, replaceHTML } from "../../utils/utils";
 import { AxiosError } from "axios";
-import { log } from "../../utils/log";
 
 export default class PortalServe extends Command {
   static description = "Serve your portal locally to see what it looks like in real time";
@@ -35,8 +37,13 @@ Serving portal at http://localhost:8000
     const port = flags.port;
 
     try {
+      if (!(await fs.pathExists(flags.folder))) {
+        throw new Error(`Source folder path ${flags.folder} does not exist`);
+      }
       await serveSourceFolder({ folders, configDir: this.config.configDir, port });
     } catch (error) {
+      cli.action.stop("failed");
+
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
         const apiResponse = apiError.response;
@@ -48,20 +55,24 @@ Serving portal at http://localhost:8000
             const nestedErrors = JSON.parse(responseData);
 
             if (nestedErrors.error) {
-              return log.error(replaceHTML(nestedErrors.error));
+              return this.error(replaceHTML(nestedErrors.error));
             } else if (nestedErrors.message) {
-              return log.error(replaceHTML(nestedErrors.message));
+              return this.error(replaceHTML(nestedErrors.message));
             }
           } else if (apiResponse.status === 401 && responseData.length > 0) {
-            log.error(replaceHTML(responseData));
+            this.error(replaceHTML(responseData));
+          } else if (apiResponse.status === 402 && responseData.length > 0 && isJSONParsable(responseData)) {
+            this.error(replaceHTML(JSON.parse(responseData).error));
           } else if (apiResponse.status === 403 && apiResponse.statusText) {
-            return log.error(replaceHTML(apiResponse.statusText));
+            return this.error(replaceHTML(apiResponse.statusText));
+          } else if (apiResponse.status === 500 && apiResponse.statusText) {
+            return this.error(replaceHTML(apiResponse.statusText));
           } else {
-            return log.error(apiError.message);
+            return this.error(apiError.message);
           }
         }
       } else {
-        log.error(`${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }
