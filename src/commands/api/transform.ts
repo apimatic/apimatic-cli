@@ -1,8 +1,10 @@
+import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
 import { log } from "../../utils/log";
 
-import { flags, Command } from "@oclif/command";
+import Command from "../../base";
+import { flags } from "@oclif/command";
 import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils";
@@ -93,6 +95,8 @@ ${formats}`
       });
       log.success(`Success! Your transformed file is located at ${savedTransformationFile}`);
     } catch (error) {
+      cli.action.stop("failed");
+
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
 

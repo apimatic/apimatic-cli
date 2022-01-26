@@ -1,8 +1,9 @@
+import cli from "cli-ux";
 import * as path from "path";
+import Command from "../../base";
 import { AxiosError } from "axios";
 import { log } from "../../utils/log";
-import { Command, flags } from "@oclif/command";
-
+import { flags } from "@oclif/command";
 import { isJSONParsable, replaceHTML } from "../../utils/utils";
 import { portalScaffold } from "../../controllers/portal/scaffold";
 
@@ -29,6 +30,8 @@ Portal scaffold completed at D:/
       const response = await portalScaffold(flags.folder);
       log.success(response);
     } catch (error) {
+      cli.action.stop("failed");
+
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
         const apiResponse = apiError.response;
@@ -40,20 +43,20 @@ Portal scaffold completed at D:/
             const nestedErrors = JSON.parse(responseData);
 
             if (nestedErrors.error) {
-              return log.error(replaceHTML(nestedErrors.error));
+              return this.error(replaceHTML(nestedErrors.error));
             } else if (nestedErrors.message) {
-              return log.error(replaceHTML(nestedErrors.message));
+              return this.error(replaceHTML(nestedErrors.message));
             }
           } else if (apiResponse.status === 401 && responseData.length > 0) {
-            log.error(replaceHTML(responseData));
+            this.error(replaceHTML(responseData));
           } else if (apiResponse.status === 403 && apiResponse.statusText) {
-            return log.error(replaceHTML(apiResponse.statusText));
+            return this.error(replaceHTML(apiResponse.statusText));
           } else {
-            return log.error(apiError.message);
+            return this.error(apiError.message);
           }
         }
       } else {
-        log.error(`${(error as Error).message}`);
+        this.error(`${(error as Error).message}`);
       }
     }
   }

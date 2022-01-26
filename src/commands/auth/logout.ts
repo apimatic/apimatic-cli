@@ -1,5 +1,5 @@
-import { log } from "../../utils/log";
-import { Command } from "@oclif/command";
+import cli from "cli-ux";
+import Command from "../../base";
 
 import { SDKClient } from "../../client-utils/sdk-client";
 
@@ -17,9 +17,11 @@ Logged out
       const client = SDKClient.getInstance();
       const response = await client.logout(this.config.configDir);
 
-      log.success(response);
+      this.success(response);
     } catch (error) {
-      log.error(error as string);
+      cli.action.stop("failed");
+
+      this.error(error as string);
     }
   }
 }

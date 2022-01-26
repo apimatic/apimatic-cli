@@ -102,6 +102,8 @@ export class SDKClient {
         ? "Logged in with authentication key"
         : `Currently logged in as ${storedAuthInfo.email}`;
     } catch (error) {
+      cli.action.stop("failed");
+
       throw error as Error;
     }
   }

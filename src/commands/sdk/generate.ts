@@ -1,8 +1,10 @@
+import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
 import { log } from "../../utils/log";
 
-import { Command, flags } from "@oclif/command";
+import Command from "../../base";
+import { flags } from "@oclif/command";
 import { ApiError } from "@apimatic/sdk";
 
 import { replaceHTML, isJSONParsable } from "../../utils/utils";
@@ -84,6 +86,8 @@ Success! Your SDK is located at swagger_sdk_csharp
       const sdkPath: string = await downloadGeneratedSDK(sdkDownloadParams, this.config.configDir);
       log.success(`Success! Your SDK is located at ${sdkPath}`);
     } catch (error) {
+      cli.action.stop("failed");
+
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as SDKGenerateUnprocessableError;

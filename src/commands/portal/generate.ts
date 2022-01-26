@@ -1,9 +1,10 @@
+import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
 import { log } from "../../utils/log";
 
-import { Command, flags } from "@oclif/command";
-
+import Command from "../../base";
+import { flags } from "@oclif/command";
 import { AxiosError } from "axios";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
@@ -49,14 +50,14 @@ Your portal has been generated at D:/
     const overrideAuthKey: string | null = flags["auth-key"] ? flags["auth-key"] : null;
 
     // Check if at destination, portal already exists and throw error if force flag is not set for both zip and extracted
-    if (fs.existsSync(portalFolderPath) && !flags.force && !zip) {
+    if ((await fs.pathExists(portalFolderPath)) && !flags.force && !zip) {
       throw new Error(`Can't download portal to path ${portalFolderPath}, because it already exists`);
-    } else if (fs.existsSync(zippedPortalPath) && !flags.force && zip) {
+    } else if ((await fs.pathExists(zippedPortalPath)) && !flags.force && zip) {
       throw new Error(`Can't download portal to path ${zippedPortalPath}, because it already exists`);
     }
     try {
       if (!(await fs.pathExists(flags.destination))) {
-        throw new Error(`Destination path ${flags.destination} does not exist`);
+        await fs.ensureDir(flags.destination);
       } else if (!(await fs.pathExists(flags.folder))) {
         throw new Error(`Portal build folder ${flags.folder} does not exist`);
       }
@@ -75,6 +76,8 @@ Your portal has been generated at D:/
 
       log.success(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error) {
+      cli.action.stop("failed");
+
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
         const apiResponse = apiError.response;

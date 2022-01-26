@@ -51,7 +51,9 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string) 
     throw new Error("Source and destination paths can't be the same");
   }
   // Check if the directory exists for the user or not
-  await fs.ensureDir(sourcePath);
+  if (!(await fs.pathExists(sourcePath))) {
+    throw new Error("Couldn't find the directory to zip");
+  }
 
   const zipPath = path.join(destinationPath, "target.zip");
 

@@ -1,11 +1,13 @@
+import cli from "cli-ux";
 import * as fs from "fs-extra";
 import { log } from "../../utils/log";
 
-import { flags, Command } from "@oclif/command";
+import Command from "../../base";
+import { flags } from "@oclif/command";
 import { ApiError, ApiValidationSummary } from "@apimatic/sdk";
 
-import { AuthenticationError } from "../../types/utils";
 import { getValidation } from "../../controllers/api/validate";
+import { AuthenticationError } from "../../types/utils";
 import { printValidationMessages, replaceHTML } from "../../utils/utils";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate";
 
@@ -51,6 +53,8 @@ Specification file provided is valid
         ? log.success("Specification file provided is valid")
         : log.error("Specification file provided is invalid");
     } catch (error) {
+      cli.action.stop("failed");
+
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
         const result = apiError.result as APIValidateError;
