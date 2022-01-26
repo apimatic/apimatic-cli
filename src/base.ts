@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import cli from "cli-ux";
 import { log } from "./utils/log";
 import { Command } from "@oclif/command";
 import { PrettyPrintableError } from "@oclif/errors";
@@ -23,8 +24,9 @@ export default abstract class extends Command {
     msg instanceof Error ? log.error(msg.message) : log.error(msg);
   }
 
-  async catch(err: unknown) {
-    return super.catch(err);
+  async catch(err: Error) {
+    cli.action.stop("failed");
+    return log.error(err.message);
   }
   async finally() {
     // called after run and catch regardless of whether or not the command errored
