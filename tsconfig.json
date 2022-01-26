@@ -3,6 +3,7 @@
     "declaration": true,
     "importHelpers": true,
     "skipLibCheck": true,
+    "composite": true,
     "module": "commonjs",
     "outDir": "lib",
     "rootDir": "src",
