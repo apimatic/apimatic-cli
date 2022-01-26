@@ -41,7 +41,7 @@ const portalChangeHandler = async (folders: PortalFolders, configDir: string) =>
 
 const servePortal = async (folder: string, port: number) => {
   console.log("Serving portal at http://localhost:" + port);
-  exec(`http-server ${folder} --port ${port}`, (err) => {
+  exec(`http-server ${folder} --port ${port} -c-1`, (err) => {
     if (err) {
       throw err;
     }
