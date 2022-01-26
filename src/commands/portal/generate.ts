@@ -56,7 +56,7 @@ Your portal has been generated at D:/
     }
     try {
       if (!(await fs.pathExists(flags.destination))) {
-        throw new Error(`Destination path ${flags.destination} does not exist`);
+        await fs.ensureDir(flags.destination);
       } else if (!(await fs.pathExists(flags.folder))) {
         throw new Error(`Portal build folder ${flags.folder} does not exist`);
       }

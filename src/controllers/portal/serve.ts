@@ -11,7 +11,6 @@ import { ServePortalParams, PortalFolders } from "../../types/portal/serve";
 
 export const serveSourceFolder = async ({ folders, configDir, port }: ServePortalParams): Promise<void> => {
   // Initialize watcher.
-  console.log("Watching for changes in source folder...");
   const watcher = chokidar.watch(folders.main, {
     ignored: /(^|[/\\])\../, // ignore dot files
     persistent: true
