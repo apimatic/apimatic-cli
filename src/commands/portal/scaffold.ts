@@ -1,9 +1,9 @@
 import cli from "cli-ux";
 import * as path from "path";
+import Command from "../../base";
 import { AxiosError } from "axios";
 import { log } from "../../utils/log";
 import { flags } from "@oclif/command";
-import Command from "@oclif/command";
 import { isJSONParsable, replaceHTML } from "../../utils/utils";
 import { portalScaffold } from "../../controllers/portal/scaffold";
 

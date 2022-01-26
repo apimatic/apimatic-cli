@@ -1,13 +1,13 @@
 import cli from "cli-ux";
 import * as fs from "fs-extra";
 
-import { flags } from "@oclif/command";
 import Command from "../../base";
+import { flags } from "@oclif/command";
 import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
-import { AuthenticationError, loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { getValidation } from "../../controllers/api/validate";
+import { AuthenticationError, loggers } from "../../types/utils";
 import { printValidationMessages, replaceHTML } from "../../utils/utils";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate";
 

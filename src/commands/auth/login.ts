@@ -1,7 +1,7 @@
 import { cli } from "cli-ux";
+import Command from "../../base";
 import { AxiosError } from "axios";
 import { flags } from "@oclif/command";
-import Command from "../../base";
 
 import { replaceHTML } from "../../utils/utils";
 import { SDKClient } from "../../client-utils/sdk-client";

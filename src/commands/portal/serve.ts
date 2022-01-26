@@ -1,13 +1,13 @@
 import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
+import { AxiosError } from "axios";
 
 import Command from "../../base";
 import { flags } from "@oclif/command";
 import { serveSourceFolder } from "../../controllers/portal/serve";
 import { PortalFolders } from "../../types/portal/serve";
 import { isJSONParsable, replaceHTML } from "../../utils/utils";
-import { AxiosError } from "axios";
 
 export default class PortalServe extends Command {
   static description = "Serve your portal locally to see what it looks like in real time";

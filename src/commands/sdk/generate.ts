@@ -2,8 +2,8 @@ import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
 
-import { flags } from "@oclif/command";
 import Command from "../../base";
+import { flags } from "@oclif/command";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
 

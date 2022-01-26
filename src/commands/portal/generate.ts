@@ -2,8 +2,8 @@ import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
 
+import Command from "../../base";
 import { flags } from "@oclif/command";
-import Command from "@oclif/command";
 import { AxiosError } from "axios";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
