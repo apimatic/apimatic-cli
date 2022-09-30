@@ -13,11 +13,10 @@ export default class PortalServe extends Command {
   static description = "Serve your portal locally to see what it looks like in real time";
 
   static examples = [
-    `$ apimatic portal:serve --folder="./portal/" --port=3000
-Serving portal at http://localhost:3000
-`,
-    `$ apimatic portal:serve --folder="./portal/"
-Serving portal at http://localhost:8000
+    `$ apimatic portal:serve --folder="./portal/" --port=8080
+Zipping folder... done
+Downloading portal... done
+Serving portal at http://localhost:8080
 `
   ];
 
@@ -27,7 +26,7 @@ Serving portal at http://localhost:8000
       required: true,
       description: "Path to portal folder to serve locally"
     }),
-    port: flags.integer({ default: 8000, description: "Port to serve portal on" })
+    port: flags.integer({ default: 8080, description: "Port to serve portal on" })
   };
 
   async run() {

@@ -109,7 +109,10 @@ Your portal has been generated at D:/
         typeof (error as AuthenticationError).body === "string"
       ) {
         log.error((error as AuthenticationError).body);
-      } else {
+      } else if(path.resolve(sourceFolderPath) === path.resolve(portalFolderPath)){
+        log.error("Source and destination paths can't be the same");
+      }
+      else {
         log.error(`${(error as Error).message}`);
       }
     }
