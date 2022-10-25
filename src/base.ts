@@ -14,7 +14,7 @@ export default abstract class extends Command {
   warn(msg: string): void {
     log.warn(msg);
   }
-  error(
+  errors(
     msg: string | Error,
     options?: {
       code?: string;

@@ -9,13 +9,13 @@ const warn = (message: string): void => {
 const success = (message: string): void => {
   console.log(`${chalk.bgGreen.bold.black("Success:")} ${chalk.green(message)}`);
 };
-const error = (message: string): void => {
+const errors = (message: string): void => {
   console.log(`${chalk.bgRedBright.bold.black("Error:")} ${chalk.redBright(message)}`);
 };
 
 export const log = {
   info: info,
-  error: error,
+  error: errors,
   warn: warn,
   success: success
 };

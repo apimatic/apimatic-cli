@@ -17,7 +17,7 @@ Your portal has been published successfully.
   ];
   static flags = {
     "api-entity": flags.string({
-      required: true,
+      default: "",
       description: "API Entity Id to publish the portal for"
     }),
     "auth-key": flags.string({
@@ -33,7 +33,7 @@ Your portal has been published successfully.
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
 
-      await publishDocsPortal(docsPortalController, flags["api-entity"]);
+      await publishDocsPortal(docsPortalController, flags["api-entity"], this.config.configDir);
 
       log.success(`Your portal has been re-published successfully.`);
     } catch (error) {
