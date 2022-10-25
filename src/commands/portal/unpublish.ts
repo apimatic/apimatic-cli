@@ -17,7 +17,7 @@ Your portal has been un-published.
 
   static flags = {
     "api-entity": flags.string({
-      required: true,
+      default: "",
       description: "API Entity Id of portal to un-publish"
     }),
     "auth-key": flags.string({

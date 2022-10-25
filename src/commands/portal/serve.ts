@@ -2,6 +2,7 @@ import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
 import { AxiosError } from "axios";
+import { log } from "../../utils/log";
 
 import Command from "../../base";
 import { flags } from "@oclif/command";
@@ -13,7 +14,7 @@ export default class PortalServe extends Command {
   static description = "Serve your portal locally to see what it looks like in real time";
 
   static examples = [
-    `$ apimatic portal:serve --folder="./portal/" --port=8080
+    `$ apimatic portal:serve --folder="./portal/" --port=8080 --destination="D:/"
 Zipping folder... done
 Downloading portal... done
 Serving portal at http://localhost:8080
@@ -26,12 +27,17 @@ Serving portal at http://localhost:8080
       required: true,
       description: "Path to portal folder to serve locally"
     }),
-    port: flags.integer({ default: 8080, description: "Port to serve portal on" })
+    port: flags.integer({ default: 8080, description: "Port to serve portal on" }),
+    destination: flags.string({
+      parse: (input) => path.resolve(input),
+      required:true,
+      description: "Downloaded portal's path"
+    })
   };
 
   async run() {
     const { flags } = this.parse(PortalServe);
-    const tempFolder: string = path.join(this.config.configDir, "temp");
+    const tempFolder: string = path.join(flags.destination, "temp");
     const folders: PortalFolders = { main: flags.folder, temp: tempFolder };
     const port = flags.port;
 

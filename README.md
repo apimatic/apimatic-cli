@@ -273,7 +273,7 @@ USAGE
   $ apimatic portal:publish
 
 OPTIONS
-  --api-entity=api-entity  (required) API Entity Id to publish the portal for
+  --api-entity=api-entity  API Entity Id to publish the portal for
   --auth-key=auth-key      override current authentication state with an authentication key
 
 EXAMPLE
@@ -308,7 +308,14 @@ USAGE
 
 OPTIONS
   --folder=folder  (required) [default: D:\Code\Backend\apimatic-cli] Path to portal folder to serve locally
-  --port=port      [default: 8000] Port to serve portal on
+  --destination=destination  (required) Downloaded portal's path
+  --port=port      [default: 8080] Port to serve portal on
+
+EXAMPLE
+  $ apimatic portal:serve --folder="./portal/" --port=8080 --destination="D:/"
+  Zipping folder... done
+  Downloading portal... done
+  Serving portal at http://localhost:8080  
 ```
 
 _See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/serve.ts)_
@@ -322,7 +329,7 @@ USAGE
   $ apimatic portal:unpublish [FILE]
 
 OPTIONS
-  --api-entity=api-entity  (required) API Entity Id of portal to un-publish
+  --api-entity=api-entity  API Entity Id of portal to un-publish
   --auth-key=auth-key      override current authentication state with an authentication key
 
 EXAMPLE
