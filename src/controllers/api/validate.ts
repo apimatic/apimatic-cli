@@ -1,9 +1,9 @@
 import cli from "cli-ux";
 import * as fs from "fs-extra";
 
-import { ApiResponse, FileWrapper } from "@apimatic/core";
+import { ApiResponse, FileWrapper } from "@apimatic/sdk";
 import { GetValidationParams } from "../../types/api/validate";
-import { APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
+import { APIValidationExternalApisController, ApiValidationSummary, ContentType } from "@apimatic/sdk";
 
 export const getValidation = async (
   { file, url }: GetValidationParams,
@@ -14,7 +14,7 @@ export const getValidation = async (
   cli.action.start("Validating specification file");
   if (file) {
     const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-    validation = await apiValidationController.validateAPIViaFile(fileDescriptor);
+    validation = await apiValidationController.validateAPIViaFile(ContentType.EnumMultipartformdata, fileDescriptor);
   } else if (url) {
     validation = await apiValidationController.validateAPIViaURL(url);
   } else {

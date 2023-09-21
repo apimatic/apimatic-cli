@@ -7,7 +7,7 @@ import {
   Platforms,
   GenerateSdkViaUrlRequest
 } from "@apimatic/sdk";
-import { ApiResponse, FileWrapper } from "@apimatic/core";
+import { ApiResponse, FileWrapper } from "@apimatic/sdk";
 import { GenerationIdParams, SimplePlatforms, DownloadSDKParams } from "../../types/sdk/generate";
 import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils";
 
