@@ -1,3 +1,10 @@
+# [1.1.0-alpha.5](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.4...v1.1.0-alpha.5) (2023-09-28)
+
+
+### Features
+
+* update tslib dependency version to match apimatic sdk ([be06f73](https://github.com/apimatic/apimatic-cli/commit/be06f735eafdd93204800efeebc2d85f5c0e8613))
+
 # [1.1.0-alpha.4](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.3...v1.1.0-alpha.4) (2023-09-28)
 
 
