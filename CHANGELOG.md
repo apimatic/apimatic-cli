@@ -1,3 +1,11 @@
+# [1.1.0-alpha.4](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.3...v1.1.0-alpha.4) (2023-09-28)
+
+
+### Features
+
+* update apimatic.io base url with new subdomain base url ([a8796cd](https://github.com/apimatic/apimatic-cli/commit/a8796cd84f4f3b415e094b1af93f3e144272626b))
+* update apimatic.io sdk ([1c4c576](https://github.com/apimatic/apimatic-cli/commit/1c4c576ed933e95362f198372f258782e5f4788a))
+
 # [1.1.0-alpha.3](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.2...v1.1.0-alpha.3) (2022-01-19)
 
 
