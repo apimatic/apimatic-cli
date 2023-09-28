@@ -43,7 +43,7 @@
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.1.0-alpha.1",
+        "@apimatic/sdk": "^0.1.0-alpha.2",
         "@oclif/command": "^1.8.0",
         "@oclif/config": "^1.17.0",
         "@oclif/plugin-autocomplete": "^0.3.0",
@@ -85,7 +85,7 @@
         "prettier": "^2.4.1",
         "rimraf": "^3.0.2",
         "ts-node": "^8.10.2",
-        "typescript": "^3.9.10"
+        "typescript": "^5.2.2"
     },
     "oclif": {
         "commands": "./lib/commands",

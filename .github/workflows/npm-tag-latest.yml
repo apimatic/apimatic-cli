@@ -13,6 +13,6 @@ jobs:
     steps:
       - name: change-latest-tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm dist-tag add @apimatic/cli@${LATEST_VERSION} latest

@@ -6,9 +6,9 @@ name: Run and check build for current commit
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: [ v3 ]
+    branches: [ alpha ]
   pull_request:
-    branches: [ v3 ]
+    branches: [ alpha ]
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ '12', '13', '14' ]
+        node: [ '14', '18' ]
     name: Node ${{ matrix.node }} sample
     steps:
       - name: checkout cli

@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ '12', '13', '14' ]
+        node: [ '18' ]
     name: Release with Node version ${{ matrix.node }}
     steps:
       - name: Checkout CLI
@@ -37,6 +37,6 @@ jobs:
       - name: Release
         working-directory: cli
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release

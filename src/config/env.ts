@@ -1,1 +1,1 @@
-export const baseURL = "https://www.apimatic.io/api";
+export const baseURL = "https://api.apimatic.io";
