@@ -22,7 +22,11 @@ export const getTransformationId = async (
   let generation: ApiResponse<Transformation>;
   if (file) {
     const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-    generation = await transformationController.transformViaFile(ContentType.EnumMultipartformdata , fileDescriptor, format as ExportFormats);
+    generation = await transformationController.transformViaFile(
+      ContentType.EnumMultipartformdata,
+      fileDescriptor,
+      format as ExportFormats
+    );
   } else if (url) {
     const body: TransformViaUrlRequest = {
       url: url,
