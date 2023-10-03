@@ -1,7 +1,6 @@
 name: Set Latest Tag
 
 on:
-  push:
   workflow_dispatch:
 
 jobs:
