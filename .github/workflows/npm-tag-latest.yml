@@ -2,6 +2,7 @@ name: Set Latest Tag
 
 on:
   workflow_dispatch:
+  push:
 
 jobs:
   release:
@@ -15,4 +16,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm dist-tag add @apimatic/cli@1.1.0-alpha.5 latest
+        run: npx dist-tag add @apimatic/cli@1.1.0-alpha.5 latest
