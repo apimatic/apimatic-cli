@@ -16,4 +16,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm whoami
+        run: |
+          npm set "//registry.npmjs.org/:_authToken" ${{ secrets.NPM_TOKEN }}
+          npm dist-tag add @apimatic/cli@1.1.0-alpha.5 latest
