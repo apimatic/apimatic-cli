@@ -4,6 +4,7 @@ import * as fs from "fs-extra";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import * as stripTags from "striptags";
+import AdmZip = require("adm-zip");
 
 import { loggers, ValidationMessages } from "../types/utils";
 
@@ -144,3 +145,31 @@ export const printValidationMessages = (
     error(replaceHTML(singleError));
   }
 };
+
+/**
+ * Extracts a ZIP file to a specified destination directory.
+ *
+ * @param zipFilePath Path to the ZIP file.
+ * @param destinationDir Path to the destination directory where files will be extracted.
+ */
+export async function extractZipFile(zipFilePath: string, destinationDir: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      const zip = new AdmZip(zipFilePath);
+      // Perform extraction in next tick to simulate async behavior
+      process.nextTick(() => {
+        try {
+          zip.extractAllTo(destinationDir, true);
+          console.log('Extraction complete.');
+          resolve();
+        } catch (error) {
+          console.error('Error during extraction:', error);
+          reject(error);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to extract ZIP file:', error);
+      reject(error);
+    }
+  });
+}
