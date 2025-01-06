@@ -13,7 +13,7 @@ import { validateAndZipPortalSource } from "../../controllers/portal/serve";
 import axios from 'axios';
 
 export default class PortalServe extends Command {
-  static description = "Serve and visualize the docs-as-code portal with hot reload";
+  static description = "Generate, serve and visualize the docs-as-code portal with hot reload";
 
   static flags = {
     port: flags.integer({
@@ -21,16 +21,16 @@ export default class PortalServe extends Command {
       description: "Port to serve the portal",
       default: 3000,
     }),
-    // destination: flags.string({
-    //   char: "d",
-    //   description: "Directory to store and serve the generated portal",
-    //   default: "./generated_portal",
-    //   parse: (input) => path.resolve(input),
-    // }),
+    destination: flags.string({
+      char: "d",
+      description: "Directory to store and serve the generated portal",
+      default: "./generated_portal",
+      parse: (input) => path.resolve(input),
+    }),
 
     source: flags.string({
       char: "s",
-      description: "Source directory containing the generated portal",
+      description: "Source directory containing specs, content, and build file",
       required: true,
       parse: (input) => path.resolve(input),
     }),
@@ -62,21 +62,21 @@ export default class PortalServe extends Command {
   async run() {
     const { flags } = this.parse(PortalServe);
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
-    const portalDir = flags.source;
-    // const sourceDir = flags.source;
+    const portalDir = flags.destination;
+    const sourceDir = flags.source;
     const port = flags.port;
     const overrideAuthKey = flags["auth-key"] || null;
 
-    if (!(await fs.pathExists(portalDir))) {
-      this.error(`The specified source directory does not exist: ${portalDir}`);
+    if (!(await fs.pathExists(sourceDir))) {
+      this.error(`The specified source directory does not exist: ${sourceDir}`);
     }
 
-    // try {
-    //   await this.generatePortal(sourceDir, portalDir, overrideAuthKey , ignoredPaths);
-    //   this.log(`Portal generated successfully at ${portalDir}`);
-    // } catch (error) {
-    //   this.handleError(error);
-    // }
+    try {
+      await this.generatePortal(sourceDir, portalDir, overrideAuthKey , ignoredPaths);
+      this.log(`Portal generated successfully at ${portalDir}`);
+    } catch (error) {
+      this.handleError(error);
+    }
 
     const app = express();
 
@@ -93,78 +93,72 @@ export default class PortalServe extends Command {
       }
     });
 
-    // if (flags.reload) {
-    //   this.watchAndRegeneratePortal(sourceDir, portalDir, overrideAuthKey , ignoredPaths);
-    // } else {
-    //   fs.watch(sourceDir, { recursive: true }, (eventType, filename) => {
-    //     if (eventType === 'change') {
-    //       this.log(`Change detected in ${filename}. Reload is disabled, no action taken.`);
-    //     }
-    //   });
-    // }
-    if (!flags.reload)
-    {
-      fs.watch(portalDir, { recursive: true }, (eventType, filename) => {
-            if (eventType === 'change') {
-              this.log(`Change detected in ${filename}. Reload is disabled, no action taken.`);
-          };
+    if (flags.reload) {
+      this.watchAndRegeneratePortal(sourceDir, portalDir, overrideAuthKey , ignoredPaths);
+    } else {
+      fs.watch(sourceDir, { recursive: true }, (eventType, filename) => {
+        if (eventType === 'change') {
+          this.log(`Change detected in ${filename}. Reload is disabled, no action taken.`);
+        }
       });
     }
+
+    return new Promise(() => { });
   }
 
-  // private async watchAndRegeneratePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null, ignoredPaths: string[]) {
-  //   // Convert ignoredPaths to absolute paths for consistent comparison
-  //   const absoluteIgnoredPaths = ignoredPaths.map(ignoredPath => path.resolve(sourceDir, ignoredPath));
+  private async watchAndRegeneratePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null, ignoredPaths: string[]) {
+    // Convert ignoredPaths to absolute paths for consistent comparison
+    const absoluteIgnoredPaths = ignoredPaths.map(ignoredPath => path.resolve(sourceDir, ignoredPath));
 
-  //   fs.watch(sourceDir, { recursive: true }, async (eventType, filename) => {
-  //     if (!filename) {
-  //       return; // Skip if filename is null or undefined
-  //     }
-  //     const filePath = path.resolve(sourceDir, filename);
+    fs.watch(sourceDir, { recursive: true }, async (eventType, filename) => {
+      if (!filename) {
+        return; // Skip if filename is null or undefined
+      }
+      const filePath = path.resolve(sourceDir, filename);
 
-  //     // Check if filePath starts with any of the absoluteIgnoredPaths
-  //     const isIgnored = absoluteIgnoredPaths.some(ignoredPath => filePath.startsWith(ignoredPath));
+      // Check if filePath starts with any of the absoluteIgnoredPaths
+      const isIgnored = absoluteIgnoredPaths.some(ignoredPath => filePath.startsWith(ignoredPath));
 
-  //     if (eventType === 'change' && !isIgnored) {
-  //       console.log(`Change detected in ${filename}. Regenerating portal...`);
-  //       try {
-  //         await this.generatePortal(sourceDir, portalDir, overrideAuthKey, ignoredPaths);
-  //         console.log('Portal regenerated successfully');
-  //       } catch (error) {
-  //         console.error(error);
-  //       }
-  //     }
-  //   });
-  // }
+      if (eventType === 'change' && !isIgnored) {
+        console.log(`Change detected in ${filename}. Regenerating portal...`);
+        try {
+          await this.generatePortal(sourceDir, portalDir, overrideAuthKey, ignoredPaths);
+          console.log('Portal regenerated successfully');
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    });
+  }
 
-  // private async generatePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null , ignoredPaths: string[] = []) {
-  //   const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-  //   const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
+  private async generatePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null , ignoredPaths: string[] = []) {
+    const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+    const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
 
-  //   const zippedBuildFilePath = await validateAndZipPortalSource(sourceDir, path.join(path.dirname(portalDir), "portal_source.zip") , ignoredPaths);
+    const zippedBuildFilePath = await validateAndZipPortalSource(sourceDir, path.join(path.dirname(portalDir), "portal_source.zip") , ignoredPaths);
 
-  //   const generatePortalParams: GeneratePortalParams = {
-  //     zippedBuildFilePath,
-  //     portalFolderPath: portalDir,
-  //     zippedPortalPath: path.join(path.dirname(portalDir), "generated_portal.zip"),
-  //     docsPortalController,
-  //     overrideAuthKey,
-  //     zip: false
-  //   };
+    const generatePortalParams: GeneratePortalParams = {
+      zippedBuildFilePath,
+      portalFolderPath: portalDir,
+      zippedPortalPath: path.join(path.dirname(portalDir), "generated_portal.zip"),
+      docsPortalController,
+      overrideAuthKey,
+      zip: false
+    };
 
-  //   await downloadDocsPortal(docsPortalController, generatePortalParams, this.config.configDir);
-  // }
+    await downloadDocsPortal(generatePortalParams, this.config.configDir);
+  }
 
-  // private handleError(error: any) {
-  //   if (axios.isAxiosError(error)) {
-  //     const axiosError = error;
-  //     if (axiosError.response) {
-  //       this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
-  //     } else {
-  //       this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
-  //     }
-  //   } else {
-  //     this.error(`Failed to generate or serve the portal: ${(error as Error).message}`);
-  //   }
-  // }
+  private handleError(error: any) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error;
+      if (axiosError.response) {
+        this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
+      } else {
+        this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
+      }
+    } else {
+      this.error(`Failed to generate or serve the portal: ${(error as Error).message}`);
+    }
+  }
 }
