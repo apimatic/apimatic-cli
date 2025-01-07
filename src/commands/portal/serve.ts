@@ -146,7 +146,7 @@ export default class PortalServe extends Command {
       zip: false
     };
 
-    await downloadDocsPortal(generatePortalParams, this.config.configDir);
+    await downloadDocsPortal(generatePortalParams);
   }
 
   private handleError(error: any) {
