@@ -11,6 +11,7 @@ import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
 import { validateAndZipPortalSource } from "../../controllers/portal/serve";
 import axios from 'axios';
+import * as chokidar from 'chokidar';
 
 export default class PortalServe extends Command {
   static description = "Generate, serve and visualize the docs-as-code portal with hot reload";
@@ -80,6 +81,12 @@ export default class PortalServe extends Command {
 
     const liveReloadServer = livereload.createServer();
     liveReloadServer.watch(portalDir);
+
+    liveReloadServer.watcher.on('change', (filePath: string) => {
+      this.log(`Change detected in generated artifact file ${filePath}. Reloading...`);
+      liveReloadServer.refresh(filePath);
+    });
+
     app.use(connectLivereload());
 
     app.use(express.static(portalDir));
@@ -96,7 +103,7 @@ export default class PortalServe extends Command {
     } else {
       fs.watch(sourceDir, { recursive: true }, (eventType, filename) => {
         if (eventType === 'change') {
-          this.log(`Change detected in ${filename}. Reload is disabled, no action taken.`);
+          this.log(`Change detected in build input file ${filename}. Reload is disabled, no action taken.`);
         }
       });
     }
@@ -116,26 +123,31 @@ export default class PortalServe extends Command {
 
   private async watchAndRegeneratePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null, ignoredPaths: string[]) {
     // Convert ignoredPaths to absolute paths for consistent comparison
-    const absoluteIgnoredPaths = ignoredPaths.map(ignoredPath => path.resolve(sourceDir, ignoredPath));
+    const generatedZipPath = path.join(sourceDir, 'portal_source.zip')
+    const generatedPortalPath = path.join(path.dirname(portalDir), "generated_portal");
+    const absoluteIgnoredPaths = [
+      ...ignoredPaths.filter(ignoredPath => ignoredPath.trim() !== ''),
+      generatedZipPath,
+      generatedPortalPath
+    ].map(ignoredPath => path.resolve(sourceDir, ignoredPath));
 
-    fs.watch(sourceDir, { recursive: true }, async (eventType, filename) => {
-      if (!filename) {
-        return; // Skip if filename is null or undefined
+    const watcher = chokidar.watch(sourceDir, { 
+      ignored: absoluteIgnoredPaths, 
+      ignoreInitial: true,
+      persistent: true 
+    });
+
+    watcher.on('change', async (filePath: string) => {
+      console.log(`Change detected in build input file ${filePath}. Regenerating portal...`);
+      try {
+        await this.generatePortal(sourceDir, portalDir, overrideAuthKey, ignoredPaths);
+        console.log('Portal regenerated successfully.');
+      } catch (error) {
+        console.error('Error during portal regeneration:', error);
       }
-      const filePath = path.resolve(sourceDir, filename);
-
-      // Check if filePath starts with any of the absoluteIgnoredPaths
-      const isIgnored = absoluteIgnoredPaths.some(ignoredPath => filePath.startsWith(ignoredPath));
-
-      if (eventType === 'change' && !isIgnored) {
-        console.log(`Change detected in ${filename}. Regenerating portal...`);
-        try {
-          await this.generatePortal(sourceDir, portalDir, overrideAuthKey, ignoredPaths);
-          console.log('Portal regenerated successfully');
-        } catch (error) {
-          console.error(error);
-        }
-      }
+    })
+    .on('error', (error: any) => {
+      console.error('Watcher error:', error);
     });
   }
 
