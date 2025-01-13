@@ -1,22 +1,89 @@
 import cli from "cli-ux";
 import * as path from "path";
 import * as fs from "fs-extra";
+import * as os from "os";
 import * as archiver from "archiver";
 import * as unzipper from "unzipper";
 import * as stripTags from "striptags";
+import { PassThrough } from "stream";
 
 import { loggers, ValidationMessages } from "../types/utils";
 
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
-    stream.pipe(unzipper.Extract({ path: destination }));
-    stream.on("close", (error: Error) => {
-      if (error) {
-        reject(new Error("Couldn't extract the zip"));
-      }
-      resolve("Extracted");
-    });
+    const extractStream = unzipper.Extract({ path: destination });
+    
+    stream.pipe(extractStream).on("error", (error: Error) => 
+      reject(new Error("Error during extraction: " + error.message))
+    );
+
+    extractStream.on("close", () => 
+      resolve("Extracted")
+    );
+    extractStream.on("error", (error: Error) => 
+      reject(new Error("Error during extraction: " + error.message))
+    );
+
+    // stream.pipe(unzipper.Extract({ path: destination }));
+    // stream.on("close", (error: Error) => {
+    //   if (error) {
+    //     reject(new Error("Couldn't extract the zip"));
+    //   }
+    //   resolve("Extracted");
+    // });
   });
+};
+
+export const createTempDirectory = async () => {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'apimatic-cli-'));
+}
+
+export const clearDirectory = async (folderPath : string) => {
+  if (!fs.existsSync(folderPath)) {
+    throw new Error(`Directory ${folderPath} does not exist`);
+  }
+
+  const files = await fs.readdir(folderPath);
+
+  for (const file of files) {
+    const filePath = path.join(folderPath, file);
+    await deleteFile(filePath);
+  }
+
+  await deleteFile(folderPath);
+};
+
+export const directoryToJson = (dirPath: string): object => {
+  const directoryStructure: { [key: string]: string | object } = {};
+
+  const items = fs.readdirSync(dirPath);
+  items.forEach(item => {
+    if (item === ".git") return; // Skip .git directory
+
+    const itemPath = path.join(dirPath, item);
+    const stats = fs.statSync(itemPath);
+
+    if (stats.isDirectory()) {
+      directoryStructure[item] = directoryToJson(itemPath);
+    } else {
+      directoryStructure[item] = item;
+    }
+  });
+
+  return directoryStructure;
+};
+
+export const isValidUrl = (input: string): boolean => {
+  try {
+    new URL(input);
+    if (fs.existsSync(input)) {
+      return false;
+    }
+    return true;
+  }
+  catch (_) {
+    return false;
+  }
 };
 
 export const deleteFile = async (filePath: string) => {
@@ -36,6 +103,28 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
   });
 };
 
+export const zipDirectoryToStream = async (sourcePath: string): Promise<NodeJS.ReadableStream> => {
+  // Check if the directory exists for the user or not
+  await fs.ensureDir(sourcePath);
+
+  const archive = archiver("zip");
+
+  return new Promise((resolve, reject) => {
+    archive.on("error", (err) => {
+      reject(err);
+    });
+
+    const passThroughStream = new PassThrough();
+    archive.pipe(passThroughStream);
+
+    archive.directory(sourcePath, false);
+
+    archive.finalize().catch(reject);
+
+    resolve(passThroughStream);
+  });
+}; 
+
 /**
  * Packages local files into a ZIP archive
  *
@@ -43,7 +132,7 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
  * @param {destinationZipPath} path to generated zip
  * return {string}
  */
-export const zipDirectory = async (sourcePath: string, destinationPath: string) => {
+export const zipDirectory = async (sourcePath: string, destinationPath: string): Promise<string> => {
   // Check if the directory exists for the user or not
   await fs.ensureDir(sourcePath);
 
@@ -51,17 +140,24 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string) 
   const output = fs.createWriteStream(zipPath);
   const archive = archiver("zip");
 
-  archive.on("error", (err) => {
-    throw err;
+  return new Promise((resolve, reject) => {
+    archive.on("error", (err) => {
+      reject(err);
+    });
+
+    output.on("error", (err) => {
+      reject(err);
+    })
+    output.on("close", () => {
+      resolve(zipPath);
+    });
+
+    archive.pipe(output);
+
+    archive.directory(sourcePath, false);
+
+    archive.finalize().catch(reject);
   });
-
-  archive.pipe(output);
-
-  // append files from a sub-directory, putting its contents at the root of archive
-  archive.directory(sourcePath, false);
-
-  await archive.finalize();
-  return zipPath;
 };
 
 type ProgressBar = {
