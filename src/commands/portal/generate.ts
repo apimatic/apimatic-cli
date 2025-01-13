@@ -75,7 +75,7 @@ Your portal has been generated at D:/
         zip
       };
 
-      const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams);
+      const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams, this.config.configDir);
 
       this.log(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error) {

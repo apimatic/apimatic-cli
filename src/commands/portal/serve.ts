@@ -18,41 +18,39 @@ export default class PortalServe extends Command {
   static flags = {
     port: flags.integer({
       char: "p",
-      description: "Port to serve the portal",
+      description: "Port to serve the portal.",
       default: 3000,
     }),
     destination: flags.string({
       char: "d",
-      description: "Directory to store and serve the generated portal",
+      description: "Directory to store and serve the generated portal.",
       default: "./generated_portal",
       parse: (input) => path.resolve(input),
     }),
-
     source: flags.string({
       char: "s",
-      description: "Source directory containing specs, content, and build file",
-      required: true,
+      description: "Source directory containing specs, content, and build file. By default, the current directory is used.",
+      default: "./",
       parse: (input) => path.resolve(input),
     }),
     open: flags.boolean({
       char: "o",
-      description: "Open the portal in the default browser",
+      description: "Open the portal in the default browser.",
       default: false,
     }),
     reload: flags.boolean({
       char: "r",
-      description: "Enable hot reload",
+      description: "Enable or disable hot reload. Enabled by default.",
       default: true,
     }),
     ignore: flags.string({
       char: "i",
-      description: "Comma-separated list of files/directories to ignore",
+      description: "Comma-separated list of files/directories to ignore.",
       default: "",
     }),
     "auth-key": flags.string({
-      description: "Override current authentication state with an authentication key",
+      description: "Override current authentication state with an authentication key.",
     }),
-
   };
 
  static examples = [
@@ -86,8 +84,8 @@ export default class PortalServe extends Command {
 
     app.use(express.static(portalDir));
 
-    app.listen(port, () => {
-      this.log(`Server started at http://localhost:${port}`);
+    const server = app.listen(port, () => {
+      this.log(`Server started at http://localhost:${port} \nPress CTRL+C to stop the server.`);
       if (flags.open) {
         open(`http://localhost:${port}`);
       }
@@ -103,7 +101,17 @@ export default class PortalServe extends Command {
       });
     }
 
-    return new Promise(() => { });
+    return new Promise<void>((resolve) => {
+      process.on('SIGINT', () => {
+        this.log('Shutting down server...');
+        liveReloadServer.close();
+        server.close(() => {
+          this.log('Server shut down successfully.');
+          resolve();
+          process.exit(0);
+        })
+      })
+     });
   }
 
   private async watchAndRegeneratePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null, ignoredPaths: string[]) {
@@ -146,7 +154,7 @@ export default class PortalServe extends Command {
       zip: false
     };
 
-    await downloadDocsPortal(generatePortalParams);
+    await downloadDocsPortal(generatePortalParams, this.config.configDir);
   }
 
   private handleError(error: any) {
