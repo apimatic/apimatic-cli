@@ -17,6 +17,10 @@ export default class PortalQuickstart extends Command {
   static description = 'Get started with generating static docs portal';
 
   static flags = {
+    "disable-default-codegen-settings": flags.boolean({
+      description: "disable default code generation settings for the portal",
+      default: false
+    }),
     "auth-key": flags.string({  
       description: "override current authentication state with an authentication key" 
     }),
