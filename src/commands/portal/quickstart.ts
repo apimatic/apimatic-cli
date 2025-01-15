@@ -17,15 +17,14 @@ export default class PortalQuickstart extends Command {
   static description = 'Get started with generating static docs portal';
 
   static flags = {
-    "auth-key": flags.string({  description: "override current authentication state with an authentication key" }),
-  }; // Add flags here if needed
-  
+    "auth-key": flags.string({  
+      description: "override current authentication state with an authentication key" 
+    }),
+  };
+   
   static examples = [
     '$ apimatic portal:quickstart',
   ];
-
-  
-  static args = [];  // Add positional arguments here if needed
   //Common flags for all commands:
   /* 
   --authKey
@@ -35,9 +34,8 @@ export default class PortalQuickstart extends Command {
   --wait-on-ratelimit
   */
   async run() {
-    const { args , flags } = this.parse(PortalQuickstart);
+    const { flags } = this.parse(PortalQuickstart);
     const git = simpleGit();
-    
     const spin = spinner();
     let targetFolder: string;
     let filePath : string;
