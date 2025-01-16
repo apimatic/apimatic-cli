@@ -82,11 +82,6 @@ export default class PortalServe extends Command {
     const liveReloadServer = livereload.createServer();
     liveReloadServer.watch(portalDir);
 
-    liveReloadServer.watcher.on('change', (filePath: string) => {
-      this.log(`Change detected in generated artifact file ${filePath}. Reloading...`);
-      liveReloadServer.refresh(filePath);
-    });
-
     app.use(connectLivereload());
 
     app.use(express.static(portalDir));
