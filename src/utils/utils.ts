@@ -8,6 +8,7 @@ import * as stripTags from "striptags";
 import { PassThrough } from "stream";
 
 import { loggers, ValidationMessages } from "../types/utils";
+import { ApiValidationSummary } from "@apimatic/sdk";
 
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
@@ -53,8 +54,43 @@ export const clearDirectory = async (folderPath : string) => {
   await deleteFile(folderPath);
 };
 
-export const directoryToJson = (dirPath: string): object => {
-  const directoryStructure: { [key: string]: string | object } = {};
+export const validationMessagesToJson = (validationMessages: ApiValidationSummary): object => {
+  const structuredValidationMessages: { [key: string]: { [key: string]: string[] } } = {
+    "Validation Messages": {
+      "Errors": [],
+      "Warnings": [],
+      "Messages": []
+    }
+  };
+
+  if (validationMessages.errors)
+  {
+    validationMessages.errors.forEach((error) => {
+      structuredValidationMessages["Validation Messages"]["Errors"].push(replaceHTML(error));
+    });
+  }
+  if (validationMessages.warnings)
+  {
+    validationMessages.warnings.forEach((warning) => {
+      structuredValidationMessages["Validation Messages"]["Warnings"].push(replaceHTML(warning));
+    });
+  }
+  if (validationMessages.messages)
+  {
+    validationMessages.messages.forEach((message) => {
+      structuredValidationMessages["Validation Messages"]["Messages"].push(replaceHTML(message));
+    });
+  }
+
+  return structuredValidationMessages;
+}
+
+interface DirectoryStructure {
+  [key: string]: string | DirectoryStructure
+}
+
+export const directoryToJson = (dirPath: string): DirectoryStructure => {
+  const directoryStructure: DirectoryStructure = {};
 
   const items = fs.readdirSync(dirPath);
   items.forEach(item => {
@@ -66,9 +102,20 @@ export const directoryToJson = (dirPath: string): object => {
     if (stats.isDirectory()) {
       directoryStructure[item] = directoryToJson(itemPath);
     } else {
-      directoryStructure[item] = item;
+      directoryStructure[item] = "";
     }
   });
+
+  directoryStructure["APIMATIC-BUILD.json"] = "# All configurations for the API portal including programming languages and themes";
+  
+  directoryStructure["spec"] = "# A directory containing all your API Definition files";
+  
+  if (!directoryStructure["content"] || typeof directoryStructure["content"] === 'string') {
+    directoryStructure["content"] = {};
+  }
+  (directoryStructure["content"] as DirectoryStructure)["toc.yml"] = "# This file constrols the structure of the side navigation bar in the API Portal";
+
+  directoryStructure["static"] = "# All static files including images, GIFs and PDFs go here"
 
   return directoryStructure;
 };
@@ -206,6 +253,7 @@ export const stopProgress = (isError = false) => {
 };
 
 export const replaceHTML = (string: string) => {
+  string = string.substring(0, string.indexOf("  "));
   return stripTags(string);
 };
 
