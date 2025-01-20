@@ -85,37 +85,47 @@ export const validationMessagesToJson = (validationMessages: ApiValidationSummar
   return structuredValidationMessages;
 }
 
-interface DirectoryStructure {
-  [key: string]: string | DirectoryStructure
+interface DirectoryNode {
+  [key: string]: DirectoryNode | string | null | undefined;
 }
 
-export const directoryToJson = (dirPath: string): DirectoryStructure => {
-  const directoryStructure: DirectoryStructure = {};
+const descriptions: { [key: string]: string } = Object.entries({
+  'APIMATIC-BUILD.json': '# All configurations for the API portal including programming languages and themes',
+  'spec': '# A directory containing all your API Definition files',
+  'content': '# A directory containing custom documentation pages in markdown',
+  'content/toc.yml': '# This file controls the structure of the side navigation bar in the API Portal',
+  'static': '# All static files including images, GIFs and PDFs go here'
+  }).reduce((acc, [key, value]) => {
+    acc[path.normalize(key)] = value;
+    return acc;
+  }, {} as { [key: string]: string});
+
+export const directoryToJson = (dirPath: string, parentPath = ''): DirectoryNode => {
+  const directoryStructure: DirectoryNode = {};
 
   const items = fs.readdirSync(dirPath);
   items.forEach(item => {
     if (item === ".git") return; // Skip .git directory
 
     const itemPath = path.join(dirPath, item);
+    const relativePath = path.join(parentPath, item);
     const stats = fs.statSync(itemPath);
 
     if (stats.isDirectory()) {
-      directoryStructure[item] = directoryToJson(itemPath);
+      const subdirectoryStructure = directoryToJson(itemPath, relativePath);
+
+      const folderName = descriptions[path.normalize(relativePath)]
+      ? `${item} : ${descriptions[path.normalize(relativePath)]}`
+      : item;
+
+      directoryStructure[folderName] = subdirectoryStructure;
     } else {
-      directoryStructure[item] = "";
+      directoryStructure[
+        descriptions[path.normalize(relativePath)] 
+        ? `${item} : ${descriptions[path.normalize(relativePath)]}`
+        : item] = null;
     }
   });
-
-  directoryStructure["APIMATIC-BUILD.json"] = "# All configurations for the API portal including programming languages and themes";
-  
-  directoryStructure["spec"] = "# A directory containing all your API Definition files";
-  
-  if (!directoryStructure["content"] || typeof directoryStructure["content"] === 'string') {
-    directoryStructure["content"] = {};
-  }
-  (directoryStructure["content"] as DirectoryStructure)["toc.yml"] = "# This file constrols the structure of the side navigation bar in the API Portal";
-
-  directoryStructure["static"] = "# All static files including images, GIFs and PDFs go here"
 
   return directoryStructure;
 };
@@ -253,7 +263,7 @@ export const stopProgress = (isError = false) => {
 };
 
 export const replaceHTML = (string: string) => {
-  string = string.substring(0, string.indexOf("  "));
+  // string = string.substring(0, string.indexOf("  "));
   return stripTags(string);
 };
 

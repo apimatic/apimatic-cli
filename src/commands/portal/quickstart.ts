@@ -58,11 +58,11 @@ export default class PortalQuickstart extends Command {
       // This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 5 simple steps.
       // Let's get started! 🚀`);
 
-      log.message(`This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 5 simple steps.`);
+      log.message(`This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.`);
 
       log.message(`Let's get started! 🚀`);
 
-      log.step(`Step 1 of 5: Import your OpenAPI Definition`);
+      log.step(`Step 1 of 4: Import your OpenAPI Definition`);
 
       const spec = await text({
         message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
@@ -125,12 +125,12 @@ export default class PortalQuickstart extends Command {
         url: url
       };
 
-      log.step(`Step 2 of 5: Validate and Lint your OpenAPI file`);
-      spin.start(`Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules... 🔍`);
+      log.step(`Step 2 of 4: Validate and Lint your OpenAPI file`);
+      spin.start(`Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules 🔍 `);
       // await sleep(2000);
       const validationSummary: ApiValidationSummary = await getValidation(validationFlags, apiValidationController);
       
-      spin.stop("Validation complete! ✅ Here are the issues we found:");
+      spin.stop("Validation complete! ✅  Here are the issues we found:");
 
       // for (const error of validationSummary.errors) {
       //   // this.log(`${kleur.red(`Error: ${error} `)}`);
@@ -189,8 +189,10 @@ export default class PortalQuickstart extends Command {
         }
       }
 
+      log.step(`Step 3 of 4: Select programming languages`)
+
       const languages = await multiselect({
-        message: "Which languages would you like to enable for the portal? Use arrow keys and the spacebar to select options. By default, all are selected.",
+        message: "💻 Your API Portal will contain SDKs and SDK Documentation in the following languages (all are enabled by default, use the arrow keys and spacebar to select options):",
         options: [
           { label: "HTTP", value: "http" },
           { label: "Typescript", value: "typescript" },
@@ -241,8 +243,10 @@ export default class PortalQuickstart extends Command {
       // '\u001b]8;;https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b\\APIMatic\'s dedicated VS Code Extension\u001b]8;;\u001b\\';
       // log.info(`You can use ${hyperlink} to fix your errors and warnings. 🔍`);
 
+      log.step(`Step 4 of 4: Generate source files for Docs as Code`)
+
       const directory = await text({
-        message: "Please enter the directory path where you would like to setup the portal:",
+        message: "Enter the directory path where you would like to setup the API Portal :",
         placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
         defaultValue: "./",//Sets the default value with placeholder showing.
         // initialValue: "huhu"//Sets the value in the cmd. removes placeholder.    
