@@ -3,13 +3,13 @@ import * as fs from "fs-extra";
 import * as FormData from "form-data";
 
 import { baseURL } from "../../config/env";
-import { deleteFile, unzipFile } from "../../utils/utils";
+import { deleteFile, extractZipFile } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
+import { AxiosRequestConfig, AxiosResponse } from "axios";
 
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import axiosInstance from "../../config/axios-config";
 
-// TODO: Remove after SDK is patched
 const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey: string | null, configDir: string) => {
   const formData = new FormData();
   const authInfo: AuthInfo | null = await getAuthInfo(configDir);
@@ -17,19 +17,18 @@ const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey:
   const config: AxiosRequestConfig = {
     headers: {
       Authorization: authInfo || overrideAuthKey ? `X-Auth-Key ${authInfo?.authKey.trim() || overrideAuthKey}` : "",
-      "User-Agent": "APIMatic CLI",
       ...formData.getHeaders()
     },
     responseType: "arraybuffer"
   };
-  const { data }: AxiosResponse = await axios.post(`${baseURL}/portal`, formData, config);
+  const { data }: AxiosResponse = await axiosInstance.post(`${baseURL}/portal`, formData, config);
   return data;
 };
 
 // Download Docs Portal
 export const downloadDocsPortal = async (
   { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
-  configDir: string
+    configDir: string
 ) => {
   cli.action.start("Downloading portal");
 
@@ -50,7 +49,7 @@ export const downloadDocsPortal = async (
   // if ((data as NodeJS.ReadableStream).readable) {
   //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
   if (!zip) {
-    await unzipFile(fs.createReadStream(zippedPortalPath), portalFolderPath);
+    await extractZipFile(zippedPortalPath, portalFolderPath);
     await deleteFile(zippedPortalPath);
   }
 

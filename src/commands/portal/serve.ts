@@ -1,0 +1,179 @@
+import { Command, flags } from "@oclif/command";
+import * as path from "path";
+import * as fs from "fs-extra";
+import * as express from "express";
+import * as livereload from "livereload";
+import * as connectLivereload from "connect-livereload";
+import * as open from "open";
+import { Client, DocsPortalManagementController } from "@apimatic/sdk";
+import { SDKClient } from "../../client-utils/sdk-client";
+import { GeneratePortalParams } from "../../types/portal/generate";
+import { downloadDocsPortal } from "../../controllers/portal/generate";
+import { validateAndZipPortalSource } from "../../controllers/portal/serve";
+import axios from 'axios';
+import * as chokidar from 'chokidar';
+
+export default class PortalServe extends Command {
+  static description = "Generate, serve and visualize the docs-as-code portal with hot reload";
+
+  static flags = {
+    port: flags.integer({
+      char: "p",
+      description: "Port to serve the portal.",
+      default: 3000,
+    }),
+    destination: flags.string({
+      char: "d",
+      description: "Directory to store and serve the generated portal.",
+      default: "./generated_portal",
+      parse: (input) => path.resolve(input),
+    }),
+    source: flags.string({
+      char: "s",
+      description: "Source directory containing specs, content, and build file. By default, the current directory is used.",
+      default: "./",
+      parse: (input) => path.resolve(input),
+    }),
+    open: flags.boolean({
+      char: "o",
+      description: "Open the portal in the default browser.",
+      default: false,
+    }),
+    reload: flags.boolean({
+      char: "r",
+      description: "Enable or disable hot reload. Enabled by default.",
+      default: true,
+    }),
+    ignore: flags.string({
+      char: "i",
+      description: "Comma-separated list of files/directories to ignore.",
+      default: "",
+    }),
+    "auth-key": flags.string({
+      description: "Override current authentication state with an authentication key.",
+    }),
+  };
+
+ static examples = [
+    '$ apimatic portal:serve --source="./portal/" --destination="./generated_portal" --port=3000 --open --reload',
+ ]
+
+  async run() {
+    const { flags } = this.parse(PortalServe);
+    const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
+    const portalDir = flags.destination;
+    const sourceDir = flags.source;
+    const port = flags.port;
+    const overrideAuthKey = flags["auth-key"] || null;
+
+    if (!(await fs.pathExists(sourceDir))) {
+      this.error(`The specified source directory does not exist: ${sourceDir}`);
+    }
+
+    try {
+      await this.generatePortal(sourceDir, portalDir, overrideAuthKey , ignoredPaths);
+      this.log(`Portal generated successfully at ${portalDir}`);
+    } catch (error) {
+      this.handleError(error);
+    }
+
+    const app = express();
+
+    const liveReloadServer = livereload.createServer();
+    liveReloadServer.watch(portalDir);
+
+    app.use(connectLivereload());
+
+    app.use(express.static(portalDir));
+
+    const server = app.listen(port, () => {
+      this.log(`Server started at http://localhost:${port} \nPress CTRL+C to stop the server.`);
+      if (flags.open) {
+        open(`http://localhost:${port}`);
+      }
+    });
+
+    if (flags.reload) {
+      this.watchAndRegeneratePortal(sourceDir, portalDir, overrideAuthKey , ignoredPaths);
+    } else {
+      fs.watch(sourceDir, { recursive: true }, (eventType, filename) => {
+        if (eventType === 'change') {
+          this.log(`Change detected in build input file ${filename}. Reload is disabled, no action taken.`);
+        }
+      });
+    }
+
+    return new Promise<void>((resolve) => {
+      process.on('SIGINT', () => {
+        this.log('Shutting down server...');
+        liveReloadServer.close();
+        server.close(() => {
+          this.log('Server shut down successfully.');
+          resolve();
+          process.exit(0);
+        })
+      })
+     });
+  }
+
+  private async watchAndRegeneratePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null, ignoredPaths: string[]) {
+    // Convert ignoredPaths to absolute paths for consistent comparison
+    const generatedZipPath = path.join(sourceDir, 'portal_source.zip')
+    const generatedPortalPath = path.join(path.dirname(portalDir), "generated_portal");
+    const absoluteIgnoredPaths = [
+      ...ignoredPaths.filter(ignoredPath => ignoredPath.trim() !== ''),
+      generatedZipPath,
+      generatedPortalPath
+    ].map(ignoredPath => path.resolve(sourceDir, ignoredPath));
+
+    const watcher = chokidar.watch(sourceDir, { 
+      ignored: absoluteIgnoredPaths, 
+      ignoreInitial: true,
+      persistent: true 
+    });
+
+    watcher.on('change', async (filePath: string) => {
+      console.log(`Change detected in build input file ${filePath}. Regenerating portal...`);
+      try {
+        await this.generatePortal(sourceDir, portalDir, overrideAuthKey, ignoredPaths);
+        console.log('Portal regenerated successfully.');
+      } catch (error) {
+        console.error('Error during portal regeneration:', error);
+      }
+    })
+    .on('error', (error: any) => {
+      console.error('Watcher error:', error);
+    });
+  }
+
+  private async generatePortal(sourceDir: string, portalDir: string, overrideAuthKey: string | null , ignoredPaths: string[] = []) {
+    const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+    const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
+
+    const zippedBuildFilePath = await validateAndZipPortalSource(sourceDir, path.join(path.dirname(portalDir), "portal_source.zip") , ignoredPaths);
+
+    const generatePortalParams: GeneratePortalParams = {
+      zippedBuildFilePath,
+      portalFolderPath: portalDir,
+      zippedPortalPath: path.join(path.dirname(portalDir), "generated_portal.zip"),
+      docsPortalController,
+      overrideAuthKey,
+      zip: false
+    };
+
+    await downloadDocsPortal(generatePortalParams, this.config.configDir);
+  }
+
+  private handleError(error: any) {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error;
+      if (axiosError.response) {
+        this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
+      } else {
+        this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
+      }
+    } else {
+      this.error(`Failed to generate or serve the portal: ${(error as Error).message}`);
+    }
+  }
+}
