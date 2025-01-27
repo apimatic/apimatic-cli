@@ -314,7 +314,7 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
       process.nextTick(() => {
         try {
           zip.extractAllTo(destinationDir, true);
-          console.log('Extraction complete.');
+          // console.log('Extraction complete.');
           resolve();
         } catch (error) {
           console.error('Error during extraction:', error);
@@ -326,4 +326,73 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
       reject(error);
     }
   });
+}
+
+export async function validateAndZipPortalSource(sourceDir: string, outputPath: string, ignoredPaths: string[] = []): Promise<string> {
+
+  const output = fs.createWriteStream(outputPath);
+  const archive = archiver('zip', {
+    zlib: { level: 9 }
+  });
+
+  return new Promise((resolve, reject) => {
+    output.on('close', () => resolve(outputPath));
+    archive.on('error', err => reject(err));
+
+    archive.pipe(output);
+
+    // Function to recursively add files and directories to the archive, excluding ignored paths
+    const addItemsToArchive = async (currentPath: string, archivePath: string | false) => {
+      const items = await fs.readdir(currentPath);
+      for (const item of items) {
+        const fullPath = path.join(currentPath, item);
+        const relativePath = path.relative(sourceDir, fullPath);
+
+        // Check if the path is ignored
+        const isIgnored = ignoredPaths.some(ignoredPath =>
+          relativePath === ignoredPath || relativePath.startsWith(ignoredPath + '/') || relativePath.startsWith(ignoredPath + '\\'));
+        if (!isIgnored) {
+          const stats = await fs.stat(fullPath);
+          if (stats.isDirectory()) {
+            await addItemsToArchive(fullPath, archivePath ? path.join(archivePath, item) : item);
+          } else {
+            archive.file(fullPath, { name: archivePath ? path.join(archivePath, item) : item });
+          }
+        }
+      }
+    };
+
+    // Start adding items from the source directory
+    addItemsToArchive(sourceDir, false).then(() => {
+      archive.finalize();
+    }).catch(reject);
+  });
+}
+export const getMessageInOrangeColor = (message: string) => {
+  return `\u001b[38;2;232;148;64m${message}\u001b[0m`;
+};
+
+export const getMessageInBlueColor = (message: string) => {
+  // return `\u001b[38;5;33m${message}\u001b[0m`;
+  return `\u001b[38;2;75;184;253m${message}\u001b[0m`;
+};
+
+export const getMessageInCyanColor = (message: string) => {
+  // return `\u001b[38;5;51m${message}\u001b[0m`;
+  // return `\u001b[38;2;95;255;255m${message}\u001b[0m`;
+  return `\u001b[38;2;61;213;231m${message}\u001b[0m`;
+
+};
+
+export const getMessageInGreenColor = (message: string) => {
+  // return `\u001b[38;5;46m${message}\u001b[0m`;
+  return `\u001b[38;2;57;233;168m${message}\u001b[0m`;
+};
+
+export const getMessageInMagentaColor = (message: string) => {
+  return `\u001b[38;2;225;117;153m${message}\u001b[0m`;
+}
+
+export const getMessageInRedColor = (message: string) => {
+  return `\u001b[38;2;230;80;41m${message}\u001b[0m`;
 }

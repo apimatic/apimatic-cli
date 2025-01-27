@@ -1,7 +1,5 @@
-import cli from "cli-ux";
 import * as fs from "fs-extra";
 import * as FormData from "form-data";
-
 import { baseURL } from "../../config/env";
 import { deleteFile, extractZipFile } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
@@ -30,8 +28,6 @@ export const downloadDocsPortal = async (
   { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
     configDir: string
 ) => {
-  cli.action.start("Downloading portal");
-
   // Check if the build file exists for the user or not
   if (!(await fs.pathExists(zippedBuildFilePath))) {
     throw new Error("Build file doesn't exist");
@@ -53,7 +49,6 @@ export const downloadDocsPortal = async (
     await deleteFile(zippedPortalPath);
   }
 
-  cli.action.stop();
   return zip ? zippedPortalPath : portalFolderPath;
   // } else {
   //   throw new Error("Couldn't download the portal");
