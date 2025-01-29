@@ -6,6 +6,29 @@ import { validateAndZipPortalSource } from '../../utils/utils';
 import { GeneratePortalParams } from '../../types/portal/generate';
 import { downloadDocsPortal } from './generate';
 
+const progressSpinner = {
+  frames: ['🔄', '🔃', '🔁', '🔂'],
+  isRunning: false,
+  interval: null as NodeJS.Timeout | null,
+  frameIndex: 0,
+  text: 'Regenerating portal...', 
+  start() {
+    this.interval = setInterval(() => {
+      this.frameIndex = (this.frameIndex + 1) % this.frames.length;
+      process.stdout.write(`\r\u001b[K${this.format()}`);
+    }, 200);
+  },
+  stop() {
+    if (this.interval !== null) {
+      clearInterval(this.interval);
+    }
+    process.stdout.write('\r\u001b[K  ✅  Portal regenerated successfully.');
+  },
+  format() {
+    return `  ${this.frames[this.frameIndex]}  ${this.text}`
+  }
+}
+
 export const watchAndRegeneratePortal = async (sourceDir: string, portalDir: string, configDir: string, overrideAuthKey: string | null, ignoredPaths: string[] = []) => {
     // Convert ignoredPaths to absolute paths for consistent comparison
     const generatedZipPath = path.join(sourceDir, 'portal_source.zip')
@@ -23,13 +46,10 @@ export const watchAndRegeneratePortal = async (sourceDir: string, portalDir: str
     });
 
     watcher.on('change', async () => {
-    //   console.log(`Change detected in build input file ${filePath}. Regenerating portal...`);
       try {
+        progressSpinner.start();
         await generatePortal(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
-        process.stdout.write('\u001b[2K'); // Clear the entire line
-        process.stdout.write('\u001b[G'); // Move the cursor to the beginning of the line
-        process.stdout.write('✅  Portal regenerated successfully.');
-        // console.log('Portal regenerated successfully.');
+        progressSpinner.stop();
       } catch (error) {
         console.error('Error during portal regeneration:', error);
       }

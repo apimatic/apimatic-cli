@@ -9,7 +9,7 @@ import * as connectLivereload from "connect-livereload";
 import * as filetype from 'file-type';
 import * as treeify from 'treeify';
 import { flags, Command } from '@oclif/command';
-import { intro, outro, text, spinner, select, multiselect, log } from '@clack/prompts';
+import { intro, outro, text, spinner, select, multiselect, log, isCancel, cancel, password } from '@clack/prompts';
 import { getValidation } from '../../controllers/api/validate';
 import { staticPortalRepoUrl } from '../../config/env';
 import { clearDirectory, isValidUrl, unzipFile, directoryToJson, createTempDirectory, deleteFile, getMessageInCyanColor, getMessageInGreenColor, getMessageInBlueColor, getMessageInOrangeColor, getMessageInMagentaColor, getMessageInRedColor } from '../../utils/utils';
@@ -18,6 +18,7 @@ import { SDKClient } from '../../client-utils/sdk-client';
 import { GetValidationParams } from '../../types/api/validate';
 import { generatePortal, watchAndRegeneratePortal } from '../../controllers/portal/serve';
 import { red, cyan, blue, green, magenta, yellow, italic, underline, bold } from 'kleur';
+import { getAuthInfo } from '../../client-utils/auth-manager';
 
 export default class PortalQuickstart extends Command {
   static description = 'Get started with generating static docs portal';
@@ -35,14 +36,13 @@ export default class PortalQuickstart extends Command {
   async run() {
     const { flags } = this.parse(PortalQuickstart);
     const spin = spinner();
+    
     const tempSpecDir = await createTempDirectory();
     let targetFolder: string;
-    
+
+    const sdkClient: SDKClient = await SDKClient.getInstance();
     const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-    const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-    const apiValidationController: APIValidationExternalApisController = new APIValidationExternalApisController(
-      client
-    );
+    const storedAuthInfo = await getAuthInfo(this.config.configDir);
 
     intro((`Hello there 👋`));
 
@@ -50,7 +50,76 @@ export default class PortalQuickstart extends Command {
 
     log.message((`Let's get started! 🚀`));
 
-    log.step(getMessageInBlueColor(`Step 1 of 4: Import your OpenAPI Definition`));
+    // Login Step.
+
+    if (!overrideAuthKey && !storedAuthInfo)
+    {
+      const login = await select({
+        message: "🚨 Oops! You're not authenticated. How would you like to proceed?",
+        options: [
+          { value: 'login', label: `Login using your APIMatic credentials.`},
+          { value: 'auth-key', label: 'Use an API Key instead.'}
+        ]
+      });
+
+      if (isCancel(login))
+      {
+        cancel('Operation was cancelled.');
+        return process.exit(0);
+      }
+
+      if (login === 'login')
+      {
+        const email = await text({
+          message: "Please enter your registered email:",
+          placeholder: "Enter your email address",
+          validate: (input) => {
+            if (!input) {
+              throw new Error(red().bold("Email is required."));
+            }
+          }
+        });
+
+        const pass = await password({
+          message: "Please enter your password:",
+          validate: (input) => {
+            if (!input) {
+              throw new Error(red().bold("Password is required."));
+            }
+          }
+        });
+
+        spin.start(getMessageInMagentaColor("Logging in..."));
+
+        await sdkClient.login(String(email), String(pass), this.config.configDir);
+
+        spin.stop(getMessageInCyanColor("✅  Login successful!")); 
+      }
+      else {
+        const authKey = await text({
+          message: "Please enter your API Key:",
+          placeholder: "Enter your API Key",
+          validate: (input) => {
+            if (!input) {
+              throw new Error(red().bold("API Key is required."));
+            }
+          }
+        });
+
+        sdkClient.setAuthKey(String(authKey), this.config.configDir);
+
+        log.info(getMessageInCyanColor(`✅  Authentication key successfully set.`));
+      }
+    }
+
+    const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+    const apiValidationController: APIValidationExternalApisController = new APIValidationExternalApisController(
+      client
+    );
+
+    // Use isCancel to return if user cancels the login prompt thingy.
+
+    log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
 
     //Get spec file.
 
@@ -69,7 +138,7 @@ export default class PortalQuickstart extends Command {
 
     //Validate spec file.
 
-    log.step(getMessageInBlueColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
+    log.step(getMessageInOrangeColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
     
     spin.start(getMessageInMagentaColor(`Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules 🔍 `));
     
@@ -104,7 +173,7 @@ export default class PortalQuickstart extends Command {
 
     //Setup languages.
 
-    log.step(getMessageInBlueColor(`Step 3 of 4: Select programming languages`));
+    log.step(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
 
     const languages = await multiselect({
       message: "💻 Select SDKs and Documentation languages for your API Portal. Press enter to include all, or use the arrow keys and spacebar to customize your selection:",
@@ -130,7 +199,7 @@ export default class PortalQuickstart extends Command {
       ]
     }) as string[];
 
-    log.step(getMessageInBlueColor(`Step 4 of 4: Generate source files for Docs as Code`));
+    log.step(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
 
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal :",
@@ -175,7 +244,7 @@ export default class PortalQuickstart extends Command {
     try {
       spin.start(getMessageInMagentaColor("Setting up portal"));
       await generatePortal(targetFolder, generatedPortalPath, this.config.configDir, overrideAuthKey);
-      spin.stop(getMessageInCyanColor("\x1b[1K✅  Portal setup complete!"));
+      spin.stop(getMessageInCyanColor("✅  Portal setup complete!"));
     } catch (error) {
       throw new Error(red().bold(`Something went wrong while generating the portal artifacts: ${error}`));
     }
@@ -204,7 +273,7 @@ export default class PortalQuickstart extends Command {
         getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
         getMessageInCyanColor(`- Read the ${referenceDocumentation}`) + getMessageInCyanColor(` to learn more about how you can customize this API Portal.\n`) +
         getMessageInCyanColor(`- Review the SDK Documentation for your favourite programming language and download an SDK from the API Portal.\n`) +
-        getMessageInCyanColor(`- Check out how you can ${customizeTheSdks}`) + getMessageInCyanColor(` using Code Generation settings.`)
+        getMessageInCyanColor(`- Check out how you can ${customizeTheSdks}`) + getMessageInCyanColor(` using Code Generation settings.\n`)
       );
     });
 
