@@ -104,6 +104,11 @@ export class PortalQuickstartPrompts {
       ],
     });
 
+    if (isCancel(useSampleSpec)) {
+      cancel('Operation cancelled.');
+      return process.exit(0);
+    }
+
     if (useSampleSpec === 'exit')
     {
       outro(getMessageInCyanColor("Good luck fixing your API definition! 🛠️  Feel free to run this command again once you're done."));
@@ -138,6 +143,11 @@ export class PortalQuickstartPrompts {
       ]
     }) as string[];
 
+    if (isCancel(languages)) {
+      cancel('Operation cancelled.');
+      return process.exit(0);
+    }
+
     return languages;
   }
 
@@ -154,6 +164,11 @@ export class PortalQuickstartPrompts {
         }
       }
     });
+
+    if (isCancel(directory)) {
+      cancel('Operation cancelled.');
+      return process.exit(0);
+    }
 
     if (directory === "./") {
       return path.join(process.cwd(), this.portalDirectory);

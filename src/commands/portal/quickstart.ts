@@ -1,24 +1,25 @@
-import { flags, Command } from '@oclif/command';
-import { APIValidationExternalApisController, ApiValidationSummary, Client } from '@apimatic/sdk';
-import { SDKClient } from '../../client-utils/sdk-client';
-import { PortalQuickstartPrompts } from '../../prompts/portal/quickstart';
-import { PortalQuickstartController } from '../../controllers/portal/quickstart';
-import { SpecFile } from '../../types/portal/quickstart';
+import { flags, Command } from "@oclif/command";
+import { APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
+import { SDKClient } from "../../client-utils/sdk-client";
+import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart";
+import { PortalQuickstartController } from "../../controllers/portal/quickstart";
+import { SpecFile } from "../../types/portal/quickstart";
 
 export default class PortalQuickstart extends Command {
-  static description = 'Get started with generating static docs portal';
+  static description = "Get started with generating static docs portal";
 
   static flags = {
-    "auth-key": flags.string({  
-      description: "override current authentication state with an authentication key" 
-    }),
+    "auth-key": flags.string({
+      description: "override current authentication state with an authentication key"
+    })
   };
-   
-  static examples = [
-    '$ apimatic portal:quickstart --auth-key="yourAuthKey"',
-  ];
 
-  private async getSpecFile(prompts: PortalQuickstartPrompts, controller: PortalQuickstartController): Promise<SpecFile> {
+  static examples = ['$ apimatic portal:quickstart --auth-key="yourAuthKey"'];
+
+  private async getSpecFile(
+    prompts: PortalQuickstartPrompts,
+    controller: PortalQuickstartController
+  ): Promise<SpecFile> {
     const spec = await prompts.specPrompt();
 
     const specFile = await controller.getSpecFile(spec);
@@ -28,21 +29,30 @@ export default class PortalQuickstart extends Command {
     return specFile;
   }
 
-  private async getSpecValidationSummary(prompts: PortalQuickstartPrompts, controller: PortalQuickstartController, specFile: SpecFile, apiValidationController: APIValidationExternalApisController): Promise<ApiValidationSummary> {
+  private async getSpecValidationSummary(
+    prompts: PortalQuickstartPrompts,
+    controller: PortalQuickstartController,
+    specFile: SpecFile,
+    apiValidationController: APIValidationExternalApisController
+  ): Promise<ApiValidationSummary> {
     const apiValidationSummary = await controller.getSpecValidationSummary(specFile, apiValidationController);
 
-    if (!apiValidationSummary.success)
-    {
+    if (!apiValidationSummary.success) {
       prompts.displaySpecValidationFailureMessage();
-    }
-    else {
+    } else {
       prompts.displaySpecValidationSuccessMessage();
     }
 
-    return apiValidationSummary
+    return apiValidationSummary;
   }
 
-  private async getBuildDirectory(prompts: PortalQuickstartPrompts, controller: PortalQuickstartController, specFile: SpecFile, apiValidationSummary: ApiValidationSummary, languages: string[]) : Promise<string> {
+  private async getBuildDirectory(
+    prompts: PortalQuickstartPrompts,
+    controller: PortalQuickstartController,
+    specFile: SpecFile,
+    apiValidationSummary: ApiValidationSummary,
+    languages: string[]
+  ): Promise<string> {
     const directory = await prompts.buildDirectoryPrompt();
 
     prompts.displayBuildDirectoryGenerationMessage();
@@ -56,11 +66,20 @@ export default class PortalQuickstart extends Command {
     return directory;
   }
 
-  private async getGeneratedPortalPath(prompts: PortalQuickstartPrompts, controller: PortalQuickstartController, directory: string, overrideAuthKey: string | null): Promise<string> { 
+  private async getGeneratedPortalPath(
+    prompts: PortalQuickstartPrompts,
+    controller: PortalQuickstartController,
+    directory: string,
+    overrideAuthKey: string | null
+  ): Promise<string> {
     prompts.displayPortalGenerationMessage();
-    
-    const generatedPortalPath = await controller.generatePortalArtifacts(directory, this.config.configDir, overrideAuthKey);
-    
+
+    const generatedPortalPath = await controller.generatePortalArtifacts(
+      directory,
+      this.config.configDir,
+      overrideAuthKey
+    );
+
     prompts.displayPortalGenerationSuccessMessage();
 
     return generatedPortalPath;
@@ -78,30 +97,41 @@ export default class PortalQuickstart extends Command {
 
     prompts.displayWelcomeMessage();
 
-    if (!controller.isUserAuthenticated(overrideAuthKey, this.config.configDir)){
+    const loggedIn = await controller.isUserAuthenticated(overrideAuthKey, this.config.configDir);
+
+    if (!loggedIn) {
       const credentials = await prompts.loginPrompt();
-      
+
       prompts.displayLoggingInMessage();
-      
-      controller.userLogin(credentials, sdkClient, this.config.configDir);
-      
+
+      await controller.userLogin(credentials, sdkClient, this.config.configDir);
+
       prompts.displayLoggedInMessage();
     }
 
     //TODO: Fix double initialization of clients.
     const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-    const apiValidationController: APIValidationExternalApisController = new APIValidationExternalApisController(client);
+    const apiValidationController: APIValidationExternalApisController = new APIValidationExternalApisController(
+      client
+    );
 
     const specFile = await this.getSpecFile(prompts, controller);
 
-    const apiValidationSummary = await this.getSpecValidationSummary(prompts, controller, specFile, apiValidationController);
-    
+    const apiValidationSummary = await this.getSpecValidationSummary(
+      prompts,
+      controller,
+      specFile,
+      apiValidationController
+    );
+
     const languages = await prompts.sdkLanguagesPrompt();
 
     const directory = await this.getBuildDirectory(prompts, controller, specFile, apiValidationSummary, languages);
 
     const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory, overrideAuthKey);
-    
+
     controller.servePortal(generatedPortalPath, directory, this.config.configDir, overrideAuthKey);
+
+    prompts.displayOutroMessage();
   }
 }
