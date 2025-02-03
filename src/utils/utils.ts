@@ -321,7 +321,6 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
 }
 
 export async function validateAndZipPortalSource(sourceDir: string, outputPath: string, ignoredPaths: string[] = []): Promise<string> {
-
   const output = fs.createWriteStream(outputPath);
   const archive = archiver('zip', {
     zlib: { level: 9 }
@@ -365,19 +364,15 @@ export const getMessageInOrangeColor = (message: string) => {
 };
 
 export const getMessageInBlueColor = (message: string) => {
-  // return `\u001b[38;5;33m${message}\u001b[0m`;
   return `\u001b[38;2;75;184;253m${message}\u001b[0m`;
 };
 
 export const getMessageInCyanColor = (message: string) => {
-  // return `\u001b[38;5;51m${message}\u001b[0m`;
-  // return `\u001b[38;2;95;255;255m${message}\u001b[0m`;
   return `\u001b[38;2;61;213;231m${message}\u001b[0m`;
 
 };
 
 export const getMessageInGreenColor = (message: string) => {
-  // return `\u001b[38;5;46m${message}\u001b[0m`;
   return `\u001b[38;2;57;233;168m${message}\u001b[0m`;
 };
 

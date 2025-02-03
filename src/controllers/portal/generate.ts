@@ -8,6 +8,7 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 
 import axiosInstance from "../../config/axios-config";
 
+//TODO: Remove after SDK is patched
 const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey: string | null, configDir: string) => {
   const formData = new FormData();
   const authInfo: AuthInfo | null = await getAuthInfo(configDir);
