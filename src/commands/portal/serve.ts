@@ -23,7 +23,7 @@ export default class PortalServe extends Command {
     destination: flags.string({
       char: "d",
       description: "Directory to store and serve the generated portal.",
-      default: "./generated_portal",
+      default: "./api-portal",
       parse: (input) => path.resolve(input)
     }),
     source: flags.string({
@@ -54,7 +54,7 @@ export default class PortalServe extends Command {
   };
 
   static examples = [
-    '$ apimatic portal:serve --source="./" --destination="./generated_portal" --port=3000 --open --reload'
+    '$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --reload'
   ];
 
   async run() {
