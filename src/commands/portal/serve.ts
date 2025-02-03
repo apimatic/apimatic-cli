@@ -54,7 +54,7 @@ export default class PortalServe extends Command {
   };
 
   static examples = [
-    '$ apimatic portal:serve --source="./portal/" --destination="./generated_portal" --port=3000 --open --reload'
+    '$ apimatic portal:serve --source="./" --destination="./generated_portal" --port=3000 --open --reload'
   ];
 
   async run() {
@@ -70,6 +70,7 @@ export default class PortalServe extends Command {
     }
 
     try {
+      this.log(`Generating portal from source directory ${sourceDir}`);
       await generatePortal(sourceDir, portalDir, this.config.configDir, overrideAuthKey, ignoredPaths);
       this.log(`Portal generated successfully at ${portalDir}`);
     } catch (error) {

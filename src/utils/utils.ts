@@ -25,14 +25,6 @@ export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) =>
     extractStream.on("error", (error: Error) => 
       reject(new Error("Error during extraction: " + error.message))
     );
-
-    // stream.pipe(unzipper.Extract({ path: destination }));
-    // stream.on("close", (error: Error) => {
-    //   if (error) {
-    //     reject(new Error("Couldn't extract the zip"));
-    //   }
-    //   resolve("Extracted");
-    // });
   });
 };
 
