@@ -1,4 +1,5 @@
 import * as fs from "fs-extra";
+import cli from "cli-ux";
 
 import { flags, Command } from "@oclif/command";
 import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
@@ -46,7 +47,9 @@ Specification file provided is valid
         client
       );
 
+      cli.action.start("Validating specification file");
       const validationSummary: ApiValidationSummary = await getValidation(flags, apiValidationController);
+      cli.action.stop();
       const logFunctions: loggers = {
         log: this.log,
         warn: this.warn,

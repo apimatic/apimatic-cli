@@ -10,7 +10,6 @@ export const getValidation = async (
 ): Promise<ApiValidationSummary> => {
   let validation: ApiResponse<ApiValidationSummary>;
 
-  // cli.action.start("Validating specification file");
   if (file) {
     const fileStatus = fs.statSync(file);
     if (fileStatus.isDirectory()){
@@ -36,6 +35,6 @@ export const getValidation = async (
   } else {
     throw new Error("Please provide a specification file");
   }
-  // cli.action.stop();
+  
   return validation.result;
 };
