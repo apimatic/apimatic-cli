@@ -39,6 +39,7 @@ export default class PortalQuickstart extends Command {
 
     if (!apiValidationSummary.success) {
       prompts.displaySpecValidationFailureMessage();
+      await prompts.specValidationFailurePrompt();
     } else {
       prompts.displaySpecValidationSuccessMessage();
     }

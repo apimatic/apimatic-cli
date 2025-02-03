@@ -39,7 +39,12 @@ export class PortalQuickstartController {
   }
 
   async userLogin(credentials: LoginCredentials, client: SDKClient, configDir: string): Promise<void> {
-    await client.login(credentials.email, credentials.password, configDir);
+    try {
+      await client.login(credentials.email, credentials.password, configDir);
+    } 
+    catch (error) {
+      throw new Error(getMessageInRedColor(`There was a problem logging in. Please verify your credentials and try again.`));
+    }
   }
 
   async getSpecFile(spec: string): Promise<SpecFile> {
@@ -62,7 +67,7 @@ export class PortalQuickstartController {
         if (fs.statSync(specPath).isDirectory()) {
           throw new Error(
             getMessageInRedColor(
-              "Directory paths are not supported, please enter a path to a valid file or zip file instead."
+              "Invalid path entered. Please enter a path to a valid file or zip file."
             )
           );
         }
@@ -103,7 +108,14 @@ export class PortalQuickstartController {
   ): Promise<void> {
     const git = simpleGit();
 
-    await git.clone(staticPortalRepoUrl, targetFolder);
+    try {
+      await git.clone(staticPortalRepoUrl, targetFolder);
+    }
+    catch (error)
+    {
+      throw new Error(getMessageInRedColor(`There was an error setting up the build directory. Please ensure the directory is empty.`));
+    }
+    
     await clearDirectory(path.join(targetFolder, ".github"));
 
     if (specFile.filePath && validationSummary.success) {
