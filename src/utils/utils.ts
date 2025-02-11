@@ -14,25 +14,21 @@ import { ApiValidationSummary } from "@apimatic/sdk";
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
   return new Promise((resolve, reject) => {
     const extractStream = unzipper.Extract({ path: destination });
-    
-    stream.pipe(extractStream).on("error", (error: Error) => 
-      reject(new Error("Error during extraction: " + error.message))
-    );
 
-    extractStream.on("close", () => 
-      resolve("Extracted")
-    );
-    extractStream.on("error", (error: Error) => 
-      reject(new Error("Error during extraction: " + error.message))
-    );
+    stream
+      .pipe(extractStream)
+      .on("error", (error: Error) => reject(new Error("Error during extraction: " + error.message)));
+
+    extractStream.on("close", () => resolve("Extracted"));
+    extractStream.on("error", (error: Error) => reject(new Error("Error during extraction: " + error.message)));
   });
 };
 
 export const createTempDirectory = async () => {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'apimatic-cli-'));
-}
+  return fs.mkdtempSync(path.join(os.tmpdir(), "apimatic-cli-"));
+};
 
-export const clearDirectory = async (folderPath : string) => {
+export const clearDirectory = async (folderPath: string) => {
   if (!fs.existsSync(folderPath)) {
     throw new Error(`Directory ${folderPath} does not exist`);
   }
@@ -50,54 +46,51 @@ export const clearDirectory = async (folderPath : string) => {
 export const validationMessagesToJson = (validationMessages: ApiValidationSummary): object => {
   const structuredValidationMessages: { [key: string]: { [key: string]: string[] } } = {
     "Validation Messages": {
-      "Errors": [],
-      "Warnings": [],
-      "Messages": []
+      Errors: [],
+      Warnings: [],
+      Messages: []
     }
   };
 
-  if (validationMessages.errors)
-  {
+  if (validationMessages.errors) {
     validationMessages.errors.forEach((error) => {
       structuredValidationMessages["Validation Messages"]["Errors"].push(replaceHTML(error));
     });
   }
-  if (validationMessages.warnings)
-  {
+  if (validationMessages.warnings) {
     validationMessages.warnings.forEach((warning) => {
       structuredValidationMessages["Validation Messages"]["Warnings"].push(replaceHTML(warning));
     });
   }
-  if (validationMessages.messages)
-  {
+  if (validationMessages.messages) {
     validationMessages.messages.forEach((message) => {
       structuredValidationMessages["Validation Messages"]["Messages"].push(replaceHTML(message));
     });
   }
 
   return structuredValidationMessages;
-}
+};
 
 interface DirectoryNode {
   [key: string]: DirectoryNode | string | null | undefined;
 }
 
 const descriptions: { [key: string]: string } = Object.entries({
-  'APIMATIC-BUILD.json': '# All configurations for the API portal including programming languages and themes',
-  'spec': '# A directory containing all your API Definition files',
-  'content': '# A directory containing custom documentation pages in markdown',
-  'content/toc.yml': '# This file controls the structure of the side navigation bar in the API Portal',
-  'static': '# All static files including images, GIFs and PDFs go here'
-  }).reduce((acc, [key, value]) => {
-    acc[path.normalize(key)] = value;
-    return acc;
-  }, {} as { [key: string]: string});
+  "APIMATIC-BUILD.json": "# All configurations for the API portal including programming languages and themes",
+  spec: "# A directory containing all your API Definition files",
+  content: "# A directory containing custom documentation pages in markdown",
+  "content/toc.yml": "# This file controls the structure of the side navigation bar in the API Portal",
+  static: "# All static files including images, GIFs and PDFs go here"
+}).reduce((acc, [key, value]) => {
+  acc[path.normalize(key)] = value;
+  return acc;
+}, {} as { [key: string]: string });
 
-export const directoryToJson = (dirPath: string, parentPath = ''): DirectoryNode => {
+export const directoryToJson = (dirPath: string, parentPath = ""): DirectoryNode => {
   const directoryStructure: DirectoryNode = {};
 
   const items = fs.readdirSync(dirPath);
-  items.forEach(item => {
+  items.forEach((item) => {
     if (item === ".git") return; // Skip .git directory
 
     const itemPath = path.join(dirPath, item);
@@ -108,15 +101,14 @@ export const directoryToJson = (dirPath: string, parentPath = ''): DirectoryNode
       const subdirectoryStructure = directoryToJson(itemPath, relativePath);
 
       const folderName = descriptions[path.normalize(relativePath)]
-      ? `${item} : ${descriptions[path.normalize(relativePath)]}`
-      : item;
+        ? `${item} : ${descriptions[path.normalize(relativePath)]}`
+        : item;
 
       directoryStructure[folderName] = subdirectoryStructure;
     } else {
       directoryStructure[
-        descriptions[path.normalize(relativePath)] 
-        ? `${item} : ${descriptions[path.normalize(relativePath)]}`
-        : item] = null;
+        descriptions[path.normalize(relativePath)] ? `${item} : ${descriptions[path.normalize(relativePath)]}` : item
+      ] = null;
     }
   });
 
@@ -124,19 +116,18 @@ export const directoryToJson = (dirPath: string, parentPath = ''): DirectoryNode
 };
 
 export const isValidUrl = (input: string): boolean => {
-  if (!input)
-  {
+  if (!input) {
     return false;
   }
 
   try {
     const url = new URL(input);
 
-    if (!['http:', 'https:'].includes(url.protocol)) {
+    if (!["http:", "https:"].includes(url.protocol)) {
       return false;
     }
 
-    if (url.protocol === 'file:' || fs.existsSync(input)) {
+    if (url.protocol === "file:" || fs.existsSync(input)) {
       return false;
     }
 
@@ -145,8 +136,7 @@ export const isValidUrl = (input: string): boolean => {
     }
 
     return true;
-  }
-  catch (_) {
+  } catch (_) {
     return false;
   }
 };
@@ -188,7 +178,7 @@ export const zipDirectoryToStream = async (sourcePath: string): Promise<NodeJS.R
 
     resolve(passThroughStream);
   });
-}; 
+};
 
 /**
  * Packages local files into a ZIP archive
@@ -212,7 +202,7 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string):
 
     output.on("error", (err) => {
       reject(err);
-    })
+    });
     output.on("close", () => {
       resolve(zipPath);
     });
@@ -322,42 +312,52 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
       const zipEntries = zip.getEntries();
       let totalSize = 0;
 
-      zipEntries.forEach(entry => {
+      zipEntries.forEach((entry) => {
         totalSize += entry.header.size;
-      })
-      
-      if (totalSize > MAX_ZIP_SIZE)
-      {
-        throw new Error(getMessageInRedColor('Archive size is too large for safe extraction.'));
+
+        const normalizedPath = path.normalize(entry.entryName);
+        if (normalizedPath.startsWith("..") || path.isAbsolute(normalizedPath)) {
+          return reject(new Error(`Blocked potentially unsafe path: ${normalizedPath}`));
+        }
+      });
+
+      if (totalSize > MAX_ZIP_SIZE) {
+        return reject(new Error(getMessageInRedColor("Archive size is too large for safe extraction.")));
       }
 
-      // Perform extraction in next tick to simulate async behavior
+      if (!fs.existsSync(destinationDir)) {
+        fs.mkdirSync(destinationDir, { recursive: true });
+      }
+
       process.nextTick(() => {
         try {
           zip.extractAllTo(destinationDir, true);
-          // console.log('Extraction complete.');
           resolve();
         } catch (error) {
-          console.error('Error during extraction:', error);
+          console.error("Error during extraction:", error);
           reject(error);
         }
       });
     } catch (error) {
-      console.error('Failed to extract ZIP file:', error);
+      console.error("Failed to extract ZIP file:", error);
       reject(error);
     }
   });
 }
 
-export async function validateAndZipPortalSource(sourceDir: string, outputPath: string, ignoredPaths: string[] = []): Promise<string> {
+export async function validateAndZipPortalSource(
+  sourceDir: string,
+  outputPath: string,
+  ignoredPaths: string[] = []
+): Promise<string> {
   const output = fs.createWriteStream(outputPath);
-  const archive = archiver('zip', {
+  const archive = archiver("zip", {
     zlib: { level: 9 }
   });
 
   return new Promise((resolve, reject) => {
-    output.on('close', () => resolve(outputPath));
-    archive.on('error', err => reject(err));
+    output.on("close", () => resolve(outputPath));
+    archive.on("error", (err) => reject(err));
 
     archive.pipe(output);
 
@@ -369,8 +369,12 @@ export async function validateAndZipPortalSource(sourceDir: string, outputPath: 
         const relativePath = path.relative(sourceDir, fullPath);
 
         // Check if the path is ignored
-        const isIgnored = ignoredPaths.some(ignoredPath =>
-          relativePath === ignoredPath || relativePath.startsWith(ignoredPath + '/') || relativePath.startsWith(ignoredPath + '\\'));
+        const isIgnored = ignoredPaths.some(
+          (ignoredPath) =>
+            relativePath === ignoredPath ||
+            relativePath.startsWith(ignoredPath + "/") ||
+            relativePath.startsWith(ignoredPath + "\\")
+        );
         if (!isIgnored) {
           const stats = await fs.stat(fullPath);
           if (stats.isDirectory()) {
@@ -383,9 +387,11 @@ export async function validateAndZipPortalSource(sourceDir: string, outputPath: 
     };
 
     // Start adding items from the source directory
-    addItemsToArchive(sourceDir, false).then(() => {
-      archive.finalize();
-    }).catch(reject);
+    addItemsToArchive(sourceDir, false)
+      .then(() => {
+        archive.finalize();
+      })
+      .catch(reject);
   });
 }
 export const getMessageInOrangeColor = (message: string) => {
@@ -398,7 +404,6 @@ export const getMessageInBlueColor = (message: string) => {
 
 export const getMessageInCyanColor = (message: string) => {
   return `\u001b[38;2;61;213;231m${message}\u001b[0m`;
-
 };
 
 export const getMessageInGreenColor = (message: string) => {
@@ -407,8 +412,8 @@ export const getMessageInGreenColor = (message: string) => {
 
 export const getMessageInMagentaColor = (message: string) => {
   return `\u001b[38;2;225;117;153m${message}\u001b[0m`;
-}
+};
 
 export const getMessageInRedColor = (message: string) => {
   return `\u001b[38;2;230;80;41m${message}\u001b[0m`;
-}
+};

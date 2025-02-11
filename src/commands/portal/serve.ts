@@ -94,7 +94,7 @@ export default class PortalServe extends Command {
     prompts.displayOutroMessage(port);
   }
 
-  private handleError(error: any) {
+  private handleError(error: unknown) {
     if (axios.isAxiosError(error)) {
       const axiosError = error;
       if (axiosError.response) {
@@ -112,8 +112,10 @@ export default class PortalServe extends Command {
       } else {
         this.error(`Failed to regenerate or serve the portal: ${axiosError.message}`);
       }
-    } else {
+    } else if (error instanceof Error) {
       this.error(`Failed to generate or serve the portal: ${(error as Error).message}`);
+    } else {
+      this.error(`Failed to generate or serve the portal: An unknown error occurred.`);
     }
   }
 }

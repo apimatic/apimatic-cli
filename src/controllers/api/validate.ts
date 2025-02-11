@@ -22,6 +22,9 @@ export const getValidation = async (
         
         await deleteFile(zipPath);
       }
+      catch (error) {
+        throw new Error("There was an error validating your spec file.");
+      }
       finally {
         await fs.remove(tempDir);
       }
