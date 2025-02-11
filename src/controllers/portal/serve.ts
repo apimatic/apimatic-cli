@@ -59,13 +59,7 @@ export const watchAndRegeneratePortal = async (
   });
 
   watcher
-    .on("change", async () => {
-      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
-    })
-    .on("unlinkDir", async () => {
-      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
-    })
-    .on("unlink", async () => {
+    .on("all", async () => {
       await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
     })
     .on("error", (error: Error) => {

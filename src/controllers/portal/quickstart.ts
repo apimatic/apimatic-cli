@@ -77,7 +77,6 @@ export class PortalQuickstartController {
               throw new Error(getMessageInRedColor(`Failed to download spec: ${error.message}`));
             }
           } else {
-            // File system errors when writing file
             throw new Error(
               getMessageInRedColor(
                 `Failed to save spec file: ${error instanceof Error ? error.message : "Unknown error"}`

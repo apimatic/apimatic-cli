@@ -7,7 +7,7 @@ import { SpecFile } from "../../types/portal/quickstart";
 import { getMessageInRedColor } from "../../utils/utils";
 
 export default class PortalQuickstart extends Command {
-  static description = "Get started with generating static docs portal";
+  static description = "Get started with generating static docs portal.";
 
   static examples = ["$ apimatic portal:quickstart"];
 
