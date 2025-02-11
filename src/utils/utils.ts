@@ -329,15 +329,16 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
         fs.mkdirSync(destinationDir, { recursive: true });
       }
 
-      process.nextTick(() => {
-        try {
-          zip.extractAllTo(destinationDir, true);
-          resolve();
-        } catch (error) {
-          console.error("Error during extraction:", error);
-          reject(error);
+      zipEntries.forEach((entry) => {
+        const resolvedPath = path.resolve(destinationDir, entry.entryName);
+
+        if (!resolvedPath.startsWith(path.resolve(destinationDir))) {
+          throw new Error("An error occurred while extracting zip file.");
         }
+
+        zip.extractEntryTo(entry, destinationDir);
       });
+      resolve();
     } catch (error) {
       console.error("Failed to extract ZIP file:", error);
       reject(error);
