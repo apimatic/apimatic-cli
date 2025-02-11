@@ -20,7 +20,7 @@ import {
 import { getValidation } from "../api/validate";
 import { GetValidationParams } from "../../types/api/validate";
 import { generatePortal } from "./serve";
-import { staticPortalRepoUrl } from "../../config/env";
+import { metadataFileContent, staticPortalRepoUrl } from "../../config/env";
 import { PortalServerService } from "../../services/portal/server";
 
 export class PortalQuickstartController {
@@ -153,34 +153,8 @@ export class PortalQuickstartController {
     const metadataFile = fs.readdirSync(specFolder).find((file) => file.startsWith("APIMATIC-META"));
 
     if (!metadataFile) {
-      const newMetadataContent = {
-        ImportSettings: {
-          AutoGenerateTestCases: false,
-          ImportAdditionalHeader: false,
-          ImportAdditionalTypeCombinatorModels: false,
-          ImportTypeCombinatorsWithOnlyOneType: false
-        },
-        CodeGenSettings: {
-          Timeout: 30,
-          ValidateRequiredParameters: true,
-          AddSingleAuthDeprecatedCode: false,
-          EnableGlobalUserAgent: true,
-          UserAgent: "{language}-SDK/{version} [OS: {os-info}, Engine: {engine}/{engine-version}]",
-          EnableLogging: true,
-          EnableModelKeywordArgsInRuby: true,
-          SymbolizeHashKeysInRuby: true,
-          ReturnCompleteHttpResponse: true,
-          UserConfigurableRetries: true,
-          UseEnumPrefix: false,
-          ExtendedAdditionalPropertiesSupport: true,
-          EnforceStandardizedCasing: true,
-          ControllerPostfix: "Api",
-          DoNotSplitWords: ["oauth"]
-        }
-      };
-
       const newMetadataFilePath = path.join(specFolder, "APIMATIC-META.json");
-      fs.writeFileSync(newMetadataFilePath, JSON.stringify(newMetadataContent, null, 2));
+      fs.writeFileSync(newMetadataFilePath, JSON.stringify(metadataFileContent, null, 2));
     }
   }
 
