@@ -1,15 +1,10 @@
 import * as path from "path";
 import * as fs from "fs-extra";
-import * as express from "express";
-import * as livereload from "livereload";
-import * as connectLivereload from "connect-livereload";
-import * as open from "open";
-
 import axios from "axios";
-
 import { Command, flags } from "@oclif/command";
-
-import { generatePortal, watchAndRegeneratePortal } from "../../controllers/portal/serve";
+import { generatePortal } from "../../controllers/portal/serve";
+import { PortalServerService } from "../../services/portal/server";
+import { PortalServePrompts } from "../../prompts/portal/serve";
 
 export default class PortalServe extends Command {
   static description = "Generate, serve and visualize the docs-as-code portal with hot reload";
@@ -53,9 +48,7 @@ export default class PortalServe extends Command {
     })
   };
 
-  static examples = [
-    '$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --reload'
-  ];
+  static examples = ['$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --reload'];
 
   async run() {
     const { flags } = this.parse(PortalServe);
@@ -63,69 +56,61 @@ export default class PortalServe extends Command {
     const portalDir = flags.destination;
     const sourceDir = flags.source;
     const port = flags.port;
-    const overrideAuthKey = flags["auth-key"] || null;
+    const overrideAuthKey = flags["auth-key"] ?? null;
+    const serverService = new PortalServerService();
+    const prompts = new PortalServePrompts();
+
+    if (isNaN(port) || port < 1 || port > 65535) {
+      throw new Error("Port number specified was invalid. Please enter a valid port number.");
+    }
 
     if (!(await fs.pathExists(sourceDir))) {
-      this.error(`The specified source directory does not exist: ${sourceDir}`);
+      throw new Error(`The specified source directory does not exist: ${sourceDir}`);
     }
 
     try {
-      this.log(`Generating portal from source directory ${sourceDir}`);
+      prompts.displayGeneratingPortalMessage(sourceDir);
       await generatePortal(sourceDir, portalDir, this.config.configDir, overrideAuthKey, ignoredPaths);
-      this.log(`Portal generated successfully at ${portalDir}`);
+      prompts.displayGeneratedPortalMessage(portalDir);
     } catch (error) {
+      prompts.displayGeneratingPortalErrorMessage();
       this.handleError(error);
     }
 
-    const app = express();
+    serverService.setupServer(portalDir);
 
-    const liveReloadServer = livereload.createServer();
-    liveReloadServer.watch(portalDir);
+    serverService.startServer(
+      {
+        generatedPortalPath: portalDir,
+        targetFolder: sourceDir,
+        configDir: this.config.configDir,
+        authKey: overrideAuthKey,
+        port,
+        openInBrowser: flags.open
+      },
+      flags.reload
+    );
 
-    app.use(connectLivereload());
-
-    app.use(express.static(portalDir));
-
-    const server = app.listen(port, () => {
-      this.log(`Server started at http://localhost:${port} \nPress CTRL+C to stop the server.`);
-      if (flags.open) {
-        open(`http://localhost:${port}`);
-      }
-    });
-
-    if (flags.reload) {
-      watchAndRegeneratePortal(sourceDir, portalDir, this.config.configDir, overrideAuthKey, ignoredPaths);
-    } else {
-      fs.watch(sourceDir, { recursive: true }, (eventType, filename) => {
-        if (eventType === "change") {
-          this.log(`Change detected in build input file ${filename}. Reload is disabled, no action taken.`);
-        }
-      });
-    }
-
-    return new Promise<void>((resolve) => {
-      const shutdown = () => {
-        this.log("Shutting down server...");
-        liveReloadServer.close();
-        server.close(() => {
-          this.log("Server shut down successfully.");
-          resolve();
-          process.exit(0);
-        });
-      };
-
-      process.on("SIGINT", shutdown);
-      process.on("SIGTERM", shutdown);
-    });
+    prompts.displayOutroMessage(port);
   }
 
   private handleError(error: any) {
     if (axios.isAxiosError(error)) {
       const axiosError = error;
       if (axiosError.response) {
-        this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
+        if (axiosError.response.status == 422) {
+          this.error(`Failed to generate or serve the portal: Please check if your build file is setup correctly.`);
+        } else {
+          this.error(
+            `Failed to generate or serve the portal: ${axiosError.response.status} ${error.response?.statusText}`
+          );
+        }
+      } else if (axiosError.request) {
+        this.error(
+          `Failed to generate or serve the portal: No response received from the server. Check your internet connection.`
+        );
       } else {
-        this.error(`Failed to generate or serve the portal: ${axiosError.message}`);
+        this.error(`Failed to regenerate or serve the portal: ${axiosError.message}`);
       }
     } else {
       this.error(`Failed to generate or serve the portal: ${(error as Error).message}`);

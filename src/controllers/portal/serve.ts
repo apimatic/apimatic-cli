@@ -2,16 +2,17 @@ import * as path from "path";
 import * as chokidar from "chokidar";
 import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { validateAndZipPortalSource } from "../../utils/utils";
+import { getMessageInRedColor, validateAndZipPortalSource } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "./generate";
+import axios from "axios";
 
 const progressSpinner = {
   frames: ["🔄", "🔃", "🔁", "🔂"],
   isRunning: false,
   interval: null as NodeJS.Timeout | null,
   frameIndex: 0,
-  text: "Regenerating portal...",
+  text: "Regenerating portal... ",
   start() {
     this.interval = setInterval(() => {
       this.frameIndex = (this.frameIndex + 1) % this.frames.length;
@@ -22,7 +23,13 @@ const progressSpinner = {
     if (this.interval !== null) {
       clearInterval(this.interval);
     }
-    process.stdout.write("\r\u001b[K  ✅  Portal regenerated successfully.");
+    process.stdout.write("\r\u001b[K  ✅  Portal regenerated successfully. ");
+  },
+  error() {
+    if (this.interval !== null) {
+      clearInterval(this.interval);
+    }
+    process.stdout.write("\r\u001b[K  ❌  Portal regeneration unsuccessful. ");
   },
   format() {
     return `  ${this.frames[this.frameIndex]}  ${this.text}`;
@@ -53,15 +60,15 @@ export const watchAndRegeneratePortal = async (
 
   watcher
     .on("change", async () => {
-      try {
-        progressSpinner.start();
-        await generatePortal(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
-        progressSpinner.stop();
-      } catch (error) {
-        console.error("Error during portal regeneration:", error);
-      }
+      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
     })
-    .on("error", (error: any) => {
+    .on("unlinkDir", async () => {
+      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
+    })
+    .on("unlink", async () => {
+      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
+    })
+    .on("error", (error: Error) => {
       console.error("Watcher error:", error);
     });
 
@@ -95,3 +102,46 @@ export const generatePortal = async (
 
   await downloadDocsPortal(generatePortalParams, configDir);
 };
+
+async function handleFileChange(
+  sourceDir: string,
+  portalDir: string,
+  configDir: string,
+  overrideAuthKey: string | null,
+  absoluteIgnoredPaths: string[]
+) {
+  try {
+    progressSpinner.start();
+    await generatePortal(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
+    progressSpinner.stop();
+  } catch (error) {
+    progressSpinner.error();
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        if (error.response.status == 422) {
+          console.error(
+            getMessageInRedColor(`Failed to regenerate portal: Please check if your build file is correct.`)
+          );
+        } else {
+          console.error(
+            getMessageInRedColor(
+              `Failed to regenerate portal: Server returned ${error.response.status} ${error.response.statusText}`
+            )
+          );
+        }
+      } else if (error.request) {
+        console.error(
+          getMessageInRedColor(
+            `Failed to regenerate portal: No response received from server. Check your internet connection.`
+          )
+        );
+      } else {
+        console.error(getMessageInRedColor(`Failed to regenerate portal: ${error.message}`));
+      }
+    } else {
+      console.error(
+        getMessageInRedColor(`Failed to regenerate portal: ${error instanceof Error ? error.message : "Unknown error"}`)
+      );
+    }
+  }
+}

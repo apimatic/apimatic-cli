@@ -26,25 +26,16 @@ import { PortalServerService } from "../../services/portal/server";
 export class PortalQuickstartController {
   private specUrl = "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
 
-  async isUserAuthenticated(authKey: string | null, configDir: string): Promise<boolean> {
-    if (!authKey) {
-      const storedAuth = await getAuthInfo(configDir);
-      if (!storedAuth || !storedAuth.authKey) {
-        return false;
-      }
-
-      return true;
+  async isUserAuthenticated(configDir: string): Promise<boolean> {
+    const storedAuth = await getAuthInfo(configDir);
+    if (!storedAuth || !storedAuth.authKey) {
+      return false;
     }
-    return false;
+    return true;
   }
 
   async userLogin(credentials: LoginCredentials, client: SDKClient, configDir: string): Promise<void> {
-    try {
-      await client.login(credentials.email, credentials.password, configDir);
-    } 
-    catch (error) {
-      throw new Error(getMessageInRedColor(`There was a problem logging in. Please verify your credentials and try again.`));
-    }
+    await client.login(credentials.email, credentials.password, configDir);
   }
 
   async getSpecFile(spec: string): Promise<SpecFile> {
@@ -52,26 +43,50 @@ export class PortalQuickstartController {
     const tempSpecDir = await createTempDirectory();
 
     if (spec) {
-      const specPath = String(spec);
+      let specPath = String(spec);
 
       if (isValidUrl(specPath)) {
         try {
+          const response = await axios.head(specPath);
+
+          if (response.headers["content-type"].includes("text/html")) {
+            throw new Error(
+              getMessageInRedColor(`Invalid URL entered, there is no file present at the URL specified.`)
+            );
+          }
+
           const specFile = await axios.get(specPath, { responseType: "arraybuffer" });
           const fileName = path.basename(specPath);
           filePath = path.join(tempSpecDir, fileName);
           await fsextra.writeFile(filePath, specFile.data);
         } catch (error) {
-          throw new Error(getMessageInRedColor(`There was an error fetching your spec: ${error}`));
+          if (axios.isAxiosError(error)) {
+            if (error.response) {
+              throw new Error(
+                getMessageInRedColor(
+                  `Failed to download spec: Server returned ${error.response.status} ${error.response.statusText}`
+                )
+              );
+            } else if (error.request) {
+              throw new Error(
+                getMessageInRedColor(
+                  `Failed to download spec: No response received from server. Check your internet connection.`
+                )
+              );
+            } else {
+              throw new Error(getMessageInRedColor(`Failed to download spec: ${error.message}`));
+            }
+          } else {
+            // File system errors when writing file
+            throw new Error(
+              getMessageInRedColor(
+                `Failed to save spec file: ${error instanceof Error ? error.message : "Unknown error"}`
+              )
+            );
+          }
         }
       } else {
-        if (fs.statSync(specPath).isDirectory()) {
-          throw new Error(
-            getMessageInRedColor(
-              "Invalid path entered. Please enter a path to a valid file or zip file."
-            )
-          );
-        }
-
+        specPath = path.normalize(specPath);
         const fileType = await filetype.fromFile(specPath);
 
         if (fileType?.ext === "zip") {
@@ -110,12 +125,10 @@ export class PortalQuickstartController {
 
     try {
       await git.clone(staticPortalRepoUrl, targetFolder);
+    } catch (error) {
+      throw new Error(getMessageInRedColor(`There was an error setting up the build directory. ${error}`));
     }
-    catch (error)
-    {
-      throw new Error(getMessageInRedColor(`There was an error setting up the build directory. Please ensure the directory is empty.`));
-    }
-    
+
     await clearDirectory(path.join(targetFolder, ".github"));
 
     if (specFile.filePath && validationSummary.success) {
@@ -171,36 +184,31 @@ export class PortalQuickstartController {
     }
   }
 
-  async generatePortalArtifacts(
-    targetFolder: string,
-    configDir: string,
-    overrideAuthKey: string | null
-  ): Promise<string> {
+  async generatePortalArtifacts(targetFolder: string, configDir: string): Promise<string> {
     const generatedPortalPath = path.join(targetFolder, "api-portal");
 
     try {
-      await generatePortal(targetFolder, generatedPortalPath, configDir, overrideAuthKey);
+      await generatePortal(targetFolder, generatedPortalPath, configDir, null);
       return generatedPortalPath;
     } catch (error) {
       throw new Error(getMessageInRedColor(`Something went wrong while generating the portal artifacts: ${error}`));
     }
   }
 
-  async servePortal(
-    generatedPortalPath: string,
-    targetFolder: string,
-    configDir: string,
-    authKey: string | null
-  ): Promise<void> {
+  async servePortal(generatedPortalPath: string, targetFolder: string, configDir: string): Promise<void> {
     const server = new PortalServerService();
 
     server.setupServer(generatedPortalPath);
 
-    server.startServer({
-      generatedPortalPath,
-      targetFolder,
-      configDir,
-      authKey
-    });
+    server.startServer(
+      {
+        generatedPortalPath,
+        targetFolder,
+        configDir,
+        authKey: null
+      },
+      true,
+      false
+    );
   }
 }

@@ -13,4 +13,6 @@ export type PortalServerConfig = {
     targetFolder: string;
     configDir: string;
     authKey: string | null;
+    port?: number;
+    openInBrowser?: boolean;
 }

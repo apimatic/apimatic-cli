@@ -1,20 +1,15 @@
-import { flags, Command } from "@oclif/command";
+import { Command } from "@oclif/command";
 import { APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart";
 import { PortalQuickstartController } from "../../controllers/portal/quickstart";
 import { SpecFile } from "../../types/portal/quickstart";
+import { getMessageInRedColor } from "../../utils/utils";
 
 export default class PortalQuickstart extends Command {
   static description = "Get started with generating static docs portal";
 
-  static flags = {
-    "auth-key": flags.string({
-      description: "override current authentication state with an authentication key"
-    })
-  };
-
-  static examples = ['$ apimatic portal:quickstart --auth-key="yourAuthKey"'];
+  static examples = ["$ apimatic portal:quickstart"];
 
   private async getSpecFile(
     prompts: PortalQuickstartPrompts,
@@ -22,11 +17,15 @@ export default class PortalQuickstart extends Command {
   ): Promise<SpecFile> {
     const spec = await prompts.specPrompt();
 
-    const specFile = await controller.getSpecFile(spec);
+    try {
+      const specFile = await controller.getSpecFile(spec);
 
-    prompts.displaySpecValidationMessage();
+      prompts.displaySpecValidationMessage();
 
-    return specFile;
+      return specFile;
+    } catch (error) {
+      throw new Error(getMessageInRedColor(`Something went wrong while setting up your spec file: ${error}`));
+    }
   }
 
   private async getSpecValidationSummary(
@@ -35,16 +34,25 @@ export default class PortalQuickstart extends Command {
     specFile: SpecFile,
     apiValidationController: APIValidationExternalApisController
   ): Promise<ApiValidationSummary> {
-    const apiValidationSummary = await controller.getSpecValidationSummary(specFile, apiValidationController);
+    try {
+      const apiValidationSummary = await controller.getSpecValidationSummary(specFile, apiValidationController);
 
-    if (!apiValidationSummary.success) {
-      prompts.displaySpecValidationFailureMessage();
-      await prompts.specValidationFailurePrompt();
-    } else {
-      prompts.displaySpecValidationSuccessMessage();
+      if (!apiValidationSummary.success) {
+        prompts.displaySpecValidationFailureMessage();
+        await prompts.specValidationFailurePrompt();
+      } else {
+        prompts.displaySpecValidationSuccessMessage();
+      }
+
+      return apiValidationSummary;
+    } catch (error) {
+      prompts.displaySpecValidationErrorMessage();
+      throw new Error(
+        getMessageInRedColor(
+          `An error occurred while validating your spec. Please check if the path/URL is correct and points to a valid file.`
+        )
+      );
     }
-
-    return apiValidationSummary;
   }
 
   private async getBuildDirectory(
@@ -54,64 +62,64 @@ export default class PortalQuickstart extends Command {
     apiValidationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<string> {
-    const directory = await prompts.buildDirectoryPrompt();
+    try {
+      const directory = await prompts.buildDirectoryPrompt();
 
-    prompts.displayBuildDirectoryGenerationMessage();
+      prompts.displayBuildDirectoryGenerationMessage();
 
-    await controller.setupBuildDirectory(directory, specFile, apiValidationSummary, languages);
+      await controller.setupBuildDirectory(directory, specFile, apiValidationSummary, languages);
 
-    prompts.displayBuildDirectoryGenerationSuccessMessage(directory);
+      prompts.displayBuildDirectoryGenerationSuccessMessage(directory);
 
-    prompts.displayBuildDirectoryAsTree(directory);
+      prompts.displayBuildDirectoryAsTree(directory);
 
-    return directory;
+      return directory;
+    } catch (error) {
+      throw new Error(getMessageInRedColor(`Something went wrong while setting up your build directory: ${error}`));
+    }
   }
 
   private async getGeneratedPortalPath(
     prompts: PortalQuickstartPrompts,
     controller: PortalQuickstartController,
-    directory: string,
-    overrideAuthKey: string | null
+    directory: string
   ): Promise<string> {
-    prompts.displayPortalGenerationMessage();
+    try {
+      prompts.displayPortalGenerationMessage();
 
-    const generatedPortalPath = await controller.generatePortalArtifacts(
-      directory,
-      this.config.configDir,
-      overrideAuthKey
-    );
+      const generatedPortalPath = await controller.generatePortalArtifacts(directory, this.config.configDir);
 
-    prompts.displayPortalGenerationSuccessMessage();
+      prompts.displayPortalGenerationSuccessMessage();
 
-    return generatedPortalPath;
+      return generatedPortalPath;
+    } catch (error) {
+      throw new Error(getMessageInRedColor(`Something went wrong while generating the portal: ${error}`));
+    }
   }
 
   async run() {
-    const { flags } = this.parse(PortalQuickstart);
-    const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-
     const prompts = new PortalQuickstartPrompts();
     const controller = new PortalQuickstartController();
 
-    //TODO: Fix double initialization of clients.
-    const sdkClient: SDKClient = SDKClient.getInstance();
-
     prompts.displayWelcomeMessage();
 
-    const loggedIn = await controller.isUserAuthenticated(overrideAuthKey, this.config.configDir);
+    let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
 
-    if (!loggedIn) {
+    while (!loggedIn) {
       const credentials = await prompts.loginPrompt();
 
       prompts.displayLoggingInMessage();
 
-      await controller.userLogin(credentials, sdkClient, this.config.configDir);
-
-      prompts.displayLoggedInMessage();
+      try {
+        await controller.userLogin(credentials, SDKClient.getInstance(), this.config.configDir);
+        loggedIn = true;
+        prompts.displayLoggedInMessage();
+      } catch (error) {
+        prompts.displayLoggingInErrorMessage();
+      }
     }
 
-    //TODO: Fix double initialization of clients.
-    const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+    const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
     const apiValidationController: APIValidationExternalApisController = new APIValidationExternalApisController(
       client
     );
@@ -129,9 +137,9 @@ export default class PortalQuickstart extends Command {
 
     const directory = await this.getBuildDirectory(prompts, controller, specFile, apiValidationSummary, languages);
 
-    const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory, overrideAuthKey);
+    const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory);
 
-    controller.servePortal(generatedPortalPath, directory, this.config.configDir, overrideAuthKey);
+    controller.servePortal(generatedPortalPath, directory, this.config.configDir);
 
     prompts.displayOutroMessage();
   }

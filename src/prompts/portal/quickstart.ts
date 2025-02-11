@@ -22,6 +22,7 @@ export class PortalQuickstartPrompts {
   private customizeTheSdks =
     "\u001b]8;;https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/\u001b\\\u001b[4mcustomize the SDKs\u001b[0m\u001b]8;;\u001b\\";
   private portalDirectory = "apimatic-quickstart-portal";
+  private defaultPortalDirectory = path.join(process.cwd(), this.portalDirectory);
 
   displayWelcomeMessage(): void {
     intro(`Hello there 👋`);
@@ -39,6 +40,13 @@ export class PortalQuickstartPrompts {
       validate: (input) => {
         if (!input) {
           return getMessageInRedColor("Email is required.");
+        }
+
+        const emailRegex =
+          /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+        if (!emailRegex.test(input)) {
+          return getMessageInRedColor("Please enter a valid email address.");
         }
       }
     });
@@ -69,6 +77,12 @@ export class PortalQuickstartPrompts {
     this.spin.start(getMessageInMagentaColor("Logging in"));
   }
 
+  displayLoggingInErrorMessage(): void {
+    this.spin.stop(
+      getMessageInRedColor(`There was a problem logging in. Please verify your credentials and try again.`)
+    );
+  }
+
   displayLoggedInMessage(): void {
     this.spin.stop(getMessageInCyanColor("✅  Login successful!"));
   }
@@ -81,9 +95,21 @@ export class PortalQuickstartPrompts {
       placeholder: "Press Enter to use a sample OpenAPI file for APIMatic",
       defaultValue: "",
       validate: (input) => {
-        if (!isValidUrl && !fs.existsSync(path.resolve(input))) {
-          return getMessageInRedColor("The directory path does not exist.");
+        if (!input) return;
+
+        if (isValidUrl(input)) return;
+
+        const resolvedPath = path.resolve(input);
+
+        if (fs.existsSync(resolvedPath)) {
+          if (fs.statSync(resolvedPath).isFile()) {
+            return;
+          }
+
+          return getMessageInRedColor("Invalid path entered. Please enter a path to a valid file or zip file.");
         }
+
+        return getMessageInRedColor("The path is invalid, it does not exist.");
       }
     });
 
@@ -106,6 +132,10 @@ export class PortalQuickstartPrompts {
 
   displaySpecValidationSuccessMessage(): void {
     this.spin.stop(getMessageInCyanColor(`✅  Validation Successful.`));
+  }
+
+  displaySpecValidationErrorMessage(): void {
+    this.spin.stop(getMessageInRedColor(`Something went wrong while validating your spec.`));
   }
 
   displaySpecValidationFailureMessage(): void {
@@ -171,8 +201,19 @@ export class PortalQuickstartPrompts {
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        if (!fs.existsSync(path.resolve(input))) {
+        const dirPath = path.resolve(input.trim() || this.portalDirectory);
+
+        if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectory) {
           return getMessageInRedColor("The directory path does not exist.");
+        }
+
+        if (dirPath !== this.defaultPortalDirectory) {
+          const files = fs.readdirSync(dirPath);
+          if (files.length > 0) {
+            return getMessageInRedColor("The directory is not empty. Please enter another directory.");
+          }
+        } else if (fs.existsSync(dirPath) && fs.readdirSync(dirPath).length > 0) {
+          return getMessageInRedColor("The directory is not empty. Please enter another directory.");
         }
       }
     });
@@ -183,7 +224,7 @@ export class PortalQuickstartPrompts {
     }
 
     if (directory === "./") {
-      return path.join(process.cwd(), this.portalDirectory);
+      return this.defaultPortalDirectory;
     } else {
       return path.join(String(directory), this.portalDirectory);
     }
@@ -202,7 +243,10 @@ export class PortalQuickstartPrompts {
 
     const tree = treeify.asTree(buildDirectory, true, true);
 
-    const coloredLogString = tree.replace(/(#.*?$)/gm, (match) => getMessageInGreenColor(match));
+    const coloredLogString = tree
+      .split("\n")
+      .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
+      .join("\n");
 
     log.info(coloredLogString);
   }

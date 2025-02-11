@@ -124,11 +124,26 @@ export const directoryToJson = (dirPath: string, parentPath = ''): DirectoryNode
 };
 
 export const isValidUrl = (input: string): boolean => {
+  if (!input)
+  {
+    return false;
+  }
+
   try {
-    new URL(input);
-    if (fs.existsSync(input)) {
+    const url = new URL(input);
+
+    if (!['http:', 'https:'].includes(url.protocol)) {
       return false;
     }
+
+    if (url.protocol === 'file:' || fs.existsSync(input)) {
+      return false;
+    }
+
+    if (!url.host) {
+      return false;
+    }
+
     return true;
   }
   catch (_) {
@@ -299,9 +314,23 @@ export const printValidationMessages = (
  * @param destinationDir Path to the destination directory where files will be extracted.
  */
 export async function extractZipFile(zipFilePath: string, destinationDir: string): Promise<void> {
+  const MAX_ZIP_SIZE = 100 * 1024 * 1024;
+
   return new Promise((resolve, reject) => {
     try {
       const zip = new AdmZip(zipFilePath);
+      const zipEntries = zip.getEntries();
+      let totalSize = 0;
+
+      zipEntries.forEach(entry => {
+        totalSize += entry.header.size;
+      })
+      
+      if (totalSize > MAX_ZIP_SIZE)
+      {
+        throw new Error(getMessageInRedColor('Archive size is too large for safe extraction.'));
+      }
+
       // Perform extraction in next tick to simulate async behavior
       process.nextTick(() => {
         try {
