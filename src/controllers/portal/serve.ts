@@ -45,10 +45,12 @@ export const watchAndRegeneratePortal = async (
 ) => {
   // Convert ignoredPaths to absolute paths for consistent comparison
   const generatedZipPath = path.join(sourceDir, "portal_source.zip");
+  const generatedPortalZipPath = path.join(sourceDir, "generated_portal.zip");
   const generatedPortalPath = path.join(path.dirname(portalDir), "api-portal");
   const absoluteIgnoredPaths = [
     ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== ""),
     generatedZipPath,
+    generatedPortalZipPath,
     generatedPortalPath
   ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
 

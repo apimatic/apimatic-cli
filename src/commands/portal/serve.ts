@@ -30,12 +30,12 @@ export default class PortalServe extends Command {
     }),
     open: flags.boolean({
       char: "o",
-      description: "Open the portal in the default browser.",
+      description: "Open the portal in the default browser. Disabled (false) by default.",
       default: false
     }),
     reload: flags.boolean({
       char: "r",
-      description: "Enable or disable hot reload. Enabled by default.",
+      description: "Enable or disable hot reload. Enabled (true) by default.",
       default: true
     }),
     ignore: flags.string({
@@ -53,8 +53,8 @@ export default class PortalServe extends Command {
   async run() {
     const { flags } = this.parse(PortalServe);
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
-    const portalDir = flags.destination;
-    const sourceDir = flags.source;
+    const portalDir = path.resolve(flags.destination);
+    const sourceDir = path.resolve(flags.source);
     const port = flags.port;
     const overrideAuthKey = flags["auth-key"] ?? null;
     const serverService = new PortalServerService();
@@ -64,8 +64,13 @@ export default class PortalServe extends Command {
       throw new Error("Port number specified was invalid. Please enter a valid port number.");
     }
 
-    if (!(await fs.pathExists(sourceDir))) {
+    if (!fs.pathExistsSync(sourceDir)) {
       throw new Error(`The specified source directory does not exist: ${sourceDir}`);
+    }
+
+    if (!fs.existsSync(portalDir))
+    {
+      fs.ensureDirSync(portalDir);
     }
 
     try {

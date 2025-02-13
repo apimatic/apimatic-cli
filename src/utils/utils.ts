@@ -336,7 +336,7 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
           throw new Error("An error occurred while extracting zip file.");
         }
 
-        zip.extractEntryTo(entry, destinationDir);
+        zip.extractEntryTo(entry, destinationDir, true, true);
       });
       resolve();
     } catch (error) {
