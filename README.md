@@ -37,6 +37,8 @@ USAGE
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
+* [`apimatic portal:quickstart`](#apimatic-portalquickstart)
+* [`apimatic portal:serve`](#apimatic-portalserve)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
 
 ## `apimatic api:transform`
@@ -213,6 +215,50 @@ EXAMPLE
 ```
 
 _See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v0.0.0-alpha.3/src/commands/portal/generate.ts)_
+
+## `apimatic portal:quickstart`
+
+Create your first API Portal using APIMatic’s Docs as Code offering.
+
+```
+USAGE
+  $ apimatic portal:quickstart
+
+DESCRIPTION
+  Create your first API Portal using APIMatic’s Docs as Code offering.
+
+EXAMPLES
+  $ apimatic portal:quickstart
+```
+
+_See code: [src/commands/portal/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/quickstart.ts)_
+
+## `apimatic portal:serve`
+
+Generate, serve and visualize the docs-as-code portal with hot reload
+
+```
+USAGE
+  $ apimatic portal:serve [-p <value>] [-d <value>] [-s <value>] [-o] [-r] [-i <value>] [--auth-key <value>]
+
+FLAGS
+  -d, --destination=<value>  [default: ./api-portal] Directory to store and serve the generated portal.
+  -i, --ignore=<value>       Comma-separated list of files/directories to ignore.
+  -o, --open                 Open the portal in the default browser.
+  -p, --port=<value>         [default: 3000] Port to serve the portal.
+  -r, --[no-]reload          Enable or disable hot reload. Enabled by default. Can be disabled with `--no-reload`.
+  -s, --source=<value>       [default: ./] Source directory containing specs, content, and build file. By default, the
+                             current directory is used.
+      --auth-key=<value>     Override current authentication state with an authentication key.
+
+DESCRIPTION
+  Generate, serve and visualize the docs-as-code portal with hot reload
+
+EXAMPLES
+  $ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --reload
+```
+
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/serve.ts)_
 
 ## `apimatic sdk:generate`
 
