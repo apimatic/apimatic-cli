@@ -108,7 +108,7 @@ export default class PortalServe extends Command {
             `Failed to generate or serve the portal: Either the build file is missing or the build file was not a valid zip archive.`
           );
         } else if (axiosError.response.status == 401) {
-          this.error(`Failed to generate or serve the portal: Please check if your auth key is correctly entered and valid.`);
+          this.error(`Failed to generate or serve the portal: Please check if you are logged in or your auth key is correctly entered and valid.`);
         } else if (axiosError.response.status == 403) {
           this.error(`Failed to generate or serve the portal: Please check your subscription details.`);
         } else if (axiosError.response.status == 422) {
