@@ -47,11 +47,13 @@ export const watchAndRegeneratePortal = async (
   const generatedZipPath = path.join(sourceDir, "portal_source.zip");
   const generatedPortalZipPath = path.join(sourceDir, "generated_portal.zip");
   const generatedPortalPath = path.join(path.dirname(portalDir), "api-portal");
+  const gitFolderPath = path.join(path.dirname(portalDir), ".git");
   const absoluteIgnoredPaths = [
     ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== ""),
     generatedZipPath,
     generatedPortalZipPath,
-    generatedPortalPath
+    generatedPortalPath,
+    gitFolderPath
   ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
 
   const watcher = chokidar.watch(sourceDir, {
@@ -60,8 +62,21 @@ export const watchAndRegeneratePortal = async (
     persistent: true
   });
 
+  const deletedDirectories = new Set<string>();
+
   watcher
-    .on("all", async () => {
+    .on("all", async (event, path) => {
+      if (event == "unlinkDir") {
+        deletedDirectories.add(path);
+      }
+
+      if (event == "unlink") {
+        for (const dir of deletedDirectories) {
+          if (path.startsWith(dir)) {
+            return;
+          }
+        }
+      }
       await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
     })
     .on("error", (error: Error) => {
@@ -114,7 +129,15 @@ async function handleFileChange(
     progressSpinner.error();
     if (axios.isAxiosError(error)) {
       if (error.response) {
-        if (error.response.status == 422) {
+        if (error.response.status == 400) {
+          console.error(
+            getMessageInRedColor(
+              `Failed to regenerate portal: Either the build file is missing or the build file was not a valid zip archive.`
+            )
+          );
+        } else if (error.response.status == 403) {
+          console.error(getMessageInRedColor(`Failed to regenerate portal: Please check your subscription details.`));
+        } else if (error.response.status == 422) {
           console.error(
             getMessageInRedColor(`Failed to regenerate portal: Please check if your build file is correct.`)
           );
@@ -126,11 +149,7 @@ async function handleFileChange(
           );
         }
       } else if (error.request) {
-        console.error(
-          getMessageInRedColor(
-            `Failed to regenerate portal: No response received from server. Check your internet connection.`
-          )
-        );
+        console.error(getMessageInRedColor(`Failed to regenerate portal: Bad request.`));
       } else {
         console.error(getMessageInRedColor(`Failed to regenerate portal: ${error.message}`));
       }

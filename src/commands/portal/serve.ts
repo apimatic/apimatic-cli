@@ -30,13 +30,14 @@ export default class PortalServe extends Command {
     }),
     open: flags.boolean({
       char: "o",
-      description: "Open the portal in the default browser. Disabled (false) by default.",
+      description: "Open the portal in the default browser.",
       default: false
     }),
     reload: flags.boolean({
       char: "r",
-      description: "Enable or disable hot reload. Enabled (true) by default.",
-      default: true
+      description: "Enable or disable hot reload. Enabled by default. Can be disabled with `--no-reload`.",
+      default: true,
+      allowNo: true
     }),
     ignore: flags.string({
       char: "i",
@@ -68,8 +69,7 @@ export default class PortalServe extends Command {
       throw new Error(`The specified source directory does not exist: ${sourceDir}`);
     }
 
-    if (!fs.existsSync(portalDir))
-    {
+    if (!fs.existsSync(portalDir)) {
       fs.ensureDirSync(portalDir);
     }
 
@@ -103,7 +103,15 @@ export default class PortalServe extends Command {
     if (axios.isAxiosError(error)) {
       const axiosError = error;
       if (axiosError.response) {
-        if (axiosError.response.status == 422) {
+        if (axiosError.response.status == 400) {
+          this.error(
+            `Failed to generate or serve the portal: Either the build file is missing or the build file was not a valid zip archive.`
+          );
+        } else if (axiosError.response.status == 401) {
+          this.error(`Failed to generate or serve the portal: Please check if your auth key is correctly entered and valid.`);
+        } else if (axiosError.response.status == 403) {
+          this.error(`Failed to generate or serve the portal: Please check your subscription details.`);
+        } else if (axiosError.response.status == 422) {
           this.error(`Failed to generate or serve the portal: Please check if your build file is setup correctly.`);
         } else {
           this.error(
@@ -111,9 +119,7 @@ export default class PortalServe extends Command {
           );
         }
       } else if (axiosError.request) {
-        this.error(
-          `Failed to generate or serve the portal: No response received from the server. Check your internet connection.`
-        );
+        this.error(`Failed to generate or serve the portal: Bad request.`);
       } else {
         this.error(`Failed to regenerate or serve the portal: ${axiosError.message}`);
       }

@@ -37,12 +37,6 @@ export class PortalServerService {
 
         if (reload) {
           watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey);
-        } else {
-          fs.watch(targetFolder, { recursive: true }, (eventType, filename) => {
-            if (eventType === "change") {
-              console.log(`Change detected in build input file ${filename}. Reload is disabled, no action taken.`);
-            }
-          });
         }
 
         if (process.stdin.setRawMode) {

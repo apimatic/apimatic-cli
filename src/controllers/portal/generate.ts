@@ -12,10 +12,18 @@ import axiosInstance from "../../config/axios-config";
 const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey: string | null, configDir: string) => {
   const formData = new FormData();
   const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+  let authorizationHeader = "";
+  if (overrideAuthKey)
+  {
+    authorizationHeader = `X-Auth-Key ${overrideAuthKey}`; 
+  }
+  else if (authInfo) {
+    authorizationHeader = `X-Auth-Key ${authInfo.authKey}`;
+  }
   formData.append("file", fs.createReadStream(zippedBuildFilePath));
   const config: AxiosRequestConfig = {
     headers: {
-      Authorization: authInfo || overrideAuthKey ? `X-Auth-Key ${authInfo?.authKey.trim() || overrideAuthKey}` : "",
+      Authorization: authorizationHeader,
       "User-Agent": "APIMatic CLI",
       ...formData.getHeaders()
     },

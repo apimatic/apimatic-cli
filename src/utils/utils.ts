@@ -369,9 +369,10 @@ export async function validateAndZipPortalSource(
         const fullPath = path.join(currentPath, item);
         const relativePath = path.relative(sourceDir, fullPath);
 
-        // Check if the path is ignored
+        // Check if the path is ignored.
         const isIgnored = ignoredPaths.some(
           (ignoredPath) =>
+            fullPath === ignoredPath ||
             relativePath === ignoredPath ||
             relativePath.startsWith(ignoredPath + "/") ||
             relativePath.startsWith(ignoredPath + "\\")
