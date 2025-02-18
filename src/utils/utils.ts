@@ -365,6 +365,12 @@ export async function validateAndZipPortalSource(
     // Function to recursively add files and directories to the archive, excluding ignored paths
     const addItemsToArchive = async (currentPath: string, archivePath: string | false) => {
       const items = await fs.readdir(currentPath);
+
+      if (!items.includes('APIMATIC-BUILD.json'))
+      {
+        throw new Error('Build file is missing, portal cannot be generated.');
+      }
+
       for (const item of items) {
         const fullPath = path.join(currentPath, item);
         const relativePath = path.relative(sourceDir, fullPath);

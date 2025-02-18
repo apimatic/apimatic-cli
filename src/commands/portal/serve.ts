@@ -69,8 +69,14 @@ export default class PortalServe extends Command {
       throw new Error(`The specified source directory does not exist: ${sourceDir}`);
     }
 
-    if (!fs.existsSync(portalDir)) {
-      fs.ensureDirSync(portalDir);
+    if (!fs.pathExistsSync(flags.destination) && flags.destination != './api-portal')
+    {
+      throw new Error(`The specified destination directory does not exist: ${flags.destination}`);
+    }
+
+    if (flags.destination == './api-portal')
+    {
+      fs.ensureDir(portalDir);
     }
 
     try {
