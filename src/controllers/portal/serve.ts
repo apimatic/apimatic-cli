@@ -57,7 +57,9 @@ export const watchAndRegeneratePortal = async (
   ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
 
   const watcher = chokidar.watch(sourceDir, {
-    ignored: absoluteIgnoredPaths,
+    ignored: (path) => {
+      return absoluteIgnoredPaths.includes(path) || /(^|[/\\])\..+/.test(path);
+    },
     ignoreInitial: true,
     persistent: true
   });
