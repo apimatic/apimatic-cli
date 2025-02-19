@@ -142,11 +142,11 @@ async function handleFileChange(
         } else if (error.response.status == 422) {
           console.error(
             getMessageInRedColor(
-              `Failed to generate the portal: We ran into a problem while processing your build file. Please check if your build file is setup correctly.`
+              `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
             )
           );
         } else if (error.response.status == 500) {
-          console.error(`Failed to generate the portal: Please verify if your build file is valid.`);
+          console.error(`Failed to generate the portal: Please verify if your build input is valid.`);
         } else {
           console.error(
             getMessageInRedColor(

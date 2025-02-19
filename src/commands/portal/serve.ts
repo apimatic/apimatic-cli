@@ -123,10 +123,10 @@ export default class PortalServe extends Command {
           this.error(`Failed to generate or serve the portal: Please check your subscription details.`);
         } else if (axiosError.response.status == 422) {
           this.error(
-            `Failed to generate or serve the portal: We ran into a problem while processing your build file. Please check if your build file is setup correctly.`
+            `Failed to generate or serve the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
           );
         } else if (axiosError.response.status == 500) {
-          this.error(`Failed to generate or serve the portal: Please verify if your build file is valid.`);
+          this.error(`Failed to generate or serve the portal: Please verify if your build input is valid.`);
         } else {
           this.error(
             `Failed to generate or serve the portal: ${axiosError.response.status} ${error.response?.statusText}`
