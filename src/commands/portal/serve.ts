@@ -69,13 +69,11 @@ export default class PortalServe extends Command {
       throw new Error(`The specified source directory does not exist: ${sourceDir}`);
     }
 
-    if (!fs.pathExistsSync(flags.destination) && flags.destination != './api-portal')
-    {
+    if (!fs.pathExistsSync(flags.destination) && flags.destination != "./api-portal") {
       throw new Error(`The specified destination directory does not exist: ${flags.destination}`);
     }
 
-    if (flags.destination == './api-portal')
-    {
+    if (flags.destination == "./api-portal") {
       fs.ensureDir(portalDir);
     }
 
@@ -108,17 +106,27 @@ export default class PortalServe extends Command {
   private handleError(error: unknown) {
     if (axios.isAxiosError(error)) {
       const axiosError = error;
-      if (axiosError.response) {
+      if (axiosError.code === "ECONNABORTED") {
+        this.error(
+          `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+        );
+      } else if (axiosError.response) {
         if (axiosError.response.status == 400) {
           this.error(
             `Failed to generate or serve the portal: Either the build file is missing or the build file was not a valid zip archive.`
           );
         } else if (axiosError.response.status == 401) {
-          this.error(`Failed to generate or serve the portal: Please check if you are logged in or your auth key is correctly entered and valid.`);
+          this.error(
+            `Failed to generate or serve the portal: Please check if you are logged in or your auth key is correctly entered and valid.`
+          );
         } else if (axiosError.response.status == 403) {
           this.error(`Failed to generate or serve the portal: Please check your subscription details.`);
         } else if (axiosError.response.status == 422) {
-          this.error(`Failed to generate or serve the portal: Please check if your build file is setup correctly.`);
+          this.error(
+            `Failed to generate or serve the portal: We ran into a problem while processing your build file. Please check if your build file is setup correctly.`
+          );
+        } else if (axiosError.response.status == 500) {
+          this.error(`Failed to generate or serve the portal: Please verify if your build file is valid.`);
         } else {
           this.error(
             `Failed to generate or serve the portal: ${axiosError.response.status} ${error.response?.statusText}`

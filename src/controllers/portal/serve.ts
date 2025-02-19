@@ -51,14 +51,11 @@ export const watchAndRegeneratePortal = async (
     ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== ""),
     generatedZipPath,
     generatedPortalZipPath,
-    generatedPortalPath,
+    generatedPortalPath
   ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
 
   const watcher = chokidar.watch(sourceDir, {
-    ignored: [
-      ...absoluteIgnoredPaths,
-      /(^|[/\\])\..+/
-    ],
+    ignored: [...absoluteIgnoredPaths, /(^|[/\\])\..+/],
     ignoreInitial: true,
     persistent: true
   });
@@ -129,7 +126,11 @@ async function handleFileChange(
   } catch (error) {
     progressSpinner.error();
     if (axios.isAxiosError(error)) {
-      if (error.response) {
+      if (error.code === "ECONNABORTED") {
+        console.error(
+          `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+        );
+      } else if (error.response) {
         if (error.response.status == 400) {
           console.error(
             getMessageInRedColor(
@@ -140,8 +141,12 @@ async function handleFileChange(
           console.error(getMessageInRedColor(`Failed to regenerate portal: Please check your subscription details.`));
         } else if (error.response.status == 422) {
           console.error(
-            getMessageInRedColor(`Failed to regenerate portal: Please check if your build file is correct.`)
+            getMessageInRedColor(
+              `Failed to generate the portal: We ran into a problem while processing your build file. Please check if your build file is setup correctly.`
+            )
           );
+        } else if (error.response.status == 500) {
+          console.error(`Failed to generate the portal: Please verify if your build file is valid.`);
         } else {
           console.error(
             getMessageInRedColor(

@@ -68,11 +68,7 @@ export class PortalQuickstartController {
                 )
               );
             } else if (error.request) {
-              throw new Error(
-                getMessageInRedColor(
-                  `Failed to download spec: No response received from server. Check your internet connection.`
-                )
-              );
+              throw new Error(getMessageInRedColor(`Failed to download spec: Bad request.`));
             } else {
               throw new Error(getMessageInRedColor(`Failed to download spec: ${error.message}`));
             }
