@@ -47,19 +47,18 @@ export const watchAndRegeneratePortal = async (
   const generatedZipPath = path.join(sourceDir, "portal_source.zip");
   const generatedPortalZipPath = path.join(sourceDir, "generated_portal.zip");
   const generatedPortalPath = path.join(path.dirname(portalDir), "api-portal");
-  const gitFolderPath = path.join(path.dirname(portalDir), ".git");
   const absoluteIgnoredPaths = [
     ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== ""),
     generatedZipPath,
     generatedPortalZipPath,
     generatedPortalPath,
-    gitFolderPath
   ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
 
   const watcher = chokidar.watch(sourceDir, {
-    ignored: (path) => {
-      return absoluteIgnoredPaths.includes(path) || /(^|[/\\])\..+/.test(path);
-    },
+    ignored: [
+      ...absoluteIgnoredPaths,
+      /(^|[/\\])\..+/
+    ],
     ignoreInitial: true,
     persistent: true
   });
