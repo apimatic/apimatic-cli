@@ -15,12 +15,12 @@ import {
 export class PortalQuickstartPrompts {
   private spin = spinner();
   private vscodeExtensionUrl =
-    "\u001b]8;;https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b\\APIMatic's interactive VS Code Extension\u001b]8;;\u001b\\";
+    "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
   private serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
   private referenceDocumentation =
-    "\u001b]8;;https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal\u001b\\\u001b[4mreference documentation\u001b[0m\u001b]8;;\u001b\\";
+    "\u001b[4mhttps://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal\u001b[0m";
   private customizeTheSdks =
-    "\u001b]8;;https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/\u001b\\\u001b[4mcustomize the SDKs\u001b[0m\u001b]8;;\u001b\\";
+    "\u001b[4mhttps://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview\u001b[0m";
   private portalDirectory = "apimatic-quickstart-portal";
   private defaultPortalDirectory = path.join(process.cwd(), this.portalDirectory);
 
@@ -146,7 +146,7 @@ export class PortalQuickstartPrompts {
     const useSampleSpec = await select({
       message: `How would you like to proceed?`,
       options: [
-        { value: "exit", label: `1. Fix the issues using ${this.vscodeExtensionUrl}.` },
+        { value: "exit", label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${this.vscodeExtensionUrl}` },
         { value: "continue", label: `2. Use an example API spec instead (recommended)` }
       ]
     });
@@ -268,13 +268,13 @@ export class PortalQuickstartPrompts {
         getMessageInCyanColor(`Press CTRL+C to stop the server.\n\n`) +
         getMessageInCyanColor(`What's next?\n`) +
         getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
-        getMessageInCyanColor(`- Read the ${this.referenceDocumentation}`) +
-        getMessageInCyanColor(` to learn more about how you can customize this API Portal.\n`) +
+        getMessageInCyanColor(`- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentation}`) +
+        getMessageInCyanColor(` \n`) +
         getMessageInCyanColor(
           `- Review the SDK Documentation for your favourite programming language and download an SDK from the API Portal.\n`
         ) +
-        getMessageInCyanColor(`- Check out how you can ${this.customizeTheSdks}`) +
-        getMessageInCyanColor(` using Code Generation settings.\n`)
+        getMessageInCyanColor(`- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdks}`) +
+        getMessageInCyanColor(` \n`)
     );
   }
 }
