@@ -356,6 +356,13 @@ export async function validateAndZipPortalSource(
     zlib: { level: 9 }
   });
 
+  const items = await fs.readdir(sourceDir);
+
+  if (!items.includes('APIMATIC-BUILD.json'))
+  {
+    throw new Error('Build file is missing, portal cannot be generated.');
+  }
+
   return new Promise((resolve, reject) => {
     output.on("close", () => resolve(outputPath));
     archive.on("error", (err) => reject(err));
@@ -365,11 +372,6 @@ export async function validateAndZipPortalSource(
     // Function to recursively add files and directories to the archive, excluding ignored paths
     const addItemsToArchive = async (currentPath: string, archivePath: string | false) => {
       const items = await fs.readdir(currentPath);
-
-      if (!items.includes('APIMATIC-BUILD.json'))
-      {
-        throw new Error('Build file is missing, portal cannot be generated.');
-      }
 
       for (const item of items) {
         const fullPath = path.join(currentPath, item);
@@ -403,25 +405,25 @@ export async function validateAndZipPortalSource(
   });
 }
 export const getMessageInOrangeColor = (message: string) => {
-  return `\u001b[38;2;232;148;64m${message}\u001b[0m`;
+  return `\u001b[33m${message}\u001b[0m`;
 };
 
 export const getMessageInBlueColor = (message: string) => {
-  return `\u001b[38;2;75;184;253m${message}\u001b[0m`;
+  return `\u001b[34m${message}\u001b[0m`;
 };
 
 export const getMessageInCyanColor = (message: string) => {
-  return `\u001b[38;2;61;213;231m${message}\u001b[0m`;
+  return `\u001b[36m${message}\u001b[0m`;
 };
 
 export const getMessageInGreenColor = (message: string) => {
-  return `\u001b[38;2;57;233;168m${message}\u001b[0m`;
+  return `\u001b[32m${message}\u001b[0m`;
 };
 
 export const getMessageInMagentaColor = (message: string) => {
-  return `\u001b[38;2;225;117;153m${message}\u001b[0m`;
+  return `\u001b[35m${message}\u001b[0m`;
 };
 
 export const getMessageInRedColor = (message: string) => {
-  return `\u001b[38;2;230;80;41m${message}\u001b[0m`;
+  return `\u001b[31m${message}\u001b[0m`;
 };
