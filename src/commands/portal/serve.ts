@@ -48,7 +48,7 @@ export default class PortalServe extends Command {
     })
   };
 
-  static examples = ['$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --reload'];
+  static examples = ['$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --no-reload'];
 
   private async cleanUpGeneratedFiles(portalDir: string) {
     const generatedPortalZipFilePath = path.join(path.dirname(portalDir), "generated_portal.zip");
