@@ -124,7 +124,7 @@ export class PortalQuickstartController {
       throw new Error(getMessageInRedColor(`There was an error setting up the build directory. ${error}`));
     }
 
-    await clearDirectory(path.join(targetFolder, ".github"));
+    await clearDirectory(path.join(targetFolder, ".git"));
 
     if (specFile.filePath && validationSummary.success) {
       await deleteFile(path.join(targetFolder, "spec", "Apimatic-Calculator.json"));

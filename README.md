@@ -235,7 +235,7 @@ _See code: [src/commands/portal/quickstart.ts](https://github.com/apimatic/apima
 
 ## `apimatic portal:serve`
 
-Generate, serve and visualize the docs-as-code portal with hot reload
+Generate, serve and visualize APIMatic's Docs as Code portal with hot reload
 
 ```
 USAGE
@@ -252,7 +252,7 @@ FLAGS
       --auth-key=<value>     Override current authentication state with an authentication key.
 
 DESCRIPTION
-  Generate, serve and visualize the docs-as-code portal with hot reload
+  Generate, serve and visualize APIMatic's Docs as Code portal with hot reload
 
 EXAMPLES
   $ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --reload
