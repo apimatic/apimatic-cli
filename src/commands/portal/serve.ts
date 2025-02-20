@@ -88,8 +88,8 @@ export default class PortalServe extends Command {
       fs.ensureDir(portalDir);
     }
 
-    const sourceDirItems = fs.readdirSync(sourceDir);
-    const portalDirItems = fs.readdirSync(portalDir);
+    const sourceDirItems = fs.readdirSync(sourceDir).filter(item => !item.startsWith('.'));
+    const portalDirItems = fs.readdirSync(portalDir).filter(item => !item.startsWith('.'));
     if (sourceDirItems.length == 0) {
       this.error(getMessageInRedColor("The source directory is empty. Please check the source path and try again."));
     } else {

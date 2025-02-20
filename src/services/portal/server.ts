@@ -39,8 +39,11 @@ export class PortalServerService {
           watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
         }
 
-        if (process.stdin.setRawMode) {
-          process.stdin.setRawMode(false);
+        if (process.platform !== "darwin") //For non-macOS users.
+        {
+          if (process.stdin.setRawMode) {
+            process.stdin.setRawMode(false);
+          }
         }
       });
 
