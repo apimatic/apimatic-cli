@@ -34,11 +34,9 @@ export default class PortalServe extends Command {
       description: "Open the portal in the default browser.",
       default: false
     }),
-    reload: flags.boolean({
-      char: "r",
-      description: "Enable or disable hot reload. Enabled by default. Can be disabled with `--no-reload`.",
-      default: true,
-      allowNo: true
+    "no-reload": flags.boolean({
+      description: "Disable hot reload.",
+      default: false
     }),
     ignore: flags.string({
       char: "i",
@@ -168,7 +166,7 @@ export default class PortalServe extends Command {
         port,
         openInBrowser: flags.open
       },
-      flags.reload
+      flags["no-reload"]
     );
 
     prompts.displayOutroMessage(port);

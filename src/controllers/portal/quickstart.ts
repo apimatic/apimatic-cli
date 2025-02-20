@@ -177,7 +177,7 @@ export class PortalQuickstartController {
         configDir,
         authKey: null
       },
-      true,
+      false,
       false
     );
   }

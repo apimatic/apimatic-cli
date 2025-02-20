@@ -25,7 +25,7 @@ export class PortalServerService {
     this.app.use(express.static(generatedPortalPath));
   }
 
-  startServer(config: PortalServerConfig, reload = true, displayShutdownMessages = true): Promise<void> {
+  startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<void> {
     const { generatedPortalPath, targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
     const serverPort = port ?? this.port;
 
@@ -35,7 +35,7 @@ export class PortalServerService {
           open(`http://localhost:${serverPort}`);
         }
 
-        if (reload) {
+        if (!noReload) {
           watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
         }
 
