@@ -208,7 +208,7 @@ export class PortalQuickstartPrompts {
         }
 
         if (dirPath !== this.defaultPortalDirectory) {
-          const files = fs.readdirSync(dirPath);
+          const files = fs.readdirSync(dirPath).filter(item => !item.startsWith('.'));;
           if (files.length > 0) {
             return getMessageInRedColor("The directory is not empty. Please enter another directory.");
           }
