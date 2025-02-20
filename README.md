@@ -239,7 +239,7 @@ Generate, serve and visualize APIMatic's Docs as Code portal with hot reload.
 
 ```
 USAGE
-  $ apimatic portal:serve [-p <value>] [-d <value>] [-s <value>] [-o] [-i <value>] [--auth-key <value>]
+  $ apimatic portal:serve [-p <value>] [-d <value>] [-s <value>] [-o] [--no-reload] [-i <value>] [--auth-key <value>]
 
 FLAGS
   -d, --destination=<value>  [default: ./api-portal] Directory to store and serve the generated portal.
