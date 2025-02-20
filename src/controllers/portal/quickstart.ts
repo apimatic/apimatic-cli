@@ -125,6 +125,7 @@ export class PortalQuickstartController {
     }
 
     await clearDirectory(path.join(targetFolder, ".git"));
+    await clearDirectory(path.join(targetFolder, ".github"));
 
     if (specFile.filePath && validationSummary.success) {
       await deleteFile(path.join(targetFolder, "spec", "Apimatic-Calculator.json"));
