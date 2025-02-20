@@ -76,11 +76,11 @@ interface DirectoryNode {
 }
 
 const descriptions: { [key: string]: string } = Object.entries({
-  "APIMATIC-BUILD.json": "# All configurations for the API portal including programming languages and themes",
-  spec: "# A directory containing all your API Definition files",
-  content: "# A directory containing custom documentation pages in markdown",
-  "content/toc.yml": "# This file controls the structure of the side navigation bar in the API Portal",
-  static: "# All static files including images, GIFs and PDFs go here"
+  "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
+  spec: "# Contains all API definition files",
+  content: "# Includes custom documentation pages in Markdown",
+  "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal",
+  static: "# Includes all static files, such as images, GIFs, and PDFs"
 }).reduce((acc, [key, value]) => {
   acc[path.normalize(key)] = value;
   return acc;
