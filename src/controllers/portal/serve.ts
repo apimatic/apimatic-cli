@@ -128,7 +128,7 @@ async function handleFileChange(
     if (axios.isAxiosError(error)) {
       if (error.code === "ECONNABORTED") {
         console.error(
-          `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+          getMessageInRedColor(`Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`)
         );
       } else if (error.response) {
         if (error.response.status == 400) {
@@ -146,7 +146,7 @@ async function handleFileChange(
             )
           );
         } else if (error.response.status == 500) {
-          console.error(`Failed to generate the portal: Please verify if your build input is valid.`);
+          console.error(getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`));
         } else {
           console.error(
             getMessageInRedColor(

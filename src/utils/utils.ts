@@ -358,9 +358,10 @@ export async function validateAndZipPortalSource(
 
   const items = await fs.readdir(sourceDir);
 
-  if (!items.includes('APIMATIC-BUILD.json'))
-  {
-    throw new Error('Build file is missing, portal cannot be generated.');
+  if (!items.some((item) => item.startsWith("APIMATIC-BUILD"))) {
+    throw new Error(
+      "APIMatic Build file is missing, portal cannot be generated. Please specify a valid APIMatic build file and try again."
+    );
   }
 
   return new Promise((resolve, reject) => {
@@ -382,9 +383,11 @@ export async function validateAndZipPortalSource(
           (ignoredPath) =>
             fullPath === ignoredPath ||
             relativePath === ignoredPath ||
+            fullPath === path.resolve(ignoredPath) ||
             relativePath.startsWith(ignoredPath + "/") ||
             relativePath.startsWith(ignoredPath + "\\")
         );
+
         if (!isIgnored) {
           const stats = await fs.stat(fullPath);
           if (stats.isDirectory()) {

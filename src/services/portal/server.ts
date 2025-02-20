@@ -26,7 +26,7 @@ export class PortalServerService {
   }
 
   startServer(config: PortalServerConfig, reload = true, displayShutdownMessages = true): Promise<void> {
-    const { generatedPortalPath, targetFolder, configDir, authKey, port, openInBrowser } = config;
+    const { generatedPortalPath, targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
     const serverPort = port ?? this.port;
 
     return new Promise<void>((resolve) => {
@@ -36,7 +36,7 @@ export class PortalServerService {
         }
 
         if (reload) {
-          watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey);
+          watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
         }
 
         if (process.stdin.setRawMode) {
