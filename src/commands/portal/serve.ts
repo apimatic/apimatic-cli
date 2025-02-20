@@ -8,7 +8,7 @@ import { PortalServePrompts } from "../../prompts/portal/serve";
 import { deleteFile, getMessageInRedColor } from "../../utils/utils";
 
 export default class PortalServe extends Command {
-  static description = "Generate, serve and visualize APIMatic's Docs as Code portal with hot reload";
+  static description = "Generate, serve and visualize APIMatic's Docs as Code portal with hot reload.";
 
   static flags = {
     port: flags.integer({
