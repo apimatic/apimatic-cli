@@ -69,7 +69,7 @@ export default class PortalServe extends Command {
     return [generatedZipPath, generatedPortalPath, generatedPortalZipPath];
   }
 
-  private validateFlagInputs(port: number, source: string, destination: string, sourceDir: string, portalDir: string) {
+  private async validateFlagInputs(port: number, source: string, destination: string, sourceDir: string, portalDir: string) {
     if (isNaN(port) || port < 1 || port > 65535) {
       this.error(getMessageInRedColor("Port number specified was invalid. Please enter a valid port number."));
     }
@@ -83,7 +83,7 @@ export default class PortalServe extends Command {
     }
 
     if (destination == "./api-portal") {
-      fs.ensureDir(portalDir);
+      await fs.ensureDir(portalDir);
     }
 
     const sourceDirItems = fs.readdirSync(sourceDir).filter(item => !item.startsWith('.'));
@@ -142,7 +142,7 @@ export default class PortalServe extends Command {
     const prompts = new PortalServePrompts();
     const allIgnoredPaths = [...ignoredPaths, ...this.getGeneratedFilesPaths(sourceDir, portalDir)];
 
-    this.validateFlagInputs(port, flags.source, flags.destination, sourceDir, portalDir);
+    await this.validateFlagInputs(port, flags.source, flags.destination, sourceDir, portalDir);
 
     try {
       prompts.displayGeneratingPortalMessage(sourceDir);
