@@ -14,6 +14,10 @@ const progressSpinner = {
   frameIndex: 0,
   text: "Regenerating portal... ",
   start() {
+    if (this.interval) {
+      return;
+    }
+
     this.interval = setInterval(() => {
       this.frameIndex = (this.frameIndex + 1) % this.frames.length;
       process.stdout.write(`\r\u001b[K${this.format()}`);
@@ -22,12 +26,14 @@ const progressSpinner = {
   stop() {
     if (this.interval !== null) {
       clearInterval(this.interval);
+      this.interval = null;
     }
     process.stdout.write("\r\u001b[K  ✅  Portal regenerated successfully. ");
   },
   error() {
     if (this.interval !== null) {
       clearInterval(this.interval);
+      this.interval = null;
     }
     process.stdout.write("\r\u001b[K  ❌  Portal regeneration unsuccessful. ");
   },
@@ -119,8 +125,8 @@ async function handleFileChange(
   overrideAuthKey: string | null,
   absoluteIgnoredPaths: string[]
 ) {
+  progressSpinner.start();
   try {
-    progressSpinner.start();
     await generatePortal(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
     progressSpinner.stop();
   } catch (error) {
