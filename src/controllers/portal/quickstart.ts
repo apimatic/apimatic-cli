@@ -1,4 +1,4 @@
-import simpleGit from "simple-git";
+import simpleGit, { SimpleGitOptions } from "simple-git";
 import axios from "axios";
 import * as path from "path";
 import * as filetype from "file-type";
@@ -116,12 +116,28 @@ export class PortalQuickstartController {
     validationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<void> {
-    const git = simpleGit();
+    const options: Partial<SimpleGitOptions> = {
+      timeout: {
+        block: 60 * 1000, // 1 minute timeout.
+      }
+    }
+    const git = simpleGit(options);
 
     try {
       await git.clone(staticPortalRepoUrl, targetFolder);
     } catch (error) {
-      throw new Error(getMessageInRedColor(`There was an error setting up the build directory. ${error}`));
+      if (error instanceof Error) {
+        if (error.message.includes("timed out")) {
+          throw new Error(getMessageInRedColor("The operation timed out. Please check your internet connection and try again."));
+        } else if (error.message.includes("Could not resolve host")) {
+          throw new Error(getMessageInRedColor("Could not resolve host. Please check your internet connection and try again."));
+        } else {
+          throw new Error(getMessageInRedColor(`There was an error setting up the build directory: ${error.message}`));
+        }
+      }
+      else {
+        throw new Error(getMessageInRedColor(`An unknown error occurred while setting up the build directory. ${error}`));
+      }
     }
 
     await clearDirectory(path.join(targetFolder, ".git"));
@@ -161,7 +177,48 @@ export class PortalQuickstartController {
       await generatePortal(targetFolder, generatedPortalPath, configDir, null);
       return generatedPortalPath;
     } catch (error) {
-      throw new Error(getMessageInRedColor(`Something went wrong while generating the portal artifacts: ${error}`));
+      if (axios.isAxiosError(error)) {
+        if (error.code === "ECONNABORTED") {
+          throw new Error(
+            getMessageInRedColor(`Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`)
+          );
+        } else if (error.code === "ENOTFOUND") {
+          throw new Error(
+            getMessageInRedColor(`Network error. Please check your internet connection and try again.`)
+          );
+        } 
+        else if (error.response) {
+          if (error.response.status == 400) {
+            throw new Error(
+              getMessageInRedColor(
+                `Failed to generate portal: Either the build file is missing or the build file was not a valid zip archive.`
+              )
+            );
+          } else if (error.response.status == 403) {
+            throw new Error(getMessageInRedColor(`Failed to generate portal: Please check your subscription details.`));
+          } else if (error.response.status == 422) {
+            throw new Error(
+              getMessageInRedColor(
+                `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
+              )
+            );
+          } else if (error.response.status == 500) {
+            throw new Error(getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`));
+          } else {
+            throw new Error(
+              getMessageInRedColor(
+                `Failed to generate portal: Server returned ${error.response.status} ${error.response.statusText}`
+              )
+            );
+          }
+        } else if (error.request) {
+          throw new Error(getMessageInRedColor(`Failed to generate portal: Bad request.`));
+        } else {
+          throw new Error(getMessageInRedColor(`Failed to generate portal: ${error.message}`));
+        }
+      } else {
+        throw new Error(getMessageInRedColor(`Something went wrong while generating the portal artifacts: ${error}`));
+      }
     }
   }
 

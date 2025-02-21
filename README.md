@@ -235,7 +235,7 @@ _See code: [src/commands/portal/quickstart.ts](https://github.com/apimatic/apima
 
 ## `apimatic portal:serve`
 
-Generate, serve and visualize APIMatic's Docs as Code portal with hot reload.
+Generate and deploy a Docs as Code portal with hot reload.
 
 ```
 USAGE
@@ -252,7 +252,7 @@ FLAGS
       --no-reload            Disable hot reload.
 
 DESCRIPTION
-  Generate, serve and visualize APIMatic's Docs as Code portal with hot reload.
+  Generate and deploy a Docs as Code portal with hot reload.
 
 EXAMPLES
   $ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --no-reload
