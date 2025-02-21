@@ -304,7 +304,7 @@ export const printValidationMessages = (
  * @param destinationDir Path to the destination directory where files will be extracted.
  */
 export async function extractZipFile(zipFilePath: string, destinationDir: string): Promise<void> {
-  const MAX_ZIP_SIZE = 100 * 1024 * 1024;
+  const MAX_ZIP_SIZE = 300 * 1024 * 1024;
 
   return new Promise((resolve, reject) => {
     try {
@@ -313,7 +313,7 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
       let totalSize = 0;
 
       zipEntries.forEach((entry) => {
-        totalSize += entry.header.size;
+        totalSize += entry.getData().length;
 
         const normalizedPath = path.normalize(entry.entryName);
         if (normalizedPath.startsWith("..") || path.isAbsolute(normalizedPath)) {
