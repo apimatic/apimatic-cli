@@ -1,11 +1,11 @@
 import * as express from "express";
 import * as livereload from "livereload";
 import * as connectLivereload from "connect-livereload";
-import * as fs from "fs";
 import * as open from "open";
 import { watchAndRegeneratePortal } from "../../controllers/portal/serve";
 import { PortalServerConfig } from "../../types/portal/quickstart";
 import { Server } from "http";
+import { getMessageInRedColor } from "../../utils/utils";
 
 export class PortalServerService {
   private server!: Server;
@@ -30,22 +30,27 @@ export class PortalServerService {
     const serverPort = port ?? this.port;
 
     return new Promise<void>((resolve) => {
-      this.server = this.app.listen(serverPort, () => {
-        if (openInBrowser) {
-          open(`http://localhost:${serverPort}`);
-        }
-
-        if (!noReload) {
-          watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
-        }
-
-        if (process.platform !== "darwin") //For non-macOS users.
-        {
-          if (process.stdin.setRawMode) {
-            process.stdin.setRawMode(false);
+      try {
+        this.server = this.app.listen(serverPort, () => {
+          if (openInBrowser) {
+            open(`http://localhost:${serverPort}`);
           }
-        }
-      });
+  
+          if (!noReload) {
+            watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
+          }
+  
+          if (process.platform !== "darwin") //For non-macOS users.
+          {
+            if (process.stdin.setRawMode) {
+              process.stdin.setRawMode(false);
+            }
+          }
+        });
+      }
+      catch (error) {
+        throw new Error(getMessageInRedColor(`There was an error starting the server: ${error}`));
+      }
 
       const shutdown = async () => {
         if (displayShutdownMessages) {
