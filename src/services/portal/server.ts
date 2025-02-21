@@ -49,7 +49,7 @@ export class PortalServerService {
         });
       }
       catch (error) {
-        throw new Error(getMessageInRedColor(`There was an error starting the server: ${error}`));
+        console.error(getMessageInRedColor(`There was an error starting the server: ${error}`));
       }
 
       const shutdown = async () => {
