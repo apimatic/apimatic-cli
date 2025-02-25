@@ -145,8 +145,8 @@ export default class PortalServe extends Command {
     await this.validateFlagInputs(port, flags.source, flags.destination, sourceDir, portalDir);
 
     try {
-      prompts.displayGeneratingPortalMessage(sourceDir);
-      await generatePortal(sourceDir, portalDir, this.config.configDir, overrideAuthKey, allIgnoredPaths);
+      prompts.displayGeneratingPortalMessage();
+      await generatePortal(sourceDir, portalDir, this.config.configDir, allIgnoredPaths, overrideAuthKey);
       prompts.displayGeneratedPortalMessage(portalDir);
     } catch (error) {
       prompts.displayGeneratingPortalErrorMessage();

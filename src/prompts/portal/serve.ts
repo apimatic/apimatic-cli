@@ -4,8 +4,8 @@ import { getMessageInRedColor } from "../../utils/utils";
 export class PortalServePrompts {
   private spin = spinner();
 
-  displayGeneratingPortalMessage(sourceDir: string): void {
-    this.spin.start(`Generating portal from source directory ${sourceDir}`);
+  displayGeneratingPortalMessage(): void {
+    this.spin.start(`Generating portal`);
   }
 
   displayGeneratingPortalErrorMessage(): void {

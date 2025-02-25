@@ -4,12 +4,12 @@ import { baseURL } from "../../config/env";
 import { deleteFile, extractZipFile } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
-import { AxiosRequestConfig, AxiosResponse } from "axios";
+import { AxiosRequestConfig, AxiosResponse, CancelTokenSource } from "axios";
 
 import axiosInstance from "../../config/axios-config";
 
 //TODO: Remove after SDK is patched
-const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey: string | null, configDir: string) => {
+const downloadPortalAxios = async (zippedBuildFilePath: string, configDir: string, overrideAuthKey: string | null, cancellationToken: CancelTokenSource | null) => {
   const formData = new FormData();
   const authInfo: AuthInfo | null = await getAuthInfo(configDir);
   let authorizationHeader = "";
@@ -29,6 +29,11 @@ const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey:
     },
     responseType: "arraybuffer"
   };
+
+  if (cancellationToken) {
+    config.cancelToken = cancellationToken.token;
+  }
+
   const { data }: AxiosResponse = await axiosInstance.post(`${baseURL}/portal`, formData, config);
   return data;
 };
@@ -36,14 +41,15 @@ const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey:
 // Download Docs Portal
 export const downloadDocsPortal = async (
   { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
-    configDir: string
+    configDir: string,
+    cancellationToken: CancelTokenSource | null = null
 ) => {
   // Check if the build file exists for the user or not
   if (!(await fs.pathExists(zippedBuildFilePath))) {
     throw new Error("Build file doesn't exist");
   }
   // TODO: ***CRITICAL*** Remove this call once the SDK is patched
-  const data: ArrayBuffer = await downloadPortalAxios(zippedBuildFilePath, overrideAuthKey, configDir);
+  const data: ArrayBuffer = await downloadPortalAxios(zippedBuildFilePath, configDir, overrideAuthKey, cancellationToken);
 
   await deleteFile(zippedBuildFilePath);
   await fs.writeFile(zippedPortalPath, data);

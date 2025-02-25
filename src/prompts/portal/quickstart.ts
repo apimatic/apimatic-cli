@@ -171,7 +171,7 @@ export class PortalQuickstartPrompts {
 
     const languages = (await multiselect({
       message:
-        "💻 Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to include all, or use the arrow keys and spacebar to customize your selection:",
+        "💻 Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
       options: [
         { label: "HTTP", value: "http" },
         { label: "Typescript", value: "typescript" },

@@ -174,7 +174,7 @@ export class PortalQuickstartController {
     const generatedPortalPath = path.join(targetFolder, "api-portal");
 
     try {
-      await generatePortal(targetFolder, generatedPortalPath, configDir, null);
+      await generatePortal(targetFolder, generatedPortalPath, configDir);
       return generatedPortalPath;
     } catch (error) {
       if (axios.isAxiosError(error)) {
