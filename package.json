@@ -109,7 +109,21 @@
             "@oclif/plugin-autocomplete",
             "@oclif/plugin-help",
             "@oclif/plugin-not-found"
-        ]
+        ],
+        "topics": {
+            "api": {
+                "description": "Transform & Validate your API specifications."
+            },
+            "auth": {
+                "description": "Login using your APIMatic credentials, or view your authentication status."
+            },
+            "portal": {
+                "description": "Generate, download and serve an API Documentation portal for your APIs."
+            },
+            "sdk": {
+                "description": "Generate SDKs for your APIs in multiple languages."
+            }
+        }
     },
     "lint-staged": {
         "*.js": "eslint --cache --fix",

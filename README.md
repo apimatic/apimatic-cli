@@ -8,6 +8,14 @@ The official CLI for APIMatic.
 [![Downloads/week](https://img.shields.io/npm/dw/@apimatic/cli.svg)](https://npmjs.org/package/@apimatic/cli)
 [![License](https://img.shields.io/npm/l/@apimatic/cli.svg)](https://github.com/apimatic/apimatic-cli/blob/master/package.json)
 
+# Getting Started
+
+To get started with APIMatic's CLI using a step by step wizard, run the following command: 
+
+```sh-session
+$ apimatic portal:quickstart
+```
+
 <!-- toc -->
 * [Usage](#usage)
 * [Commands](#commands)
