@@ -366,7 +366,12 @@ export async function validateAndZipPortalSource(
 
   return new Promise((resolve, reject) => {
     output.on("close", () => resolve(outputPath));
-    archive.on("error", (err) => reject(err));
+    output.on("error", (err) => {
+      return reject(new Error(`Failed to zip the source directory: ${err.message}`));
+    })
+    archive.on("error", (err) => {
+      return reject(new Error(`Failed to zip the source directory: ${err.message}`));
+    });
 
     archive.pipe(output);
 
@@ -404,9 +409,23 @@ export async function validateAndZipPortalSource(
       .then(() => {
         archive.finalize();
       })
-      .catch(reject);
+      .catch((err) => {
+        return reject (new Error(`Failed to add items to the zip created for source directory: ${err.message}`));
+      });
   });
 }
+
+export async function cleanUpGeneratedPortalFiles(sourceDir: string) {
+    const generatedPortalZipFilePath = path.join(sourceDir, "generated_portal.zip");
+    const generatedPortalSourceZipFilePath = path.join(sourceDir, "portal_source.zip");
+    if (fs.existsSync(generatedPortalZipFilePath)) {
+      await deleteFile(generatedPortalZipFilePath);
+    }
+    if (fs.existsSync(generatedPortalSourceZipFilePath)) {
+      await deleteFile(generatedPortalSourceZipFilePath);
+    }
+  }
+
 export const getMessageInOrangeColor = (message: string) => {
   return `\u001b[33m${message}\u001b[0m`;
 };

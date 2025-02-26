@@ -5,7 +5,7 @@ import { Command, flags } from "@oclif/command";
 import { generatePortal } from "../../controllers/portal/serve";
 import { PortalServerService } from "../../services/portal/server";
 import { PortalServePrompts } from "../../prompts/portal/serve";
-import { deleteFile, getMessageInRedColor } from "../../utils/utils";
+import { cleanUpGeneratedPortalFiles, getMessageInRedColor } from "../../utils/utils";
 
 export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
@@ -50,17 +50,6 @@ export default class PortalServe extends Command {
 
   static examples = ['$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --no-reload'];
 
-  private async cleanUpGeneratedFiles(portalDir: string) {
-    const generatedPortalZipFilePath = path.join(path.dirname(portalDir), "generated_portal.zip");
-    const generatedPortalSourceZipFilePath = path.join(path.dirname(portalDir), "portal_source.zip");
-    if (fs.existsSync(generatedPortalZipFilePath)) {
-      await deleteFile(generatedPortalZipFilePath);
-    }
-    if (fs.existsSync(generatedPortalSourceZipFilePath)) {
-      await deleteFile(generatedPortalSourceZipFilePath);
-    }
-  }
-
   private getGeneratedFilesPaths(sourceDir: string, portalDir: string): string[] {
     const generatedZipPath = path.join(sourceDir, "portal_source.zip");
     const generatedPortalZipPath = path.join(sourceDir, "generated_portal.zip");
@@ -69,7 +58,7 @@ export default class PortalServe extends Command {
     return [generatedZipPath, generatedPortalPath, generatedPortalZipPath];
   }
 
-  private async validateFlagInputs(port: number, source: string, destination: string, sourceDir: string, portalDir: string) {
+  private async validateFlagInputs(port: number, destination: string, sourceDir: string, portalDir: string) {
     if (isNaN(port) || port < 1 || port > 65535) {
       this.error(getMessageInRedColor("Port number specified was invalid. Please enter a valid port number."));
     }
@@ -142,15 +131,16 @@ export default class PortalServe extends Command {
     const prompts = new PortalServePrompts();
     const allIgnoredPaths = [...ignoredPaths, ...this.getGeneratedFilesPaths(sourceDir, portalDir)];
 
-    await this.validateFlagInputs(port, flags.source, flags.destination, sourceDir, portalDir);
+    await this.validateFlagInputs(port, flags.destination, sourceDir, portalDir);
 
     try {
       prompts.displayGeneratingPortalMessage();
       await generatePortal(sourceDir, portalDir, this.config.configDir, allIgnoredPaths, overrideAuthKey);
       prompts.displayGeneratedPortalMessage(portalDir);
+      await cleanUpGeneratedPortalFiles(sourceDir);
     } catch (error) {
       prompts.displayGeneratingPortalErrorMessage();
-      await this.cleanUpGeneratedFiles(portalDir);
+      await cleanUpGeneratedPortalFiles(sourceDir);
       this.handleError(error);
     }
 

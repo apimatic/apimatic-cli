@@ -2,7 +2,7 @@ import * as path from "path";
 import * as chokidar from "chokidar";
 import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { getMessageInMagentaColor, getMessageInRedColor, validateAndZipPortalSource } from "../../utils/utils";
+import { cleanUpGeneratedPortalFiles, getMessageInMagentaColor, getMessageInRedColor, validateAndZipPortalSource } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "./generate";
 import axios, { CancelTokenSource } from "axios";
@@ -38,7 +38,7 @@ const progressSpinner = {
     process.stdout.write("\r\u001b[K  ❌  Portal regeneration unsuccessful. ");
   },
   format() {
-    return `  ${this.frames[this.frameIndex]}  ${this.text}`;
+    return `   ${this.frames[this.frameIndex]}  ${this.text}`;
   }
 };
 
@@ -112,14 +112,14 @@ export const generatePortal = async (
 
   const zippedBuildFilePath = await validateAndZipPortalSource(
     sourceDir,
-    path.join(path.dirname(portalDir), "portal_source.zip"),
+    path.join(sourceDir, "portal_source.zip"),
     ignoredPaths
   );
 
   const generatePortalParams: GeneratePortalParams = {
     zippedBuildFilePath,
     portalFolderPath: portalDir,
-    zippedPortalPath: path.join(path.dirname(portalDir), "generated_portal.zip"),
+    zippedPortalPath: path.join(sourceDir, "generated_portal.zip"),
     docsPortalController,
     overrideAuthKey,
     zip: false
@@ -140,11 +140,13 @@ async function handleFileChange(
   try {
     await generatePortal(sourceDir, portalDir, configDir, absoluteIgnoredPaths, overrideAuthKey, cancellationToken);
     progressSpinner.stop();
+    await cleanUpGeneratedPortalFiles(sourceDir);
   } catch (error) {
     if (axios.isCancel(error)) {
       return;
     }
     progressSpinner.error();
+    await cleanUpGeneratedPortalFiles(sourceDir);
     if (axios.isAxiosError(error)) {
       if (error.code === "ECONNABORTED") {
         console.error(

@@ -15,7 +15,8 @@ import {
   unzipFile,
   getMessageInRedColor,
   clearDirectory,
-  deleteFile
+  deleteFile,
+  cleanUpGeneratedPortalFiles
 } from "../../utils/utils";
 import { getValidation } from "../api/validate";
 import { GetValidationParams } from "../../types/api/validate";
@@ -237,5 +238,7 @@ export class PortalQuickstartController {
       false,
       false
     );
+
+    await cleanUpGeneratedPortalFiles(targetFolder);
   }
 }
