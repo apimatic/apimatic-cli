@@ -3,7 +3,7 @@ import * as path from "path";
 import { getMessageInRedColor, getNonHiddenItemsFromDirectory } from "../../utils/utils";
 
 export class DirectoryValidator {
-  constructor(private error: (message: string) => void) {}
+  constructor(private readonly error: (message: string) => void) {}
 
   validateSourceDirectory(sourceDir: string) {
     if (!fs.pathExistsSync(sourceDir)) {

@@ -1,7 +1,7 @@
 import { getMessageInRedColor } from "../../utils/utils";
 
 export class PortValidator {
-  constructor(private error: (message: string) => void) {}
+  constructor(private readonly error: (message: string) => void) {}
 
   validate(port: number) {
     if (isNaN(port) || port < 1 || port > 65535) {

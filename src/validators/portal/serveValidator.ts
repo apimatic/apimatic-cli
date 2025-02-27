@@ -2,8 +2,8 @@ import { DirectoryValidator } from "../common/directoryValidator";
 import { PortValidator } from "../common/portValidator";
 
 export class PortalServeValidator {
-  private portValidator: PortValidator;
-  private directoryValidator: DirectoryValidator;
+  private readonly portValidator: PortValidator;
+  private readonly directoryValidator: DirectoryValidator;
 
   constructor(error: (message: string) => void) {
     this.portValidator = new PortValidator(error);
