@@ -10,8 +10,8 @@ import { getMessageInRedColor } from "../../utils/utils";
 export class PortalServerService {
   private server!: Server;
   private liveReloadServer!: livereload.LiveReloadServer;
-  private app: express.Application;
-  private port = 3000;
+  private readonly app: express.Application;
+  private readonly port = 3000;
 
   constructor() {
     this.app = express();

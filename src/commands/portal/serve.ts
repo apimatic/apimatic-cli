@@ -1,11 +1,11 @@
 import * as path from "path";
-import * as fs from "fs-extra";
 import axios from "axios";
 import { Command, flags } from "@oclif/command";
 import { generatePortal } from "../../controllers/portal/serve";
 import { PortalServerService } from "../../services/portal/server";
 import { PortalServePrompts } from "../../prompts/portal/serve";
 import { cleanUpGeneratedPortalFiles, getMessageInRedColor } from "../../utils/utils";
+import { PortalServeValidator } from "../../validators/portal/serveValidator";
 
 export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
@@ -48,7 +48,9 @@ export default class PortalServe extends Command {
     })
   };
 
-  static examples = ['$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --no-reload'];
+  static examples = [
+    '$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --no-reload'
+  ];
 
   private getGeneratedFilesPaths(sourceDir: string, portalDir: string): string[] {
     const generatedZipPath = path.join(sourceDir, "portal_source.zip");
@@ -56,68 +58,6 @@ export default class PortalServe extends Command {
     const generatedPortalPath = path.join(path.dirname(portalDir), "api-portal");
 
     return [generatedZipPath, generatedPortalPath, generatedPortalZipPath];
-  }
-
-  private async validateFlagInputs(port: number, destination: string, sourceDir: string, portalDir: string) {
-    if (isNaN(port) || port < 1 || port > 65535) {
-      this.error(getMessageInRedColor("Port number specified was invalid. Please enter a valid port number."));
-    }
-
-    if (!fs.pathExistsSync(sourceDir)) {
-      this.error(getMessageInRedColor(`The specified source directory does not exist: ${sourceDir}`));
-    }
-
-    if (!fs.pathExistsSync(destination) && destination != "./api-portal") {
-      this.error(getMessageInRedColor(`The specified destination directory does not exist: ${destination}`));
-    }
-
-    if (destination == "./api-portal") {
-      await fs.ensureDir(portalDir);
-    }
-
-    const sourceDirItems = fs.readdirSync(sourceDir).filter(item => !item.startsWith('.'));
-    const portalDirItems = fs.readdirSync(portalDir).filter(item => !item.startsWith('.'));
-    if (sourceDirItems.length == 0) {
-      this.error(getMessageInRedColor("The source directory is empty. Please check the source path and try again."));
-    } else {
-      if (!sourceDirItems.includes("spec")) {
-        this.error(
-          getMessageInRedColor("The spec directory is missing. Please specify a valid spec file in the spec directory.")
-        );
-      }
-      if (!sourceDirItems.some((item) => item.startsWith("APIMATIC-BUILD"))) {
-        this.error(
-          getMessageInRedColor(
-            "APIMatic Build file is missing, portal cannot be generated. Please specify a valid APIMatic build file and try again."
-          )
-        );
-      }
-
-      const specFolderItems = fs.readdirSync(path.join(sourceDir, "spec"));
-      if (specFolderItems.length == 0) {
-        this.error(
-          getMessageInRedColor("The spec directory is empty. Please specify a valid spec file in the spec directory.")
-        );
-      }
-      if (
-        specFolderItems.length == 1 &&
-        specFolderItems.some((item) => item.toLowerCase().startsWith("apimatic-meta"))
-      ) {
-        this.error(
-          getMessageInRedColor(
-            "The spec directory is missing a spec file. Please specify a valid spec file in the spec directory."
-          )
-        );
-      }
-    }
-
-    if (portalDirItems.length > 0 && destination != "./api-portal") {
-      this.error(
-        getMessageInRedColor(
-          "The specified destination directory is not empty. Please check the destination path and try again."
-        )
-      );
-    }
   }
 
   async run() {
@@ -129,9 +69,10 @@ export default class PortalServe extends Command {
     const overrideAuthKey = flags["auth-key"] ?? null;
     const serverService = new PortalServerService();
     const prompts = new PortalServePrompts();
+    const validator = new PortalServeValidator(this.error);
     const allIgnoredPaths = [...ignoredPaths, ...this.getGeneratedFilesPaths(sourceDir, portalDir)];
 
-    await this.validateFlagInputs(port, flags.destination, sourceDir, portalDir);
+    await validator.validate(port, flags.destination, sourceDir, portalDir);
 
     try {
       prompts.displayGeneratingPortalMessage();
@@ -211,7 +152,7 @@ export default class PortalServe extends Command {
         this.error(getMessageInRedColor(`Failed to regenerate or serve the portal: ${axiosError.message}`));
       }
     } else if (error instanceof Error) {
-      this.error(getMessageInRedColor(`Failed to generate or serve the portal: ${(error as Error).message}`));
+      this.error(getMessageInRedColor(`Failed to generate or serve the portal: ${error.message}`));
     } else {
       this.error(getMessageInRedColor(`Failed to generate or serve the portal: An unknown error occurred.`));
     }

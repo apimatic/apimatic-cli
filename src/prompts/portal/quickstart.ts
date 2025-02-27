@@ -13,16 +13,16 @@ import {
 } from "../../utils/utils";
 
 export class PortalQuickstartPrompts {
-  private spin = spinner();
-  private vscodeExtensionUrl =
+  private readonly spin = spinner();
+  private readonly vscodeExtensionUrl =
     "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
-  private serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
-  private referenceDocumentation =
+  private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
+  private readonly referenceDocumentation =
     "\u001b[4mhttps://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal\u001b[0m";
-  private customizeTheSdks =
+  private readonly customizeTheSdks =
     "\u001b[4mhttps://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview\u001b[0m";
-  private portalDirectory = "apimatic-quickstart-portal";
-  private defaultPortalDirectory = path.join(process.cwd(), this.portalDirectory);
+  private readonly portalDirectory = "apimatic-quickstart-portal";
+  private readonly defaultPortalDirectory = path.join(process.cwd(), this.portalDirectory);
 
   displayWelcomeMessage(): void {
     intro(`Hello there 👋`);

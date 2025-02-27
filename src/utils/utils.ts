@@ -166,7 +166,7 @@ export const zipDirectoryToStream = async (sourcePath: string): Promise<NodeJS.R
 
   return new Promise((resolve, reject) => {
     archive.on("error", (err) => {
-      reject(err);
+      reject(new Error(err.message));
     });
 
     const passThroughStream = new PassThrough();
@@ -197,11 +197,11 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string):
 
   return new Promise((resolve, reject) => {
     archive.on("error", (err) => {
-      reject(err);
+      reject(new Error(err.message));
     });
 
     output.on("error", (err) => {
-      reject(err);
+      reject(new Error(err.message));
     });
     output.on("close", () => {
       resolve(zipPath);
@@ -261,7 +261,6 @@ export const stopProgress = (isError = false) => {
 };
 
 export const replaceHTML = (string: string) => {
-  // string = string.substring(0, string.indexOf("  "));
   return stripTags(string);
 };
 
@@ -333,15 +332,14 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
         const resolvedPath = path.resolve(destinationDir, entry.entryName);
 
         if (!resolvedPath.startsWith(path.resolve(destinationDir))) {
-          throw new Error("An error occurred while extracting zip file.");
+          return reject(new Error("An error occurred while extracting zip file."));
         }
 
         zip.extractEntryTo(entry, destinationDir, true, true);
       });
       resolve();
     } catch (error) {
-      console.error("Failed to extract ZIP file:", error);
-      reject(error);
+      return reject(new Error(`Failed to extract ZIP File: ${error}`));
     }
   });
 }
@@ -368,7 +366,7 @@ export async function validateAndZipPortalSource(
     output.on("close", () => resolve(outputPath));
     output.on("error", (err) => {
       return reject(new Error(`Failed to zip the source directory: ${err.message}`));
-    })
+    });
     archive.on("error", (err) => {
       return reject(new Error(`Failed to zip the source directory: ${err.message}`));
     });
@@ -410,21 +408,25 @@ export async function validateAndZipPortalSource(
         archive.finalize();
       })
       .catch((err) => {
-        return reject (new Error(`Failed to add items to the zip created for source directory: ${err.message}`));
+        return reject(new Error(`Failed to add items to the zip created for source directory: ${err.message}`));
       });
   });
 }
 
 export async function cleanUpGeneratedPortalFiles(sourceDir: string) {
-    const generatedPortalZipFilePath = path.join(sourceDir, "generated_portal.zip");
-    const generatedPortalSourceZipFilePath = path.join(sourceDir, "portal_source.zip");
-    if (fs.existsSync(generatedPortalZipFilePath)) {
-      await deleteFile(generatedPortalZipFilePath);
-    }
-    if (fs.existsSync(generatedPortalSourceZipFilePath)) {
-      await deleteFile(generatedPortalSourceZipFilePath);
-    }
+  const generatedPortalZipFilePath = path.join(sourceDir, "generated_portal.zip");
+  const generatedPortalSourceZipFilePath = path.join(sourceDir, "portal_source.zip");
+  if (fs.existsSync(generatedPortalZipFilePath)) {
+    await deleteFile(generatedPortalZipFilePath);
   }
+  if (fs.existsSync(generatedPortalSourceZipFilePath)) {
+    await deleteFile(generatedPortalSourceZipFilePath);
+  }
+}
+
+export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] => {
+  return fs.readdirSync(directoryPath).filter((item) => !item.startsWith("."));
+};
 
 export const getMessageInOrangeColor = (message: string) => {
   return `\u001b[33m${message}\u001b[0m`;

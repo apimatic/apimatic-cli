@@ -6,9 +6,8 @@ import * as fs from "fs";
 import * as fsextra from "fs-extra";
 import { getAuthInfo } from "../../client-utils/auth-manager";
 import { APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
-import { LoginCredentials } from "../../types/portal/quickstart";
+import { LoginCredentials, SpecFile } from "../../types/portal/quickstart";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { SpecFile } from "../../types/portal/quickstart";
 import {
   createTempDirectory,
   isValidUrl,
@@ -25,11 +24,11 @@ import { metadataFileContent, staticPortalRepoUrl } from "../../config/env";
 import { PortalServerService } from "../../services/portal/server";
 
 export class PortalQuickstartController {
-  private specUrl = "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
+  private readonly specUrl = "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);
-    if (!storedAuth || !storedAuth.authKey) {
+    if (!storedAuth?.authKey) {
       return false;
     }
     return true;
@@ -119,9 +118,9 @@ export class PortalQuickstartController {
   ): Promise<void> {
     const options: Partial<SimpleGitOptions> = {
       timeout: {
-        block: 60 * 1000, // 1 minute timeout.
+        block: 60 * 1000 // 1 minute timeout.
       }
-    }
+    };
     const git = simpleGit(options);
 
     try {
@@ -129,15 +128,20 @@ export class PortalQuickstartController {
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes("timed out")) {
-          throw new Error(getMessageInRedColor("The operation timed out. Please check your internet connection and try again."));
+          throw new Error(
+            getMessageInRedColor("The operation timed out. Please check your internet connection and try again.")
+          );
         } else if (error.message.includes("Could not resolve host")) {
-          throw new Error(getMessageInRedColor("Could not resolve host. Please check your internet connection and try again."));
+          throw new Error(
+            getMessageInRedColor("Could not resolve host. Please check your internet connection and try again.")
+          );
         } else {
           throw new Error(getMessageInRedColor(`There was an error setting up the build directory: ${error.message}`));
         }
-      }
-      else {
-        throw new Error(getMessageInRedColor(`An unknown error occurred while setting up the build directory. ${error}`));
+      } else {
+        throw new Error(
+          getMessageInRedColor(`An unknown error occurred while setting up the build directory. ${error}`)
+        );
       }
     }
 
@@ -181,14 +185,13 @@ export class PortalQuickstartController {
       if (axios.isAxiosError(error)) {
         if (error.code === "ECONNABORTED") {
           throw new Error(
-            getMessageInRedColor(`Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`)
+            getMessageInRedColor(
+              `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+            )
           );
         } else if (error.code === "ENOTFOUND") {
-          throw new Error(
-            getMessageInRedColor(`Network error. Please check your internet connection and try again.`)
-          );
-        } 
-        else if (error.response) {
+          throw new Error(getMessageInRedColor(`Network error. Please check your internet connection and try again.`));
+        } else if (error.response) {
           if (error.response.status == 400) {
             throw new Error(
               getMessageInRedColor(
@@ -204,7 +207,9 @@ export class PortalQuickstartController {
               )
             );
           } else if (error.response.status == 500) {
-            throw new Error(getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`));
+            throw new Error(
+              getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`)
+            );
           } else {
             throw new Error(
               getMessageInRedColor(

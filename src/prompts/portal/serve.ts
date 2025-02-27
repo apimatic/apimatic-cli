@@ -2,7 +2,7 @@ import { log, outro, spinner } from "@clack/prompts";
 import { getMessageInRedColor } from "../../utils/utils";
 
 export class PortalServePrompts {
-  private spin = spinner();
+  private readonly spin = spinner();
 
   displayGeneratingPortalMessage(): void {
     this.spin.start(`Generating portal`);
