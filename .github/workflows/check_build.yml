@@ -35,8 +35,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: cli
-        run: |
-          npm install
+        run: npm install
 
       - name: Check Build
         working-directory: 'cli'
