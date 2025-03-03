@@ -2,13 +2,18 @@ import * as path from "path";
 import * as chokidar from "chokidar";
 import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { cleanUpGeneratedPortalFiles, getMessageInMagentaColor, getMessageInRedColor, validateAndZipPortalSource } from "../../utils/utils";
+import {
+  cleanUpGeneratedPortalFiles,
+  getMessageInMagentaColor,
+  getMessageInRedColor,
+  validateAndZipPortalSource
+} from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "./generate";
 import axios, { CancelTokenSource } from "axios";
 
 const progressSpinner = {
-  frames: ['◒', '◐', '◓', '◑'].map(frame => getMessageInMagentaColor(frame)),
+  frames: ["◒", "◐", "◓", "◑"].map((frame) => getMessageInMagentaColor(frame)),
   isRunning: false,
   interval: null as NodeJS.Timeout | null,
   frameIndex: 0,
@@ -76,9 +81,8 @@ export const watchAndRegeneratePortal = async (
         deletedDirectories.add(path);
       }
 
-      if (cancellationToken)
-      {
-        cancellationToken.cancel('New portal regeneration request, operation cancelled.');
+      if (cancellationToken) {
+        cancellationToken.cancel("New portal regeneration request, operation cancelled.");
       }
 
       cancellationToken = axios.CancelToken.source();
@@ -148,27 +152,25 @@ async function handleFileChange(
     progressSpinner.error();
     await cleanUpGeneratedPortalFiles(sourceDir);
     if (axios.isAxiosError(error)) {
-      if (error.code === "ECONNABORTED") {
-        console.error(
-          getMessageInRedColor(`Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`)
-        );
-      } else if (error.response) {
-        if (error.response.status == 400) {
+      if (error.response) {
+        if (error.response.status === 400) {
           console.error(
             getMessageInRedColor(
               `Failed to regenerate portal: Either the build file is missing or the build file was not a valid zip archive.`
             )
           );
-        } else if (error.response.status == 403) {
+        } else if (error.response.status === 403) {
           console.error(getMessageInRedColor(`Failed to regenerate portal: Please check your subscription details.`));
-        } else if (error.response.status == 422) {
+        } else if (error.response.status === 422) {
           console.error(
             getMessageInRedColor(
               `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
             )
           );
-        } else if (error.response.status == 500) {
-          console.error(getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`));
+        } else if (error.response.status === 500) {
+          console.error(
+            getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`)
+          );
         } else {
           console.error(
             getMessageInRedColor(
@@ -177,7 +179,19 @@ async function handleFileChange(
           );
         }
       } else if (error.request) {
-        console.error(getMessageInRedColor(`Failed to regenerate portal: Bad request.`));
+        if (error.code === "ECONNABORTED") {
+          console.error(
+            getMessageInRedColor(
+              `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+            )
+          );
+        } else {
+          console.error(
+            getMessageInRedColor(
+              `Failed to regenerate portal: No response received from the server. Please try again later.`
+            )
+          );
+        }
       } else {
         console.error(getMessageInRedColor(`Failed to regenerate portal: ${error.message}`));
       }

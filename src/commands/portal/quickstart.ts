@@ -24,7 +24,7 @@ export default class PortalQuickstart extends Command {
 
       return specFile;
     } catch (error) {
-      throw new Error(getMessageInRedColor(`Something went wrong while setting up your spec file: ${error}`));
+      this.error(getMessageInRedColor(`Something went wrong while setting up your spec file: ${error}`));
     }
   }
 
@@ -47,7 +47,7 @@ export default class PortalQuickstart extends Command {
       return apiValidationSummary;
     } catch (error) {
       prompts.displaySpecValidationErrorMessage();
-      throw new Error(
+      this.error(
         getMessageInRedColor(
           `An error occurred while validating your spec. Please check if the path/URL is correct and points to a valid file.`
         )
@@ -75,7 +75,7 @@ export default class PortalQuickstart extends Command {
 
       return directory;
     } catch (error) {
-      throw new Error(getMessageInRedColor(`Something went wrong while setting up your build directory: ${error}`));
+      this.error(getMessageInRedColor(`Something went wrong while setting up your build directory: ${error}`));
     }
   }
 
@@ -93,7 +93,7 @@ export default class PortalQuickstart extends Command {
 
       return generatedPortalPath;
     } catch (error) {
-      throw new Error(getMessageInRedColor(`Something went wrong while generating the portal: ${error}`));
+      this.error(getMessageInRedColor(`Something went wrong while generating the portal: ${error}`));
     }
   }
 

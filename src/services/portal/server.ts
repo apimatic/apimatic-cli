@@ -5,7 +5,7 @@ import * as open from "open";
 import { watchAndRegeneratePortal } from "../../controllers/portal/serve";
 import { PortalServerConfig } from "../../types/portal/quickstart";
 import { Server } from "http";
-import { getMessageInRedColor } from "../../utils/utils";
+import { getMessageInRedColor, isPortInUse } from "../../utils/utils";
 
 export class PortalServerService {
   private server!: Server;
@@ -25,9 +25,14 @@ export class PortalServerService {
     this.app.use(express.static(generatedPortalPath));
   }
 
-  startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<void> {
+  async startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<void> {
     const { generatedPortalPath, targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
     const serverPort = port ?? this.port;
+
+    const portInUse = await isPortInUse(serverPort);
+    if (portInUse) {
+      throw new Error(getMessageInRedColor(`Port ${serverPort} is already in use.`));
+    }
 
     return new Promise<void>((resolve) => {
       try {
@@ -35,21 +40,20 @@ export class PortalServerService {
           if (openInBrowser) {
             open(`http://localhost:${serverPort}`);
           }
-  
+
           if (!noReload) {
             watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
           }
-  
-          if (process.platform !== "darwin") //For non-macOS users.
-          {
+
+          if (process.platform !== "darwin") {
+            //For non-macOS users.
             if (process.stdin.setRawMode) {
               process.stdin.setRawMode(false);
             }
           }
         });
-      }
-      catch (error) {
-        console.error(getMessageInRedColor(`There was an error starting the server: ${error}`));
+      } catch (error) {
+        throw new Error(getMessageInRedColor(`There was an error starting the server: ${error}`));
       }
 
       const shutdown = async () => {

@@ -87,7 +87,7 @@ export default class PortalServe extends Command {
 
     serverService.setupServer(portalDir);
 
-    serverService.startServer(
+    await serverService.startServer(
       {
         generatedPortalPath: portalDir,
         targetFolder: sourceDir,
@@ -106,55 +106,57 @@ export default class PortalServe extends Command {
   private handleError(error: unknown) {
     if (axios.isAxiosError(error)) {
       const axiosError = error;
-      if (axiosError.code === "ECONNABORTED") {
-        this.error(
-          getMessageInRedColor(
-            `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
-          )
-        );
-      } else if (axiosError.response) {
-        if (axiosError.response.status == 400) {
+      if (axiosError.response) {
+        if (axiosError.response.status === 400) {
           this.error(
             getMessageInRedColor(
-              `Failed to generate or serve the portal: Either the build file is missing or the build file was not a valid zip archive.`
+              `Failed to generate the portal: Either the build file is missing or the build input was not a valid zip archive.`
             )
           );
-        } else if (axiosError.response.status == 401) {
+        } else if (axiosError.response.status === 401) {
           this.error(
             getMessageInRedColor(
-              `Failed to generate or serve the portal: Please check if you are logged in or your auth key is correctly entered and valid.`
+              `Failed to generate the portal: Please check if you are logged in or your auth key is correctly entered and valid.`
             )
           );
-        } else if (axiosError.response.status == 403) {
-          this.error(
-            getMessageInRedColor(`Failed to generate or serve the portal: Please check your subscription details.`)
-          );
-        } else if (axiosError.response.status == 422) {
+        } else if (axiosError.response.status === 403) {
+          this.error(getMessageInRedColor(`Failed to generate the portal: Please check your subscription details.`));
+        } else if (axiosError.response.status === 422) {
           this.error(
             getMessageInRedColor(
-              `Failed to generate or serve the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
+              `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
             )
           );
-        } else if (axiosError.response.status == 500) {
+        } else if (axiosError.response.status === 500) {
           this.error(
-            getMessageInRedColor(`Failed to generate or serve the portal: Please verify if your build input is valid.`)
+            getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`)
           );
         } else {
           this.error(
             getMessageInRedColor(
-              `Failed to generate or serve the portal: ${axiosError.response.status} ${error.response?.statusText}`
+              `Failed to generate the portal: ${axiosError.response.status} ${error.response?.statusText}`
             )
           );
         }
       } else if (axiosError.request) {
-        this.error(getMessageInRedColor(`Failed to generate or serve the portal: Bad request.`));
+        if (axiosError.code === "ECONNABORTED") {
+          this.error(
+            getMessageInRedColor(
+              `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+            )
+          );
+        } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
+          this.error(getMessageInRedColor(`Network error. Please check your internet connection and try again.`));
+        } else {
+          this.error(getMessageInRedColor(`No response received from the server. Please try again later.`));
+        }
       } else {
-        this.error(getMessageInRedColor(`Failed to regenerate or serve the portal: ${axiosError.message}`));
+        this.error(getMessageInRedColor(`Failed to generate the portal: ${axiosError.message}`));
       }
     } else if (error instanceof Error) {
-      this.error(getMessageInRedColor(`Failed to generate or serve the portal: ${error.message}`));
+      this.error(getMessageInRedColor(`Failed to generate the portal: ${error.message}`));
     } else {
-      this.error(getMessageInRedColor(`Failed to generate or serve the portal: An unknown error occurred.`));
+      this.error(getMessageInRedColor(`Failed to generate the portal: An unknown error occurred.`));
     }
   }
 }

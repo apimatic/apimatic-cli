@@ -1,4 +1,5 @@
 import cli from "cli-ux";
+import * as net from "net";
 import * as path from "path";
 import * as fs from "fs-extra";
 import * as os from "os";
@@ -422,6 +423,27 @@ export async function cleanUpGeneratedPortalFiles(sourceDir: string) {
   if (fs.existsSync(generatedPortalSourceZipFilePath)) {
     await deleteFile(generatedPortalSourceZipFilePath);
   }
+}
+
+export function isPortInUse(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+
+    server.once("error", (err: any) => {
+      if (err.code === "EADDRINUSE") {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+
+    server.once("listening", () => {
+      server.close();
+      resolve(false);
+    });
+
+    server.listen(port);
+  });
 }
 
 export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] => {

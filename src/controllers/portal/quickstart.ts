@@ -24,7 +24,8 @@ import { metadataFileContent, staticPortalRepoUrl } from "../../config/env";
 import { PortalServerService } from "../../services/portal/server";
 
 export class PortalQuickstartController {
-  private readonly specUrl = "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
+  private readonly specUrl =
+    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);
@@ -68,7 +69,21 @@ export class PortalQuickstartController {
                 )
               );
             } else if (error.request) {
-              throw new Error(getMessageInRedColor(`Failed to download spec: Bad request.`));
+              if (error.code === "ECONNABORTED") {
+                throw new Error(
+                  getMessageInRedColor(
+                    `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+                  )
+                );
+              } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
+                throw new Error(
+                  getMessageInRedColor(`Network error. Please check your internet connection and try again.`)
+                );
+              } else {
+                throw new Error(
+                  getMessageInRedColor(`Failed to download spec: No response received while trying to download spec.`)
+                );
+              }
             } else {
               throw new Error(getMessageInRedColor(`Failed to download spec: ${error.message}`));
             }
@@ -133,7 +148,7 @@ export class PortalQuickstartController {
           );
         } else if (error.message.includes("Could not resolve host")) {
           throw new Error(
-            getMessageInRedColor("Could not resolve host. Please check your internet connection and try again.")
+            getMessageInRedColor("Could not resolve the host. Please check your internet connection and try again.")
           );
         } else {
           throw new Error(getMessageInRedColor(`There was an error setting up the build directory: ${error.message}`));
@@ -183,30 +198,22 @@ export class PortalQuickstartController {
       return generatedPortalPath;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        if (error.code === "ECONNABORTED") {
-          throw new Error(
-            getMessageInRedColor(
-              `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
-            )
-          );
-        } else if (error.code === "ENOTFOUND") {
-          throw new Error(getMessageInRedColor(`Network error. Please check your internet connection and try again.`));
-        } else if (error.response) {
-          if (error.response.status == 400) {
+        if (error.response) {
+          if (error.response.status === 400) {
             throw new Error(
               getMessageInRedColor(
-                `Failed to generate portal: Either the build file is missing or the build file was not a valid zip archive.`
+                `Failed to generate portal: Either the build file is missing or the build input was not a valid zip archive.`
               )
             );
-          } else if (error.response.status == 403) {
+          } else if (error.response.status === 403) {
             throw new Error(getMessageInRedColor(`Failed to generate portal: Please check your subscription details.`));
-          } else if (error.response.status == 422) {
+          } else if (error.response.status === 422) {
             throw new Error(
               getMessageInRedColor(
                 `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
               )
             );
-          } else if (error.response.status == 500) {
+          } else if (error.response.status === 500) {
             throw new Error(
               getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`)
             );
@@ -218,12 +225,24 @@ export class PortalQuickstartController {
             );
           }
         } else if (error.request) {
-          throw new Error(getMessageInRedColor(`Failed to generate portal: Bad request.`));
+          if (error.code === "ECONNABORTED") {
+            throw new Error(
+              getMessageInRedColor(
+                `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+              )
+            );
+          } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
+            throw new Error(
+              getMessageInRedColor(`Network error. Please check your internet connection and try again.`)
+            );
+          } else {
+            throw new Error(getMessageInRedColor(`No response received from the server. Please try again later.`));
+          }
         } else {
           throw new Error(getMessageInRedColor(`Failed to generate portal: ${error.message}`));
         }
       } else {
-        throw new Error(getMessageInRedColor(`Something went wrong while generating the portal artifacts: ${error}`));
+        throw new Error(getMessageInRedColor(`Unable to generate the portal artifacts: ${error}`));
       }
     }
   }
@@ -233,7 +252,7 @@ export class PortalQuickstartController {
 
     server.setupServer(generatedPortalPath);
 
-    server.startServer(
+    await server.startServer(
       {
         generatedPortalPath,
         targetFolder,
