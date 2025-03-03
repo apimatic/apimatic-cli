@@ -164,12 +164,12 @@ async function handleFileChange(
         } else if (error.response.status === 422) {
           console.error(
             getMessageInRedColor(
-              `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
+              `Failed to regenerate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
             )
           );
         } else if (error.response.status === 500) {
           console.error(
-            getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`)
+            getMessageInRedColor(`Failed to regenerate the portal: Please verify if your build input is valid.`)
           );
         } else {
           console.error(
@@ -185,6 +185,8 @@ async function handleFileChange(
               `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
             )
           );
+        } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
+          throw new Error(getMessageInRedColor(`Network error. Please check your internet connection and try again.`));
         } else {
           console.error(
             getMessageInRedColor(
