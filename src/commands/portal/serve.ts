@@ -1,6 +1,6 @@
 import * as path from "path";
 import axios from "axios";
-import { Command, flags } from "@oclif/command";
+import { Command, Flags } from "@oclif/core";
 import { generatePortal } from "../../controllers/portal/serve";
 import { PortalServerService } from "../../services/portal/server";
 import { PortalServePrompts } from "../../prompts/portal/serve";
@@ -11,39 +11,39 @@ export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
 
   static flags = {
-    port: flags.integer({
+    port: Flags.integer({
       char: "p",
       description: "Port to serve the portal.",
       default: 3000
     }),
-    destination: flags.string({
+    destination: Flags.string({
       char: "d",
       description: "Directory to store and serve the generated portal.",
       default: "./api-portal",
-      parse: (input) => path.resolve(input)
+      parse: async (input) => path.resolve(input)
     }),
-    source: flags.string({
+    source: Flags.string({
       char: "s",
       description:
         "Source directory containing specs, content, and build file. By default, the current directory is used.",
       default: "./",
-      parse: (input) => path.resolve(input)
+      parse: async (input) => path.resolve(input)
     }),
-    open: flags.boolean({
+    open: Flags.boolean({
       char: "o",
       description: "Open the portal in the default browser.",
       default: false
     }),
-    "no-reload": flags.boolean({
+    "no-reload": Flags.boolean({
       description: "Disable hot reload.",
       default: false
     }),
-    ignore: flags.string({
+    ignore: Flags.string({
       char: "i",
       description: "Comma-separated list of files/directories to ignore.",
       default: ""
     }),
-    "auth-key": flags.string({
+    "auth-key": Flags.string({
       description: "Override current authentication state with an authentication key."
     })
   };
@@ -61,7 +61,7 @@ export default class PortalServe extends Command {
   }
 
   async run() {
-    const { flags } = this.parse(PortalServe);
+    const { flags } = await this.parse(PortalServe);
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
     const portalDir = path.resolve(flags.destination);
     const sourceDir = path.resolve(flags.source);

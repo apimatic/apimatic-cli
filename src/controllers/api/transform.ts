@@ -1,4 +1,4 @@
-import cli from "cli-ux";
+import { ux } from "@oclif/core";
 import * as fs from "fs-extra";
 
 import { writeFileUsingReadableStream } from "../../utils/utils";
@@ -17,7 +17,7 @@ export const getTransformationId = async (
   { file, url, format }: TransformationIdParams,
   transformationController: TransformationController
 ): Promise<Transformation> => {
-  cli.action.start("Transforming API specification");
+  ux.action.start("Transforming API specification");
 
   let generation: ApiResponse<Transformation>;
   if (file) {
@@ -36,7 +36,7 @@ export const getTransformationId = async (
   } else {
     throw new Error("Please provide a specification file");
   }
-  cli.action.stop();
+  ux.action.stop();
   return generation.result;
 };
 
@@ -45,7 +45,7 @@ export const downloadTransformationFile = async ({
   destinationFilePath,
   transformationController
 }: DownloadTransformationParams): Promise<string> => {
-  cli.action.start("Downloading Transformed file");
+  ux.action.start("Downloading Transformed file");
 
   const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
 
@@ -54,7 +54,7 @@ export const downloadTransformationFile = async ({
   } else {
     throw new Error("Couldn't save transformation file");
   }
-  cli.action.stop();
+  ux.action.stop();
   return destinationFilePath;
 };
 // Get valid platform from user's input, convert simple platform to valid Platforms enum value

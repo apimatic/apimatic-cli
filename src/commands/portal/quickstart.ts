@@ -1,4 +1,4 @@
-import { Command } from "@oclif/command";
+import { Command } from "@oclif/core";
 import { APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart";

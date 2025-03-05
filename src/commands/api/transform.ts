@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from "fs-extra";
 
-import { flags, Command } from "@oclif/command";
+import { Flags, Command } from "@oclif/core";
 import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils";
@@ -25,33 +25,33 @@ Success! Your transformed file is located at D:/swagger_raml.yaml
   ];
 
   static flags = {
-    format: flags.string({
-      parse: (format: string) => getValidFormat(format.toUpperCase()),
+    format: Flags.string({
+      parse: async (format: string) => getValidFormat(format.toUpperCase()),
       required: true,
       description: `specification format to transform API specification into
 ${formats}`
     }),
-    file: flags.string({
-      parse: (input) => path.resolve(input),
+    file: Flags.string({
+      parse: async (input) => path.resolve(input),
       default: "",
       description: "path to the API specification file to transform"
     }),
-    url: flags.string({
+    url: Flags.string({
       default: "",
       description:
         "URL to the API specification file to transform. Can be used in place of the --file option if the API specification is publicly available."
     }),
-    destination: flags.string({
-      parse: (input) => path.resolve(input),
+    destination: Flags.string({
+      parse: async (input) => path.resolve(input),
       default: path.resolve("./"),
       description: "directory to download transformed file to"
     }),
-    force: flags.boolean({ char: "f", default: false, description: "overwrite if same file exist in the destination" }),
-    "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
+    force: Flags.boolean({ char: "f", default: false, description: "overwrite if same file exist in the destination" }),
+    "auth-key": Flags.string({ description: "override current authentication state with an authentication key" })
   };
 
   async run() {
-    const { flags } = this.parse(Transform);
+    const { flags } = await this.parse(Transform);
     const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
     const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
     const destinationFilePath: string = path.join(
@@ -78,9 +78,9 @@ ${formats}`
       const { id, apiValidationSummary }: Transformation = await getTransformationId(flags, transformationController);
 
       const logFunctions: loggers = {
-        log: this.log,
-        warn: this.warn,
-        error: this.error
+        log: (message) => this.log(message),
+        warn: (message) => this.warn(message),
+        error: (message) => this.error(message)
       };
       printValidationMessages(apiValidationSummary, logFunctions);
 

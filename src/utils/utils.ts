@@ -1,4 +1,3 @@
-import cli from "cli-ux";
 import * as net from "net";
 import * as path from "path";
 import * as fs from "fs-extra";
@@ -214,51 +213,6 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string):
 
     archive.finalize().catch(reject);
   });
-};
-
-type ProgressBar = {
-  start: () => void;
-  stop: () => void;
-  update: (progress: number) => void;
-};
-
-// TODO: Instead of making progressBar a static, you should have "startProgress"
-// return the instance of the progress bar created, the same way "cli.progress"
-// method does.
-let progressBar: ProgressBar;
-
-// TODO: I didn't mean to say that we should create a fake progress bar when we
-// set the requirements to include progress bar. You should get the download or
-// upload progress by tracking how much of the steam has been read/written and
-// compare that with the remaining size of the stream (in case of upload, you
-// get size from the file size and in case of download, you get it from the
-// content-type header). In case the progress can not be calculated, show a
-// spinner.
-export const startProgress = (title: string) => {
-  progressBar = cli.progress({
-    format: `${title} | {bar}`,
-    barCompleteChar: "\u2588",
-    barIncompleteChar: "\u2591"
-  });
-  progressBar.start();
-  const total = 100;
-  let count = 0;
-
-  const iv = setInterval(() => {
-    count++;
-    progressBar.update(count);
-    if (count === total - 1) {
-      clearInterval(iv);
-    }
-  }, 50);
-};
-
-export const stopProgress = (isError = false) => {
-  if (isError) {
-    return progressBar ? progressBar.stop() : null;
-  }
-  progressBar.update(100);
-  return progressBar.stop();
 };
 
 export const replaceHTML = (string: string) => {

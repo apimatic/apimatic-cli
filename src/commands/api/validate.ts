@@ -1,7 +1,6 @@
 import * as fs from "fs-extra";
-import cli from "cli-ux";
 
-import { flags, Command } from "@oclif/command";
+import { ux, Flags, Command } from "@oclif/core";
 import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils";
@@ -23,18 +22,18 @@ Specification file provided is valid
   ];
 
   static flags = {
-    file: flags.string({ default: "", description: "Path to the API specification file to validate" }),
-    url: flags.string({
+    file: Flags.string({ default: "", description: "Path to the API specification file to validate" }),
+    url: Flags.string({
       default: "",
       description:
         "URL to the specification file to validate. Can be used in place of the --file option if the API specification is publicly available."
     }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
-    "auth-key": flags.string({ description: "override current authentication state with an authentication key" })
+    "auth-key": Flags.string({ description: "override current authentication state with an authentication key" })
   };
 
   async run() {
-    const { flags } = this.parse(Validate);
+    const { flags } = await this.parse(Validate);
 
     try {
       if (flags.file && !(await fs.pathExists(flags.file))) {
@@ -47,13 +46,13 @@ Specification file provided is valid
         client
       );
 
-      cli.action.start("Validating specification file");
+      ux.action.start("Validating specification file");
       const validationSummary: ApiValidationSummary = await getValidation(flags, apiValidationController);
-      cli.action.stop();
+      ux.action.stop();
       const logFunctions: loggers = {
-        log: this.log,
-        warn: this.warn,
-        error: this.error
+        log: (message) => this.log(message),
+        warn: (message) => this.warn(message),
+        error: (message) => this.error(message)
       };
       printValidationMessages(validationSummary, logFunctions);
 
