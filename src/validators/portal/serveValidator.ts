@@ -11,7 +11,7 @@ export class PortalServeValidator {
   }
 
   async validate(port: number, destination: string, sourceDir: string, portalDir: string) {
-    this.portValidator.validate(port);
+    await this.portValidator.validate(port);
     this.directoryValidator.validateSourceDirectory(sourceDir);
     await this.directoryValidator.validateGeneratedPortalDestinationDirectory(destination, portalDir);
     this.directoryValidator.validatePortalSourceDirectory(sourceDir);

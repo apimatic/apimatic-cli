@@ -25,14 +25,9 @@ export class PortalServerService {
     this.app.use(express.static(generatedPortalPath));
   }
 
-  async startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<void> {
+  startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<void> {
     const { generatedPortalPath, targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
     const serverPort = port ?? this.port;
-
-    const portInUse = await isPortInUse(serverPort);
-    if (portInUse) {
-      throw new Error(getMessageInRedColor(`Port ${serverPort} is already in use. Please provide an alternative port number to continue.`));
-    }
 
     return new Promise<void>((resolve) => {
       try {

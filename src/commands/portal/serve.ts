@@ -87,7 +87,7 @@ export default class PortalServe extends Command {
 
     serverService.setupServer(portalDir);
 
-    await serverService.startServer(
+    serverService.startServer(
       {
         generatedPortalPath: portalDir,
         targetFolder: sourceDir,
