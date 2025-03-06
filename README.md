@@ -1,5 +1,6 @@
 @apimatic/cli
 =============
+apimatic is in Alpha.
 
 The official CLI for APIMatic.
 
@@ -23,7 +24,7 @@ $ apimatic portal:quickstart
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g @apimatic/cli@1.0.1-alpha.3
+$ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (-v|--version|version)

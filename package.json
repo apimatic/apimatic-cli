@@ -102,6 +102,7 @@
     "oclif": {
         "commands": "./lib/commands",
         "bin": "apimatic",
+        "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
         "plugins": [
             "@oclif/plugin-autocomplete",
             "@oclif/plugin-help",
@@ -120,7 +121,8 @@
             "sdk": {
                 "description": "Generate SDKs for your APIs in multiple languages."
             }
-        }
+        },
+        "state": "Alpha"
     },
     "lint-staged": {
         "*.js": "eslint --cache --fix",
