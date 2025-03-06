@@ -106,10 +106,10 @@ export class PortalQuickstartPrompts {
             return;
           }
 
-          return getMessageInRedColor("Invalid path entered. Please enter a path to a valid file or zip file.");
+          return getMessageInRedColor("Error: The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again.");
         }
 
-        return getMessageInRedColor("The path is invalid, it does not exist.");
+        return getMessageInRedColor("Error: The specified file does not exist. Please enter a valid file path.");
       }
     });
 
@@ -204,16 +204,16 @@ export class PortalQuickstartPrompts {
         const dirPath = path.resolve(input.trim() || this.portalDirectory);
 
         if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectory) {
-          return getMessageInRedColor("The directory path does not exist.");
+          return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
         }
 
         if (dirPath !== this.defaultPortalDirectory) {
           const files = fs.readdirSync(dirPath).filter(item => !item.startsWith('.'));;
           if (files.length > 0) {
-            return getMessageInRedColor("The directory is not empty. Please enter another directory.");
+            return getMessageInRedColor("Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.");
           }
         } else if (fs.existsSync(dirPath) && fs.readdirSync(dirPath).length > 0) {
-          return getMessageInRedColor("The directory is not empty. Please enter another directory.");
+          return getMessageInRedColor("Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.");
         }
       }
     });
@@ -232,6 +232,10 @@ export class PortalQuickstartPrompts {
 
   displayBuildDirectoryGenerationMessage(): void {
     this.spin.start(getMessageInMagentaColor("Generating build directory... ⚙️"));
+  }
+
+  displayBuildDirectoryGenerationErrorMessage(): void {
+    this.spin.stop(getMessageInRedColor(`Something went wrong while setting up your build directory.`));
   }
 
   displayBuildDirectoryGenerationSuccessMessage(targetFolder: string): void {

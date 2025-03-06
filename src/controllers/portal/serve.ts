@@ -156,25 +156,25 @@ async function handleFileChange(
         if (error.response.status === 400) {
           console.error(
             getMessageInRedColor(
-              `Failed to regenerate portal: Either the build file is missing or the build file was not a valid zip archive.`
+              `Failed to regenerate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files.`
             )
           );
         } else if (error.response.status === 403) {
-          console.error(getMessageInRedColor(`Failed to regenerate portal: Please check your subscription details.`));
+          console.error(getMessageInRedColor(`Access denied. It looks like you don’t have access to APIMatic’s Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
         } else if (error.response.status === 422) {
           console.error(
             getMessageInRedColor(
-              `Failed to regenerate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
+              `Failed to regenerate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files.`
             )
           );
         } else if (error.response.status === 500) {
           console.error(
-            getMessageInRedColor(`Failed to regenerate the portal: Please verify if your build input is valid.`)
+            getMessageInRedColor(`Failed to regenerate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files. If the issue persists, reach out to our team at support@apimatic.io`)
           );
         } else {
           console.error(
             getMessageInRedColor(
-              `Failed to regenerate portal: Server returned ${error.response.status} ${error.response.statusText}`
+              `Failed to regenerate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files. If the issue persists, reach out to our team at support@apimatic.io`
             )
           );
         }
@@ -182,7 +182,7 @@ async function handleFileChange(
         if (error.code === "ECONNABORTED") {
           console.error(
             getMessageInRedColor(
-              `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+              `Your request timed out. Please try again or reach out to our team at support@apimatic.io  for help if your problem persists.`
             )
           );
         } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
@@ -190,7 +190,7 @@ async function handleFileChange(
         } else {
           console.error(
             getMessageInRedColor(
-              `Failed to regenerate portal: No response received from the server. Please try again later.`
+              `No response received from the server. Please try again later.`
             )
           );
         }

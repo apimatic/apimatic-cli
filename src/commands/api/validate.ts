@@ -5,7 +5,7 @@ import { ApiError, APIValidationExternalApisController, ApiValidationSummary, Cl
 
 import { AuthenticationError, loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { getValidation } from "../../controllers/api/validate";
+import { getValidationSummary } from "../../controllers/api/validate";
 import { printValidationMessages, replaceHTML } from "../../utils/utils";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate";
 
@@ -47,7 +47,7 @@ Specification file provided is valid
       );
 
       ux.action.start("Validating specification file");
-      const validationSummary: ApiValidationSummary = await getValidation(flags, apiValidationController);
+      const validationSummary: ApiValidationSummary = await getValidationSummary(flags, apiValidationController);
       ux.action.stop();
       const logFunctions: loggers = {
         log: (message) => this.log(message),

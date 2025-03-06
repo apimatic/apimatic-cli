@@ -31,7 +31,7 @@ export class PortalServerService {
 
     const portInUse = await isPortInUse(serverPort);
     if (portInUse) {
-      throw new Error(getMessageInRedColor(`Port ${serverPort} is already in use.`));
+      throw new Error(getMessageInRedColor(`Port ${serverPort} is already in use. Please provide an alternative port number to continue.`));
     }
 
     return new Promise<void>((resolve) => {

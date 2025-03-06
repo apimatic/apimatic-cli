@@ -17,15 +17,11 @@ export default class PortalQuickstart extends Command {
   ): Promise<SpecFile> {
     const spec = await prompts.specPrompt();
 
-    try {
-      const specFile = await controller.getSpecFile(spec);
+    const specFile = await controller.getSpecFile(spec);
 
-      prompts.displaySpecValidationMessage();
+    prompts.displaySpecValidationMessage();
 
-      return specFile;
-    } catch (error) {
-      this.error(getMessageInRedColor(`Something went wrong while setting up your spec file: ${error}`));
-    }
+    return specFile;
   }
 
   private async getSpecValidationSummary(
@@ -49,7 +45,7 @@ export default class PortalQuickstart extends Command {
       prompts.displaySpecValidationErrorMessage();
       this.error(
         getMessageInRedColor(
-          `An error occurred while validating your spec. Please check if the path/URL is correct and points to a valid file.`
+          "The specified path/URL does not point to a valid API Definition file. Please provide a valid API Definition file and try again."
         )
       );
     }
@@ -62,21 +58,17 @@ export default class PortalQuickstart extends Command {
     apiValidationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<string> {
-    try {
-      const directory = await prompts.buildDirectoryPrompt();
+    const directory = await prompts.buildDirectoryPrompt();
 
-      prompts.displayBuildDirectoryGenerationMessage();
+    prompts.displayBuildDirectoryGenerationMessage();
 
-      await controller.setupBuildDirectory(directory, specFile, apiValidationSummary, languages);
+    await controller.setupBuildDirectory(prompts, directory, specFile, apiValidationSummary, languages);
 
-      prompts.displayBuildDirectoryGenerationSuccessMessage(directory);
+    prompts.displayBuildDirectoryGenerationSuccessMessage(directory);
 
-      prompts.displayBuildDirectoryAsTree(directory);
+    prompts.displayBuildDirectoryAsTree(directory);
 
-      return directory;
-    } catch (error) {
-      this.error(getMessageInRedColor(`Something went wrong while setting up your build directory: ${error}`));
-    }
+    return directory;
   }
 
   private async getGeneratedPortalPath(
@@ -84,17 +76,13 @@ export default class PortalQuickstart extends Command {
     controller: PortalQuickstartController,
     directory: string
   ): Promise<string> {
-    try {
-      prompts.displayPortalGenerationMessage();
+    prompts.displayPortalGenerationMessage();
 
-      const generatedPortalPath = await controller.generatePortalArtifacts(directory, this.config.configDir);
+    const generatedPortalPath = await controller.generatePortalArtifacts(directory, this.config.configDir);
 
-      prompts.displayPortalGenerationSuccessMessage();
+    prompts.displayPortalGenerationSuccessMessage();
 
-      return generatedPortalPath;
-    } catch (error) {
-      this.error(getMessageInRedColor(`Something went wrong while generating the portal: ${error}`));
-    }
+    return generatedPortalPath;
   }
 
   async run() {
@@ -124,23 +112,27 @@ export default class PortalQuickstart extends Command {
       client
     );
 
-    const specFile = await this.getSpecFile(prompts, controller);
+    try {
+      const specFile = await this.getSpecFile(prompts, controller);
 
-    const apiValidationSummary = await this.getSpecValidationSummary(
-      prompts,
-      controller,
-      specFile,
-      apiValidationController
-    );
+      const apiValidationSummary = await this.getSpecValidationSummary(
+        prompts,
+        controller,
+        specFile,
+        apiValidationController
+      );
 
-    const languages = await prompts.sdkLanguagesPrompt();
+      const languages = await prompts.sdkLanguagesPrompt();
 
-    const directory = await this.getBuildDirectory(prompts, controller, specFile, apiValidationSummary, languages);
+      const directory = await this.getBuildDirectory(prompts, controller, specFile, apiValidationSummary, languages);
 
-    const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory);
+      const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory);
 
-    controller.servePortal(generatedPortalPath, directory, this.config.configDir);
+      controller.servePortal(generatedPortalPath, directory, this.config.configDir);
 
-    prompts.displayOutroMessage();
+      prompts.displayOutroMessage();
+    } catch (error) {
+      this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
+    }
   }
 }

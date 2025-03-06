@@ -110,31 +110,31 @@ export default class PortalServe extends Command {
         if (axiosError.response.status === 400) {
           this.error(
             getMessageInRedColor(
-              `Failed to generate the portal: Either the build file is missing or the build input was not a valid zip archive.`
+              `Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files.`
             )
           );
         } else if (axiosError.response.status === 401) {
           this.error(
             getMessageInRedColor(
-              `Failed to generate the portal: Please check if you are logged in or your auth key is correctly entered and valid.`
+              `Failed to generate the portal. Please ensure that you are logged in or have provided a valid Auth key.`
             )
           );
         } else if (axiosError.response.status === 403) {
-          this.error(getMessageInRedColor(`Failed to generate the portal: Please check your subscription details.`));
+          this.error(getMessageInRedColor(`Access denied. It looks like you don’t have access to APIMatic’s Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
         } else if (axiosError.response.status === 422) {
           this.error(
             getMessageInRedColor(
-              `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
+              `Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files.`
             )
           );
         } else if (axiosError.response.status === 500) {
           this.error(
-            getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`)
+            getMessageInRedColor(`Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files. If the issue persists, reach out to our team at support@apimatic.io`)
           );
         } else {
           this.error(
             getMessageInRedColor(
-              `Failed to generate the portal: ${axiosError.response.status} ${error.response?.statusText}`
+              `Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files. If the issue persists, reach out to our team at support@apimatic.io`
             )
           );
         }
@@ -142,7 +142,7 @@ export default class PortalServe extends Command {
         if (axiosError.code === "ECONNABORTED") {
           this.error(
             getMessageInRedColor(
-              `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+              `Your request timed out. Please try again or reach out to our team at support@apimatic.io for help if your problem persists.`
             )
           );
         } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
@@ -156,7 +156,7 @@ export default class PortalServe extends Command {
     } else if (error instanceof Error) {
       this.error(getMessageInRedColor(`Failed to generate the portal: ${error.message}`));
     } else {
-      this.error(getMessageInRedColor(`Failed to generate the portal: An unknown error occurred.`));
+      this.error(getMessageInRedColor(`Something went wrong while generating the portal, please try again later. If the issue persists, contact our team at support@apimatic.io`));
     }
   }
 }

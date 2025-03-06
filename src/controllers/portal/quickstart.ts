@@ -17,11 +17,12 @@ import {
   deleteFile,
   cleanUpGeneratedPortalFiles
 } from "../../utils/utils";
-import { getValidation } from "../api/validate";
+import { getValidationSummary } from "../api/validate";
 import { GetValidationParams } from "../../types/api/validate";
 import { generatePortal } from "./serve";
 import { metadataFileContent, staticPortalRepoUrl } from "../../config/env";
 import { PortalServerService } from "../../services/portal/server";
+import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart";
 
 export class PortalQuickstartController {
   private readonly specUrl =
@@ -52,7 +53,9 @@ export class PortalQuickstartController {
 
           if (response.headers["content-type"].includes("text/html")) {
             throw new Error(
-              getMessageInRedColor(`Invalid URL entered, there is no file present at the URL specified.`)
+              getMessageInRedColor(
+                `Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`
+              )
             );
           }
 
@@ -63,34 +66,48 @@ export class PortalQuickstartController {
         } catch (error) {
           if (axios.isAxiosError(error)) {
             if (error.response) {
-              throw new Error(
-                getMessageInRedColor(
-                  `Failed to download spec: Server returned ${error.response.status} ${error.response.statusText}`
-                )
-              );
+              if (error.response.status === 404) {
+                throw new Error(
+                  getMessageInRedColor(
+                    `Unable to download the API Definition. The server returned a 404 Not Found error. Please verify that the provided URL is correct and publicly accessible.`
+                  )
+                );
+              } else {
+                throw new Error(
+                  getMessageInRedColor(
+                    `Unable to download the API Definition. The server returned ${error.response.status} ${error.response.statusText}`
+                  )
+                );
+              }
             } else if (error.request) {
               if (error.code === "ECONNABORTED") {
                 throw new Error(
                   getMessageInRedColor(
-                    `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+                    `Unable to download the API Definition, your request timed out. Please check your internet connection and try again, or contact APIMatic support for help if your problem persists.`
                   )
                 );
               } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
                 throw new Error(
-                  getMessageInRedColor(`Network error. Please check your internet connection and try again.`)
+                  getMessageInRedColor(
+                    `Failed to download the API Definition file due to network issues. Please check your internet connection and try again.`
+                  )
                 );
               } else {
                 throw new Error(
-                  getMessageInRedColor(`Failed to download spec: No response received while trying to download spec.`)
+                  getMessageInRedColor(
+                    `Failed to download the API Definition file, no response was received from the server. Please try again later.`
+                  )
                 );
               }
             } else {
-              throw new Error(getMessageInRedColor(`Failed to download spec: ${error.message}`));
+              throw new Error(getMessageInRedColor(`Failed to download API Definition: ${error.message}`));
             }
           } else {
             throw new Error(
               getMessageInRedColor(
-                `Failed to save spec file: ${error instanceof Error ? error.message : "Unknown error"}`
+                `Unable to save API Definition : ${
+                  error instanceof Error ? error.message : "Unknown error"
+                }`
               )
             );
           }
@@ -122,10 +139,13 @@ export class PortalQuickstartController {
       url: specFile.url
     };
 
-    return await getValidation(validationFlags, apiValidationController);
+    const validationSummary = getValidationSummary(validationFlags, apiValidationController);
+
+    return validationSummary;
   }
 
   async setupBuildDirectory(
+    prompts: PortalQuickstartPrompts,
     targetFolder: string,
     specFile: SpecFile,
     validationSummary: ApiValidationSummary,
@@ -141,22 +161,23 @@ export class PortalQuickstartController {
     try {
       await git.clone(staticPortalRepoUrl, targetFolder);
     } catch (error) {
+      prompts.displayBuildDirectoryGenerationErrorMessage();
       if (error instanceof Error) {
         if (error.message.includes("timed out")) {
           throw new Error(
-            getMessageInRedColor("The operation timed out. Please check your internet connection and try again.")
+            getMessageInRedColor(
+              "The operation timed out while setting up the build directory. Please check your internet connection and try again."
+            )
           );
         } else if (error.message.includes("Could not resolve host")) {
           throw new Error(
-            getMessageInRedColor("Could not resolve the host. Please check your internet connection and try again.")
+            getMessageInRedColor("Unable to resolve the host. Please check your network settings and try again.")
           );
         } else {
-          throw new Error(getMessageInRedColor(`There was an error setting up the build directory: ${error.message}`));
+          throw new Error(getMessageInRedColor(`Failed to set up the build directory. ${error.message}`));
         }
       } else {
-        throw new Error(
-          getMessageInRedColor(`An unknown error occurred while setting up the build directory. ${error}`)
-        );
+        throw new Error(getMessageInRedColor(`Failed to set up the build directory. ${error}`));
       }
     }
 
@@ -202,25 +223,25 @@ export class PortalQuickstartController {
           if (error.response.status === 400) {
             throw new Error(
               getMessageInRedColor(
-                `Failed to generate portal: Either the build file is missing or the build input was not a valid zip archive.`
+                `The provided input is not valid. Please ensure the zip file contains a valid build file at the root level.`
               )
             );
           } else if (error.response.status === 403) {
-            throw new Error(getMessageInRedColor(`Failed to generate portal: Please check your subscription details.`));
+            throw new Error(getMessageInRedColor(`Access denied. It looks like you don’t have access to APIMatic’s Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
           } else if (error.response.status === 422) {
             throw new Error(
               getMessageInRedColor(
-                `Failed to generate the portal: We ran into a problem while processing your build input. Please check if your build input is setup correctly.`
+                `Unable to process the build input. Please verify that your zip file is correctly structured and your build file is a valid JSON file.`
               )
             );
           } else if (error.response.status === 500) {
             throw new Error(
-              getMessageInRedColor(`Failed to generate the portal: Please verify if your build input is valid.`)
+              getMessageInRedColor(`The server encountered an error while generating your portal, please try again. If the issue persists, contact our team at support@apimatic.io`)
             );
           } else {
             throw new Error(
               getMessageInRedColor(
-                `Failed to generate portal: Server returned ${error.response.status} ${error.response.statusText}`
+                `Something went wrong while generating the portal. The server returned the following error ${error.response.status} ${error.response.statusText}. Please try again later. If the issue persists, contact our team at support@apimatic.io`
               )
             );
           }
@@ -228,21 +249,21 @@ export class PortalQuickstartController {
           if (error.code === "ECONNABORTED") {
             throw new Error(
               getMessageInRedColor(
-                `Your request timed out. Please try again or contact APIMatic support for help if your problem persists.`
+                `The portal generation request timed out. Please try again. If the issue persists, try out our Async API for Docs as Code: https://docs.apimatic.io/platform-api/#/http/api-endpoints/docs-portal-management/generate-on-prem-portal-via-build-input`
               )
             );
           } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
             throw new Error(
-              getMessageInRedColor(`Network error. Please check your internet connection and try again.`)
+              getMessageInRedColor(`Network error encountered while generating the portal. Please check your connection and try again.`)
             );
           } else {
-            throw new Error(getMessageInRedColor(`No response received from the server. Please try again later.`));
+            throw new Error(getMessageInRedColor(`Something went wrong while generating the portal, please try again. If the issue persists, reach out to our support team at support@apimatic.io`));
           }
         } else {
           throw new Error(getMessageInRedColor(`Failed to generate portal: ${error.message}`));
         }
       } else {
-        throw new Error(getMessageInRedColor(`Unable to generate the portal artifacts: ${error}`));
+        throw new Error(getMessageInRedColor(`Something went wrong while generating the portal, please try again later. If the issue persists, contact our team at support@apimatic.io`));
       }
     }
   }

@@ -4,7 +4,7 @@ import { GetValidationParams } from "../../types/api/validate";
 import { APIValidationExternalApisController, ApiValidationSummary, ContentType } from "@apimatic/sdk";
 import { createTempDirectory, deleteFile, zipDirectory } from "../../utils/utils";
 
-export const getValidation = async (
+export const getValidationSummary = async (
   { file, url }: GetValidationParams,
   apiValidationController: APIValidationExternalApisController
 ): Promise<ApiValidationSummary> => {
