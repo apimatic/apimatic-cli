@@ -9,7 +9,7 @@ export default class Login extends Command {
 
   static examples = [
     `$ apimatic auth:login
-Please enter your registered email: apimatic-user@gmail.com
+Enter your registered email: apimatic-user@gmail.com
 Please enter your password: *********
 
 You have successfully logged into APIMatic
