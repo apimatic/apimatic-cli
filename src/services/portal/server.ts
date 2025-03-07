@@ -5,7 +5,7 @@ import * as open from "open";
 import { watchAndRegeneratePortal } from "../../controllers/portal/serve";
 import { PortalServerConfig } from "../../types/portal/quickstart";
 import { Server } from "http";
-import { getMessageInRedColor, isPortInUse } from "../../utils/utils";
+import { getMessageInRedColor } from "../../utils/utils";
 
 export class PortalServerService {
   private server!: Server;
