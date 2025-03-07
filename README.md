@@ -28,7 +28,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.0.1-alpha.11 win32-x64 node-v20.18.3
+@apimatic/cli/0.0.0-alpha.0 win32-x64 node-v20.18.3
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
