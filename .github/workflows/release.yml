@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ '18' ]
+        node: [ '20' ]
     name: Release with Node version ${{ matrix.node }}
     steps:
       - name: Checkout CLI
