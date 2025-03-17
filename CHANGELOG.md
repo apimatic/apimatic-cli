@@ -1,3 +1,10 @@
+# [1.1.0-alpha.6](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.5...v1.1.0-alpha.6) (2025-03-17)
+
+
+### Features
+
+* **portal:** adds portal quickstart and serve commands ([#33](https://github.com/apimatic/apimatic-cli/issues/33)) ([ab2da9a](https://github.com/apimatic/apimatic-cli/commit/ab2da9a0bcea520abcb92bba7e0d75b7dce6af60)), closes [#10](https://github.com/apimatic/apimatic-cli/issues/10)
+
 # [1.1.0-alpha.5](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.4...v1.1.0-alpha.5) (2023-09-28)
 
 
