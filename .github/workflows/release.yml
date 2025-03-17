@@ -9,14 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ '18' ]
+        node: [ '20' ]
     name: Release with Node version ${{ matrix.node }}
     steps:
       - name: Checkout CLI
         uses: actions/checkout@v2
         with:
           repository: apimatic/apimatic-cli
-          token: ${{ secrets.ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: false
           fetch-depth: 0
           path: cli
@@ -27,7 +27,6 @@ jobs:
       - name: Install dependencies
         working-directory: cli
         run: |
-          git config --global url."https://${{ secrets.ACCESS_TOKEN }}@github.com/".insteadOf https://github.com/
           npm install
           npm install --save-dev @semantic-release/changelog @semantic-release/git
       - name: Check Build
@@ -37,6 +36,6 @@ jobs:
       - name: Release
         working-directory: cli
         env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release

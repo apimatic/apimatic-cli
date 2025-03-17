@@ -2,4 +2,8 @@
 /* eslint-disable no-undef */
 /* eslint-disable @typescript-eslint/no-var-requires */
 
-require("@oclif/command").run().then(require("@oclif/command/flush")).catch(require("@oclif/errors/handle"));
+const { run, flush, handle } = require("@oclif/core");
+
+run()
+  .then(flush)
+  .catch(handle);

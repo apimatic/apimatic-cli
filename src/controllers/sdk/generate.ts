@@ -1,5 +1,5 @@
 import * as fs from "fs-extra";
-import cli from "cli-ux";
+import { ux } from "@oclif/core";
 
 import {
   CodeGenerationExternalApisController,
@@ -15,7 +15,7 @@ export const getSDKGenerationId = async (
   { file, url, platform }: GenerationIdParams,
   sdkGenerationController: CodeGenerationExternalApisController
 ): Promise<string> => {
-  cli.action.start("Generating SDK");
+  ux.action.start("Generating SDK");
 
   let generation: ApiResponse<UserCodeGeneration>;
   const sdkPlatform = getSDKPlatform(platform) as Platforms;
@@ -32,7 +32,7 @@ export const getSDKGenerationId = async (
   } else {
     throw new Error("Please provide a specification file");
   }
-  cli.action.stop();
+  ux.action.stop();
   return generation.result.id;
 };
 
@@ -53,16 +53,16 @@ export const downloadGeneratedSDK = async (
   { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
   sdkGenerationController: CodeGenerationExternalApisController
 ): Promise<string> => {
-  cli.action.start("Downloading SDK");
+  ux.action.start("Downloading SDK");
   const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
   if ((result as NodeJS.ReadableStream).readable) {
     if (!zip) {
       await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
-      cli.action.stop();
+      ux.action.stop();
       return sdkFolderPath;
     } else {
       await writeFileUsingReadableStream(result as NodeJS.ReadableStream, zippedSDKPath);
-      cli.action.stop();
+      ux.action.stop();
       return zippedSDKPath;
     }
   } else {

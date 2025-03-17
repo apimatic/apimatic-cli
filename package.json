@@ -11,7 +11,7 @@
         "access": "public"
     },
     "engines": {
-        "node": ">=12.0.0"
+        "node": ">=20.0.0"
     },
     "files": [
         "/bin",
@@ -44,60 +44,96 @@
     },
     "dependencies": {
         "@apimatic/sdk": "^0.1.0-alpha.2",
-        "@oclif/command": "^1.8.0",
-        "@oclif/config": "^1.17.0",
-        "@oclif/plugin-autocomplete": "^0.3.0",
-        "@oclif/plugin-help": "^3.2.3",
-        "@oclif/plugin-not-found": "^1.2.4",
-        "archiver": "^5.3.0",
-        "axios": "^0.24.0",
+        "@clack/prompts": "^0.10.0",
+        "@oclif/core": "^4.2.8",
+        "@oclif/plugin-autocomplete": "^3.2.24",
+        "@oclif/plugin-help": "^6.2.26",
+        "@oclif/plugin-not-found": "^3.2.44",
+        "adm-zip": "^0.5.14",
+        "archiver": "^7.0.1",
+        "axios": "^1.8.1",
         "base-64": "^1.0.0",
-        "form-data": "^4.0.0",
-        "fs-extra": "^10.0.0",
+        "chokidar": "^3.6.0",
+        "connect-livereload": "^0.6.1",
+        "express": "^4.17.1",
+        "file-type": "^15.0.0",
+        "form-data": "^4.0.2",
+        "fs-extra": "^11.3.0",
+        "livereload": "^0.9.3",
+        "open": "^8.4.0",
+        "simple-git": "^3.27.0",
         "striptags": "^3.2.0",
+        "treeify": "^1.1.0",
         "tslib": "^2.5.0",
-        "unzipper": "^0.10.11"
+        "unzipper": "^0.12.3"
     },
     "devDependencies": {
         "@commitlint/cli": "^15.0.0",
         "@commitlint/config-conventional": "^15.0.0",
-        "@oclif/dev-cli": "^1.26.0",
-        "@oclif/test": "^1.2.8",
+        "@oclif/test": "^4.1.11",
+        "@types/adm-zip": "^0.5.5",
         "@types/archiver": "^5.1.1",
-        "@types/axios": "^0.14.0",
         "@types/base-64": "^1.0.0",
         "@types/chai": "^4.2.22",
+        "@types/connect-livereload": "^0.5.1",
+        "@types/express": "^4.17.13",
         "@types/fs-extra": "^9.0.13",
+        "@types/livereload": "^0.9.2",
         "@types/mocha": "^5.2.7",
         "@types/node": "^10.17.60",
+        "@types/treeify": "^1.0.3",
         "@types/unzipper": "^0.10.4",
-        "@typescript-eslint/eslint-plugin": "^5.0.0",
-        "@typescript-eslint/parser": "^5.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.0.0",
+        "@typescript-eslint/parser": "^8.0.0",
         "chai": "^4.3.4",
-        "eslint": "^7.32.0",
+        "eslint": "^9.21.0",
         "eslint-config-prettier": "^8.3.0",
         "eslint-plugin-import": "^2.25.2",
-        "globby": "^10.0.2",
         "husky": "^7.0.4",
         "lint-staged": "^11.2.6",
-        "mocha": "^5.2.0",
-        "nyc": "^14.1.1",
+        "mocha": "^11.1.0",
+        "nyc": "^17.1.0",
+        "oclif": "^4.17.34",
         "prettier": "^2.4.1",
-        "rimraf": "^3.0.2",
+        "rimraf": "^6.0.1",
         "ts-node": "^8.10.2",
         "typescript": "^5.2.2"
     },
     "oclif": {
         "commands": "./lib/commands",
         "bin": "apimatic",
+        "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
         "plugins": [
             "@oclif/plugin-autocomplete",
             "@oclif/plugin-help",
             "@oclif/plugin-not-found"
-        ]
+        ],
+        "topics": {
+            "api": {
+                "description": "Transform & Validate your API specifications."
+            },
+            "auth": {
+                "description": "Login using your APIMatic credentials, or view your authentication status."
+            },
+            "portal": {
+                "description": "Generate, download and serve an API Documentation portal for your APIs."
+            },
+            "sdk": {
+                "description": "Generate SDKs for your APIs in multiple languages."
+            }
+        },
+        "state": "Alpha"
     },
     "lint-staged": {
         "*.js": "eslint --cache --fix",
         "*.{js,ts}": "prettier --write"
+    },
+    "overrides": {
+        "inflight": "npm:lru-cache@^7.14.1",
+        "lodash.get": "npm:lodash@^4.17.21",
+        "@humanwhocodes/config-array": "npm:@eslint/config-array@latest",
+        "rimraf": "^6.0.1",
+        "glob": "^10.4.5",
+        "q": "npm:promise@^8.3.0"
     }
 }

@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from "fs-extra";
 
-import { Command, flags } from "@oclif/command";
+import { ux, Command, Flags } from "@oclif/core";
 import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 
 import { AxiosError } from "axios";
@@ -13,22 +13,22 @@ import { AuthenticationError } from "../../types/utils";
 
 export default class PortalGenerate extends Command {
   static description =
-    "Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://portal-api-docs.apimatic.io/#/http/generating-api-portal/build-file)";
+    "Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)";
 
   static flags = {
-    folder: flags.string({
-      parse: (input) => path.resolve(input),
+    folder: Flags.string({
+      parse: async (input) => path.resolve(input),
       default: "./",
       description: "path to the input directory containing API specifications and config files"
     }),
-    destination: flags.string({
-      parse: (input) => path.resolve(input),
+    destination: Flags.string({
+      parse: async (input) => path.resolve(input),
       default: path.resolve("./"),
       description: "path to the downloaded portal"
     }),
-    force: flags.boolean({ char: "f", default: false, description: "overwrite if a portal exists in the destination" }),
-    zip: flags.boolean({ default: false, description: "download the generated portal as a .zip archive" }),
-    "auth-key": flags.string({
+    force: Flags.boolean({ char: "f", default: false, description: "overwrite if a portal exists in the destination" }),
+    zip: Flags.boolean({ default: false, description: "download the generated portal as a .zip archive" }),
+    "auth-key": Flags.string({
       default: "",
       description: "override current authentication state with an authentication key"
     })
@@ -41,7 +41,7 @@ Your portal has been generated at D:/
   ];
 
   async run() {
-    const { flags } = this.parse(PortalGenerate);
+    const { flags } = await this.parse(PortalGenerate);
     const zip = flags.zip;
     const sourceFolderPath: string = flags.folder;
     const portalFolderPath: string = path.join(flags.destination, "generated_portal");
@@ -74,9 +74,9 @@ Your portal has been generated at D:/
         overrideAuthKey,
         zip
       };
-
+      ux.action.start('Generating portal');
       const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams, this.config.configDir);
-
+      ux.action.stop();
       this.log(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error) {
       if (error && (error as AxiosError).response) {
@@ -84,7 +84,7 @@ Your portal has been generated at D:/
         const apiResponse = apiError.response;
 
         if (apiResponse) {
-          const responseData = apiResponse.data.toString();
+          const responseData = (apiResponse.data as string).toString();
 
           if (apiResponse.status === 422 && responseData.length > 0 && isJSONParsable(responseData)) {
             const nestedErrors = JSON.parse(responseData);

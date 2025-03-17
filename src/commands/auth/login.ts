@@ -1,8 +1,7 @@
-import { cli } from "cli-ux";
 import { AxiosError } from "axios";
-import { flags, Command } from "@oclif/command";
-
-import { replaceHTML } from "../../utils/utils";
+import { Flags, Command } from "@oclif/core";
+import { outro, password, text } from "@clack/prompts";
+import { getMessageInRedColor, replaceHTML } from "../../utils/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
 
 export default class Login extends Command {
@@ -10,7 +9,7 @@ export default class Login extends Command {
 
   static examples = [
     `$ apimatic auth:login
-Please enter your registered email: apimatic-user@gmail.com
+Enter your registered email: apimatic-user@gmail.com
 Please enter your password: *********
 
 You have successfully logged into APIMatic
@@ -20,11 +19,11 @@ Authentication key successfully set`
   ];
 
   static flags = {
-    "auth-key": flags.string({ default: "", description: "Set authentication key for all commands" })
+    "auth-key": Flags.string({ default: "", description: "Set authentication key for all commands" })
   };
 
   async run() {
-    const { flags } = this.parse(Login);
+    const { flags } = await this.parse(Login);
     const configDir: string = this.config.configDir;
     try {
       const client: SDKClient = SDKClient.getInstance();
@@ -35,14 +34,34 @@ Authentication key successfully set`
         return this.log(response);
       } else {
         // If user logs in with email and password
-        const email: string = await cli.prompt("Please enter your registered email");
-        const password: string = await cli.prompt("Please enter your password", {
-          type: "hide"
+        const email = await text({
+          message: "Enter your registered email:",
+          validate: (input) => {
+            if (!input) {
+              return getMessageInRedColor("Email is required.");
+            }
+
+            const emailRegex =
+              /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+            if (!emailRegex.test(input)) {
+              return getMessageInRedColor("Please enter a valid email address.");
+            }
+          }
         });
 
-        const response: string = await client.login(email, password, configDir);
+        const pass = await password({
+          message: "Please enter your password:",
+          validate: (input) => {
+            if (!input) {
+              return getMessageInRedColor("Password is required.");
+            }
+          }
+        });
 
-        this.log(response);
+        const response: string = await client.login(email as string, pass as string, configDir);
+
+        outro(response);
       }
     } catch (error) {
       if (error && (error as AxiosError).response) {
@@ -53,7 +72,7 @@ Authentication key successfully set`
           const responseData = apiResponse.data;
 
           if (apiResponse.status === 403 && responseData) {
-            return this.error(replaceHTML(responseData));
+            return this.error(replaceHTML(JSON.stringify(responseData)));
           } else {
             return this.error(apiError.message);
           }

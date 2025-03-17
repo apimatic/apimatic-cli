@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from "fs-extra";
 
-import { Command, flags } from "@oclif/command";
+import { Command, Flags } from "@oclif/core";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
 
@@ -13,35 +13,35 @@ import { AuthenticationError } from "../../types/utils";
 export default class SdkGenerate extends Command {
   static description = "Generate SDK for your APIs";
   static flags = {
-    platform: flags.string({
-      parse: (input) => input.toUpperCase(),
+    platform: Flags.string({
+      parse: async (input) => input.toUpperCase(),
       required: true,
       description: `language platform for sdk
 Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT
 Legacy: CS_NET_STANDARD_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|TS_GENERIC_LIB`
     }),
-    file: flags.string({
-      parse: (input) => path.resolve(input),
+    file: Flags.string({
+      parse: async (input) => path.resolve(input),
       default: "",
       description: "path to the API specification to generate SDKs for"
     }),
-    url: flags.string({
+    url: Flags.string({
       default: "",
       description:
         "URL to the API specification to generate SDKs for. Can be used in place of the --file option if the API specification is publicly available."
     }),
-    destination: flags.string({
-      parse: (input) => path.resolve(input),
+    destination: Flags.string({
+      parse: async (input) => path.resolve(input),
       default: path.resolve("./"),
       description: "directory to download the generated SDK to"
     }),
-    force: flags.boolean({
+    force: Flags.boolean({
       char: "f",
       default: false,
       description: "overwrite if an SDK already exists in the destination"
     }),
-    zip: flags.boolean({ default: false, description: "download the generated SDK as a .zip archive" }),
-    "auth-key": flags.string({
+    zip: Flags.boolean({ default: false, description: "download the generated SDK as a .zip archive" }),
+    "auth-key": Flags.string({
       default: "",
       description: "override current authentication state with an authentication key"
     })
@@ -61,7 +61,7 @@ Success! Your SDK is located at swagger_sdk_csharp
   ];
 
   async run() {
-    const { flags } = this.parse(SdkGenerate);
+    const { flags } = await this.parse(SdkGenerate);
     const zip = flags.zip;
     const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
     const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());

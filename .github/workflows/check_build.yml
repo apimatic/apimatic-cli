@@ -18,14 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ '14', '18' ]
+        node: [ '14', '18', '20' ]
     name: Node ${{ matrix.node }} sample
     steps:
       - name: checkout cli
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: apimatic/apimatic-cli
-          token: ${{ secrets.ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: false
           fetch-depth: 0
           path: cli
@@ -35,9 +35,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: cli
-        run: |
-          git config --global url."https://${{ secrets.ACCESS_TOKEN }}@github.com/".insteadOf https://github.com/
-          npm install
+        run: npm install
 
       - name: Check Build
         working-directory: 'cli'

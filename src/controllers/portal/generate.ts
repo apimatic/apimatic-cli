@@ -1,44 +1,55 @@
-import cli from "cli-ux";
 import * as fs from "fs-extra";
 import * as FormData from "form-data";
-
 import { baseURL } from "../../config/env";
-import { deleteFile, unzipFile } from "../../utils/utils";
+import { deleteFile, extractZipFile } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
+import { AxiosRequestConfig, AxiosResponse, CancelTokenSource } from "axios";
 
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import axiosInstance from "../../config/axios-config";
 
-// TODO: Remove after SDK is patched
-const downloadPortalAxios = async (zippedBuildFilePath: string, overrideAuthKey: string | null, configDir: string) => {
+//TODO: Remove after SDK is patched
+const downloadPortalAxios = async (zippedBuildFilePath: string, configDir: string, overrideAuthKey: string | null, cancellationToken: CancelTokenSource | null) => {
   const formData = new FormData();
   const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+  let authorizationHeader = "";
+  if (overrideAuthKey)
+  {
+    authorizationHeader = `X-Auth-Key ${overrideAuthKey}`; 
+  }
+  else if (authInfo) {
+    authorizationHeader = `X-Auth-Key ${authInfo.authKey}`;
+  }
   formData.append("file", fs.createReadStream(zippedBuildFilePath));
   const config: AxiosRequestConfig = {
     headers: {
-      Authorization: authInfo || overrideAuthKey ? `X-Auth-Key ${authInfo?.authKey.trim() || overrideAuthKey}` : "",
+      Authorization: authorizationHeader,
       "User-Agent": "APIMatic CLI",
       ...formData.getHeaders()
     },
     responseType: "arraybuffer"
   };
-  const { data }: AxiosResponse = await axios.post(`${baseURL}/portal`, formData, config);
+
+  if (cancellationToken) {
+    config.cancelToken = cancellationToken.token;
+  }
+
+  const { data }: AxiosResponse = await axiosInstance.post(`${baseURL}/portal`, formData, config);
   return data;
 };
 
 // Download Docs Portal
 export const downloadDocsPortal = async (
   { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
-  configDir: string
+    configDir: string,
+    cancellationToken: CancelTokenSource | null = null
 ) => {
-  cli.action.start("Downloading portal");
-
   // Check if the build file exists for the user or not
   if (!(await fs.pathExists(zippedBuildFilePath))) {
     throw new Error("Build file doesn't exist");
   }
   // TODO: ***CRITICAL*** Remove this call once the SDK is patched
-  const data: ArrayBuffer = await downloadPortalAxios(zippedBuildFilePath, overrideAuthKey, configDir);
+  const data: ArrayBuffer = await downloadPortalAxios(zippedBuildFilePath, configDir, overrideAuthKey, cancellationToken);
 
   await deleteFile(zippedBuildFilePath);
   await fs.writeFile(zippedPortalPath, data);
@@ -50,11 +61,10 @@ export const downloadDocsPortal = async (
   // if ((data as NodeJS.ReadableStream).readable) {
   //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
   if (!zip) {
-    await unzipFile(fs.createReadStream(zippedPortalPath), portalFolderPath);
+    await extractZipFile(zippedPortalPath, portalFolderPath);
     await deleteFile(zippedPortalPath);
   }
 
-  cli.action.stop();
   return zip ? zippedPortalPath : portalFolderPath;
   // } else {
   //   throw new Error("Couldn't download the portal");
