@@ -1,15 +1,16 @@
 import * as path from "path";
 import * as fs from "fs-extra";
 
-import { ux, Command, Flags } from "@oclif/core";
+import { Command, Flags } from "@oclif/core";
 import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 
 import { AxiosError } from "axios";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
-import { zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
+import { replaceHTML, isJSONParsable, validateAndZipPortalSource, getGeneratedFilesPaths } from "../../utils/utils";
 import { AuthenticationError } from "../../types/utils";
+import { PortalGeneratePrompts } from "../../prompts/portal/generate";
 
 export default class PortalGenerate extends Command {
   static description =
@@ -45,26 +46,31 @@ Your portal has been generated at D:/
     const zip = flags.zip;
     const sourceFolderPath: string = flags.folder;
     const portalFolderPath: string = path.join(flags.destination, "generated_portal");
-    const zippedPortalPath: string = path.join(flags.destination, "generated_portal.zip");
-
+    const zippedPortalPath: string = path.join(flags.destination, ".generated_portal.zip");
     const overrideAuthKey: string | null = flags["auth-key"] ? flags["auth-key"] : null;
+    const prompts = new PortalGeneratePrompts();
 
     // Check if at destination, portal already exists and throw error if force flag is not set for both zip and extracted
     if (fs.existsSync(portalFolderPath) && !flags.force && !zip) {
-      throw new Error(`Can't download portal to path ${portalFolderPath}, because it already exists`);
+      await prompts.existingDestinationPortalFolderPrompt();
     } else if (fs.existsSync(zippedPortalPath) && !flags.force && zip) {
-      throw new Error(`Can't download portal to path ${zippedPortalPath}, because it already exists`);
+      await prompts.existingDestinationPortalZipPrompt();
     }
     try {
       if (!(await fs.pathExists(flags.destination))) {
-        throw new Error(`Destination path ${flags.destination} does not exist`);
+        throw new Error(`Destination path ${flags.destination} does not exist.`);
       } else if (!(await fs.pathExists(flags.folder))) {
-        throw new Error(`Portal build folder ${flags.folder} does not exist`);
+        throw new Error(`Portal build folder ${flags.folder} does not exist.`);
       }
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
 
-      const zippedBuildFilePath = await zipDirectory(sourceFolderPath, flags.destination);
+      const pathsToIgnore = getGeneratedFilesPaths(sourceFolderPath, portalFolderPath);
+      const zippedBuildFilePath = await validateAndZipPortalSource(
+        sourceFolderPath,
+        path.join(sourceFolderPath, ".portal_source.zip"),
+        pathsToIgnore
+      );
 
       const generatePortalParams: GeneratePortalParams = {
         zippedBuildFilePath,
@@ -74,11 +80,16 @@ Your portal has been generated at D:/
         overrideAuthKey,
         zip
       };
-      ux.action.start('Generating portal');
+
+      prompts.displayPortalGenerationMessage();
+
       const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams, this.config.configDir);
-      ux.action.stop();
-      this.log(`Your portal has been generated at ${generatedPortalPath}`);
+
+      prompts.displayPortalGenerationSuccessMessage();
+
+      prompts.displayOutroMessage(generatedPortalPath);
     } catch (error) {
+      prompts.displayPortalGenerationErrorMessage();
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;
         const apiResponse = apiError.response;

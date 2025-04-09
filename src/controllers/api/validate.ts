@@ -12,24 +12,16 @@ export const getValidationSummary = async (
 
   if (file) {
     const fileStatus = fs.statSync(file);
-    if (fileStatus.isDirectory()){
+    if (fileStatus.isDirectory()) {
       const tempDir = await createTempDirectory();
+      const zipPath = await zipDirectory(file, tempDir);
+      const zipFile = new FileWrapper(fs.createReadStream(zipPath));
+      validation = await apiValidationController.validateAPIViaFile(ContentType.EnumMultipartformdata, zipFile);
 
-      try {
-        const zipPath = await zipDirectory(file, tempDir);
-        const zipFile = new FileWrapper(fs.createReadStream(zipPath));
-        validation = await apiValidationController.validateAPIViaFile(ContentType.EnumMultipartformdata, zipFile);
-        
-        await deleteFile(zipPath);
-      }
-      catch (error) {
-        throw new Error("There was an error validating your spec file.");
-      }
-      finally {
-        await fs.remove(tempDir);
-      }
-    }
-    else {
+      await deleteFile(zipPath);
+
+      await fs.remove(tempDir);
+    } else {
       const fileDescriptor = new FileWrapper(fs.createReadStream(file));
       validation = await apiValidationController.validateAPIViaFile(ContentType.EnumMultipartformdata, fileDescriptor);
     }
@@ -38,6 +30,6 @@ export const getValidationSummary = async (
   } else {
     throw new Error("Please provide a specification file");
   }
-  
+
   return validation.result;
 };

@@ -12,11 +12,11 @@ export class DirectoryValidator {
   }
 
   async validateGeneratedPortalDestinationDirectory(destinationDir: string, portalDir: string) {
-    if (!fs.pathExistsSync(destinationDir) && destinationDir != "./api-portal") {
+    if (!fs.pathExistsSync(destinationDir) && destinationDir != "./generated_portal") {
       this.error(getMessageInRedColor(`The specified destination directory does not exist: ${destinationDir}. Please provide a valid destination directory to continue.`));
     }
 
-    if (destinationDir == "./api-portal") {
+    if (destinationDir == "./generated_portal") {
       await fs.ensureDir(portalDir);
     }
   }
@@ -58,7 +58,7 @@ export class DirectoryValidator {
 
   validateGeneratedPortalDestinationDirectoryIsEmpty(destinationDir: string) {
     const portalDirItems = getNonHiddenItemsFromDirectory(destinationDir);
-    if (portalDirItems.length > 0 && destinationDir != "./api-portal") {
+    if (portalDirItems.length > 0 && destinationDir != "./generated_portal") {
       this.error(
         getMessageInRedColor(
           "The destination directory is not empty. Please specify an empty destination directory or empty the provided directory."

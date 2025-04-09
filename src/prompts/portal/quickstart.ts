@@ -17,12 +17,11 @@ export class PortalQuickstartPrompts {
   private readonly vscodeExtensionUrl =
     "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
   private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
-  private readonly referenceDocumentation =
+  private readonly referenceDocumentationUrl =
     "\u001b[4mhttps://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal\u001b[0m";
-  private readonly customizeTheSdks =
+  private readonly customizeTheSdksUrl =
     "\u001b[4mhttps://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview\u001b[0m";
-  private readonly portalDirectory = "apimatic-quickstart-portal";
-  private readonly defaultPortalDirectory = path.join(process.cwd(), this.portalDirectory);
+  private readonly defaultPortalDirectoryPath = process.cwd();
 
   displayWelcomeMessage(): void {
     intro(`Hello there 👋`);
@@ -162,7 +161,7 @@ export class PortalQuickstartPrompts {
           "Good luck fixing your API definition! 🛠️  Feel free to run this command again once you're done."
         )
       );
-      process.exit(0);
+      return process.exit(0);
     }
   }
 
@@ -201,13 +200,13 @@ export class PortalQuickstartPrompts {
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const dirPath = path.resolve(input.trim() || this.portalDirectory);
+        const dirPath = path.resolve(input.trim());
 
-        if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectory) {
+        if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
           return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
         }
 
-        if (dirPath !== this.defaultPortalDirectory) {
+        if (dirPath !== this.defaultPortalDirectoryPath) {
           const files = fs.readdirSync(dirPath).filter(item => !item.startsWith('.'));;
           if (files.length > 0) {
             return getMessageInRedColor("Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.");
@@ -224,9 +223,9 @@ export class PortalQuickstartPrompts {
     }
 
     if (directory === "./") {
-      return this.defaultPortalDirectory;
+      return this.defaultPortalDirectoryPath;
     } else {
-      return path.join(String(directory), this.portalDirectory);
+      return String(directory);
     }
   }
 
@@ -272,12 +271,12 @@ export class PortalQuickstartPrompts {
         getMessageInCyanColor(`Press CTRL+C to stop the server.\n\n`) +
         getMessageInCyanColor(`What's next?\n`) +
         getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
-        getMessageInCyanColor(`- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentation}`) +
+        getMessageInCyanColor(`- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentationUrl}`) +
         getMessageInCyanColor(` \n`) +
         getMessageInCyanColor(
           `- Review the SDK Documentation for your favourite programming language and download an SDK from the API Portal.\n`
         ) +
-        getMessageInCyanColor(`- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdks}`) +
+        getMessageInCyanColor(`- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`) +
         getMessageInCyanColor(` \n`)
     );
   }
