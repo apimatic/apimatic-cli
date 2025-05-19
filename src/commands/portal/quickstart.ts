@@ -121,7 +121,7 @@ export default class PortalQuickstart extends Command {
 
       controller.servePortal(generatedPortalPath, directory, this.config.configDir);
 
-      prompts.displayOutroMessage();
+      prompts.displayOutroMessage(directory);
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

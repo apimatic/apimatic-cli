@@ -262,11 +262,11 @@ export class PortalQuickstartPrompts {
     this.spin.stop(getMessageInCyanColor("✅  Portal setup complete!"));
   }
 
-  displayOutroMessage(): void {
+  displayOutroMessage(directory: string): void {
     log.step(
       getMessageInCyanColor(`📢  Your API Portal is live at: ${this.serverUrl}\n`) +
         getMessageInCyanColor(
-          `Hot reload enabled! Edit files in ./apimatic-quickstart-portal to see changes instantly reflected in your API Portal.\n`
+          `Hot reload enabled! Edit files in ${directory} to see changes instantly reflected in your API Portal.\n`
         ) +
         getMessageInCyanColor(`Press CTRL+C to stop the server.\n\n`) +
         getMessageInCyanColor(`What's next?\n`) +
