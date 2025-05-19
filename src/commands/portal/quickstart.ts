@@ -7,7 +7,7 @@ import { SpecFile } from "../../types/portal/quickstart";
 import { getMessageInRedColor } from "../../utils/utils";
 
 export default class PortalQuickstart extends Command {
-  static description = "Create your first API Portal using APIMatic’s Docs as Code offering.";
+  static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
   static examples = ["$ apimatic portal:quickstart"];
 
@@ -119,9 +119,11 @@ export default class PortalQuickstart extends Command {
 
       const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory);
 
-      controller.servePortal(generatedPortalPath, directory, this.config.configDir);
-
-      prompts.displayOutroMessage(directory);
+      const serverStarted = await controller.servePortal(generatedPortalPath, directory, this.config.configDir);
+      
+      if (serverStarted) {
+        prompts.displayOutroMessage(directory);
+      }
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

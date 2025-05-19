@@ -301,7 +301,7 @@ export class PortalQuickstartController {
               )
             );
           } else if (error.response.status === 403) {
-            throw new Error(getMessageInRedColor(`Access denied. It looks like you don’t have access to APIMatic’s Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
+            throw new Error(getMessageInRedColor(`Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
           } else if (error.response.status === 422) {
             throw new Error(
               getMessageInRedColor(
@@ -342,12 +342,14 @@ export class PortalQuickstartController {
     }
   }
 
-  async servePortal(generatedPortalPath: string, targetFolder: string, configDir: string): Promise<void> {
+  async servePortal(generatedPortalPath: string, targetFolder: string, configDir: string): Promise<boolean> {
     const server = new PortalServerService();
 
     server.setupServer(generatedPortalPath);
 
-    await server.startServer(
+    await cleanUpGeneratedPortalFiles(targetFolder);
+
+    return await server.startServer(
       {
         generatedPortalPath,
         targetFolder,
@@ -357,7 +359,5 @@ export class PortalQuickstartController {
       false,
       false
     );
-
-    await cleanUpGeneratedPortalFiles(targetFolder);
   }
 }
