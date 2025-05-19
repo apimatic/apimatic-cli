@@ -23,7 +23,7 @@ export class PortalServerService {
     const maxPort = startPort + 10; // Limit the port search range
     
     while (port < maxPort) {
-      if (!isPortInUse(port)) {
+      if (!(await isPortInUse(port))) {
         return port;
       }
       port++;
