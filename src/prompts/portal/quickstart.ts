@@ -69,7 +69,7 @@ export class PortalQuickstartPrompts {
       return process.exit(0);
     }
 
-    return { email: String(email), password: String(pass) };
+    return { email: String(email).trim(), password: String(pass).trim() };
   }
 
   displayLoggingInMessage(): void {
@@ -117,7 +117,7 @@ export class PortalQuickstartPrompts {
       return process.exit(0);
     }
 
-    return String(spec);
+    return String(spec).trim();
   }
 
   displaySpecValidationMessage(): void {
@@ -225,7 +225,7 @@ export class PortalQuickstartPrompts {
     if (directory === "./") {
       return this.defaultPortalDirectoryPath;
     } else {
-      return String(directory);
+      return String(directory).trim();
     }
   }
 

@@ -47,7 +47,7 @@ Your portal has been generated at D:/
     const sourceFolderPath: string = flags.folder;
     const portalFolderPath: string = path.join(flags.destination, "generated_portal");
     const zippedPortalPath: string = path.join(flags.destination, ".generated_portal.zip");
-    const overrideAuthKey: string | null = flags["auth-key"] ? flags["auth-key"] : null;
+    const overrideAuthKey: string | null = flags["auth-key"] ?? null;
     const prompts = new PortalGeneratePrompts();
 
     // Check if at destination, portal already exists and throw error if force flag is not set for both zip and extracted
