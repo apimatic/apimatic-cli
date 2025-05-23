@@ -400,6 +400,15 @@ export function isPortInUse(port: number): Promise<boolean> {
   });
 }
 
+export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body as NodeJS.ReadableStream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const text = Buffer.concat(chunks).toString("utf-8");
+    return JSON.parse(text);
+}
+
 export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] => {
   return fs.readdirSync(directoryPath).filter((item) => !item.startsWith("."));
 };

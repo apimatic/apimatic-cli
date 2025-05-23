@@ -2,13 +2,13 @@ import * as path from "path";
 import * as fs from "fs-extra";
 
 import { ux, Command, Flags } from "@oclif/core";
-import { Client, DocsPortalManagementController } from "@apimatic/sdk";
+import { ApiError, Client, DocsPortalManagementController, PortalGenerationForbiddenResponseError, PortalGenerationValidationErrorResponseError, UnauthorizedResponseError } from "@apimatic/sdk";
 
 import { AxiosError } from "axios";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
-import { zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
+import { zipDirectory, replaceHTML, isJSONParsable, deleteFile, extractZipFile, parseStreamBodyToJson } from "../../utils/utils";
 import { AuthenticationError } from "../../types/utils";
 
 export default class PortalGenerate extends Command {
@@ -26,8 +26,15 @@ export default class PortalGenerate extends Command {
       default: path.resolve("./"),
       description: "path to the downloaded portal"
     }),
-    force: Flags.boolean({ char: "f", default: false, description: "overwrite if a portal exists in the destination" }),
-    zip: Flags.boolean({ default: false, description: "download the generated portal as a .zip archive" }),
+    force: Flags.boolean({ 
+      char: "f", 
+      default: false, 
+      description: "overwrite if a portal exists in the destination" 
+    }),
+    zip: Flags.boolean({ 
+      default: false, 
+      description: "download the generated portal as a .zip archive" 
+    }),
     "auth-key": Flags.string({
       default: "",
       description: "override current authentication state with an authentication key"
@@ -46,7 +53,7 @@ Your portal has been generated at D:/
     const sourceFolderPath: string = flags.folder;
     const portalFolderPath: string = path.join(flags.destination, "generated_portal");
     const zippedPortalPath: string = path.join(flags.destination, "generated_portal.zip");
-
+    const zippedBuildFilePath = await zipDirectory(sourceFolderPath, flags.destination);
     const overrideAuthKey: string | null = flags["auth-key"] ? flags["auth-key"] : null;
 
     // Check if at destination, portal already exists and throw error if force flag is not set for both zip and extracted
@@ -64,8 +71,6 @@ Your portal has been generated at D:/
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
       const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
 
-      const zippedBuildFilePath = await zipDirectory(sourceFolderPath, flags.destination);
-
       const generatePortalParams: GeneratePortalParams = {
         zippedBuildFilePath,
         portalFolderPath,
@@ -75,42 +80,54 @@ Your portal has been generated at D:/
         zip
       };
       ux.action.start('Generating portal');
-      const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams, this.config.configDir);
+      const generatedPortalPath: string | undefined = await downloadDocsPortal(generatePortalParams, this.config.configDir);
       ux.action.stop();
       this.log(`Your portal has been generated at ${generatedPortalPath}`);
     } catch (error) {
-      if (error && (error as AxiosError).response) {
-        const apiError = error as AxiosError;
-        const apiResponse = apiError.response;
+      ux.action.stop();
 
-        if (apiResponse) {
-          const responseData = (apiResponse.data as string).toString();
+      if (error instanceof PortalGenerationValidationErrorResponseError) // 400
+      {
+        const validationError = error as PortalGenerationValidationErrorResponseError;
+        const body = await parseStreamBodyToJson(validationError.body as NodeJS.ReadableStream);
+        const key = Object.keys(body.errors)[0];
+        const message = body.errors[key][0];
+        this.error(body.title + "\n" + message);
+      } 
+      else if (error instanceof UnauthorizedResponseError) // 401
+      {
+        const unauthorizedError = error as UnauthorizedResponseError;
+        const body = await parseStreamBodyToJson(unauthorizedError.body as NodeJS.ReadableStream);
+        this.error(body.message);
+      }
+      else if (error instanceof PortalGenerationForbiddenResponseError) // 403
+      {
+        const forbiddenError = error as PortalGenerationForbiddenResponseError;
+        const body = await parseStreamBodyToJson(forbiddenError.body as NodeJS.ReadableStream);
+        const message = body.errors[Object.keys(body.errors)[0]][0];
+        this.error(body.title + " " + body.detail + ":\n" + message);
+      }
+      else if (error instanceof ApiError && error.statusCode === 422) { // 422
+        const data = error.body as NodeJS.ReadableStream;
+        // Create a write stream and pipe the response data to it
+        const writeStream = fs.createWriteStream(zippedPortalPath);
+        await new Promise((resolve, reject) => {
+          data.pipe(writeStream)
+            .on('finish', resolve)
+            .on('error', reject);
+        });
+        await deleteFile(zippedBuildFilePath);
 
-          if (apiResponse.status === 422 && responseData.length > 0 && isJSONParsable(responseData)) {
-            const nestedErrors = JSON.parse(responseData);
-
-            if (nestedErrors.error) {
-              return this.error(replaceHTML(nestedErrors.error));
-            } else if (nestedErrors.message) {
-              return this.error(replaceHTML(nestedErrors.message));
-            }
-          } else if (apiResponse.status === 401 && responseData.length > 0) {
-            this.error("You are not authorized to perform this action");
-          } else if (apiResponse.status === 403 && apiResponse.statusText) {
-            return this.error("Your subscription does not allow on premise portal generation");
-          } else {
-            return this.error(apiError.message);
-          }
+        if (!zip) {
+          // Extract the zip file if zip flag is false
+          await extractZipFile(zippedPortalPath, portalFolderPath);
+          // Clean up the zip file after extraction
+          await deleteFile(zippedPortalPath);
         }
-      } else if ((error as AuthenticationError).statusCode === 401) {
-        this.error("You are not authorized to perform this action");
-      } else if (
-        (error as AuthenticationError).statusCode === 402 &&
-        (error as AuthenticationError).body &&
-        typeof (error as AuthenticationError).body === "string"
-      ) {
-        this.error((error as AuthenticationError).body);
-      } else {
+
+        this.error("An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " + flags.destination);
+      }
+      else {
         this.error(`${(error as Error).message}`);
       }
     }
