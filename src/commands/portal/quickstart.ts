@@ -7,7 +7,7 @@ import { SpecFile } from "../../types/portal/quickstart";
 import { getMessageInRedColor } from "../../utils/utils";
 
 export default class PortalQuickstart extends Command {
-  static description = "Create your first API Portal using APIMatic’s Docs as Code offering.";
+  static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
   static examples = ["$ apimatic portal:quickstart"];
 
@@ -15,9 +15,9 @@ export default class PortalQuickstart extends Command {
     prompts: PortalQuickstartPrompts,
     controller: PortalQuickstartController
   ): Promise<SpecFile> {
-    const spec = await prompts.specPrompt();
+    const specPath = await prompts.specPrompt();
 
-    const specFile = await controller.getSpecFile(spec);
+    const specFile = await controller.getSpecFile(specPath);
 
     prompts.displaySpecValidationMessage();
 
@@ -30,25 +30,16 @@ export default class PortalQuickstart extends Command {
     specFile: SpecFile,
     apiValidationController: APIValidationExternalApisController
   ): Promise<ApiValidationSummary> {
-    try {
-      const apiValidationSummary = await controller.getSpecValidationSummary(specFile, apiValidationController);
+    const apiValidationSummary = await controller.getSpecValidationSummary(prompts, specFile, apiValidationController);
 
-      if (!apiValidationSummary.success) {
-        prompts.displaySpecValidationFailureMessage();
-        await prompts.specValidationFailurePrompt();
-      } else {
-        prompts.displaySpecValidationSuccessMessage();
-      }
-
-      return apiValidationSummary;
-    } catch (error) {
-      prompts.displaySpecValidationErrorMessage();
-      this.error(
-        getMessageInRedColor(
-          "The specified path/URL does not point to a valid API Definition file. Please provide a valid API Definition file and try again."
-        )
-      );
+    if (!apiValidationSummary.success) {
+      prompts.displaySpecValidationFailureMessage();
+      await prompts.specValidationFailurePrompt();
+    } else {
+      prompts.displaySpecValidationSuccessMessage();
     }
+
+    return apiValidationSummary;
   }
 
   private async getBuildDirectory(
@@ -58,17 +49,17 @@ export default class PortalQuickstart extends Command {
     apiValidationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<string> {
-    const directory = await prompts.buildDirectoryPrompt();
+    const buildDirectoryPath = await prompts.buildDirectoryPrompt();
 
     prompts.displayBuildDirectoryGenerationMessage();
 
-    await controller.setupBuildDirectory(prompts, directory, specFile, apiValidationSummary, languages);
+    await controller.setupBuildDirectory(prompts, buildDirectoryPath, specFile, apiValidationSummary, languages);
 
-    prompts.displayBuildDirectoryGenerationSuccessMessage(directory);
+    prompts.displayBuildDirectoryGenerationSuccessMessage(buildDirectoryPath);
 
-    prompts.displayBuildDirectoryAsTree(directory);
+    prompts.displayBuildDirectoryAsTree(buildDirectoryPath);
 
-    return directory;
+    return buildDirectoryPath;
   }
 
   private async getGeneratedPortalPath(
@@ -128,9 +119,11 @@ export default class PortalQuickstart extends Command {
 
       const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory);
 
-      controller.servePortal(generatedPortalPath, directory, this.config.configDir);
-
-      prompts.displayOutroMessage();
+      const serverStarted = await controller.servePortal(generatedPortalPath, directory, this.config.configDir);
+      
+      if (serverStarted) {
+        prompts.displayOutroMessage(directory);
+      }
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

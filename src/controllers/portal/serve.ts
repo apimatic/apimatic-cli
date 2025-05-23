@@ -4,6 +4,7 @@ import { Client, DocsPortalManagementController } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client";
 import {
   cleanUpGeneratedPortalFiles,
+  getGeneratedFilesPaths,
   getMessageInMagentaColor,
   getMessageInRedColor,
   validateAndZipPortalSource
@@ -55,14 +56,10 @@ export const watchAndRegeneratePortal = async (
   ignoredPaths: string[] = []
 ) => {
   // Convert ignoredPaths to absolute paths for consistent comparison
-  const generatedZipPath = path.join(sourceDir, "portal_source.zip");
-  const generatedPortalZipPath = path.join(sourceDir, "generated_portal.zip");
-  const generatedPortalPath = path.join(path.dirname(portalDir), "api-portal");
+  const generatedFilesPaths = getGeneratedFilesPaths(sourceDir, portalDir); 
   const absoluteIgnoredPaths = [
     ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== ""),
-    generatedZipPath,
-    generatedPortalZipPath,
-    generatedPortalPath
+    ...generatedFilesPaths
   ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
 
   const watcher = chokidar.watch(sourceDir, {
@@ -116,14 +113,14 @@ export const generatePortal = async (
 
   const zippedBuildFilePath = await validateAndZipPortalSource(
     sourceDir,
-    path.join(sourceDir, "portal_source.zip"),
+    path.join(sourceDir, ".portal_source.zip"),
     ignoredPaths
   );
 
   const generatePortalParams: GeneratePortalParams = {
     zippedBuildFilePath,
     portalFolderPath: portalDir,
-    zippedPortalPath: path.join(sourceDir, "generated_portal.zip"),
+    zippedPortalPath: path.join(sourceDir, ".generated_portal.zip"),
     docsPortalController,
     overrideAuthKey,
     zip: false

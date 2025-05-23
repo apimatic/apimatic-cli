@@ -191,7 +191,7 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string):
   // Check if the directory exists for the user or not
   await fs.ensureDir(sourcePath);
 
-  const zipPath = path.join(destinationPath, "target.zip");
+  const zipPath = path.join(destinationPath, ".target.zip");
   const output = fs.createWriteStream(zipPath);
   const archive = archiver("zip");
 
@@ -226,6 +226,14 @@ export const isJSONParsable = (json: string) => {
   } catch (e) {
     return false;
   }
+};
+
+export const getGeneratedFilesPaths = (sourceDir: string, portalDir: string): string[] => {
+  const generatedZipPath = path.join(sourceDir, ".portal_source.zip");
+  const generatedPortalZipPath = path.join(sourceDir, ".generated_portal.zip");
+  const generatedPortalPath = path.join(path.dirname(portalDir), "generated_portal");
+
+  return [generatedZipPath, generatedPortalPath, generatedPortalZipPath];
 };
 
 export const getFileNameFromPath = (filePath: string) => {
@@ -369,8 +377,8 @@ export async function validateAndZipPortalSource(
 }
 
 export async function cleanUpGeneratedPortalFiles(sourceDir: string) {
-  const generatedPortalZipFilePath = path.join(sourceDir, "generated_portal.zip");
-  const generatedPortalSourceZipFilePath = path.join(sourceDir, "portal_source.zip");
+  const generatedPortalZipFilePath = path.join(sourceDir, ".generated_portal.zip");
+  const generatedPortalSourceZipFilePath = path.join(sourceDir, ".portal_source.zip");
   if (fs.existsSync(generatedPortalZipFilePath)) {
     await deleteFile(generatedPortalZipFilePath);
   }

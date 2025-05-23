@@ -7,17 +7,21 @@ import { ApiResponse, Client, ContentType, DocsPortalManagementController, FileW
 // Download Docs Portal
 export const downloadDocsPortal = async (
   { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
-    configDir: string,
+  configDir: string
 ) => {
   if (!(await fs.pathExists(zippedBuildFilePath))) {
     throw new Error("Build file doesn't exist");
   }
   const authInfo: AuthInfo | null = await getAuthInfo(configDir);
-  const authorizationHeader = overrideAuthKey ? `X-Auth-Key ${overrideAuthKey}` : (authInfo ? `X-Auth-Key ${authInfo.authKey}` : "");
+  const authorizationHeader = overrideAuthKey
+    ? `X-Auth-Key ${overrideAuthKey}`
+    : authInfo
+    ? `X-Auth-Key ${authInfo.authKey}`
+    : "";
 
   const client = new Client({
     customHeaderAuthenticationCredentials: {
-      'Authorization': authorizationHeader
+      Authorization: authorizationHeader
     },
     timeout: 0
   });
@@ -28,30 +32,27 @@ export const downloadDocsPortal = async (
 
   const file = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
 
-  const response: ApiResponse<NodeJS.ReadableStream | Blob> = await docsPortalManagementController.generateOnPremPortalViaBuildInput(contentType, file);
-  const { result, ...httpResponse } = response;
+  const response: ApiResponse<NodeJS.ReadableStream | Blob> =
+    await docsPortalManagementController.generateOnPremPortalViaBuildInput(contentType, file);
+  const { result } = response;
 
-  if (httpResponse.statusCode === 200) {
-    const data = result as NodeJS.ReadableStream;
-    // Create a write stream and pipe the response data to it
-    const writeStream = fs.createWriteStream(zippedPortalPath);
-    await new Promise((resolve, reject) => {
-      data.pipe(writeStream)
-        .on('finish', resolve)
-        .on('error', reject);
-    });
+  const data = result as NodeJS.ReadableStream;
+  // Create a write stream and pipe the response data to it
+  const writeStream = fs.createWriteStream(zippedPortalPath);
+  await new Promise((resolve, reject) => {
+    data.pipe(writeStream).on("finish", resolve).on("error", reject);
+  });
 
-    // Delete the build file as it's no longer needed
-    await deleteFile(zippedBuildFilePath);
+  // Delete the build file as it's no longer needed
+  await deleteFile(zippedBuildFilePath);
 
-    if (!zip) {
-      // Extract the zip file if zip flag is false
-      await extractZipFile(zippedPortalPath, portalFolderPath);
-      // Clean up the zip file after extraction
-      await deleteFile(zippedPortalPath);
-      return portalFolderPath;
-    }
-
-    return zippedPortalPath;
+  if (!zip) {
+    // Extract the zip file if zip flag is false
+    await extractZipFile(zippedPortalPath, portalFolderPath);
+    // Clean up the zip file after extraction
+    await deleteFile(zippedPortalPath);
+    return portalFolderPath;
   }
+
+  return zippedPortalPath;
 };

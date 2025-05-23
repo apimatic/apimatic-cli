@@ -5,7 +5,7 @@ import * as filetype from "file-type";
 import * as fs from "fs";
 import * as fsextra from "fs-extra";
 import { getAuthInfo } from "../../client-utils/auth-manager";
-import { APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
+import { ApiError, APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
 import { LoginCredentials, SpecFile } from "../../types/portal/quickstart";
 import { SDKClient } from "../../client-utils/sdk-client";
 import {
@@ -18,11 +18,12 @@ import {
   cleanUpGeneratedPortalFiles
 } from "../../utils/utils";
 import { getValidationSummary } from "../api/validate";
-import { GetValidationParams } from "../../types/api/validate";
+import { APIValidateError, AuthorizationError, GetValidationParams } from "../../types/api/validate";
 import { generatePortal } from "./serve";
 import { metadataFileContent, staticPortalRepoUrl } from "../../config/env";
 import { PortalServerService } from "../../services/portal/server";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart";
+import { AuthenticationError } from "../../types/utils";
 
 export class PortalQuickstartController {
   private readonly specUrl =
@@ -131,6 +132,7 @@ export class PortalQuickstartController {
   }
 
   async getSpecValidationSummary(
+    prompts: PortalQuickstartPrompts,
     specFile: SpecFile,
     apiValidationController: APIValidationExternalApisController
   ): Promise<ApiValidationSummary> {
@@ -139,9 +141,81 @@ export class PortalQuickstartController {
       url: specFile.url
     };
 
-    const validationSummary = getValidationSummary(validationFlags, apiValidationController);
-
-    return validationSummary;
+    try {
+      const validationSummary = await getValidationSummary(validationFlags, apiValidationController);
+      return validationSummary;
+    }
+    catch (error) {
+      prompts.displaySpecValidationErrorMessage();
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          if (error.response.status === 400) {
+            throw new Error(
+              getMessageInRedColor(
+                `The provided spec file is not valid. Please ensure that the spec you have provided is a valid API definition file.`
+              )
+            );
+          } else if (error.response.status === 500) {
+            throw new Error(
+              getMessageInRedColor(
+                `The server encountered an error while validating your spec file, please try again later. If the issue persists, contact our team at support@apimatic.io`
+              )
+            );
+          } else {
+            throw new Error(
+              getMessageInRedColor(
+                `Something went wrong while validating your spec file. The server returned the following error ${error.response.status} ${error.response.statusText}. Please try again later. If the issue persists, contact our team at support@apimatic.io`
+              )
+            );
+          }
+        } else if (error.request) {
+          if (error.code === "ECONNABORTED") {
+            throw new Error(getMessageInRedColor(`The spec validation request timed out. Please try again.`));
+          } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
+            throw new Error(
+              getMessageInRedColor(
+                `Network error encountered while validating the spec file. Please check your connection and try again.`
+              )
+            );
+          } else {
+            throw new Error(
+              getMessageInRedColor(
+                `Something went wrong while validating the spec file, please try again. If the issue persists, reach out to our support team at support@apimatic.io`
+              )
+            );
+          }
+        } else {
+          throw new Error(getMessageInRedColor(`Failed to validate spec file: ${error.message}`));
+        }
+      } else if ((error as ApiError).result) {
+        const apiError = error as ApiError;
+        const result = apiError.result as APIValidateError;
+        if (result.modelState["exception Error"] && apiError.statusCode === 400) {
+          throw new Error(
+            `The provided spec file is not valid. Please ensure that the spec file you have provided is a valid API definition file.`
+          );
+        } else if ((error as AuthorizationError).body && apiError.statusCode === 401) {
+          throw new Error("You are not authorized to perform this action");
+        } else {
+          throw new Error((error as Error).message);
+        }
+      } else if ((error as AuthenticationError).statusCode === 401) {
+        throw new Error("You are not authorized to perform this action");
+      } else if (
+        (error as AuthenticationError).statusCode === 402 &&
+        (error as AuthenticationError).body &&
+        typeof (error as AuthenticationError).body === "string"
+      ) {
+        throw new Error((error as AuthenticationError).body);
+      }
+      else {
+        throw new Error(
+          getMessageInRedColor(
+            `Something went wrong while validating the spec file, please try again later. If the issue persists, contact our team at support@apimatic.io`
+          )
+        );
+      }
+    }
   }
 
   async setupBuildDirectory(
@@ -212,7 +286,7 @@ export class PortalQuickstartController {
   }
 
   async generatePortalArtifacts(targetFolder: string, configDir: string): Promise<string> {
-    const generatedPortalPath = path.join(targetFolder, "api-portal");
+    const generatedPortalPath = path.join(targetFolder, "generated_portal");
 
     try {
       await generatePortal(targetFolder, generatedPortalPath, configDir);
@@ -227,7 +301,7 @@ export class PortalQuickstartController {
               )
             );
           } else if (error.response.status === 403) {
-            throw new Error(getMessageInRedColor(`Access denied. It looks like you don’t have access to APIMatic’s Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
+            throw new Error(getMessageInRedColor(`Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
           } else if (error.response.status === 422) {
             throw new Error(
               getMessageInRedColor(
@@ -268,12 +342,14 @@ export class PortalQuickstartController {
     }
   }
 
-  async servePortal(generatedPortalPath: string, targetFolder: string, configDir: string): Promise<void> {
+  async servePortal(generatedPortalPath: string, targetFolder: string, configDir: string): Promise<boolean> {
     const server = new PortalServerService();
 
     server.setupServer(generatedPortalPath);
 
-    await server.startServer(
+    await cleanUpGeneratedPortalFiles(targetFolder);
+
+    return await server.startServer(
       {
         generatedPortalPath,
         targetFolder,
@@ -283,7 +359,5 @@ export class PortalQuickstartController {
       false,
       false
     );
-
-    await cleanUpGeneratedPortalFiles(targetFolder);
   }
 }
