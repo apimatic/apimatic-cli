@@ -43,7 +43,6 @@
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.1.0-alpha.2",
         "@clack/prompts": "^0.10.0",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
