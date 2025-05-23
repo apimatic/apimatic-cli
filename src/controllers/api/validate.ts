@@ -1,7 +1,6 @@
 import * as fs from "fs-extra";
-import { ApiResponse, FileWrapper } from "@apimatic/sdk";
+import { ApiResponse, APIValidationExternalApisController, ApiValidationSummary, ContentType, FileWrapper } from "@apimatic/sdk";
 import { GetValidationParams } from "../../types/api/validate";
-import { APIValidationExternalApisController, ApiValidationSummary, ContentType } from "@apimatic/sdk";
 import { createTempDirectory, deleteFile, zipDirectory } from "../../utils/utils";
 
 export const getValidationSummary = async (

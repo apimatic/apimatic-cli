@@ -1,13 +1,12 @@
 import * as fs from "fs-extra";
 import { ux } from "@oclif/core";
 
-import {
+import { ApiResponse, 
   CodeGenerationExternalApisController,
   UserCodeGeneration,
   Platforms,
-  GenerateSdkViaUrlRequest
-} from "@apimatic/sdk";
-import { ApiResponse, FileWrapper } from "@apimatic/sdk";
+  GenerateSdkViaUrlRequest, 
+  FileWrapper } from "@apimatic/sdk";
 import { GenerationIdParams, SimplePlatforms, DownloadSDKParams } from "../../types/sdk/generate";
 import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils";
 

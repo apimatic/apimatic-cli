@@ -129,7 +129,7 @@ export const generatePortal = async (
     zip: false
   };
 
-  await downloadDocsPortal(generatePortalParams, configDir, cancellationToken);
+  await downloadDocsPortal(generatePortalParams, configDir);
 };
 
 async function handleFileChange(

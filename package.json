@@ -43,6 +43,11 @@
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet"
     },
     "dependencies": {
+        "@apimatic/sdk": "file:./lib/sdk",
+        "@apimatic/authentication-adapters": "^0.5.4",
+        "@apimatic/axios-client-adapter": "^0.3.7",
+        "@apimatic/core": "^0.10.16",
+        "@apimatic/schema": "^0.7.14",
         "@clack/prompts": "^0.10.0",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
