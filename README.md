@@ -272,7 +272,7 @@ USAGE
   $ apimatic portal:serve [-p <value>] [-d <value>] [-s <value>] [-o] [--no-reload] [-i <value>] [--auth-key <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: ./api-portal] Directory to store and serve the generated portal.
+  -d, --destination=<value>  [default: ./generated_portal] Directory to store and serve the generated portal.
   -i, --ignore=<value>       Comma-separated list of files/directories to ignore.
   -o, --open                 Open the portal in the default browser.
   -p, --port=<value>         [default: 3000] Port to serve the portal.
@@ -285,7 +285,7 @@ DESCRIPTION
   Generate and deploy a Docs as Code portal with hot reload.
 
 EXAMPLES
-  $ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --no-reload
+  $ apimatic portal:serve --source="./" --destination="./generated_portal" --port=3000 --open --no-reload
 ```
 
 _See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.0.1-alpha.11/src/commands/portal/serve.ts)_

@@ -4,7 +4,7 @@ import { Command, Flags } from "@oclif/core";
 import { generatePortal } from "../../controllers/portal/serve";
 import { PortalServerService } from "../../services/portal/server";
 import { PortalServePrompts } from "../../prompts/portal/serve";
-import { cleanUpGeneratedPortalFiles, getMessageInRedColor } from "../../utils/utils";
+import { cleanUpGeneratedPortalFiles, getGeneratedFilesPaths, getMessageInRedColor } from "../../utils/utils";
 import { PortalServeValidator } from "../../validators/portal/serveValidator";
 
 export default class PortalServe extends Command {
@@ -19,7 +19,7 @@ export default class PortalServe extends Command {
     destination: Flags.string({
       char: "d",
       description: "Directory to store and serve the generated portal.",
-      default: "./api-portal",
+      default: "./generated_portal",
       parse: async (input) => path.resolve(input)
     }),
     source: Flags.string({
@@ -49,16 +49,8 @@ export default class PortalServe extends Command {
   };
 
   static examples = [
-    '$ apimatic portal:serve --source="./" --destination="./api-portal" --port=3000 --open --no-reload'
+    '$ apimatic portal:serve --source="./" --destination="./generated_portal" --port=3000 --open --no-reload'
   ];
-
-  private getGeneratedFilesPaths(sourceDir: string, portalDir: string): string[] {
-    const generatedZipPath = path.join(sourceDir, "portal_source.zip");
-    const generatedPortalZipPath = path.join(sourceDir, "generated_portal.zip");
-    const generatedPortalPath = path.join(path.dirname(portalDir), "api-portal");
-
-    return [generatedZipPath, generatedPortalPath, generatedPortalZipPath];
-  }
 
   async run() {
     const { flags } = await this.parse(PortalServe);
@@ -70,7 +62,7 @@ export default class PortalServe extends Command {
     const serverService = new PortalServerService();
     const prompts = new PortalServePrompts();
     const validator = new PortalServeValidator(this.error);
-    const allIgnoredPaths = [...ignoredPaths, ...this.getGeneratedFilesPaths(sourceDir, portalDir)];
+    const allIgnoredPaths = [...ignoredPaths, ...getGeneratedFilesPaths(sourceDir, portalDir)];
 
     await validator.validate(port, flags.destination, sourceDir, portalDir);
 
