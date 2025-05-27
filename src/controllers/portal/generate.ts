@@ -3,47 +3,72 @@ import { deleteFile, extractZipFile } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { ApiResponse, Client, ContentType, DocsPortalManagementController, FileWrapper } from "@apimatic/sdk";
+import { BuildFileError, PortalGenerationError } from "../../types/portal/errors";
 
-// Download Docs Portal
-export const downloadDocsPortal = async (
-  { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
-  configDir: string
-) => {
-  if (!(await fs.pathExists(zippedBuildFilePath))) {
-    throw new Error("Build file doesn't exist");
+const CONTENT_TYPE = ContentType.EnumMultipartformdata;
+const TIMEOUT = 0;
+
+const createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
+  if (overrideAuthKey) {
+    return `X-Auth-Key ${overrideAuthKey}`;
   }
-  const authInfo: AuthInfo | null = await getAuthInfo(configDir);
-  const authorizationHeader = overrideAuthKey
-    ? `X-Auth-Key ${overrideAuthKey}`
-    : authInfo
-    ? `X-Auth-Key ${authInfo.authKey}`
-    : "";
+  if (!authInfo) {
+    return "";
+  }
+  return `X-Auth-Key ${authInfo.authKey}`;
+};
 
-  const client = new Client({
+const createApiClient = (authorizationHeader: string): Client => {
+  return new Client({
     customHeaderAuthenticationCredentials: {
       Authorization: authorizationHeader
     },
-    timeout: 0
+    timeout: TIMEOUT
   });
+};
 
+const handlePortalGeneration = async (
+  docsPortalManagementController: DocsPortalManagementController,
+  zippedBuildFilePath: string
+): Promise<NodeJS.ReadableStream> => {
+  const file = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
+  const response: ApiResponse<NodeJS.ReadableStream | Blob> =
+    await docsPortalManagementController.generateOnPremPortalViaBuildInput(CONTENT_TYPE, file);
+
+  if (!response.result) {
+    throw new PortalGenerationError("Failed to generate portal: No result received");
+  }
+
+  return response.result as NodeJS.ReadableStream;
+};
+
+const savePortalToFile = async (data: NodeJS.ReadableStream, zippedPortalPath: string): Promise<void> => {
+  const writeStream = fs.createWriteStream(zippedPortalPath);
+  await new Promise<void>((resolve, reject) => {
+    data
+      .pipe(writeStream)
+      .on("finish", () => resolve())
+      .on("error", (error) => reject(new PortalGenerationError(`Failed to save portal: ${error.message}`)));
+  });
+};
+
+export const downloadDocsPortal = async (
+  { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
+  configDir: string
+): Promise<string> => {
+  if (!(await fs.pathExists(zippedBuildFilePath))) {
+    throw new BuildFileError("Build file doesn't exist");
+  }
+
+  const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+  const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
+  const client = createApiClient(authorizationHeader);
   const docsPortalManagementController = new DocsPortalManagementController(client);
 
-  const contentType = ContentType.EnumMultipartformdata;
+  const data = await handlePortalGeneration(docsPortalManagementController, zippedBuildFilePath);
+  await savePortalToFile(data, zippedPortalPath);
 
-  const file = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
-
-  const response: ApiResponse<NodeJS.ReadableStream | Blob> =
-    await docsPortalManagementController.generateOnPremPortalViaBuildInput(contentType, file);
-  const { result } = response;
-
-  const data = result as NodeJS.ReadableStream;
-  // Create a write stream and pipe the response data to it
-  const writeStream = fs.createWriteStream(zippedPortalPath);
-  await new Promise((resolve, reject) => {
-    data.pipe(writeStream).on("finish", resolve).on("error", reject);
-  });
-
-  // Delete the build file as it's no longer needed
+  // Clean up the build file as it's no longer needed
   await deleteFile(zippedBuildFilePath);
 
   if (!zip) {

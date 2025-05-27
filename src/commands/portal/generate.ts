@@ -3,15 +3,11 @@ import * as fs from "fs-extra";
 
 import { Command, Flags } from "@oclif/core";
 import {
-  Client,
-  DocsPortalManagementController,
-  PortalGenerationForbiddenResponseError,
-  PortalGenerationValidationErrorResponseError,
+  ProblemDetailsError,
   UnauthorizedResponseError,
   ApiError
 } from "@apimatic/sdk";
 
-import { SDKClient } from "../../client-utils/sdk-client";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "../../controllers/portal/generate";
 import {
@@ -20,24 +16,35 @@ import {
   deleteFile,
   extractZipFile,
   parseStreamBodyToJson,
-  zipDirectory
+  getMessageInRedColor
 } from "../../utils/utils";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate";
 
+const DEFAULT_FOLDER = "./";
+const DEFAULT_DESTINATION = path.resolve("./");
+const GENERATED_PORTAL_FOLDER = "generated_portal";
+const GENERATED_PORTAL_ZIP = ".generated_portal.zip";
+
 interface GenerateFlags {
-  folder: string;
-  destination: string;
-  force: boolean;
-  zip: boolean;
-  "auth-key": string;
+  readonly folder: string;
+  readonly destination: string;
+  readonly force: boolean;
+  readonly zip: boolean;
+  readonly "auth-key": string;
 }
 
 interface PortalPaths {
-  sourceFolderPath: string;
-  destinationFolderPath: string;
-  portalFolderPath: string;
-  zippedPortalPath: string;
-  zippedBuildFilePath: string;
+  readonly sourceFolderPath: string;
+  readonly destinationFolderPath: string;
+  readonly portalFolderPath: string;
+  readonly zippedPortalPath: string;
+}
+
+interface ErrorResponse {
+  readonly title: string;
+  readonly detail?: string;
+  readonly errors: Record<string, string[]>;
+  readonly message?: string;
 }
 
 export default class PortalGenerate extends Command {
@@ -46,13 +53,13 @@ export default class PortalGenerate extends Command {
 
   static flags = {
     folder: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: "./",
+      parse: async (input: string) => path.resolve(input),
+      default: DEFAULT_FOLDER,
       description: "path to the input directory containing API specifications and config files"
     }),
     destination: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: path.resolve("./"),
+      parse: async (input: string) => path.resolve(input),
+      default: DEFAULT_DESTINATION,
       description: "path to the downloaded portal"
     }),
     force: Flags.boolean({
@@ -87,18 +94,17 @@ Your portal has been generated at D:/
     return {
       sourceFolderPath: flags.folder,
       destinationFolderPath: flags.destination,
-      portalFolderPath: path.join(flags.destination, "generated_portal"),
-      zippedPortalPath: path.join(flags.destination, ".generated_portal.zip"),
-      zippedBuildFilePath: await zipDirectory(flags.folder, flags.destination)
+      portalFolderPath: path.join(flags.destination, GENERATED_PORTAL_FOLDER),
+      zippedPortalPath: path.join(flags.destination, GENERATED_PORTAL_ZIP)
     };
   }
 
   private async validatePaths(paths: PortalPaths): Promise<void> {
     if (!(await fs.pathExists(paths.sourceFolderPath))) {
-      throw new Error(`Portal build folder ${paths.sourceFolderPath} does not exist.`);
+      this.error(getMessageInRedColor(`Portal build input folder ${paths.sourceFolderPath} does not exist.`));
     }
     if (!(await fs.pathExists(path.dirname(paths.portalFolderPath)))) {
-      throw new Error(`Destination path ${path.dirname(paths.portalFolderPath)} does not exist.`);
+      this.error(getMessageInRedColor(`Destination path ${path.dirname(paths.portalFolderPath)} does not exist.`));
     }
   }
 
@@ -110,59 +116,62 @@ Your portal has been generated at D:/
     }
   }
 
-  private async handleApiError(
-    error: unknown,
-    paths: PortalPaths,
-    zip: boolean
-  ): Promise<never> {
-    if (error instanceof PortalGenerationValidationErrorResponseError) {
-      // 400
-      const validationError = error as PortalGenerationValidationErrorResponseError;
-      const body = await parseStreamBodyToJson(validationError.body as NodeJS.ReadableStream);
+  private async parseErrorResponse(error: unknown): Promise<ErrorResponse> {
+    if (error instanceof Error && "body" in error) {
+      const stream = (error as { body: NodeJS.ReadableStream }).body;
+      return await parseStreamBodyToJson(stream);
+    }
+    throw error;
+  }
+
+  private async handleApiError(error: unknown, paths: PortalPaths, zip: boolean): Promise<never> {
+    if (error instanceof ProblemDetailsError) {
+      //400
+      const body = await this.parseErrorResponse(error);
       const key = Object.keys(body.errors)[0];
       const message = body.errors[key][0];
-      this.error(body.title + "\n" + message);
+      this.error(getMessageInRedColor(body.title + "\n" + message));
     } else if (error instanceof UnauthorizedResponseError) {
-      // 401
-      const unauthorizedError = error as UnauthorizedResponseError;
-      const body = await parseStreamBodyToJson(unauthorizedError.body as NodeJS.ReadableStream);
-      this.error(body.message);
-    } else if (error instanceof PortalGenerationForbiddenResponseError) {
-      // 403
-      const forbiddenError = error as PortalGenerationForbiddenResponseError;
-      const body = await parseStreamBodyToJson(forbiddenError.body as NodeJS.ReadableStream);
+      //401
+      const body = await this.parseErrorResponse(error);
+      this.error(getMessageInRedColor(body.message ?? "Unauthorized access"));
+    } else if (error instanceof ProblemDetailsError) {
+      //403
+      const body = await this.parseErrorResponse(error);
       const message = body.errors[Object.keys(body.errors)[0]][0];
-      this.error(body.title + " " + body.detail + ":\n" + message);
+      this.error(body.title + " " + (body.detail ?? "") + ":\n" + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
-      // 422
-      const data = error.body as NodeJS.ReadableStream;
-      // Create a write stream and pipe the response data to it
-      const writeStream = fs.createWriteStream(paths.zippedPortalPath);
-      await new Promise((resolve, reject) => {
-        data.pipe(writeStream).on("finish", resolve).on("error", reject);
-      });
-      await deleteFile(paths.zippedBuildFilePath);
-
-      if (!zip) {
-        // Extract the zip file if zip flag is false
-        await extractZipFile(paths.zippedPortalPath, paths.portalFolderPath);
-        // Clean up the zip file after extraction
-        await deleteFile(paths.zippedPortalPath);
-      }
-
+      //422
+      await this.handleValidationError(error, paths, zip);
       this.error(
-        "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-          paths.destinationFolderPath
+        getMessageInRedColor(
+          "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
+            paths.destinationFolderPath
+        )
       );
     } else {
-      this.error(error instanceof Error ? error.message : String(error));
+      this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
+    }
+  }
+
+  private async handleValidationError(error: ApiError, paths: PortalPaths, zip: boolean): Promise<void> {
+    const data = error.body as NodeJS.ReadableStream;
+    const writeStream = fs.createWriteStream(paths.zippedPortalPath);
+
+    await new Promise<void>((resolve, reject) => {
+      data
+        .pipe(writeStream)
+        .on("finish", () => resolve())
+        .on("error", reject);
+    });
+
+    if (!zip) {
+      await extractZipFile(paths.zippedPortalPath, paths.portalFolderPath);
+      await deleteFile(paths.zippedPortalPath);
     }
   }
 
   private async generatePortal(paths: PortalPaths, flags: GenerateFlags, configDir: string): Promise<string> {
-    const client: Client = await SDKClient.getInstance().getClient(flags["auth-key"] ?? null, configDir);
-    const docsPortalController = new DocsPortalManagementController(client);
-
     const pathsToIgnore = getGeneratedFilesPaths(paths.sourceFolderPath, paths.portalFolderPath);
     const zippedBuildFilePath = await validateAndZipPortalSource(
       paths.sourceFolderPath,
@@ -174,12 +183,10 @@ Your portal has been generated at D:/
       zippedBuildFilePath,
       portalFolderPath: paths.portalFolderPath,
       zippedPortalPath: paths.zippedPortalPath,
-      docsPortalController,
       overrideAuthKey: flags["auth-key"] ?? null,
       zip: flags.zip
     };
 
-    this.prompts.displayPortalGenerationMessage();
     const generatedPortalPath = await downloadDocsPortal(generatePortalParams, configDir);
     this.prompts.displayPortalGenerationSuccessMessage();
     this.prompts.displayOutroMessage(generatedPortalPath);
@@ -187,10 +194,12 @@ Your portal has been generated at D:/
     return generatedPortalPath;
   }
 
-  async run() {
+  async run(): Promise<void> {
     const { flags } = await this.parse(PortalGenerate);
     const paths = await this.getPortalPaths(flags as GenerateFlags);
+
     try {
+      this.prompts.displayPortalGenerationMessage();
       await this.validatePaths(paths);
       await this.checkExistingPortal(paths, flags as GenerateFlags);
       await this.generatePortal(paths, flags as GenerateFlags, this.config.configDir);
