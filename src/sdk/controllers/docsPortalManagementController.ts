@@ -10,8 +10,7 @@ import { ContentType, contentTypeSchema } from '../models/contentType';
 import { array, optional, string, unknown } from '../schema';
 import { BaseController } from './baseController';
 import { ApiError } from '@apimatic/core';
-import { PortalGenerationForbiddenResponseError } from '../errors/portalGenerationForbiddenResponseError';
-import { PortalGenerationValidationErrorResponseError } from '../errors/portalGenerationValidationErrorResponseError';
+import { ProblemDetailsError } from '../errors/problemDetailsError';
 import { UnauthorizedResponseError } from '../errors/unauthorizedResponseError';
 
 export class DocsPortalManagementController extends BaseController {
@@ -132,17 +131,9 @@ export class DocsPortalManagementController extends BaseController {
     });
     req.header('Content-Type', mapped.contentType);
     req.formData({ file: file });
-    req.throwOn(
-      400,
-      PortalGenerationValidationErrorResponseError,
-      'Bad Request'
-    );
+    req.throwOn(400, ProblemDetailsError, 'Bad Request');
     req.throwOn(401, UnauthorizedResponseError, 'Unauthorized');
-    req.throwOn(
-      403,
-      PortalGenerationForbiddenResponseError,
-      'Subscription Issue'
-    );
+    req.throwOn(403, ProblemDetailsError, 'Subscription Issue');
     req.throwOn(
       422,
       ApiError,
