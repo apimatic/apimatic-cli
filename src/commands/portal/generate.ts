@@ -199,9 +199,9 @@ Your portal has been generated at D:/
     const paths = await this.getPortalPaths(flags as GenerateFlags);
 
     try {
+      await this.checkExistingPortal(paths, flags as GenerateFlags);
       this.prompts.displayPortalGenerationMessage();
       await this.validatePaths(paths);
-      await this.checkExistingPortal(paths, flags as GenerateFlags);
       await this.generatePortal(paths, flags as GenerateFlags, this.config.configDir);
     } catch (error) {
       this.prompts.displayPortalGenerationErrorMessage();
