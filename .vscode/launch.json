@@ -19,6 +19,11 @@
             // "auth:login",
             // "auth:status"
             // "portal:quickstart",
+            // "portal:generate",
+            // "--folder", 
+            // "test-source",
+            // "--destination",
+            // "test-portal",
             // "portal:serve",
             // "api:transform",
             // "--help"
@@ -42,5 +47,31 @@
         ],
         "console": "externalTerminal",
         "preLaunchTask": "tsc: build - tsconfig.json"
-    }]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Tests",
+      "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+      "args": [
+        "--require",
+        "ts-node/register",
+        "--project",
+        "${workspaceFolder}/tsconfig.json",
+        "--forbid-only",
+        "test/**/*.test.ts",
+        "--timeout",
+        "99999",
+      ],
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": [
+        "--nolazy",
+        "--inspect-brk",
+        "--trace-warnings"
+      ],
+      "internalConsoleOptions": "openOnSessionStart",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    }
+  ]
 }
