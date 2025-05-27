@@ -146,13 +146,10 @@ export const deleteFile = async (filePath: string) => {
 };
 
 export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, destinationPath: string) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const writeStream = fs.createWriteStream(destinationPath);
     stream.pipe(writeStream);
-    writeStream.on("close", (error: Error) => {
-      if (error) {
-        return reject(new Error("Couldn't zip the stream"));
-      }
+    writeStream.on("close", () => {
       resolve("Zipped");
     });
   });
@@ -312,11 +309,6 @@ export async function validateAndZipPortalSource(
   outputPath: string,
   ignoredPaths: string[] = []
 ): Promise<string> {
-  const output = fs.createWriteStream(outputPath);
-  const archive = archiver("zip", {
-    zlib: { level: 9 }
-  });
-
   const items = await fs.readdir(sourceDir);
 
   if (!items.some((item) => item.startsWith("APIMATIC-BUILD"))) {
@@ -324,6 +316,11 @@ export async function validateAndZipPortalSource(
       "APIMatic Build file is missing, portal cannot be generated. Please specify a valid APIMatic build file and try again."
     );
   }
+
+  const output = fs.createWriteStream(outputPath);
+  const archive = archiver("zip", {
+    zlib: { level: 9 }
+  });
 
   return new Promise((resolve, reject) => {
     output.on("close", () => resolve(outputPath));
