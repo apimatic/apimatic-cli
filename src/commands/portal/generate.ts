@@ -125,18 +125,12 @@ Your portal has been generated at D:/
   }
 
   private async handleApiError(error: unknown, paths: PortalPaths, zip: boolean): Promise<never> {
-    if (error instanceof ProblemDetailsError) {
-      //400
-      const body = await this.parseErrorResponse(error);
-      const key = Object.keys(body.errors)[0];
-      const message = body.errors[key][0];
-      this.error(getMessageInRedColor(body.title + "\n" + message));
-    } else if (error instanceof UnauthorizedResponseError) {
+    if (error instanceof UnauthorizedResponseError) {
       //401
       const body = await this.parseErrorResponse(error);
       this.error(getMessageInRedColor(body.message ?? "Unauthorized access"));
     } else if (error instanceof ProblemDetailsError) {
-      //403
+      //400 & 403
       const body = await this.parseErrorResponse(error);
       const message = body.errors[Object.keys(body.errors)[0]][0];
       this.error(body.title + " " + (body.detail ?? "") + ":\n" + message);
