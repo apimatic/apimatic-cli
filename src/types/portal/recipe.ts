@@ -1,0 +1,38 @@
+export interface WorkflowContext {
+    showContent(content: string): Promise<any>;
+    showEndpoint(config: EndpointConfig): Promise<any>;
+}
+
+export interface EndpointConfig {
+description: string;
+  endpointPermalink: string;
+  args: Record<string, any>;
+  verify: (response: any, setError: (error: string) => void) => boolean;
+}
+
+export interface StepConfig {
+  name: string;
+  stepCallback: () => Promise<any>;
+}
+
+export interface WorkflowDefinition {
+  [stepKey: string]: StepConfig;
+}
+
+export interface SerializableWorkflow {
+  name: string;
+  steps: SerializableStep[];
+}
+
+export interface SerializableStep {
+  key: string;
+  name: string;
+  type: 'content' | 'endpoint';
+  config: ContentStepConfig | EndpointStepConfig;
+}
+
+export interface ContentStepConfig {
+  content: string;
+}
+
+export interface EndpointStepConfig extends EndpointConfig {}
