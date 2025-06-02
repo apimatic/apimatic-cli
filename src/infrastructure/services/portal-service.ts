@@ -75,7 +75,7 @@ export class PortalService {
       //400 & 403
       const body = await this.parseErrorResponse(error);
       const message = body.errors[Object.keys(body.errors)[0]][0];
-      return getMessageInRedColor(body.title + "\n" + (body.detail ?? "") + "\n- " + message);
+      return getMessageInRedColor(body.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
       await this.extractErrorZipFile(error, params);

@@ -6,6 +6,7 @@ import { getMessageInRedColor } from "../../utils/utils";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate";
 import { PortalGenerateAction } from "../../actions/portal/generate";
 import { Result } from "../../types/common/result";
+import { Errors } from "@oclif/core";
 
 const DEFAULT_FOLDER = "./";
 const DEFAULT_DESTINATION = path.resolve("./");
@@ -64,8 +65,7 @@ Your portal has been generated at D:/
       await this.checkExistingPortal(paths, flags as GenerateFlags);
       const validationResult = await this.validatePaths(paths);
       if (!validationResult.isSuccess) {
-        this.prompts.logError(validationResult.error!);
-        process.exit(1);
+        this.error(validationResult.error!);
       }
 
       const generatePortalResult = await portalGenerateAction.generatePortal(
@@ -75,12 +75,14 @@ Your portal has been generated at D:/
       );
 
       if (!generatePortalResult.isSuccess) {
-        this.prompts.logError(
-          getMessageInRedColor(`An error occurred while generating the portal: \n${generatePortalResult.error!}`)
-        );
-        process.exit(1);
+        this.prompts.logError(getMessageInRedColor(`An error occurred while generating the portal: \n${generatePortalResult.error!}`));
       }
-    } catch (error) {
+    } 
+    catch (error: any) {
+      if (error instanceof Errors.CLIError) {
+        throw error;
+      }
+      // Handle unexpected errors
       this.error(
         getMessageInRedColor(
           `An unexpected error occurred while generating the portal, please try again later. If the issue persists, reach out to our team at support@apimatic.io for assistance.`

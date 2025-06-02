@@ -309,14 +309,6 @@ export async function validateAndZipPortalSource(
   outputPath: string,
   ignoredPaths: string[] = []
 ): Promise<string> {
-  const items = await fs.readdir(sourceDir);
-
-  if (!items.some((item) => item.startsWith("APIMATIC-BUILD"))) {
-    throw new Error(
-      "APIMatic Build file is missing, portal cannot be generated. Please specify a valid APIMatic build file and try again."
-    );
-  }
-
   const output = fs.createWriteStream(outputPath);
   const archive = archiver("zip", {
     zlib: { level: 9 }

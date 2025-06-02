@@ -10,11 +10,11 @@ import { EventEmitter } from "events";
 EventEmitter.defaultMaxListeners = 50;
 
 const COMMAND = "portal:generate";
-const GENERATION_SUCCESS_MESSAGE = "Portal generated successfully";
+const GENERATION_SUCCESS_MESSAGE = "The generated portal can be found at";
 const GENERATION_FAILURE_MESSAGE = "Something went wrong while generating your portal";
 const AUTHENTICATION_FAILURE_MESSAGE = "Authorization has been denied for this request";
 const VALIDATION_FAILURE_MESSAGE = "One or more validation errors occurred";
-const BUILD_FILE_MISSING_MESSAGE = "APIMatic Build file is missing, portal cannot be generated";
+const BUILD_FILE_MISSING_MESSAGE = "Build file not found";
 const SUBSCRIPTION_FAILURE_MESSAGE = "Access denied to resource";
 const SUBSCRIPTION_FAILURE_DETAILS_MESSAGE = "Requested features are not available in subscription";
 
@@ -77,29 +77,26 @@ describe("apimatic portal:generate", function () {
 
   // Flag validation
   it("validates source folder path exists", async () => {
-    const { stdout, error } = await runCommand([COMMAND, "--folder", "non-existent-folder"]);
-    expect(stdout).to.contain(GENERATION_FAILURE_MESSAGE);
+    const {error } = await runCommand([COMMAND, "--folder", "non-existent-folder"]);
     expect(error?.message).to.contain("does not exist");
   });
 
   it("validates destination path exists", async () => {
-    const { stdout, error } = await runCommand([COMMAND, "--destination", "non-existent-destination"]);
-    expect(stdout).to.contain(GENERATION_FAILURE_MESSAGE);
+    const { error } = await runCommand([COMMAND, "--destination", "non-existent-destination"]);
     expect(error?.message).to.contain("does not exist");
   });
 
   it("validates APIMatic build file exists", async () => {
     await setupValidBuildDirectory(sourceBuildInputDir);
     fs.rmSync(path.join(sourceBuildInputDir, "APIMATIC-BUILD.json"));
-    const { stdout, error } = await runCommand([
+    const { stdout } = await runCommand([
       COMMAND,
       "--folder",
       sourceBuildInputDir,
       "--destination",
       portalArtifactsDir
     ]);
-    expect(stdout).to.contain(GENERATION_FAILURE_MESSAGE);
-    expect(error?.message).to.contain(BUILD_FILE_MISSING_MESSAGE);
+    expect(stdout).to.contain(BUILD_FILE_MISSING_MESSAGE);
   });
 
   // File system operations
@@ -165,8 +162,8 @@ describe("apimatic portal:generate", function () {
         portalArtifactsDir
       ]);
       expect(stdout).to.contain(GENERATION_FAILURE_MESSAGE);
-      expect(error?.message).to.contain(VALIDATION_FAILURE_MESSAGE);
-      expect(error?.message).to.contain(
+      expect(stdout).to.contain(VALIDATION_FAILURE_MESSAGE);
+      expect(stdout).to.contain(
         "No build tasks provided. Both generatePortal and generateVersionedPortal are null"
       );
     });
@@ -183,7 +180,7 @@ describe("apimatic portal:generate", function () {
         "invalid-auth-key"
       ]);
       expect(stdout).to.contain(GENERATION_FAILURE_MESSAGE);
-      expect(error?.message).to.contain(AUTHENTICATION_FAILURE_MESSAGE);
+      expect(stdout).to.contain(AUTHENTICATION_FAILURE_MESSAGE);
     });
 
     it("throws 403 error due to subscription error", async () => {
@@ -215,9 +212,9 @@ describe("apimatic portal:generate", function () {
         "valid-but-restricted-auth-key"
       ]);
       expect(stdout).to.contain(GENERATION_FAILURE_MESSAGE);
-      expect(error?.message).to.contain(SUBSCRIPTION_FAILURE_MESSAGE);
-      expect(error?.message).to.contain(SUBSCRIPTION_FAILURE_DETAILS_MESSAGE);
-      expect(error?.message).to.contain("Unsupported languages provided in build file 'CS_NET_STANDARD_LIB'");
+      expect(stdout).to.contain(SUBSCRIPTION_FAILURE_MESSAGE);
+      expect(stdout).to.contain(SUBSCRIPTION_FAILURE_DETAILS_MESSAGE);
+      expect(stdout).to.contain("Unsupported languages provided in build file 'CS_NET_STANDARD_LIB'");
       nock.enableNetConnect();
     });
 
@@ -241,7 +238,7 @@ describe("apimatic portal:generate", function () {
         portalArtifactsDir
       ]);
       expect(stdout).to.contain(GENERATION_FAILURE_MESSAGE);
-      expect(error?.message).to.contain(
+      expect(stdout).to.contain(
         "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path"
       );
       expect(fs.existsSync(path.join(portalArtifactsDir, "generated_portal", "apimatic-debug", "apimatic-report.html")))
