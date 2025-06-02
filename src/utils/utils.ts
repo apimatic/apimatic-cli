@@ -225,12 +225,12 @@ export const isJSONParsable = (json: string) => {
   }
 };
 
-export const getGeneratedFilesPaths = (sourceDir: string, portalDir: string): string[] => {
-  const generatedZipPath = path.join(sourceDir, ".portal_source.zip");
-  const generatedPortalZipPath = path.join(sourceDir, ".generated_portal.zip");
-  const generatedPortalPath = path.join(path.dirname(portalDir), "generated_portal");
+export const getGeneratedFilesPaths = (sourceDirectoryPath: string, generatedPortalArtifactsDirectoryPath: string): string[] => {
+  const generatedBuildInputZipPath = path.join(sourceDirectoryPath, ".portal_source.zip");
+  const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
+  const generatedPortalArtifactsFolderPath = path.join(path.dirname(generatedPortalArtifactsDirectoryPath), "generated_portal");
 
-  return [generatedZipPath, generatedPortalPath, generatedPortalZipPath];
+  return [generatedBuildInputZipPath, generatedPortalArtifactsFolderPath, generatedPortalArtifactsZipFilePath];
 };
 
 export const getFileNameFromPath = (filePath: string) => {

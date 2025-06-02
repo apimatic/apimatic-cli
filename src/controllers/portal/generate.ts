@@ -1,12 +1,51 @@
 import * as fs from "fs-extra";
-import { deleteFile, extractZipFile } from "../../utils/utils";
-import { GeneratePortalParams } from "../../types/portal/generate";
+import { deleteFile, extractZipFile, getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils";
+import { ErrorResponse, GeneratePortalParams } from "../../types/portal/generate";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
-import { ApiResponse, Client, ContentType, DocsPortalManagementController, FileWrapper } from "@apimatic/sdk";
-import { BuildFileError, PortalGenerationError } from "../../types/portal/errors";
-
+import {
+  ApiError,
+  ApiResponse,
+  Client,
+  ContentType,
+  DocsPortalManagementController,
+  FileWrapper,
+  ProblemDetailsError,
+  UnauthorizedResponseError
+} from "@apimatic/sdk";
+import { Result } from "../../types/common/result";
 const CONTENT_TYPE = ContentType.EnumMultipartformdata;
 const TIMEOUT = 0;
+
+export const downloadDocsPortal = async (
+  params: GeneratePortalParams,
+  configDir: string
+): Promise<Result<string, string>> => {
+  if (!(await fs.pathExists(params.sourceBuildInputZipFilePath))) {
+    return Result.failure("Build file doesn't exist");
+  }
+
+  const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+  const authorizationHeader = createAuthorizationHeader(authInfo, params.overrideAuthKey);
+  const client = createApiClient(authorizationHeader);
+  const docsPortalManagementController = new DocsPortalManagementController(client);
+
+  try {
+    const stream = await generatePortalFromSyncEndpoint(docsPortalManagementController, params.sourceBuildInputZipFilePath);
+    await saveGeneratedPortalStreamToZipFile(stream, params.generatedPortalArtifactsZipFilePath);
+    await deleteFile(params.sourceBuildInputZipFilePath);
+
+    if (params.generateZipFile) {
+      return Result.success(params.generatedPortalArtifactsZipFilePath);
+    }
+
+    await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
+    await deleteFile(params.generatedPortalArtifactsZipFilePath);
+    
+    return Result.success(params.generatedPortalArtifactsFolderPath);
+  } catch (error) {
+    return handlePortalGenerationErrors(error, params);
+  }
+};
 
 const createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
   if (overrideAuthKey) {
@@ -27,7 +66,7 @@ const createApiClient = (authorizationHeader: string): Client => {
   });
 };
 
-const handlePortalGeneration = async (
+const generatePortalFromSyncEndpoint = async (
   docsPortalManagementController: DocsPortalManagementController,
   zippedBuildFilePath: string
 ): Promise<NodeJS.ReadableStream> => {
@@ -35,49 +74,66 @@ const handlePortalGeneration = async (
   const response: ApiResponse<NodeJS.ReadableStream | Blob> =
     await docsPortalManagementController.generateOnPremPortalViaBuildInput(CONTENT_TYPE, file);
 
-  if (!response.result) {
-    throw new PortalGenerationError("Failed to generate portal: No result received");
-  }
-
   return response.result as NodeJS.ReadableStream;
 };
 
-const savePortalToFile = async (data: NodeJS.ReadableStream, zippedPortalPath: string): Promise<void> => {
-  const writeStream = fs.createWriteStream(zippedPortalPath);
+const saveGeneratedPortalStreamToZipFile = async (data: NodeJS.ReadableStream, generatedPortalArtifactsZipFilePath: string): Promise<void> => {
+  const writeStream = fs.createWriteStream(generatedPortalArtifactsZipFilePath);
   await new Promise<void>((resolve, reject) => {
     data
       .pipe(writeStream)
       .on("finish", () => resolve())
-      .on("error", (error) => reject(new PortalGenerationError(`Failed to save portal: ${error.message}`)));
+      .on("error", (error) =>
+        reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`))
+      );
   });
 };
 
-export const downloadDocsPortal = async (
-  { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
-  configDir: string
-): Promise<string> => {
-  if (!(await fs.pathExists(zippedBuildFilePath))) {
-    throw new BuildFileError("Build file doesn't exist");
+const handlePortalGenerationErrors = async (error: unknown, params: GeneratePortalParams): Promise<Result<string, string>> => {
+  if (error instanceof UnauthorizedResponseError) {
+    //401
+    const body = await parseErrorResponse(error);
+    return Result.failure(getMessageInRedColor(body.message ?? "Unauthorized access"));
+  } else if (error instanceof ProblemDetailsError) {
+    //400 & 403
+    const body = await parseErrorResponse(error);
+    const message = body.errors[Object.keys(body.errors)[0]][0];
+    return Result.failure(getMessageInRedColor(body.title + " " + (body.detail ?? "") + ":\n" + message));
+  } else if (error instanceof ApiError && error.statusCode === 422) {
+    //422
+    await extractErrorZipFile(error, params);
+    return Result.failure(
+      getMessageInRedColor(
+        "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
+          params.generatedPortalArtifactsFolderPath
+      )
+    );
+  } else {
+    return Result.failure(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
   }
+};
 
-  const authInfo: AuthInfo | null = await getAuthInfo(configDir);
-  const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
-  const client = createApiClient(authorizationHeader);
-  const docsPortalManagementController = new DocsPortalManagementController(client);
-
-  const data = await handlePortalGeneration(docsPortalManagementController, zippedBuildFilePath);
-  await savePortalToFile(data, zippedPortalPath);
-
-  // Clean up the build file as it's no longer needed
-  await deleteFile(zippedBuildFilePath);
-
-  if (!zip) {
-    // Extract the zip file if zip flag is false
-    await extractZipFile(zippedPortalPath, portalFolderPath);
-    // Clean up the zip file after extraction
-    await deleteFile(zippedPortalPath);
-    return portalFolderPath;
+const parseErrorResponse = async (error: unknown): Promise<ErrorResponse> => {
+  if (error instanceof Error && "body" in error) {
+    const stream = (error as { body: NodeJS.ReadableStream }).body;
+    return await parseStreamBodyToJson(stream);
   }
+  throw error;
+};
 
-  return zippedPortalPath;
+const extractErrorZipFile = async (error: ApiError, params: GeneratePortalParams): Promise<void> => {
+  const data = error.body as NodeJS.ReadableStream;
+  const writeStream = fs.createWriteStream(params.generatedPortalArtifactsZipFilePath);
+
+  await new Promise<void>((resolve, reject) => {
+    data
+      .pipe(writeStream)
+      .on("finish", () => resolve())
+      .on("error", reject);
+  });
+
+  if (!params.generateZipFile) {
+    await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
+    await deleteFile(params.generatedPortalArtifactsZipFilePath);
+  }
 };

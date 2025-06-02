@@ -2,7 +2,6 @@
   "compilerOptions": {
     "declaration": true,
     "importHelpers": true,
-    "composite": true,
     "skipLibCheck": true,
     "module": "commonjs",
     "outDir": "lib",
@@ -10,11 +9,10 @@
     "strict": true,
     "target": "es2017",
     "lib": ["es2018", "dom"],
-    "baseUrl": ".",
     "paths": {
       "@apimatic/sdk": ["./src/sdk"]
     },
-    "inlineSourceMap": true
+    "inlineSourceMap": true,
   },
   "include": [
     "src/**/*"

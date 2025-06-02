@@ -104,11 +104,11 @@ export const generatePortal = async (
   );
 
   const generatePortalParams: GeneratePortalParams = {
-    zippedBuildFilePath,
-    portalFolderPath: portalDir,
-    zippedPortalPath: path.join(sourceDir, ".generated_portal.zip"),
+    sourceBuildInputZipFilePath: zippedBuildFilePath,
+    generatedPortalArtifactsFolderPath: portalDir,
+    generatedPortalArtifactsZipFilePath: path.join(sourceDir, ".generated_portal.zip"),
     overrideAuthKey,
-    zip: false
+    generateZipFile: false
   };
 
   await downloadDocsPortal(generatePortalParams, configDir);
