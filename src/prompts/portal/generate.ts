@@ -1,5 +1,4 @@
-import { cancel, outro, select, spinner } from "@clack/prompts";
-import { isCancel } from "axios";
+import { cancel, outro, select, spinner, isCancel } from "@clack/prompts";
 import { getMessageInRedColor } from "../../utils/utils";
 
 export class PortalGeneratePrompts {

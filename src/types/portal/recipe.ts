@@ -1,3 +1,13 @@
+export enum PortalEntityType {
+  Recipe = 'recipe',
+  Toc = 'toc'
+}
+
+export enum StepType {
+  Content = 'content',
+  Endpoint = 'endpoint'
+}
+
 export interface WorkflowContext {
     showContent(content: string): Promise<any>;
     showEndpoint(config: EndpointConfig): Promise<any>;
