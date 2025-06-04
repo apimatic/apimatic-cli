@@ -3,7 +3,13 @@ import * as fs from "fs-extra";
 import { PortalService } from "../../infrastructure/services/portal-service";
 import { PortalPaths, GeneratePortalParams, GenerateFlags } from "../../types/portal/generate";
 import { Result } from "../../types/common/result";
-import { getGeneratedFilesPaths, validateAndZipPortalSource, deleteFile, extractZipFile } from "../../utils/utils";
+import {
+  getGeneratedFilesPaths,
+  validateAndZipPortalSource,
+  deleteFile,
+  extractZipFile,
+  getMessageInRedColor
+} from "../../utils/utils";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate";
 
 export class PortalGenerateAction {
@@ -13,7 +19,7 @@ export class PortalGenerateAction {
     this.prompts = new PortalGeneratePrompts();
   }
 
-  async generatePortal(paths: PortalPaths, flags: GenerateFlags, configDir: string): Promise<Result<string, string>> {
+  async generatePortal(paths: PortalPaths, flags: GenerateFlags, configDir: string): Promise<void> {
     this.prompts.displayPortalGenerationMessage();
     const pathsToIgnore = getGeneratedFilesPaths(paths.sourceFolderPath, paths.generatedPortalArtifactsFolderPath);
 
@@ -34,17 +40,16 @@ export class PortalGenerateAction {
 
     const docsPortalService = new PortalService();
     const portalGenerationResult = await docsPortalService.generateOnPremPortal(generatePortalParams, configDir);
+    await deleteFile(sourceBuildInputZipFilePath);
 
     if (portalGenerationResult.isSuccess) {
       await this.saveGeneratedPortalStreamToZipFile(
         portalGenerationResult.value!,
         paths.generatedPortalArtifactsZipFilePath
       );
-      await deleteFile(sourceBuildInputZipFilePath);
 
       if (flags.zip) {
         this.prompts.displayOutroMessage(paths.generatedPortalArtifactsZipFilePath);
-        return Result.success(paths.generatedPortalArtifactsZipFilePath);
       }
 
       await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsFolderPath);
@@ -52,10 +57,11 @@ export class PortalGenerateAction {
 
       this.prompts.displayPortalGenerationSuccessMessage();
       this.prompts.displayOutroMessage(paths.generatedPortalArtifactsFolderPath);
-      return Result.success(paths.generatedPortalArtifactsFolderPath);
     } else {
       this.prompts.displayPortalGenerationErrorMessage();
-      return Result.failure(portalGenerationResult.error!);
+      this.prompts.logError(
+        getMessageInRedColor(`An error occurred while generating the portal: \n${portalGenerationResult.error!}`)
+      );
     }
   }
 

@@ -1,5 +1,6 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
+import * as path from "path";
 import { FileWrapper, ApiResponse, ApiError } from "@apimatic/sdk";
 import {
   ContentType,
@@ -78,10 +79,12 @@ export class PortalService {
       return getMessageInRedColor(body.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
-      await this.extractErrorZipFile(error, params);
+      return await this.saveAndExtractErrorZipFile(error, params);
+    } else if (error instanceof ApiError && error.statusCode === 500) {
+      //500
+      //TODO: Replace this message with the one returned by the API once we improve the messaging.
       return getMessageInRedColor(
-        "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-          params.generatedPortalArtifactsFolderPath
+        "An internal server error occurred. Please try again or reach out to our team at support@apimatic.io for help if your problem persists."
       );
     } else {
       return getMessageInRedColor(error instanceof Error ? error.message : String(error));
@@ -96,20 +99,32 @@ export class PortalService {
     throw error;
   };
 
-  private extractErrorZipFile = async (error: ApiError, params: GeneratePortalParams): Promise<void> => {
+  private saveAndExtractErrorZipFile = async (error: ApiError, params: GeneratePortalParams): Promise<string> => {
     const data = error.body as NodeJS.ReadableStream;
     const writeStream = fs.createWriteStream(params.generatedPortalArtifactsZipFilePath);
 
-    await new Promise<void>((resolve, reject) => {
+    return await new Promise<string>((resolve, reject) => {
       data
         .pipe(writeStream)
-        .on("finish", () => resolve())
-        .on("error", reject);
+        .on("finish", async () => {
+          await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
+          await deleteFile(params.generatedPortalArtifactsZipFilePath);
+          await deleteFile(path.join(params.generatedPortalArtifactsFolderPath, "static"));
+          // fs.rmSync(path.join(params.generatedPortalArtifactsFolderPath, "static"), { recursive: true, force: true });
+          resolve(
+            getMessageInRedColor(
+              "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
+                params.generatedPortalArtifactsFolderPath
+            )
+          );
+        })
+        .on("error", async () => {
+          reject(
+            getMessageInRedColor(
+              "An error occurred during portal generation due to an issue with the input. The error report could not be generated. Please try again later."
+            )
+          );
+        });
     });
-
-    if (!params.generateZipFile) {
-      await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
-      await deleteFile(params.generatedPortalArtifactsZipFilePath);
-    }
   };
 }
