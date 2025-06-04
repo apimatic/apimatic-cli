@@ -1,6 +1,6 @@
 import { SerializableRecipe, SerializableStep } from "../../types/portal/recipe";
 
-export class RecipeBuilder {
+export class PortalRecipeBuilder {
   private recipe: SerializableRecipe;
 
   constructor(name: string) {
@@ -24,9 +24,7 @@ export class RecipeBuilder {
     key: string, 
     name: string, 
     description: string,
-    endpointPermalink: string,
-    args: Record<string, any>,
-    verifyFunction: (response: any, setError: (error: string) => void) => boolean
+    endpointPermalink: string
   ): this {
     this.recipe.steps.push({
       key,
@@ -35,8 +33,6 @@ export class RecipeBuilder {
       config: {
         description,
         endpointPermalink,
-        args,
-        verify: verifyFunction
       }
     });
     return this;

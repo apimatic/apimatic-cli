@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { spinner, select, text, cancel, isCancel } from "@clack/prompts";
+import { spinner, select, text, cancel, isCancel, outro } from "@clack/prompts";
 import { isValidUrl } from "../../utils/utils";
 
 export class PortalRecipePrompts {
@@ -141,5 +141,26 @@ export class PortalRecipePrompts {
     }
 
     return (endpointDescription as string).trim();
+  }
+
+  public async addAnotherStepSelectionPrompt(): Promise<boolean> {
+    const stepType = await select({
+      message: `Do you want to add another step?`,
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" }
+      ]
+    });
+
+    if (isCancel(stepType)) {
+      cancel("Operation cancelled.");
+      return process.exit(0);
+    }
+
+    return stepType === "yes";
+  }
+
+  logError(error: string): void {
+    outro(error);
   }
 }

@@ -3,15 +3,8 @@ import * as prettier from "prettier";
 import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../types/portal/recipe";
 import { Result } from "../../types/common/result";
 
-export class RecipeGenerator {
-  private recipe: Map<string, SerializableRecipe> = new Map();
-
-  public async createRecipe(workflowData: SerializableRecipe): Promise<string> {
-    this.recipe.set(workflowData.name, workflowData);
-    return await this.generateScript(workflowData);
-  }
-
-  private async generateScript(recipe: SerializableRecipe): Promise<string> {
+export class PortalRecipeGenerator {
+  public async createScriptFromRecipe(recipe: SerializableRecipe): Promise<string> {
     let script = `async function SampleWorkflow(workflowCtx, portal) {`;
     script += "return {";
 
@@ -28,7 +21,7 @@ export class RecipeGenerator {
         script += "return workflowCtx.showEndpoint({";
         script += `description: "${endpointConfig.description}",`;
         script += `endpointPermalink: "${endpointConfig.endpointPermalink}",`;
-        script += `args: ${JSON.stringify(endpointConfig.args)},`;
+        script += `args: { //Add endpoint parameters with desired values to override the default values here. },`;
         script += "verify: (response, setError) => {";
         script += this.generateVerifyFunction();
         script += "},";
@@ -53,26 +46,11 @@ export class RecipeGenerator {
     return `if (response.StatusCode == 200) { return true; } else { setError("API Call wasn't able to get a valid response. Please try again."); return false; }`;
   }
 
-  private serializeWorkflow(workflowName: string): Result<string, string> {
-    const workflow = this.recipe.get(workflowName);
-    if (!workflow) {
-      return Result.failure(`Workflow ${workflowName} not found`);
-    }
-    return Result.success(JSON.stringify(workflow, null, 2));
-  }
-
   public deserializeWorkflow(jsonString: string): SerializableRecipe {
     return JSON.parse(jsonString) as SerializableRecipe;
   }
 
-  public async saveWorkflowToFile(workflowName: string, filePath: string, format: boolean = true): Promise<void> {
-    const workflow = this.recipe.get(workflowName);
-    if (!workflow) {
-      throw new Error(`Workflow ${workflowName} not found`);
-    }
-
-    let script = await this.generateScript(workflow);
-
+  public async saveRecipeToFile(script: string, filePath: string, format: boolean = true): Promise<void> {
     if (format) {
       script = await this.formatScript(script);
     }

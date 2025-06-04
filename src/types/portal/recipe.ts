@@ -16,8 +16,6 @@ export interface RecipeContext {
 export interface EndpointConfig {
   description: string;
   endpointPermalink: string;
-  args: Record<string, any>;
-  verify: (response: any, setError: (error: string) => void) => boolean;
 }
 
 export interface StepConfig {
