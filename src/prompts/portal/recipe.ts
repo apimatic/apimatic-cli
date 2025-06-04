@@ -23,14 +23,11 @@ export class PortalRecipePrompts {
     return (recipeName as string).trim().replace(" ", "-");
   }
 
-  public async stepNamePrompt(): Promise<string> {
+  public async stepNamePrompt(defaultStepName: string): Promise<string> {
     const stepName = await text({
       message: `Enter a name for the step you want to add to your API Recipe:`,
-      validate: (name) => {
-        if (!name) {
-          return "Step name cannot be empty. Please provide a name for the step.";
-        }
-      }
+      defaultValue: defaultStepName,
+      placeholder: defaultStepName
     });
 
     if (isCancel(stepName)) {

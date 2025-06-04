@@ -1,20 +1,20 @@
 export enum PortalEntityType {
-  Recipe = 'recipe',
-  Toc = 'toc'
+  Recipe = "recipe",
+  Toc = "toc"
 }
 
 export enum StepType {
-  Content = 'content',
-  Endpoint = 'endpoint'
+  Content = "content",
+  Endpoint = "endpoint"
 }
 
-export interface WorkflowContext {
-    showContent(content: string): Promise<any>;
-    showEndpoint(config: EndpointConfig): Promise<any>;
+export interface RecipeContext {
+  showContent(content: string): Promise<any>;
+  showEndpoint(config: EndpointConfig): Promise<any>;
 }
 
 export interface EndpointConfig {
-description: string;
+  description: string;
   endpointPermalink: string;
   args: Record<string, any>;
   verify: (response: any, setError: (error: string) => void) => boolean;
@@ -25,11 +25,11 @@ export interface StepConfig {
   stepCallback: () => Promise<any>;
 }
 
-export interface WorkflowDefinition {
+export interface RecipeDefinition {
   [stepKey: string]: StepConfig;
 }
 
-export interface SerializableWorkflow {
+export interface SerializableRecipe {
   name: string;
   steps: SerializableStep[];
 }
@@ -37,7 +37,7 @@ export interface SerializableWorkflow {
 export interface SerializableStep {
   key: string;
   name: string;
-  type: 'content' | 'endpoint';
+  type: "content" | "endpoint";
   config: ContentStepConfig | EndpointStepConfig;
 }
 

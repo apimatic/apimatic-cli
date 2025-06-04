@@ -31,8 +31,13 @@ export class PortalRecipeAction {
         const endpointGroupName = await this.prompts.endpointGroupNamePrompt();
         const endpointName = await this.prompts.endpointNamePrompt();
         const description = await this.prompts.endpointDescriptionPrompt();
+        const endpointPermalink = await this.createPermalink([endpointGroupName, endpointName]);
       }
     }
+  }
+
+  private async createPermalink(pathPieces: string[]): Promise<string> {
+    return `$e${pathPieces.map(encodeURIComponent).join("/")}`;
   }
 
   private async createMarkdownFile(recipeName: string): Promise<void> {
