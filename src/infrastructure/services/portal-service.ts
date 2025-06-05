@@ -1,6 +1,5 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
-import * as path from "path";
 import { FileWrapper, ApiResponse, ApiError } from "@apimatic/sdk";
 import {
   ContentType,
@@ -103,14 +102,13 @@ export class PortalService {
     const data = error.body as NodeJS.ReadableStream;
     const writeStream = fs.createWriteStream(params.generatedPortalArtifactsZipFilePath);
 
+    //TODO: Extract zip to temp folder and only copy the the debug report.
     return await new Promise<string>((resolve, reject) => {
       data
         .pipe(writeStream)
         .on("finish", async () => {
           await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
           await deleteFile(params.generatedPortalArtifactsZipFilePath);
-          await deleteFile(path.join(params.generatedPortalArtifactsFolderPath, "static"));
-          // fs.rmSync(path.join(params.generatedPortalArtifactsFolderPath, "static"), { recursive: true, force: true });
           resolve(
             getMessageInRedColor(
               "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
