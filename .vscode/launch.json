@@ -1,0 +1,77 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug APIMatic CLI",
+        "skipFiles": ["<node_internals>/"],
+        "program": "${workspaceFolder}/bin/run",
+        "args": [
+            // "api:validate",
+            // "--file=C:/Users/User/Desktop/spec/Errors.yaml",
+            // "--file=https://petstore.swagger.io/v2/swagger.json"
+            // "api:transform",
+            // "--format=OpenApi3Json",
+            // "--file=C:/Users/User/Desktop/test-cli/spec/Calculator.json",
+            // "--destination=C:/Users/User/Desktop/test-cli/spec"
+            // "auth:logout",
+            // "auth:login",
+            // "auth:status"
+            // "portal:quickstart",
+            // "portal:generate",
+            // "--folder", 
+            // "test-source",
+            // "--destination",
+            // "test-portal",
+            // "portal:serve",
+            // "api:transform",
+            // "--help"
+            //   "--folder=C:/Users/User/Desktop/demo/portal",
+            //   "--destination=C:\\Users\\User\\Desktop\\demo\\portal\\api-portal"
+            // "--source=C:/Users/User/Desktop/demo/portal/",
+            // "--destination=C:/Users/User/Desktop/demo/portal/api-portal2",
+            // "--source=C:/Users/User/Desktop/demo/portal",
+            // "--source=\"C:\\Users\\User\\Desktop\\test-cli\"",
+            // "--destination=\"C:\\Users\\User\\Desktop\\demo\\portal\\api-portal\"",
+            // "--destination=\"C:\\Users\\User\\Desktop\\demo\\api-portal\"",
+            // "--source=C:/Users/User/Desktop/test-cli",
+            // "--destination=C:/Users/User/Desktop/test-cli/api-portal",
+            // "--source=C:\\Users\\User\\Desktop\\test-cli-2",
+            // "--destination=C:\\Users\\User\\Desktop\\test-cli-2\\generated_portal"
+            // "--port=70000"
+            // "--ignore=C:/Users/User/Desktop/demo/portal/content,C:/Users/User/Desktop/demo/portal/static/images/logo.png",
+            // "--no-reload",
+            // "--auth-key=\"invalidApiKey\"",
+            // "--help"
+        ],
+        "console": "externalTerminal",
+        "preLaunchTask": "tsc: build - tsconfig.json"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug CLI Tests",
+      "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+      "args": [
+        "--require",
+        "ts-node/register",
+        "--project",
+        "${workspaceFolder}/tsconfig.json",
+        "--forbid-only",
+        "test/**/*.test.ts",
+        "--timeout",
+        "99999",
+      ],
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": [
+        "--nolazy",
+        "--inspect-brk",
+        "--trace-warnings"
+      ],
+      "internalConsoleOptions": "openOnSessionStart",
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal"
+    }
+  ]
+}

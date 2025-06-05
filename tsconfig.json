@@ -9,7 +9,10 @@
     "strict": true,
     "target": "es2017",
     "lib": ["es2018", "dom"],
-    "inlineSourceMap": true
+    "paths": {
+      "@apimatic/sdk": ["./src/sdk"]
+    },
+    "inlineSourceMap": true,
   },
   "include": [
     "src/**/*"

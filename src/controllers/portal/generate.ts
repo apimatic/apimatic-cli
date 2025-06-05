@@ -1,72 +1,139 @@
 import * as fs from "fs-extra";
-import * as FormData from "form-data";
-import { baseURL } from "../../config/env";
-import { deleteFile, extractZipFile } from "../../utils/utils";
-import { GeneratePortalParams } from "../../types/portal/generate";
+import { deleteFile, extractZipFile, getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils";
+import { ErrorResponse, GeneratePortalParams } from "../../types/portal/generate";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
-import { AxiosRequestConfig, AxiosResponse, CancelTokenSource } from "axios";
+import {
+  ApiError,
+  ApiResponse,
+  Client,
+  ContentType,
+  DocsPortalManagementController,
+  FileWrapper,
+  ProblemDetailsError,
+  UnauthorizedResponseError
+} from "@apimatic/sdk";
+import { Result } from "../../types/common/result";
+const CONTENT_TYPE = ContentType.EnumMultipartformdata;
+const TIMEOUT = 0;
 
-import axiosInstance from "../../config/axios-config";
+export const downloadDocsPortal = async (
+  params: GeneratePortalParams,
+  configDir: string
+): Promise<Result<string, string>> => {
+  if (!(await fs.pathExists(params.sourceBuildInputZipFilePath))) {
+    return Result.failure("Build file doesn't exist");
+  }
 
-//TODO: Remove after SDK is patched
-const downloadPortalAxios = async (zippedBuildFilePath: string, configDir: string, overrideAuthKey: string | null, cancellationToken: CancelTokenSource | null) => {
-  const formData = new FormData();
   const authInfo: AuthInfo | null = await getAuthInfo(configDir);
-  let authorizationHeader = "";
-  if (overrideAuthKey)
-  {
-    authorizationHeader = `X-Auth-Key ${overrideAuthKey}`; 
-  }
-  else if (authInfo) {
-    authorizationHeader = `X-Auth-Key ${authInfo.authKey}`;
-  }
-  formData.append("file", fs.createReadStream(zippedBuildFilePath));
-  const config: AxiosRequestConfig = {
-    headers: {
-      Authorization: authorizationHeader,
-      "User-Agent": "APIMatic CLI",
-      ...formData.getHeaders()
-    },
-    responseType: "arraybuffer"
-  };
+  const authorizationHeader = createAuthorizationHeader(authInfo, params.overrideAuthKey);
+  const client = createApiClient(authorizationHeader);
+  const docsPortalManagementController = new DocsPortalManagementController(client);
 
-  if (cancellationToken) {
-    config.cancelToken = cancellationToken.token;
-  }
+  try {
+    const stream = await generatePortalFromSyncEndpoint(docsPortalManagementController, params.sourceBuildInputZipFilePath);
+    await saveGeneratedPortalStreamToZipFile(stream, params.generatedPortalArtifactsZipFilePath);
+    await deleteFile(params.sourceBuildInputZipFilePath);
 
-  const { data }: AxiosResponse = await axiosInstance.post(`${baseURL}/portal`, formData, config);
-  return data;
+    if (params.generateZipFile) {
+      return Result.success(params.generatedPortalArtifactsZipFilePath);
+    }
+
+    await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
+    await deleteFile(params.generatedPortalArtifactsZipFilePath);
+    
+    return Result.success(params.generatedPortalArtifactsFolderPath);
+  } catch (error) {
+    return handlePortalGenerationErrors(error, params);
+  }
 };
 
-// Download Docs Portal
-export const downloadDocsPortal = async (
-  { zippedBuildFilePath, portalFolderPath, zippedPortalPath, overrideAuthKey, zip }: GeneratePortalParams,
-    configDir: string,
-    cancellationToken: CancelTokenSource | null = null
-) => {
-  // Check if the build file exists for the user or not
-  if (!(await fs.pathExists(zippedBuildFilePath))) {
-    throw new Error("Build file doesn't exist");
+const createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
+  if (overrideAuthKey) {
+    return `X-Auth-Key ${overrideAuthKey}`;
   }
-  // TODO: ***CRITICAL*** Remove this call once the SDK is patched
-  const data: ArrayBuffer = await downloadPortalAxios(zippedBuildFilePath, configDir, overrideAuthKey, cancellationToken);
-
-  await deleteFile(zippedBuildFilePath);
-  await fs.writeFile(zippedPortalPath, data);
-
-  // TODO: Uncomment this code block when the SDK is patched
-  // const file: FileWrapper = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
-  // const { result }: ApiResponse<NodeJS.ReadableStream | Blob> =
-  //   await docsPortalController.generateOnPremPortalViaBuildInput(file);
-  // if ((data as NodeJS.ReadableStream).readable) {
-  //   await writeFileUsingReadableStream(data as NodeJS.ReadableStream, zippedPortalPath);
-  if (!zip) {
-    await extractZipFile(zippedPortalPath, portalFolderPath);
-    await deleteFile(zippedPortalPath);
+  if (!authInfo) {
+    return "";
   }
+  return `X-Auth-Key ${authInfo.authKey}`;
+};
 
-  return zip ? zippedPortalPath : portalFolderPath;
-  // } else {
-  //   throw new Error("Couldn't download the portal");
-  // }
+const createApiClient = (authorizationHeader: string): Client => {
+  return new Client({
+    customHeaderAuthenticationCredentials: {
+      Authorization: authorizationHeader
+    },
+    timeout: TIMEOUT
+  });
+};
+
+const generatePortalFromSyncEndpoint = async (
+  docsPortalManagementController: DocsPortalManagementController,
+  zippedBuildFilePath: string
+): Promise<NodeJS.ReadableStream> => {
+  const file = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
+  const response: ApiResponse<NodeJS.ReadableStream | Blob> =
+    await docsPortalManagementController.generateOnPremPortalViaBuildInput(CONTENT_TYPE, file);
+
+  return response.result as NodeJS.ReadableStream;
+};
+
+const saveGeneratedPortalStreamToZipFile = async (data: NodeJS.ReadableStream, generatedPortalArtifactsZipFilePath: string): Promise<void> => {
+  const writeStream = fs.createWriteStream(generatedPortalArtifactsZipFilePath);
+  await new Promise<void>((resolve, reject) => {
+    data
+      .pipe(writeStream)
+      .on("finish", () => resolve())
+      .on("error", (error) =>
+        reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`))
+      );
+  });
+};
+
+const handlePortalGenerationErrors = async (error: unknown, params: GeneratePortalParams): Promise<Result<string, string>> => {
+  if (error instanceof UnauthorizedResponseError) {
+    //401
+    const body = await parseErrorResponse(error);
+    return Result.failure(getMessageInRedColor(body.message ?? "Unauthorized access"));
+  } else if (error instanceof ProblemDetailsError) {
+    //400 & 403
+    const body = await parseErrorResponse(error);
+    const message = body.errors[Object.keys(body.errors)[0]][0];
+    return Result.failure(getMessageInRedColor(body.title + " " + (body.detail ?? "") + ":\n" + message));
+  } else if (error instanceof ApiError && error.statusCode === 422) {
+    //422
+    await extractErrorZipFile(error, params);
+    return Result.failure(
+      getMessageInRedColor(
+        "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
+          params.generatedPortalArtifactsFolderPath
+      )
+    );
+  } else {
+    return Result.failure(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
+  }
+};
+
+const parseErrorResponse = async (error: unknown): Promise<ErrorResponse> => {
+  if (error instanceof Error && "body" in error) {
+    const stream = (error as { body: NodeJS.ReadableStream }).body;
+    return await parseStreamBodyToJson(stream);
+  }
+  throw error;
+};
+
+const extractErrorZipFile = async (error: ApiError, params: GeneratePortalParams): Promise<void> => {
+  const data = error.body as NodeJS.ReadableStream;
+  const writeStream = fs.createWriteStream(params.generatedPortalArtifactsZipFilePath);
+
+  await new Promise<void>((resolve, reject) => {
+    data
+      .pipe(writeStream)
+      .on("finish", () => resolve())
+      .on("error", reject);
+  });
+
+  if (!params.generateZipFile) {
+    await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
+    await deleteFile(params.generatedPortalArtifactsZipFilePath);
+  }
 };

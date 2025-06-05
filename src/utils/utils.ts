@@ -146,13 +146,10 @@ export const deleteFile = async (filePath: string) => {
 };
 
 export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, destinationPath: string) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const writeStream = fs.createWriteStream(destinationPath);
     stream.pipe(writeStream);
-    writeStream.on("close", (error: Error) => {
-      if (error) {
-        return reject(new Error("Couldn't zip the stream"));
-      }
+    writeStream.on("close", () => {
       resolve("Zipped");
     });
   });
@@ -228,12 +225,12 @@ export const isJSONParsable = (json: string) => {
   }
 };
 
-export const getGeneratedFilesPaths = (sourceDir: string, portalDir: string): string[] => {
-  const generatedZipPath = path.join(sourceDir, ".portal_source.zip");
-  const generatedPortalZipPath = path.join(sourceDir, ".generated_portal.zip");
-  const generatedPortalPath = path.join(path.dirname(portalDir), "generated_portal");
+export const getGeneratedFilesPaths = (sourceDirectoryPath: string, generatedPortalArtifactsDirectoryPath: string): string[] => {
+  const generatedBuildInputZipPath = path.join(sourceDirectoryPath, ".portal_source.zip");
+  const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
+  const generatedPortalArtifactsFolderPath = path.join(path.dirname(generatedPortalArtifactsDirectoryPath), "generated_portal");
 
-  return [generatedZipPath, generatedPortalPath, generatedPortalZipPath];
+  return [generatedBuildInputZipPath, generatedPortalArtifactsFolderPath, generatedPortalArtifactsZipFilePath];
 };
 
 export const getFileNameFromPath = (filePath: string) => {
@@ -317,14 +314,6 @@ export async function validateAndZipPortalSource(
     zlib: { level: 9 }
   });
 
-  const items = await fs.readdir(sourceDir);
-
-  if (!items.some((item) => item.startsWith("APIMATIC-BUILD"))) {
-    throw new Error(
-      "APIMatic Build file is missing, portal cannot be generated. Please specify a valid APIMatic build file and try again."
-    );
-  }
-
   return new Promise((resolve, reject) => {
     output.on("close", () => resolve(outputPath));
     output.on("error", (err) => {
@@ -406,6 +395,15 @@ export function isPortInUse(port: number): Promise<boolean> {
 
     server.listen(port);
   });
+}
+
+export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const text = Buffer.concat(chunks).toString("utf-8");
+    return JSON.parse(text);
 }
 
 export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] => {
