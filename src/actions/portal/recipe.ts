@@ -10,7 +10,6 @@ import path = require("path");
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;
-  private readonly markdownFilePath = "resources/portal/api-recipe.md";
 
   constructor() {
     this.prompts = new PortalRecipePrompts();
@@ -44,7 +43,7 @@ export class PortalRecipeAction {
           const endpointName = await this.prompts.endpointNamePrompt();
           const description = await this.prompts.endpointDescriptionPrompt();
           const endpointPermalink = await this.createPermalink([endpointGroupName, endpointName]);
-          recipeBuilder.addEndpointStep(stepName, stepName, description, endpointPermalink, )
+          recipeBuilder.addEndpointStep(stepName, stepName, description, endpointPermalink);
           addAnotherStep = await this.prompts.addAnotherStepSelectionPrompt();
         }
       }
@@ -52,7 +51,11 @@ export class PortalRecipeAction {
     }
 
     const generatedRecipeScript = await recipeGenerator.createScriptFromRecipe(recipeBuilder.build());
-    await recipeGenerator.saveRecipeToFile(generatedRecipeScript, path.join(cwd(), "content", "api-recipes", recipeName));
+    const destinationPath = path.join(cwd(), "content", "api-recipes", recipeName);
+    await recipeGenerator.saveRecipeToFile(
+      generatedRecipeScript,
+      destinationPath
+    );
   }
 
   private async createPermalink(pathPieces: string[]): Promise<string> {
@@ -61,7 +64,7 @@ export class PortalRecipeAction {
 
   private async createMarkdownFile(recipeName: string): Promise<void> {
     const directory = "content/api-recipes";
-    const markdownFileContent = fs.readFileSync(this.markdownFilePath, "utf-8");
+    const markdownFileContent = PortalRecipeAction.getMarkdownFileContent();
 
     fs.mkdirSync(directory, { recursive: true });
     fs.writeFileSync(`${directory}/${recipeName}.md`, markdownFileContent);
@@ -86,5 +89,10 @@ export class PortalRecipeAction {
     }
     const content = await response.text();
     return Result.success(content);
+  }
+
+  private static getMarkdownFileContent() {
+    return `# This is a Guided Walkthrough File
+This is the starter content`;
   }
 }
