@@ -23,7 +23,11 @@ export default class PortalNew extends Command {
     const portalRecipeAction = new PortalRecipeAction();
 
     if (args.type === PortalEntityType.Recipe) {
-      const recipeGenerationResult = await portalRecipeAction.createRecipe();
+      const recipeCreationResult = await portalRecipeAction.createRecipe(flags.name);
+      if (!recipeCreationResult.isSuccess)
+      {
+        this.error(`Unable to generate the API recipe: ${recipeCreationResult.error}`)
+      }
     }
   }
 }

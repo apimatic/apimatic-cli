@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as prettier from "prettier";
 import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../types/portal/recipe";
-import { Result } from "../../types/common/result";
 
 export class PortalRecipeGenerator {
   public async createScriptFromRecipe(recipe: SerializableRecipe): Promise<string> {
