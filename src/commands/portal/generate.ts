@@ -6,7 +6,6 @@ import { getMessageInRedColor } from "../../utils/utils";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate";
 import { PortalGenerateAction } from "../../actions/portal/generate";
 import { Result } from "../../types/common/result";
-import { Errors } from "@oclif/core";
 
 const DEFAULT_FOLDER = "./";
 const DEFAULT_DESTINATION = path.resolve("./");
@@ -61,34 +60,17 @@ Your portal has been generated at D:/
     const paths = await this.getPortalPaths(flags as GenerateFlags);
     const portalGenerateAction = new PortalGenerateAction();
 
-    try {
-      await this.checkExistingPortal(paths, flags as GenerateFlags);
-      const validationResult = await this.validatePaths(paths);
-      if (!validationResult.isSuccess) {
-        this.error(validationResult.error!);
-      }
-
-      const generatePortalResult = await portalGenerateAction.generatePortal(
-        paths,
-        flags as GenerateFlags,
-        this.config.configDir
-      );
-
-      if (!generatePortalResult.isSuccess) {
-        this.prompts.logError(getMessageInRedColor(`An error occurred while generating the portal: \n${generatePortalResult.error!}`));
-      }
-    } 
-    catch (error: any) {
-      if (error instanceof Errors.CLIError) {
-        throw error;
-      }
-      // Handle unexpected errors
-      this.error(
-        getMessageInRedColor(
-          `An unexpected error occurred while generating the portal, please try again later. If the issue persists, reach out to our team at support@apimatic.io for assistance.`
-        )
-      );
+    const shouldContinueWithExistingPortal = await this.checkExistingPortal(paths, flags as GenerateFlags);
+    if (!shouldContinueWithExistingPortal) {
+      process.exit(1);
     }
+
+    const validationResult = await this.validatePaths(paths);
+    if (!validationResult.isSuccess) {
+      this.error(validationResult.error!);
+    }
+
+    await portalGenerateAction.generatePortal(paths, flags as GenerateFlags, this.config.configDir);
   }
 
   private async getPortalPaths(flags: GenerateFlags): Promise<PortalPaths> {
@@ -102,7 +84,9 @@ Your portal has been generated at D:/
 
   private async validatePaths(paths: PortalPaths): Promise<Result<string, string>> {
     if (!(await fs.pathExists(paths.sourceFolderPath))) {
-      return Result.failure(getMessageInRedColor(`Portal build input folder ${paths.sourceFolderPath} does not exist.`));
+      return Result.failure(
+        getMessageInRedColor(`Portal build input folder ${paths.sourceFolderPath} does not exist.`)
+      );
     }
     if (!(await fs.pathExists(path.dirname(paths.generatedPortalArtifactsFolderPath)))) {
       return Result.failure(
@@ -115,15 +99,16 @@ Your portal has been generated at D:/
     return Result.success("Paths validated successfully.");
   }
 
-  private async checkExistingPortal(paths: PortalPaths, flags: GenerateFlags): Promise<void> {
+  private async checkExistingPortal(paths: PortalPaths, flags: GenerateFlags): Promise<boolean> {
     if (fs.existsSync(paths.generatedPortalArtifactsFolderPath) && !flags.force && !flags.zip) {
       if (!(await this.prompts.overwriteExistingPortalArtifactsPrompt())) {
-        process.exit(1);
+        return false;
       }
     } else if (fs.existsSync(paths.generatedPortalArtifactsZipFilePath) && !flags.force && flags.zip) {
       if (!(await this.prompts.existingDestinationPortalZipPrompt())) {
-        process.exit(1);
+        return false;
       }
     }
+    return true;
   }
 }
