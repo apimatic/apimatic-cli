@@ -1,6 +1,7 @@
 import * as fs from "fs";
-import { spinner, select, text, cancel, isCancel, outro } from "@clack/prompts";
-import { isValidUrl } from "../../utils/utils";
+import { TreeObject, asTree } from "treeify";
+import { spinner, select, text, cancel, isCancel, outro, log } from "@clack/prompts";
+import { getMessageInGreenColor, isValidUrl } from "../../utils/utils";
 
 export class PortalRecipePrompts {
   private readonly spin = spinner();
@@ -144,7 +145,7 @@ export class PortalRecipePrompts {
   }
 
   public async addAnotherStepSelectionPrompt(): Promise<boolean> {
-    const stepType = await select({
+    const addAnotherStep = await select({
       message: `Do you want to add another step?`,
       options: [
         { value: "yes", label: "Yes" },
@@ -152,15 +153,47 @@ export class PortalRecipePrompts {
       ]
     });
 
-    if (isCancel(stepType)) {
+    if (isCancel(addAnotherStep)) {
       cancel("Operation cancelled.");
       return process.exit(0);
     }
 
-    return stepType === "yes";
+    return addAnotherStep === "yes";
   }
 
-  logError(error: string): void {
+  public async overwriteTailIncludesPrompt(): Promise<boolean> {
+    const overwriteTailIncludes = await select({
+      message: `Your build config file already contains the 'tailIncludes' property. Do you want to overwrite it?`,
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" }
+      ]
+    });
+
+    if (isCancel(overwriteTailIncludes)) {
+      cancel("Operation cancelled.");
+      return process.exit(0);
+    }
+
+    return overwriteTailIncludes === "yes";
+  }
+
+  public displayRecipeGenerationSuccessMessage() {
+    outro(`✅  Recipe has been added successfully!`);
+  }
+
+  public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: TreeObject) {
+    const tree = asTree(buildDirectoryTreeObject, true, true);
+
+    const coloredLogString = tree
+      .split("\n")
+      .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
+      .join("\n");
+
+    log.step(coloredLogString);
+  }
+
+  public logError(error: string): void {
     outro(error);
   }
 }

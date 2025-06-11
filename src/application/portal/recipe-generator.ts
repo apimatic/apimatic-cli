@@ -20,7 +20,7 @@ export class PortalRecipeGenerator {
         script += "return workflowCtx.showEndpoint({";
         script += `description: "${endpointConfig.description}",`;
         script += `endpointPermalink: "${endpointConfig.endpointPermalink}",`;
-        script += `args: { //Add endpoint parameters with desired values to override the default values here. },`;
+        script += `args: { /*Add endpoint parameters with desired values to override the default values here.*/ },`;
         script += "verify: (response, setError) => {";
         script += this.generateVerifyFunction();
         script += "},";
@@ -45,16 +45,22 @@ export class PortalRecipeGenerator {
     return `if (response.StatusCode == 200) { return true; } else { setError("API Call wasn't able to get a valid response. Please try again."); return false; }`;
   }
 
-  public deserializeWorkflow(jsonString: string): SerializableRecipe {
-    return JSON.parse(jsonString) as SerializableRecipe;
-  }
-
-  public async saveRecipeToFile(script: string, filePath: string, format: boolean = true): Promise<void> {
+  public async saveGeneratedRecipeScriptToBuildDirectory(
+    generatedRecipeScript: string,
+    generatedRecipeScriptsDirectoryPath: string,
+    recipeName: string,
+    format: boolean = true
+  ): Promise<void> {
     if (format) {
-      script = await this.formatScript(script);
+      generatedRecipeScript = await this.formatScript(generatedRecipeScript);
     }
 
-    fs.writeFileSync(filePath, script, "utf8");
+    fs.mkdirSync(generatedRecipeScriptsDirectoryPath, { recursive: true });
+    await fs.promises.writeFile(
+      `${generatedRecipeScriptsDirectoryPath}/${recipeName}.js`,
+      generatedRecipeScript,
+      "utf8"
+    );
   }
 
   private async formatScript(code: string): Promise<string> {

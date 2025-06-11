@@ -1,8 +1,3 @@
-export enum PortalEntityType {
-  Recipe = "recipe",
-  Toc = "toc"
-}
-
 export enum StepType {
   Content = "content",
   Endpoint = "endpoint"

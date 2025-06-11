@@ -60,6 +60,7 @@
         "${workspaceFolder}/tsconfig.json",
         "--forbid-only",
         "test/**/*.test.ts",
+        // "${file}", // Run Tests for the currently open test file.
         "--timeout",
         "99999",
       ],
