@@ -1,13 +1,8 @@
 import * as path from "path";
-import * as fs from "fs-extra";
 import { Command, Flags } from "@oclif/core";
-import { getMessageInRedColor } from "../../../utils/utils";
-import { PortalNewTocPrompts } from "../../../prompts/portal/new/toc";
 import { PortalNewTocAction } from "../../../actions/portal/new/toc";
-import { Result } from "../../../types/common/result";
 
-const DEFAULT_DESTINATION = path.resolve("./");
-const DEFAULT_TOC_FILENAME = "toc.yml";
+const DEFAULT_FOLDER = "./";
 
 export default class PortalNewToc extends Command {
   static description =
@@ -16,8 +11,12 @@ export default class PortalNewToc extends Command {
   static flags = {
     destination: Flags.string({
       parse: async (input: string) => path.resolve(input),
-      default: DEFAULT_DESTINATION,
       description: "path where the toc file will be created"
+    }),
+    folder: Flags.string({
+      parse: async (input: string) => path.resolve(input),
+      description: "path of the working directory",
+      default: DEFAULT_FOLDER
     }),
     force: Flags.boolean({
       char: "f",
@@ -29,50 +28,23 @@ export default class PortalNewToc extends Command {
   static examples = [
     `$ apimatic portal:new:toc --destination="./portal/content/"
 A new toc file has been created at ./portal/content/toc.yml
+`,
+    `$ apimatic portal:new:toc --folder="./my-project" --destination="./portal/content/"
+A new toc file has been created at ./portal/content/toc.yml using ./my-project as working directory
 `
   ];
 
-  private readonly prompts: PortalNewTocPrompts;
-
   constructor(argv: string[], config: any) {
     super(argv, config);
-    this.prompts = new PortalNewTocPrompts();
   }
 
   async run(): Promise<void> {
     const { flags } = await this.parse(PortalNewToc);
-    const tocPath = path.join(flags.destination, DEFAULT_TOC_FILENAME);
     const portalNewTocAction = new PortalNewTocAction();
+    const result = await portalNewTocAction.createToc(flags.folder, flags.destination, flags.force);
 
-    const shouldContinueWithExistingToc = await this.checkExistingToc(tocPath, flags);
-    if (!shouldContinueWithExistingToc) {
-      process.exit(1);
+    if (result.isFailed()) {
+      this.error(result.error!);
     }
-
-    const validationResult = await this.validatePath(flags.destination);
-    if (!validationResult.isSuccess) {
-      this.error(validationResult.error!);
-    }
-
-    await portalNewTocAction.createToc(tocPath);
-  }
-
-  private async validatePath(destinationPath: string): Promise<Result<string, string>> {
-    if (!(await fs.pathExists(destinationPath))) {
-      return Result.failure(
-        getMessageInRedColor(`Destination path ${destinationPath} does not exist.`)
-      );
-    }
-
-    return Result.success("Path validated successfully.");
-  }
-
-  private async checkExistingToc(tocPath: string, flags: any): Promise<boolean> {
-    if (fs.existsSync(tocPath) && !flags.force) {
-      if (!(await this.prompts.overwriteExistingTocPrompt())) {
-        return false;
-      }
-    }
-    return true;
   }
 } 
