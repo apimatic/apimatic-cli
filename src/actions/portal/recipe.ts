@@ -3,12 +3,11 @@ import * as path from "path";
 import * as yaml from "yaml";
 import { TreeObject } from "treeify";
 import { PortalRecipePrompts } from "../../prompts/portal/recipe";
-import { SerializableRecipe, StepType } from "../../types/portal/recipe";
+import { SerializableRecipe, StepType, DirectoryNode } from "../../types/portal/recipe";
 import { getMessageInRedColor, isValidUrl } from "../../utils/utils";
 import { Result } from "../../types/common/result";
 import { PortalRecipeBuilder } from "../../application/portal/recipe-builder";
 import { PortalRecipeGenerator } from "../../application/portal/recipe-generator";
-import { DirectoryNode } from "../../types/portal/quickstart";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;

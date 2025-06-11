@@ -39,3 +39,7 @@ export interface ContentStepConfig {
 }
 
 export interface EndpointStepConfig extends EndpointConfig {}
+
+export interface DirectoryNode {
+  [key: string]: DirectoryNode | string | null | undefined;
+}
