@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as fsExtra from "fs-extra";
 import * as path from "path";
 import * as yaml from "yaml";
 import { TreeObject } from "treeify";
@@ -16,28 +17,38 @@ export class PortalRecipeAction {
     this.prompts = new PortalRecipePrompts();
   }
 
-  public async createRecipe(buildDirectoryPath: string, name?: string): Promise<void> {
+  public async createRecipe(buildDirectoryPath: string, name?: string): Promise<Result<string, string>> {
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
     const recipeFileName = recipeName.split(" ").join("");
     const recipeBuilder = new PortalRecipeBuilder(recipeName);
     const recipeGenerator = new PortalRecipeGenerator();
 
+    const validationResult = await this.validateBuildDirectoryPath(buildDirectoryPath);
+    if (!validationResult.isSuccess)
+    {
+      this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${validationResult.error!}`))
+      return Result.failure(`Unable to generate API Recipe.`);
+    }
+
     //TODO: Create a type for the build config and use that here instead of any.
     const buildConfig = await this.parseBuildConfig(buildDirectoryPath);
     if (!buildConfig.isSuccess) {
       this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${buildConfig.error!}`));
+      return Result.failure(`Unable to generate API Recipe.`);
     }
 
     const contentFolder = this.getContentFolderPath(buildConfig.value, buildDirectoryPath);
     const recipeResult = await this.promptUserAndBuildNewRecipe(recipeBuilder);
     if (!recipeResult.isSuccess) {
       this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${recipeResult.error!}`));
+      return Result.failure(`Unable to generate API Recipe.`);
     }
 
     const registerRecipeInBuildConfigResult = await this.registerRecipeInBuildConfig(buildConfig.value!, recipeName, recipeFileName, buildDirectoryPath);
     if (!registerRecipeInBuildConfigResult.isSuccess)
     {
       this.prompts.logError(getMessageInRedColor(`Unable to generated API Recipe: ${registerRecipeInBuildConfigResult.error!}`));
+      return Result.failure(`Unable to generate API Recipe.`);
     }
     
     await this.createMarkdownFile(recipeFileName, contentFolder);
@@ -56,6 +67,16 @@ export class PortalRecipeAction {
 
     this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
     this.prompts.displayRecipeGenerationSuccessMessage();
+    return Result.success("Generated recipe successfully.");
+  }
+
+  private async validateBuildDirectoryPath(buildDirectoryPath: string) : Promise<Result<string, string>> {
+    if (!(await fsExtra.pathExists(buildDirectoryPath)))
+    {
+      return Result.failure(`Portal build input folder ${buildDirectoryPath} does not exist.`);
+    }
+
+    return Result.success("Portal build input folder validated successfully.");
   }
 
   //TODO: Figure out a better way to do this without the while loop.
@@ -73,6 +94,7 @@ export class PortalRecipeAction {
           const contentResult = await this.getContentFromContentFilePath(contentFilePath);
           if (contentResult.isSuccess) {
             recipeBuilder.addContentStep(stepName, stepName, contentResult.value!);
+            this.prompts.displayStepAddedSuccessfullyMessage();
             addAnotherStep = await this.prompts.addAnotherStepSelectionPrompt();
           } else {
             return Result.failure(contentResult.error!);
@@ -85,6 +107,7 @@ export class PortalRecipeAction {
           const description = await this.prompts.endpointDescriptionPrompt();
           const endpointPermalink = await this.createPermalink([endpointGroupName, endpointName]);
           recipeBuilder.addEndpointStep(stepName, stepName, description, endpointPermalink);
+          this.prompts.displayStepAddedSuccessfullyMessage();
           addAnotherStep = await this.prompts.addAnotherStepSelectionPrompt();
           break;
         }
@@ -207,11 +230,11 @@ export class PortalRecipeAction {
     parentPath = ""
   ): Promise<DirectoryNode> {
     const markdownFilePath = `content/api-recipes/${recipeFileName}.md`;
-    const generatedRecipeScriptFilePath = `scripts/api-recipes/${recipeFileName}.js`;
+    const generatedRecipeScriptFilePath = `static/scripts/api-recipes/${recipeFileName}.js`;
     const descriptions: { [key: string]: string } = Object.entries({
-      "APIMATIC-BUILD.json": "# Contains the 'tailIncludes' property, which registers your recipes as workflows",
-      [markdownFilePath]: "# Markdown file with static placeholder text for your API Recipe",
-      "content/toc.yml": "# Contains a new group with a new page for your API Recipe",
+      "APIMATIC-BUILD.json": "# Contains the 'tailIncludes' property, which registers your API recipe as a workflow",
+      [markdownFilePath]: "# Markdown file with static placeholder text for your API recipe",
+      "content/toc.yml": "# Contains the API Recipes group with a new page for your API recipe",
       [generatedRecipeScriptFilePath]: "# The generated recipe script file containing all of the steps"
     }).reduce((acc, [key, value]) => {
       acc[path.normalize(key)] = value;

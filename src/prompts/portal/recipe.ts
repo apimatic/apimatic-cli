@@ -178,6 +178,10 @@ export class PortalRecipePrompts {
     return overwriteTailIncludes === "yes";
   }
 
+  public displayStepAddedSuccessfullyMessage() {
+    log.step(`✅  Step has been added successfully.`);
+  }
+
   public displayRecipeGenerationSuccessMessage() {
     outro(`✅  Recipe has been added successfully!`);
   }
