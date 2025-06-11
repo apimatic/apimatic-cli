@@ -2,12 +2,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "yaml";
 import { TreeObject } from "treeify";
-import { PortalRecipePrompts } from "../../prompts/portal/recipe";
-import { SerializableRecipe, StepType, DirectoryNode } from "../../types/portal/recipe";
-import { getMessageInRedColor, isValidUrl } from "../../utils/utils";
-import { Result } from "../../types/common/result";
-import { PortalRecipeBuilder } from "../../application/portal/recipe-builder";
-import { PortalRecipeGenerator } from "../../application/portal/recipe-generator";
+import { PortalRecipePrompts } from "../../../prompts/portal/recipe";
+import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/portal/recipe";
+import { getMessageInRedColor, isValidUrl } from "../../../utils/utils";
+import { Result } from "../../../types/common/result";
+import { PortalRecipeBuilder } from "../../../application/portal/new/recipe-builder";
+import { PortalRecipeGenerator } from "../../../application/portal/new/recipe-generator";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;
@@ -16,9 +16,9 @@ export class PortalRecipeAction {
     this.prompts = new PortalRecipePrompts();
   }
 
-  public async createRecipe(name: string | undefined, destinationPath: string | undefined): Promise<void> {
-    const buildDirectoryPath = destinationPath ?? process.cwd();
-    const recipeName = (name ?? (await this.prompts.recipeNamePrompt())).split(" ").join("");
+  public async createRecipe(buildDirectoryPath: string, name?: string): Promise<void> {
+    const recipeName = name ?? (await this.prompts.recipeNamePrompt());
+    const recipeFileName = recipeName.split(" ").join("");
     const recipeBuilder = new PortalRecipeBuilder(recipeName);
     const recipeGenerator = new PortalRecipeGenerator();
 
@@ -28,26 +28,31 @@ export class PortalRecipeAction {
       this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${buildConfig.error!}`));
     }
 
-    const contentFolder = buildConfig.value.generatePortal?.contentFolder ?? buildDirectoryPath;
+    const contentFolder = this.getContentFolderPath(buildConfig.value, buildDirectoryPath);
     const recipeResult = await this.promptUserAndBuildNewRecipe(recipeBuilder);
     if (!recipeResult.isSuccess) {
       this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${recipeResult.error!}`));
     }
 
-    await this.createMarkdownFile(recipeName, contentFolder);
+    const registerRecipeInBuildConfigResult = await this.registerRecipeInBuildConfig(buildConfig.value!, recipeName, recipeFileName, buildDirectoryPath);
+    if (!registerRecipeInBuildConfigResult.isSuccess)
+    {
+      this.prompts.logError(getMessageInRedColor(`Unable to generated API Recipe: ${registerRecipeInBuildConfigResult.error!}`));
+    }
+    
+    await this.createMarkdownFile(recipeFileName, contentFolder);
 
     const generatedRecipeScript = await recipeGenerator.createScriptFromRecipe(recipeResult.value!);
     const generatedRecipeScriptsDirectoryPath = path.join(contentFolder, "static", "scripts", "api-recipes");
     await recipeGenerator.saveGeneratedRecipeScriptToBuildDirectory(
       generatedRecipeScript,
       generatedRecipeScriptsDirectoryPath,
-      recipeName
+      recipeFileName
     );
 
-    await this.registerRecipeInBuildConfig(buildConfig.value!, recipeName, buildDirectoryPath);
-    await this.addRecipeToToc(recipeName, contentFolder);
+    await this.addRecipeToToc(recipeName, recipeFileName, contentFolder);
 
-    const buildDirectoryStructure = await this.getBuildDirectoryStructure(contentFolder, recipeName);
+    const buildDirectoryStructure = await this.getBuildDirectoryStructure(contentFolder, recipeFileName);
 
     this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
     this.prompts.displayRecipeGenerationSuccessMessage();
@@ -94,19 +99,25 @@ export class PortalRecipeAction {
   private async registerRecipeInBuildConfig(
     buildConfig: any,
     recipeName: string,
+    recipeFileName: string,
     buildDirectoryPath: string
-  ): Promise<void> {
-    const scriptReference = this.getRecipeScriptReferenceForTailIncludesProperty(recipeName);
+  ): Promise<Result<string, string>> {
+    const scriptReference = this.getRecipeScriptReferenceForTailIncludesProperty(recipeName, recipeFileName);
     const tailIncludesContent = buildConfig.generatePortal.tailIncludes;
 
     if (tailIncludesContent) {
       const overwriteTailIncludes = await this.prompts.overwriteTailIncludesPrompt();
       if (overwriteTailIncludes) {
         await this.writeTailIncludesToBuildConfig(scriptReference, buildDirectoryPath);
+        return Result.success("Overwrite complete.")
+      }
+      else {
+        return Result.failure("Operation cancelled.")
       }
     }
 
     await this.writeTailIncludesToBuildConfig(scriptReference, buildDirectoryPath);
+    return Result.success("Wrote new `tailIncludes` property to build config.")
   }
 
   private async writeTailIncludesToBuildConfig(tailIncludes: string, buildDirectoryPath: string): Promise<void> {
@@ -122,7 +133,7 @@ export class PortalRecipeAction {
     await fs.promises.writeFile(buildFilePath, JSON.stringify(buildConfig, null, 2));
   }
 
-  private async addRecipeToToc(recipeName: string, contentFolder: string): Promise<void> {
+  private async addRecipeToToc(recipeName: string, recipeFileName: string, contentFolder: string): Promise<void> {
     const tocFilePath = path.join(contentFolder, "content", "toc.yml");
     const tocContent = await fs.promises.readFile(tocFilePath, "utf-8");
     const tocData = yaml.parse(tocContent);
@@ -138,7 +149,7 @@ export class PortalRecipeAction {
 
     apiRecipesGroup.items.push({
       page: recipeName,
-      file: `api-recipes/${recipeName}.md`
+      file: `api-recipes/${recipeFileName}.md`
     });
 
     await fs.promises.writeFile(tocFilePath, yaml.stringify(tocData));
@@ -148,12 +159,12 @@ export class PortalRecipeAction {
     return `$e/${pathPieces.map(encodeURIComponent).join("/")}`;
   }
 
-  private async createMarkdownFile(recipeName: string, contentFolder: string): Promise<void> {
+  private async createMarkdownFile(recipeFileName: string, contentFolder: string): Promise<void> {
     const directory = path.join(contentFolder, "content", "api-recipes");
     const markdownFileContent = this.getMarkdownFileContent();
 
     fs.mkdirSync(directory, { recursive: true });
-    fs.writeFileSync(`${directory}/${recipeName}.md`, markdownFileContent);
+    fs.writeFileSync(`${directory}/${recipeFileName}.md`, markdownFileContent);
   }
 
   private async getContentFromContentFilePath(contentFilePath: string): Promise<Result<string, string>> {
@@ -192,11 +203,11 @@ export class PortalRecipeAction {
 
   private async getBuildDirectoryStructure(
     contentFolder: string,
-    recipeName: string,
+    recipeFileName: string,
     parentPath = ""
   ): Promise<DirectoryNode> {
-    const markdownFilePath = `content/api-recipes/${recipeName}.md`;
-    const generatedRecipeScriptFilePath = `scripts/api-recipes/${recipeName}.js`;
+    const markdownFilePath = `content/api-recipes/${recipeFileName}.md`;
+    const generatedRecipeScriptFilePath = `scripts/api-recipes/${recipeFileName}.js`;
     const descriptions: { [key: string]: string } = Object.entries({
       "APIMATIC-BUILD.json": "# Contains the 'tailIncludes' property, which registers your recipes as workflows",
       [markdownFilePath]: "# Markdown file with static placeholder text for your API Recipe",
@@ -218,7 +229,7 @@ export class PortalRecipeAction {
       const stats = fs.statSync(itemPath);
 
       if (stats.isDirectory()) {
-        const subdirectoryStructure = await this.getBuildDirectoryStructure(itemPath, recipeName, relativePath);
+        const subdirectoryStructure = await this.getBuildDirectoryStructure(itemPath, recipeFileName, relativePath);
 
         const folderName = descriptions[path.normalize(relativePath)]
           ? `${item} : ${descriptions[path.normalize(relativePath)]}`
@@ -235,24 +246,36 @@ export class PortalRecipeAction {
     return directoryStructure;
   }
 
+  //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
+  private getContentFolderPath(buildConfig: any, buildDirectoryPath: string) : string {
+    const contentFolder = buildConfig.generatePortal?.contentFolder;
+    if (contentFolder)
+    {
+      return path.join(buildDirectoryPath, contentFolder);
+    }
+
+    return buildDirectoryPath;
+  }
+
   private getMarkdownFileContent(): string {
     return `# This is a Guided Walkthrough File
 This is the starter content`;
   }
 
-  private getRecipeScriptReferenceForTailIncludesProperty(recipeName: string): string {
+  private getRecipeScriptReferenceForTailIncludesProperty(recipeName: string, recipeFileName: string): string {
     return `${this.getScriptTagForWorkflow(
-      recipeName
+      recipeFileName
     )}<script>document.addEventListener('DOMContentLoaded', (event) => {APIMaticDevPortal.ready(({ registerWorkflow }) => {${this.getNewRegisteredWorkflow(
-      recipeName
+      recipeName,
+      recipeFileName
     )}});});</script>`;
   }
 
-  private getScriptTagForWorkflow(recipeName: string): string {
-    return `<script defer src='./static/scripts/api-recipes/${recipeName}.js'></script>`;
+  private getScriptTagForWorkflow(recipeFileName: string): string {
+    return `<script defer src='./static/scripts/api-recipes/${recipeFileName}.js'></script>`;
   }
 
-  private getNewRegisteredWorkflow(recipeName: string): string {
-    return `registerWorkflow('page:api-recipes/${recipeName}','${recipeName}',SampleWorkflow);`;
+  private getNewRegisteredWorkflow(recipeName: string, recipeFileName: string): string {
+    return `registerWorkflow('page:api-recipes/${recipeFileName}','${recipeName}',SampleWorkflow);`;
   }
 }

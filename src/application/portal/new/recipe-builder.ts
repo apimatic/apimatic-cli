@@ -1,4 +1,4 @@
-import { SerializableRecipe, SerializableStep } from "../../types/portal/recipe";
+import { SerializableRecipe, SerializableStep } from "../../../types/portal/recipe";
 
 export class PortalRecipeBuilder {
   private recipe: SerializableRecipe;

@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as prettier from "prettier";
-import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../types/portal/recipe";
+import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../../types/portal/recipe";
 
 export class PortalRecipeGenerator {
   public async createScriptFromRecipe(recipe: SerializableRecipe): Promise<string> {
@@ -48,7 +48,7 @@ export class PortalRecipeGenerator {
   public async saveGeneratedRecipeScriptToBuildDirectory(
     generatedRecipeScript: string,
     generatedRecipeScriptsDirectoryPath: string,
-    recipeName: string,
+    recipeFileName: string,
     format: boolean = true
   ): Promise<void> {
     if (format) {
@@ -57,7 +57,7 @@ export class PortalRecipeGenerator {
 
     fs.mkdirSync(generatedRecipeScriptsDirectoryPath, { recursive: true });
     await fs.promises.writeFile(
-      `${generatedRecipeScriptsDirectoryPath}/${recipeName}.js`,
+      `${generatedRecipeScriptsDirectoryPath}/${recipeFileName}.js`,
       generatedRecipeScript,
       "utf8"
     );
