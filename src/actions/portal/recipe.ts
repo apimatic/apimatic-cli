@@ -90,6 +90,7 @@ export class PortalRecipeAction {
     return Result.success(recipeBuilder.build());
   }
 
+  //TODO: Figure out a way to dynamically update tailIncludes property in build config file.
   private async registerRecipeInBuildConfig(
     buildConfig: any,
     recipeName: string,
