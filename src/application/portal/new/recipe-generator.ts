@@ -41,10 +41,6 @@ export class PortalRecipeGenerator {
     return script;
   }
 
-  private generateVerifyFunction(): string {
-    return `if (response.StatusCode == 200) { return true; } else { setError("API Call wasn't able to get a valid response. Please try again."); return false; }`;
-  }
-
   public async saveGeneratedRecipeScriptToBuildDirectory(
     generatedRecipeScript: string,
     generatedRecipeScriptsDirectoryPath: string,
@@ -61,6 +57,10 @@ export class PortalRecipeGenerator {
       generatedRecipeScript,
       "utf8"
     );
+  }
+
+  private generateVerifyFunction(): string {
+    return `if (response.StatusCode == 200) { return true; } else { setError("API Call wasn't able to get a valid response. Please try again."); return false; }`;
   }
 
   private async formatScript(code: string): Promise<string> {

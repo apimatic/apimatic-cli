@@ -38,11 +38,6 @@ export class PortalRecipeBuilder {
     return this;
   }
 
-  addSteps(steps: SerializableStep[]): this {
-    this.recipe.steps.push(...steps);
-    return this;
-  }
-
   build(): SerializableRecipe {
     return this.recipe;
   }
