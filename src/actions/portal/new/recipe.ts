@@ -12,6 +12,7 @@ import { PortalRecipeGenerator } from "../../../application/portal/new/recipe-ge
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;
+  private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
 
   constructor() {
     this.prompts = new PortalRecipePrompts();
@@ -145,7 +146,7 @@ export class PortalRecipeAction {
 
   private async writeTailIncludesToBuildConfig(tailIncludes: string, buildDirectoryPath: string): Promise<void> {
     const files = await fs.promises.readdir(buildDirectoryPath);
-    const buildFile = files.find((file) => file.endsWith("APIMATIC-BUILD.json"));
+    const buildFile = files.find((file) => file === this.BUILD_FILE_NAME);
 
     const buildFilePath = path.join(buildDirectoryPath, buildFile!);
     const fileData = await fs.promises.readFile(buildFilePath, "utf-8");
@@ -214,10 +215,10 @@ export class PortalRecipeAction {
   //TODO: Create a type for the build config and use that here instead of any.
   private async parseBuildConfig(buildDirectoryPath: string): Promise<Result<any, string>> {
     const files = await fs.promises.readdir(buildDirectoryPath);
-    const buildFile = files.find((file) => file.endsWith("APIMATIC-BUILD.json"));
+    const buildFile = files.find((file) => file === this.BUILD_FILE_NAME);
 
     if (!buildFile) {
-      return Result.failure("No APIMATIC-BUILD.json file found in the current directory!");
+      return Result.failure("No APIMATIC-BUILD.json file found in the current directory.");
     }
 
     const fileData = await fs.promises.readFile(path.join(buildDirectoryPath, buildFile), "utf-8");
