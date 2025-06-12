@@ -3,19 +3,35 @@ import * as fs from "fs-extra";
 import { PortalNewTocPrompts } from "../../../prompts/portal/new/toc";
 import { Result } from "../../../types/common/result";
 import { getMessageInRedColor } from "../../../utils/utils";
+import { SDLProcessor } from "../../../services/sdl-processor";
+import { TocGenerator } from "../../../services/toc-generator";
+import { ContentParser } from "../../../services/content-parser";
+import { TocEndpoint, TocModel } from "../../../types/toc/toc";
 
 const DEFAULT_TOC_FILENAME = "toc.yml";
 const APIMATIC_BUILD_FILE = "APIMATIC-BUILD.json";
 
 export class PortalNewTocAction {
   private readonly prompts: PortalNewTocPrompts;
+  private readonly sdlProcessor: SDLProcessor;
+  private readonly tocGenerator: TocGenerator;
+  private readonly contentParser: ContentParser;
 
   constructor() {
     this.prompts = new PortalNewTocPrompts();
+    this.sdlProcessor = new SDLProcessor();
+    this.tocGenerator = new TocGenerator();
+    this.contentParser = new ContentParser();
   }
 
-  async createToc(workingDirectory: string, destination?: string, force: boolean = false): Promise<Result<string, string>> {    
-
+  async createToc(
+    workingDirectory: string,
+    configDir: string,
+    destination?: string,
+    force: boolean = false,
+    useIndividualEndpoints: boolean = false,
+    useIndividualModels: boolean = false
+  ): Promise<Result<string, string>> {
     try {
       const finalDestination = await this.getDestinationPath(workingDirectory, destination);
       const validationResult = await this.validatePath(finalDestination);
@@ -26,40 +42,54 @@ export class PortalNewTocAction {
 
       const tocPath = path.join(finalDestination, DEFAULT_TOC_FILENAME);
       const shouldContinue = await this.checkExistingToc(tocPath, force);
-      
+
       if (!shouldContinue) {
         return Result.cancelled("Operation was cancelled by the user");
       }
 
       this.prompts.displayTocCreationMessage();
 
-      //Check individual endpoints and models flag
-      //Transform to SDL if spec is found in the working directory
-      //Generate Yaml for endpoints and models
+      let endpointGroups = new Map<string, TocEndpoint[]>();
+      let models: TocModel[] = [];
 
-      //Check the existance of content directory
-      //Parse all the markdown files in the content directory and generate yaml
+      if (useIndividualEndpoints || useIndividualModels) {
+        const specFolderPath = await this.getSpecFolderPath(workingDirectory);
+        const sdlResult = await this.sdlProcessor.getTocComponentsFromSdl(
+          specFolderPath,
+          workingDirectory,
+          configDir
+        );
+        endpointGroups = sdlResult.endpointGroups;
+        models = sdlResult.models;
+      }
 
-      //Add fixed items in yaml e.g. getting-started, sdk-infra
-       
-      //Write the Yaml file
-      await fs.writeFile(tocPath, "# Table of Contents\n", "utf8");
+      const contentFolderPath = await this.getContentFolderPath(workingDirectory);
+      const contentGroups = await this.contentParser.parseContentFolder(contentFolderPath, contentFolderPath);
+
+      const toc = this.tocGenerator.createTocStructure(
+        endpointGroups,
+        models,
+        useIndividualEndpoints,
+        useIndividualModels,
+        contentGroups
+      );
+      const yamlString = this.tocGenerator.transformToYaml(toc);
+
+      await fs.writeFile(tocPath, yamlString, "utf8");
 
       this.prompts.displayTocCreationSuccessMessage();
       this.prompts.displayOutroMessage(tocPath);
       return Result.success(tocPath);
     } catch (error) {
       this.prompts.displayTocCreationErrorMessage();
-      this.prompts.logError(
-        getMessageInRedColor(`An error occurred while creating the toc file: \n${error}`)
-      );
+      this.prompts.logError(getMessageInRedColor(`An error occurred while creating the toc file: \n${error}`));
       return Result.failure(`Failed to create toc file: ${error}`);
     }
   }
 
   private async getDestinationPath(workingDirectory: string, providedDestination?: string): Promise<string> {
     if (providedDestination === undefined) {
-      const inferredDestination = this.getContentFolderPath(workingDirectory);
+      const inferredDestination = await this.getContentFolderPath(workingDirectory);
       await fs.ensureDir(inferredDestination);
       return inferredDestination;
     }
@@ -68,33 +98,30 @@ export class PortalNewTocAction {
 
   private async validatePath(destinationPath: string): Promise<Result<string, string>> {
     if (!(await fs.pathExists(destinationPath))) {
-      return Result.failure(
-        getMessageInRedColor(`Destination path ${destinationPath} does not exist.`)
-      );
+      return Result.failure(getMessageInRedColor(`Destination path ${destinationPath} does not exist.`));
     }
-
     return Result.success("Path validated successfully.");
   }
 
   private async checkExistingToc(tocPath: string, force: boolean): Promise<boolean> {
-    if (fs.existsSync(tocPath) && !force) {
+    if ((await fs.pathExists(tocPath)) && !force) {
       return await this.prompts.overwriteExistingTocPrompt();
     }
     return true;
   }
 
-  private getContentFolderPath(workingDirectory: string): string {
+  private async getContentFolderPath(workingDirectory: string): Promise<string> {
     const buildFilePath = path.join(workingDirectory, APIMATIC_BUILD_FILE);
     const defaultContentFolder = path.join(workingDirectory, "content");
 
-    if (!fs.existsSync(buildFilePath)) {
+    if (!(await fs.pathExists(buildFilePath))) {
       return defaultContentFolder;
     }
 
     try {
-      const buildFileContent = fs.readFileSync(buildFilePath, 'utf8');
+      const buildFileContent = await fs.readFile(buildFilePath, "utf8");
       const buildConfig = JSON.parse(buildFileContent);
-      
+
       if (buildConfig.generatePortal?.contentFolder) {
         return path.join(workingDirectory, buildConfig.generatePortal.contentFolder, "content");
       }
@@ -104,4 +131,26 @@ export class PortalNewTocAction {
 
     return defaultContentFolder;
   }
-} 
+
+  private async getSpecFolderPath(workingDirectory: string): Promise<string> {
+    const buildFilePath = path.join(workingDirectory, APIMATIC_BUILD_FILE);
+    const defaultSpecFolder = path.join(workingDirectory, "spec");
+
+    if (!(await fs.pathExists(buildFilePath))) {
+      return defaultSpecFolder;
+    }
+
+    try {
+      const buildFileContent = await fs.readFile(buildFilePath, "utf8");
+      const buildConfig = JSON.parse(buildFileContent);
+
+      if (buildConfig.generatePortal?.contentFolder) {
+        return path.join(workingDirectory, buildConfig.generatePortal.apiSpecPath);
+      }
+    } catch (error) {
+      return defaultSpecFolder;
+    }
+
+    return defaultSpecFolder;
+  }
+}

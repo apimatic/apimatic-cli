@@ -22,6 +22,14 @@ export default class PortalNewToc extends Command {
       char: "f",
       default: false,
       description: "overwrite if a toc file exists in the destination"
+    }),
+    "use-individual-endpoints": Flags.boolean({
+      default: false,
+      description: "use individual endpoints generation instead of SDL-based endpoints"
+    }),
+    "use-individual-models": Flags.boolean({
+      default: false,
+      description: "use individual models generation instead of SDL-based models"
     })
   };
 
@@ -41,7 +49,14 @@ A new toc file has been created at ./portal/content/toc.yml using ./my-project a
   async run(): Promise<void> {
     const { flags } = await this.parse(PortalNewToc);
     const portalNewTocAction = new PortalNewTocAction();
-    const result = await portalNewTocAction.createToc(flags.folder, flags.destination, flags.force);
+    const result = await portalNewTocAction.createToc(
+      flags.folder,
+      this.config.configDir,
+      flags.destination,
+      flags.force,
+      flags["use-individual-endpoints"],
+      flags["use-individual-models"]
+    );
 
     if (result.isFailed()) {
       this.error(result.error!);

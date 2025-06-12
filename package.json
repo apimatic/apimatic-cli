@@ -69,7 +69,8 @@
         "striptags": "^3.2.0",
         "treeify": "^1.1.0",
         "tslib": "^2.5.0",
-        "unzipper": "^0.12.3"
+        "unzipper": "^0.12.3",
+        "yaml": "^2.8.0"
     },
     "devDependencies": {
         "@commitlint/cli": "^15.0.0",

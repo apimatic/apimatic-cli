@@ -1,6 +1,13 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
-import { FileWrapper, ApiResponse, ApiError } from "@apimatic/sdk";
+import {
+  FileWrapper,
+  ApiResponse,
+  ApiError,
+  TransformationController,
+  Transformation,
+  ExportFormats
+} from "@apimatic/sdk";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -12,6 +19,7 @@ import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate";
 import { Result } from "../../types/common/result";
 import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils";
+import { TransformationData, TransformationIdParams } from "../../types/api/transform";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -38,6 +46,40 @@ export class PortalService {
       return Result.success(stream);
     } catch (error) {
       return Result.failure(await this.handlePortalGenerationErrors(error, params));
+    }
+  }
+
+  async generateSdl(specPath: string, configDir: string): Promise<Result<any, string>> {
+    if (!(await fsExtra.pathExists(specPath))) {
+      return Result.failure("Spec file doesn't exist");
+    }
+
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
+    const client = this.createApiClient(authorizationHeader);
+    const transformationController = new TransformationController(client);
+
+    try {
+      const file = new FileWrapper(fs.createReadStream(specPath));
+      const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
+        ContentType.EnumMultipartformdata,
+        file,
+        ExportFormats.APIMATIC
+      );
+
+      if (!generation.result.success) {
+        return Result.failure("");
+      }
+
+      const transformationId = generation.result.id;
+      const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
+      if ((result as NodeJS.ReadableStream).readable) {
+        return Result.success(await parseStreamBodyToJson(result as NodeJS.ReadableStream));
+      } else {
+        return Result.failure("");
+      }
+    } catch (error) {
+      return Result.failure("");
     }
   }
 

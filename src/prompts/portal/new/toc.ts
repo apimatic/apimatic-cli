@@ -44,4 +44,12 @@ export class PortalNewTocPrompts {
   logError(error: string): void {
     outro(error);
   }
+
+  displayWarning(message: string): void {
+    log.warning(message);
+  }
+
+  displayInfo(message: string): void {
+    log.info(message);
+  }
 } 
