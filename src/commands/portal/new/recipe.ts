@@ -2,7 +2,7 @@ import * as path from "path";
 import { Command, Flags } from "@oclif/core";
 import { PortalRecipeAction } from "../../../actions/portal/new/recipe";
 
-const DEFAULT_FOLDER = "./";
+const DEFAULT_FOLDER = path.resolve("./");
 
 export default class PortalNewRecipe extends Command {
   static override description = "Generate an API Recipe for a static API Documentation portal.";

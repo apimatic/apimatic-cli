@@ -65,11 +65,13 @@
         "fs-extra": "^11.3.0",
         "livereload": "^0.9.3",
         "open": "^8.4.0",
+        "prettier": "^2.8.8",
         "simple-git": "^3.27.0",
         "striptags": "^3.2.0",
         "treeify": "^1.1.0",
         "tslib": "^2.5.0",
-        "unzipper": "^0.12.3"
+        "unzipper": "^0.12.3",
+        "yaml": "^2.3.4"
     },
     "devDependencies": {
         "@commitlint/cli": "^15.0.0",
@@ -100,7 +102,6 @@
         "nock": "^14.0.4",
         "nyc": "^17.1.0",
         "oclif": "^4.17.34",
-        "prettier": "^2.4.1",
         "rimraf": "^6.0.1",
         "ts-node": "^8.10.2",
         "typescript": "^5.2.2"
