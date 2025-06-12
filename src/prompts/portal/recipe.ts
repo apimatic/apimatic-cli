@@ -21,7 +21,7 @@ export class PortalRecipePrompts {
       return process.exit(0);
     }
 
-    return (recipeName as string).trim().replace(" ", "-");
+    return (recipeName as string).trim();
   }
 
   public async stepNamePrompt(defaultStepName: string): Promise<string> {
