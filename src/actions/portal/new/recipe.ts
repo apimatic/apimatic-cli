@@ -38,7 +38,7 @@ export class PortalRecipeAction {
       return Result.failure(`Unable to generate API Recipe.`);
     }
 
-    const contentFolder = this.getContentFolderPath(buildConfig.value, buildDirectoryPath);
+    const contentFolderPath = this.getContentFolderPath(buildConfig.value, buildDirectoryPath);
     const recipeResult = await this.promptUserAndBuildNewRecipe(recipeBuilder);
     if (!recipeResult.isSuccess) {
       this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${recipeResult.error!}`));
@@ -52,22 +52,22 @@ export class PortalRecipeAction {
       return Result.failure(`Unable to generate API Recipe.`);
     }
     
-    await this.createMarkdownFile(recipeFileName, contentFolder);
+    await this.createMarkdownFile(recipeFileName, contentFolderPath);
 
     const generatedRecipeScript = await recipeGenerator.createScriptFromRecipe(recipeResult.value!);
-    const generatedRecipeScriptsDirectoryPath = path.join(contentFolder, "static", "scripts", "api-recipes");
+    const generatedRecipeScriptsDirectoryPath = path.join(contentFolderPath, "static", "scripts", "api-recipes");
     await recipeGenerator.saveGeneratedRecipeScriptToBuildDirectory(
       generatedRecipeScript,
       generatedRecipeScriptsDirectoryPath,
       recipeFileName
     );
 
-    await this.addRecipeToToc(recipeName, recipeFileName, contentFolder);
+    await this.addRecipeToToc(recipeName, recipeFileName, contentFolderPath);
 
-    const buildDirectoryStructure = await this.getBuildDirectoryStructure(contentFolder, recipeFileName);
+    const buildDirectoryStructure = await this.getBuildDirectoryStructure(contentFolderPath, recipeFileName);
 
     this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
-    this.prompts.displayRecipeGenerationSuccessMessage();
+    this.prompts.displayRecipeGenerationSuccessMessage(contentFolderPath);
     return Result.success("Generated recipe successfully.");
   }
 

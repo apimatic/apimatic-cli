@@ -182,8 +182,9 @@ export class PortalRecipePrompts {
     log.step(`✅  Step has been added successfully.`);
   }
 
-  public displayRecipeGenerationSuccessMessage() {
-    outro(`✅  Recipe has been added successfully!`);
+  public displayRecipeGenerationSuccessMessage(recipePath: string) {
+    log.step(`✅  Recipe has been added successfully!`)
+    outro(`Generated recipe has been added to build directory at: ${recipePath}`);
   }
 
   public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: TreeObject) {
