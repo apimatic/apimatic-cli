@@ -67,7 +67,9 @@ export class PortalRecipeAction {
       }
     }
 
-    await this.addRecipeToToc(tocFileResult.value, tocFilePath, recipeName, recipeFileName);
+    if (!recipeAlreadyExists) {
+      await this.addRecipeToToc(tocFileResult.value, tocFilePath, recipeName, recipeFileName);
+    }
     await this.registerRecipeInBuildConfig(recipeName, recipeFileName, buildDirectoryPath);
     await this.createMarkdownFile(recipeFileName, contentFolderPath);
 
