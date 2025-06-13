@@ -1,7 +1,7 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
 import * as path from "path";
-import { FileWrapper, ApiResponse, ApiError } from "@apimatic/sdk";
+import { FileWrapper, ApiResponse, ApiError, InternalServerErrorResponseError } from "@apimatic/sdk";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -80,7 +80,7 @@ export class PortalService {
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
       return await this.saveAndExtractErrorZipFile(error, params);
-    } else if (error instanceof ApiError && error.statusCode === 500) {
+    } else if (error instanceof InternalServerErrorResponseError) {
       //500
       const body = await this.parseErrorResponse(error);
       return getMessageInRedColor(

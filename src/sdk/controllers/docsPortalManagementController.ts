@@ -10,6 +10,7 @@ import { ContentType, contentTypeSchema } from '../models/contentType';
 import { array, optional, string, unknown } from '../schema';
 import { BaseController } from './baseController';
 import { ApiError } from '@apimatic/core';
+import { InternalServerErrorResponseError } from '../errors/internalServerErrorResponseError';
 import { ProblemDetailsError } from '../errors/problemDetailsError';
 import { UnauthorizedResponseError } from '../errors/unauthorizedResponseError';
 
@@ -139,6 +140,7 @@ export class DocsPortalManagementController extends BaseController {
       ApiError,
       'Unprocessable Entity - Contains error.zip for build issues'
     );
+    req.throwOn(500, InternalServerErrorResponseError, 'Internal Server Error');
     req.authenticate([{ authorization: true }]);
     return req.callAsStream(requestOptions);
   }
