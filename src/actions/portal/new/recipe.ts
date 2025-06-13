@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as fsExtra from "fs-extra";
 import * as path from "path";
-import * as yaml from "yaml";
+import { parse, stringify } from "yaml";
 import { TreeObject } from "treeify";
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe";
 import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/portal/recipe";
@@ -25,33 +25,50 @@ export class PortalRecipeAction {
     const recipeGenerator = new PortalRecipeGenerator();
 
     const validationResult = await this.validateBuildDirectoryPath(buildDirectoryPath);
-    if (!validationResult.isSuccess)
-    {
-      this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${validationResult.error!}`))
+    if (!validationResult.isSuccess) {
+      this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${validationResult.error!}`));
       return Result.failure(`Unable to generate API Recipe.`);
     }
 
     //TODO: Create a type for the build config and use that here instead of any.
-    const buildConfig = await this.parseBuildConfig(buildDirectoryPath);
-    if (!buildConfig.isSuccess) {
-      this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${buildConfig.error!}`));
+    const buildConfigResult = await this.parseBuildConfig(buildDirectoryPath);
+    if (!buildConfigResult.isSuccess) {
+      this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${buildConfigResult.error!}`));
       return Result.failure(`Unable to generate API Recipe.`);
     }
 
-    const contentFolderPath = this.getContentFolderPath(buildConfig.value, buildDirectoryPath);
+    const contentFolderPath = this.getContentFolderPath(buildConfigResult.value, buildDirectoryPath);
     const recipeResult = await this.promptUserAndBuildNewRecipe(recipeBuilder);
     if (!recipeResult.isSuccess) {
       this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${recipeResult.error!}`));
       return Result.failure(`Unable to generate API Recipe.`);
     }
 
-    const registerRecipeInBuildConfigResult = await this.registerRecipeInBuildConfig(buildConfig.value!, recipeName, recipeFileName, buildDirectoryPath);
-    if (!registerRecipeInBuildConfigResult.isSuccess)
-    {
-      this.prompts.logError(getMessageInRedColor(`Unable to generated API Recipe: ${registerRecipeInBuildConfigResult.error!}`));
+    const tocFilePath = path.join(contentFolderPath, "content", "toc.yml");
+    const tocFileResult = await this.parseTocFile(tocFilePath);
+    if (!tocFileResult.isSuccess) {
+      this.prompts.logError(getMessageInRedColor(`Unable to generate API Recipe: ${tocFileResult.error!}`));
       return Result.failure(`Unable to generate API Recipe.`);
     }
-    
+
+    const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocFileResult.value!, recipeName, recipeFileName);
+    if (recipeAlreadyExists) {
+      if (!(await this.prompts.overwriteApiRecipeInTocPrompt())) {
+        this.prompts.logError(getMessageInRedColor("Unable to generate API Recipe: Operation cancelled."));
+        return Result.failure("Unable to generate API Recipe: Operation cancelled.");
+      }
+    }
+
+    const tailIncludesPropertyAlreadyExists = this.checkTailIncludesPropertyAlreadyExists(buildConfigResult.value!);
+    if (tailIncludesPropertyAlreadyExists) {
+      if (!(await this.prompts.overwriteTailIncludesPrompt())) {
+        this.prompts.logError(getMessageInRedColor("Unable to generate API Recipe: Operation cancelled."));
+        return Result.failure("Unable to generate API Recipe: Operation cancelled.");
+      }
+    }
+
+    await this.addRecipeToToc(tocFileResult.value, tocFilePath, recipeName, recipeFileName);
+    await this.registerRecipeInBuildConfig(recipeName, recipeFileName, buildDirectoryPath);
     await this.createMarkdownFile(recipeFileName, contentFolderPath);
 
     const generatedRecipeScript = await recipeGenerator.createScriptFromRecipe(recipeResult.value!);
@@ -62,8 +79,6 @@ export class PortalRecipeAction {
       recipeFileName
     );
 
-    await this.addRecipeToToc(recipeName, recipeFileName, contentFolderPath);
-
     const buildDirectoryStructure = await this.getBuildDirectoryStructure(contentFolderPath, recipeFileName);
 
     this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
@@ -71,9 +86,8 @@ export class PortalRecipeAction {
     return Result.success("Generated recipe successfully.");
   }
 
-  private async validateBuildDirectoryPath(buildDirectoryPath: string) : Promise<Result<string, string>> {
-    if (!(await fsExtra.pathExists(buildDirectoryPath)))
-    {
+  private async validateBuildDirectoryPath(buildDirectoryPath: string): Promise<Result<string, string>> {
+    if (!(await fsExtra.pathExists(buildDirectoryPath))) {
       return Result.failure(`Portal build input folder ${buildDirectoryPath} does not exist.`);
     }
 
@@ -121,27 +135,12 @@ export class PortalRecipeAction {
 
   //TODO: Figure out a way to dynamically update tailIncludes property in build config file.
   private async registerRecipeInBuildConfig(
-    buildConfig: any,
     recipeName: string,
     recipeFileName: string,
     buildDirectoryPath: string
-  ): Promise<Result<string, string>> {
+  ): Promise<void> {
     const scriptReference = this.getRecipeScriptReferenceForTailIncludesProperty(recipeName, recipeFileName);
-    const tailIncludesContent = buildConfig.generatePortal.tailIncludes;
-
-    if (tailIncludesContent) {
-      const overwriteTailIncludes = await this.prompts.overwriteTailIncludesPrompt();
-      if (overwriteTailIncludes) {
-        await this.writeTailIncludesToBuildConfig(scriptReference, buildDirectoryPath);
-        return Result.success("Overwrite complete.")
-      }
-      else {
-        return Result.failure("Operation cancelled.")
-      }
-    }
-
     await this.writeTailIncludesToBuildConfig(scriptReference, buildDirectoryPath);
-    return Result.success("Wrote new `tailIncludes` property to build config.")
   }
 
   private async writeTailIncludesToBuildConfig(tailIncludes: string, buildDirectoryPath: string): Promise<void> {
@@ -157,11 +156,23 @@ export class PortalRecipeAction {
     await fs.promises.writeFile(buildFilePath, JSON.stringify(buildConfig, null, 2));
   }
 
-  private async addRecipeToToc(recipeName: string, recipeFileName: string, contentFolder: string): Promise<void> {
-    const tocFilePath = path.join(contentFolder, "content", "toc.yml");
+  //TODO: Replace any with concrete toc file object.
+  private async parseTocFile(tocFilePath: string): Promise<Result<any, string>> {
     const tocContent = await fs.promises.readFile(tocFilePath, "utf-8");
-    const tocData = yaml.parse(tocContent);
 
+    try {
+      return Result.success(parse(tocContent));
+    } catch (error) {
+      return Result.failure(`Unable to parse TOC file:  ${(error as Error).message}`);
+    }
+  }
+
+  private async addRecipeToToc(
+    tocData: any,
+    tocFilePath: string,
+    recipeName: string,
+    recipeFileName: string
+  ): Promise<void> {
     let apiRecipesGroup = tocData.toc?.find((item: any) => item.group === "API Recipes");
     if (!apiRecipesGroup) {
       apiRecipesGroup = {
@@ -176,7 +187,7 @@ export class PortalRecipeAction {
       file: `api-recipes/${recipeFileName}.md`
     });
 
-    await fs.promises.writeFile(tocFilePath, yaml.stringify(tocData));
+    await fs.promises.writeFile(tocFilePath, stringify(tocData));
   }
 
   private async createPermalink(pathPieces: string[]): Promise<string> {
@@ -225,6 +236,27 @@ export class PortalRecipeAction {
     return Result.success(JSON.parse(fileData));
   }
 
+  private checkRecipeAlreadyExists(tocData: any, recipeName: string, recipeFileName: string): boolean {
+    let apiRecipesGroup = tocData.toc?.find((item: any) => item.group === "API Recipes");
+    if (!apiRecipesGroup) {
+      return false;
+    }
+
+    // Check if recipe name or file name already exists
+    const existingRecipe = apiRecipesGroup.items.find(
+      (item: any) => item.page === recipeName || item.file === `api-recipes/${recipeFileName}.md`
+    );
+    if (existingRecipe) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private checkTailIncludesPropertyAlreadyExists(buildConfig: any): boolean {
+    return buildConfig.generatePortal?.tailIncludes !== undefined;
+  }
+
   private async getBuildDirectoryStructure(
     contentFolder: string,
     recipeFileName: string,
@@ -271,10 +303,9 @@ export class PortalRecipeAction {
   }
 
   //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
-  private getContentFolderPath(buildConfig: any, buildDirectoryPath: string) : string {
+  private getContentFolderPath(buildConfig: any, buildDirectoryPath: string): string {
     const contentFolder = buildConfig.generatePortal?.contentFolder;
-    if (contentFolder)
-    {
+    if (contentFolder) {
       return path.join(buildDirectoryPath, contentFolder);
     }
 

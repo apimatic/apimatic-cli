@@ -178,12 +178,29 @@ export class PortalRecipePrompts {
     return overwriteTailIncludes === "yes";
   }
 
+  public async overwriteApiRecipeInTocPrompt(): Promise<boolean> {
+    const overwriteApiRecipeInToc = await select({
+      message: `There is an API Recipe with the same name already present. Do you want to overwrite it?`,
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" }
+      ]
+    });
+
+    if (isCancel(overwriteApiRecipeInToc)) {
+      cancel("Operation cancelled.");
+      return process.exit(0);
+    }
+
+    return overwriteApiRecipeInToc === "yes";
+  }
+
   public displayStepAddedSuccessfullyMessage() {
     log.step(`✅  Step has been added successfully.`);
   }
 
   public displayRecipeGenerationSuccessMessage(recipePath: string) {
-    log.step(`✅  Recipe has been added successfully!`)
+    log.step(`✅  Recipe has been added successfully!`);
     outro(`Generated recipe has been added to build directory at: ${recipePath}`);
   }
 

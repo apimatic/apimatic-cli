@@ -14,8 +14,7 @@ export default class PortalNewRecipe extends Command {
     name: Flags.string({ description: "name for the recipe" }),
     folder: Flags.string({
       parse: async (input: string) => path.resolve(input),
-      description:
-        "path to the build directory containing specs, content, and build config file.",
+      description: "path to the build directory containing specs, content, and build config file.",
       default: DEFAULT_FOLDER
     })
   };
