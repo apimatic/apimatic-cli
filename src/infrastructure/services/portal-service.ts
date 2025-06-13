@@ -82,9 +82,9 @@ export class PortalService {
       return await this.saveAndExtractErrorZipFile(error, params);
     } else if (error instanceof ApiError && error.statusCode === 500) {
       //500
-      //TODO: Replace this message with the one returned by the API once we improve the messaging.
+      const body = await this.parseErrorResponse(error);
       return getMessageInRedColor(
-        "An internal server error occurred. Please try again or reach out to our team at support@apimatic.io for help if your problem persists."
+        `${body.message} Please try again or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
       return getMessageInRedColor(error instanceof Error ? error.message : String(error));
