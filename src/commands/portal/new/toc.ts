@@ -22,11 +22,11 @@ export default class PortalNewToc extends Command {
       default: false,
       description: "overwrite if a toc file exists in the destination"
     }),
-    "use-individual-endpoints": Flags.boolean({
+    "expand-endpoints": Flags.boolean({
       default: false,
       description: "use individual endpoints generation instead of SDL-based endpoints"
     }),
-    "use-individual-models": Flags.boolean({
+    "expand-models": Flags.boolean({
       default: false,
       description: "use individual models generation instead of SDL-based models"
     })
@@ -53,8 +53,8 @@ A new toc file has been created at ./portal/content/toc.yml using ./my-project a
       this.config.configDir,
       flags.destination,
       flags.force,
-      flags["use-individual-endpoints"],
-      flags["use-individual-models"]
+      flags["expand-endpoints"],
+      flags["expand-models"]
     );
 
     if (result.isFailed()) {

@@ -29,8 +29,8 @@ export class PortalNewTocAction {
     configDir: string,
     destination?: string,
     force: boolean = false,
-    useIndividualEndpoints: boolean = false,
-    useIndividualModels: boolean = false
+    expandEndpoints: boolean = false,
+    expandModels: boolean = false
   ): Promise<Result<string, string>> {
     try {
       const finalDestination = await this.getDestinationPath(workingDirectory, destination);
@@ -52,7 +52,7 @@ export class PortalNewTocAction {
       let endpointGroups = new Map<string, TocEndpoint[]>();
       let models: TocModel[] = [];
 
-      if (useIndividualEndpoints || useIndividualModels) {
+      if (expandEndpoints || expandModels) {
         const specFolderPath = await this.getSpecFolderPath(workingDirectory);
         const sdlResult = await this.sdlParser.getTocComponentsFromSdl(
           specFolderPath,
@@ -69,8 +69,8 @@ export class PortalNewTocAction {
       const toc = this.tocGenerator.createTocStructure(
         endpointGroups,
         models,
-        useIndividualEndpoints,
-        useIndividualModels,
+        expandEndpoints,
+        expandModels,
         contentGroups
       );
       const yamlString = this.tocGenerator.transformToYaml(toc);

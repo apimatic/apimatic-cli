@@ -5,8 +5,8 @@ export class TocStructureGenerator {
   createTocStructure(
     endpointGroups: Map<string, TocEndpoint[]>,
     models: TocModel[],
-    useIndividualEndpoints: boolean = false,
-    useIndividualModels: boolean = false,
+    expandEndpoints: boolean = false,
+    expandModels: boolean = false,
     contentGroups: TocGroup[] = []
   ): Toc {
     const tocStructure: Toc = {
@@ -30,7 +30,7 @@ export class TocStructureGenerator {
     }
 
     // Add API Endpoints section
-    if (!useIndividualEndpoints || endpointGroups.size === 0) {
+    if (!expandEndpoints || endpointGroups.size === 0) {
       tocStructure.toc.push({
         generate: "API Endpoints",
         from: "endpoints"
@@ -53,7 +53,7 @@ export class TocStructureGenerator {
     }
 
     // Add Models section
-    if (!useIndividualModels || models.length === 0) {
+    if (!expandModels || models.length === 0) {
       tocStructure.toc.push({
         generate: "Models",
         from: "models"
