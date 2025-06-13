@@ -1,5 +1,6 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
+import * as path from "path";
 import { FileWrapper, ApiResponse, ApiError } from "@apimatic/sdk";
 import {
   ContentType,
@@ -70,7 +71,7 @@ export class PortalService {
     if (error instanceof UnauthorizedResponseError) {
       //401
       const body = await this.parseErrorResponse(error);
-      return getMessageInRedColor(body.message ?? "Unauthorized access");
+      return getMessageInRedColor(body.message ?? "Unauthorized access.");
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const body = await this.parseErrorResponse(error);
@@ -109,10 +110,11 @@ export class PortalService {
         .on("finish", async () => {
           await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
           await deleteFile(params.generatedPortalArtifactsZipFilePath);
+          await deleteFile(path.join(params.generatedPortalArtifactsFolderPath, "static"));
           resolve(
             getMessageInRedColor(
               "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-                params.generatedPortalArtifactsFolderPath
+                path.join(params.generatedPortalArtifactsFolderPath, "apimatic-debug")
             )
           );
         })
