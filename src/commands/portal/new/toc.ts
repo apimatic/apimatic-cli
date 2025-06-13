@@ -19,7 +19,6 @@ export default class PortalNewToc extends Command {
       default: DEFAULT_FOLDER
     }),
     force: Flags.boolean({
-      char: "f",
       default: false,
       description: "overwrite if a toc file exists in the destination"
     }),

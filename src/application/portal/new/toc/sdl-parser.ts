@@ -1,10 +1,10 @@
 import * as path from "path";
 import * as fs from "fs-extra";
-import { PortalService } from "../infrastructure/services/portal-service";
-import { validateAndZipPortalSource, deleteFile } from "../utils/utils";
-import { TocEndpoint, TocModel } from "../types/toc/toc";
+import { PortalService } from "../../../../infrastructure/services/portal-service";
+import { validateAndZipPortalSource, deleteFile } from "../../../../utils/utils";
+import { TocEndpoint, TocModel } from "../../../../types/toc/toc";
 
-export class SDLProcessor {
+export class SdlParser {
   private readonly portalService: PortalService;
 
   constructor() {

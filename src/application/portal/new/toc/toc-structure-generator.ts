@@ -1,7 +1,7 @@
 import { stringify } from "yaml";
-import { Toc, TocGroup, TocEndpoint, TocModel, TocEndpointGroupOverview } from "../types/toc/toc";
+import { Toc, TocGroup, TocEndpoint, TocModel, TocEndpointGroupOverview } from "../../../../types/toc/toc";
 
-export class TocGenerator {
+export class TocStructureGenerator {
   createTocStructure(
     endpointGroups: Map<string, TocEndpoint[]>,
     models: TocModel[],
@@ -96,4 +96,4 @@ export class TocGenerator {
     }
     return obj;
   }
-}
+} 

@@ -3,9 +3,9 @@ import * as fs from "fs-extra";
 import { PortalNewTocPrompts } from "../../../prompts/portal/new/toc";
 import { Result } from "../../../types/common/result";
 import { getMessageInRedColor } from "../../../utils/utils";
-import { SDLProcessor } from "../../../services/sdl-processor";
-import { TocGenerator } from "../../../services/toc-generator";
-import { ContentParser } from "../../../services/content-parser";
+import { SdlParser } from "../../../application/portal/new/toc/sdl-parser";
+import { TocStructureGenerator } from "../../../application/portal/new/toc/toc-structure-generator";
+import { TocContentParser } from "../../../application/portal/new/toc/toc-content-parser";
 import { TocEndpoint, TocModel } from "../../../types/toc/toc";
 
 const DEFAULT_TOC_FILENAME = "toc.yml";
@@ -13,15 +13,15 @@ const APIMATIC_BUILD_FILE = "APIMATIC-BUILD.json";
 
 export class PortalNewTocAction {
   private readonly prompts: PortalNewTocPrompts;
-  private readonly sdlProcessor: SDLProcessor;
-  private readonly tocGenerator: TocGenerator;
-  private readonly contentParser: ContentParser;
+  private readonly sdlParser: SdlParser;
+  private readonly tocGenerator: TocStructureGenerator;
+  private readonly contentParser: TocContentParser;
 
   constructor() {
     this.prompts = new PortalNewTocPrompts();
-    this.sdlProcessor = new SDLProcessor();
-    this.tocGenerator = new TocGenerator();
-    this.contentParser = new ContentParser();
+    this.sdlParser = new SdlParser();
+    this.tocGenerator = new TocStructureGenerator();
+    this.contentParser = new TocContentParser();
   }
 
   async createToc(
@@ -54,7 +54,7 @@ export class PortalNewTocAction {
 
       if (useIndividualEndpoints || useIndividualModels) {
         const specFolderPath = await this.getSpecFolderPath(workingDirectory);
-        const sdlResult = await this.sdlProcessor.getTocComponentsFromSdl(
+        const sdlResult = await this.sdlParser.getTocComponentsFromSdl(
           specFolderPath,
           workingDirectory,
           configDir
