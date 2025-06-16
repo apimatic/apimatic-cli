@@ -1,5 +1,4 @@
 import { cancel, outro, select, spinner, isCancel, log } from "@clack/prompts";
-import { getMessageInRedColor } from "../../../utils/utils";
 
 export class PortalNewTocPrompts {
   private readonly spin = spinner();
@@ -31,10 +30,6 @@ export class PortalNewTocPrompts {
 
   displayTocCreationSuccessMessage(): void {
     this.spin.stop("✅ Toc file created successfully.");
-  }
-
-  displayTocCreationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while creating your toc file.`));
   }
 
   displayOutroMessage(tocPath: string): void {

@@ -19,7 +19,8 @@ import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate";
 import { Result } from "../../types/common/result";
 import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils";
-import { TransformationData, TransformationIdParams } from "../../types/api/transform";
+import { TransformationData } from "../../types/api/transform";
+import { Sdl } from "../../types/sdl/sdl";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -49,7 +50,7 @@ export class PortalService {
     }
   }
 
-  async generateSdl(specPath: string, configDir: string): Promise<Result<any, string>> {
+  async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
     if (!(await fsExtra.pathExists(specPath))) {
       return Result.failure("Spec file doesn't exist");
     }
@@ -68,19 +69,23 @@ export class PortalService {
       );
 
       if (!generation.result.success) {
-        return Result.failure("");
+        return this.createGenericErrorResult();
       }
 
       const transformationId = generation.result.id;
       const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
       if ((result as NodeJS.ReadableStream).readable) {
-        return Result.success(await parseStreamBodyToJson(result as NodeJS.ReadableStream));
+        return Result.success(await parseStreamBodyToJson(result as NodeJS.ReadableStream) as Sdl);
       } else {
-        return Result.failure("");
+        return this.createGenericErrorResult();
       }
     } catch (error) {
-      return Result.failure("");
+      return this.createGenericErrorResult();
     }
+  }
+
+  private createGenericErrorResult() {
+    return Result.failure<Sdl, string>("An unexpected error occurred");
   }
 
   private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {

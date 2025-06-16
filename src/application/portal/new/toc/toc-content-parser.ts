@@ -4,10 +4,6 @@ import { TocGroup, TocCustomPage } from "../../../../types/toc/toc";
 
 export class TocContentParser {
   async parseContentFolder(contentFolderPath: string, workingDirectory: string): Promise<TocGroup[]> {
-    if (!await fs.pathExists(contentFolderPath)) {
-      return [];
-    }
-
     const items = await fs.readdir(contentFolderPath);
     const contentItems: (TocGroup | TocCustomPage)[] = [];
 
@@ -29,7 +25,7 @@ export class TocContentParser {
         
         contentItems.push({
           page: pageName,
-          file: relativePath
+          file: this.normalizePath(relativePath)
         });
       }
     }
@@ -44,5 +40,9 @@ export class TocContentParser {
       group: "Custom Content",
       items: contentItems
     }];
+  }
+  
+  private normalizePath(path: string) : string {
+    return path.replace(/\\/g, '/');
   }
 } 

@@ -1,8 +1,9 @@
 import * as path from "path";
-import * as fs from "fs-extra";
 import { PortalService } from "../../../../infrastructure/services/portal-service";
 import { validateAndZipPortalSource, deleteFile } from "../../../../utils/utils";
 import { TocEndpoint, TocModel } from "../../../../types/toc/toc";
+import { Result } from "../../../../types/common/result";
+import { Sdl, SdlEndpoint, SdlModel } from "../../../../types/sdl/sdl";
 
 export class SdlParser {
   private readonly portalService: PortalService;
@@ -11,17 +12,7 @@ export class SdlParser {
     this.portalService = new PortalService();
   }
 
-  async getTocComponentsFromSdl(specFolderPath: string, workingDirectory: string, configDir: string): Promise<{
-    endpointGroups: Map<string, TocEndpoint[]>;
-    models: TocModel[];
-  }> {
-    if (!await fs.pathExists(specFolderPath)) {
-      return {
-        endpointGroups: new Map(),
-        models: []
-      };
-    }
-
+  async getTocComponentsFromSdl(specFolderPath: string, workingDirectory: string, configDir: string): Promise<Result<{endpointGroups: Map<string, TocEndpoint[]>;models: TocModel[];},string>> {
     const sourceSpecInputZipFilePath = await validateAndZipPortalSource(
       specFolderPath,
       path.join(workingDirectory, ".spec_source.zip")
@@ -31,26 +22,23 @@ export class SdlParser {
       const result = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir);
       
       if (!result.isSuccess()) {
-        return {
-          endpointGroups: new Map(),
-          models: []
-        };
+        return Result.failure("Unable to extract components from spec. Check for any issues in your spec file.")
       }
 
-      const sdl = result.value;
+      const sdl : Sdl = result.value!
       const endpointGroups = this.extractEndpointGroups(sdl);
       const models = this.extractModels(sdl);
 
-      return { endpointGroups, models };
+      return Result.success({ endpointGroups, models });
     } finally {
       await deleteFile(sourceSpecInputZipFilePath);
     }
   }
 
-  private extractEndpointGroups(sdl: any): Map<string, TocEndpoint[]> {
+  private extractEndpointGroups(sdl: Sdl): Map<string, TocEndpoint[]> {
     const endpointGroups = new Map<string, TocEndpoint[]>();
     
-    const endpoints = sdl.Endpoints.map((e: any): TocEndpoint => ({
+    const endpoints = sdl.Endpoints.map((e: SdlEndpoint): TocEndpoint => ({
       generate: null,
       from: "endpoint",
       endpointName: e.Name,
@@ -68,8 +56,8 @@ export class SdlParser {
     return endpointGroups;
   }
 
-  private extractModels(sdl: any): TocModel[] {
-    return sdl.CustomTypes.map((e: any): TocModel => ({
+  private extractModels(sdl: Sdl): TocModel[] {
+    return sdl.CustomTypes.map((e: SdlModel): TocModel => ({
       generate: null,
       from: "model",
       modelName: e.Name
