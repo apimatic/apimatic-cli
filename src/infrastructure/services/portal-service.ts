@@ -1,13 +1,16 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
 import * as path from "path";
-import { FileWrapper, ApiResponse, ApiError, InternalServerErrorResponseError } from "@apimatic/sdk";
 import {
   ContentType,
   DocsPortalManagementController,
   Client,
   UnauthorizedResponseError,
-  ProblemDetailsError
+  ProblemDetailsError,
+  FileWrapper,
+  ApiResponse,
+  ApiError,
+  InternalServerErrorResponseError
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate";
