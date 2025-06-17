@@ -1,17 +1,26 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
-import { FileWrapper, ApiResponse, ApiError } from "@apimatic/sdk";
+import * as path from "path";
 import {
   ContentType,
   DocsPortalManagementController,
   Client,
   UnauthorizedResponseError,
-  ProblemDetailsError
+  ProblemDetailsError,
+  FileWrapper,
+  ApiResponse,
+  ApiError,
+  TransformationController,
+  Transformation,
+  ExportFormats,
+  InternalServerErrorResponseError
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate";
 import { Result } from "../../types/common/result";
 import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils";
+import { TransformationData } from "../../types/api/transform";
+import { Sdl } from "../../types/sdl/sdl";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -39,6 +48,44 @@ export class PortalService {
     } catch (error) {
       return Result.failure(await this.handlePortalGenerationErrors(error, params));
     }
+  }
+
+  async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
+    if (!(await fsExtra.pathExists(specPath))) {
+      return Result.failure("Spec file doesn't exist");
+    }
+
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
+    const client = this.createApiClient(authorizationHeader);
+    const transformationController = new TransformationController(client);
+
+    try {
+      const file = new FileWrapper(fs.createReadStream(specPath));
+      const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
+        ContentType.EnumMultipartformdata,
+        file,
+        ExportFormats.APIMATIC
+      );
+
+      if (!generation.result.success) {
+        return this.createGenericErrorResult();
+      }
+
+      const transformationId = generation.result.id;
+      const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
+      if ((result as NodeJS.ReadableStream).readable) {
+        return Result.success((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
+      } else {
+        return this.createGenericErrorResult();
+      }
+    } catch {
+      return this.createGenericErrorResult();
+    }
+  }
+
+  private createGenericErrorResult() {
+    return Result.failure<Sdl, string>("An unexpected error occurred");
   }
 
   private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
@@ -70,7 +117,7 @@ export class PortalService {
     if (error instanceof UnauthorizedResponseError) {
       //401
       const body = await this.parseErrorResponse(error);
-      return getMessageInRedColor(body.message ?? "Unauthorized access");
+      return getMessageInRedColor(body.message ?? "Unauthorized access.");
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const body = await this.parseErrorResponse(error);
@@ -79,11 +126,11 @@ export class PortalService {
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
       return await this.saveAndExtractErrorZipFile(error, params);
-    } else if (error instanceof ApiError && error.statusCode === 500) {
+    } else if (error instanceof InternalServerErrorResponseError) {
       //500
-      //TODO: Replace this message with the one returned by the API once we improve the messaging.
+      const body = await this.parseErrorResponse(error);
       return getMessageInRedColor(
-        "An internal server error occurred. Please try again or reach out to our team at support@apimatic.io for help if your problem persists."
+        `${body.message} Please try again or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
       return getMessageInRedColor(error instanceof Error ? error.message : String(error));
@@ -109,10 +156,11 @@ export class PortalService {
         .on("finish", async () => {
           await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
           await deleteFile(params.generatedPortalArtifactsZipFilePath);
+          await deleteFile(path.join(params.generatedPortalArtifactsFolderPath, "static"));
           resolve(
             getMessageInRedColor(
               "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-                params.generatedPortalArtifactsFolderPath
+                path.join(params.generatedPortalArtifactsFolderPath, "apimatic-debug")
             )
           );
         })

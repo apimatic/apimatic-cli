@@ -66,7 +66,7 @@ Your portal has been generated at D:/
     }
 
     const validationResult = await this.validatePaths(paths);
-    if (!validationResult.isSuccess) {
+    if (validationResult.isFailed()) {
       this.error(validationResult.error!);
     }
 

@@ -42,7 +42,7 @@ export class PortalGenerateAction {
     const portalGenerationResult = await docsPortalService.generateOnPremPortal(generatePortalParams, configDir);
     await deleteFile(sourceBuildInputZipFilePath);
 
-    if (portalGenerationResult.isSuccess) {
+    if (portalGenerationResult.isSuccess()) {
       await this.saveGeneratedPortalStreamToZipFile(
         portalGenerationResult.value!,
         paths.generatedPortalArtifactsZipFilePath
@@ -60,7 +60,7 @@ export class PortalGenerateAction {
     } else {
       this.prompts.displayPortalGenerationErrorMessage();
       this.prompts.logError(
-        getMessageInRedColor(`An error occurred while generating the portal: \n${portalGenerationResult.error!}`)
+        getMessageInRedColor(`${portalGenerationResult.error!}`)
       );
     }
   }
