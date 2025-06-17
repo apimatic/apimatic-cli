@@ -63,7 +63,7 @@ export class PortalNewTocAction {
       return Result.success(tocPath);
     } catch (error) {
       this.prompts.logError(getMessageInRedColor(`${error}`));
-      return Result.failure(`Something went wrong while creating your toc file.`);
+      return Result.failure(`❌ An unexpected error occurred while generating the TOC file.`);
     }
   }
 
@@ -90,32 +90,33 @@ export class PortalNewTocAction {
       return { endpointGroups: new Map(), models: [] };
     }
 
-    this.prompts.startProgressIndicatorWithMessage("Extracting endpoints and/or models from spec...");
+    this.prompts.startProgressIndicatorWithMessage("Extracting endpoints and/or models from the API specification...");
     const specFolderPath = await this.getSpecFolderPath(workingDirectory);
 
     if (!(await fs.pathExists(specFolderPath))) {
-      this.prompts.stopProgressIndicatorWithMessage(`⚠️ Spec folder not found at ${specFolderPath}`);
-      this.prompts.displayInfo("Falling back on using non-expanded endpoints and/or models...");
+      this.prompts.stopProgressIndicatorWithMessage(`⚠️ Could not find the specification folder at: ${specFolderPath}`);
+      this.prompts.displayInfo("Falling back to default TOC structure without expanded endpoints or models...");
       return { endpointGroups: new Map(), models: [] };
     }
 
     const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, workingDirectory, configDir);
 
-    if (sdlResult.isSuccess()) {
-      this.prompts.stopProgressIndicatorWithMessage(`✅ Extracted endpoints and/or models from spec successfully.`);
-      return sdlResult.value!;
+    if (!sdlResult.isSuccess()) {
+      this.prompts.stopProgressIndicatorWithMessage(`⚠️ ${sdlResult.error!}`);
+      this.prompts.displayInfo("Falling back to default TOC structure without expanded endpoints or models...");
+      return { endpointGroups: new Map(), models: [] };
     }
 
-    this.prompts.stopProgressIndicatorWithMessage(`⚠️ ${sdlResult.error!}`);
-    this.prompts.displayInfo("Falling back on using non-expanded endpoints and/or models...");
-    return { endpointGroups: new Map(), models: [] };
+    this.prompts.stopProgressIndicatorWithMessage("✅ Successfully extracted endpoints and/or models from the specification.");
+    return sdlResult.value!;
+
   }
 
   private async extractContentGroups(workingDirectory: string): Promise<TocGroup[]> {
     const contentFolderPath = await this.getContentFolderPath(workingDirectory);
 
     if (!(await fs.pathExists(contentFolderPath))) {
-      this.prompts.displayInfo(`⚠️ Content folder not found at ${contentFolderPath}`);
+      this.prompts.displayInfo(`⚠️ Could not locate the content folder at: ${contentFolderPath}`);
       this.prompts.displayInfo("Skipping custom content addition in TOC...");
       return [];
     }

@@ -33,7 +33,7 @@ export class PortalNewTocPrompts {
   }
 
   displayOutroMessage(tocPath: string): void {
-    outro(`The toc file has been created at ${tocPath}`);
+    outro(`✅ TOC file successfully created at: ${tocPath}`);
   }
 
   logError(error: string): void {
