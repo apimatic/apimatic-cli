@@ -6,29 +6,29 @@ const DEFAULT_FOLDER = process.cwd();
 
 export default class PortalNewToc extends Command {
   static description =
-    "Create a new table of contents (toc) file for your API Documentation portal. The generated file will be a YAML file with the .yml extension.";
+    "Generates a new Table of Contents (TOC) file used for the generation of your API documentation portal. The output is a YAML file with the .yml extension.";
 
   static flags = {
     destination: Flags.string({
       parse: async (input: string) => path.resolve(input),
-      description: "path where the toc file will be created"
+      description: "optional path where the generated TOC file will be saved. Defaults to the current working directory if not provided.",
     }),
     folder: Flags.string({
       parse: async (input: string) => path.resolve(input),
-      description: "path of the working directory",
+      description: "path to the working directory containing the API project files. Defaults to the current working directory if not specified.",
       default: DEFAULT_FOLDER
     }),
     force: Flags.boolean({
       default: false,
-      description: "overwrite if a toc file exists in the destination"
+      description: "overwrite the TOC file if one already exists at the destination.",
     }),
     "expand-endpoints": Flags.boolean({
       default: false,
-      description: "expand endpoints into individual entries"
+      description: "include individual entries for each endpoint in the generated TOC. Requires a valid API specification in the working directory."
     }),
     "expand-models": Flags.boolean({
       default: false,
-      description: "expand models into individual entries"
+      description: "include individual entries for each model in the generated TOC. Requires a valid API specification in the working directory."
     })
   };
 
@@ -36,8 +36,11 @@ export default class PortalNewToc extends Command {
     `$ apimatic portal:new:toc --destination="./portal/content/"
 A new toc file has been created at ./portal/content/toc.yml
 `,
+    `$ apimatic portal:new:toc --folder="./my-project" 
+A new toc file has been created at ./my-project/content/toc.yml
+`,
     `$ apimatic portal:new:toc --folder="./my-project" --destination="./portal/content/"
-A new toc file has been created at ./portal/content/toc.yml using ./my-project as working directory
+A new toc file has been created at ./portal/content/toc.yml
 `
   ];
 
