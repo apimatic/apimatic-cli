@@ -24,12 +24,12 @@ export class PortalNewTocPrompts {
     return useExistingFile === "yes";
   }
 
-  displayTocCreationMessage(): void {
-    this.spin.start("Creating toc file...");
+  startProgressIndicatorWithMessage(message: string): void {
+    this.spin.start(message);
   }
 
-  displayTocCreationSuccessMessage(): void {
-    this.spin.stop("✅ Toc file created successfully.");
+  stopProgressIndicatorWithMessage(message: string) : void {
+    this.spin.stop(message);
   }
 
   displayOutroMessage(tocPath: string): void {
@@ -45,6 +45,6 @@ export class PortalNewTocPrompts {
   }
 
   displayInfo(message: string): void {
-    log.info(message);
+    log.step(message);
   }
 } 

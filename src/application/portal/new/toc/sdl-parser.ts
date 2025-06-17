@@ -22,7 +22,7 @@ export class SdlParser {
       const result = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir);
       
       if (!result.isSuccess()) {
-        return Result.failure("Unable to extract components from spec. Check for any issues in your spec file.")
+        return Result.failure("Unable to extract components from spec. Check for any issues in your spec file using APIMatic's interactive VS Code Extension.")
       }
 
       const sdl : Sdl = result.value!

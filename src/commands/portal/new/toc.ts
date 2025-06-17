@@ -2,7 +2,7 @@ import * as path from "path";
 import { Command, Flags } from "@oclif/core";
 import { PortalNewTocAction } from "../../../actions/portal/new/toc";
 
-const DEFAULT_FOLDER = "./";
+const DEFAULT_FOLDER = process.cwd();
 
 export default class PortalNewToc extends Command {
   static description =
@@ -24,11 +24,11 @@ export default class PortalNewToc extends Command {
     }),
     "expand-endpoints": Flags.boolean({
       default: false,
-      description: "use individual endpoints generation instead of SDL-based endpoints"
+      description: "expand endpoints into individual entries"
     }),
     "expand-models": Flags.boolean({
       default: false,
-      description: "use individual models generation instead of SDL-based models"
+      description: "expand models into individual entries"
     })
   };
 

@@ -1,19 +1,17 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
 import {
+  ContentType,
+  DocsPortalManagementController,
+  Client,
+  UnauthorizedResponseError,
+  ProblemDetailsError,
   FileWrapper,
   ApiResponse,
   ApiError,
   TransformationController,
   Transformation,
   ExportFormats
-} from "@apimatic/sdk";
-import {
-  ContentType,
-  DocsPortalManagementController,
-  Client,
-  UnauthorizedResponseError,
-  ProblemDetailsError
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate";
@@ -75,11 +73,11 @@ export class PortalService {
       const transformationId = generation.result.id;
       const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
       if ((result as NodeJS.ReadableStream).readable) {
-        return Result.success(await parseStreamBodyToJson(result as NodeJS.ReadableStream) as Sdl);
+        return Result.success((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
       } else {
         return this.createGenericErrorResult();
       }
-    } catch (error) {
+    } catch {
       return this.createGenericErrorResult();
     }
   }
