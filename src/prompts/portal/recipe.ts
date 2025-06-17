@@ -24,6 +24,33 @@ export class PortalRecipePrompts {
     return (recipeName as string).trim();
   }
 
+  public async buildConfigFilePathPrompt(): Promise<string> {
+    const buildConfigFilePath = await text({
+      message: `APIMATIC-BUILD.json file was not found in the provided directory. Please provide the absolute path to your build config file:`,
+      validate: (path) => {
+        if (!path) {
+          return "Build config file path cannot be empty. Please provide a valid file path.";
+        }
+
+        if (!path.endsWith(".json")) {
+          return "The content file must be a JSON (.json) file. Please provide a valid file path.";
+        }
+        if (fs.existsSync(path) && fs.statSync(path).isFile()) {
+          return;
+        }
+
+        return "The specified path is either not a valid absolute file path or it doesn't exist. Please provide a valid file path.";
+      }
+    });
+
+    if (isCancel(buildConfigFilePath)) {
+      cancel("Operation cancelled.");
+      return process.exit(0);
+    }
+
+    return (buildConfigFilePath as string).trim();
+  }
+
   public async stepNamePrompt(defaultStepName: string): Promise<string> {
     const stepName = await text({
       message: `Enter a name for the step you want to add to your API Recipe:`,

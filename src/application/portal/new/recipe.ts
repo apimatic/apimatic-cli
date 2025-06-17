@@ -1,6 +1,6 @@
-import { SerializableRecipe, SerializableStep } from "../../../types/portal/recipe";
+import { SerializableRecipe } from "../../../types/portal/recipe";
 
-export class PortalRecipeBuilder {
+export class PortalRecipe {
   private recipe: SerializableRecipe;
 
   constructor(name: string) {
@@ -38,7 +38,7 @@ export class PortalRecipeBuilder {
     return this;
   }
 
-  build(): SerializableRecipe {
+  toSerializableRecipe(): SerializableRecipe {
     return this.recipe;
   }
 }
