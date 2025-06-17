@@ -1,5 +1,6 @@
 import * as fsExtra from "fs-extra";
 import * as fs from "fs";
+import * as path from "path";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -11,7 +12,8 @@ import {
   ApiError,
   TransformationController,
   Transformation,
-  ExportFormats
+  ExportFormats,
+  InternalServerErrorResponseError
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
 import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate";
@@ -115,7 +117,7 @@ export class PortalService {
     if (error instanceof UnauthorizedResponseError) {
       //401
       const body = await this.parseErrorResponse(error);
-      return getMessageInRedColor(body.message ?? "Unauthorized access");
+      return getMessageInRedColor(body.message ?? "Unauthorized access.");
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const body = await this.parseErrorResponse(error);
@@ -124,11 +126,11 @@ export class PortalService {
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
       return await this.saveAndExtractErrorZipFile(error, params);
-    } else if (error instanceof ApiError && error.statusCode === 500) {
+    } else if (error instanceof InternalServerErrorResponseError) {
       //500
-      //TODO: Replace this message with the one returned by the API once we improve the messaging.
+      const body = await this.parseErrorResponse(error);
       return getMessageInRedColor(
-        "An internal server error occurred. Please try again or reach out to our team at support@apimatic.io for help if your problem persists."
+        `${body.message} Please try again or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
       return getMessageInRedColor(error instanceof Error ? error.message : String(error));
@@ -154,10 +156,11 @@ export class PortalService {
         .on("finish", async () => {
           await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
           await deleteFile(params.generatedPortalArtifactsZipFilePath);
+          await deleteFile(path.join(params.generatedPortalArtifactsFolderPath, "static"));
           resolve(
             getMessageInRedColor(
               "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-                params.generatedPortalArtifactsFolderPath
+                path.join(params.generatedPortalArtifactsFolderPath, "apimatic-debug")
             )
           );
         })

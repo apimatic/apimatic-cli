@@ -56,7 +56,7 @@ export class PortalGeneratePrompts {
   }
 
   displayPortalGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while generating your portal.`));
+    this.spin.stop(getMessageInRedColor(`Portal Generation failed.`));
   }
 
   displayOutroMessage(generatedPortalPath: string): void {

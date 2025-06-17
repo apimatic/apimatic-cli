@@ -60,7 +60,7 @@ export class PortalGenerateAction {
     } else {
       this.prompts.displayPortalGenerationErrorMessage();
       this.prompts.logError(
-        getMessageInRedColor(`An error occurred while generating the portal: \n${portalGenerationResult.error!}`)
+        getMessageInRedColor(`${portalGenerationResult.error!}`)
       );
     }
   }

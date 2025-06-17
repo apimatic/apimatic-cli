@@ -17,8 +17,8 @@ export default class SdkGenerate extends Command {
       parse: async (input) => input.toUpperCase(),
       required: true,
       description: `language platform for sdk
-Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT
-Legacy: CS_NET_STANDARD_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|TS_GENERIC_LIB`
+Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT|GO
+Legacy: CS_NET_STANDARD_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB_V2|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|TS_GENERIC_LIB|GO_GENERIC_LIB`
     }),
     file: Flags.string({
       parse: async (input) => path.resolve(input),

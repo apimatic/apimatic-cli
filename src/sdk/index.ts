@@ -25,6 +25,7 @@ export * from './controllers/docsPortalGenerationAsyncController';
 export * from './controllers/docsPortalManagementController';
 export * from './controllers/transformationController';
 export { ApiError } from './core';
+export * from './errors/internalServerErrorResponseError';
 export * from './errors/problemDetailsError';
 export * from './errors/unauthorizedResponseError';
 export { Accept } from './models/accept';
