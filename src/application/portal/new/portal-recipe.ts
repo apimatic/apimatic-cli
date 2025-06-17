@@ -1,7 +1,7 @@
 import { SerializableRecipe } from "../../../types/portal/recipe";
 
 export class PortalRecipe {
-  private recipe: SerializableRecipe;
+  private readonly recipe: SerializableRecipe;
 
   constructor(name: string) {
     this.recipe = {

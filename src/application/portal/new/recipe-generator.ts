@@ -35,12 +35,10 @@ export class PortalRecipeGenerator {
     recipeFileName: string
   ): Promise<void> {
     let apiRecipesGroup = tocData.toc?.find((item: any) => item.group === "API Recipes");
-    if (!apiRecipesGroup) {
-      apiRecipesGroup = {
-        group: "API Recipes",
-        items: []
-      };
-    }
+    apiRecipesGroup ??= {
+      group: "API Recipes",
+      items: []
+    };
 
     const existingRecipe = apiRecipesGroup.items.find(
       (item: any) => item.page === recipeName || item.file === `api-recipes/${recipeFileName}.md`

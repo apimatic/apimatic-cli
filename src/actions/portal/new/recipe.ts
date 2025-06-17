@@ -7,7 +7,7 @@ import { PortalRecipePrompts } from "../../../prompts/portal/recipe";
 import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/portal/recipe";
 import { getMessageInRedColor, isValidUrl } from "../../../utils/utils";
 import { Result } from "../../../types/common/result";
-import { PortalRecipe } from "../../../application/portal/new/recipe";
+import { PortalRecipe } from "../../../application/portal/new/portal-recipe";
 import { PortalRecipeGenerator } from "../../../application/portal/new/recipe-generator";
 
 export class PortalRecipeAction {
@@ -58,12 +58,12 @@ export class PortalRecipeAction {
       return Result.failure(getMessageInRedColor(`Unable to generate API Recipe: ${tocFileResult.error!}`));
     }
 
-    const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocFileResult.value!, recipeName, recipeFileName);
+    const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocFileResult.value, recipeName, recipeFileName);
     if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt())) {
       return Result.failure(getMessageInRedColor("Unable to generate API Recipe: Operation cancelled."));
     }
 
-    const tailIncludesPropertyAlreadyExists = this.checkTailIncludesPropertyAlreadyExists(buildConfigResult.value!);
+    const tailIncludesPropertyAlreadyExists = this.checkTailIncludesPropertyAlreadyExists(buildConfigResult.value);
     if (tailIncludesPropertyAlreadyExists) {
       if (!(await this.prompts.overwriteTailIncludesPrompt())) {
         return Result.failure(getMessageInRedColor("Unable to generate API Recipe: Operation cancelled."));
@@ -78,7 +78,7 @@ export class PortalRecipeAction {
     const recipeGenerator = new PortalRecipeGenerator();
     await recipeGenerator.createRecipe(
       recipeResult.value!,
-      tocFileResult.value!,
+      tocFileResult.value,
       tocFilePath,
       recipeName,
       recipeFileName,
