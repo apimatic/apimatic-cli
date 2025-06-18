@@ -5,7 +5,7 @@ import { parse } from "yaml";
 import { TreeObject } from "treeify";
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe";
 import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/portal/recipe";
-import { getMessageInRedColor, isValidUrl } from "../../../utils/utils";
+import { isValidUrl } from "../../../utils/utils";
 import { Result } from "../../../types/common/result";
 import { PortalRecipe } from "../../../application/portal/new/portal-recipe";
 import { PortalRecipeGenerator } from "../../../application/portal/new/recipe-generator";
@@ -28,16 +28,12 @@ export class PortalRecipeAction {
 
     const validateBuildDirectoryPathResult = await this.validateBuildDirectoryPath(buildDirectoryPath);
     if (!validateBuildDirectoryPathResult.isSuccess) {
-      return Result.failure(
-        getMessageInRedColor(`Unable to generate API Recipe: ${validateBuildDirectoryPathResult.error!}`)
-      );
+      return Result.failure(`Unable to generate API Recipe: ${validateBuildDirectoryPathResult.error!}`);
     }
 
     const validateBuildConfigFilePathResult = await this.validateBuildConfigFilePath(buildConfigFilePath);
     if (!validateBuildConfigFilePathResult.isSuccess) {
-      return Result.failure(
-        getMessageInRedColor(`Unable to generate API Recipe: ${validateBuildConfigFilePathResult}`)
-      );
+      return Result.failure(`Unable to generate API Recipe: ${validateBuildConfigFilePathResult}`);
     }
 
     //TODO: Create a type for the build config and use that here instead of any.
@@ -47,7 +43,7 @@ export class PortalRecipeAction {
     );
     const buildConfigResult = await this.parseBuildConfig(resolvedBuildConfigFilePath);
     if (!buildConfigResult.isSuccess) {
-      return Result.failure(getMessageInRedColor(`Unable to generate API Recipe: ${buildConfigResult.error!}`));
+      return Result.failure(`Unable to generate API Recipe: ${buildConfigResult.error!}`);
     }
 
     const contentFolderPath = this.getContentFolderPath(buildConfigResult.value, buildDirectoryPath);
@@ -55,24 +51,24 @@ export class PortalRecipeAction {
     //TODO: Replace any type of tocFileResult.value to concrete type.
     const tocFileResult = await this.parseTocFile(tocFilePath);
     if (!tocFileResult.isSuccess) {
-      return Result.failure(getMessageInRedColor(`Unable to generate API Recipe: ${tocFileResult.error!}`));
+      return Result.failure(`Unable to generate API Recipe: ${tocFileResult.error!}`);
     }
 
     const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocFileResult.value, recipeName, recipeFileName);
     if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt())) {
-      return Result.failure(getMessageInRedColor("Unable to generate API Recipe: Operation cancelled."));
+      return Result.cancelled("Operation was cancelled by the user.");
     }
 
     const tailIncludesPropertyAlreadyExists = this.checkTailIncludesPropertyAlreadyExists(buildConfigResult.value);
     if (tailIncludesPropertyAlreadyExists) {
       if (!(await this.prompts.overwriteTailIncludesPrompt())) {
-        return Result.failure(getMessageInRedColor("Unable to generate API Recipe: Operation cancelled."));
+        return Result.cancelled("Operation was cancelled by the user.");
       }
     }
 
     const recipeResult = await this.promptUserAndBuildNewRecipe(recipeName);
     if (!recipeResult.isSuccess) {
-      return Result.failure(getMessageInRedColor(`Unable to generate API Recipe: ${recipeResult.error!}`));
+      return Result.failure(`Unable to generate API Recipe: ${recipeResult.error!}`);
     }
 
     const recipeGenerator = new PortalRecipeGenerator();
@@ -147,7 +143,7 @@ export class PortalRecipeAction {
   ): Promise<Result<string, string>> {
     const contentFilePath = await this.prompts.contentFilePathPrompt();
     const contentResult = await this.getContentFromContentFilePath(contentFilePath);
-    if (contentResult.isSuccess) {
+    if (contentResult.isSuccess()) {
       recipe.addContentStep(stepName, stepName, contentResult.value!);
       this.prompts.displayStepAddedSuccessfullyMessage();
       return Result.success("Added content step successfully.");
@@ -172,7 +168,9 @@ export class PortalRecipeAction {
     try {
       return Result.success(parse(tocContent));
     } catch (error) {
-      return Result.failure(`Unable to parse TOC file:  ${(error as Error).message}`);
+      return Result.failure(
+        `Unable to parse the TOC file located at ${tocFilePath}. Please make sure that the TOC is a valid YAML file.`
+      );
     }
   }
 
@@ -209,7 +207,7 @@ export class PortalRecipeAction {
       const files = await fs.promises.readdir(buildDirectoryPath);
       const buildFileExists = files.find((file) => file === this.BUILD_FILE_NAME);
       if (!buildFileExists) {
-        return await this.prompts.buildConfigFilePathPrompt();
+        return await this.prompts.buildConfigFilePathPrompt(buildDirectoryPath);
       }
 
       return path.join(buildDirectoryPath, this.BUILD_FILE_NAME);
@@ -225,7 +223,7 @@ export class PortalRecipeAction {
       return Result.success(JSON.parse(fileData));
     } catch {
       return Result.failure(
-        "There was an error parsing the build config file, please check your build config file and try again later."
+        `There was an error parsing the build config file located at "${buildConfigFilePath}". Please check your build config file and try again later.`
       );
     }
   }

@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as path from "path";
 import { TreeObject, asTree } from "treeify";
 import { spinner, select, text, cancel, isCancel, outro, log } from "@clack/prompts";
 import { getMessageInGreenColor, isValidUrl } from "../../utils/utils";
@@ -24,22 +25,24 @@ export class PortalRecipePrompts {
     return (recipeName as string).trim();
   }
 
-  public async buildConfigFilePathPrompt(): Promise<string> {
+  public async buildConfigFilePathPrompt(buildDirectoryPath: string): Promise<string> {
     const buildConfigFilePath = await text({
-      message: `APIMATIC-BUILD.json file was not found in the provided directory. Please provide the absolute path to your build config file:`,
-      validate: (path) => {
-        if (!path) {
+      message: `APIMATIC-BUILD.json not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
+      validate: (filePath) => {
+        if (!filePath) {
           return "Build config file path cannot be empty. Please provide a valid file path.";
         }
 
-        if (!path.endsWith(".json")) {
+        if (!filePath.endsWith(".json")) {
           return "The content file must be a JSON (.json) file. Please provide a valid file path.";
         }
-        if (fs.existsSync(path) && fs.statSync(path).isFile()) {
+
+        const resolvedPath = path.resolve(buildDirectoryPath, filePath);
+        if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
           return;
         }
 
-        return "The specified path is either not a valid absolute file path or it doesn't exist. Please provide a valid file path.";
+        return "The specified path is either not a valid relative file path or it doesn't exist. Please provide a valid relative file path.";
       }
     });
 
@@ -48,7 +51,7 @@ export class PortalRecipePrompts {
       return process.exit(0);
     }
 
-    return (buildConfigFilePath as string).trim();
+    return path.resolve(buildDirectoryPath, (buildConfigFilePath as string).trim());
   }
 
   public async stepNamePrompt(defaultStepName: string): Promise<string> {

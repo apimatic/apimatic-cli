@@ -2,6 +2,7 @@ import * as path from "path";
 import { Command, Flags } from "@oclif/core";
 import { PortalRecipeAction } from "../../../actions/portal/new/recipe";
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe";
+import { getMessageInRedColor } from "../../../utils/utils";
 
 const DEFAULT_FOLDER = process.cwd();
 export default class PortalNewRecipe extends Command {
@@ -31,7 +32,11 @@ Generated recipe has been added to build directory at: C:/`
     const portalRecipePrompts = new PortalRecipePrompts(); 
 
     const createRecipeResult = await portalRecipeAction.createRecipe(flags.folder, flags["build-config"], flags.name);
-    if (!createRecipeResult.isSuccess)
+    if (createRecipeResult.isFailed())
+    {
+      portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.error!));
+    }
+    if (createRecipeResult.isCancelled())
     {
       portalRecipePrompts.logError(createRecipeResult.error!);
     }
