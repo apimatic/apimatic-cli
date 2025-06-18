@@ -167,7 +167,7 @@ export class PortalRecipeAction {
 
     try {
       return Result.success(parse(tocContent));
-    } catch (error) {
+    } catch {
       return Result.failure(
         `Unable to parse the TOC file located at ${tocFilePath}. Please make sure that the TOC is a valid YAML file.`
       );
