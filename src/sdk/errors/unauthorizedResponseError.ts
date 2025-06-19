@@ -11,6 +11,7 @@ import { ApiError } from '../core';
  */
 interface UnauthorizedResponse {
   message?: string;
+  additionalProperties?: Record<string, unknown>;
 }
 
 export class UnauthorizedResponseError extends ApiError<UnauthorizedResponse> {}

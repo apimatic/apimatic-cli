@@ -6,14 +6,14 @@
 
 import { ApiResponse, RequestOptions } from '../core';
 import {
-  APIEntityCodeGeneration,
-  aPIEntityCodeGenerationSchema,
-} from '../models/aPIEntityCodeGeneration';
+  ApiEntityCodeGeneration,
+  apiEntityCodeGenerationSchema,
+} from '../models/apiEntityCodeGeneration';
 import { Platforms, platformsSchema } from '../models/platforms';
 import { array, string } from '../schema';
 import { BaseController } from './baseController';
 
-export class CodeGenerationImportedApisController extends BaseController {
+export class CodeGenerationImportedApIsController extends BaseController {
   /**
    * Generate an SDK for an API Version.
    *
@@ -25,11 +25,11 @@ export class CodeGenerationImportedApisController extends BaseController {
    *                                   Docs in.
    * @return Response from the API call
    */
-  async generateSDK(
+  async generateSdk(
     apiEntityId: string,
     template: Platforms,
     requestOptions?: RequestOptions
-  ): Promise<ApiResponse<APIEntityCodeGeneration>> {
+  ): Promise<ApiResponse<ApiEntityCodeGeneration>> {
     const req = this.createRequest('POST');
     const mapped = req.prepareArgs({
       apiEntityId: [apiEntityId, string()],
@@ -39,7 +39,7 @@ export class CodeGenerationImportedApisController extends BaseController {
     req.form({ template: mapped.template });
     req.appendTemplatePath`/api-entities/${mapped.apiEntityId}/code-generations/generate`;
     req.authenticate([{ authorization: true }]);
-    return req.callAsJson(aPIEntityCodeGenerationSchema, requestOptions);
+    return req.callAsJson(apiEntityCodeGenerationSchema, requestOptions);
   }
 
   /**
@@ -52,7 +52,7 @@ export class CodeGenerationImportedApisController extends BaseController {
    *                                generation-imported-apis/generate-sdk).
    * @return Response from the API call
    */
-  async downloadSDK(
+  async downloadSdk(
     apiEntityId: string,
     codegenId: string,
     requestOptions?: RequestOptions
@@ -76,12 +76,12 @@ export class CodeGenerationImportedApisController extends BaseController {
   async listAllCodeGenerations(
     apiEntityId: string,
     requestOptions?: RequestOptions
-  ): Promise<ApiResponse<APIEntityCodeGeneration[]>> {
+  ): Promise<ApiResponse<ApiEntityCodeGeneration[]>> {
     const req = this.createRequest('GET');
     const mapped = req.prepareArgs({ apiEntityId: [apiEntityId, string()] });
     req.appendTemplatePath`/api-entities/${mapped.apiEntityId}/code-generations`;
     req.authenticate([{ authorization: true }]);
-    return req.callAsJson(array(aPIEntityCodeGenerationSchema), requestOptions);
+    return req.callAsJson(array(apiEntityCodeGenerationSchema), requestOptions);
   }
 
   /**
@@ -98,7 +98,7 @@ export class CodeGenerationImportedApisController extends BaseController {
     apiEntityId: string,
     codegenId: string,
     requestOptions?: RequestOptions
-  ): Promise<ApiResponse<APIEntityCodeGeneration>> {
+  ): Promise<ApiResponse<ApiEntityCodeGeneration>> {
     const req = this.createRequest('GET');
     const mapped = req.prepareArgs({
       apiEntityId: [apiEntityId, string()],
@@ -106,7 +106,7 @@ export class CodeGenerationImportedApisController extends BaseController {
     });
     req.appendTemplatePath`/api-entities/${mapped.apiEntityId}/code-generations/${mapped.codegenId}`;
     req.authenticate([{ authorization: true }]);
-    return req.callAsJson(aPIEntityCodeGenerationSchema, requestOptions);
+    return req.callAsJson(apiEntityCodeGenerationSchema, requestOptions);
   }
 
   /**

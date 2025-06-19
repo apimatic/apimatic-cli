@@ -10,13 +10,13 @@ import { Schema, stringEnum } from '../schema';
  * Enum for Platforms
  */
 export enum Platforms {
-  CSNETSTANDARDLIB = 'CS_NET_STANDARD_LIB',
-  JAVAECLIPSEJRELIB = 'JAVA_ECLIPSE_JRE_LIB',
-  PHPGENERICLIBV2 = 'PHP_GENERIC_LIB_V2',
-  PYTHONGENERICLIB = 'PYTHON_GENERIC_LIB',
-  RUBYGENERICLIB = 'RUBY_GENERIC_LIB',
-  TSGENERICLIB = 'TS_GENERIC_LIB',
-  GOGENERICLIB = 'GO_GENERIC_LIB',
+  CsNetStandardLib = 'CS_NET_STANDARD_LIB',
+  JavaEclipseJreLib = 'JAVA_ECLIPSE_JRE_LIB',
+  PhpGenericLibV2 = 'PHP_GENERIC_LIB_V2',
+  PythonGenericLib = 'PYTHON_GENERIC_LIB',
+  RubyGenericLib = 'RUBY_GENERIC_LIB',
+  TsGenericLib = 'TS_GENERIC_LIB',
+  GoGenericLib = 'GO_GENERIC_LIB',
 }
 
 /**

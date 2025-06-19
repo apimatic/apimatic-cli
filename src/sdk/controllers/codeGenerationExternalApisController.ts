@@ -17,7 +17,7 @@ import {
 import { array, string } from '../schema';
 import { BaseController } from './baseController';
 
-export class CodeGenerationExternalApisController extends BaseController {
+export class CodeGenerationExternalApIsController extends BaseController {
   /**
    * Generate an SDK for an API by by uploading the API specification file.
    *
@@ -33,7 +33,7 @@ export class CodeGenerationExternalApisController extends BaseController {
    *                                in.
    * @return Response from the API call
    */
-  async generateSDKViaFile(
+  async generateSdkViaFile(
     file: FileWrapper,
     template: Platforms,
     requestOptions?: RequestOptions
@@ -59,7 +59,7 @@ export class CodeGenerationExternalApisController extends BaseController {
    * @param body         Request Body
    * @return Response from the API call
    */
-  async generateSDKViaURL(
+  async generateSdkViaUrl(
     body: GenerateSdkViaUrlRequest,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<UserCodeGeneration>> {
@@ -90,7 +90,7 @@ export class CodeGenerationExternalApisController extends BaseController {
    *                             generation-external-apis/generate-sdk-via-url) calls.
    * @return Response from the API call
    */
-  async downloadSDK(
+  async downloadSdk(
     codegenId: string,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<NodeJS.ReadableStream | Blob>> {

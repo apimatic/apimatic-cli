@@ -10,7 +10,7 @@ import { Schema, stringEnum } from '../schema';
  * Enum for Accept2
  */
 export enum Accept2 {
-  EnumApplicationvndapimaticapiEntityfullv1json = 'application/vnd.apimatic.apiEntity.full.v1+json',
+  EnumApplicationvndapimaticapiEntityfullv1Json = 'application/vnd.apimatic.apiEntity.full.v1+json',
 }
 
 /**

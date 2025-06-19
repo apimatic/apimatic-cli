@@ -26,7 +26,7 @@ import { string } from '../schema';
 import { BaseController } from './baseController';
 import { ApiError } from '@apimatic/core';
 
-export class ApisManagementController extends BaseController {
+export class ApIsManagementController extends BaseController {
   /**
    * Import an API into the APIMatic Dashboard by uploading the API specification file.
    *
@@ -40,7 +40,7 @@ export class ApisManagementController extends BaseController {
    *                                    transformer/overview-transformer#supported-input-formats).
    * @return Response from the API call
    */
-  async importAPIViaFile(
+  async importApiViaFile(
     contentType: ContentType,
     file: FileWrapper,
     requestOptions?: RequestOptions
@@ -69,7 +69,7 @@ export class ApisManagementController extends BaseController {
    * @param body         Request Body
    * @return Response from the API call
    */
-  async importAPIViaURL(
+  async importApiViaUrl(
     body: ImportApiViaUrlRequest,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<ApiEntity>> {
@@ -110,7 +110,7 @@ export class ApisManagementController extends BaseController {
    *                                        transformer/overview-transformer#supported-input-formats).
    * @return Response from the API call
    */
-  async importNewAPIVersionViaFile(
+  async importNewApiVersionViaFile(
     apiGroupId: string,
     accept: Accept,
     versionOverride: string,
@@ -144,7 +144,7 @@ export class ApisManagementController extends BaseController {
    * @param body         Request Body
    * @return Response from the API call
    */
-  async importNewAPIVersionViaURL(
+  async importNewApiVersionViaUrl(
     apiGroupId: string,
     accept: Accept,
     body: ImportApiVersionViaUrlRequest,
@@ -182,7 +182,7 @@ export class ApisManagementController extends BaseController {
    *                                     transformer/overview-transformer#supported-input-formats).
    * @return Response from the API call
    */
-  async inplaceAPIImportViaFile(
+  async inplaceApiImportViaFile(
     apiEntityId: string,
     accept: Accept2,
     file: FileWrapper,
@@ -212,7 +212,7 @@ export class ApisManagementController extends BaseController {
    * @param body          Request Body
    * @return Response from the API call
    */
-  async inplaceAPIImportViaURL(
+  async inplaceApiImportViaUrl(
     apiEntityId: string,
     body: InplaceImportApiViaUrlRequest,
     requestOptions?: RequestOptions
@@ -238,7 +238,7 @@ export class ApisManagementController extends BaseController {
    * @param apiEntityId   The ID of the API Entity to fetch.
    * @return Response from the API call
    */
-  async fetchAPIEntity(
+  async fetchApiEntity(
     apiEntityId: string,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<ApiEntity>> {
@@ -259,7 +259,7 @@ export class ApisManagementController extends BaseController {
    *                                       transformer#supported-input-formats).
    * @return Response from the API call
    */
-  async downloadApisPecification(
+  async downloadApiSpecification(
     apiEntityId: string,
     format: ExportFormats,
     requestOptions?: RequestOptions

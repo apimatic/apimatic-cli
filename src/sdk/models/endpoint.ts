@@ -8,9 +8,10 @@ import {
   array,
   boolean,
   lazy,
-  object,
+  optional,
   Schema,
   string,
+  typedExpandoObject,
   unknown,
 } from '../schema';
 import { Parameter, parameterSchema } from './parameter';
@@ -51,23 +52,28 @@ export interface Endpoint {
   errors: unknown[];
   /** Test Cases associated with Endpoint */
   testCases: TestCase[];
+  additionalProperties?: Record<string, unknown>;
 }
 
-export const endpointSchema: Schema<Endpoint> = object({
-  id: ['id', string()],
-  apiId: ['apiId', string()],
-  name: ['name', string()],
-  httpMethod: ['httpMethod', string()],
-  group: ['group', string()],
-  skipAuthentication: ['skipAuthentication', boolean()],
-  route: ['route', string()],
-  response: ['response', lazy(() => responseSchema)],
-  hasOptionalQueryParams: ['hasOptionalQueryParams', boolean()],
-  hasOptionalFieldParams: ['hasOptionalFieldParams', boolean()],
-  collectParameters: ['collectParameters', boolean()],
-  wrapBodyInObject: ['wrapBodyInObject', boolean()],
-  requiredScopes: ['requiredScopes', array(string())],
-  parameters: ['parameters', array(lazy(() => parameterSchema))],
-  errors: ['errors', array(unknown())],
-  testCases: ['testCases', array(lazy(() => testCaseSchema))],
-});
+export const endpointSchema: Schema<Endpoint> = typedExpandoObject(
+  {
+    id: ['id', string()],
+    apiId: ['apiId', string()],
+    name: ['name', string()],
+    httpMethod: ['httpMethod', string()],
+    group: ['group', string()],
+    skipAuthentication: ['skipAuthentication', boolean()],
+    route: ['route', string()],
+    response: ['response', lazy(() => responseSchema)],
+    hasOptionalQueryParams: ['hasOptionalQueryParams', boolean()],
+    hasOptionalFieldParams: ['hasOptionalFieldParams', boolean()],
+    collectParameters: ['collectParameters', boolean()],
+    wrapBodyInObject: ['wrapBodyInObject', boolean()],
+    requiredScopes: ['requiredScopes', array(string())],
+    parameters: ['parameters', array(lazy(() => parameterSchema))],
+    errors: ['errors', array(unknown())],
+    testCases: ['testCases', array(lazy(() => testCaseSchema))],
+  },
+  'additionalProperties',
+  optional(unknown())
+);

@@ -90,7 +90,7 @@ export class DocsPortalManagementController extends BaseController {
    * @param accept        Example: application/zip
    * @return Response from the API call
    */
-  async generateOnPremPortalViaAPIEntity(
+  async generateOnPremPortalViaApiEntity(
     apiEntityId: string,
     accept: Accept3,
     requestOptions?: RequestOptions

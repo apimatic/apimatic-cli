@@ -5,18 +5,18 @@
  */
 
 import { HttpClientOptions } from './clientAdapter';
+import { PartialLoggingOptions } from './core';
 
 /** An interface for all configuration parameters required by the SDK. */
 export interface Configuration {
   timeout: number;
   environment: Environment;
-  /** @deprecated use customHeaderAuthenticationCredentials field instead */
-  authorization?: string;
   customHeaderAuthenticationCredentials?: {
     'Authorization': string;
   };
   httpClientOptions?: Partial<HttpClientOptions>;
   unstable_httpClientOptions?: any;
+  logging?: PartialLoggingOptions;
 }
 
 /** Environments available for API */

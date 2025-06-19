@@ -14,13 +14,16 @@ export {
   FileWrapper,
   isFileWrapper,
   ResponseValidationError,
+  LoggerInterface,
+  LogLevel,
+  ConsoleLogger,
 } from './core';
 export * from './defaultConfiguration';
-export * from './controllers/aPIValidationExternalApisController';
-export * from './controllers/aPIValidationImportedApisController';
-export * from './controllers/apisManagementController';
-export * from './controllers/codeGenerationExternalApisController';
-export * from './controllers/codeGenerationImportedApisController';
+export * from './controllers/apiValidationExternalApIsController';
+export * from './controllers/apiValidationImportedApIsController';
+export * from './controllers/apIsManagementController';
+export * from './controllers/codeGenerationExternalApIsController';
+export * from './controllers/codeGenerationImportedApIsController';
 export * from './controllers/docsPortalGenerationAsyncController';
 export * from './controllers/docsPortalManagementController';
 export * from './controllers/transformationController';
@@ -32,7 +35,7 @@ export { Accept } from './models/accept';
 export { Accept2 } from './models/accept2';
 export { Accept3 } from './models/accept3';
 export type { ApiEntity } from './models/apiEntity';
-export type { APIEntityCodeGeneration } from './models/aPIEntityCodeGeneration';
+export type { ApiEntityCodeGeneration } from './models/apiEntityCodeGeneration';
 export type { ApiEntityDetailed } from './models/apiEntityDetailed';
 export type { ApiValidationSummary } from './models/apiValidationSummary';
 export type { Attributes } from './models/attributes';
@@ -42,7 +45,7 @@ export type { AuthScope } from './models/authScope';
 export type { CodeGeneration } from './models/codeGeneration';
 export type { CodeGenSettings } from './models/codeGenSettings';
 export { ContentType } from './models/contentType';
-export type { CSNETSTANDARDLIB } from './models/cSNETSTANDARDLIB';
+export type { Csnetstandardlib } from './models/csnetstandardlib';
 export type { CustomType } from './models/customType';
 export type { DocsValidationSummary } from './models/docsValidationSummary';
 export type { Endpoint } from './models/endpoint';
