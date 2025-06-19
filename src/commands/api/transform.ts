@@ -26,7 +26,7 @@ Success! Your transformed file is located at D:/swagger_raml.yaml
 
   static flags = {
     format: Flags.string({
-      parse: async (format: string) => getValidFormat(format.toUpperCase()),
+      parse: async (format: string) => getValidFormat(format),
       required: true,
       description: `specification format to transform API specification into
 ${formats}`
