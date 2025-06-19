@@ -3,7 +3,7 @@ import * as fs from "fs-extra";
 
 import { Command, Flags } from "@oclif/core";
 import { SDKClient } from "../../client-utils/sdk-client";
-import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
+import { ApiError, Client, CodeGenerationExternalApIsController } from "@apimatic/sdk";
 
 import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils";
 import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate";
@@ -83,7 +83,7 @@ Success! Your SDK is located at swagger_sdk_csharp
 
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-      const sdkGenerationController: CodeGenerationExternalApisController = new CodeGenerationExternalApisController(
+      const sdkGenerationController: CodeGenerationExternalApIsController = new CodeGenerationExternalApIsController(
         client
       );
 

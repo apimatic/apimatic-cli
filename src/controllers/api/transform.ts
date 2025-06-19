@@ -32,7 +32,7 @@ export const getTransformationId = async (
       url: url,
       exportFormat: format as ExportFormats
     };
-    generation = await transformationController.transformViaURL(body);
+    generation = await transformationController.transformViaUrl(body);
   } else {
     throw new Error("Please provide a specification file");
   }

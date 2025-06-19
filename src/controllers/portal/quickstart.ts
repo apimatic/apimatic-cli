@@ -5,7 +5,7 @@ import * as filetype from "file-type";
 import * as fs from "fs";
 import * as fsextra from "fs-extra";
 import { getAuthInfo } from "../../client-utils/auth-manager";
-import { ApiError, APIValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
+import { ApiError, ApiValidationExternalApIsController, ApiValidationSummary } from "@apimatic/sdk";
 import { LoginCredentials, SpecFile } from "../../types/portal/quickstart";
 import { SDKClient } from "../../client-utils/sdk-client";
 import {
@@ -134,7 +134,7 @@ export class PortalQuickstartController {
   async getSpecValidationSummary(
     prompts: PortalQuickstartPrompts,
     specFile: SpecFile,
-    apiValidationController: APIValidationExternalApisController
+    apiValidationController: ApiValidationExternalApIsController
   ): Promise<ApiValidationSummary> {
     const validationFlags: GetValidationParams = {
       file: specFile.filePath,

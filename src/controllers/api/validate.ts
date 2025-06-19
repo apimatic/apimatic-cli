@@ -1,11 +1,11 @@
 import * as fs from "fs-extra";
-import { ApiResponse, APIValidationExternalApisController, ApiValidationSummary, ContentType, FileWrapper } from "@apimatic/sdk";
+import { ApiResponse, ApiValidationExternalApIsController, ApiValidationSummary, ContentType, FileWrapper } from "@apimatic/sdk";
 import { GetValidationParams } from "../../types/api/validate";
 import { createTempDirectory, deleteFile, zipDirectory } from "../../utils/utils";
 
 export const getValidationSummary = async (
   { file, url }: GetValidationParams,
-  apiValidationController: APIValidationExternalApisController
+  apiValidationController: ApiValidationExternalApIsController
 ): Promise<ApiValidationSummary> => {
   let validation: ApiResponse<ApiValidationSummary>;
 
@@ -15,17 +15,17 @@ export const getValidationSummary = async (
       const tempDir = await createTempDirectory();
       const zipPath = await zipDirectory(file, tempDir);
       const zipFile = new FileWrapper(fs.createReadStream(zipPath));
-      validation = await apiValidationController.validateAPIViaFile(ContentType.EnumMultipartformdata, zipFile);
+      validation = await apiValidationController.validateApiViaFile(ContentType.EnumMultipartformdata, zipFile);
 
       await deleteFile(zipPath);
 
       await fs.remove(tempDir);
     } else {
       const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-      validation = await apiValidationController.validateAPIViaFile(ContentType.EnumMultipartformdata, fileDescriptor);
+      validation = await apiValidationController.validateApiViaFile(ContentType.EnumMultipartformdata, fileDescriptor);
     }
   } else if (url) {
-    validation = await apiValidationController.validateAPIViaURL(url);
+    validation = await apiValidationController.validateApiViaUrl(url);
   } else {
     throw new Error("Please provide a specification file");
   }
