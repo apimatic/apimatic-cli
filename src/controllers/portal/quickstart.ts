@@ -189,18 +189,13 @@ export class PortalQuickstartController {
         }
       } else if ((error as ApiError).result) {
         const apiError = error as ApiError;
-        const result = apiError.result as APIValidateError;
-        if (result.modelState["exception Error"] && apiError.statusCode === 400) {
-          throw new Error(
-            `The provided spec file is not valid. Please ensure that the spec file you have provided is a valid API definition file.`
-          );
-        } else if ((error as AuthorizationError).body && apiError.statusCode === 401) {
-          throw new Error("You are not authorized to perform this action");
+        if ((error as AuthorizationError).body && apiError.statusCode === 401) {
+          throw new Error("You are not authorized to perform this action.");
         } else {
           throw new Error((error as Error).message);
         }
       } else if ((error as AuthenticationError).statusCode === 401) {
-        throw new Error("You are not authorized to perform this action");
+        throw new Error("You are not authorized to perform this action.");
       } else if (
         (error as AuthenticationError).statusCode === 402 &&
         (error as AuthenticationError).body &&

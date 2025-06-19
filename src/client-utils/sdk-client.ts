@@ -120,7 +120,7 @@ export class SDKClient {
       return new Client({
         timeout: 0,
         customHeaderAuthenticationCredentials: {
-          'Authorization': `X-Auth-Key ${overrideAuthKey}`
+          'Authorization': `X-Auth-Key ${storedAuthInfo.authKey}`
         }
       });
     } else {
