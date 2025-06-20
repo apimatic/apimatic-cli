@@ -11,7 +11,7 @@ EventEmitter.defaultMaxListeners = 50;
 
 const COMMAND = "portal:generate";
 const GENERATION_SUCCESS_MESSAGE = "The generated portal can be found at";
-const GENERATION_FAILURE_MESSAGE = "Something went wrong while generating your portal";
+const GENERATION_FAILURE_MESSAGE = "Portal Generation failed";
 const AUTHENTICATION_FAILURE_MESSAGE = "Authorization has been denied for this request";
 const VALIDATION_FAILURE_MESSAGE = "One or more validation errors occurred";
 const BUILD_FILE_MISSING_MESSAGE = "Build file not found";
@@ -154,7 +154,7 @@ describe("apimatic portal:generate", function () {
           dummy: "dummyValue"
         })
       );
-      const { stdout, error } = await runCommand([
+      const { stdout } = await runCommand([
         COMMAND,
         "--folder",
         sourceBuildInputDir,
@@ -170,7 +170,7 @@ describe("apimatic portal:generate", function () {
 
     it("throws 401 error due to invalid authentication key", async () => {
       await setupValidBuildDirectory(sourceBuildInputDir);
-      const { stdout, error } = await runCommand([
+      const { stdout } = await runCommand([
         COMMAND,
         "--folder",
         sourceBuildInputDir,
@@ -202,7 +202,7 @@ describe("apimatic portal:generate", function () {
           }
         });
 
-      const { stdout, error } = await runCommand([
+      const { stdout } = await runCommand([
         COMMAND,
         "--folder",
         sourceBuildInputDir,
@@ -230,7 +230,7 @@ describe("apimatic portal:generate", function () {
       await setupValidBuildDirectory(sourceBuildInputDir);
       fs.writeFileSync(path.join(sourceBuildInputDir, "content", "guides", "toc.yml"), INVALID_TOC_YAML);
 
-      const { stdout, error } = await runCommand([
+      const { stdout } = await runCommand([
         COMMAND,
         "--folder",
         sourceBuildInputDir,

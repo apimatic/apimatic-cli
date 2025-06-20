@@ -49,7 +49,9 @@ export class PortalGenerateAction {
       );
 
       if (flags.zip) {
+        this.prompts.displayPortalGenerationSuccessMessage();
         this.prompts.displayOutroMessage(paths.generatedPortalArtifactsZipFilePath);
+        return;
       }
 
       await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsFolderPath);
