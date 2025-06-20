@@ -17,7 +17,7 @@ import { string } from '../schema';
 import { BaseController } from './baseController';
 import { ApiError } from '@apimatic/core';
 
-export class APIValidationImportedApisController extends BaseController {
+export class ApiValidationImportedApIsController extends BaseController {
   /**
    * Validate an API using the [APIMatic Validator](https://docs.apimatic.io/generate-sdks/overview-
    * sdks#step-2-api-validation).
@@ -25,7 +25,7 @@ export class APIValidationImportedApisController extends BaseController {
    * @param apiEntityId   The ID of the API Entity to perform validation for.
    * @return Response from the API call
    */
-  async validateAPI(
+  async validateApi(
     apiEntityId: string,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<ApiValidationSummary>> {
@@ -48,7 +48,7 @@ export class APIValidationImportedApisController extends BaseController {
    * @param apiEntityId   The ID of the API Entity to perform validation for.
    * @return Response from the API call
    */
-  async validateAPIForDocs(
+  async validateApiForDocs(
     apiEntityId: string,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<DocsValidationSummary>> {

@@ -11,7 +11,7 @@ import { Schema, stringEnum } from '../schema';
  */
 export enum PackageRepositories {
   Npm = 'Npm',
-  PyPI = 'PyPI',
+  PyPi = 'PyPI',
   RubyGems = 'RubyGems',
 }
 

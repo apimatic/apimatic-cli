@@ -14,7 +14,7 @@ import { string } from '../schema';
 import { BaseController } from './baseController';
 import { ApiError } from '@apimatic/core';
 
-export class APIValidationExternalApisController extends BaseController {
+export class ApiValidationExternalApIsController extends BaseController {
   /**
    * Validate an API by uploading the API specification file.
    *
@@ -28,7 +28,7 @@ export class APIValidationExternalApisController extends BaseController {
    *                                    transformer/overview-transformer#supported-input-formats).
    * @return Response from the API call
    */
-  async validateAPIViaFile(
+  async validateApiViaFile(
     contentType: ContentType,
     file: FileWrapper,
     requestOptions?: RequestOptions
@@ -59,7 +59,7 @@ export class APIValidationExternalApisController extends BaseController {
    *                                 publicly accessible.
    * @return Response from the API call
    */
-  async validateAPIViaURL(
+  async validateApiViaUrl(
     descriptionUrl: string,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<ApiValidationSummary>> {

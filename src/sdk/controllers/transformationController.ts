@@ -61,7 +61,7 @@ export class TransformationController extends BaseController {
    * @param body         Request Body
    * @return Response from the API call
    */
-  async transformViaURL(
+  async transformViaUrl(
     body: TransformViaUrlRequest,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<Transformation>> {

@@ -65,7 +65,7 @@ export class PortalService {
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         ContentType.EnumMultipartformdata,
         file,
-        ExportFormats.APIMATIC
+        ExportFormats.Apimatic
       );
 
       if (!generation.result.success) {

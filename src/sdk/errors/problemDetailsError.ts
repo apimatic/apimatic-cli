@@ -16,6 +16,7 @@ interface ProblemDetails {
   detail?: string;
   instance?: string;
   errors?: Record<string, unknown>;
+  additionalProperties?: Record<string, unknown>;
 }
 
 export class ProblemDetailsError extends ApiError<ProblemDetails> {}

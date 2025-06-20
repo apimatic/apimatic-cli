@@ -10,20 +10,20 @@ import { Schema, stringEnum } from '../schema';
  * Enum for ExportFormats
  */
 export enum ExportFormats {
-  APIMATIC = 'APIMATIC',
-  WADL2009 = 'WADL2009',
-  WSDL = 'WSDL',
-  SWAGGER10 = 'Swagger10',
-  SWAGGER20 = 'Swagger20',
-  SWAGGERYAML = 'SwaggerYaml',
-  OAS3 = 'OpenApi3Json',
-  OPENAPI3YAML = 'OpenApi3Yaml',
-  APIBLUEPRINT = 'APIBluePrint',
-  RAML = 'RAML',
-  RAML10 = 'RAML10',
-  POSTMAN10 = 'Postman10',
-  POSTMAN20 = 'Postman20',
-  GRAPHQLSCHEMA = 'GraphQlSchema',
+  Apimatic = 'APIMATIC',
+  Wadl2009 = 'WADL2009',
+  Wsdl = 'WSDL',
+  Swagger10 = 'Swagger10',
+  Swagger20 = 'Swagger20',
+  Swaggeryaml = 'SwaggerYaml',
+  Oas3 = 'OpenApi3Json',
+  Openapi3Yaml = 'OpenApi3Yaml',
+  Apiblueprint = 'APIBluePrint',
+  Raml = 'RAML',
+  Raml10 = 'RAML10',
+  Postman10 = 'Postman10',
+  Postman20 = 'Postman20',
+  Graphqlschema = 'GraphQlSchema',
 }
 
 /**

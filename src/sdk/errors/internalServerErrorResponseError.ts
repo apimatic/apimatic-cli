@@ -11,6 +11,7 @@ import { ApiError } from '../core';
  */
 interface InternalServerErrorResponse {
   message?: string;
+  additionalProperties?: Record<string, unknown>;
 }
 
 export class InternalServerErrorResponseError extends ApiError<

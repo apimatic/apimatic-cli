@@ -5,50 +5,42 @@
  */
 
 import {
-  lazy,
   optional,
   Schema,
   string,
   typedExpandoObject,
   unknown,
 } from '../schema';
-import {
-  AuthorIdentifiers,
-  authorIdentifiersSchema,
-} from './authorIdentifiers';
+import { Id, idSchema } from './id';
+import { Link, linkSchema } from './link';
 
-export interface PublishedPackage {
-  id: string;
-  createdOn: string;
-  apiEntityId: string;
+/** This structure contains all details that goes into package deployment. */
+export interface Csnetstandardlib {
+  /** Unique package identifier */
+  id?: Id;
+  /** Package Repository as per platform */
   packageRepository: string;
-  template: string;
+  /** Package Name */
   packageName: string;
   version: string;
+  /** Any additional platform specific deployment detail */
   additionalDeploymentInformation?: unknown;
-  authorIdentifiers: AuthorIdentifiers;
-  link: string;
+  /** Link of deployed package */
+  link?: Link;
   additionalProperties?: Record<string, unknown>;
 }
 
-export const publishedPackageSchema: Schema<PublishedPackage> = typedExpandoObject(
+export const csnetstandardlibSchema: Schema<Csnetstandardlib> = typedExpandoObject(
   {
-    id: ['id', string()],
-    createdOn: ['createdOn', string()],
-    apiEntityId: ['apiEntityId', string()],
+    id: ['id', optional(idSchema)],
     packageRepository: ['packageRepository', string()],
-    template: ['template', string()],
     packageName: ['packageName', string()],
     version: ['version', string()],
     additionalDeploymentInformation: [
       'additionalDeploymentInformation',
       optional(unknown()),
     ],
-    authorIdentifiers: [
-      'authorIdentifiers',
-      lazy(() => authorIdentifiersSchema),
-    ],
-    link: ['link', string()],
+    link: ['link', optional(linkSchema)],
   },
   'additionalProperties',
   optional(unknown())

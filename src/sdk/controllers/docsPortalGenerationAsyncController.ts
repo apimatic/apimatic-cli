@@ -25,23 +25,23 @@ export class DocsPortalGenerationAsyncController extends BaseController {
    *
    * @param contentType
    * @param file                   The input file to the Portal Generator. Must contain the build file.
-   * @param xAPIMaticCallbackUrl   Optional header containing callback url. This url will be called by
+   * @param xApiMaticCallbackUrl   Optional header containing callback url. This url will be called by
    *                                              the server once the portal generation completes
    * @return Response from the API call
    */
   async generateOnPremPortalViaBuildInputAsync(
     contentType: ContentType,
     file: FileWrapper,
-    xAPIMaticCallbackUrl?: string,
+    xApiMaticCallbackUrl?: string,
     requestOptions?: RequestOptions
   ): Promise<ApiResponse<PortalGenerationAsyncResponse>> {
     const req = this.createRequest('POST', '/portal/v2');
     const mapped = req.prepareArgs({
       contentType: [contentType, contentTypeSchema],
-      xAPIMaticCallbackUrl: [xAPIMaticCallbackUrl, optional(string())],
+      xApiMaticCallbackUrl: [xApiMaticCallbackUrl, optional(string())],
     });
     req.header('Content-Type', mapped.contentType);
-    req.header('X-APIMatic-CallbackUrl', mapped.xAPIMaticCallbackUrl);
+    req.header('X-APIMatic-CallbackUrl', mapped.xApiMaticCallbackUrl);
     req.formData({ file: file });
     req.throwOn(400, ApiError, 'Bad Request');
     req.throwOn(401, ApiError, 'Unauthorized');

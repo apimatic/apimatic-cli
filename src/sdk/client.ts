@@ -16,7 +16,9 @@ import { Configuration, Environment } from './configuration';
 import {
   DEFAULT_CONFIGURATION,
   DEFAULT_RETRY_CONFIG,
+  DEFAULT_LOGGING_OPTIONS,
 } from './defaultConfiguration';
+import { ApiLogger, LoggingOptions, mergeLoggingOptions } from './core';
 import { ApiError } from './core';
 import { setHeader } from './core';
 import { updateUserAgent } from './core';
@@ -33,6 +35,7 @@ export class Client implements ClientInterface {
   private _config: Readonly<Configuration>;
   private _timeout: number;
   private _retryConfig: RetryConfiguration;
+  private _loggingOp: LoggingOptions;
   private _requestBuilderFactory: SdkRequestBuilderFactory;
   private _userAgent: string;
 
@@ -45,22 +48,22 @@ export class Client implements ClientInterface {
       ...DEFAULT_RETRY_CONFIG,
       ...this._config.httpClientOptions?.retryConfig,
     };
+    this._loggingOp = this._config.logging
+      ? mergeLoggingOptions(this._config.logging ?? {})
+      : mergeLoggingOptions(
+          this._config.logging ?? {},
+          DEFAULT_LOGGING_OPTIONS
+        );
     this._timeout =
       typeof this._config.httpClientOptions?.timeout != 'undefined'
         ? this._config.httpClientOptions.timeout
         : this._config.timeout;
-    const clonedConfig = {
-      ...this._config,
-      customHeaderAuthenticationCredentials: this._config
-        .customHeaderAuthenticationCredentials || {
-        Authorization: this._config.authorization || '',
-      },
-    };
-
-    this._userAgent = updateUserAgent('APIMatic CLI');
+    this._userAgent = updateUserAgent(
+      'TypeScript-SDK/3.0.0 [OS: {os-info}, Engine: {engine}/{engine-version}]'
+    );
     this._requestBuilderFactory = createRequestHandlerFactory(
       (server) => getBaseUri(server, this._config),
-      createAuthProviderFromConfig(clonedConfig),
+      createAuthProviderFromConfig(this._config),
       new HttpClient(AbortError, {
         timeout: this._timeout,
         clientConfigOverrides: this._config.unstable_httpClientOptions,
@@ -72,7 +75,8 @@ export class Client implements ClientInterface {
         withUserAgent(this._userAgent),
         withAuthenticationByDefault,
       ],
-      this._retryConfig
+      this._retryConfig,
+      this._loggingOp
     );
   }
 
@@ -108,14 +112,17 @@ function createRequestHandlerFactory(
   authProvider: AuthenticatorInterface<AuthParams>,
   httpClient: HttpClient,
   addons: ((rb: SdkRequestBuilder) => void)[],
-  retryConfig: RetryConfiguration
+  retryConfig: RetryConfiguration,
+  loggingOptions: LoggingOptions
 ): SdkRequestBuilderFactory {
   const requestBuilderFactory = createRequestBuilderFactory(
     createHttpClientAdapter(httpClient),
     baseUrlProvider,
     ApiError,
     authProvider,
-    retryConfig
+    retryConfig,
+    undefined,
+    new ApiLogger(loggingOptions)
   );
 
   return tap(requestBuilderFactory, ...addons);

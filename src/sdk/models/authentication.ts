@@ -7,10 +7,10 @@
 import {
   array,
   lazy,
-  object,
   optional,
   Schema,
   string,
+  typedExpandoObject,
   unknown,
 } from '../schema';
 import { AuthScope, authScopeSchema } from './authScope';
@@ -31,14 +31,19 @@ export interface Authentication {
   authGrantTypes: string[];
   /** Paramater Formats */
   paramFormats?: unknown;
+  additionalProperties?: Record<string, unknown>;
 }
 
-export const authenticationSchema: Schema<Authentication> = object({
-  id: ['id', string()],
-  authType: ['authType', string()],
-  scopes: ['scopes', array(lazy(() => authScopeSchema))],
-  parameters: ['parameters', array(string())],
-  authScopes: ['authScopes', array(string())],
-  authGrantTypes: ['authGrantTypes', array(string())],
-  paramFormats: ['paramFormats', optional(unknown())],
-});
+export const authenticationSchema: Schema<Authentication> = typedExpandoObject(
+  {
+    id: ['id', string()],
+    authType: ['authType', string()],
+    scopes: ['scopes', array(lazy(() => authScopeSchema))],
+    parameters: ['parameters', array(string())],
+    authScopes: ['authScopes', array(string())],
+    authGrantTypes: ['authGrantTypes', array(string())],
+    paramFormats: ['paramFormats', optional(unknown())],
+  },
+  'additionalProperties',
+  optional(unknown())
+);
