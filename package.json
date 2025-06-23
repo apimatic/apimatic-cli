@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.6",
+    "version": "1.1.0-alpha.8",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run"
@@ -43,10 +43,6 @@
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet"
     },
     "dependencies": {
-        "@apimatic/authentication-adapters": "^0.5.4",
-        "@apimatic/axios-client-adapter": "^0.3.7",
-        "@apimatic/core": "^0.10.16",
-        "@apimatic/schema": "^0.7.14",
         "@apimatic/sdk": "^0.2.0-alpha.1",
         "@clack/prompts": "^0.11.0",
         "@oclif/core": "^4.2.8",
