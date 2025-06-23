@@ -1,3 +1,10 @@
+# [1.1.0-alpha.7](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.6...v1.1.0-alpha.7) (2025-06-20)
+
+
+### Bug Fixes
+
+* updated dependency version of apimatic/sdk ([#90](https://github.com/apimatic/apimatic-cli/issues/90)) ([8efd8f8](https://github.com/apimatic/apimatic-cli/commit/8efd8f810b9d71914e1ffc762d2ab4b65a9040f9))
+
 # [1.1.0-alpha.6](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.5...v1.1.0-alpha.6) (2025-03-17)
 
 
