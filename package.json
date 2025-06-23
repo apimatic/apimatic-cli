@@ -102,6 +102,7 @@
         "oclif": "^4.17.34",
         "prettier": "^2.4.1",
         "rimraf": "^6.0.1",
+        "tmp-promise": "^3.0.3",
         "ts-node": "^8.10.2",
         "typescript": "^5.2.2"
     },
