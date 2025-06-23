@@ -2,7 +2,7 @@ import { ux } from "@oclif/core";
 import * as fs from "fs-extra";
 
 import { writeFileUsingReadableStream } from "../../utils/utils";
-import { DownloadTransformationParams, TransformationData, TransformationIdParams } from "../../types/api/transform";
+import { DownloadTransformationParams, TransformationData, TransformationFormats, TransformationIdParams } from "../../types/api/transform";
 import {
   ApiResponse,
   ContentType,
@@ -59,10 +59,12 @@ export const downloadTransformationFile = async ({
 };
 // Get valid platform from user's input, convert simple platform to valid Platforms enum value
 export const getValidFormat = (format: string) => {
-  if (Object.keys(ExportFormats).find((exportFormat) => exportFormat === format)) {
-    return ExportFormats[format as keyof typeof ExportFormats];
+  const key = Object.keys(TransformationFormats).find((value) => value === format) as keyof typeof TransformationFormats | undefined;
+  if (key) {
+    const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;
+    return ExportFormats[transformationFormat];
   } else {
-    const formats = Object.keys(ExportFormats).join("|");
-    throw new Error(`Please provide a valid platform i.e. ${formats}`);
+    const formats = Object.keys(TransformationFormats).join("|");
+    throw new Error(`Please provide a valid platform, e.g. ${formats}`);
   }
 };
