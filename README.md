@@ -17,11 +17,6 @@ To get started with APIMatic's CLI using a step by step wizard, run the followin
 $ apimatic portal:quickstart
 ```
 
-<!-- toc -->
-* [Getting Started](#getting-started)
-* [Usage](#usage)
-* [Commands](#commands)
-<!-- tocstop -->
 # Usage
 <!-- usage -->
 ```sh-session
@@ -67,8 +62,8 @@ FLAGS
       --destination=<value>  [default: ./] directory to download transformed file to
       --file=<value>         path to the API specification file to transform
       --format=<value>       (required) specification format to transform API specification into
-                             Apimatic|Wadl2009|Wsdl|Swagger10|Swagger20|Swaggeryaml|Oas3|Openapi3Yaml|Apiblueprint|Raml|
-                             Raml10|Postman10|Postman20|Graphqlschema
+                             APIMATIC|WADL2009|WSDL|SWAGGER10|SWAGGER20|SWAGGERYAML|OAS3|OPENAPI3YAML|APIBLUEPRINT|RAML|
+                             RAML10|POSTMAN10|POSTMAN20|GRAPHQLSCHEMA
       --url=<value>          URL to the API specification file to transform. Can be used in place of the --file option
                              if the API specification is publicly available.
 
