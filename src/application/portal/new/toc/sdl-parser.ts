@@ -6,11 +6,7 @@ import { Result } from "../../../../types/common/result";
 import { Sdl, SdlEndpoint, SdlModel } from "../../../../types/sdl/sdl";
 
 export class SdlParser {
-  private readonly portalService: PortalService;
-
-  constructor() {
-    this.portalService = new PortalService();
-  }
+  constructor(private readonly portalService: PortalService) {}
 
   async getTocComponentsFromSdl(specFolderPath: string, workingDirectory: string, configDir: string): Promise<Result<{endpointGroups: Map<string, TocEndpoint[]>;models: TocModel[];},string>> {
     const sourceSpecInputZipFilePath = await validateAndZipPortalSource(
@@ -22,7 +18,7 @@ export class SdlParser {
       const result = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir);
       
       if (!result.isSuccess()) {
-        return Result.failure("Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic’s interactive VS Code extension")
+        return Result.failure("Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic's interactive VS Code extension")
       }
 
       const sdl : Sdl = result.value!
