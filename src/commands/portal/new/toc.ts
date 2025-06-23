@@ -5,8 +5,15 @@ import { PortalNewTocAction } from "../../../actions/portal/new/toc";
 const DEFAULT_FOLDER = process.cwd();
 
 export default class PortalNewToc extends Command {
-  static description =
-    "Generates a new Table of Contents (TOC) file used for the generation of your API documentation portal. The output is a YAML file with the .yml extension.";
+  static summary = 'Generates a TOC file based on the content directory and spec folder provided in your working directory';
+
+  static description = `This command generates a new Table of Contents (TOC) file used in the
+generation of your API documentation portal.
+
+The output is a YAML file with the .yml extension.
+
+To learn more about the TOC file and APIMatic build directory structure, visit:
+https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal`;
 
   static flags = {
     destination: Flags.string({
