@@ -7,6 +7,7 @@ import { SdlParser } from "../../../application/portal/new/toc/sdl-parser";
 import { TocStructureGenerator } from "../../../application/portal/new/toc/toc-structure-generator";
 import { TocContentParser } from "../../../application/portal/new/toc/toc-content-parser";
 import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc";
+import { PortalService } from "../../../infrastructure/services/portal-service";
 
 const DEFAULT_TOC_FILENAME = "toc.yml";
 const APIMATIC_BUILD_FILENAME = "APIMATIC-BUILD.json";
@@ -19,7 +20,7 @@ export class PortalNewTocAction {
 
   constructor() {
     this.prompts = new PortalNewTocPrompts();
-    this.sdlParser = new SdlParser();
+    this.sdlParser = new SdlParser(new PortalService());
     this.tocGenerator = new TocStructureGenerator();
     this.contentParser = new TocContentParser();
   }
@@ -57,7 +58,7 @@ export class PortalNewTocAction {
         contentGroups
       );
       const yamlString = this.tocGenerator.transformToYaml(toc);
-      this.writeToc(tocPath, yamlString, "utf8");
+      await this.writeToc(tocPath, yamlString, "utf8");
 
       this.prompts.displayOutroMessage(tocPath);
       return Result.success(tocPath);
@@ -109,7 +110,6 @@ export class PortalNewTocAction {
 
     this.prompts.stopProgressIndicatorWithMessage("✅ Successfully extracted endpoints and/or models from the specification.");
     return sdlResult.value!;
-
   }
 
   private async extractContentGroups(workingDirectory: string): Promise<TocGroup[]> {

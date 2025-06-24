@@ -105,7 +105,9 @@ export class SDKClient {
     if (overrideAuthKey) {
       return new Client({
         timeout: 0,
-        authorization: `X-Auth-Key ${overrideAuthKey}`
+        customHeaderAuthenticationCredentials: {
+          'Authorization': `X-Auth-Key ${overrideAuthKey}`
+        }
       });
     }
     let storedAuthInfo: AuthInfo | null = await getAuthInfo(configDir);
@@ -117,7 +119,9 @@ export class SDKClient {
     if (storedAuthInfo.authKey !== "") {
       return new Client({
         timeout: 0,
-        authorization: `X-Auth-Key ${storedAuthInfo.authKey}`
+        customHeaderAuthenticationCredentials: {
+          'Authorization': `X-Auth-Key ${storedAuthInfo.authKey}`
+        }
       });
     } else {
       throw new Error("Please login first or provide an authKey");
