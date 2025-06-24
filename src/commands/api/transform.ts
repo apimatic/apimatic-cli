@@ -8,10 +8,10 @@ import { AuthenticationError, loggers } from "../../types/utils";
 import { SDKClient } from "../../client-utils/sdk-client";
 import { printValidationMessages } from "../../utils/utils";
 import { getFileNameFromPath, replaceHTML } from "../../utils/utils";
-import { DestinationFormats } from "../../types/api/transform";
+import { DestinationFormats, TransformationFormats } from "../../types/api/transform";
 import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform";
 
-const formats: string = Object.keys(ExportFormats).join("|");
+const formats: string = Object.keys(TransformationFormats).join("|");
 export default class Transform extends Command {
   static description = `Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.`;
 
@@ -26,7 +26,7 @@ Success! Your transformed file is located at D:/swagger_raml.yaml
 
   static flags = {
     format: Flags.string({
-      parse: async (format: string) => getValidFormat(format.toUpperCase()),
+      parse: async (format: string) => getValidFormat(format),
       required: true,
       description: `specification format to transform API specification into
 ${formats}`

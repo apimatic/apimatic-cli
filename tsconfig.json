@@ -9,7 +9,7 @@
     "strict": true,
     "target": "es2017",
     "lib": ["es2018", "dom"],
-    "inlineSourceMap": true
+    "inlineSourceMap": true,
   },
   "include": [
     "src/**/*"

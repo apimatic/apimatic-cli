@@ -1,16 +1,15 @@
 import * as path from "path";
 import * as chokidar from "chokidar";
-import { Client, DocsPortalManagementController } from "@apimatic/sdk";
-import { SDKClient } from "../../client-utils/sdk-client";
 import {
   cleanUpGeneratedPortalFiles,
+  getGeneratedFilesPaths,
   getMessageInMagentaColor,
   getMessageInRedColor,
   validateAndZipPortalSource
 } from "../../utils/utils";
 import { GeneratePortalParams } from "../../types/portal/generate";
 import { downloadDocsPortal } from "./generate";
-import axios, { CancelTokenSource } from "axios";
+import axios from "axios";
 
 const progressSpinner = {
   frames: ["◒", "◐", "◓", "◑"].map((frame) => getMessageInMagentaColor(frame)),
@@ -55,14 +54,10 @@ export const watchAndRegeneratePortal = async (
   ignoredPaths: string[] = []
 ) => {
   // Convert ignoredPaths to absolute paths for consistent comparison
-  const generatedZipPath = path.join(sourceDir, "portal_source.zip");
-  const generatedPortalZipPath = path.join(sourceDir, "generated_portal.zip");
-  const generatedPortalPath = path.join(path.dirname(portalDir), "api-portal");
+  const generatedFilesPaths = getGeneratedFilesPaths(sourceDir, portalDir); 
   const absoluteIgnoredPaths = [
     ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== ""),
-    generatedZipPath,
-    generatedPortalZipPath,
-    generatedPortalPath
+    ...generatedFilesPaths
   ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
 
   const watcher = chokidar.watch(sourceDir, {
@@ -73,19 +68,11 @@ export const watchAndRegeneratePortal = async (
 
   const deletedDirectories = new Set<string>();
 
-  let cancellationToken: CancelTokenSource | null = null;
-
   watcher
     .on("all", async (event, path) => {
       if (event == "unlinkDir") {
         deletedDirectories.add(path);
       }
-
-      if (cancellationToken) {
-        cancellationToken.cancel("New portal regeneration request, operation cancelled.");
-      }
-
-      cancellationToken = axios.CancelToken.source();
 
       if (event == "unlink") {
         for (const dir of deletedDirectories) {
@@ -94,7 +81,7 @@ export const watchAndRegeneratePortal = async (
           }
         }
       }
-      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths, cancellationToken);
+      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
     })
     .on("error", (error: Error) => {
       console.error("Watcher error:", error);
@@ -108,28 +95,23 @@ export const generatePortal = async (
   portalDir: string,
   configDir: string,
   ignoredPaths: string[] = [],
-  overrideAuthKey: string | null = null,
-  cancellationToken: CancelTokenSource | null = null
+  overrideAuthKey: string | null = null
 ) => {
-  const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, configDir);
-  const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
-
   const zippedBuildFilePath = await validateAndZipPortalSource(
     sourceDir,
-    path.join(sourceDir, "portal_source.zip"),
+    path.join(sourceDir, ".portal_source.zip"),
     ignoredPaths
   );
 
   const generatePortalParams: GeneratePortalParams = {
-    zippedBuildFilePath,
-    portalFolderPath: portalDir,
-    zippedPortalPath: path.join(sourceDir, "generated_portal.zip"),
-    docsPortalController,
+    sourceBuildInputZipFilePath: zippedBuildFilePath,
+    generatedPortalArtifactsFolderPath: portalDir,
+    generatedPortalArtifactsZipFilePath: path.join(sourceDir, ".generated_portal.zip"),
     overrideAuthKey,
-    zip: false
+    generateZipFile: false
   };
 
-  await downloadDocsPortal(generatePortalParams, configDir, cancellationToken);
+  await downloadDocsPortal(generatePortalParams, configDir);
 };
 
 async function handleFileChange(
@@ -137,12 +119,11 @@ async function handleFileChange(
   portalDir: string,
   configDir: string,
   overrideAuthKey: string | null,
-  absoluteIgnoredPaths: string[],
-  cancellationToken: CancelTokenSource | null
+  absoluteIgnoredPaths: string[]
 ) {
   progressSpinner.start();
   try {
-    await generatePortal(sourceDir, portalDir, configDir, absoluteIgnoredPaths, overrideAuthKey, cancellationToken);
+    await generatePortal(sourceDir, portalDir, configDir, absoluteIgnoredPaths, overrideAuthKey);
     progressSpinner.stop();
     await cleanUpGeneratedPortalFiles(sourceDir);
   } catch (error) {

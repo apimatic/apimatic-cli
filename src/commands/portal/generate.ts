@@ -1,15 +1,16 @@
 import * as path from "path";
 import * as fs from "fs-extra";
+import { Command, Flags } from "@oclif/core";
+import { GenerateFlags, PortalPaths } from "../../types/portal/generate";
+import { getMessageInRedColor } from "../../utils/utils";
+import { PortalGeneratePrompts } from "../../prompts/portal/generate";
+import { PortalGenerateAction } from "../../actions/portal/generate";
+import { Result } from "../../types/common/result";
 
-import { ux, Command, Flags } from "@oclif/core";
-import { Client, DocsPortalManagementController } from "@apimatic/sdk";
-
-import { AxiosError } from "axios";
-import { SDKClient } from "../../client-utils/sdk-client";
-import { GeneratePortalParams } from "../../types/portal/generate";
-import { downloadDocsPortal } from "../../controllers/portal/generate";
-import { zipDirectory, replaceHTML, isJSONParsable } from "../../utils/utils";
-import { AuthenticationError } from "../../types/utils";
+const DEFAULT_FOLDER = "./";
+const DEFAULT_DESTINATION = path.resolve("./");
+const GENERATED_PORTAL_ARTIFACTS_FOLDER = "generated_portal";
+const GENERATED_PORTAL_ARTIFACTS_ZIP = ".generated_portal.zip";
 
 export default class PortalGenerate extends Command {
   static description =
@@ -17,17 +18,24 @@ export default class PortalGenerate extends Command {
 
   static flags = {
     folder: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: "./",
+      parse: async (input: string) => path.resolve(input),
+      default: DEFAULT_FOLDER,
       description: "path to the input directory containing API specifications and config files"
     }),
     destination: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: path.resolve("./"),
+      parse: async (input: string) => path.resolve(input),
+      default: DEFAULT_DESTINATION,
       description: "path to the downloaded portal"
     }),
-    force: Flags.boolean({ char: "f", default: false, description: "overwrite if a portal exists in the destination" }),
-    zip: Flags.boolean({ default: false, description: "download the generated portal as a .zip archive" }),
+    force: Flags.boolean({
+      char: "f",
+      default: false,
+      description: "overwrite if a portal exists in the destination"
+    }),
+    zip: Flags.boolean({
+      default: false,
+      description: "download the generated portal as a .zip archive"
+    }),
     "auth-key": Flags.string({
       default: "",
       description: "override current authentication state with an authentication key"
@@ -40,79 +48,67 @@ Your portal has been generated at D:/
 `
   ];
 
-  async run() {
+  private readonly prompts: PortalGeneratePrompts;
+
+  constructor(argv: string[], config: any) {
+    super(argv, config);
+    this.prompts = new PortalGeneratePrompts();
+  }
+
+  async run(): Promise<void> {
     const { flags } = await this.parse(PortalGenerate);
-    const zip = flags.zip;
-    const sourceFolderPath: string = flags.folder;
-    const portalFolderPath: string = path.join(flags.destination, "generated_portal");
-    const zippedPortalPath: string = path.join(flags.destination, "generated_portal.zip");
+    const paths = await this.getPortalPaths(flags as GenerateFlags);
+    const portalGenerateAction = new PortalGenerateAction();
 
-    const overrideAuthKey: string | null = flags["auth-key"] ? flags["auth-key"] : null;
-
-    // Check if at destination, portal already exists and throw error if force flag is not set for both zip and extracted
-    if (fs.existsSync(portalFolderPath) && !flags.force && !zip) {
-      throw new Error(`Can't download portal to path ${portalFolderPath}, because it already exists`);
-    } else if (fs.existsSync(zippedPortalPath) && !flags.force && zip) {
-      throw new Error(`Can't download portal to path ${zippedPortalPath}, because it already exists`);
+    const shouldContinueWithExistingPortal = await this.checkExistingPortal(paths, flags as GenerateFlags);
+    if (!shouldContinueWithExistingPortal) {
+      process.exit(1);
     }
-    try {
-      if (!(await fs.pathExists(flags.destination))) {
-        throw new Error(`Destination path ${flags.destination} does not exist`);
-      } else if (!(await fs.pathExists(flags.folder))) {
-        throw new Error(`Portal build folder ${flags.folder} does not exist`);
+
+    const validationResult = await this.validatePaths(paths);
+    if (validationResult.isFailed()) {
+      this.error(validationResult.error!);
+    }
+
+    await portalGenerateAction.generatePortal(paths, flags as GenerateFlags, this.config.configDir);
+  }
+
+  private async getPortalPaths(flags: GenerateFlags): Promise<PortalPaths> {
+    return {
+      sourceFolderPath: flags.folder,
+      destinationFolderPath: flags.destination,
+      generatedPortalArtifactsFolderPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
+      generatedPortalArtifactsZipFilePath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP)
+    };
+  }
+
+  private async validatePaths(paths: PortalPaths): Promise<Result<string, string>> {
+    if (!(await fs.pathExists(paths.sourceFolderPath))) {
+      return Result.failure(
+        getMessageInRedColor(`Portal build input folder ${paths.sourceFolderPath} does not exist.`)
+      );
+    }
+    if (!(await fs.pathExists(path.dirname(paths.generatedPortalArtifactsFolderPath)))) {
+      return Result.failure(
+        getMessageInRedColor(
+          `Destination path ${path.dirname(paths.generatedPortalArtifactsFolderPath)} does not exist.`
+        )
+      );
+    }
+
+    return Result.success("Paths validated successfully.");
+  }
+
+  private async checkExistingPortal(paths: PortalPaths, flags: GenerateFlags): Promise<boolean> {
+    if (fs.existsSync(paths.generatedPortalArtifactsFolderPath) && !flags.force && !flags.zip) {
+      if (!(await this.prompts.overwriteExistingPortalArtifactsPrompt())) {
+        return false;
       }
-      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
-      const docsPortalController: DocsPortalManagementController = new DocsPortalManagementController(client);
-
-      const zippedBuildFilePath = await zipDirectory(sourceFolderPath, flags.destination);
-
-      const generatePortalParams: GeneratePortalParams = {
-        zippedBuildFilePath,
-        portalFolderPath,
-        zippedPortalPath,
-        docsPortalController,
-        overrideAuthKey,
-        zip
-      };
-      ux.action.start('Generating portal');
-      const generatedPortalPath: string = await downloadDocsPortal(generatePortalParams, this.config.configDir);
-      ux.action.stop();
-      this.log(`Your portal has been generated at ${generatedPortalPath}`);
-    } catch (error) {
-      if (error && (error as AxiosError).response) {
-        const apiError = error as AxiosError;
-        const apiResponse = apiError.response;
-
-        if (apiResponse) {
-          const responseData = (apiResponse.data as string).toString();
-
-          if (apiResponse.status === 422 && responseData.length > 0 && isJSONParsable(responseData)) {
-            const nestedErrors = JSON.parse(responseData);
-
-            if (nestedErrors.error) {
-              return this.error(replaceHTML(nestedErrors.error));
-            } else if (nestedErrors.message) {
-              return this.error(replaceHTML(nestedErrors.message));
-            }
-          } else if (apiResponse.status === 401 && responseData.length > 0) {
-            this.error("You are not authorized to perform this action");
-          } else if (apiResponse.status === 403 && apiResponse.statusText) {
-            return this.error("Your subscription does not allow on premise portal generation");
-          } else {
-            return this.error(apiError.message);
-          }
-        }
-      } else if ((error as AuthenticationError).statusCode === 401) {
-        this.error("You are not authorized to perform this action");
-      } else if (
-        (error as AuthenticationError).statusCode === 402 &&
-        (error as AuthenticationError).body &&
-        typeof (error as AuthenticationError).body === "string"
-      ) {
-        this.error((error as AuthenticationError).body);
-      } else {
-        this.error(`${(error as Error).message}`);
+    } else if (fs.existsSync(paths.generatedPortalArtifactsZipFilePath) && !flags.force && flags.zip) {
+      if (!(await this.prompts.existingDestinationPortalZipPrompt())) {
+        return false;
       }
     }
+    return true;
   }
 }

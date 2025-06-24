@@ -18,8 +18,9 @@ export type SDKGenerateUnprocessableError = {
 export enum SimplePlatforms {
   CSHARP = "CS_NET_STANDARD_LIB",
   JAVA = "JAVA_ECLIPSE_JRE_LIB",
-  PHP = "PHP_GENERIC_LIB",
+  PHP = "PHP_GENERIC_LIB_V2",
   PYTHON = "PYTHON_GENERIC_LIB",
   RUBY = "RUBY_GENERIC_LIB",
-  TYPESCRIPT = "TS_GENERIC_LIB"
+  TYPESCRIPT = "TS_GENERIC_LIB",
+  GO = "GO_GENERIC_LIB"
 }

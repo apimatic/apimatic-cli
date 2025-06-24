@@ -5,51 +5,86 @@ import * as open from "open";
 import { watchAndRegeneratePortal } from "../../controllers/portal/serve";
 import { PortalServerConfig } from "../../types/portal/quickstart";
 import { Server } from "http";
-import { getMessageInRedColor } from "../../utils/utils";
+import { getMessageInRedColor, isPortInUse } from "../../utils/utils";
 
 export class PortalServerService {
   private server!: Server;
   private liveReloadServer!: livereload.LiveReloadServer;
   private readonly app: express.Application;
   private readonly port = 3000;
+  private readonly liveReloadPort = 35729;
 
   constructor() {
     this.app = express();
   }
 
-  setupServer(generatedPortalPath: string): void {
-    this.liveReloadServer = livereload.createServer();
-    this.liveReloadServer.watch(generatedPortalPath);
+  private async findAvailablePort(startPort: number): Promise<number> {
+    let port = startPort;
+    const maxPort = startPort + 10; // Limit the port search range
+    
+    while (port < maxPort) {
+      if (!(await isPortInUse(port))) {
+        return port;
+      }
+      port++;
+    }
+    
+    // If no port is found in the range, return the original port
+    return startPort;
+  }
 
-    this.app.use(connectLivereload());
+  private async createLiveReloadServer(generatedPortalPath: string): Promise<void> {
+    try {
+      const availablePort = await this.findAvailablePort(this.liveReloadPort);
+
+      this.liveReloadServer = livereload.createServer({
+        port: availablePort
+      });
+      
+      this.liveReloadServer.watch(generatedPortalPath);
+    } catch (error) {
+      console.log(getMessageInRedColor(`Unable to serve the portal: ${(error as Error).message}`));
+    }
+  }
+
+  async setupServer(generatedPortalPath: string): Promise<void> {
+    await this.createLiveReloadServer(generatedPortalPath);
+    
+    if (this.liveReloadServer) {
+      this.app.use(connectLivereload());
+    }
     this.app.use(express.static(generatedPortalPath));
   }
 
-  startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<void> {
+  async startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<boolean> {
     const { generatedPortalPath, targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
-    const serverPort = port ?? this.port;
+    const requestedPort = port ?? this.port;
 
-    return new Promise<void>((resolve) => {
-      try {
-        this.server = this.app.listen(serverPort, () => {
-          if (openInBrowser) {
-            open(`http://localhost:${serverPort}`);
-          }
+    return new Promise<boolean>((resolve, reject) => {
+      this.server = this.app.listen(requestedPort, () => {
+        if (openInBrowser) {
+          open(`http://localhost:${requestedPort}`);
+        }
 
-          if (!noReload) {
-            watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
-          }
+        if (!noReload) {
+          watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
+        }
 
-          if (process.platform !== "darwin") {
-            //For non-macOS users.
-            if (process.stdin.setRawMode) {
-              process.stdin.setRawMode(false);
-            }
+        if (process.platform !== "darwin") {
+          //For non-macOS users.
+          if (process.stdin.setRawMode) {
+            process.stdin.setRawMode(false);
           }
-        });
-      } catch (error) {
-        throw new Error(getMessageInRedColor(`There was an error starting the server: ${error}`));
-      }
+        }
+        resolve(true);
+      }).on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(getMessageInRedColor(`Port ${requestedPort} is not available. Unable to serve your portal.`));
+        } else {
+          console.error(getMessageInRedColor(`Unable to serve the portal: ${err.message}`));
+        }
+        reject(err);
+      });
 
       const shutdown = async () => {
         if (displayShutdownMessages) {
@@ -59,7 +94,7 @@ export class PortalServerService {
         if (displayShutdownMessages) {
           console.log("Server shut down successfully.");
         }
-        resolve();
+        resolve(true);
         process.exit(0);
       };
 

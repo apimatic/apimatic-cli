@@ -1,19 +1,18 @@
 import * as fs from "fs-extra";
 import { ux } from "@oclif/core";
 
-import {
-  CodeGenerationExternalApisController,
+import { ApiResponse, 
+  CodeGenerationExternalApIsController,
   UserCodeGeneration,
   Platforms,
-  GenerateSdkViaUrlRequest
-} from "@apimatic/sdk";
-import { ApiResponse, FileWrapper } from "@apimatic/sdk";
+  GenerateSdkViaUrlRequest, 
+  FileWrapper } from "@apimatic/sdk";
 import { GenerationIdParams, SimplePlatforms, DownloadSDKParams } from "../../types/sdk/generate";
 import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils";
 
 export const getSDKGenerationId = async (
   { file, url, platform }: GenerationIdParams,
-  sdkGenerationController: CodeGenerationExternalApisController
+  sdkGenerationController: CodeGenerationExternalApIsController
 ): Promise<string> => {
   ux.action.start("Generating SDK");
 
@@ -21,14 +20,14 @@ export const getSDKGenerationId = async (
   const sdkPlatform = getSDKPlatform(platform) as Platforms;
   if (file) {
     const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-    generation = await sdkGenerationController.generateSDKViaFile(fileDescriptor, sdkPlatform);
+    generation = await sdkGenerationController.generateSdkViaFile(fileDescriptor, sdkPlatform);
   } else if (url) {
     // If url to spec file is provided
     const body: GenerateSdkViaUrlRequest = {
       url: url,
       template: sdkPlatform
     };
-    generation = await sdkGenerationController.generateSDKViaURL(body);
+    generation = await sdkGenerationController.generateSdkViaUrl(body);
   } else {
     throw new Error("Please provide a specification file");
   }
@@ -51,10 +50,10 @@ const getSDKPlatform = (platform: string): Platforms | SimplePlatforms => {
 // Download Platform
 export const downloadGeneratedSDK = async (
   { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
-  sdkGenerationController: CodeGenerationExternalApisController
+  sdkGenerationController: CodeGenerationExternalApIsController
 ): Promise<string> => {
   ux.action.start("Downloading SDK");
-  const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSDK(codeGenId);
+  const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSdk(codeGenId);
   if ((result as NodeJS.ReadableStream).readable) {
     if (!zip) {
       await unzipFile(result as NodeJS.ReadableStream, sdkFolderPath);
