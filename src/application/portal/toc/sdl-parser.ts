@@ -1,9 +1,9 @@
 import * as path from "path";
-import { PortalService } from "../../../../infrastructure/services/portal-service";
-import { validateAndZipPortalSource, deleteFile } from "../../../../utils/utils";
-import { TocEndpoint, TocModel } from "../../../../types/toc/toc";
-import { Result } from "../../../../types/common/result";
-import { Sdl, SdlEndpoint, SdlModel } from "../../../../types/sdl/sdl";
+import { PortalService } from "../../../infrastructure/services/portal-service";
+import { validateAndZipPortalSource, deleteFile } from "../../../utils/utils";
+import { TocEndpoint, TocModel } from "../../../types/toc/toc";
+import { Result } from "../../../types/common/result";
+import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl";
 
 export class SdlParser {
   constructor(private readonly portalService: PortalService) {}
