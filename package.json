@@ -4,7 +4,7 @@
     "version": "1.1.0-alpha.8",
     "author": "APIMatic",
     "bin": {
-        "apimatic": "./bin/run"
+        "apimatic": "./bin/run.js"
     },
     "bugs": "https://github.com/apimatic/apimatic-cli/issues",
     "publishConfig": {
@@ -14,8 +14,8 @@
         "node": ">=20.0.0"
     },
     "files": [
-        "/bin",
-        "/lib",
+        "./bin",
+        "./lib",
         "/npm-shrinkwrap.json",
         "/oclif.manifest.json"
     ],
@@ -106,6 +106,7 @@
     },
     "oclif": {
         "commands": "./lib/commands",
+        "dirname": "apimatic",
         "bin": "apimatic",
         "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
         "plugins": [
