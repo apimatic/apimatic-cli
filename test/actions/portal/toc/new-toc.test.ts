@@ -1,8 +1,8 @@
-import { expect } from "chai";
 import * as path from "path";
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
+import { expect } from "chai";
 import { dir as tmpDir, DirectoryResult } from "tmp-promise";
-import { PortalNewTocAction } from "../../../../src/actions/portal/toc/new-toc";
+import { PortalNewTocAction } from "../../../../src/actions/portal/toc/new-toc.js";
 
 describe("PortalNewTocAction", () => {
   let TEST_WORKING_DIR: string;
@@ -16,8 +16,8 @@ describe("PortalNewTocAction", () => {
     TEST_CONFIG_DIR = path.join(TEST_WORKING_DIR, "config");
     portalNewTocAction = new PortalNewTocAction();
     
-    await fs.ensureDir(TEST_WORKING_DIR);
-    await fs.ensureDir(path.join(TEST_WORKING_DIR, "content"));
+    await fsExtra.ensureDir(TEST_WORKING_DIR);
+    await fsExtra.ensureDir(path.join(TEST_WORKING_DIR, "content"));
   });
 
   afterEach(async () => {
@@ -36,9 +36,9 @@ describe("PortalNewTocAction", () => {
       );
 
       expect(result.isSuccess()).to.be.true;
-      expect(await fs.pathExists(expectedTocPath)).to.be.true;
+      expect(await fsExtra.pathExists(expectedTocPath)).to.be.true;
       
-      const tocContent = await fs.readFile(expectedTocPath, "utf8");
+      const tocContent = await fsExtra.readFile(expectedTocPath, "utf8");
       expect(tocContent).to.include("Getting Started");
       expect(tocContent).to.include("API Endpoints");
       expect(tocContent).to.include("Models");
@@ -47,7 +47,7 @@ describe("PortalNewTocAction", () => {
 
     it("should create TOC file at custom location", async () => {
       const customDestination = path.join(TEST_WORKING_DIR, "custom");
-      await fs.ensureDir(customDestination);
+      await fsExtra.ensureDir(customDestination);
       const expectedTocPath = path.join(customDestination, "toc.yml");
 
       const result = await portalNewTocAction.createToc(
@@ -58,9 +58,9 @@ describe("PortalNewTocAction", () => {
       );
 
       expect(result.isSuccess()).to.be.true;
-      expect(await fs.pathExists(expectedTocPath)).to.be.true;
+      expect(await fsExtra.pathExists(expectedTocPath)).to.be.true;
       
-      await fs.remove(customDestination);
+      await fsExtra.remove(customDestination);
     });
   });
 }); 
