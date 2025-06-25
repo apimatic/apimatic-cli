@@ -17,27 +17,32 @@ Generated recipe has been added to build directory at: C:/`
     name: Flags.string({ description: "name for the recipe" }),
     folder: Flags.string({
       parse: async (input: string) => path.resolve(input),
-      description: "path to the build directory containing specs, content, and build config file. Defaults to the current working directory if not provided.",
-      default: DEFAULT_FOLDER,
+      description:
+        "path to the build directory containing specs, content, and build config file. Defaults to the current working directory if not provided.",
+      default: DEFAULT_FOLDER
     }),
     "build-config": Flags.string({
       parse: async (input: string) => path.resolve(input),
-      description: "path to the APIMATIC-BUILD.json file. Defaults to the APIMATIC-BUILD.json file in the build directory if not provided."
+      description:
+        "path to the APIMATIC-BUILD.json file. Defaults to the APIMATIC-BUILD.json file in the build directory if not provided."
     })
   };
 
   public async run(): Promise<void> {
     const { flags } = await this.parse(PortalNewRecipe);
     const portalRecipeAction = new PortalRecipeAction();
-    const portalRecipePrompts = new PortalRecipePrompts(); 
+    const portalRecipePrompts = new PortalRecipePrompts();
 
-    const createRecipeResult = await portalRecipeAction.createRecipe(flags.folder, flags["build-config"], flags.name);
-    if (createRecipeResult.isFailed())
-    {
+    const createRecipeResult = await portalRecipeAction.createRecipe(
+      flags.folder,
+      this.config.configDir,
+      flags["build-config"],
+      flags.name
+    );
+    if (createRecipeResult.isFailed()) {
       portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.error!));
     }
-    if (createRecipeResult.isCancelled())
-    {
+    if (createRecipeResult.isCancelled()) {
       portalRecipePrompts.logError(createRecipeResult.error!);
     }
   }

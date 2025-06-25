@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { TreeObject, asTree } from "treeify";
-import { spinner, select, text, cancel, isCancel, outro, log } from "@clack/prompts";
+import { spinner, select, text, cancel, isCancel, outro, log, autocomplete } from "@clack/prompts";
 import { getMessageInGreenColor, isValidUrl } from "../../utils/utils";
 
 export class PortalRecipePrompts {
@@ -120,15 +120,23 @@ export class PortalRecipePrompts {
     return (contentFilePath as string).trim();
   }
 
-  public async endpointGroupNamePrompt(): Promise<string> {
-    const endpointGroupName = await text({
-      message: `Enter the endpoint group name:`,
-      validate: (name) => {
-        if (!name) {
-          return "Endpoint group name cannot be empty. Please provide a name for the endpoint group.";
-        }
-      }
-    });
+  public async endpointGroupNamePrompt(endpointGroups: Map<string, string[]>): Promise<string> {
+    // const endpointGroupName = await text({
+    //   message: `Enter the endpoint group name:`,
+    //   validate: (name) => {
+    //     if (!name) {
+    //       return "Endpoint group name cannot be empty. Please provide a name for the endpoint group.";
+    //     }
+    //   }
+    // });
+    const groupNames = Array.from(endpointGroups.keys()).map((name) => ({
+      value: name,
+      label: name,
+    }));
+    const endpointGroupName = await autocomplete({
+      message: `Select the endpoint group name:`,
+      options: groupNames,
+    })
 
     if (isCancel(endpointGroupName)) {
       cancel("Operation cancelled.");
@@ -138,14 +146,22 @@ export class PortalRecipePrompts {
     return (endpointGroupName as string).trim();
   }
 
-  public async endpointNamePrompt(): Promise<string> {
-    const endpointName = await text({
-      message: `Enter the name of the endpoint:`,
-      validate: (name) => {
-        if (!name) {
-          return "Endpoint name cannot be empty. Please provide a name for the endpoint.";
-        }
-      }
+  public async endpointNamePrompt(endpointGroups: Map<string, string[]>, endpointGroupName: string): Promise<string> {
+    // const endpointName = await text({
+    //   message: `Enter the name of the endpoint:`,
+    //   validate: (name) => {
+    //     if (!name) {
+    //       return "Endpoint name cannot be empty. Please provide a name for the endpoint.";
+    //     }
+    //   }
+    // });
+    const endpointNames = endpointGroups.get(endpointGroupName);
+    const endpointName = await autocomplete({
+      message: `Select the name of the endpoint:`,
+      options: endpointNames!.map((name) => ({
+        value: name,
+        label: name
+      }))
     });
 
     if (isCancel(endpointName)) {
@@ -232,6 +248,14 @@ export class PortalRecipePrompts {
   public displayRecipeGenerationSuccessMessage(recipePath: string) {
     log.step(`✅  Recipe has been added successfully!`);
     outro(`Generated recipe has been added to build directory at: ${recipePath}`);
+  }
+
+  public startProgressIndicatorWithMessage(message: string): void {
+    this.spin.start(message);
+  }
+
+  public stopProgressIndicatorWithMessage(message: string): void {
+    this.spin.stop(message);
   }
 
   public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: TreeObject) {

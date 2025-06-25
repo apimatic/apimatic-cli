@@ -9,17 +9,22 @@ import { isValidUrl } from "../../../utils/utils";
 import { Result } from "../../../types/common/result";
 import { PortalRecipe } from "../../../application/portal/new/portal-recipe";
 import { PortalRecipeGenerator } from "../../../application/portal/new/recipe-generator";
+import { SdlParser } from "../../../application/portal/new/toc/sdl-parser";
+import { PortalService } from "../../../infrastructure/services/portal-service";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;
+  private readonly sdlParser: SdlParser;
   private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
 
   constructor() {
     this.prompts = new PortalRecipePrompts();
+    this.sdlParser = new SdlParser(new PortalService());
   }
 
   public async createRecipe(
     buildDirectoryPath: string,
+    configDir: string,
     buildConfigFilePath?: string,
     name?: string
   ): Promise<Result<string, string>> {
@@ -27,12 +32,12 @@ export class PortalRecipeAction {
     const recipeFileName = this.createRecipeFileName(recipeName);
 
     const validateBuildDirectoryPathResult = await this.validateBuildDirectoryPath(buildDirectoryPath);
-    if (!validateBuildDirectoryPathResult.isSuccess) {
+    if (validateBuildDirectoryPathResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${validateBuildDirectoryPathResult.error!}`);
     }
 
     const validateBuildConfigFilePathResult = await this.validateBuildConfigFilePath(buildConfigFilePath);
-    if (!validateBuildConfigFilePathResult.isSuccess) {
+    if (validateBuildConfigFilePathResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${validateBuildConfigFilePathResult}`);
     }
 
@@ -42,7 +47,7 @@ export class PortalRecipeAction {
       buildConfigFilePath
     );
     const buildConfigResult = await this.parseBuildConfig(resolvedBuildConfigFilePath);
-    if (!buildConfigResult.isSuccess) {
+    if (buildConfigResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${buildConfigResult.error!}`);
     }
 
@@ -50,7 +55,7 @@ export class PortalRecipeAction {
     const tocFilePath = path.join(contentFolderPath, "content", "toc.yml");
     //TODO: Replace any type of tocFileResult.value to concrete type.
     const tocFileResult = await this.parseTocFile(tocFilePath);
-    if (!tocFileResult.isSuccess) {
+    if (tocFileResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${tocFileResult.error!}`);
     }
 
@@ -66,7 +71,16 @@ export class PortalRecipeAction {
       }
     }
 
-    const recipeResult = await this.promptUserAndBuildNewRecipe(recipeName);
+    const extractEndpointGroupsFromSdlResult = await this.extractEndpointGroupsFromSdl(
+      buildConfigResult.value,
+      contentFolderPath,
+      configDir
+    );
+    if (extractEndpointGroupsFromSdlResult.isFailed()) {
+      return Result.failure(`Unable to generate API Recipe: ${extractEndpointGroupsFromSdlResult}`);
+    }
+
+    const recipeResult = await this.promptUserAndBuildNewRecipe(extractEndpointGroupsFromSdlResult.value!, recipeName);
     if (!recipeResult.isSuccess) {
       return Result.failure(`Unable to generate API Recipe: ${recipeResult.error!}`);
     }
@@ -110,7 +124,10 @@ export class PortalRecipeAction {
   }
 
   //TODO: Figure out a better way to do this without the while loop.
-  private async promptUserAndBuildNewRecipe(recipeName: string): Promise<Result<SerializableRecipe, string>> {
+  private async promptUserAndBuildNewRecipe(
+    endpointGroups: Map<string, string[]>,
+    recipeName: string
+  ): Promise<Result<SerializableRecipe, string>> {
     const recipe = new PortalRecipe(recipeName);
     let idx: number = 1;
     let addAnotherStep = true;
@@ -120,13 +137,13 @@ export class PortalRecipeAction {
       switch (stepType) {
         case StepType.Content: {
           const addContentStepResult = await this.promptUserAndAddContentStepToRecipe(recipe, stepName);
-          if (!addContentStepResult.isSuccess) {
+          if (addContentStepResult.isFailed()) {
             return Result.failure(addContentStepResult.error!);
           }
           break;
         }
         case StepType.Endpoint: {
-          await this.promptUserAndAddEndpointStepToRecipe(recipe, stepName);
+          await this.promptUserAndAddEndpointStepToRecipe(recipe, endpointGroups, stepName);
           break;
         }
       }
@@ -152,9 +169,15 @@ export class PortalRecipeAction {
     }
   }
 
-  private async promptUserAndAddEndpointStepToRecipe(recipe: PortalRecipe, stepName: string): Promise<void> {
-    const endpointGroupName = await this.prompts.endpointGroupNamePrompt();
-    const endpointName = await this.prompts.endpointNamePrompt();
+  private async promptUserAndAddEndpointStepToRecipe(
+    recipe: PortalRecipe,
+    endpointGroups: Map<string, string[]>,
+    stepName: string
+  ): Promise<void> {
+    // const endpointGroupName = await this.prompts.endpointGroupNamePrompt();
+    // const endpointName = await this.prompts.endpointNamePrompt();
+    const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
+    const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
     const description = await this.prompts.endpointDescriptionPrompt();
     const endpointPermalink = await this.createPermalink([endpointGroupName, endpointName]);
     recipe.addEndpointStep(stepName, stepName, description, endpointPermalink);
@@ -292,6 +315,47 @@ export class PortalRecipeAction {
     });
 
     return directoryStructure;
+  }
+
+  private async extractEndpointGroupsFromSdl(
+    buildConfig: any,
+    contentFolderPath: string,
+    configDir: string
+  ): Promise<Result<Map<string, string[]>, string>> {
+    const specFolderPath = this.getSpecFolderPath(buildConfig, contentFolderPath);
+    if (!(await fsExtra.pathExists(specFolderPath))) {
+      return Result.failure(`API specification file not found at ${specFolderPath}.`);
+    }
+
+    this.prompts.startProgressIndicatorWithMessage(
+      "Extracting endpoint groups and endpoints from the API specification."
+    );
+
+    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(
+      specFolderPath,
+      contentFolderPath,
+      configDir
+    );
+
+    if (endpointGroupsResult.isFailed()) {
+      this.prompts.stopProgressIndicatorWithMessage("Unable to extract endpoints from your API specification.");
+      return Result.failure(`⚠️ ${endpointGroupsResult.error!}`);
+    }
+
+    this.prompts.stopProgressIndicatorWithMessage(
+      "✅ Successfully extracted endpoint groups and endpoints from the API specification."
+    );
+    return Result.success(endpointGroupsResult.value!);
+  }
+
+  //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
+  private getSpecFolderPath(buildConfig: any, contentFolderPath: string): string {
+    const apiSpecPath = buildConfig.generatePortal?.apiSpecPath;
+    if (apiSpecPath) {
+      return path.join(contentFolderPath, apiSpecPath);
+    }
+
+    return path.join(contentFolderPath, "spec");
   }
 
   //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
