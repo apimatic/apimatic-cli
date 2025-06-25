@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as fs from "fs-extra";
-import { TocGroup, TocCustomPage } from "../../../../types/toc/toc";
+import { TocGroup, TocCustomPage } from "../../../types/toc/toc";
 
 export class TocContentParser {
   async parseContentFolder(contentFolderPath: string, workingDirectory: string): Promise<TocGroup[]> {

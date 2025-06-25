@@ -2,7 +2,7 @@ import { expect } from "chai";
 import * as path from "path";
 import * as fs from "fs-extra";
 import { dir as tmpDir, DirectoryResult } from "tmp-promise";
-import { PortalNewTocAction } from "../../../../src/actions/portal/new/toc";
+import { PortalNewTocAction } from "../../../../src/actions/portal/toc/new-toc";
 
 describe("PortalNewTocAction", () => {
   let TEST_WORKING_DIR: string;

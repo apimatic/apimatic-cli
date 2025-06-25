@@ -1,11 +1,11 @@
 import * as path from "path";
 import * as fs from "fs-extra";
-import { PortalNewTocPrompts } from "../../../prompts/portal/new/toc";
+import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc";
 import { Result } from "../../../types/common/result";
 import { getMessageInRedColor } from "../../../utils/utils";
-import { SdlParser } from "../../../application/portal/new/toc/sdl-parser";
-import { TocStructureGenerator } from "../../../application/portal/new/toc/toc-structure-generator";
-import { TocContentParser } from "../../../application/portal/new/toc/toc-content-parser";
+import { SdlParser } from "../../../application/portal/toc/sdl-parser";
+import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator";
+import { TocContentParser } from "../../../application/portal/toc/toc-content-parser";
 import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc";
 import { PortalService } from "../../../infrastructure/services/portal-service";
 
@@ -178,4 +178,4 @@ export class PortalNewTocAction {
       return defaultSpecFolder;
     }
   }
-}
+} 

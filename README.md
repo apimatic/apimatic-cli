@@ -42,7 +42,7 @@ USAGE
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
-* [`apimatic portal:new:toc`](#apimatic-portalnewtoc)
+* [`apimatic portal:toc:new`](#apimatic-portaltocnew)
 * [`apimatic portal:quickstart`](#apimatic-portalquickstart)
 * [`apimatic portal:serve`](#apimatic-portalserve)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
@@ -244,13 +244,13 @@ EXAMPLES
 
 _See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/generate.ts)_
 
-## `apimatic portal:new:toc`
+## `apimatic portal:toc:new`
 
 Generates a TOC file based on the content directory and spec folder provided in your working directory
 
 ```
 USAGE
-  $ apimatic portal:new:toc [--destination <value>] [--folder <value>] [--force] [--expand-endpoints]
+  $ apimatic portal:toc:new [--destination <value>] [--folder <value>] [--force] [--expand-endpoints]
     [--expand-models]
 
 FLAGS
@@ -276,17 +276,17 @@ DESCRIPTION
   https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal
 
 EXAMPLES
-  $ apimatic portal:new:toc --destination="./portal/content/"
+  $ apimatic portal:toc:new --destination="./portal/content/"
   A new toc file has been created at ./portal/content/toc.yml
 
-  $ apimatic portal:new:toc --folder="./my-project" 
+  $ apimatic portal:toc:new --folder="./my-project" 
   A new toc file has been created at ./my-project/content/toc.yml
 
-  $ apimatic portal:new:toc --folder="./my-project" --destination="./portal/content/"
+  $ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"
   A new toc file has been created at ./portal/content/toc.yml
 ```
 
-_See code: [src/commands/portal/new/toc.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/new/toc.ts)_
+_See code: [src/commands/portal/toc/new/toc.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/toc/new/toc.ts)_
 
 ## `apimatic portal:quickstart`
 

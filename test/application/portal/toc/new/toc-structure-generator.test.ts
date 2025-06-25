@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { TocStructureGenerator } from "../../../../../src/application/portal/new/toc/toc-structure-generator";
+import { TocStructureGenerator } from "../../../../../src/application/portal/toc/toc-structure-generator";
 import { TocEndpoint, TocGroup, TocModel, Toc, TocCustomPage } from "../../../../../src/types/toc/toc";
 
 describe("TocStructureGenerator", () => {
