@@ -1,16 +1,16 @@
+import * as path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
-import * as path from "path";
 import { parse } from "yaml";
 import { TreeObject } from "treeify";
-import { PortalRecipePrompts } from "../../../prompts/portal/recipe";
-import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/recipe/recipe";
-import { isValidUrl } from "../../../utils/utils";
-import { Result } from "../../../types/common/result";
-import { PortalRecipe } from "../../../application/portal/new/portal-recipe";
-import { PortalRecipeGenerator } from "../../../application/portal/new/recipe-generator";
-import { SdlParser } from "../../../application/portal/new/toc/sdl-parser";
-import { PortalService } from "../../../infrastructure/services/portal-service";
+import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
+import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/recipe/recipe.js";
+import { isValidUrl } from "../../../utils/utils.js";
+import { Result } from "../../../types/common/result.js";
+import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
+import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
+import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
+import { PortalService } from "../../../infrastructure/services/portal-service.js";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;

@@ -1,7 +1,7 @@
 import * as path from "path";
 import { Command, Flags } from "@oclif/core";
-import { PortalRecipeAction } from "../../../actions/portal/recipe/new-recipe.js"
-import { PortalRecipePrompts } from "../../../prompts/portal/recipe.js";
+import { PortalRecipeAction } from "../../../actions/portal/recipe/new-recipe.js";
+import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
 import { getMessageInRedColor } from "../../../utils/utils.js";
 
 const DEFAULT_FOLDER = process.cwd();

@@ -1,8 +1,8 @@
-import * as fs from "fs";
 import * as path from "path";
-import * as prettier from "prettier";
+import fs from "fs";
+import prettier from "prettier";
 import { stringify } from "yaml";
-import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../../types/recipe/recipe";
+import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../../types/recipe/recipe.js";
 
 export class PortalRecipeGenerator {
   //TODO: Replace tocFileContent any type with concrete type.

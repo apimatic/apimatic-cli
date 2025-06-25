@@ -1,4 +1,4 @@
-import { SerializableRecipe } from "../../../types/recipe/recipe";
+import { SerializableRecipe } from "../../../types/recipe/recipe.js";
 
 export class PortalRecipe {
   private readonly recipe: SerializableRecipe;
