@@ -1,11 +1,11 @@
 import * as path from "path";
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
 import { Command, Flags } from "@oclif/core";
-import { GenerateFlags, PortalPaths } from "../../types/portal/generate";
-import { getMessageInRedColor } from "../../utils/utils";
-import { PortalGeneratePrompts } from "../../prompts/portal/generate";
-import { PortalGenerateAction } from "../../actions/portal/generate";
-import { Result } from "../../types/common/result";
+import { GenerateFlags, PortalPaths } from "../../types/portal/generate.js";
+import { getMessageInRedColor } from "../../utils/utils.js";
+import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
+import { PortalGenerateAction } from "../../actions/portal/generate.js";
+import { Result } from "../../types/common/result.js";
 
 const DEFAULT_FOLDER = "./";
 const DEFAULT_DESTINATION = path.resolve("./");
@@ -83,12 +83,12 @@ Your portal has been generated at D:/
   }
 
   private async validatePaths(paths: PortalPaths): Promise<Result<string, string>> {
-    if (!(await fs.pathExists(paths.sourceFolderPath))) {
+    if (!(await fsExtra.pathExists(paths.sourceFolderPath))) {
       return Result.failure(
         getMessageInRedColor(`Portal build input folder ${paths.sourceFolderPath} does not exist.`)
       );
     }
-    if (!(await fs.pathExists(path.dirname(paths.generatedPortalArtifactsFolderPath)))) {
+    if (!(await fsExtra.pathExists(path.dirname(paths.generatedPortalArtifactsFolderPath)))) {
       return Result.failure(
         getMessageInRedColor(
           `Destination path ${path.dirname(paths.generatedPortalArtifactsFolderPath)} does not exist.`
@@ -100,11 +100,11 @@ Your portal has been generated at D:/
   }
 
   private async checkExistingPortal(paths: PortalPaths, flags: GenerateFlags): Promise<boolean> {
-    if (fs.existsSync(paths.generatedPortalArtifactsFolderPath) && !flags.force && !flags.zip) {
+    if (fsExtra.existsSync(paths.generatedPortalArtifactsFolderPath) && !flags.force && !flags.zip) {
       if (!(await this.prompts.overwriteExistingPortalArtifactsPrompt())) {
         return false;
       }
-    } else if (fs.existsSync(paths.generatedPortalArtifactsZipFilePath) && !flags.force && flags.zip) {
+    } else if (fsExtra.existsSync(paths.generatedPortalArtifactsZipFilePath) && !flags.force && flags.zip) {
       if (!(await this.prompts.existingDestinationPortalZipPrompt())) {
         return false;
       }

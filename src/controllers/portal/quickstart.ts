@@ -1,13 +1,13 @@
-import simpleGit, { SimpleGitOptions } from "simple-git";
+import { simpleGit } from "simple-git";
 import axios from "axios";
 import * as path from "path";
 import * as filetype from "file-type";
-import * as fs from "fs";
-import * as fsextra from "fs-extra";
-import { getAuthInfo } from "../../client-utils/auth-manager";
+import fs from "fs";
+import fsExtra from "fs-extra";
+import { getAuthInfo } from "../../client-utils/auth-manager.js";
 import { ApiError, ApiValidationExternalApIsController, ApiValidationSummary } from "@apimatic/sdk";
-import { LoginCredentials, SpecFile } from "../../types/portal/quickstart";
-import { SDKClient } from "../../client-utils/sdk-client";
+import { LoginCredentials, SpecFile } from "../../types/portal/quickstart.js";
+import { SDKClient } from "../../client-utils/sdk-client.js";
 import {
   createTempDirectory,
   isValidUrl,
@@ -16,14 +16,14 @@ import {
   clearDirectory,
   deleteFile,
   cleanUpGeneratedPortalFiles
-} from "../../utils/utils";
-import { getValidationSummary } from "../api/validate";
-import { APIValidateError, AuthorizationError, GetValidationParams } from "../../types/api/validate";
-import { generatePortal } from "./serve";
-import { metadataFileContent, staticPortalRepoUrl } from "../../config/env";
-import { PortalServerService } from "../../services/portal/server";
-import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart";
-import { AuthenticationError } from "../../types/utils";
+} from "../../utils/utils.js";
+import { getValidationSummary } from "../api/validate.js";
+import { AuthorizationError, GetValidationParams } from "../../types/api/validate.js";
+import { generatePortal } from "./serve.js";
+import { metadataFileContent, staticPortalRepoUrl } from "../../config/env.js";
+import { PortalServerService } from "../../services/portal/server.js";
+import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
+import { AuthenticationError } from "../../types/utils.js";
 
 export class PortalQuickstartController {
   private readonly specUrl =
@@ -63,7 +63,7 @@ export class PortalQuickstartController {
           const specFile = await axios.get(specPath, { responseType: "arraybuffer" });
           const fileName = path.basename(specPath);
           filePath = path.join(tempSpecDir, fileName);
-          await fsextra.writeFile(filePath, specFile.data);
+          await fsExtra.writeFile(filePath, specFile.data);
         } catch (error) {
           if (axios.isAxiosError(error)) {
             if (error.response) {
@@ -106,9 +106,7 @@ export class PortalQuickstartController {
           } else {
             throw new Error(
               getMessageInRedColor(
-                `Unable to save API Definition : ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }`
+                `Unable to save API Definition : ${error instanceof Error ? error.message : "Unknown error"}`
               )
             );
           }
@@ -123,7 +121,7 @@ export class PortalQuickstartController {
         } else {
           const destinationPath = path.join(tempSpecDir, path.basename(specPath));
           filePath = destinationPath;
-          await fsextra.copy(specPath, destinationPath);
+          await fsExtra.copy(specPath, destinationPath);
         }
       }
     }
@@ -144,8 +142,7 @@ export class PortalQuickstartController {
     try {
       const validationSummary = await getValidationSummary(validationFlags, apiValidationController);
       return validationSummary;
-    }
-    catch (error) {
+    } catch (error) {
       prompts.displaySpecValidationErrorMessage();
       if (axios.isAxiosError(error)) {
         if (error.response) {
@@ -202,8 +199,7 @@ export class PortalQuickstartController {
         typeof (error as AuthenticationError).body === "string"
       ) {
         throw new Error((error as AuthenticationError).body);
-      }
-      else {
+      } else {
         throw new Error(
           getMessageInRedColor(
             `Something went wrong while validating the spec file, please try again later. If the issue persists, contact our team at support@apimatic.io`
@@ -220,12 +216,11 @@ export class PortalQuickstartController {
     validationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<void> {
-    const options: Partial<SimpleGitOptions> = {
+    const git = simpleGit({
       timeout: {
         block: 60 * 1000 // 1 minute timeout.
       }
-    };
-    const git = simpleGit(options);
+    });
 
     try {
       await git.clone(staticPortalRepoUrl, targetFolder);
@@ -255,7 +250,7 @@ export class PortalQuickstartController {
 
     if (specFile.filePath && validationSummary.success) {
       await deleteFile(path.join(targetFolder, "spec", "Apimatic-Calculator.json"));
-      fsextra.copy(specFile.filePath, path.join(targetFolder, "spec", path.basename(specFile.filePath)));
+      fsExtra.copy(specFile.filePath, path.join(targetFolder, "spec", path.basename(specFile.filePath)));
     }
 
     const buildFilePath = path.join(targetFolder, "APIMATIC-BUILD.json");
@@ -296,7 +291,11 @@ export class PortalQuickstartController {
               )
             );
           } else if (error.response.status === 403) {
-            throw new Error(getMessageInRedColor(`Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
+            throw new Error(
+              getMessageInRedColor(
+                `Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`
+              )
+            );
           } else if (error.response.status === 422) {
             throw new Error(
               getMessageInRedColor(
@@ -305,7 +304,9 @@ export class PortalQuickstartController {
             );
           } else if (error.response.status === 500) {
             throw new Error(
-              getMessageInRedColor(`The server encountered an error while generating your portal, please try again. If the issue persists, contact our team at support@apimatic.io`)
+              getMessageInRedColor(
+                `The server encountered an error while generating your portal, please try again. If the issue persists, contact our team at support@apimatic.io`
+              )
             );
           } else {
             throw new Error(
@@ -323,16 +324,26 @@ export class PortalQuickstartController {
             );
           } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
             throw new Error(
-              getMessageInRedColor(`Network error encountered while generating the portal. Please check your connection and try again.`)
+              getMessageInRedColor(
+                `Network error encountered while generating the portal. Please check your connection and try again.`
+              )
             );
           } else {
-            throw new Error(getMessageInRedColor(`Something went wrong while generating the portal, please try again. If the issue persists, reach out to our support team at support@apimatic.io`));
+            throw new Error(
+              getMessageInRedColor(
+                `Something went wrong while generating the portal, please try again. If the issue persists, reach out to our support team at support@apimatic.io`
+              )
+            );
           }
         } else {
           throw new Error(getMessageInRedColor(`Failed to generate portal: ${error.message}`));
         }
       } else {
-        throw new Error(getMessageInRedColor(`Something went wrong while generating the portal, please try again later. If the issue persists, contact our team at support@apimatic.io`));
+        throw new Error(
+          getMessageInRedColor(
+            `Something went wrong while generating the portal, please try again later. If the issue persists, contact our team at support@apimatic.io`
+          )
+        );
       }
     }
   }

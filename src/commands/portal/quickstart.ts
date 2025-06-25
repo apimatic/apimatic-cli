@@ -1,10 +1,10 @@
 import { Command } from "@oclif/core";
 import { ApiValidationExternalApIsController, ApiValidationSummary, Client } from "@apimatic/sdk";
-import { SDKClient } from "../../client-utils/sdk-client";
-import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart";
-import { PortalQuickstartController } from "../../controllers/portal/quickstart";
-import { SpecFile } from "../../types/portal/quickstart";
-import { getMessageInRedColor } from "../../utils/utils";
+import { SDKClient } from "../../client-utils/sdk-client.js";
+import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
+import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
+import { SpecFile } from "../../types/portal/quickstart.js";
+import { getMessageInRedColor } from "../../utils/utils.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";

@@ -2,8 +2,8 @@ import * as base64 from "base-64";
 import axios, { AxiosResponse } from "axios";
 
 import { Client } from "@apimatic/sdk";
-import { baseURL } from "../config/env";
-import { setAuthInfo, getAuthInfo, AuthInfo } from "./auth-manager";
+import { baseURL } from "../config/env.js";
+import { setAuthInfo, getAuthInfo, AuthInfo } from "./auth-manager.js";
 /**
  * The Singleton class defines the `getInstance` method that lets clients access
  * the unique singleton instance.
@@ -106,7 +106,7 @@ export class SDKClient {
       return new Client({
         timeout: 0,
         customHeaderAuthenticationCredentials: {
-          'Authorization': `X-Auth-Key ${overrideAuthKey}`
+          Authorization: `X-Auth-Key ${overrideAuthKey}`
         }
       });
     }
@@ -120,7 +120,7 @@ export class SDKClient {
       return new Client({
         timeout: 0,
         customHeaderAuthenticationCredentials: {
-          'Authorization': `X-Auth-Key ${storedAuthInfo.authKey}`
+          Authorization: `X-Auth-Key ${storedAuthInfo.authKey}`
         }
       });
     } else {

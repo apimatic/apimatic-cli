@@ -1,5 +1,5 @@
-import { DirectoryValidator } from "../common/directoryValidator";
-import { PortValidator } from "../common/portValidator";
+import { DirectoryValidator } from "../common/directoryValidator.js";
+import { PortValidator } from "../common/portValidator.js";
 
 export class PortalServeValidator {
   private readonly portValidator: PortValidator;

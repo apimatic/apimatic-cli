@@ -1,8 +1,8 @@
 import { AxiosError } from "axios";
 import { Flags, Command } from "@oclif/core";
 import { outro, password, text } from "@clack/prompts";
-import { getMessageInRedColor, replaceHTML } from "../../utils/utils";
-import { SDKClient } from "../../client-utils/sdk-client";
+import { getMessageInRedColor, replaceHTML } from "../../utils/utils.js";
+import { SDKClient } from "../../client-utils/sdk-client.js";
 
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";

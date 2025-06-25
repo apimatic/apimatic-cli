@@ -1,11 +1,11 @@
-import * as express from "express";
-import * as livereload from "livereload";
-import * as connectLivereload from "connect-livereload";
-import * as open from "open";
-import { watchAndRegeneratePortal } from "../../controllers/portal/serve";
-import { PortalServerConfig } from "../../types/portal/quickstart";
+import express from "express";
+import livereload from "livereload";
+import connectLivereload from "connect-livereload";
+import open from "open";
+import { watchAndRegeneratePortal } from "../../controllers/portal/serve.js";
+import { PortalServerConfig } from "../../types/portal/quickstart.js";
 import { Server } from "http";
-import { getMessageInRedColor, isPortInUse } from "../../utils/utils";
+import { getMessageInRedColor, isPortInUse } from "../../utils/utils.js";
 
 export class PortalServerService {
   private server!: Server;

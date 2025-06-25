@@ -1,4 +1,4 @@
-import { getMessageInRedColor, isPortInUse } from "../../utils/utils";
+import { getMessageInRedColor, isPortInUse } from "../../utils/utils.js";
 
 export class PortValidator {
   constructor(private readonly error: (message: string) => void) {}
