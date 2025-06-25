@@ -20,7 +20,7 @@
             // "auth:status"
             // "portal:quickstart",
             // "portal:generate",
-            // "portal:new:toc",
+            // "portal:toc:new",
             //"--expand-endpoints",
             //"--expand-models",
             // "--force",
