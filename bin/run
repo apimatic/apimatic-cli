@@ -2,8 +2,11 @@
 /* eslint-disable no-undef */
 /* eslint-disable @typescript-eslint/no-var-requires */
 
-const { run, flush, handle } = require("@oclif/core");
+import { run, flush, handle } from "@oclif/core";
 
-run()
-  .then(flush)
-  .catch(handle);
+try {
+  await run();
+  await flush();
+} catch (error) {
+  await handle(error);
+}
