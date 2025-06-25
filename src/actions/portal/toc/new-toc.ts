@@ -1,13 +1,13 @@
 import * as path from "path";
 import fsExtra from "fs-extra";
-import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc";
-import { Result } from "../../../types/common/result";
-import { getMessageInRedColor } from "../../../utils/utils";
-import { SdlParser } from "../../../application/portal/toc/sdl-parser";
-import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator";
-import { TocContentParser } from "../../../application/portal/toc/toc-content-parser";
-import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc";
-import { PortalService } from "../../../infrastructure/services/portal-service";
+import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc.js";
+import { Result } from "../../../types/common/result.js";
+import { getMessageInRedColor } from "../../../utils/utils.js";
+import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
+import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator.js";
+import { TocContentParser } from "../../../application/portal/toc/toc-content-parser.js";
+import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc.js";
+import { PortalService } from "../../../infrastructure/services/portal-service.js";
 
 const DEFAULT_TOC_FILENAME = "toc.yml";
 const APIMATIC_BUILD_FILENAME = "APIMATIC-BUILD.json";
@@ -108,7 +108,9 @@ export class PortalNewTocAction {
       return { endpointGroups: new Map(), models: [] };
     }
 
-    this.prompts.stopProgressIndicatorWithMessage("✅ Successfully extracted endpoints and/or models from the specification.");
+    this.prompts.stopProgressIndicatorWithMessage(
+      "✅ Successfully extracted endpoints and/or models from the specification."
+    );
     return sdlResult.value!;
   }
 
@@ -178,4 +180,4 @@ export class PortalNewTocAction {
       return defaultSpecFolder;
     }
   }
-} 
+}

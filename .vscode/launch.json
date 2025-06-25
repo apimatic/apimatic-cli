@@ -56,17 +56,14 @@
       "type": "node",
       "request": "launch",
       "name": "Debug CLI Tests",
-      "program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+      "program": "${workspaceFolder}/node_modules/tsx/dist/cli.mjs",
       "args": [
-        "--require",
-        "ts-node/register",
-        "--project",
-        "${workspaceFolder}/tsconfig.json",
+        "${workspaceFolder}/node_modules/mocha/bin/_mocha",
         "--forbid-only",
         "test/**/*.test.ts",
         // "${file}", // Run Tests for the currently open test file.
         "--timeout",
-        "99999",
+        "99999"
       ],
       "cwd": "${workspaceFolder}",
       "runtimeArgs": [

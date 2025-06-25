@@ -1,13 +1,13 @@
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
 
 import { ux, Flags, Command } from "@oclif/core";
 import { ApiError, ApiValidationExternalApIsController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
-import { AuthenticationError, loggers } from "../../types/utils";
-import { SDKClient } from "../../client-utils/sdk-client";
-import { getValidationSummary } from "../../controllers/api/validate";
-import { printValidationMessages, replaceHTML } from "../../utils/utils";
-import { APIValidateError, AuthorizationError } from "../../types/api/validate";
+import { AuthenticationError, loggers } from "../../types/utils.js";
+import { SDKClient } from "../../client-utils/sdk-client.js";
+import { getValidationSummary } from "../../controllers/api/validate.js";
+import { printValidationMessages, replaceHTML } from "../../utils/utils.js";
+import { APIValidateError, AuthorizationError } from "../../types/api/validate.js";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
@@ -36,7 +36,7 @@ Specification file provided is valid
     const { flags } = await this.parse(Validate);
 
     try {
-      if (flags.file && !(await fs.pathExists(flags.file))) {
+      if (flags.file && !(await fsExtra.pathExists(flags.file))) {
         throw new Error(`Validation file: ${flags.file} does not exist`);
       }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;

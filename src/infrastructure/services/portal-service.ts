@@ -1,5 +1,5 @@
-import * as fsExtra from "fs-extra";
-import * as fs from "fs";
+import fsExtra from "fs-extra";
+import fs from "fs";
 import * as path from "path";
 import {
   ContentType,
@@ -15,12 +15,12 @@ import {
   ExportFormats,
   InternalServerErrorResponseError
 } from "@apimatic/sdk";
-import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
-import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate";
-import { Result } from "../../types/common/result";
-import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils";
-import { TransformationData } from "../../types/api/transform";
-import { Sdl } from "../../types/sdl/sdl";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate.js";
+import { Result } from "../../types/common/result.js";
+import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils.js";
+import { TransformationData } from "../../types/api/transform.js";
+import { Sdl } from "../../types/sdl/sdl.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;

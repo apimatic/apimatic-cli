@@ -1,6 +1,6 @@
-import * as fs from "fs";
+import fs from "fs";
 import * as path from "path";
-import * as treeify from "treeify";
+import treeify from "treeify";
 import { intro, outro, text, spinner, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
 import {
   getMessageInCyanColor,
@@ -10,7 +10,7 @@ import {
   getMessageInRedColor,
   isValidUrl,
   directoryToJson
-} from "../../utils/utils";
+} from "../../utils/utils.js";
 
 export class PortalQuickstartPrompts {
   private readonly spin = spinner();
@@ -98,14 +98,16 @@ export class PortalQuickstartPrompts {
 
         if (isValidUrl(input)) return;
 
-        const resolvedPath = path.resolve(input);
+        const dirPath = path.resolve((input ?? "").trim());
 
-        if (fs.existsSync(resolvedPath)) {
-          if (fs.statSync(resolvedPath).isFile()) {
+        if (fs.existsSync(dirPath)) {
+          if (fs.statSync(dirPath).isFile()) {
             return;
           }
 
-          return getMessageInRedColor("Error: The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again.");
+          return getMessageInRedColor(
+            "Error: The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again."
+          );
         }
 
         return getMessageInRedColor("Error: The specified file does not exist. Please enter a valid file path.");
@@ -145,7 +147,10 @@ export class PortalQuickstartPrompts {
     const useSampleSpec = await select({
       message: `How would you like to proceed?`,
       options: [
-        { value: "exit", label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${this.vscodeExtensionUrl}` },
+        {
+          value: "exit",
+          label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${this.vscodeExtensionUrl}`
+        },
         { value: "continue", label: `2. Use an example API spec instead (recommended)` }
       ]
     });
@@ -200,19 +205,23 @@ export class PortalQuickstartPrompts {
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const dirPath = path.resolve(input.trim());
+        const dirPath = path.resolve((input ?? "").trim());
 
         if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
           return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
         }
 
         if (dirPath !== this.defaultPortalDirectoryPath) {
-          const files = fs.readdirSync(dirPath).filter(item => !item.startsWith('.'));;
+          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
-            return getMessageInRedColor("Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.");
+            return getMessageInRedColor(
+              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
+            );
           }
         } else if (fs.existsSync(dirPath) && fs.readdirSync(dirPath).length > 0) {
-          return getMessageInRedColor("Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.");
+          return getMessageInRedColor(
+            "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
+          );
         }
       }
     });
@@ -271,12 +280,16 @@ export class PortalQuickstartPrompts {
         getMessageInCyanColor(`Press CTRL+C to stop the server.\n\n`) +
         getMessageInCyanColor(`What's next?\n`) +
         getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
-        getMessageInCyanColor(`- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentationUrl}`) +
+        getMessageInCyanColor(
+          `- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentationUrl}`
+        ) +
         getMessageInCyanColor(` \n`) +
         getMessageInCyanColor(
           `- Review the SDK Documentation for your favourite programming language and download an SDK from the API Portal.\n`
         ) +
-        getMessageInCyanColor(`- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`) +
+        getMessageInCyanColor(
+          `- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`
+        ) +
         getMessageInCyanColor(` \n`)
     );
   }

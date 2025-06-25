@@ -1,5 +1,5 @@
 import { cancel, outro, select, spinner, isCancel } from "@clack/prompts";
-import { getMessageInRedColor } from "../../utils/utils";
+import { getMessageInRedColor } from "../../utils/utils.js";
 
 export class PortalGeneratePrompts {
   private readonly spin = spinner();

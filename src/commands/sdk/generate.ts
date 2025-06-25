@@ -1,14 +1,14 @@
 import * as path from "path";
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
 
 import { Command, Flags } from "@oclif/core";
-import { SDKClient } from "../../client-utils/sdk-client";
+import { SDKClient } from "../../client-utils/sdk-client.js";
 import { ApiError, Client, CodeGenerationExternalApIsController } from "@apimatic/sdk";
 
-import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils";
-import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate";
-import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate";
-import { AuthenticationError } from "../../types/utils";
+import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils.js";
+import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate.js";
+import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate.js";
+import { AuthenticationError } from "../../types/utils.js";
 
 export default class SdkGenerate extends Command {
   static description = "Generate SDK for your APIs";
@@ -68,16 +68,16 @@ Success! Your SDK is located at swagger_sdk_csharp
     const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toLowerCase());
 
     // Check if at destination, SDK already exists and throw error if force flag is not set for both zip and extracted
-    if (fs.existsSync(sdkFolderPath) && !flags.force && !zip) {
+    if (fsExtra.existsSync(sdkFolderPath) && !flags.force && !zip) {
       throw new Error(`Can't download SDK to path ${sdkFolderPath}, because it already exists`);
-    } else if (fs.existsSync(zippedSDKPath) && !flags.force && zip) {
+    } else if (fsExtra.existsSync(zippedSDKPath) && !flags.force && zip) {
       throw new Error(`Can't download SDK to path ${zippedSDKPath}, because it already exists`);
     }
 
     try {
-      if (!(await fs.pathExists(path.resolve(flags.destination)))) {
+      if (!(await fsExtra.pathExists(path.resolve(flags.destination)))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
-      } else if (!(await fs.pathExists(path.resolve(flags.file)))) {
+      } else if (!(await fsExtra.pathExists(path.resolve(flags.file)))) {
         throw new Error(`Specification file ${flags.file} does not exist`);
       }
 

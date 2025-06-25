@@ -1,6 +1,6 @@
 import { Command } from "@oclif/core";
 
-import { SDKClient } from "../../client-utils/sdk-client";
+import { SDKClient } from "../../client-utils/sdk-client.js";
 
 export default class Login extends Command {
   static description = "Clear local login credentials";

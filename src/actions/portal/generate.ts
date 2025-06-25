@@ -1,16 +1,16 @@
 import * as path from "path";
-import * as fs from "fs-extra";
-import { PortalService } from "../../infrastructure/services/portal-service";
-import { PortalPaths, GeneratePortalParams, GenerateFlags } from "../../types/portal/generate";
-import { Result } from "../../types/common/result";
+import fsExtra from "fs-extra";
+import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { PortalPaths, GeneratePortalParams, GenerateFlags } from "../../types/portal/generate.js";
+import { Result } from "../../types/common/result.js";
 import {
   getGeneratedFilesPaths,
   validateAndZipPortalSource,
   deleteFile,
   extractZipFile,
   getMessageInRedColor
-} from "../../utils/utils";
-import { PortalGeneratePrompts } from "../../prompts/portal/generate";
+} from "../../utils/utils.js";
+import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 
 export class PortalGenerateAction {
   private readonly prompts: PortalGeneratePrompts;
@@ -61,9 +61,7 @@ export class PortalGenerateAction {
       this.prompts.displayOutroMessage(paths.generatedPortalArtifactsFolderPath);
     } else {
       this.prompts.displayPortalGenerationErrorMessage();
-      this.prompts.logError(
-        getMessageInRedColor(`${portalGenerationResult.error!}`)
-      );
+      this.prompts.logError(getMessageInRedColor(`${portalGenerationResult.error!}`));
     }
   }
 
@@ -71,7 +69,7 @@ export class PortalGenerateAction {
     data: NodeJS.ReadableStream,
     generatedPortalArtifactsZipFilePath: string
   ): Promise<void> {
-    const writeStream = fs.createWriteStream(generatedPortalArtifactsZipFilePath);
+    const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
     await new Promise<void>((resolve, reject) => {
       data
         .pipe(writeStream)

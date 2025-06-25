@@ -1,8 +1,8 @@
-import { expect } from "chai";
 import * as path from "path";
-import * as fs from "fs-extra";
-import { TocContentParser } from "../../../../../src/application/portal/toc/toc-content-parser";
-import { TocGroup } from "../../../../../src/types/toc/toc";
+import fsExtra from "fs-extra";
+import { expect } from "chai";
+import { TocContentParser } from "../../../../../src/application/portal/toc/toc-content-parser.js";
+import { TocGroup } from "../../../../../src/types/toc/toc.js";
 import { dir as tmpDir, DirectoryResult } from "tmp-promise";
 
 describe("TocContentParser", () => {
@@ -16,7 +16,7 @@ describe("TocContentParser", () => {
     TEST_CONFIG_DIR = tmpDirResult.path;
     TEST_CONTENT_DIR = path.join(TEST_CONFIG_DIR, "content");
     tocContentParser = new TocContentParser();
-    await fs.ensureDir(TEST_CONTENT_DIR);
+    await fsExtra.ensureDir(TEST_CONTENT_DIR);
   });
 
   afterEach(async () => {
@@ -25,8 +25,8 @@ describe("TocContentParser", () => {
 
   describe("parseContentFolder", () => {
     it("should parse flat directory structure", async () => {
-      await fs.writeFile(path.join(TEST_CONTENT_DIR, "guide1.md"), "# Guide 1");
-      await fs.writeFile(path.join(TEST_CONTENT_DIR, "guide2.md"), "# Guide 2");
+      await fsExtra.writeFile(path.join(TEST_CONTENT_DIR, "guide1.md"), "# Guide 1");
+      await fsExtra.writeFile(path.join(TEST_CONTENT_DIR, "guide2.md"), "# Guide 2");
 
       const result = await tocContentParser.parseContentFolder(TEST_CONTENT_DIR, TEST_CONTENT_DIR);
 
@@ -46,9 +46,9 @@ describe("TocContentParser", () => {
 
     it("should parse nested directory structure", async () => {
       const nestedDir = path.join(TEST_CONTENT_DIR, "guides");
-      await fs.ensureDir(nestedDir);
-      await fs.writeFile(path.join(nestedDir, "guide1.md"), "# Guide 1");
-      await fs.writeFile(path.join(nestedDir, "guide2.md"), "# Guide 2");
+      await fsExtra.ensureDir(nestedDir);
+      await fsExtra.writeFile(path.join(nestedDir, "guide1.md"), "# Guide 1");
+      await fsExtra.writeFile(path.join(nestedDir, "guide2.md"), "# Guide 2");
 
       const result = await tocContentParser.parseContentFolder(TEST_CONTENT_DIR, TEST_CONTENT_DIR);
 
@@ -76,9 +76,9 @@ describe("TocContentParser", () => {
     });
 
     it("should only include markdown files", async () => {
-      await fs.writeFile(path.join(TEST_CONTENT_DIR, "guide1.md"), "# Guide 1");
-      await fs.writeFile(path.join(TEST_CONTENT_DIR, "image.png"), "binary content");
-      await fs.writeFile(path.join(TEST_CONTENT_DIR, "data.json"), "{}");
+      await fsExtra.writeFile(path.join(TEST_CONTENT_DIR, "guide1.md"), "# Guide 1");
+      await fsExtra.writeFile(path.join(TEST_CONTENT_DIR, "image.png"), "binary content");
+      await fsExtra.writeFile(path.join(TEST_CONTENT_DIR, "data.json"), "{}");
 
       const result = await tocContentParser.parseContentFolder(TEST_CONTENT_DIR, TEST_CONTENT_DIR);
 
@@ -94,8 +94,8 @@ describe("TocContentParser", () => {
     it("should generate correct relative paths", async () => {
       const workingDir = path.join(TEST_CONTENT_DIR, "..");
       const nestedDir = path.join(TEST_CONTENT_DIR, "guides");
-      await fs.ensureDir(nestedDir);
-      await fs.writeFile(path.join(nestedDir, "guide1.md"), "# Guide 1");
+      await fsExtra.ensureDir(nestedDir);
+      await fsExtra.writeFile(path.join(nestedDir, "guide1.md"), "# Guide 1");
 
       const result = await tocContentParser.parseContentFolder(TEST_CONTENT_DIR, workingDir);
 

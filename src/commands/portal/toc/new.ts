@@ -1,6 +1,6 @@
 import * as path from "path";
 import { Command, Flags } from "@oclif/core";
-import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc";
+import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc.js";
 
 const DEFAULT_FOLDER = process.cwd();
 
