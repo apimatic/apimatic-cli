@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { TreeObject, asTree } from "treeify";
+import treeify from "treeify";
 import { spinner, select, text, cancel, isCancel, outro, log, autocomplete } from "@clack/prompts";
 import { getMessageInGreenColor, isValidUrl } from "../../../utils/utils.js";
 
@@ -258,8 +258,8 @@ export class PortalRecipePrompts {
     this.spin.stop(message);
   }
 
-  public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: TreeObject) {
-    const tree = asTree(buildDirectoryTreeObject, true, true);
+  public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: treeify.TreeObject) {
+    const tree = treeify.asTree(buildDirectoryTreeObject, true, true);
 
     const coloredLogString = tree
       .split("\n")

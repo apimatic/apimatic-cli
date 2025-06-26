@@ -8,9 +8,9 @@ const DEFAULT_FOLDER = process.cwd();
 export default class PortalNewRecipe extends Command {
   static override description = "Generate an API Recipe for a static API Documentation portal.";
   static override examples = [
-    `$ apimatic portal:new:recipe --name="My API Recipe" --folder="./build-folder" --build-config-file="./build-folder/APIMATIC-BUILD.json"
+    `$ apimatic portal:recipe:new --name="My API Recipe" --folder="./build-folder" --build-config-file="./build-folder/APIMATIC-BUILD.json"
 Generated recipe has been added to build directory at: C:/build-folder/`,
-    `$ apimatic portal:new:recipe
+    `$ apimatic portal:recipe:new
 Generated recipe has been added to build directory at: C:/`
   ];
   static override flags = {
