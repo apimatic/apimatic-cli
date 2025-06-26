@@ -1,3 +1,10 @@
+# [1.1.0-alpha.8](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.7...v1.1.0-alpha.8) (2025-06-24)
+
+
+### Features
+
+* **portal:** adds portal:new:toc command and other various improvements ([#93](https://github.com/apimatic/apimatic-cli/issues/93)) ([cfae452](https://github.com/apimatic/apimatic-cli/commit/cfae452b26f2ebf393b22afb82740e5b18c78738)), closes [#55](https://github.com/apimatic/apimatic-cli/issues/55) [#56](https://github.com/apimatic/apimatic-cli/issues/56) [#72](https://github.com/apimatic/apimatic-cli/issues/72) [#73](https://github.com/apimatic/apimatic-cli/issues/73)
+
 # [1.1.0-alpha.7](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.6...v1.1.0-alpha.7) (2025-06-20)
 
 
