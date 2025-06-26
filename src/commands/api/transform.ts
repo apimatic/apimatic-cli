@@ -6,8 +6,7 @@ import { TransformationController, Transformation, Client, ApiError } from "@api
 
 import { AuthenticationError, loggers } from "../../types/utils.js";
 import { SDKClient } from "../../client-utils/sdk-client.js";
-import { printValidationMessages } from "../../utils/utils.js";
-import { getFileNameFromPath, replaceHTML } from "../../utils/utils.js";
+import { printValidationMessages, getFileNameFromPath, replaceHTML } from "../../utils/utils.js";
 import { DestinationFormats, TransformationFormats } from "../../types/api/transform.js";
 import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform.js";
 
