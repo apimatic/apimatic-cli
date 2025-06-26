@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import * as path from "path";
 import * as fs from "fs-extra";
-import { SdlParser } from "../../../../../src/application/portal/new/toc/sdl-parser";
+import { SdlParser } from "../../../../../src/application/portal/toc/sdl-parser";
 import { PortalService } from "../../../../../src/infrastructure/services/portal-service";
 import { Result } from "../../../../../src/types/common/result";
 import { Sdl } from "../../../../../src/types/sdl/sdl";

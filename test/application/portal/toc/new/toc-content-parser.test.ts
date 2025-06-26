@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import * as path from "path";
 import * as fs from "fs-extra";
-import { TocContentParser } from "../../../../../src/application/portal/new/toc/toc-content-parser";
+import { TocContentParser } from "../../../../../src/application/portal/toc/toc-content-parser";
 import { TocGroup } from "../../../../../src/types/toc/toc";
 import { dir as tmpDir, DirectoryResult } from "tmp-promise";
 

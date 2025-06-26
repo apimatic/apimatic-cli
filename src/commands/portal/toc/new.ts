@@ -1,10 +1,10 @@
 import * as path from "path";
 import { Command, Flags } from "@oclif/core";
-import { PortalNewTocAction } from "../../../actions/portal/new/toc";
+import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc";
 
 const DEFAULT_FOLDER = process.cwd();
 
-export default class PortalNewToc extends Command {
+export default class PortalTocNew extends Command {
   static summary = 'Generates a TOC file based on the content directory and spec folder provided in your working directory';
 
   static description = `This command generates a new Table of Contents (TOC) file used in the
@@ -40,13 +40,13 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
   };
 
   static examples = [
-    `$ apimatic portal:new:toc --destination="./portal/content/"
+    `$ apimatic portal:toc:new --destination="./portal/content/"
 A new toc file has been created at ./portal/content/toc.yml
 `,
-    `$ apimatic portal:new:toc --folder="./my-project" 
+    `$ apimatic portal:toc:new --folder="./my-project" 
 A new toc file has been created at ./my-project/content/toc.yml
 `,
-    `$ apimatic portal:new:toc --folder="./my-project" --destination="./portal/content/"
+    `$ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"
 A new toc file has been created at ./portal/content/toc.yml
 `
   ];
@@ -56,7 +56,7 @@ A new toc file has been created at ./portal/content/toc.yml
   }
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(PortalNewToc);
+    const { flags } = await this.parse(PortalTocNew);
     const portalNewTocAction = new PortalNewTocAction();
     const result = await portalNewTocAction.createToc(
       flags.folder,
@@ -71,4 +71,4 @@ A new toc file has been created at ./portal/content/toc.yml
       this.error(result.error!);
     }
   }
-} 
+}
