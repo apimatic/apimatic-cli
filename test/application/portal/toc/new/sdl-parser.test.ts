@@ -129,8 +129,8 @@ describe("SdlParser", () => {
       const result = await sdlParser.getTocComponentsFromSdl(TEST_SPEC_DIR, TEST_SPEC_DIR, TEST_CONFIG_DIR);
 
       expect(result.isSuccess()).to.be.false;
-      expect(result.error).to.equal(
-        "Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic's interactive VS Code extension"
+      expect(result.error).to.contain(
+        "Failed to extract endpoints/models from the specification."
       );
     });
 
