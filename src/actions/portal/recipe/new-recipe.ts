@@ -3,9 +3,10 @@ import fs from "fs";
 import fsExtra from "fs-extra";
 import { parse } from "yaml";
 import { TreeObject } from "treeify";
+import { tmpdir } from "os";
+import { execa } from "execa";
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
 import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/recipe/recipe.js";
-import { isValidUrl } from "../../../utils/utils.js";
 import { Result } from "../../../types/common/result.js";
 import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
 import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
@@ -28,6 +29,8 @@ export class PortalRecipeAction {
     buildConfigFilePath?: string,
     name?: string
   ): Promise<Result<string, string>> {
+    this.prompts.displayWelcomeMessage();
+
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
     const recipeFileName = this.createRecipeFileName(recipeName);
 
@@ -64,13 +67,6 @@ export class PortalRecipeAction {
       return Result.cancelled("Operation was cancelled by the user.");
     }
 
-    const tailIncludesPropertyAlreadyExists = this.checkTailIncludesPropertyAlreadyExists(buildConfigResult.value);
-    if (tailIncludesPropertyAlreadyExists) {
-      if (!(await this.prompts.overwriteTailIncludesPrompt())) {
-        return Result.cancelled("Operation was cancelled by the user.");
-      }
-    }
-
     const extractEndpointGroupsFromSdlResult = await this.extractEndpointGroupsFromSdl(
       buildConfigResult.value,
       contentFolderPath,
@@ -88,6 +84,7 @@ export class PortalRecipeAction {
     const recipeGenerator = new PortalRecipeGenerator();
     await recipeGenerator.createRecipe(
       recipeResult.value!,
+      buildConfigResult.value!,
       tocFileResult.value,
       tocFilePath,
       recipeName,
@@ -104,7 +101,14 @@ export class PortalRecipeAction {
   }
 
   private createRecipeFileName(recipeName: string): string {
-    return recipeName.trim().split(" ").join("-");
+    return this.toPascalCase(recipeName.trim());
+  }
+
+  private toPascalCase(str: string): string {
+    return str
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join("");
   }
 
   private async validateBuildDirectoryPath(buildDirectoryPath: string): Promise<Result<string, string>> {
@@ -131,6 +135,7 @@ export class PortalRecipeAction {
     const recipe = new PortalRecipe(recipeName);
     let idx: number = 1;
     let addAnotherStep = true;
+    this.prompts.displayStepsInformation();
     while (addAnotherStep) {
       const stepType = await this.prompts.stepTypeSelectionPrompt();
       const stepName = await this.prompts.stepNamePrompt("Step " + idx);
@@ -158,14 +163,42 @@ export class PortalRecipeAction {
     recipe: PortalRecipe,
     stepName: string
   ): Promise<Result<string, string>> {
-    const contentFilePath = await this.prompts.contentFilePathPrompt();
-    const contentResult = await this.getContentFromContentFilePath(contentFilePath);
-    if (contentResult.isSuccess()) {
-      recipe.addContentStep(stepName, stepName, contentResult.value!);
+    this.prompts.displayContentStepInfo();
+    this.prompts.startProgressIndicatorWithMessage("Waiting for you to close the text editor");
+    let editor = process.env.EDITOR;
+    let editorArgs: string[] = [];
+
+    try {
+      const tempFilePath = path.join(tmpdir(), `api-recipe-markdown-content-${Date.now()}.md`);
+      const template = `# The Heading Goes Here\n\nThis is placeholder text for your API Recipe content step. Feel free to edit this. Save your changes and then close the file once you're done.`;
+
+      await fsExtra.writeFile(tempFilePath, template);
+
+      if (!editor) {
+        if (process.platform === "win32") {
+          await execa("cmd", ["/c", "start", "/wait", "notepad", tempFilePath], { stdio: "ignore" });
+        } else {
+          editor = "nano";
+          await execa(editor, [tempFilePath], { stdio: "ignore" });
+        }
+      } else {
+        if (editor === "code" || editor.endsWith("code.cmd") || editor.endsWith("code.exe")) {
+          editorArgs.push("--wait");
+        }
+        editorArgs.push(tempFilePath);
+        await execa(editor, editorArgs, { stdio: "ignore" });
+      }
+
+      this.prompts.stopProgressIndicatorWithMessage("✅  Text editor closed.");
+      const fileContent = await fsExtra.readFile(tempFilePath, "utf-8");
+
+      await fsExtra.unlink(tempFilePath);
+
+      recipe.addContentStep(stepName, stepName, fileContent);
       this.prompts.displayStepAddedSuccessfullyMessage();
       return Result.success("Added content step successfully.");
-    } else {
-      return Result.failure(contentResult.error!);
+    } catch (error) {
+      return Result.failure(`Unable to add content step. Please try again later.`);
     }
   }
 
@@ -174,8 +207,6 @@ export class PortalRecipeAction {
     endpointGroups: Map<string, string[]>,
     stepName: string
   ): Promise<void> {
-    // const endpointGroupName = await this.prompts.endpointGroupNamePrompt();
-    // const endpointName = await this.prompts.endpointNamePrompt();
     const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
     const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
     const description = await this.prompts.endpointDescriptionPrompt();
@@ -199,27 +230,6 @@ export class PortalRecipeAction {
 
   private async createPermalink(pathPieces: string[]): Promise<string> {
     return `$e/${pathPieces.map(encodeURIComponent).join("/")}`;
-  }
-
-  private async getContentFromContentFilePath(contentFilePath: string): Promise<Result<string, string>> {
-    try {
-      if (isValidUrl(contentFilePath)) {
-        return await this.fetchFileContentFromUrl(contentFilePath);
-      }
-
-      return Result.success(await fs.promises.readFile(contentFilePath, "utf-8"));
-    } catch (error) {
-      return Result.failure(`Failed to read content from file path: ${(error as Error).message}`);
-    }
-  }
-
-  private async fetchFileContentFromUrl(url: string): Promise<Result<string, string>> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return Result.failure(`Failed to fetch content from URL: ${url}`);
-    }
-    const content = await response.text();
-    return Result.success(content);
   }
 
   private async getResolvedBuildConfigFilePath(
@@ -268,10 +278,6 @@ export class PortalRecipeAction {
     return false;
   }
 
-  private checkTailIncludesPropertyAlreadyExists(buildConfig: any): boolean {
-    return buildConfig.generatePortal?.tailIncludes !== undefined;
-  }
-
   private async getBuildDirectoryStructure(
     contentFolder: string,
     recipeFileName: string,
@@ -280,7 +286,7 @@ export class PortalRecipeAction {
     const markdownFilePath = `content/api-recipes/${recipeFileName}.md`;
     const generatedRecipeScriptFilePath = `static/scripts/api-recipes/${recipeFileName}.js`;
     const descriptions: { [key: string]: string } = Object.entries({
-      "APIMATIC-BUILD.json": "# Contains the 'tailIncludes' property, which registers your API recipe as a workflow",
+      "APIMATIC-BUILD.json": "# Contains the 'recipes' property, which registers your API recipes as workflows",
       [markdownFilePath]: "# Markdown file with static placeholder text for your API recipe",
       "content/toc.yml": "# Contains the API Recipes group with a new page for your API recipe",
       [generatedRecipeScriptFilePath]: "# The generated recipe script file containing all of the steps"
@@ -293,7 +299,7 @@ export class PortalRecipeAction {
 
     const items = fs.readdirSync(contentFolder);
     items.forEach(async (item) => {
-      if (item === ".git") return; // Skip .git directory
+      if (item.startsWith(".") || item === "generated_portal") return; // Skip hidden and generated_portal directories.
 
       const itemPath = path.join(contentFolder, item);
       const relativePath = path.join(parentPath, item);
@@ -343,7 +349,7 @@ export class PortalRecipeAction {
     }
 
     this.prompts.stopProgressIndicatorWithMessage(
-      "✅ Successfully extracted endpoint groups and endpoints from the API specification."
+      "✅  Successfully extracted endpoint groups and endpoints from the API specification."
     );
     return Result.success(endpointGroupsResult.value!);
   }

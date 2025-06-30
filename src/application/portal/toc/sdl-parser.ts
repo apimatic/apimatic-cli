@@ -56,6 +56,14 @@ export class SdlParser {
     }
 
     const sdl: Sdl = sdlResult.value!;
+    const endpointGroups = this.extractEndpointGroupsForRecipe(sdl);
+
+    await deleteFile(sourceSpecInputZipFilePath);
+
+    return Result.success(endpointGroups);
+  }
+
+  private extractEndpointGroupsForRecipe(sdl: Sdl): Map<string, string[]> {
     const endpointGroups = new Map<string, string[]>();
     for (const endpoint of sdl.Endpoints) {
       if (!endpointGroups.has(endpoint.Group)) {
@@ -64,7 +72,8 @@ export class SdlParser {
 
       endpointGroups.get(endpoint.Group)!.push(endpoint.Name);
     }
-    return Result.success(endpointGroups);
+
+    return endpointGroups;
   }
 
   private extractEndpointGroupsForToc(sdl: Sdl): Map<string, TocEndpoint[]> {

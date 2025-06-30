@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.8",
+    "version": "1.1.0-alpha.10",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -56,6 +56,7 @@
         "base-64": "^1.0.0",
         "chokidar": "^3.6.0",
         "connect-livereload": "^0.6.1",
+        "execa": "^9.6.0",
         "express": "^4.17.1",
         "file-type": "^15.0.0",
         "form-data": "^4.0.2",

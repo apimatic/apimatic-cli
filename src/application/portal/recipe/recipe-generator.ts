@@ -8,6 +8,7 @@ export class PortalRecipeGenerator {
   //TODO: Replace tocFileContent any type with concrete type.
   public async createRecipe(
     recipe: SerializableRecipe,
+    buildConfig: any,
     tocFileContent: any,
     tocFilePath: string,
     recipeName: string,
@@ -16,7 +17,7 @@ export class PortalRecipeGenerator {
     contentFolderPath: string
   ) {
     await this.addRecipeToToc(tocFileContent, tocFilePath, recipeName, recipeFileName);
-    await this.registerRecipeInBuildConfigFile(recipeName, recipeFileName, buildConfigFilePath);
+    await this.registerRecipeInBuildConfigFile(buildConfig, recipeName, recipeFileName, buildConfigFilePath);
     await this.createMarkdownFile(recipeFileName, contentFolderPath);
 
     const generatedRecipeScript = await this.createScriptFromRecipe(recipe);
@@ -48,27 +49,50 @@ export class PortalRecipeGenerator {
         page: recipeName,
         file: `api-recipes/${recipeFileName}.md`
       });
-      tocData.toc.push(apiRecipesGroup);
+
+      const toc = tocData.toc;
+      let lastGroupIdx = -1;
+      for (let i = 0; i < toc.length; i++) {
+        if (toc[i].group) lastGroupIdx = i;
+      }
+
+      // Insert after the last group section, before any generate sections
+      toc.splice(lastGroupIdx + 1, 0, apiRecipesGroup);
 
       await fs.promises.writeFile(tocFilePath, stringify(tocData));
     }
   }
 
-  //TODO: Figure out a way to dynamically update tailIncludes property in build config file.
   private async registerRecipeInBuildConfigFile(
+    buildConfig: any,
     recipeName: string,
     recipeFileName: string,
     buildConfigFilePath: string
   ): Promise<void> {
-    const scriptReference = this.getRecipeScriptReferenceForTailIncludesProperty(recipeName, recipeFileName);
-    await this.writeTailIncludesToBuildConfigFile(scriptReference, buildConfigFilePath);
+    if (!buildConfig.recipes) {
+      buildConfig.recipes = {};
+    }
+    const recipesConfig = buildConfig.recipes;
+
+    if (!recipesConfig.workflows) {
+      recipesConfig.workflows = [];
+    }
+
+    recipesConfig.workflows.push({
+      name: recipeName,
+      permalink: `page:api-recipes/${recipeFileName}`,
+      functionName: this.toPascalCase(recipeName),
+      path: `./${recipeFileName}.js`
+    });
+
+    await this.writeRecipesConfigToBuildConfigFile(recipesConfig, buildConfigFilePath);
   }
 
-  private async writeTailIncludesToBuildConfigFile(tailIncludes: string, buildConfigFilePath: string): Promise<void> {
+  private async writeRecipesConfigToBuildConfigFile(recipesConfig: string, buildConfigFilePath: string): Promise<void> {
     const fileData = await fs.promises.readFile(buildConfigFilePath, "utf-8");
     const buildConfig = JSON.parse(fileData);
 
-    buildConfig.generatePortal.tailIncludes = tailIncludes;
+    buildConfig.recipes = recipesConfig;
 
     await fs.promises.writeFile(buildConfigFilePath, JSON.stringify(buildConfig, null, 2));
   }
@@ -82,7 +106,7 @@ export class PortalRecipeGenerator {
   }
 
   private async createScriptFromRecipe(recipe: SerializableRecipe): Promise<string> {
-    let script: string = `async function SampleWorkflow(workflowCtx, portal) {`;
+    let script: string = `export default function ${this.toPascalCase(recipe.name)}(workflowCtx, portal) {`;
     script += "return {";
 
     recipe.steps.forEach((step, index) => {
@@ -138,9 +162,10 @@ export class PortalRecipeGenerator {
 
   private addEndpointStepToScript(endpointConfig: EndpointStepConfig): string {
     let script = "return workflowCtx.showEndpoint({";
-    script += `description: "${endpointConfig.description}",`;
+    if (endpointConfig.description !== "") {
+      script += `description: "${endpointConfig.description}",`;
+    }
     script += `endpointPermalink: "${endpointConfig.endpointPermalink}",`;
-    script += `args: { /*Add endpoint parameters with desired values to override the default values here.*/ },`;
     script += "verify: (response, setError) => {";
     script += this.generateVerifyFunction();
     script += "},";
@@ -153,23 +178,6 @@ export class PortalRecipeGenerator {
 This is the starter content`;
   }
 
-  private getRecipeScriptReferenceForTailIncludesProperty(recipeName: string, recipeFileName: string): string {
-    return `${this.getScriptTagForWorkflow(
-      recipeFileName
-    )}<script>document.addEventListener('DOMContentLoaded', (event) => {APIMaticDevPortal.ready(({ registerWorkflow }) => {${this.getNewRegisteredWorkflow(
-      recipeName,
-      recipeFileName
-    )}});});</script>`;
-  }
-
-  private getScriptTagForWorkflow(recipeFileName: string): string {
-    return `<script defer src='./static/scripts/api-recipes/${recipeFileName}.js'></script>`;
-  }
-
-  private getNewRegisteredWorkflow(recipeName: string, recipeFileName: string): string {
-    return `registerWorkflow('page:api-recipes/${recipeFileName}','${recipeName}',SampleWorkflow);`;
-  }
-
   private async formatScript(code: string): Promise<string> {
     return prettier.format(code, {
       parser: "babel",
@@ -178,5 +186,12 @@ This is the starter content`;
       tabWidth: 2,
       trailingComma: "es5"
     });
+  }
+
+  private toPascalCase(str: string): string {
+    return str
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join("");
   }
 }
