@@ -67,16 +67,12 @@ export class PortalRecipeAction {
       return Result.cancelled("Operation was cancelled by the user.");
     }
 
-    const extractEndpointGroupsFromSdlResult = await this.extractEndpointGroupsFromSdl(
+    const recipeResult = await this.promptUserAndBuildNewRecipe(
       buildConfigResult.value,
       contentFolderPath,
+      recipeName,
       configDir
     );
-    if (extractEndpointGroupsFromSdlResult.isFailed()) {
-      return Result.failure(`Unable to generate API Recipe: ${extractEndpointGroupsFromSdlResult}`);
-    }
-
-    const recipeResult = await this.promptUserAndBuildNewRecipe(extractEndpointGroupsFromSdlResult.value!, recipeName);
     if (!recipeResult.isSuccess) {
       return Result.failure(`Unable to generate API Recipe: ${recipeResult.error!}`);
     }
@@ -93,7 +89,7 @@ export class PortalRecipeAction {
       contentFolderPath
     );
 
-    const buildDirectoryStructure = await this.getBuildDirectoryStructure(contentFolderPath, recipeFileName);
+    const buildDirectoryStructure = await this.getBuildDirectoryStructure(recipeFileName);
 
     this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
     this.prompts.displayRecipeGenerationSuccessMessage(contentFolderPath);
@@ -129,10 +125,13 @@ export class PortalRecipeAction {
 
   //TODO: Figure out a better way to do this without the while loop.
   private async promptUserAndBuildNewRecipe(
-    endpointGroups: Map<string, string[]>,
-    recipeName: string
+    buildConfig: any,
+    contentFolderPath: string,
+    recipeName: string,
+    configDir: string
   ): Promise<Result<SerializableRecipe, string>> {
     const recipe = new PortalRecipe(recipeName);
+    let endpointGroups: Map<string, string[]> | undefined;
     let idx: number = 1;
     let addAnotherStep = true;
     this.prompts.displayStepsInformation();
@@ -148,6 +147,17 @@ export class PortalRecipeAction {
           break;
         }
         case StepType.Endpoint: {
+          if (!endpointGroups) {
+            const extractEndpointGroupsFromSdlResult = await this.extractEndpointGroupsFromSdl(
+              buildConfig,
+              contentFolderPath,
+              configDir
+            );
+            if (extractEndpointGroupsFromSdlResult.isFailed()) {
+              return Result.failure(`Unable to generate API Recipe: ${extractEndpointGroupsFromSdlResult}`);
+            }
+            endpointGroups = extractEndpointGroupsFromSdlResult.value!;
+          }
           await this.promptUserAndAddEndpointStepToRecipe(recipe, endpointGroups, stepName);
           break;
         }
@@ -217,6 +227,13 @@ export class PortalRecipeAction {
 
   //TODO: Replace any with concrete toc file object.
   private async parseTocFile(tocFilePath: string): Promise<Result<any, string>> {
+    // Check if the file exists
+    if (!fs.existsSync(tocFilePath)) {
+      return Result.failure<any, string>(
+        `TOC file not found at ${tocFilePath}. Please run 'apimatic:toc:new' to create your TOC file first.`
+      );
+    }
+
     const tocContent = await fs.promises.readFile(tocFilePath, "utf-8");
 
     try {
@@ -279,48 +296,20 @@ export class PortalRecipeAction {
   }
 
   private async getBuildDirectoryStructure(
-    contentFolder: string,
-    recipeFileName: string,
-    parentPath = ""
+    recipeFileName: string
   ): Promise<DirectoryNode> {
-    const markdownFilePath = `content/recipes/${recipeFileName}.md`;
-    const generatedRecipeScriptFilePath = `static/scripts/recipes/${recipeFileName}.js`;
-    const descriptions: { [key: string]: string } = Object.entries({
-      "APIMATIC-BUILD.json": "# Contains the 'recipes' property, which registers your API recipes as workflows",
-      [markdownFilePath]: "# Markdown file with static placeholder text for your API recipe",
-      "content/toc.yml": "# Contains the API Recipes group with a new page for your API recipe",
-      [generatedRecipeScriptFilePath]: "# The generated recipe script file containing all of the steps"
-    }).reduce((acc, [key, value]) => {
-      acc[path.normalize(key)] = value;
-      return acc;
-    }, {} as { [key: string]: string });
-
-    const directoryStructure: DirectoryNode = {};
-
-    const items = fs.readdirSync(contentFolder);
-    items.forEach(async (item) => {
-      if (item.startsWith(".") || item === "generated_portal") return; // Skip hidden and generated_portal directories.
-
-      const itemPath = path.join(contentFolder, item);
-      const relativePath = path.join(parentPath, item);
-      const stats = fs.statSync(itemPath);
-
-      if (stats.isDirectory()) {
-        const subdirectoryStructure = await this.getBuildDirectoryStructure(itemPath, recipeFileName, relativePath);
-
-        const folderName = descriptions[path.normalize(relativePath)]
-          ? `${item} : ${descriptions[path.normalize(relativePath)]}`
-          : item;
-
-        directoryStructure[folderName] = subdirectoryStructure;
-      } else {
-        directoryStructure[
-          descriptions[path.normalize(relativePath)] ? `${item} : ${descriptions[path.normalize(relativePath)]}` : item
-        ] = null;
+    return {
+      content: {
+        "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
+      },
+      static: {
+        scripts: {
+          recipes: {
+            [`${recipeFileName}.js : # The generated recipe script file containing all of the steps`]: null
+          }
+        }
       }
-    });
-
-    return directoryStructure;
+    };
   }
 
   private async extractEndpointGroupsFromSdl(

@@ -35,12 +35,24 @@ export class PortalRecipeGenerator {
     recipeName: string,
     recipeFileName: string
   ): Promise<void> {
-    let apiRecipesGroup = tocData.toc?.find((item: any) => item.group === "API Recipes");
-    apiRecipesGroup ??= {
-      group: "API Recipes",
-      items: []
-    };
+    let toc = tocData.toc;
+    let apiRecipesGroup = toc.find((item: any) => item.group === "API Recipes");
 
+    if (!apiRecipesGroup) {
+      // If the group doesn't exist, create and insert it after the last group
+      apiRecipesGroup = {
+        group: "API Recipes",
+        items: []
+      };
+      // Insert after the last group section, before any generate sections
+      let lastGroupIdx = -1;
+      for (let i = 0; i < toc.length; i++) {
+        if (toc[i].group) lastGroupIdx = i;
+      }
+      toc.splice(lastGroupIdx + 1, 0, apiRecipesGroup);
+    }
+
+    // Only add the recipe if it doesn't already exist
     const existingRecipe = apiRecipesGroup.items.find(
       (item: any) => item.page === recipeName || item.file === `recipes/${recipeFileName}.md`
     );
@@ -49,16 +61,6 @@ export class PortalRecipeGenerator {
         page: recipeName,
         file: `recipes/${recipeFileName}.md`
       });
-
-      const toc = tocData.toc;
-      let lastGroupIdx = -1;
-      for (let i = 0; i < toc.length; i++) {
-        if (toc[i].group) lastGroupIdx = i;
-      }
-
-      // Insert after the last group section, before any generate sections
-      toc.splice(lastGroupIdx + 1, 0, apiRecipesGroup);
-
       await fs.promises.writeFile(tocFilePath, stringify(tocData));
     }
   }
