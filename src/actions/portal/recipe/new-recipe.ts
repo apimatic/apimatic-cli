@@ -169,7 +169,7 @@ export class PortalRecipeAction {
     let editorArgs: string[] = [];
 
     try {
-      const tempFilePath = path.join(tmpdir(), `api-recipe-markdown-content-${Date.now()}.md`);
+      const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.md`);
       const template = `# The Heading Goes Here\n\nThis is placeholder text for your API Recipe content step. Feel free to edit this. Save your changes and then close the file once you're done.`;
 
       await fsExtra.writeFile(tempFilePath, template);
@@ -269,7 +269,7 @@ export class PortalRecipeAction {
 
     // Check if recipe name or file name already exists
     const existingRecipe = apiRecipesGroup.items.find(
-      (item: any) => item.page === recipeName || item.file === `api-recipes/${recipeFileName}.md`
+      (item: any) => item.page === recipeName || item.file === `recipes/${recipeFileName}.md`
     );
     if (existingRecipe) {
       return true;
@@ -283,8 +283,8 @@ export class PortalRecipeAction {
     recipeFileName: string,
     parentPath = ""
   ): Promise<DirectoryNode> {
-    const markdownFilePath = `content/api-recipes/${recipeFileName}.md`;
-    const generatedRecipeScriptFilePath = `static/scripts/api-recipes/${recipeFileName}.js`;
+    const markdownFilePath = `content/recipes/${recipeFileName}.md`;
+    const generatedRecipeScriptFilePath = `static/scripts/recipes/${recipeFileName}.js`;
     const descriptions: { [key: string]: string } = Object.entries({
       "APIMATIC-BUILD.json": "# Contains the 'recipes' property, which registers your API recipes as workflows",
       [markdownFilePath]: "# Markdown file with static placeholder text for your API recipe",

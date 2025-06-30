@@ -21,7 +21,7 @@ export class PortalRecipeGenerator {
     await this.createMarkdownFile(recipeFileName, contentFolderPath);
 
     const generatedRecipeScript = await this.createScriptFromRecipe(recipe);
-    const generatedRecipeScriptsDirectoryPath = path.join(contentFolderPath, "static", "scripts", "api-recipes");
+    const generatedRecipeScriptsDirectoryPath = path.join(contentFolderPath, "static", "scripts", "recipes");
     await this.saveGeneratedRecipeScriptToBuildDirectory(
       generatedRecipeScript,
       generatedRecipeScriptsDirectoryPath,
@@ -42,12 +42,12 @@ export class PortalRecipeGenerator {
     };
 
     const existingRecipe = apiRecipesGroup.items.find(
-      (item: any) => item.page === recipeName || item.file === `api-recipes/${recipeFileName}.md`
+      (item: any) => item.page === recipeName || item.file === `recipes/${recipeFileName}.md`
     );
     if (!existingRecipe) {
       apiRecipesGroup.items.push({
         page: recipeName,
-        file: `api-recipes/${recipeFileName}.md`
+        file: `recipes/${recipeFileName}.md`
       });
 
       const toc = tocData.toc;
@@ -80,7 +80,7 @@ export class PortalRecipeGenerator {
 
     recipesConfig.workflows.push({
       name: recipeName,
-      permalink: `page:api-recipes/${recipeFileName}`,
+      permalink: `page:recipes/${recipeFileName}`,
       functionName: this.toPascalCase(recipeName),
       path: `./${recipeFileName}.js`
     });
@@ -98,7 +98,7 @@ export class PortalRecipeGenerator {
   }
 
   private async createMarkdownFile(recipeFileName: string, contentFolder: string): Promise<void> {
-    const directory = path.join(contentFolder, "content", "api-recipes");
+    const directory = path.join(contentFolder, "content", "recipes");
     const markdownFileContent = this.getMarkdownFileContent();
 
     fs.mkdirSync(directory, { recursive: true });

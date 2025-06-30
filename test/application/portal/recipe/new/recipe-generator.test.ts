@@ -62,8 +62,8 @@ describe("PortalRecipeGenerator", () => {
       buildConfigFilePath,
       contentFolderPath
     );
-    expect(fs.existsSync(path.join("content", "api-recipes", `${recipeFileName}.md`))).to.be.true;
-    expect(fs.existsSync(path.join("static", "scripts", "api-recipes", `${recipeFileName}.js`))).to.be.true;
+    expect(fs.existsSync(path.join("content", "recipes", `${recipeFileName}.md`))).to.be.true;
+    expect(fs.existsSync(path.join("static", "scripts", "recipes", `${recipeFileName}.js`))).to.be.true;
   });
 
   it("should add a new recipe to TOC if not present", async () => {
@@ -76,11 +76,11 @@ describe("PortalRecipeGenerator", () => {
     const tocObj = yaml.parse(written);
     const apiRecipesGroup = tocObj.toc.find((item: any) => item.group === "API Recipes");
     const recipeFiles = apiRecipesGroup ? apiRecipesGroup.items.map((item: any) => item.file) : [];
-    expect(recipeFiles.filter((file: string) => file === "api-recipes/recipe-file.md")).to.have.lengthOf(1);
+    expect(recipeFiles.filter((file: string) => file === "recipes/recipe-file.md")).to.have.lengthOf(1);
   });
 
   it("should not duplicate recipe in TOC if already present", async () => {
-    const tocData = { toc: [{ group: "API Recipes", items: [{ page: "Recipe Name", file: "api-recipes/recipe-file.md" }] }] };
+    const tocData = { toc: [{ group: "API Recipes", items: [{ page: "Recipe Name", file: "recipes/recipe-file.md" }] }] };
     const tocFilePath = "toc.yml";
     fs.writeFileSync(tocFilePath, yaml.stringify(tocData));
     await generator["addRecipeToToc"](tocData, tocFilePath, "Recipe Name", "recipe-file");
@@ -88,7 +88,7 @@ describe("PortalRecipeGenerator", () => {
     const tocObj = yaml.parse(written);
     const apiRecipesGroup = tocObj.toc.find((item: any) => item.group === "API Recipes");
     const recipeFiles = apiRecipesGroup ? apiRecipesGroup.items.map((item: any) => item.file) : [];
-    expect(recipeFiles.filter((file: string) => file === "api-recipes/recipe-file.md")).to.have.lengthOf(1);
+    expect(recipeFiles.filter((file: string) => file === "recipes/recipe-file.md")).to.have.lengthOf(1);
   });
 
   it("should register a workflow in build config", async () => {
@@ -102,7 +102,7 @@ describe("PortalRecipeGenerator", () => {
 
   it("should write recipes config to build config file", async () => {
     const buildConfigFilePath = "build.json";
-    const recipesConfig = JSON.stringify({ workflows: [{ name: "Test", permalink: "page:api-recipes/test" }] });
+    const recipesConfig = JSON.stringify({ workflows: [{ name: "Test", permalink: "page:recipes/test" }] });
     await generator["writeRecipesConfigToBuildConfigFile"](recipesConfig, buildConfigFilePath);
     const written = fs.readFileSync(buildConfigFilePath, "utf-8");
     expect(written).to.include("workflows");
@@ -111,8 +111,8 @@ describe("PortalRecipeGenerator", () => {
 
   it("should create a markdown file in the correct location", async () => {
     await generator["createMarkdownFile"]("test-recipe", ".");
-    expect(fs.existsSync(path.join("content", "api-recipes", "test-recipe.md"))).to.be.true;
-    const content = fs.readFileSync(path.join("content", "api-recipes", "test-recipe.md"), "utf-8");
+    expect(fs.existsSync(path.join("content", "recipes", "test-recipe.md"))).to.be.true;
+    const content = fs.readFileSync(path.join("content", "recipes", "test-recipe.md"), "utf-8");
     expect(content).to.include("Guided Walkthrough");
   });
 
@@ -126,7 +126,7 @@ describe("PortalRecipeGenerator", () => {
 
   it("should save and format generated recipe script", async () => {
     const script = "export default function Test() { return {}; }";
-    const dir = path.join("static", "scripts", "api-recipes");
+    const dir = path.join("static", "scripts", "recipes");
     await generator["saveGeneratedRecipeScriptToBuildDirectory"](script, dir, "test-recipe");
     expect(fs.existsSync(path.join(dir, "test-recipe.js"))).to.be.true;
     const content = fs.readFileSync(path.join(dir, "test-recipe.js"), "utf-8");
