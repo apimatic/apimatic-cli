@@ -10,8 +10,12 @@ export class PortalRecipePrompts {
   public displayWelcomeMessage(): void {
     intro(`Welcome to the API Recipe Generation Wizard. 🪄`);
     log.step(`This wizard will guide you through the process of creating an API Recipe.`);
-    log.message(`An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.`);
-    log.message(`For additional information, please refer to the documentation: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes`);
+    log.message(
+      `An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.`
+    );
+    log.message(
+      `For additional information, please refer to the documentation: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes`
+    );
     log.message(`Let's get started! 🚀`);
   }
 
@@ -80,9 +84,13 @@ export class PortalRecipePrompts {
 
   public displayStepsInformation(): void {
     log.step(`You can add multiple steps to your API Recipe. Each step can be of two types:`);
-    log.message(`1. Content Step: For displaying custom content, such as instructions or information related to your API.`);
+    log.message(
+      `1. Content Step: For displaying custom content, such as instructions or information related to your API.`
+    );
     log.message(`2. Endpoint Step: For displaying an API endpoint, its playground and other relevant details.`);
-    log.message(`The endpoints extracted from your API specification will be available for selection when adding an Endpoint Step.`);
+    log.message(
+      `The endpoints extracted from your API specification will be available for selection when adding an Endpoint Step.`
+    );
     log.message(`You can add as many steps as you want, and they will be displayed in the order you add them.`);
     log.message(`Let's proceed to adding steps to your API Recipe. 📝`);
   }
@@ -111,13 +119,13 @@ export class PortalRecipePrompts {
   public async endpointGroupNamePrompt(endpointGroups: Map<string, string[]>): Promise<string> {
     const groupNames = Array.from(endpointGroups.keys()).map((name) => ({
       value: name,
-      label: name,
+      label: name
     }));
     const endpointGroupName = await autocomplete({
       message: `Select the endpoint group name:`,
-      maxItems: 10, 
-      options: groupNames,
-    })
+      maxItems: 10,
+      options: groupNames
+    });
 
     if (isCancel(endpointGroupName)) {
       cancel("Operation cancelled.");
@@ -201,7 +209,9 @@ export class PortalRecipePrompts {
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
     log.step(`✅  Recipe has been added successfully!`);
     log.message(`Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
-    outro(`Run the command 'apimatic portal:serve' to serve your API Documentation portal with the newly created recipe.`);
+    outro(
+      `Run the command 'apimatic portal:serve' to serve your API Documentation portal with the newly created recipe.`
+    );
   }
 
   public startProgressIndicatorWithMessage(message: string): void {
@@ -220,7 +230,7 @@ export class PortalRecipePrompts {
       .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
       .join("\n");
 
-    log.step(coloredLogString);
+    log.step(`Feel free to edit the following files :\n` + coloredLogString);
   }
 
   public logError(error: string): void {

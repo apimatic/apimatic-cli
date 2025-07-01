@@ -304,7 +304,7 @@ export class PortalRecipeAction {
       static: {
         scripts: {
           recipes: {
-            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps, feel free to modify this to customize your API Recipe`]: null
+            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
           }
         }
       }
