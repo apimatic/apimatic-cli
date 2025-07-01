@@ -5,8 +5,9 @@ import os from "os";
 import archiver from "archiver";
 import unzipper from "unzipper";
 import stripTags from "striptags";
-import { PassThrough } from "stream";
 import AdmZip from "adm-zip";
+import colors from "picocolors";
+import { PassThrough } from "stream";
 
 import { loggers, ValidationMessages } from "../types/utils.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
@@ -420,25 +421,25 @@ export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] 
 };
 
 export const getMessageInOrangeColor = (message: string) => {
-  return `\u001b[33m${message}\u001b[0m`;
+  return colors.yellow(message);
 };
 
 export const getMessageInBlueColor = (message: string) => {
-  return `\u001b[34m${message}\u001b[0m`;
+  return colors.blueBright(message);
 };
 
 export const getMessageInCyanColor = (message: string) => {
-  return `\u001b[36m${message}\u001b[0m`;
+  return colors.cyan(message);
 };
 
 export const getMessageInGreenColor = (message: string) => {
-  return `\u001b[32m${message}\u001b[0m`;
+  return colors.greenBright(message);
 };
 
 export const getMessageInMagentaColor = (message: string) => {
-  return `\u001b[35m${message}\u001b[0m`;
+  return colors.magentaBright(message);
 };
 
 export const getMessageInRedColor = (message: string) => {
-  return `\u001b[31m${message}\u001b[0m`;
+  return colors.redBright(message);
 };
