@@ -12,6 +12,7 @@ import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.j
 import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
+import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;
@@ -131,7 +132,7 @@ export class PortalRecipeAction {
     configDir: string
   ): Promise<Result<SerializableRecipe, string>> {
     const recipe = new PortalRecipe(recipeName);
-    let endpointGroups: Map<string, string[]> | undefined;
+    let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
     let idx: number = 1;
     let addAnotherStep = true;
     this.prompts.displayStepsInformation();
@@ -214,12 +215,12 @@ export class PortalRecipeAction {
 
   private async promptUserAndAddEndpointStepToRecipe(
     recipe: PortalRecipe,
-    endpointGroups: Map<string, string[]>,
+    endpointGroups: Map<string, SdlEndpoint[]>,
     stepName: string
   ): Promise<void> {
     const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
     const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
-    const description = await this.prompts.endpointDescriptionPrompt();
+    const description = await this.prompts.endpointDescriptionPrompt(endpointGroups, endpointGroupName, endpointName);
     const endpointPermalink = await this.createPermalink([endpointGroupName, endpointName]);
     recipe.addEndpointStep(stepName, stepName, description, endpointPermalink);
     this.prompts.displayStepAddedSuccessfullyMessage();
@@ -315,7 +316,7 @@ export class PortalRecipeAction {
     buildConfig: any,
     contentFolderPath: string,
     configDir: string
-  ): Promise<Result<Map<string, string[]>, string>> {
+  ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     const specFolderPath = this.getSpecFolderPath(buildConfig, contentFolderPath);
     if (!(await fsExtra.pathExists(specFolderPath))) {
       return Result.failure(`API specification file not found at ${specFolderPath}.`);

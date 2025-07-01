@@ -41,7 +41,7 @@ export class SdlParser {
     specFolderPath: string,
     contentFolderPath: string,
     configDir: string
-  ): Promise<Result<Map<string, string[]>, string>> {
+  ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     const sourceSpecInputZipFilePath = await validateAndZipPortalSource(
       specFolderPath,
       path.join(contentFolderPath, ".spec_source.zip")
@@ -63,14 +63,18 @@ export class SdlParser {
     return Result.success(endpointGroups);
   }
 
-  private extractEndpointGroupsForRecipe(sdl: Sdl): Map<string, string[]> {
-    const endpointGroups = new Map<string, string[]>();
+  private extractEndpointGroupsForRecipe(sdl: Sdl): Map<string, SdlEndpoint[]> {
+    const endpointGroups = new Map<string, SdlEndpoint[]>();
     for (const endpoint of sdl.Endpoints) {
       if (!endpointGroups.has(endpoint.Group)) {
         endpointGroups.set(endpoint.Group, []);
       }
 
-      endpointGroups.get(endpoint.Group)!.push(endpoint.Name);
+      endpointGroups.get(endpoint.Group)!.push({
+        Name: endpoint.Name,
+        Description: endpoint.Description,
+        Group: endpoint.Group
+      });
     }
 
     return endpointGroups;

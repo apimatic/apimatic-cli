@@ -79,13 +79,24 @@ export class PortalRecipeGenerator {
     if (!recipesConfig.workflows) {
       recipesConfig.workflows = [];
     }
+    const existingIndex = recipesConfig.workflows.findIndex(
+      (workflow: any) => workflow.name.toLocaleLowerCase() === recipeName.toLocaleLowerCase()
+    );
 
-    recipesConfig.workflows.push({
+    const newWorkflow = {
       name: recipeName,
       permalink: `page:recipes/${recipeFileName}`,
       functionName: this.toPascalCase(recipeName),
-      path: `./${recipeFileName}.js`
-    });
+      scriptPath: `./static/scripts/recipes/${recipeFileName}.js`
+    };
+
+    if (existingIndex !== -1) {
+      // Replace the existing workflow
+      recipesConfig.workflows[existingIndex] = newWorkflow;
+    } else {
+      // Add as new workflow
+      recipesConfig.workflows.push(newWorkflow);
+    }
 
     await this.writeRecipesConfigToBuildConfigFile(recipesConfig, buildConfigFilePath);
   }
@@ -165,7 +176,7 @@ export class PortalRecipeGenerator {
   private addEndpointStepToScript(endpointConfig: EndpointStepConfig): string {
     let script = "return workflowCtx.showEndpoint({";
     if (endpointConfig.description !== "") {
-      script += `description: "${endpointConfig.description}",`;
+      script += `description: ${JSON.stringify(endpointConfig.description)},`;
     }
     script += `endpointPermalink: "${endpointConfig.endpointPermalink}",`;
     script += "verify: (response, setError) => {";
