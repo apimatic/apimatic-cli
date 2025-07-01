@@ -73,7 +73,7 @@ export class PortalRecipeAction {
       recipeName,
       configDir
     );
-    if (!recipeResult.isSuccess) {
+    if (recipeResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${recipeResult.error!}`);
     }
 
@@ -154,7 +154,7 @@ export class PortalRecipeAction {
               configDir
             );
             if (extractEndpointGroupsFromSdlResult.isFailed()) {
-              return Result.failure(`Unable to generate API Recipe: ${extractEndpointGroupsFromSdlResult}`);
+              return Result.failure(`${extractEndpointGroupsFromSdlResult.error!}`);
             }
             endpointGroups = extractEndpointGroupsFromSdlResult.value!;
           }
@@ -234,9 +234,8 @@ export class PortalRecipeAction {
       );
     }
 
-    const tocContent = await fs.promises.readFile(tocFilePath, "utf-8");
-
     try {
+      const tocContent = await fs.promises.readFile(tocFilePath, "utf-8");
       return Result.success(parse(tocContent));
     } catch {
       return Result.failure(
@@ -305,7 +304,7 @@ export class PortalRecipeAction {
       static: {
         scripts: {
           recipes: {
-            [`${recipeFileName}.js : # The generated recipe script file containing all of the steps`]: null
+            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps, feel free to modify this to customize your API Recipe`]: null
           }
         }
       }
@@ -334,7 +333,7 @@ export class PortalRecipeAction {
 
     if (endpointGroupsResult.isFailed()) {
       this.prompts.stopProgressIndicatorWithMessage("Unable to extract endpoints from your API specification.");
-      return Result.failure(`⚠️ ${endpointGroupsResult.error!}`);
+      return Result.failure(`${endpointGroupsResult.error!}`);
     }
 
     this.prompts.stopProgressIndicatorWithMessage(

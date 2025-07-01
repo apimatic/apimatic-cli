@@ -43,7 +43,7 @@ Generated recipe has been added to build directory at: C:/`
       portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.error!));
     }
     if (createRecipeResult.isCancelled()) {
-      portalRecipePrompts.logError(createRecipeResult.error!);
+      portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.value!));
     }
   }
 }

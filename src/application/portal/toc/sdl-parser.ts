@@ -51,7 +51,7 @@ export class SdlParser {
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(
-        "Failed to extract endpoints from the specification. Please validate your spec using APIMatic's interactive VS Code Extension."
+        "Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
       );
     }
 
