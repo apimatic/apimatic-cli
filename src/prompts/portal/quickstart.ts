@@ -277,8 +277,10 @@ export class PortalQuickstartPrompts {
         getMessageInCyanColor(
           `Hot reload enabled! Edit files in ${directory} to see changes instantly reflected in your API Portal.\n`
         ) +
-        getMessageInCyanColor(`Press CTRL+C to stop the server.\n\n`) +
-        getMessageInCyanColor(`What's next?\n`) +
+        getMessageInCyanColor(`Press CTRL+C to stop the server.`)
+    );
+    outro(
+      getMessageInCyanColor(`What's next?\n`) +
         getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
         getMessageInCyanColor(
           `- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentationUrl}`
@@ -289,8 +291,7 @@ export class PortalQuickstartPrompts {
         ) +
         getMessageInCyanColor(
           `- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`
-        ) +
-        getMessageInCyanColor(` \n`)
+        )
     );
   }
 }
