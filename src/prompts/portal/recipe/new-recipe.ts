@@ -229,7 +229,7 @@ export class PortalRecipePrompts {
 
     const coloredLogString = tree
       .split("\n")
-      .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
+      .map((line: string) => line.replace(/#.*/, (match: string) => getMessageInGreenColor(match)))
       .join("\n");
 
     log.step(`🛠️ You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);

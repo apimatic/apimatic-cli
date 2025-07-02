@@ -6,7 +6,10 @@ import { getMessageInRedColor } from "../../../utils/utils.js";
 
 const DEFAULT_FOLDER = process.cwd();
 export default class PortalNewRecipe extends Command {
-  static override description = "Generate an API Recipe for a static API Documentation portal.";
+  static override summary = "Generate an API Recipe for a static API Documentation portal.";
+
+  static override description = "To learn more about API Recipes, visit: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes";
+
   static override examples = [
     `$ apimatic portal:recipe:new --name="My API Recipe" --folder="./build-folder" --build-config-file="./build-folder/APIMATIC-BUILD.json"
 Generated recipe has been added to build directory at: C:/build-folder/`,
@@ -18,7 +21,7 @@ Generated recipe has been added to build directory at: C:/`
     folder: Flags.string({
       parse: async (input: string) => path.resolve(input),
       description:
-        "path to the build directory containing specs, content, and build config file. Defaults to the current working directory if not provided.",
+        "path to the build directory containing the specs folder, content folder, and the build config file. Defaults to the current working directory if not provided.",
       default: DEFAULT_FOLDER
     }),
     "build-config": Flags.string({
