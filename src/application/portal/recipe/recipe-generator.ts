@@ -80,7 +80,7 @@ export class PortalRecipeGenerator {
       recipesConfig.workflows = [];
     }
     const existingIndex = recipesConfig.workflows.findIndex(
-      (workflow: any) => workflow.name.toLocaleLowerCase() === recipeName.toLocaleLowerCase()
+      (workflow: any) => workflow.name === recipeName
     );
 
     const newWorkflow = {

@@ -233,7 +233,7 @@ export class PortalRecipePrompts {
       .join("\n");
 
     log.step(`🛠️ You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
-    log.message(`💡 Modify the TOC file to change the position of the API Recipes in the navbar`);
+    log.message(`💡 Modify the TOC file to change the position of the API Recipes section in the navbar.`);
   }
 
   public logError(error: string): void {
