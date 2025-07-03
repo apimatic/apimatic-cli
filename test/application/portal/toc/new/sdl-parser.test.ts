@@ -24,15 +24,18 @@ describe("SdlParser", () => {
       Endpoints: [
         {
           Name: "Login",
-          Group: "Authentication"
+          Group: "Authentication",
+          Description: "User login endpoint"
         },
         {
           Name: "Logout",
-          Group: "Authentication"
+          Group: "Authentication",
+          Description: "User logout endpoint"
         },
         {
           Name: "GetProducts",
-          Group: "Products"
+          Group: "Products",
+          Description: "Fetches a list of products"
         }
       ],
       CustomTypes: [

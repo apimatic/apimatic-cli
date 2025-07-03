@@ -1,3 +1,10 @@
+# [1.1.0-alpha.9](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.8...v1.1.0-alpha.9) (2025-06-26)
+
+
+### Features
+
+* rename portal:new:toc command to portal:toc:new ([#99](https://github.com/apimatic/apimatic-cli/issues/99)) ([1a6b1c4](https://github.com/apimatic/apimatic-cli/commit/1a6b1c4aa42aa23bf5439f473f8176f2733f41bf))
+
 # [1.1.0-alpha.8](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.7...v1.1.0-alpha.8) (2025-06-24)
 
 
