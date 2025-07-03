@@ -1,14 +1,15 @@
-import * as net from "net";
 import * as path from "path";
-import * as fs from "fs-extra";
-import * as os from "os";
-import * as archiver from "archiver";
-import * as unzipper from "unzipper";
-import * as stripTags from "striptags";
+import net from "net";
+import fs from "fs-extra";
+import os from "os";
+import archiver from "archiver";
+import unzipper from "unzipper";
+import stripTags from "striptags";
+import AdmZip from "adm-zip";
+import colors from "picocolors";
 import { PassThrough } from "stream";
-import AdmZip = require("adm-zip");
 
-import { loggers, ValidationMessages } from "../types/utils";
+import { loggers, ValidationMessages } from "../types/utils.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
 
 export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
@@ -71,10 +72,12 @@ export const validationMessagesToJson = (validationMessages: ApiValidationSummar
   return structuredValidationMessages;
 };
 
+// TODO: Move to types folder.
 interface DirectoryNode {
   [key: string]: DirectoryNode | string | null | undefined;
 }
 
+// TODO: Move to portal:quickstart command.
 const descriptions: { [key: string]: string } = Object.entries({
   "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
   spec: "# Contains all API definition files",
@@ -86,6 +89,7 @@ const descriptions: { [key: string]: string } = Object.entries({
   return acc;
 }, {} as { [key: string]: string });
 
+// TODO: Move to portal:quickstart command.
 export const directoryToJson = (dirPath: string, parentPath = ""): DirectoryNode => {
   const directoryStructure: DirectoryNode = {};
 
@@ -225,10 +229,16 @@ export const isJSONParsable = (json: string) => {
   }
 };
 
-export const getGeneratedFilesPaths = (sourceDirectoryPath: string, generatedPortalArtifactsDirectoryPath: string): string[] => {
+export const getGeneratedFilesPaths = (
+  sourceDirectoryPath: string,
+  generatedPortalArtifactsDirectoryPath: string
+): string[] => {
   const generatedBuildInputZipPath = path.join(sourceDirectoryPath, ".portal_source.zip");
   const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
-  const generatedPortalArtifactsFolderPath = path.join(path.dirname(generatedPortalArtifactsDirectoryPath), "generated_portal");
+  const generatedPortalArtifactsFolderPath = path.join(
+    path.dirname(generatedPortalArtifactsDirectoryPath),
+    "generated_portal"
+  );
 
   return [generatedBuildInputZipPath, generatedPortalArtifactsFolderPath, generatedPortalArtifactsZipFilePath];
 };
@@ -398,12 +408,12 @@ export function isPortInUse(port: number): Promise<boolean> {
 }
 
 export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
-    const chunks: Buffer[] = [];
-    for await (const chunk of body) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    const text = Buffer.concat(chunks).toString("utf-8");
-    return JSON.parse(text);
+  const chunks: Buffer[] = [];
+  for await (const chunk of body) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const text = Buffer.concat(chunks).toString("utf-8");
+  return JSON.parse(text);
 }
 
 export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] => {
@@ -411,25 +421,25 @@ export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] 
 };
 
 export const getMessageInOrangeColor = (message: string) => {
-  return `\u001b[33m${message}\u001b[0m`;
+  return colors.yellow(message);
 };
 
 export const getMessageInBlueColor = (message: string) => {
-  return `\u001b[34m${message}\u001b[0m`;
+  return colors.blueBright(message);
 };
 
 export const getMessageInCyanColor = (message: string) => {
-  return `\u001b[36m${message}\u001b[0m`;
+  return colors.cyan(message);
 };
 
 export const getMessageInGreenColor = (message: string) => {
-  return `\u001b[32m${message}\u001b[0m`;
+  return colors.greenBright(message);
 };
 
 export const getMessageInMagentaColor = (message: string) => {
-  return `\u001b[35m${message}\u001b[0m`;
+  return colors.magentaBright(message);
 };
 
 export const getMessageInRedColor = (message: string) => {
-  return `\u001b[31m${message}\u001b[0m`;
+  return colors.redBright(message);
 };

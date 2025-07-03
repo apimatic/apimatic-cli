@@ -1,8 +1,13 @@
 import { ux } from "@oclif/core";
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
 
-import { writeFileUsingReadableStream } from "../../utils/utils";
-import { DownloadTransformationParams, TransformationData, TransformationFormats, TransformationIdParams } from "../../types/api/transform";
+import { writeFileUsingReadableStream } from "../../utils/utils.js";
+import {
+  DownloadTransformationParams,
+  TransformationData,
+  TransformationFormats,
+  TransformationIdParams
+} from "../../types/api/transform.js";
 import {
   ApiResponse,
   ContentType,
@@ -21,7 +26,7 @@ export const getTransformationId = async (
 
   let generation: ApiResponse<Transformation>;
   if (file) {
-    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+    const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file));
     generation = await transformationController.transformViaFile(
       ContentType.EnumMultipartformdata,
       fileDescriptor,
@@ -59,7 +64,9 @@ export const downloadTransformationFile = async ({
 };
 // Get valid platform from user's input, convert simple platform to valid Platforms enum value
 export const getValidFormat = (format: string) => {
-  const key = Object.keys(TransformationFormats).find((value) => value === format) as keyof typeof TransformationFormats | undefined;
+  const key = Object.keys(TransformationFormats).find((value) => value === format) as
+    | keyof typeof TransformationFormats
+    | undefined;
   if (key) {
     const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;
     return ExportFormats[transformationFormat];

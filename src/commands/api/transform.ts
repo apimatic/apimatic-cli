@@ -1,15 +1,15 @@
 import * as path from "path";
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
 
 import { Flags, Command } from "@oclif/core";
-import { TransformationController, Transformation, Client, ApiError, ExportFormats } from "@apimatic/sdk";
+import { TransformationController, Transformation, Client, ApiError } from "@apimatic/sdk";
 
-import { AuthenticationError, loggers } from "../../types/utils";
-import { SDKClient } from "../../client-utils/sdk-client";
-import { printValidationMessages } from "../../utils/utils";
-import { getFileNameFromPath, replaceHTML } from "../../utils/utils";
-import { DestinationFormats, TransformationFormats } from "../../types/api/transform";
-import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform";
+import { AuthenticationError, loggers } from "../../types/utils.js";
+import { SDKClient } from "../../client-utils/sdk-client.js";
+import { printValidationMessages } from "../../utils/utils.js";
+import { getFileNameFromPath, replaceHTML } from "../../utils/utils.js";
+import { DestinationFormats, TransformationFormats } from "../../types/api/transform.js";
+import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform.js";
 
 const formats: string = Object.keys(TransformationFormats).join("|");
 export default class Transform extends Command {
@@ -60,15 +60,15 @@ ${formats}`
     );
 
     // Check if destination file already exist and throw error if force flag is not set
-    if (fs.existsSync(destinationFilePath) && !flags.force) {
+    if (fsExtra.existsSync(destinationFilePath) && !flags.force) {
       throw new Error(`Can't download transformed file to path ${destinationFilePath}, because it already exists`);
     }
 
     try {
       // Check if paths provided are valid
-      if (flags.file && !(await fs.pathExists(flags.file))) {
+      if (flags.file && !(await fsExtra.pathExists(flags.file))) {
         throw new Error(`Transformation file: ${flags.file} does not exist`);
-      } else if (!(await fs.pathExists(flags.destination))) {
+      } else if (!(await fsExtra.pathExists(flags.destination))) {
         throw new Error(`Destination path: ${flags.destination} does not exist`);
       }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;

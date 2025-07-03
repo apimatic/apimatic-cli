@@ -1,6 +1,6 @@
 import * as path from "path";
-import * as fs from "fs-extra";
-import { TocGroup, TocCustomPage } from "../../../types/toc/toc";
+import * as fs from "fs/promises";
+import { TocGroup, TocCustomPage } from "../../../types/toc/toc.js";
 
 export class TocContentParser {
   async parseContentFolder(contentFolderPath: string, workingDirectory: string): Promise<TocGroup[]> {
@@ -22,7 +22,7 @@ export class TocContentParser {
       } else if (stats.isFile() && item.endsWith(".md")) {
         const relativePath = path.relative(workingDirectory, itemPath);
         const pageName = path.basename(item, ".md");
-        
+
         contentItems.push({
           page: pageName,
           file: this.normalizePath(relativePath)
@@ -36,13 +36,15 @@ export class TocContentParser {
     }
 
     // Wrap everything under a "Custom Content" group
-    return [{
-      group: "Custom Content",
-      items: contentItems
-    }];
+    return [
+      {
+        group: "Custom Content",
+        items: contentItems
+      }
+    ];
   }
-  
-  private normalizePath(path: string) : string {
-    return path.replace(/\\/g, '/');
+
+  private normalizePath(path: string): string {
+    return path.replace(/\\/g, "/");
   }
-} 
+}

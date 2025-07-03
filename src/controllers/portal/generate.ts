@@ -1,7 +1,7 @@
-import * as fs from "fs-extra";
-import { deleteFile, extractZipFile, getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils";
-import { ErrorResponse, GeneratePortalParams } from "../../types/portal/generate";
-import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager";
+import fsExtra from "fs-extra";
+import { deleteFile, extractZipFile, getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils.js";
+import { ErrorResponse, GeneratePortalParams } from "../../types/portal/generate.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import {
   ApiError,
   ApiResponse,
@@ -12,7 +12,7 @@ import {
   ProblemDetailsError,
   UnauthorizedResponseError
 } from "@apimatic/sdk";
-import { Result } from "../../types/common/result";
+import { Result } from "../../types/common/result.js";
 const CONTENT_TYPE = ContentType.EnumMultipartformdata;
 const TIMEOUT = 0;
 
@@ -20,7 +20,7 @@ export const downloadDocsPortal = async (
   params: GeneratePortalParams,
   configDir: string
 ): Promise<Result<string, string>> => {
-  if (!(await fs.pathExists(params.sourceBuildInputZipFilePath))) {
+  if (!(await fsExtra.pathExists(params.sourceBuildInputZipFilePath))) {
     return Result.failure("Build file doesn't exist");
   }
 
@@ -70,7 +70,7 @@ const generatePortalFromSyncEndpoint = async (
   docsPortalManagementController: DocsPortalManagementController,
   zippedBuildFilePath: string
 ): Promise<NodeJS.ReadableStream> => {
-  const file = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
+  const file = new FileWrapper(fsExtra.createReadStream(zippedBuildFilePath));
   const response: ApiResponse<NodeJS.ReadableStream | Blob> =
     await docsPortalManagementController.generateOnPremPortalViaBuildInput(CONTENT_TYPE, file);
 
@@ -78,7 +78,7 @@ const generatePortalFromSyncEndpoint = async (
 };
 
 const saveGeneratedPortalStreamToZipFile = async (data: NodeJS.ReadableStream, generatedPortalArtifactsZipFilePath: string): Promise<void> => {
-  const writeStream = fs.createWriteStream(generatedPortalArtifactsZipFilePath);
+  const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
   await new Promise<void>((resolve, reject) => {
     data
       .pipe(writeStream)
@@ -123,7 +123,7 @@ const parseErrorResponse = async (error: unknown): Promise<ErrorResponse> => {
 
 const extractErrorZipFile = async (error: ApiError, params: GeneratePortalParams): Promise<void> => {
   const data = error.body as NodeJS.ReadableStream;
-  const writeStream = fs.createWriteStream(params.generatedPortalArtifactsZipFilePath);
+  const writeStream = fsExtra.createWriteStream(params.generatedPortalArtifactsZipFilePath);
 
   await new Promise<void>((resolve, reject) => {
     data

@@ -1,11 +1,11 @@
 import * as path from "path";
 import axios from "axios";
 import { Command, Flags } from "@oclif/core";
-import { generatePortal } from "../../controllers/portal/serve";
-import { PortalServerService } from "../../services/portal/server";
-import { PortalServePrompts } from "../../prompts/portal/serve";
-import { cleanUpGeneratedPortalFiles, getGeneratedFilesPaths, getMessageInRedColor } from "../../utils/utils";
-import { PortalServeValidator } from "../../validators/portal/serveValidator";
+import { generatePortal } from "../../controllers/portal/serve.js";
+import { PortalServerService } from "../../services/portal/server.js";
+import { PortalServePrompts } from "../../prompts/portal/serve.js";
+import { cleanUpGeneratedPortalFiles, getGeneratedFilesPaths, getMessageInRedColor } from "../../utils/utils.js";
+import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
 
 export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
@@ -112,7 +112,7 @@ export default class PortalServe extends Command {
             )
           );
         } else if (axiosError.response.status === 403) {
-          this.error(getMessageInRedColor(`Access denied. It looks like you don’t have access to APIMatic’s Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
+          this.error(getMessageInRedColor(`Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
         } else if (axiosError.response.status === 422) {
           this.error(
             getMessageInRedColor(

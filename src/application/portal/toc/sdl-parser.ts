@@ -1,14 +1,18 @@
 import * as path from "path";
-import { PortalService } from "../../../infrastructure/services/portal-service";
-import { validateAndZipPortalSource, deleteFile } from "../../../utils/utils";
-import { TocEndpoint, TocModel } from "../../../types/toc/toc";
-import { Result } from "../../../types/common/result";
-import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl";
+import { PortalService } from "../../../infrastructure/services/portal-service.js";
+import { validateAndZipPortalSource, deleteFile } from "../../../utils/utils.js";
+import { TocEndpoint, TocModel } from "../../../types/toc/toc.js";
+import { Result } from "../../../types/common/result.js";
+import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl.js";
 
 export class SdlParser {
   constructor(private readonly portalService: PortalService) {}
 
-  async getTocComponentsFromSdl(specFolderPath: string, workingDirectory: string, configDir: string): Promise<Result<{endpointGroups: Map<string, TocEndpoint[]>;models: TocModel[];},string>> {
+  public async getTocComponentsFromSdl(
+    specFolderPath: string,
+    workingDirectory: string,
+    configDir: string
+  ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
     const sourceSpecInputZipFilePath = await validateAndZipPortalSource(
       specFolderPath,
       path.join(workingDirectory, ".spec_source.zip")
@@ -16,14 +20,16 @@ export class SdlParser {
 
     try {
       const result = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir);
-      
+
       if (!result.isSuccess()) {
-        return Result.failure("Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic's interactive VS Code extension")
+        return Result.failure(
+          "Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic's interactive VS Code Extension."
+        );
       }
 
-      const sdl : Sdl = result.value!
-      const endpointGroups = this.extractEndpointGroups(sdl);
-      const models = this.extractModels(sdl);
+      const sdl: Sdl = result.value!;
+      const endpointGroups = this.extractEndpointGroupsForToc(sdl);
+      const models = this.extractModelsForToc(sdl);
 
       return Result.success({ endpointGroups, models });
     } finally {
@@ -31,15 +37,60 @@ export class SdlParser {
     }
   }
 
-  private extractEndpointGroups(sdl: Sdl): Map<string, TocEndpoint[]> {
+  public async getEndpointGroupsFromSdl(
+    specFolderPath: string,
+    contentFolderPath: string,
+    configDir: string
+  ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
+    const sourceSpecInputZipFilePath = await validateAndZipPortalSource(
+      specFolderPath,
+      path.join(contentFolderPath, ".spec_source.zip")
+    );
+
+    const sdlResult = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir);
+
+    if (!sdlResult.isSuccess()) {
+      return Result.failure(
+        "Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
+      );
+    }
+
+    const sdl: Sdl = sdlResult.value!;
+    const endpointGroups = this.extractEndpointGroupsForRecipe(sdl);
+
+    await deleteFile(sourceSpecInputZipFilePath);
+
+    return Result.success(endpointGroups);
+  }
+
+  private extractEndpointGroupsForRecipe(sdl: Sdl): Map<string, SdlEndpoint[]> {
+    const endpointGroups = new Map<string, SdlEndpoint[]>();
+    for (const endpoint of sdl.Endpoints) {
+      if (!endpointGroups.has(endpoint.Group)) {
+        endpointGroups.set(endpoint.Group, []);
+      }
+
+      endpointGroups.get(endpoint.Group)!.push({
+        Name: endpoint.Name,
+        Description: endpoint.Description,
+        Group: endpoint.Group
+      });
+    }
+
+    return endpointGroups;
+  }
+
+  private extractEndpointGroupsForToc(sdl: Sdl): Map<string, TocEndpoint[]> {
     const endpointGroups = new Map<string, TocEndpoint[]>();
-    
-    const endpoints = sdl.Endpoints.map((e: SdlEndpoint): TocEndpoint => ({
-      generate: null,
-      from: "endpoint",
-      endpointName: e.Name,
-      endpointGroup: e.Group
-    }));
+
+    const endpoints = sdl.Endpoints.map(
+      (e: SdlEndpoint): TocEndpoint => ({
+        generate: null,
+        from: "endpoint",
+        endpointName: e.Name,
+        endpointGroup: e.Group
+      })
+    );
 
     endpoints.forEach((endpoint: TocEndpoint) => {
       const group = endpoint.endpointGroup;
@@ -52,11 +103,13 @@ export class SdlParser {
     return endpointGroups;
   }
 
-  private extractModels(sdl: Sdl): TocModel[] {
-    return sdl.CustomTypes.map((e: SdlModel): TocModel => ({
-      generate: null,
-      from: "model",
-      modelName: e.Name
-    }));
+  private extractModelsForToc(sdl: Sdl): TocModel[] {
+    return sdl.CustomTypes.map(
+      (e: SdlModel): TocModel => ({
+        generate: null,
+        from: "model",
+        modelName: e.Name
+      })
+    );
   }
-} 
+}
