@@ -1,5 +1,5 @@
 import { stringify } from "yaml";
-import { Toc, TocGroup, TocEndpoint, TocModel, TocEndpointGroupOverview } from "../../../types/toc/toc";
+import { Toc, TocGroup, TocEndpoint, TocModel, TocEndpointGroupOverview } from "../../../types/toc/toc.js";
 
 export class TocStructureGenerator {
   createTocStructure(
@@ -96,4 +96,4 @@ export class TocStructureGenerator {
     }
     return obj;
   }
-} 
+}

@@ -1,13 +1,13 @@
 import * as path from "path";
-import * as fs from "fs-extra";
-import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc";
-import { Result } from "../../../types/common/result";
-import { getMessageInRedColor } from "../../../utils/utils";
-import { SdlParser } from "../../../application/portal/toc/sdl-parser";
-import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator";
-import { TocContentParser } from "../../../application/portal/toc/toc-content-parser";
-import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc";
-import { PortalService } from "../../../infrastructure/services/portal-service";
+import fsExtra from "fs-extra";
+import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc.js";
+import { Result } from "../../../types/common/result.js";
+import { getMessageInRedColor } from "../../../utils/utils.js";
+import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
+import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator.js";
+import { TocContentParser } from "../../../application/portal/toc/toc-content-parser.js";
+import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc.js";
+import { PortalService } from "../../../infrastructure/services/portal-service.js";
 
 const DEFAULT_TOC_FILENAME = "toc.yml";
 const APIMATIC_BUILD_FILENAME = "APIMATIC-BUILD.json";
@@ -69,8 +69,8 @@ export class PortalNewTocAction {
   }
 
   private async writeToc(path: string, content: string, encoding: string) {
-    await fs.ensureFile(path);
-    await fs.writeFile(path, content, encoding);
+    await fsExtra.ensureFile(path);
+    await fsExtra.writeFile(path, content, encoding);
   }
 
   private async handleExistingToc(tocPath: string, force: boolean): Promise<Result<string, string>> {
@@ -94,7 +94,7 @@ export class PortalNewTocAction {
     this.prompts.startProgressIndicatorWithMessage("Extracting endpoints and/or models from the API specification...");
     const specFolderPath = await this.getSpecFolderPath(workingDirectory);
 
-    if (!(await fs.pathExists(specFolderPath))) {
+    if (!(await fsExtra.pathExists(specFolderPath))) {
       this.prompts.stopProgressIndicatorWithMessage(`⚠️ Could not find the specification folder at: ${specFolderPath}`);
       this.prompts.displayInfo("Falling back to default TOC structure without expanded endpoints or models...");
       return { endpointGroups: new Map(), models: [] };
@@ -108,14 +108,16 @@ export class PortalNewTocAction {
       return { endpointGroups: new Map(), models: [] };
     }
 
-    this.prompts.stopProgressIndicatorWithMessage("✅ Successfully extracted endpoints and/or models from the specification.");
+    this.prompts.stopProgressIndicatorWithMessage(
+      "✅ Successfully extracted endpoints and/or models from the specification."
+    );
     return sdlResult.value!;
   }
 
   private async extractContentGroups(workingDirectory: string): Promise<TocGroup[]> {
     const contentFolderPath = await this.getContentFolderPath(workingDirectory);
 
-    if (!(await fs.pathExists(contentFolderPath))) {
+    if (!(await fsExtra.pathExists(contentFolderPath))) {
       this.prompts.displayInfo(`⚠️ Could not locate the content folder at: ${contentFolderPath}`);
       this.prompts.displayInfo("Skipping custom content addition in TOC...");
       return [];
@@ -133,7 +135,7 @@ export class PortalNewTocAction {
   }
 
   private async checkExistingToc(tocPath: string, force: boolean): Promise<boolean> {
-    if ((await fs.pathExists(tocPath)) && !force) {
+    if ((await fsExtra.pathExists(tocPath)) && !force) {
       return await this.prompts.overwriteExistingTocPrompt();
     }
     return true;
@@ -143,12 +145,12 @@ export class PortalNewTocAction {
     const buildFilePath = path.join(workingDirectory, APIMATIC_BUILD_FILENAME);
     const defaultContentFolder = path.join(workingDirectory, "content");
 
-    if (!(await fs.pathExists(buildFilePath))) {
+    if (!(await fsExtra.pathExists(buildFilePath))) {
       return defaultContentFolder;
     }
 
     try {
-      const buildConfig = await fs.readJson(buildFilePath, "utf8");
+      const buildConfig = await fsExtra.readJson(buildFilePath, "utf8");
 
       if (buildConfig.generatePortal?.contentFolder == null) {
         return defaultContentFolder;
@@ -163,12 +165,12 @@ export class PortalNewTocAction {
     const buildFilePath = path.join(workingDirectory, APIMATIC_BUILD_FILENAME);
     const defaultSpecFolder = path.join(workingDirectory, "spec");
 
-    if (!(await fs.pathExists(buildFilePath))) {
+    if (!(await fsExtra.pathExists(buildFilePath))) {
       return defaultSpecFolder;
     }
 
     try {
-      const buildConfig = await fs.readJson(buildFilePath, "utf8");
+      const buildConfig = await fsExtra.readJson(buildFilePath, "utf8");
 
       if (buildConfig.generatePortal?.apiSpecPath == null) {
         return defaultSpecFolder;
@@ -178,4 +180,4 @@ export class PortalNewTocAction {
       return defaultSpecFolder;
     }
   }
-} 
+}

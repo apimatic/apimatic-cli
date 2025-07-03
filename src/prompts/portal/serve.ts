@@ -1,5 +1,5 @@
 import { log, outro, spinner } from "@clack/prompts";
-import { getMessageInRedColor } from "../../utils/utils";
+import { getMessageInRedColor } from "../../utils/utils.js";
 
 export class PortalServePrompts {
   private readonly spin = spinner();

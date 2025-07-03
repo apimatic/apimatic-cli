@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-alpha.8 win32-x64 node-v23.4.0
+@apimatic/cli/1.1.0-alpha.10 win32-x64 node-v23.4.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -42,9 +42,10 @@ USAGE
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
-* [`apimatic portal:toc:new`](#apimatic-portaltocnew)
 * [`apimatic portal:quickstart`](#apimatic-portalquickstart)
+* [`apimatic portal:recipe:new`](#apimatic-portalrecipenew)
 * [`apimatic portal:serve`](#apimatic-portalserve)
+* [`apimatic portal:toc:new`](#apimatic-portaltocnew)
 * [`apimatic sdk:generate`](#apimatic-sdkgenerate)
 
 ## `apimatic api:transform`
@@ -244,50 +245,6 @@ EXAMPLES
 
 _See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/generate.ts)_
 
-## `apimatic portal:toc:new`
-
-Generates a TOC file based on the content directory and spec folder provided in your working directory
-
-```
-USAGE
-  $ apimatic portal:toc:new [--destination <value>] [--folder <value>] [--force] [--expand-endpoints]
-    [--expand-models]
-
-FLAGS
-  --destination=<value>  optional path where the generated TOC file will be saved. Defaults to the current working
-                         directory if not provided.
-  --expand-endpoints     include individual entries for each endpoint in the generated TOC. Requires a valid API
-                         specification in the working directory.
-  --expand-models        include individual entries for each model in the generated TOC. Requires a valid API
-                         specification in the working directory.
-  --folder=<value>       [default: ./] path to the working directory containing the API project
-                         files. Defaults to the current working directory if not specified.
-  --force                overwrite the TOC file if one already exists at the destination.
-
-DESCRIPTION
-  Generates a TOC file based on the content directory and spec folder provided in your working directory
-
-  This command generates a new Table of Contents (TOC) file used in the
-  generation of your API documentation portal.
-
-  The output is a YAML file with the .yml extension.
-
-  To learn more about the TOC file and APIMatic build directory structure, visit:
-  https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal
-
-EXAMPLES
-  $ apimatic portal:toc:new --destination="./portal/content/"
-  A new toc file has been created at ./portal/content/toc.yml
-
-  $ apimatic portal:toc:new --folder="./my-project" 
-  A new toc file has been created at ./my-project/content/toc.yml
-
-  $ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"
-  A new toc file has been created at ./portal/content/toc.yml
-```
-
-_See code: [src/commands/portal/toc/new/toc.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/toc/new/toc.ts)_
-
 ## `apimatic portal:quickstart`
 
 Create your first API Portal using APIMatic's Docs as Code offering.
@@ -304,6 +261,37 @@ EXAMPLES
 ```
 
 _See code: [src/commands/portal/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/quickstart.ts)_
+
+## `apimatic portal:recipe:new`
+
+Generate an API Recipe for a static API Documentation portal.
+
+```
+USAGE
+  $ apimatic portal:recipe:new [--name <value>] [--folder <value>] [--build-config <value>]
+
+FLAGS
+  --build-config=<value>  path to the APIMATIC-BUILD.json file. Defaults to the APIMATIC-BUILD.json file in the build
+                          directory if not provided.
+  --folder=<value>        [default: C:\Users\Ali\Desktop\apimatic-cli] path to the build directory containing specs,
+                          content, and build config file. Defaults to the current working directory if not provided.
+  --name=<value>          name for the recipe
+
+DESCRIPTION
+  Generate an API Recipe for a static API Documentation portal.
+
+  To learn more about API Recipes, visit:
+  https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes
+
+EXAMPLES
+  $ apimatic portal:recipe:new --name="My API Recipe" --folder="./build-folder" --build-config-file="./build-folder/APIMATIC-BUILD.json"
+  Generated recipe has been added to build directory at: C:/build-folder/
+
+  $ apimatic portal:recipe:new
+  Generated recipe has been added to build directory at: C:/
+```
+
+_See code: [src/commands/portal/recipe/new.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/recipe/new.ts)_
 
 ## `apimatic portal:serve`
 
@@ -332,6 +320,50 @@ EXAMPLES
 ```
 
 _See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/serve.ts)_
+
+## `apimatic portal:toc:new`
+
+Generates a TOC file based on the content directory and spec folder provided in your working directory
+
+```
+USAGE
+  $ apimatic portal:toc:new [--destination <value>] [--folder <value>] [--force] [--expand-endpoints]
+    [--expand-models]
+
+FLAGS
+  --destination=<value>  optional path where the generated TOC file will be saved. Defaults to the current working
+                         directory if not provided.
+  --expand-endpoints     include individual entries for each endpoint in the generated TOC. Requires a valid API
+                         specification in the working directory.
+  --expand-models        include individual entries for each model in the generated TOC. Requires a valid API
+                         specification in the working directory.
+  --folder=<value>       [default: C:\Users\Ali\Desktop\apimatic-cli] path to the working directory containing the API
+                         project files. Defaults to the current working directory if not specified.
+  --force                overwrite the TOC file if one already exists at the destination.
+
+DESCRIPTION
+  Generates a TOC file based on the content directory and spec folder provided in your working directory
+
+  This command generates a new Table of Contents (TOC) file used in the
+  generation of your API documentation portal.
+
+  The output is a YAML file with the .yml extension.
+
+  To learn more about the TOC file and APIMatic build directory structure, visit:
+  https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal
+
+EXAMPLES
+  $ apimatic portal:toc:new --destination="./portal/content/"
+  A new toc file has been created at ./portal/content/toc.yml
+
+  $ apimatic portal:toc:new --folder="./my-project" 
+  A new toc file has been created at ./my-project/content/toc.yml
+
+  $ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"
+  A new toc file has been created at ./portal/content/toc.yml
+```
+
+_See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/toc/new.ts)_
 
 ## `apimatic sdk:generate`
 

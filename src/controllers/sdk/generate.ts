@@ -1,14 +1,15 @@
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
 import { ux } from "@oclif/core";
-
-import { ApiResponse, 
+import {
+  ApiResponse,
   CodeGenerationExternalApIsController,
   UserCodeGeneration,
   Platforms,
-  GenerateSdkViaUrlRequest, 
-  FileWrapper } from "@apimatic/sdk";
-import { GenerationIdParams, SimplePlatforms, DownloadSDKParams } from "../../types/sdk/generate";
-import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils";
+  GenerateSdkViaUrlRequest,
+  FileWrapper
+} from "@apimatic/sdk";
+import { GenerationIdParams, SimplePlatforms, DownloadSDKParams } from "../../types/sdk/generate.js";
+import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils.js";
 
 export const getSDKGenerationId = async (
   { file, url, platform }: GenerationIdParams,
@@ -19,7 +20,7 @@ export const getSDKGenerationId = async (
   let generation: ApiResponse<UserCodeGeneration>;
   const sdkPlatform = getSDKPlatform(platform) as Platforms;
   if (file) {
-    const fileDescriptor = new FileWrapper(fs.createReadStream(file));
+    const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file));
     generation = await sdkGenerationController.generateSdkViaFile(fileDescriptor, sdkPlatform);
   } else if (url) {
     // If url to spec file is provided

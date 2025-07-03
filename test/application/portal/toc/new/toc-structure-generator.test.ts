@@ -1,6 +1,6 @@
 import { expect } from "chai";
-import { TocStructureGenerator } from "../../../../../src/application/portal/toc/toc-structure-generator";
-import { TocEndpoint, TocGroup, TocModel, Toc, TocCustomPage } from "../../../../../src/types/toc/toc";
+import { TocStructureGenerator } from "../../../../../src/application/portal/toc/toc-structure-generator.js";
+import { TocEndpoint, TocGroup, TocModel, Toc, TocCustomPage } from "../../../../../src/types/toc/toc.js";
 
 describe("TocStructureGenerator", () => {
   let tocStructureGenerator: TocStructureGenerator;

@@ -1,15 +1,15 @@
 import * as path from "path";
-import * as chokidar from "chokidar";
+import axios from "axios";
+import chokidar from "chokidar";
 import {
   cleanUpGeneratedPortalFiles,
   getGeneratedFilesPaths,
   getMessageInMagentaColor,
   getMessageInRedColor,
   validateAndZipPortalSource
-} from "../../utils/utils";
-import { GeneratePortalParams } from "../../types/portal/generate";
-import { downloadDocsPortal } from "./generate";
-import axios from "axios";
+} from "../../utils/utils.js";
+import { GeneratePortalParams } from "../../types/portal/generate.js";
+import { downloadDocsPortal } from "./generate.js";
 
 const progressSpinner = {
   frames: ["◒", "◐", "◓", "◑"].map((frame) => getMessageInMagentaColor(frame)),
@@ -141,7 +141,7 @@ async function handleFileChange(
             )
           );
         } else if (error.response.status === 403) {
-          console.error(getMessageInRedColor(`Access denied. It looks like you don’t have access to APIMatic’s Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
+          console.error(getMessageInRedColor(`Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
         } else if (error.response.status === 422) {
           console.error(
             getMessageInRedColor(

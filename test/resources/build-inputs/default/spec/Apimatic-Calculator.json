@@ -1,0 +1,104 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "APIMATIC Calculator-test",
+    "description": "Simple calculator API hosted on APIMATIC for demo purposes",
+    "contact": {},
+    "version": "2.3"
+  },
+  "servers": [
+    {
+      "url": "https://examples.apimatic.io/apps/calculator",
+      "description": "This environment connect to the LIVE calculator API",
+      "variables": {}
+    }
+  ],
+  "paths": {
+    "/{operation}": {
+      "get": {
+        "tags": [
+          "Simple Calculator"
+        ],
+        "summary": "Calculate",
+        "description": "Calculates the expression using the specified operation.",
+        "operationId": "Calculate",
+        "parameters": [
+          {
+            "name": "operation",
+            "in": "path",
+            "description": "The operator to apply on the variables",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "$ref": "#/components/schemas/OperationType"
+            }
+          },
+          {
+            "name": "x",
+            "in": "query",
+            "description": "The LHS value",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "y",
+            "in": "query",
+            "description": "The RHS value",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {},
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "number",
+                  "format": "double"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OperationType": {
+        "title": "OperationType",
+        "enum": [
+          "SUM",
+          "SUBTRACT",
+          "MULTIPLY",
+          "DIVIDE"
+        ],
+        "type": "string",
+        "description": "Possible operators are sum, subtract, multiply, divide",
+        "example": "SUM"
+      }
+    }
+  },
+  "security": [
+    {}
+  ],
+  "tags": [
+    {
+      "name": "Simple Calculator",
+      "description": ""
+    }
+  ]
+}

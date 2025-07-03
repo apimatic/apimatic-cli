@@ -1,5 +1,5 @@
 import * as path from "path";
-import * as fs from "fs-extra";
+import fsExtra from "fs-extra";
 
 export type AuthInfo = {
   email: string;
@@ -12,7 +12,7 @@ export type AuthInfo = {
  */
 export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
   try {
-    const data: AuthInfo | null = JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
+    const data: AuthInfo | null = JSON.parse(await fsExtra.readFile(path.join(configDir, "config.json"), "utf8"));
     return data;
   } catch (e) {
     return null;
@@ -28,7 +28,7 @@ export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
 export async function setAuthInfo(credentials: AuthInfo, configDir: string): Promise<void> {
   const configFilePath = path.join(configDir, "config.json");
 
-  if (!fs.existsSync(configFilePath)) fs.createFileSync(configFilePath);
+  if (!fsExtra.existsSync(configFilePath)) fsExtra.createFileSync(configFilePath);
 
-  return await fs.writeFile(configFilePath, JSON.stringify(credentials));
+  return await fsExtra.writeFile(configFilePath, JSON.stringify(credentials));
 }

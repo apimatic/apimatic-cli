@@ -5,6 +5,7 @@ export interface Sdl {
 
 export interface SdlEndpoint {
   readonly Name: string,
+  readonly Description: string,
   readonly Group: string
 }
 

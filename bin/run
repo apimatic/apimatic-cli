@@ -1,9 +1,0 @@
-#!/usr/bin/env node
-/* eslint-disable no-undef */
-/* eslint-disable @typescript-eslint/no-var-requires */
-
-const { run, flush, handle } = require("@oclif/core");
-
-run()
-  .then(flush)
-  .catch(handle);

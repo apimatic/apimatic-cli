@@ -3,15 +3,20 @@
     "declaration": true,
     "importHelpers": true,
     "skipLibCheck": true,
-    "module": "commonjs",
+    "module": "nodenext",
     "outDir": "lib",
     "rootDir": "src",
     "strict": true,
     "target": "es2017",
     "lib": ["es2018", "dom"],
-    "inlineSourceMap": true,
+    "sourceMap": true,
+    "moduleResolution": "nodenext",
+    "allowSyntheticDefaultImports": true,
   },
   "include": [
     "src/**/*"
-  ]
+  ], 
+  "ts-node": {
+    "esm": true
+  }
 }
