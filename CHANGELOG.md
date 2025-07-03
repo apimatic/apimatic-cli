@@ -1,3 +1,10 @@
+# [1.1.0-alpha.10](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.9...v1.1.0-alpha.10) (2025-07-03)
+
+
+### Features
+
+* **portal:** adds portal:recipe:new command for api recipes and migrates codebase to esm from commonjs ([#103](https://github.com/apimatic/apimatic-cli/issues/103)) ([adb6d0d](https://github.com/apimatic/apimatic-cli/commit/adb6d0dfdf878744fe744f6cee70acbecf8b269d)), closes [#62](https://github.com/apimatic/apimatic-cli/issues/62)
+
 # [1.1.0-alpha.9](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.8...v1.1.0-alpha.9) (2025-06-26)
 
 
