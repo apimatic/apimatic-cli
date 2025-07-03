@@ -15,7 +15,7 @@ export class PortalRecipePrompts {
       `An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.`
     );
     log.message(
-      `ℹ️ Learn more: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes`
+      `ℹ️  Learn more: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes`
     );
     log.message(`Let's get started! 🚀`);
   }
@@ -188,7 +188,7 @@ export class PortalRecipePrompts {
 
   public async overwriteApiRecipeInTocPrompt(): Promise<boolean> {
     const overwriteApiRecipeInToc = await select({
-      message: `⚠️ A recipe with this name already exists. Do you want to overwrite it?`,
+      message: `⚠️  A recipe with this name already exists. Do you want to overwrite it?`,
       options: [
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" }
@@ -212,7 +212,7 @@ export class PortalRecipePrompts {
     log.message(`📦 Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
     log.message
     outro(
-      `▶️ Run the command 'apimatic portal:serve' to preview your documentation portal.`
+      `▶ Run the command 'apimatic portal:serve' to preview your documentation portal.`
     );
   }
 
@@ -232,7 +232,7 @@ export class PortalRecipePrompts {
       .map((line: string) => line.replace(/#.*/, (match: string) => getMessageInGreenColor(match)))
       .join("\n");
 
-    log.step(`🛠️ You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
+    log.step(`🛠️  You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
     log.message(`💡 Modify the TOC file to change the position of the API Recipes section in the navbar.`);
   }
 
