@@ -58,7 +58,7 @@
         "connect-livereload": "^0.6.1",
         "execa": "^9.6.0",
         "express": "^4.17.1",
-        "file-type": "^15.0.0",
+        "file-type": "^16.5.4",
         "form-data": "^4.0.2",
         "fs-extra": "^11.3.0",
         "livereload": "^0.9.3",
