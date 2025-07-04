@@ -4,6 +4,7 @@ import * as path from "path";
 import filetype from "file-type";
 import fs from "fs";
 import fsExtra from "fs-extra";
+import { readdir } from "fs/promises";
 import { getAuthInfo } from "../../client-utils/auth-manager.js";
 import { ApiError, ApiValidationExternalApIsController, ApiValidationSummary } from "@apimatic/sdk";
 import { LoginCredentials, SpecFile } from "../../types/portal/quickstart.js";
@@ -114,19 +115,18 @@ export class PortalQuickstartController {
       } else {
         specPath = path.normalize(specPath);
         const fileType = await filetype.fromFile(specPath);
+        filePath = tempSpecDir;
 
         if (fileType?.ext === "zip") {
-          filePath = tempSpecDir;
           await unzipFile(fs.createReadStream(specPath), tempSpecDir);
         } else {
           const destinationPath = path.join(tempSpecDir, path.basename(specPath));
-          filePath = destinationPath;
           await fsExtra.copy(specPath, destinationPath);
         }
       }
     }
 
-    return { filePath, url: this.specUrl };
+    return { localPath: filePath, url: this.specUrl };
   }
 
   async getSpecValidationSummary(
@@ -135,7 +135,7 @@ export class PortalQuickstartController {
     apiValidationController: ApiValidationExternalApIsController
   ): Promise<ApiValidationSummary> {
     const validationFlags: GetValidationParams = {
-      file: specFile.filePath,
+      file: specFile.localPath,
       url: specFile.url
     };
 
@@ -248,20 +248,15 @@ export class PortalQuickstartController {
     await clearDirectory(path.join(targetFolder, ".git"));
     await clearDirectory(path.join(targetFolder, ".github"));
 
-    if (specFile.filePath && validationSummary.success) {
+    if (specFile.localPath && validationSummary.success) {
       const specFolder = path.join(targetFolder, "spec");
       await deleteFile(path.join(specFolder, "Apimatic-Calculator.json"));
 
-      const stat = fs.lstatSync(specFile.filePath);
-      if (stat.isDirectory()) {
-        const files = fs.readdirSync(specFile.filePath);
-        for (const file of files) {
-          const srcPath = path.join(specFile.filePath, file);
-          const destPath = path.join(specFolder, file);
-          await fsExtra.copy(srcPath, destPath);
-        }
-      } else {
-        await fsExtra.copy(specFile.filePath, path.join(specFolder, path.basename(specFile.filePath)));
+      const files = await readdir(specFile.localPath);
+      for (const file of files) {
+        const srcPath = path.join(specFile.localPath, file);
+        const destPath = path.join(specFolder, file);
+        await fsExtra.copy(srcPath, destPath);
       }
     }
 
