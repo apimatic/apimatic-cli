@@ -1,3 +1,10 @@
+# [1.1.0-alpha.12](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.11...v1.1.0-alpha.12) (2025-07-04)
+
+
+### Bug Fixes
+
+* quickstart fails for zipped specs ([#107](https://github.com/apimatic/apimatic-cli/issues/107)) ([49b403c](https://github.com/apimatic/apimatic-cli/commit/49b403c2b18fee6f203e9f0193531927fb47ca56))
+
 # [1.1.0-alpha.11](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.10...v1.1.0-alpha.11) (2025-07-04)
 
 
