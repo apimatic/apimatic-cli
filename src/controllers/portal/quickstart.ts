@@ -250,20 +250,18 @@ export class PortalQuickstartController {
 
     if (specFile.filePath && validationSummary.success) {
       const specFolder = path.join(targetFolder, "spec");
-      await deleteFile(path.join(targetFolder, "spec", "Apimatic-Calculator.json"));
-      
-      if (specFile.filePath && validationSummary.success) {
-        const stat = fs.lstatSync(specFile.filePath);
-        if (stat.isDirectory()) {
-          const files = fs.readdirSync(specFile.filePath);
-          for (const file of files) {
-            const srcPath = path.join(specFile.filePath, file);
-            const destPath = path.join(specFolder, file);
-            await fsExtra.copy(srcPath, destPath);
-          }
-        } else {
-          await fsExtra.copy(specFile.filePath, path.join(specFolder, path.basename(specFile.filePath)));
+      await deleteFile(path.join(specFolder, "Apimatic-Calculator.json"));
+
+      const stat = fs.lstatSync(specFile.filePath);
+      if (stat.isDirectory()) {
+        const files = fs.readdirSync(specFile.filePath);
+        for (const file of files) {
+          const srcPath = path.join(specFile.filePath, file);
+          const destPath = path.join(specFolder, file);
+          await fsExtra.copy(srcPath, destPath);
         }
+      } else {
+        await fsExtra.copy(specFile.filePath, path.join(specFolder, path.basename(specFile.filePath)));
       }
     }
 
