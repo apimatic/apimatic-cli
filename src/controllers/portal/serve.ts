@@ -111,7 +111,10 @@ export const generatePortal = async (
     generateZipFile: false
   };
 
-  await downloadDocsPortal(generatePortalParams, configDir);
+  const generatedDocsResult = await downloadDocsPortal(generatePortalParams, configDir);
+  if (generatedDocsResult.isFailed()) {
+    throw new Error(generatedDocsResult.error);
+  }
 };
 
 async function handleFileChange(

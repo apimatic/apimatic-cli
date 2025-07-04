@@ -4,7 +4,7 @@ export type LoginCredentials = {
 }
 
 export type SpecFile = {
-    filePath: string;
+    localPath: string;
     url: string;
 }
 
