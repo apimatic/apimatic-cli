@@ -1,7 +1,7 @@
 import { simpleGit } from "simple-git";
 import axios from "axios";
 import * as path from "path";
-import * as filetype from "file-type";
+import filetype from "file-type";
 import fs from "fs";
 import fsExtra from "fs-extra";
 import { getAuthInfo } from "../../client-utils/auth-manager.js";
