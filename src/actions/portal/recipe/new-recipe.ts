@@ -1,6 +1,7 @@
 import * as path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
+import which from "which";
 import { parse } from "yaml";
 import { TreeObject } from "treeify";
 import { tmpdir } from "os";
@@ -188,9 +189,14 @@ export class PortalRecipeAction {
       if (!editor) {
         if (process.platform === "win32") {
           await execa("cmd", ["/c", "start", "/wait", "notepad", tempFilePath], { stdio: "ignore" });
-        } else {
-          editor = "nano";
+        } else if (process.platform === "darwin") {
+          editor = "open -e";
           await execa(editor, [tempFilePath], { stdio: "ignore" });
+        }
+        else if (process.platform === "linux") {
+          const [ editor, ...args ] = await this.findEditorLinux();
+          
+          await execa(editor, [...args, tempFilePath], { stdio: "ignore" });
         }
       } else {
         if (editor === "code" || editor.endsWith("code.cmd") || editor.endsWith("code.exe")) {
@@ -211,6 +217,31 @@ export class PortalRecipeAction {
     } catch (error) {
       return Result.failure(`Unable to add content step. Please try again later.`);
     }
+  }
+
+  private async findEditorLinux() {
+    const editors = [
+      ['gedit'],
+      ['kate'],
+      ['pluma'],
+      ['mousepad'],
+      ['leafpad'],
+      ['xed'],
+      ['code', '--wait'],
+      ['atom', '--wait'],
+      ['sublime-text', '--wait'],
+    ];
+
+    for (const editor of editors) {
+      try {
+        await which(editor[0]);
+        return editor;
+      } catch {
+        // Ignore and move on to the next editor
+      }
+    }
+
+    throw new Error('No supported GUI editor found on this Linux system.'); 
   }
 
   private async promptUserAndAddEndpointStepToRecipe(
