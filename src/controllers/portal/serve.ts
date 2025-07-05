@@ -67,6 +67,7 @@ export const watchAndRegeneratePortal = async (
   });
 
   const deletedDirectories = new Set<string>();
+  let isHandlingChange = false;
 
   watcher
     .on("all", async (event, path) => {
@@ -81,7 +82,18 @@ export const watchAndRegeneratePortal = async (
           }
         }
       }
-      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
+
+      if (isHandlingChange) {
+        return;
+      }
+    
+      isHandlingChange = true;
+      try {
+        await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
+      }
+      finally {
+        isHandlingChange = false;
+      }
     })
     .on("error", (error: Error) => {
       console.error("Watcher error:", error);
