@@ -28,7 +28,7 @@ import { AuthenticationError } from "../../types/utils.js";
 
 export class PortalQuickstartController {
   private readonly specUrl =
-    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
+    "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);
@@ -43,7 +43,6 @@ export class PortalQuickstartController {
   }
 
   async getSpecFile(spec: string): Promise<SpecFile> {
-    let filePath = "";
     const tempSpecDir = await createTempDirectory();
 
     if (spec) {
@@ -63,7 +62,7 @@ export class PortalQuickstartController {
 
           const specFile = await axios.get(specPath, { responseType: "arraybuffer" });
           const fileName = path.basename(specPath);
-          filePath = path.join(tempSpecDir, fileName);
+          const filePath = path.join(tempSpecDir, fileName);
           await fsExtra.writeFile(filePath, specFile.data);
         } catch (error) {
           if (axios.isAxiosError(error)) {
@@ -115,7 +114,6 @@ export class PortalQuickstartController {
       } else {
         specPath = path.normalize(specPath);
         const fileType = await filetype.fromFile(specPath);
-        filePath = tempSpecDir;
 
         if (fileType?.ext === "zip") {
           await unzipFile(fs.createReadStream(specPath), tempSpecDir);
@@ -126,7 +124,7 @@ export class PortalQuickstartController {
       }
     }
 
-    return { localPath: filePath, url: this.specUrl };
+    return { localPath: tempSpecDir, url: this.specUrl };
   }
 
   async getSpecValidationSummary(
