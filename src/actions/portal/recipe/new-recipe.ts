@@ -190,8 +190,8 @@ export class PortalRecipeAction {
         if (process.platform === "win32") {
           await execa("cmd", ["/c", "start", "/wait", "notepad", tempFilePath], { stdio: "ignore" });
         } else if (process.platform === "darwin") {
-          editor = "open -t";
-          await execa(editor, [tempFilePath], { stdio: "ignore" });
+          editor = "open";
+          await execa(editor, ["-t", tempFilePath], { stdio: "ignore" });
         }
         else if (process.platform === "linux") {
           const [ editor, ...args ] = await this.findEditorLinux();
