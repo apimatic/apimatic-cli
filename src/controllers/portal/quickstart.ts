@@ -220,6 +220,8 @@ export class PortalQuickstartController {
       }
     });
 
+    fsExtra.emptyDirSync(targetFolder);
+
     try {
       await git.clone(staticPortalRepoUrl, targetFolder);
     } catch (error) {
