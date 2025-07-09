@@ -91,7 +91,7 @@ export class PortalQuickstartPrompts {
 
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
-      placeholder: "Press Enter to use a sample OpenAPI file for APIMatic",
+      placeholder: "Enter Absolute URL or Press Enter to use sample OpenAPI file for APIMatic",
       defaultValue: "",
       validate: (input) => {
         if (!input) return;
