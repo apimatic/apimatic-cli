@@ -16,7 +16,7 @@
             // "--file=C:/Users/User/Desktop/test-cli/spec/Calculator.json",
             // "--destination=C:/Users/User/Desktop/test-cli/spec"
             // "auth:logout",
-            // "auth:login",
+             "auth:login",
             // "auth:status"
             // "portal:quickstart",
             // "portal:generate",

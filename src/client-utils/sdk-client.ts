@@ -56,9 +56,9 @@ export class SDKClient {
         configDir
       );
 
-      return "Logged in";
+      return "✅ Logged in successfully as " + email;
     } else if (authKey === storedAuthInfo.authKey) {
-      return "Already logged in";
+      return `🔐 You are already logged in as '${email}'.`;
     } else {
       setAuthInfo(
         {
@@ -67,8 +67,9 @@ export class SDKClient {
         },
         configDir
       );
-      return "Logged in";
+      return "🔁 Session updated. Logged in as " + email;
     }
+
   }
 
   public async logout(configDir: string): Promise<string> {
