@@ -29,6 +29,7 @@ export class PortalQuickstartPrompts {
       `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.`
     );
     log.message(`Let's get started! 🚀`);
+    log.message(`Note: Quickstart requires an empty directory.`)
   }
 
   async loginPrompt(): Promise<{ email: string; password: string }> {
