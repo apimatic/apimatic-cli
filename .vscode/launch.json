@@ -16,10 +16,10 @@
             // "--file=C:/Users/User/Desktop/test-cli/spec/Calculator.json",
             // "--destination=C:/Users/User/Desktop/test-cli/spec"
             // "auth:logout",
-             "auth:login",
+            // "auth:login",
             // "auth:status"
             // "portal:quickstart",
-            // "portal:generate",
+             "portal:generate",
             // "portal:toc:new",
             //"--expand-endpoints",
             //"--expand-models",
@@ -28,7 +28,7 @@
             // "test-source",
             // "--destination",
             // "test-portal",
-            // "portal:serve",
+           //  "portal:serve",
             // "api:transform",
             // "--help"
             //   "--folder=C:/Users/User/Desktop/demo/portal",

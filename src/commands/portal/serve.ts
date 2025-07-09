@@ -1,6 +1,7 @@
 import * as path from "path";
 import axios from "axios";
 import { Command, Flags } from "@oclif/core";
+import getPort from 'get-port';
 import { generatePortal } from "../../controllers/portal/serve.js";
 import { PortalServerService } from "../../services/portal/server.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
@@ -57,12 +58,20 @@ export default class PortalServe extends Command {
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
     const portalDir = path.resolve(flags.destination);
     const sourceDir = path.resolve(flags.source);
-    const port = flags.port;
     const overrideAuthKey = flags["auth-key"] ?? null;
     const serverService = new PortalServerService();
     const prompts = new PortalServePrompts();
     const validator = new PortalServeValidator(this.error);
     const allIgnoredPaths = [...ignoredPaths, ...getGeneratedFilesPaths(sourceDir, portalDir)];
+    const preferredPort = flags.port ?? 3000;
+
+    const availablePort = await getPort({ port: preferredPort });
+
+    if (availablePort !== preferredPort) {
+      this.log(`⚠️  Port ${preferredPort} is already in use. Falling back to available port ${availablePort}.`);
+    }
+
+    const port = availablePort;
 
     await validator.validate(port, flags.destination, sourceDir, portalDir);
 
