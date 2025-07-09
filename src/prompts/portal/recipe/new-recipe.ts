@@ -208,7 +208,6 @@ export class PortalRecipePrompts {
   }
 
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
-    log.step(`🎉 Recipe has been added successfully!`);
     log.message(`📦 Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
     outro(
       `▶ Run the command 'apimatic portal:serve' to preview your documentation portal.`
