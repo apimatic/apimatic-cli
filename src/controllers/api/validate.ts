@@ -1,11 +1,11 @@
 import fsExtra from "fs-extra";
-import { ApiResponse, ApiValidationExternalApIsController, ApiValidationSummary, ContentType, FileWrapper } from "@apimatic/sdk";
+import { ApiResponse, ApiValidationExternalApisController, ApiValidationSummary, ContentType, FileWrapper } from "@apimatic/sdk";
 import { GetValidationParams } from "../../types/api/validate.js";
 import { createTempDirectory, deleteFile, zipDirectory } from "../../utils/utils.js";
 
 export const getValidationSummary = async (
   { file, url }: GetValidationParams,
-  apiValidationController: ApiValidationExternalApIsController
+  apiValidationController: ApiValidationExternalApisController
 ): Promise<ApiValidationSummary> => {
   let validation: ApiResponse<ApiValidationSummary>;
 

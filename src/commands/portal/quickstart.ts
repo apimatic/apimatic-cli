@@ -1,5 +1,5 @@
 import { Command } from "@oclif/core";
-import { ApiValidationExternalApIsController, ApiValidationSummary, Client } from "@apimatic/sdk";
+import { ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
@@ -28,7 +28,7 @@ export default class PortalQuickstart extends Command {
     prompts: PortalQuickstartPrompts,
     controller: PortalQuickstartController,
     specFile: SpecFile,
-    apiValidationController: ApiValidationExternalApIsController
+    apiValidationController: ApiValidationExternalApisController
   ): Promise<ApiValidationSummary> {
     const apiValidationSummary = await controller.getSpecValidationSummary(prompts, specFile, apiValidationController);
 
@@ -99,7 +99,7 @@ export default class PortalQuickstart extends Command {
     }
 
     const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
-    const apiValidationController: ApiValidationExternalApIsController = new ApiValidationExternalApIsController(
+    const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
       client
     );
 
