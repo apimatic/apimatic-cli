@@ -212,6 +212,7 @@ export class PortalRecipePrompts {
     outro(
       `▶ Run the command 'apimatic portal:serve' to preview your documentation portal.`
     );
+    log.message(`💡 Modify the toc.yml file to change the position of the API Recipes section in the navbar.`);
   }
 
   public startProgressIndicatorWithMessage(message: string): void {
@@ -231,7 +232,6 @@ export class PortalRecipePrompts {
       .join("\n");
 
     log.step(`🛠️  You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
-    log.message(`💡 Modify the toc.yml file to change the position of the API Recipes section in the navbar.`);
   }
 
   public logError(error: string): void {
