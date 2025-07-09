@@ -231,7 +231,7 @@ export class PortalRecipeAction {
     // Check if the file exists
     if (!fs.existsSync(tocFilePath)) {
       return Result.failure<any, string>(
-        `TOC file not found at ${tocFilePath}. Please run 'apimatic:toc:new' to create your TOC file first.`
+        `toc.yml file not found at ${tocFilePath}. Please run 'apimatic:toc:new' to create your toc.yml file first.`
       );
     }
 
@@ -240,7 +240,7 @@ export class PortalRecipeAction {
       return Result.success(parse(tocContent));
     } catch {
       return Result.failure(
-        `Unable to parse the TOC file located at ${tocFilePath}. Please make sure that the TOC is a valid YAML file.`
+        `Unable to parse the toc.yml file located at ${tocFilePath}. Please make sure that the toc.yml is a valid YAML file.`
       );
     }
   }
