@@ -99,7 +99,8 @@ export class PortalQuickstartPrompts {
 
         if (isValidUrl(input)) return;
 
-        const dirPath = path.resolve((input ?? "").trim());
+        const cleanedPath = (input ?? "").trim().replace(/^["']|["']$/g, "");
+        const dirPath = path.resolve(cleanedPath);
 
         if (fs.existsSync(dirPath)) {
           if (fs.statSync(dirPath).isFile()) {
@@ -206,7 +207,8 @@ export class PortalQuickstartPrompts {
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const dirPath = path.resolve((input ?? "").trim());
+        const cleanedPath = (input ?? "").trim().replace(/^["']|["']$/g, "");
+        const dirPath = path.resolve(cleanedPath);
 
         if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
           return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
