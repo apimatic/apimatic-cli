@@ -229,20 +229,6 @@ export const isJSONParsable = (json: string) => {
   }
 };
 
-export const getGeneratedFilesPaths = (
-  sourceDirectoryPath: string,
-  generatedPortalArtifactsDirectoryPath: string
-): string[] => {
-  const generatedBuildInputZipPath = path.join(sourceDirectoryPath, ".portal_source.zip");
-  const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
-  const generatedPortalArtifactsFolderPath = path.join(
-    path.dirname(generatedPortalArtifactsDirectoryPath),
-    "generated_portal"
-  );
-
-  return [generatedBuildInputZipPath, generatedPortalArtifactsFolderPath, generatedPortalArtifactsZipFilePath];
-};
-
 export const getFileNameFromPath = (filePath: string) => {
   return path.basename(filePath).split(".")[0];
 };
@@ -386,27 +372,6 @@ export async function cleanUpGeneratedPortalFiles(sourceDir: string) {
   }
 }
 
-export function isPortInUse(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-
-    server.once("error", (err: any) => {
-      if (err.code === "EADDRINUSE") {
-        resolve(true);
-      } else {
-        resolve(false);
-      }
-    });
-
-    server.once("listening", () => {
-      server.close();
-      resolve(false);
-    });
-
-    server.listen(port);
-  });
-}
-
 export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
   const chunks: Buffer[] = [];
   for await (const chunk of body) {
@@ -415,10 +380,6 @@ export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promis
   const text = Buffer.concat(chunks).toString("utf-8");
   return JSON.parse(text);
 }
-
-export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] => {
-  return fs.readdirSync(directoryPath).filter((item) => !item.startsWith("."));
-};
 
 export const getMessageInOrangeColor = (message: string) => {
   return colors.yellow(message);

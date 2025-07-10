@@ -1,19 +1,9 @@
-import { log, outro, spinner } from "@clack/prompts";
-import { getMessageInRedColor } from "../../utils/utils.js";
+import { log, outro } from "@clack/prompts";
+import { BasePrompts } from "./common/base-prompts.js";
 
-export class PortalServePrompts {
-  private readonly spin = spinner();
-
-  displayGeneratingPortalMessage(): void {
-    this.spin.start(`Generating portal`);
-  }
-
-  displayGeneratingPortalErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`There was an error while generating the portal.`));
-  }
-
-  displayGeneratedPortalMessage(portalDir: string): void {
-    this.spin.stop(`Portal generated successfully at ${portalDir}`);
+export class PortalServePrompts extends BasePrompts {
+  displayGeneratedPortalMessage(portalArtifactsDirectory: string): void {
+    this.spin.stop(`Portal generated successfully at ${portalArtifactsDirectory}`);
   }
 
   displayOutroMessage(port: number): void {
