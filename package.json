@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.10",
+    "version": "1.1.0-alpha.14",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -44,7 +44,7 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.2.0-alpha.1",
+        "@apimatic/sdk": "^0.2.0-alpha.2",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",

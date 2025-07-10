@@ -6,6 +6,7 @@ import { PortalServerService } from "../../services/portal/server.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { cleanUpGeneratedPortalFiles, getGeneratedFilesPaths, getMessageInRedColor } from "../../utils/utils.js";
 import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
+import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 
 export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
@@ -22,8 +23,7 @@ export default class PortalServe extends Command {
       default: "./generated_portal",
       parse: async (input) => path.resolve(input)
     }),
-    source: Flags.string({
-      char: "s",
+    folder: Flags.string({
       description:
         "Source directory containing specs, content, and build file. By default, the current directory is used.",
       default: "./",
@@ -54,6 +54,7 @@ export default class PortalServe extends Command {
 
   async run() {
     const { flags } = await this.parse(PortalServe);
+    const paths = this.getServePaths(flags as ServeFlags);
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
     const portalDir = path.resolve(flags.destination);
     const sourceDir = path.resolve(flags.source);
@@ -93,6 +94,18 @@ export default class PortalServe extends Command {
     );
 
     prompts.displayOutroMessage(port);
+  }
+
+  private getServePaths(flags: ServeFlags) : ServePaths {
+    const GENERATED_PORTAL_ARTIFACTS_FOLDER = "generated_portal";
+    const GENERATED_PORTAL_ARTIFACTS_ZIP_FILE = ".generated_portal.zip";
+
+    return {
+      sourceFolderPath: flags.folder,
+      destinationFolderPath: flags.destination,
+      generatedPortalArtifactsFolderPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
+      generatedPortalArtifactsZipFilePath : path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP_FILE)
+    };
   }
 
   private handleError(error: unknown) {
