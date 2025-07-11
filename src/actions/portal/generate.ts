@@ -15,7 +15,7 @@ import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 export class PortalGenerateAction {
   private readonly prompts: PortalGeneratePrompts;
 
-  constructor() {
+  constructor(private readonly portalService: PortalService) {
     this.prompts = new PortalGeneratePrompts();
   }
 
@@ -38,8 +38,7 @@ export class PortalGenerateAction {
       generateZipFile: flags.zip
     };
 
-    const docsPortalService = new PortalService();
-    const portalGenerationResult = await docsPortalService.generateOnPremPortal(generatePortalParams, configDir);
+    const portalGenerationResult = await this.portalService.generateOnPremPortal(generatePortalParams, configDir);
     await deleteFile(sourceBuildInputZipFilePath);
 
     if (portalGenerationResult.isSuccess()) {
@@ -76,5 +75,9 @@ export class PortalGenerateAction {
         .on("finish", () => resolve())
         .on("error", (error) => reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`)));
     });
+  }
+
+  public getPromptsForTest() {
+    return this.prompts;
   }
 }

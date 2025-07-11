@@ -6,6 +6,7 @@ import { getMessageInRedColor } from "../../utils/utils.js";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 import { PortalGenerateAction } from "../../actions/portal/generate.js";
 import { Result } from "../../types/common/result.js";
+import { PortalService } from "../../infrastructure/services/portal-service.js";
 
 const DEFAULT_FOLDER = "./";
 const DEFAULT_DESTINATION = path.resolve("./");
@@ -58,7 +59,7 @@ Your portal has been generated at D:/
   async run(): Promise<void> {
     const { flags } = await this.parse(PortalGenerate);
     const paths = await this.getPortalPaths(flags as GenerateFlags);
-    const portalGenerateAction = new PortalGenerateAction();
+    const portalGenerateAction = new PortalGenerateAction(new PortalService());
 
     const shouldContinueWithExistingPortal = await this.checkExistingPortal(paths, flags as GenerateFlags);
     if (!shouldContinueWithExistingPortal) {
