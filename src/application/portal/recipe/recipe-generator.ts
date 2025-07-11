@@ -80,7 +80,7 @@ export class PortalRecipeGenerator {
       recipesConfig.workflows = [];
     }
     const existingIndex = recipesConfig.workflows.findIndex(
-      (workflow: any) => workflow.name === recipeName
+      (workflow: any) => workflow.permalink === `page:recipes/${recipeFileName}`
     );
 
     const newWorkflow = {

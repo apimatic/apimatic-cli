@@ -1,7 +1,7 @@
 import fsExtra from "fs-extra";
 
 import { ux, Flags, Command } from "@oclif/core";
-import { ApiError, ApiValidationExternalApIsController, ApiValidationSummary, Client } from "@apimatic/sdk";
+import { ApiError, ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils.js";
 import { SDKClient } from "../../client-utils/sdk-client.js";
@@ -42,7 +42,7 @@ Specification file provided is valid
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
 
-      const apiValidationController: ApiValidationExternalApIsController = new ApiValidationExternalApIsController(
+      const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
         client
       );
 
