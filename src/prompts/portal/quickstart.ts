@@ -99,7 +99,7 @@ export class PortalQuickstartPrompts {
 
         if (isValidUrl(input)) return;
 
-        const cleanedPath = (input ?? "").trim().replace(/^["']|["']$/g, "");
+        const cleanedPath = (input ?? "").trim().replace(/^(["'])|(["'])$/g, "");
         const dirPath = path.resolve(cleanedPath);
 
         if (fs.existsSync(dirPath)) {
@@ -207,7 +207,7 @@ export class PortalQuickstartPrompts {
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const cleanedPath = (input ?? "").trim().replace(/^["']|["']$/g, "");
+        const cleanedPath = (input ?? "").trim().replace(/^(["'])|(["'])$/g, "");
         const dirPath = path.resolve(cleanedPath);
 
         if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
