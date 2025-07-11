@@ -2,8 +2,6 @@ import * as path from "path";
 import axios from "axios";
 import chokidar from "chokidar";
 import {
-  cleanUpGeneratedPortalFiles,
-  getGeneratedFilesPaths,
   getMessageInMagentaColor,
   getMessageInRedColor,
   validateAndZipPortalSource
@@ -47,20 +45,20 @@ const progressSpinner = {
 };
 
 export const watchAndRegeneratePortal = async (
-  sourceDir: string,
-  portalDir: string,
+  sourceDirectoryPath: string,
+  generatedPortalArtifactsDirectoryPath: string,
   configDir: string,
   overrideAuthKey: string | null,
   ignoredPaths: string[] = []
 ) => {
   // Convert ignoredPaths to absolute paths for consistent comparison
-  const generatedFilesPaths = getGeneratedFilesPaths(sourceDir, portalDir); 
+  // const generatedFilesPaths = getGeneratedFilesPaths(sourceDir, portalDir); 
   const absoluteIgnoredPaths = [
     ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== ""),
-    ...generatedFilesPaths
-  ].map((ignoredPath) => path.resolve(sourceDir, ignoredPath));
+    // ...generatedFilesPaths
+  ].map((ignoredPath) => path.resolve(sourceDirectoryPath, ignoredPath));
 
-  const watcher = chokidar.watch(sourceDir, {
+  const watcher = chokidar.watch(sourceDirectoryPath, {
     ignored: [...absoluteIgnoredPaths, /(^|[/\\])\..+/],
     ignoreInitial: true,
     persistent: true
@@ -81,7 +79,7 @@ export const watchAndRegeneratePortal = async (
           }
         }
       }
-      await handleFileChange(sourceDir, portalDir, configDir, overrideAuthKey, absoluteIgnoredPaths);
+      await handleFileChange(sourceDirectoryPath, generatedPortalArtifactsDirectoryPath, configDir, overrideAuthKey, absoluteIgnoredPaths);
     })
     .on("error", (error: Error) => {
       console.error("Watcher error:", error);
@@ -97,6 +95,7 @@ export const generatePortal = async (
   ignoredPaths: string[] = [],
   overrideAuthKey: string | null = null
 ) => {
+  //TODO: Refactor this validateAndZipPortalSource method, it carries dual responsibility. 
   const zippedBuildFilePath = await validateAndZipPortalSource(
     sourceDir,
     path.join(sourceDir, ".portal_source.zip"),
@@ -128,13 +127,13 @@ async function handleFileChange(
   try {
     await generatePortal(sourceDir, portalDir, configDir, absoluteIgnoredPaths, overrideAuthKey);
     progressSpinner.stop();
-    await cleanUpGeneratedPortalFiles(sourceDir);
+    // await cleanUpGeneratedPortalFiles(sourceDir);
   } catch (error) {
     if (axios.isCancel(error)) {
       return;
     }
     progressSpinner.error();
-    await cleanUpGeneratedPortalFiles(sourceDir);
+    // await cleanUpGeneratedPortalFiles(sourceDir);
     if (axios.isAxiosError(error)) {
       if (error.response) {
         if (error.response.status === 400) {

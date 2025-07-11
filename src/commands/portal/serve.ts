@@ -1,10 +1,6 @@
 import * as path from "path";
-import axios from "axios";
 import { Command, Flags } from "@oclif/core";
-import { generatePortal } from "../../controllers/portal/serve.js";
-import { PortalServerService } from "../../services/portal/server.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { cleanUpGeneratedPortalFiles, getGeneratedFilesPaths, getMessageInRedColor } from "../../utils/utils.js";
 import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { PortalServeAction } from "../../actions/portal/serve.js";
@@ -65,7 +61,7 @@ export default class PortalServe extends Command {
       portalServePrompts.logError(validationResult.error!);
     }
 
-    const servePortalResult = await portalServeAction.servePortal(flags as ServeFlags, paths);
+    const servePortalResult = await portalServeAction.servePortal(flags as ServeFlags, paths, this.config.configDir);
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(servePortalResult.error!);
     }
@@ -73,13 +69,11 @@ export default class PortalServe extends Command {
 
   private getServePaths(flags: ServeFlags): ServePaths {
     const GENERATED_PORTAL_ARTIFACTS_FOLDER = "generated_portal";
-    const GENERATED_PORTAL_ARTIFACTS_ZIP_FILE = ".generated_portal.zip";
 
     return {
-      sourceFolderPath: flags.folder,
-      destinationFolderPath: flags.destination,
-      generatedPortalArtifactsFolderPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP_FILE)
+      sourceDirectoryPath: flags.folder,
+      destinationDirectoryPath: flags.destination,
+      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER)
     };
   }
 }

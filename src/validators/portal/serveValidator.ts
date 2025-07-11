@@ -19,17 +19,17 @@ export class PortalServeValidator {
       return Result.failure(portValidationResult.error!);
     }
     
-    const sourceDirectoryValidationResult = this.directoryValidator.validateSourceDirectory(sourceDir);
+    const sourceDirectoryValidationResult = this.directoryValidator.validateSourceDirectory(paths.sourceDirectoryPath);
     if (sourceDirectoryValidationResult.isFailed()) {
       return Result.failure(sourceDirectoryValidationResult.error!);
     }
 
-    const destinationDirectoryValidationResult = await this.directoryValidator.validateDestinationDirectory(destination, portalDir);
+    const destinationDirectoryValidationResult = await this.directoryValidator.validateDestinationDirectory(paths.destinationDirectoryPath);
     if (destinationDirectoryValidationResult.isFailed()) {
       return Result.failure(destinationDirectoryValidationResult.error!);
     }
 
-    const specDirectoryValidationResult = this.directoryValidator.validateSpecDirectory(sourceDir);
+    const specDirectoryValidationResult = this.directoryValidator.validateSpecDirectory(paths.sourceDirectoryPath);
     if (specDirectoryValidationResult.isFailed()) {
       return Result.failure(specDirectoryValidationResult.error!);
     }

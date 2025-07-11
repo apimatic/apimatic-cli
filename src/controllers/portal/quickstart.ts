@@ -15,8 +15,7 @@ import {
   unzipFile,
   getMessageInRedColor,
   clearDirectory,
-  deleteFile,
-  cleanUpGeneratedPortalFiles
+  deleteFile
 } from "../../utils/utils.js";
 import { getValidationSummary } from "../api/validate.js";
 import { AuthorizationError, GetValidationParams } from "../../types/api/validate.js";
@@ -29,6 +28,8 @@ import { AuthenticationError } from "../../types/utils.js";
 export class PortalQuickstartController {
   private readonly specUrl =
     "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
+  private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
+  private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);
@@ -355,22 +356,33 @@ export class PortalQuickstartController {
     }
   }
 
-  async servePortal(generatedPortalPath: string, targetFolder: string, configDir: string): Promise<boolean> {
+  async servePortal(generatedPortalPath: string, sourceDirectoryPath: string, configDir: string): Promise<boolean> {
     const server = new PortalServerService();
 
     server.setupServer(generatedPortalPath);
 
-    await cleanUpGeneratedPortalFiles(targetFolder);
+    await this.cleanUpGeneratedPortalFiles(sourceDirectoryPath);
 
     return await server.startServer(
       {
         generatedPortalPath,
-        targetFolder,
+        sourceDirectoryPath: sourceDirectoryPath,
         configDir,
         authKey: null
       },
       false,
       false
     );
+  }
+
+  private async cleanUpGeneratedPortalFiles(sourceDirectoryPath: string) {
+    const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, this.GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME);
+    const generatedPortalBuildInputZipFilePath = path.join(sourceDirectoryPath, this.GENERATED_BUILD_INPUT_ZIP_FILENAME);
+    if (fs.existsSync(generatedPortalArtifactsZipFilePath)) {
+      await deleteFile(generatedPortalArtifactsZipFilePath);
+    }
+    if (fs.existsSync(generatedPortalBuildInputZipFilePath)) {
+      await deleteFile(generatedPortalBuildInputZipFilePath);
+    }
   }
 }

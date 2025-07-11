@@ -9,8 +9,7 @@ export interface ServeFlags {
 }
 
 export interface ServePaths {
-  readonly sourceFolderPath: string;
-  readonly destinationFolderPath: string;
-  readonly generatedPortalArtifactsFolderPath: string;
-  readonly generatedPortalArtifactsZipFilePath: string;
+  readonly sourceDirectoryPath: string;
+  readonly destinationDirectoryPath: string;
+  readonly generatedPortalArtifactsDirectoryPath: string;
 }
