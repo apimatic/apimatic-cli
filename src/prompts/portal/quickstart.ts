@@ -87,6 +87,18 @@ export class PortalQuickstartPrompts {
     this.spin.stop(getMessageInCyanColor("✅  Login successful!"));
   }
 
+  removeQuotes(str: string) {
+    const trimmed = str.trim();
+    const quotes = ['"', "'"];
+    
+    for (const quote of quotes) {
+        if (trimmed.startsWith(quote) && trimmed.endsWith(quote) && trimmed.length > 1) {
+            return trimmed.slice(1, -1);
+        }
+    }
+    return trimmed;
+}
+
   async specPrompt(): Promise<string> {
     log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
 
@@ -99,7 +111,7 @@ export class PortalQuickstartPrompts {
 
         if (isValidUrl(input)) return;
 
-        const cleanedPath = (input ?? "").trim().replace(/^(["'])|(["'])$/g, "");
+        const cleanedPath = this.removeQuotes(input ?? "");
         const dirPath = path.resolve(cleanedPath);
 
         if (fs.existsSync(dirPath)) {
@@ -207,7 +219,7 @@ export class PortalQuickstartPrompts {
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const cleanedPath = (input ?? "").trim().replace(/^(["'])|(["'])$/g, "");
+        const cleanedPath = this.removeQuotes(input ?? "");
         const dirPath = path.resolve(cleanedPath);
 
         if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
