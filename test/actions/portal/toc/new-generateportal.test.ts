@@ -6,7 +6,6 @@ EventEmitter.defaultMaxListeners = 50;
 import sinon from "sinon";
 import { dir as tmpDir, DirectoryResult } from "tmp-promise";
 import { Readable } from "stream";
-import { PortalGeneratePrompts } from "../../../../src/prompts/portal/generate.js";
 import { Result } from "../../../../src/types/common/result.js";
 import type { PortalGenerateAction as PortalGenerateActionType } from "../../../../src/actions/portal/generate.js";
 import { PortalService } from "../../../../src/infrastructure/services/portal-service.js";
@@ -95,7 +94,6 @@ describe("PortalGenerateAction", () => {
   }
 
   it("should generate portal without zip flag", async () => {
-    // Arrange
     const params = getDefaultParams();
   
     // Mock write stream for createWriteStreamStub
@@ -119,11 +117,9 @@ describe("PortalGenerateAction", () => {
   });
 
   it("should generate portal with zip flag", async () => {
-    // Arrange
     const params = getDefaultParams();
     params.flags.zip = true;
 
-    // Mock write stream for createWriteStreamStub
     const writeStream = new Readable() as any;
     writeStream.pipe = function () { return this; };
     writeStream.on = function (event: string, cb: () => void) {
@@ -143,11 +139,10 @@ describe("PortalGenerateAction", () => {
   });
 
   it("should use custom auth key", async () => {
-    // Arrange
     const params = getDefaultParams();
     params.flags["auth-key"] = "my-key";
     let receivedParams: any = null;
-    // Stub PortalService.generateOnPremPortal to capture params
+
     const fakeStream = new Readable();
     fakeStream._read = () => {};
     const portalService = {
@@ -169,7 +164,6 @@ describe("PortalGenerateAction", () => {
   });
 
   it("should handle portal service failure", async () => {
-    // Arrange
     const params = getDefaultParams();
     let receivedParams: any = null;
     const portalService = {
