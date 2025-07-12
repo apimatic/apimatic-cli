@@ -19,9 +19,9 @@ import {
 } from "../../utils/utils.js";
 import { getValidationSummary } from "../api/validate.js";
 import { AuthorizationError, GetValidationParams } from "../../types/api/validate.js";
-import { generatePortal } from "./serve.js";
+import { generatePortal } from "../../application/portal/serve/portal-watcher.js";
 import { metadataFileContent, staticPortalRepoUrl } from "../../config/env.js";
-import { PortalServerService } from "../../services/portal/server.js";
+import { PortalServeService } from "../../application/portal/serve/serve-service.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { AuthenticationError } from "../../types/utils.js";
 
@@ -357,7 +357,7 @@ export class PortalQuickstartController {
   }
 
   async servePortal(generatedPortalPath: string, sourceDirectoryPath: string, configDir: string): Promise<boolean> {
-    const server = new PortalServerService();
+    const server = new PortalServeService();
 
     server.setupServer(generatedPortalPath);
 

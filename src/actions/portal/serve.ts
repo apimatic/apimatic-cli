@@ -1,7 +1,7 @@
 import path from "path";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
-import { PortalServerService } from "../../services/portal/server.js";
+import { PortalServeService } from "../../application/portal/serve/serve-service.js";
 import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GeneratePortalParams } from "../../types/portal/generate.js";
@@ -9,14 +9,14 @@ import { validateAndZipPortalSource } from "../../utils/utils.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts;
-  private readonly serverService: PortalServerService;
+  private readonly serverService: PortalServeService;
   private readonly docsPortalService: PortalService;
   private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
   private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
 
   public constructor() {
     this.prompts = new PortalServePrompts();
-    this.serverService = new PortalServerService();
+    this.serverService = new PortalServeService();
     this.docsPortalService = new PortalService();
   }
 

@@ -3,12 +3,11 @@ import livereload from "livereload";
 import connectLivereload from "connect-livereload";
 import open from "open";
 import net from "net";
-import { watchAndRegeneratePortal } from "../../controllers/portal/serve.js";
-import { PortalServerConfig } from "../../types/portal/quickstart.js";
+import { PortalServerConfig } from "../../../types/portal/quickstart.js";
 import { Server } from "http";
-import { getMessageInRedColor } from "../../utils/utils.js";
+import { getMessageInRedColor } from "../../../utils/utils.js";
 
-export class PortalServerService {
+export class PortalServeService {
   private server!: Server;
   private liveReloadServer!: livereload.LiveReloadServer;
   private readonly app: express.Application;
