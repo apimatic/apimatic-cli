@@ -48,32 +48,23 @@ export class PortalServeAction {
 
     this.prompts.startProgressIndicator("Generating portal");
 
-    const generateOnPremPortalResult = await this.docsPortalService.generateOnPremPortal(generatePortalParams, configDirectoryPath);
-    if (generateOnPremPortalResult.isFailed())
-    {
+    const generateOnPremPortalResult = await this.docsPortalService.generateOnPremPortal(
+      generatePortalParams,
+      configDirectoryPath
+    );
+    if (generateOnPremPortalResult.isFailed()) {
       this.prompts.stopProgressIndicator("There was an error while generating the portal.");
       return Result.failure(generateOnPremPortalResult.error!);
     }
 
     this.prompts.stopProgressIndicator(`Portal generated successfully at ${flags.destination}`);
 
-    const setupServerResult = this.serverService.setupServer(flags.destination);
+    const setupServerResult = await this.serverService.setupServer(flags.destination);
     if (setupServerResult.isFailed()) {
       return Result.failure(setupServerResult.error!);
     }
 
-    const startServerResult = this.serverService.startServer(
-      {
-        generatedPortalPath: flags.destination,
-        sourceDirectoryPath: flags.folder,
-        configDir: configDirectoryPath,
-        authKey: flags["auth-key"],
-        ignoredPaths: ignoredPaths,
-        port: flags.port,
-        openInBrowser: flags.open
-      },
-      flags["no-reload"]
-    );
+    const startServerResult = await this.serverService.startServer(paths, flags, ignoredPaths, configDirectoryPath);
     if (startServerResult.isFailed()) {
       return Result.failure(startServerResult.error!);
     }
@@ -85,8 +76,11 @@ export class PortalServeAction {
 
   private getGeneratedFilesPaths(sourceDirectoryPath: string, generatedPortalArtifactsDirectoryPath: string): string[] {
     const generatedBuildInputZipPath = path.join(sourceDirectoryPath, this.GENERATED_BUILD_INPUT_ZIP_FILENAME);
-    const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, this.GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME);
+    const generatedPortalArtifactsZipFilePath = path.join(
+      sourceDirectoryPath,
+      this.GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME
+    );
 
-    return [generatedBuildInputZipPath, generatedPortalArtifactsZipFilePath, generatedPortalArtifactsDirectoryPath,];
+    return [generatedBuildInputZipPath, generatedPortalArtifactsZipFilePath, generatedPortalArtifactsDirectoryPath];
   }
 }

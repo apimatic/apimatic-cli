@@ -35,6 +35,10 @@ export class PortalService {
     }
 
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+    if (authInfo === null && !params.overrideAuthKey) {
+      return Result.failure("You are not logged in, please login using `apimatic auth:login` or provide an auth key.");
+    }
+
     const authorizationHeader = this.createAuthorizationHeader(authInfo, params.overrideAuthKey);
     const client = this.createApiClient(authorizationHeader);
     const docsPortalManagementController = new DocsPortalManagementController(client);

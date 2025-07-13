@@ -1,8 +1,17 @@
 import * as path from "path";
 import chokidar from "chokidar";
-import { getMessageInMagentaColor } from "../../../utils/utils.js";
+import { getMessageInMagentaColor, validateAndZipPortalSource } from "../../../utils/utils.js";
+import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
+import { GeneratePortalParams } from "../../../types/portal/generate.js";
+import { PortalService } from "../../../infrastructure/services/portal-service.js";
 
 export class PortalWatcher {
+  private readonly docsPortalService: PortalService;
+
+  public constructor() {
+    this.docsPortalService = new PortalService();
+  }
+
   private readonly progressSpinner = {
     frames: ["◒", "◐", "◓", "◑"].map((frame) => getMessageInMagentaColor(frame)),
     isRunning: false,
@@ -17,7 +26,7 @@ export class PortalWatcher {
       this.interval = setInterval(() => {
         this.frameIndex = (this.frameIndex + 1) % this.frames.length;
         process.stdout.write(`\r\u001b[K${this.format()}`);
-      }, 200);
+      }, 100);
     },
     stop() {
       if (this.interval !== null) {
@@ -39,20 +48,17 @@ export class PortalWatcher {
   };
 
   public async watchAndRegeneratePortal(
-    sourceDirectoryPath: string,
-    generatedPortalArtifactsDirectoryPath: string,
-    configDir: string,
-    overrideAuthKey: string | null,
-    ignoredPaths: string[] = []
+    paths: ServePaths,
+    flags: ServeFlags,
+    ignoredPaths: string[],
+    configDirectoryPath: string
   ) {
     // Convert ignoredPaths to absolute paths for consistent comparison
-    // const generatedFilesPaths = getGeneratedFilesPaths(sourceDir, portalDir);
     const absoluteIgnoredPaths = [
       ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== "")
-      // ...generatedFilesPaths
-    ].map((ignoredPath) => path.resolve(sourceDirectoryPath, ignoredPath));
+    ].map((ignoredPath) => path.resolve(paths.sourceDirectoryPath, ignoredPath));
 
-    const watcher = chokidar.watch(sourceDirectoryPath, {
+    const watcher = chokidar.watch(paths.sourceDirectoryPath, {
       ignored: [...absoluteIgnoredPaths, /(^|[/\\])\..+/],
       ignoreInitial: true,
       persistent: true
@@ -73,7 +79,7 @@ export class PortalWatcher {
             }
           }
         }
-        await handleFileChange();
+        await this.handleFileChange(paths, flags, absoluteIgnoredPaths, configDirectoryPath);
       })
       .on("error", (error: Error) => {
         console.error("Watcher error:", error);
@@ -82,13 +88,36 @@ export class PortalWatcher {
     return watcher;
   }
 
-  private handleFileChange(
+  private async handleFileChange(
+    paths: ServePaths,
+    flags: ServeFlags,
+    absoluteIgnoredPaths: string[],
+    configDirectoryPath: string
   ) {
-    progressSpinner.start();
+    this.progressSpinner.start();
 
-    await generatePortal(sourceDir, portalDir, configDir, absoluteIgnoredPaths, overrideAuthKey);
-    
-    progressSpinner.stop();
+    const sourceBuildInputZipFilePath = await validateAndZipPortalSource(
+      paths.sourceDirectoryPath,
+      path.join(paths.sourceDirectoryPath, ".portal_source.zip"),
+      absoluteIgnoredPaths
+    );
+
+    //TODO: Remove usage of empty string and null.
+    const generatePortalParams: GeneratePortalParams = {
+      sourceBuildInputZipFilePath: sourceBuildInputZipFilePath,
+      generatedPortalArtifactsFolderPath: paths.generatedPortalArtifactsDirectoryPath,
+      generatedPortalArtifactsZipFilePath: "",
+      overrideAuthKey: flags["auth-key"] ?? null,
+      generateZipFile: false
+    };
+
+    const portalGenerationResult = await this.docsPortalService.generateOnPremPortal(generatePortalParams, configDirectoryPath)
+    if (portalGenerationResult.isFailed()) {
+      this.progressSpinner.error();
+      console.error(portalGenerationResult.error!);
+    }
+
+    this.progressSpinner.stop();
     // await cleanUpGeneratedPortalFiles(sourceDir);
   }
 }

@@ -3,44 +3,58 @@ import livereload from "livereload";
 import connectLivereload from "connect-livereload";
 import open from "open";
 import net from "net";
-import { PortalServerConfig } from "../../../types/portal/quickstart.js";
 import { Server } from "http";
-import { getMessageInRedColor } from "../../../utils/utils.js";
 import { Result } from "../../../types/common/result.js";
+import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
+import { PortalWatcher } from "./portal-watcher.js";
 
 export class ServeHandler {
   private server!: Server;
   private liveReloadServer!: livereload.LiveReloadServer;
   private readonly app: express.Application;
+  private readonly portalWatcher: PortalWatcher;
   private readonly DEFAULT_SERVER_PORT = 3000;
   private readonly DEFAULT_LIVE_RELOAD_SERVER_PORT = 35729;
 
   constructor() {
     this.app = express();
+    this.portalWatcher = new PortalWatcher();
   }
 
-  public async setupServer(generatedPortalPath: string): Promise<Result<string,string>> {
-    await this.createLiveReloadServer(generatedPortalPath);
+  public async setupServer(generatedPortalPath: string): Promise<Result<string, string>> {
+    const createLiveReloadServerResult = await this.createLiveReloadServer(generatedPortalPath);
+    if (createLiveReloadServerResult.isFailed()) {
+      return Result.failure(createLiveReloadServerResult.error!);
+    }
 
     if (this.liveReloadServer) {
       this.app.use(connectLivereload());
     }
     this.app.use(express.static(generatedPortalPath));
+
+    return Result.success(`Server is set up and serving files from ${generatedPortalPath}`);
   }
 
-  public async startServer(config: PortalServerConfig, noReload = false, displayShutdownMessages = true): Promise<boolean> {
-    const { generatedPortalPath, sourceDirectoryPath: targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
-    const requestedPort = port ?? this.DEFAULT_SERVER_PORT;
+  public async startServer(
+    paths: ServePaths,
+    flags: ServeFlags,
+    ignoredPaths: string[],
+    configDirectoryPath: string,
+    displayShutdownMessages = true
+  ): Promise<Result<boolean, string>> {
+    // const { generatedPortalPath, sourceDirectoryPath: targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
+    const requestedPort = flags.port ?? this.DEFAULT_SERVER_PORT;
 
-    return new Promise<boolean>((resolve, reject) => {
+    return new Promise<Result<boolean, string>>((resolve, reject) => {
       this.server = this.app
-        .listen(requestedPort, () => {
-          if (openInBrowser) {
+        .listen(requestedPort, async () => {
+          if (flags.open) {
             open(`http://localhost:${requestedPort}`);
           }
 
-          if (!noReload) {
+          if (!flags["no-reload"]) {
             // watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
+            await this.portalWatcher.watchAndRegeneratePortal(paths, flags, ignoredPaths, configDirectoryPath);
           }
 
           if (process.platform !== "darwin") {
@@ -49,15 +63,18 @@ export class ServeHandler {
               process.stdin.setRawMode(false);
             }
           }
-          resolve(true);
+          resolve(Result.success(true));
         })
         .on("error", (err: NodeJS.ErrnoException) => {
           if (err.code === "EADDRINUSE") {
-            console.error(getMessageInRedColor(`Port ${requestedPort} is not available. Unable to serve your portal.`));
+            reject(Result.failure(`Port ${requestedPort} is not available. Unable to serve your portal.`));
           } else {
-            console.error(getMessageInRedColor(`Unable to serve the portal: ${err.message}`));
+            reject(
+              Result.failure(
+                `Something went wrong while serving your portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
+              )
+            );
           }
-          reject(err);
         });
 
       const shutdown = async () => {
@@ -68,7 +85,7 @@ export class ServeHandler {
         if (displayShutdownMessages) {
           console.log("Server shut down successfully.");
         }
-        resolve(true);
+        resolve(Result.success(true));
         process.exit(0);
       };
 
@@ -77,7 +94,7 @@ export class ServeHandler {
     });
   }
 
-  async stopServer(): Promise<void> {
+  private async stopServer(): Promise<void> {
     if (this.liveReloadServer) {
       this.liveReloadServer.close();
     }
@@ -104,7 +121,7 @@ export class ServeHandler {
     return startPort;
   }
 
-  private async createLiveReloadServer(generatedPortalPath: string): Promise<void> {
+  private async createLiveReloadServer(generatedPortalPath: string): Promise<Result<string, string>> {
     try {
       const availablePort = await this.findAvailablePort(this.DEFAULT_LIVE_RELOAD_SERVER_PORT);
 
@@ -113,8 +130,12 @@ export class ServeHandler {
       });
 
       this.liveReloadServer.watch(generatedPortalPath);
+
+      return Result.success(`LiveReload server started on port ${availablePort}`);
     } catch (error) {
-      return Result.failure("An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance.");
+      return Result.failure(
+        "An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance."
+      );
     }
   }
 
