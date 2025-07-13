@@ -6,8 +6,9 @@ import net from "net";
 import { PortalServerConfig } from "../../../types/portal/quickstart.js";
 import { Server } from "http";
 import { getMessageInRedColor } from "../../../utils/utils.js";
+import { Result } from "../../../types/common/result.js";
 
-export class PortalServeService {
+export class ServeHandler {
   private server!: Server;
   private liveReloadServer!: livereload.LiveReloadServer;
   private readonly app: express.Application;
@@ -18,7 +19,7 @@ export class PortalServeService {
     this.app = express();
   }
 
-  public async setupServer(generatedPortalPath: string): Promise<void> {
+  public async setupServer(generatedPortalPath: string): Promise<Result<string,string>> {
     await this.createLiveReloadServer(generatedPortalPath);
 
     if (this.liveReloadServer) {
@@ -39,7 +40,7 @@ export class PortalServeService {
           }
 
           if (!noReload) {
-            watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
+            // watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
           }
 
           if (process.platform !== "darwin") {
@@ -113,7 +114,7 @@ export class PortalServeService {
 
       this.liveReloadServer.watch(generatedPortalPath);
     } catch (error) {
-      console.log(getMessageInRedColor(`Unable to serve the portal: ${(error as Error).message}`));
+      return Result.failure("An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance.");
     }
   }
 

@@ -1,7 +1,7 @@
 import path from "path";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
-import { PortalServeService } from "../../application/portal/serve/serve-service.js";
+import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GeneratePortalParams } from "../../types/portal/generate.js";
@@ -9,14 +9,14 @@ import { validateAndZipPortalSource } from "../../utils/utils.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts;
-  private readonly serverService: PortalServeService;
+  private readonly serverService: ServeHandler;
   private readonly docsPortalService: PortalService;
   private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
   private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
 
   public constructor() {
     this.prompts = new PortalServePrompts();
-    this.serverService = new PortalServeService();
+    this.serverService = new ServeHandler();
     this.docsPortalService = new PortalService();
   }
 
@@ -57,9 +57,12 @@ export class PortalServeAction {
 
     this.prompts.stopProgressIndicator(`Portal generated successfully at ${flags.destination}`);
 
-    this.serverService.setupServer(flags.destination);
+    const setupServerResult = this.serverService.setupServer(flags.destination);
+    if (setupServerResult.isFailed()) {
+      return Result.failure(setupServerResult.error!);
+    }
 
-    this.serverService.startServer(
+    const startServerResult = this.serverService.startServer(
       {
         generatedPortalPath: flags.destination,
         sourceDirectoryPath: flags.folder,
@@ -71,6 +74,9 @@ export class PortalServeAction {
       },
       flags["no-reload"]
     );
+    if (startServerResult.isFailed()) {
+      return Result.failure(startServerResult.error!);
+    }
 
     this.prompts.displayOutroMessage(flags.port);
 
