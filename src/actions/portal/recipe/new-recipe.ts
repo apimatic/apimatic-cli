@@ -1,6 +1,7 @@
 import * as path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
+import which from "which";
 import { parse } from "yaml";
 import { TreeObject } from "treeify";
 import { tmpdir } from "os";
@@ -175,22 +176,24 @@ export class PortalRecipeAction {
     stepName: string
   ): Promise<Result<string, string>> {
     this.prompts.displayContentStepInfo();
-    this.prompts.startProgressIndicatorWithMessage("Waiting for you to close the text editor");
     let editor = process.env.EDITOR;
     let editorArgs: string[] = [];
+    const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.md`);
+    const template = `# The Heading Goes Here\n\nThis is placeholder text for your API Recipe content step. Feel free to edit this. Save your changes and then close the file once you're done.`;
+    await fsExtra.writeFile(tempFilePath, template);
 
     try {
-      const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.md`);
-      const template = `# The Heading Goes Here\n\nThis is placeholder text for your API Recipe content step. Feel free to edit this. Save your changes and then close the file once you're done.`;
-
-      await fsExtra.writeFile(tempFilePath, template);
-
       if (!editor) {
         if (process.platform === "win32") {
           await execa("cmd", ["/c", "start", "/wait", "notepad", tempFilePath], { stdio: "ignore" });
-        } else {
-          editor = "nano";
-          await execa(editor, [tempFilePath], { stdio: "ignore" });
+        } else if (process.platform === "darwin" || process.platform === "linux") {
+          editor = "vim";
+          try {
+            await execa(editor, [tempFilePath], { stdio: "inherit" });
+          }
+          catch (error) {
+            // User exiting vim can throw a non-zero exit code leading to exception, ignore it. 
+          }
         }
       } else {
         if (editor === "code" || editor.endsWith("code.cmd") || editor.endsWith("code.exe")) {
@@ -200,16 +203,16 @@ export class PortalRecipeAction {
         await execa(editor, editorArgs, { stdio: "ignore" });
       }
 
-      this.prompts.stopProgressIndicatorWithMessage("✅  Text editor closed.");
       const fileContent = await fsExtra.readFile(tempFilePath, "utf-8");
-
-      await fsExtra.unlink(tempFilePath);
-
       recipe.addContentStep(stepName, stepName, fileContent);
+      
       this.prompts.displayStepAddedSuccessfullyMessage();
       return Result.success("Added content step successfully.");
     } catch (error) {
       return Result.failure(`Unable to add content step. Please try again later.`);
+    }
+    finally {
+      await fsExtra.unlink(tempFilePath);
     }
   }
 

@@ -21,6 +21,7 @@ import { Result } from "../../types/common/result.js";
 import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Sdl } from "../../types/sdl/sdl.js";
+import * as os from "os";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -93,11 +94,20 @@ export class PortalService {
     return `X-Auth-Key ${key ?? ""}`;
   };
 
+  private getUserAgent(): string {
+      const osInfo = `${os.platform()} ${os.release()}`;
+      const engine = "Node.js";
+      const engineVersion = process.version;
+      
+      return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
+    }
+    
   private createApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
+      userAgent: this.getUserAgent(),
       timeout: this.TIMEOUT
     });
   };
