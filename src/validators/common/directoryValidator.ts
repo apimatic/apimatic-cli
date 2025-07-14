@@ -48,7 +48,7 @@ export class DirectoryValidator {
     const portalDirectoryItems = this.getDirectoryItems(destinationDirectoryPath);
     if (portalDirectoryItems.length > 0) {
       return Result.failure(
-        "The destination directory is not empty. Please specify an empty destination directory or empty the provided directory."
+        "The destination directory is not empty. Please specify an empty destination directory or clear the contents of the provided directory."
       );
     }
 

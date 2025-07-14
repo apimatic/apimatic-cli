@@ -42,7 +42,6 @@ export class ServeHandler {
     configDirectoryPath: string,
     displayShutdownMessages = true
   ): Promise<Result<boolean, string>> {
-    // const { generatedPortalPath, sourceDirectoryPath: targetFolder, configDir, authKey, ignoredPaths, port, openInBrowser } = config;
     const requestedPort = flags.port ?? this.DEFAULT_SERVER_PORT;
 
     return new Promise<Result<boolean, string>>((resolve, reject) => {
@@ -52,10 +51,7 @@ export class ServeHandler {
             open(`http://localhost:${requestedPort}`);
           }
 
-          if (!flags["no-reload"]) {
-            // watchAndRegeneratePortal(targetFolder, generatedPortalPath, configDir, authKey, ignoredPaths);
-            await this.portalWatcher.watchAndRegeneratePortal(paths, flags, ignoredPaths, configDirectoryPath);
-          }
+          await this.portalWatcher.watchAndRegeneratePortal(paths, flags, ignoredPaths, configDirectoryPath);
 
           if (process.platform !== "darwin") {
             //For non-macOS users.

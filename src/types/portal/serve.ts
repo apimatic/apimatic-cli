@@ -12,4 +12,5 @@ export interface ServePaths {
   readonly sourceDirectoryPath: string;
   readonly destinationDirectoryPath: string;
   readonly generatedPortalArtifactsDirectoryPath: string;
+  readonly generatedPortalArtifactsZipFilePath: string;
 }

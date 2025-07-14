@@ -1,9 +1,17 @@
 import * as path from "path";
+import fsExtra from "fs-extra";
 import chokidar from "chokidar";
-import { getMessageInMagentaColor, validateAndZipPortalSource } from "../../../utils/utils.js";
+import {
+  deleteFile,
+  extractZipFile,
+  getMessageInMagentaColor,
+  validateAndZipPortalSource
+} from "../../../utils/utils.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { GeneratePortalParams } from "../../../types/portal/generate.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
+import { WatcherHandler } from "./watcher-handler.js";
+import { Result } from "../../../types/common/result.js";
 
 export class PortalWatcher {
   private readonly docsPortalService: PortalService;
@@ -54,17 +62,21 @@ export class PortalWatcher {
     configDirectoryPath: string
   ) {
     // Convert ignoredPaths to absolute paths for consistent comparison
-    const absoluteIgnoredPaths = [
-      ...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== "")
-    ].map((ignoredPath) => path.resolve(paths.sourceDirectoryPath, ignoredPath));
+    const absoluteIgnoredPaths = [...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== "")].map(
+      (ignoredPath) => path.resolve(paths.sourceDirectoryPath, ignoredPath)
+    );
 
     const watcher = chokidar.watch(paths.sourceDirectoryPath, {
       ignored: [...absoluteIgnoredPaths, /(^|[/\\])\..+/],
       ignoreInitial: true,
-      persistent: true
+      persistent: true,
+      awaitWriteFinish: true,
+      atomic: true
     });
 
     const deletedDirectories = new Set<string>();
+    const eventQueue = new Map();
+    const handler = new WatcherHandler();
 
     watcher
       .on("all", async (event, path) => {
@@ -79,10 +91,19 @@ export class PortalWatcher {
             }
           }
         }
-        await this.handleFileChange(paths, flags, absoluteIgnoredPaths, configDirectoryPath);
+
+        eventQueue.clear();
+        const eventId: string = `${Date.now()}-${Math.random()}`;
+        eventQueue.set(eventId, path);
+
+        await handler.execute(async () => {
+          await this.handleFileChange(paths, flags, eventQueue, absoluteIgnoredPaths, eventId, configDirectoryPath);
+        });
       })
-      .on("error", (error: Error) => {
-        console.error("Watcher error:", error);
+      .on("error", () => {
+        console.error(
+          "An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at support@apimatic.io"
+        );
       });
 
     return watcher;
@@ -91,9 +112,11 @@ export class PortalWatcher {
   private async handleFileChange(
     paths: ServePaths,
     flags: ServeFlags,
+    eventQueue: Map<string, string>,
     absoluteIgnoredPaths: string[],
+    eventId: string,
     configDirectoryPath: string
-  ) {
+  ): Promise<void> {
     this.progressSpinner.start();
 
     const sourceBuildInputZipFilePath = await validateAndZipPortalSource(
@@ -111,13 +134,41 @@ export class PortalWatcher {
       generateZipFile: false
     };
 
-    const portalGenerationResult = await this.docsPortalService.generateOnPremPortal(generatePortalParams, configDirectoryPath)
-    if (portalGenerationResult.isFailed()) {
+    const generateOnPremPortalResult = await this.docsPortalService.generateOnPremPortal(
+      generatePortalParams,
+      configDirectoryPath
+    );
+    await deleteFile(sourceBuildInputZipFilePath);
+    if (generateOnPremPortalResult.isFailed()) {
       this.progressSpinner.error();
-      console.error(portalGenerationResult.error!);
+      console.error(generateOnPremPortalResult.error!);
+    }
+
+    if (eventQueue.has(eventId)) {
+      await this.saveGeneratedPortalStreamToZipFile(
+        generateOnPremPortalResult.value!,
+        paths.generatedPortalArtifactsZipFilePath
+      );
+
+      await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsDirectoryPath);
+      await deleteFile(paths.generatedPortalArtifactsZipFilePath);
+
+      eventQueue.clear();
     }
 
     this.progressSpinner.stop();
-    // await cleanUpGeneratedPortalFiles(sourceDir);
+  }
+
+  private async saveGeneratedPortalStreamToZipFile(
+    data: NodeJS.ReadableStream,
+    generatedPortalArtifactsZipFilePath: string
+  ): Promise<void> {
+    const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
+    await new Promise<void>((resolve, reject) => {
+      data
+        .pipe(writeStream)
+        .on("finish", () => resolve())
+        .on("error", (error) => reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`)));
+    });
   }
 }

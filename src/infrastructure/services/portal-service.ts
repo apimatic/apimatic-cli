@@ -1,6 +1,6 @@
+import * as path from "path";
 import fsExtra from "fs-extra";
 import fs from "fs";
-import * as path from "path";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -26,7 +26,7 @@ export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly TIMEOUT = 0;
 
-  async generateOnPremPortal(
+  public async generateOnPremPortal(
     params: GeneratePortalParams,
     configDir: string
   ): Promise<Result<NodeJS.ReadableStream, string>> {
@@ -54,7 +54,7 @@ export class PortalService {
     }
   }
 
-  async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
+  public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
     if (!(await fsExtra.pathExists(specPath))) {
       return Result.failure("Spec file doesn't exist");
     }
@@ -134,10 +134,12 @@ export class PortalService {
       //500
       const body = await this.parseErrorResponse(error);
       return getMessageInRedColor(
-        `${body.message} Please try again or reach out to our team at support@apimatic.io for help if your problem persists.`
+        `${body.message} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
-      return getMessageInRedColor(error instanceof Error ? error.message : String(error));
+      return getMessageInRedColor(
+        "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
+      );
     }
   };
 

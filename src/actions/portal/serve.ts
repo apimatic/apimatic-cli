@@ -1,11 +1,12 @@
 import path from "path";
+import fsExtra from "fs-extra";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GeneratePortalParams } from "../../types/portal/generate.js";
-import { validateAndZipPortalSource } from "../../utils/utils.js";
+import { deleteFile, extractZipFile, validateAndZipPortalSource } from "../../utils/utils.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts;
@@ -30,6 +31,41 @@ export class PortalServeAction {
       ...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.generatedPortalArtifactsDirectoryPath)
     ];
 
+    this.prompts.startProgressIndicator("Generating portal");
+
+    const generateOnPremPortalResult = await this.generatePortal(flags, paths, ignoredPaths, configDirectoryPath);
+    if (generateOnPremPortalResult.isFailed()) {
+      this.prompts.stopProgressIndicator("There was an error while generating the portal.");
+      return Result.failure(generateOnPremPortalResult.error!);
+    }
+
+    this.prompts.stopProgressIndicator(`Portal generated successfully at ${flags.destination}`);
+
+    const setupServerResult = await this.serverService.setupServer(generateOnPremPortalResult.value!);
+    if (setupServerResult.isFailed()) {
+      return Result.failure(setupServerResult.error!);
+    }
+
+    if (flags["no-reload"]) {
+      return Result.success(`Portal was successfully served without hot-reload.`);
+    }
+
+    const startServerResult = await this.serverService.startServer(paths, flags, ignoredPaths, configDirectoryPath);
+    if (startServerResult.isFailed()) {
+      return Result.failure(startServerResult.error!);
+    }
+
+    this.prompts.displayOutroMessage(flags.port);
+
+    return Result.success(`Portal was successfully served.`);
+  }
+
+  private async generatePortal(
+    flags: ServeFlags,
+    paths: ServePaths,
+    ignoredPaths: string[],
+    configDirectoryPath: string
+  ): Promise<Result<string, string>> {
     //TODO: Refactor this method, it carries dual responsibility.
     const sourceBuildInputZipFilePath = await validateAndZipPortalSource(
       paths.sourceDirectoryPath,
@@ -46,32 +82,24 @@ export class PortalServeAction {
       generateZipFile: false
     };
 
-    this.prompts.startProgressIndicator("Generating portal");
-
     const generateOnPremPortalResult = await this.docsPortalService.generateOnPremPortal(
       generatePortalParams,
       configDirectoryPath
     );
+    await deleteFile(sourceBuildInputZipFilePath);
     if (generateOnPremPortalResult.isFailed()) {
-      this.prompts.stopProgressIndicator("There was an error while generating the portal.");
       return Result.failure(generateOnPremPortalResult.error!);
     }
 
-    this.prompts.stopProgressIndicator(`Portal generated successfully at ${flags.destination}`);
+    await this.saveGeneratedPortalStreamToZipFile(
+      generateOnPremPortalResult.value!,
+      paths.generatedPortalArtifactsZipFilePath
+    );
 
-    const setupServerResult = await this.serverService.setupServer(flags.destination);
-    if (setupServerResult.isFailed()) {
-      return Result.failure(setupServerResult.error!);
-    }
+    await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsDirectoryPath);
+    await deleteFile(paths.generatedPortalArtifactsZipFilePath);
 
-    const startServerResult = await this.serverService.startServer(paths, flags, ignoredPaths, configDirectoryPath);
-    if (startServerResult.isFailed()) {
-      return Result.failure(startServerResult.error!);
-    }
-
-    this.prompts.displayOutroMessage(flags.port);
-
-    return Result.success(`Portal was successfully served.`);
+    return Result.success(paths.generatedPortalArtifactsDirectoryPath);
   }
 
   private getGeneratedFilesPaths(sourceDirectoryPath: string, generatedPortalArtifactsDirectoryPath: string): string[] {
@@ -82,5 +110,18 @@ export class PortalServeAction {
     );
 
     return [generatedBuildInputZipPath, generatedPortalArtifactsZipFilePath, generatedPortalArtifactsDirectoryPath];
+  }
+
+  private async saveGeneratedPortalStreamToZipFile(
+    data: NodeJS.ReadableStream,
+    generatedPortalArtifactsZipFilePath: string
+  ): Promise<void> {
+    const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
+    await new Promise<void>((resolve, reject) => {
+      data
+        .pipe(writeStream)
+        .on("finish", () => resolve())
+        .on("error", (error) => reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`)));
+    });
   }
 }

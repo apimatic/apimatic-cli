@@ -15,7 +15,9 @@ import {
   unzipFile,
   getMessageInRedColor,
   clearDirectory,
-  deleteFile
+  deleteFile,
+  validateAndZipPortalSource,
+  extractZipFile
 } from "../../utils/utils.js";
 import { getValidationSummary } from "../api/validate.js";
 import { AuthorizationError, GetValidationParams } from "../../types/api/validate.js";
@@ -25,6 +27,8 @@ import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { AuthenticationError } from "../../types/utils.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { GeneratePortalParams } from "../../types/portal/generate.js";
+import { Result } from "../../types/common/result.js";
 
 export class PortalQuickstartController {
   private readonly specUrl =
@@ -284,11 +288,36 @@ export class PortalQuickstartController {
     }
   }
 
-  async generatePortalArtifacts(targetFolder: string, configDir: string): Promise<string> {
-    const generatedPortalPath = path.join(targetFolder, "generated_portal");
+  async generatePortalArtifacts(sourceDirectoryPath: string, configDir: string): Promise<string> {
+    const generatedPortalPath = path.join(sourceDirectoryPath, "generated_portal");
+    const generatedPortalZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
     const docsPortalService = new PortalService();
 
-    await docsPortalService.generatePortal(targetFolder, generatedPortalPath, configDir);
+    const sourceBuildInputZipFilePath = await validateAndZipPortalSource(sourceDirectoryPath, generatedPortalPath);
+
+    //TODO: Remove usage of empty string and null.
+    const generatePortalParams: GeneratePortalParams = {
+      sourceBuildInputZipFilePath: sourceBuildInputZipFilePath,
+      generatedPortalArtifactsFolderPath: generatedPortalPath,
+      generatedPortalArtifactsZipFilePath: "",
+      generateZipFile: false,
+      overrideAuthKey: null
+    };
+
+    const generateOnPremPortalResult = await docsPortalService.generateOnPremPortal(generatePortalParams, configDir);
+    await deleteFile(sourceBuildInputZipFilePath);
+    if (generateOnPremPortalResult.isFailed()) {
+      throw new Error(getMessageInRedColor(generateOnPremPortalResult.error!));
+    }
+
+    await this.saveGeneratedPortalStreamToZipFile(
+      generateOnPremPortalResult.value!, 
+      generatedPortalZipFilePath
+    );
+
+    await extractZipFile(generatedPortalZipFilePath, generatedPortalPath);
+    await deleteFile(generatedPortalZipFilePath);
+
     return generatedPortalPath;
   }
 
@@ -336,5 +365,18 @@ export class PortalQuickstartController {
     if (fs.existsSync(generatedPortalBuildInputZipFilePath)) {
       await deleteFile(generatedPortalBuildInputZipFilePath);
     }
+  }
+
+  private async saveGeneratedPortalStreamToZipFile(
+    data: NodeJS.ReadableStream,
+    generatedPortalArtifactsZipFilePath: string
+  ): Promise<void> {
+    const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
+    await new Promise<void>((resolve, reject) => {
+      data
+        .pipe(writeStream)
+        .on("finish", () => resolve())
+        .on("error", (error) => reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`)));
+    });
   }
 }

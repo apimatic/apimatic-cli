@@ -4,6 +4,7 @@ import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { PortalServeAction } from "../../actions/portal/serve.js";
+import { getMessageInRedColor } from "../../utils/utils.js";
 
 export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
@@ -58,22 +59,28 @@ export default class PortalServe extends Command {
 
     const validationResult = await portalServeValidator.validateFlagsAndPaths(flags as ServeFlags, paths);
     if (validationResult.isFailed()) {
-      portalServePrompts.logError(validationResult.error!);
+      portalServePrompts.logError(getMessageInRedColor(validationResult.error!));
+      // this.error(validationResult.error!);
+      process.exit(1);
     }
 
     const servePortalResult = await portalServeAction.servePortal(flags as ServeFlags, paths, this.config.configDir);
     if (servePortalResult.isFailed()) {
-      portalServePrompts.logError(servePortalResult.error!);
+      portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
+      // this.error(servePortalResult.error!);
+      process.exit(1);
     }
   }
 
   private getServePaths(flags: ServeFlags): ServePaths {
     const GENERATED_PORTAL_ARTIFACTS_FOLDER = "generated_portal";
+    const GENERATED_PORTAL_ARTIFACTS_ZIP_FILE = ".generated_portal.zip";
 
     return {
       sourceDirectoryPath: flags.folder,
       destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER)
+      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
+      generatedPortalArtifactsZipFilePath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP_FILE)
     };
   }
 }
