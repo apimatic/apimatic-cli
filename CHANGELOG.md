@@ -1,3 +1,10 @@
+# [1.1.0-alpha.13](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.12...v1.1.0-alpha.13) (2025-07-11)
+
+
+### Features
+
+* adds user-agent and various other improvements for serve, quickstart and recipe commands ([#110](https://github.com/apimatic/apimatic-cli/issues/110)) ([5eecf75](https://github.com/apimatic/apimatic-cli/commit/5eecf754b366015edf6a20f5ee354f9aec814abd))
+
 # [1.1.0-alpha.12](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.11...v1.1.0-alpha.12) (2025-07-04)
 
 

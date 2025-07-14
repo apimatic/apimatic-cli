@@ -92,7 +92,7 @@ export class PortalQuickstartPrompts {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
       placeholder: "Press Enter to use a sample OpenAPI file for APIMatic",
-      defaultValue: "",
+      defaultValue: "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
       validate: (input) => {
         if (!input) return;
 

@@ -2,7 +2,7 @@ import fsExtra from "fs-extra";
 import { ux } from "@oclif/core";
 import {
   ApiResponse,
-  CodeGenerationExternalApIsController,
+  CodeGenerationExternalApisController,
   UserCodeGeneration,
   Platforms,
   GenerateSdkViaUrlRequest,
@@ -13,7 +13,7 @@ import { unzipFile, writeFileUsingReadableStream } from "../../utils/utils.js";
 
 export const getSDKGenerationId = async (
   { file, url, platform }: GenerationIdParams,
-  sdkGenerationController: CodeGenerationExternalApIsController
+  sdkGenerationController: CodeGenerationExternalApisController
 ): Promise<string> => {
   ux.action.start("Generating SDK");
 
@@ -51,7 +51,7 @@ const getSDKPlatform = (platform: string): Platforms | SimplePlatforms => {
 // Download Platform
 export const downloadGeneratedSDK = async (
   { codeGenId, zippedSDKPath, sdkFolderPath, zip }: DownloadSDKParams,
-  sdkGenerationController: CodeGenerationExternalApIsController
+  sdkGenerationController: CodeGenerationExternalApisController
 ): Promise<string> => {
   ux.action.start("Downloading SDK");
   const { result }: ApiResponse<NodeJS.ReadableStream | Blob> = await sdkGenerationController.downloadSdk(codeGenId);
