@@ -46,7 +46,7 @@ export class DirectoryValidator {
     }
 
     const portalDirectoryItems = this.getDirectoryItems(destinationDirectoryPath);
-    if (portalDirectoryItems.length > 0) {
+    if (portalDirectoryItems.length > 0 && !destinationDirectoryPath.endsWith("generated_portal")) {
       return Result.failure(
         "The destination directory is not empty. Please specify an empty destination directory or clear the contents of the provided directory."
       );
