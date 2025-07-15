@@ -155,9 +155,9 @@ export class PortalWatcher {
       await deleteFile(paths.generatedPortalArtifactsZipFilePath);
 
       eventQueue.clear();
-    }
 
-    this.progressSpinner.stop();
+      this.progressSpinner.stop();
+    }
   }
 
   private async saveGeneratedPortalStreamToZipFile(
