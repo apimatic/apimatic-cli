@@ -29,8 +29,23 @@ export class ServeHandler {
 
     if (this.liveReloadServer) {
       this.app.use(connectLivereload());
+
+      this.app.use((_, res, next) => {
+        res.setHeader(
+          'Content-Security-Policy',
+          `default-src 'self'; script-src 'self' http://localhost:${createLiveReloadServerResult.value!} 'unsafe-inline'; connect-src http://localhost:${createLiveReloadServerResult.value!} ws://localhost:${createLiveReloadServerResult.value!}`
+        );
+        next();
+      });
     }
-    this.app.use(express.static(generatedPortalPath));
+    this.app.use(express.static(generatedPortalPath, { redirect: true }));
+
+    this.app.use((_, res, next) => {
+      res.setHeader(
+        'Content-Security-Policy',
+        `default-src 'self'; script-src 'self' http://localhost:${createLiveReloadServerResult.value!} 'unsafe-inline'; connect-src http://localhost:${createLiveReloadServerResult.value!}`
+      );
+    });
 
     return Result.success(`Server is set up and serving files from ${generatedPortalPath}`);
   }
@@ -117,7 +132,7 @@ export class ServeHandler {
     return startPort;
   }
 
-  private async createLiveReloadServer(generatedPortalPath: string): Promise<Result<string, string>> {
+  private async createLiveReloadServer(generatedPortalPath: string): Promise<Result<number, string>> {
     try {
       const availablePort = await this.findAvailablePort(this.DEFAULT_LIVE_RELOAD_SERVER_PORT);
 
@@ -127,7 +142,7 @@ export class ServeHandler {
 
       this.liveReloadServer.watch(generatedPortalPath);
 
-      return Result.success(`LiveReload server started on port ${availablePort}`);
+      return Result.success(availablePort);
     } catch (error) {
       return Result.failure(
         "An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance."

@@ -47,6 +47,7 @@ export class PortalServeAction {
     }
 
     if (flags["no-reload"]) {
+      this.prompts.displayOutroMessage(flags.port);
       return Result.success(`Portal was successfully served without hot-reload.`);
     }
 
