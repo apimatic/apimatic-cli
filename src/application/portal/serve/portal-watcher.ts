@@ -78,6 +78,7 @@ export class PortalWatcher {
     const eventQueue = new Map();
     const handler = new WatcherHandler();
 
+    //TODO: Add debounce delay for reducing number of events (greater than 300 ms, already tried that value).
     watcher
       .on("all", async (event, path) => {
         if (event == "unlinkDir") {

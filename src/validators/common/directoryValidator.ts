@@ -16,18 +16,17 @@ export class DirectoryValidator {
     const sourceDirItems = this.getDirectoryItems(sourceDir);
     if (sourceDirItems.length == 0) {
       return Result.failure(
-        "The source directory is empty. Please ensure that the provided path points to a directory containing a valid build input."
+        "The source directory is empty. Please ensure that the directory contains a valid build input."
+      );
+    }
+    if (!sourceDirItems.some((item) => item.startsWith("APIMATIC-BUILD.json"))) {
+      return Result.failure(
+        "The source directory is missing the 'APIMATIC-BUILD.json' file. Please add a valid build config file to continue."
       );
     }
     if (!sourceDirItems.includes("spec")) {
       return Result.failure(
-        "The provided build directory is missing a 'spec' directory. Please create a 'spec' directory containing a valid API Definition file to continue."
-      );
-    }
-    if (!sourceDirItems.some((item) => item.startsWith("APIMATIC-BUILD"))) {
-      // Are we planning on this?
-      return Result.failure(
-        "The provided directory is missing an APIMATIC-BUILD.json file. Please add a valid build file to continue."
+        "The source directory is missing a 'spec' directory. Please create a 'spec' directory containing a valid API Definition file to continue."
       );
     }
 
@@ -41,7 +40,7 @@ export class DirectoryValidator {
 
     if (!fsExtra.pathExistsSync(destinationDirectoryPath)) {
       return Result.failure(
-        `The specified destination directory does not exist: ${destinationDirectoryPath}. Please provide a valid destination directory to continue.`
+        `The destination directory does not exist: ${destinationDirectoryPath}. Please provide a valid destination directory to continue.`
       );
     }
 
@@ -61,7 +60,7 @@ export class DirectoryValidator {
 
     if (specDirectoryItems.length == 0) {
       return Result.failure(
-        "The provided build directory is missing an API Definition file. Please add a valid API Definition file to the 'spec' directory to continue."
+        "The 'spec' directory is missing an API Definition file. Please add a valid API Definition file to the 'spec' directory to continue."
       );
     }
 
@@ -70,7 +69,7 @@ export class DirectoryValidator {
       specDirectoryItems.some((item) => item.toLowerCase().includes("apimatic-meta"))
     ) {
       return Result.failure(
-        "The provided build directory is missing an API Definition file. Please add a valid API Definition file to the 'spec' directory to continue."
+        "The 'spec' directory is missing an API Definition file. Please add a valid API Definition file to the 'spec' directory to continue."
       );
     }
 
