@@ -29,23 +29,8 @@ export class ServeHandler {
 
     if (this.liveReloadServer) {
       this.app.use(connectLivereload());
-
-      this.app.use((_, res, next) => {
-        res.setHeader(
-          'Content-Security-Policy',
-          `default-src 'self'; script-src 'self' http://localhost:${createLiveReloadServerResult.value!} 'unsafe-inline'; connect-src http://localhost:${createLiveReloadServerResult.value!} ws://localhost:${createLiveReloadServerResult.value!}`
-        );
-        next();
-      });
     }
-    this.app.use(express.static(generatedPortalPath, { redirect: true }));
-
-    this.app.use((_, res, next) => {
-      res.setHeader(
-        'Content-Security-Policy',
-        `default-src 'self'; script-src 'self' http://localhost:${createLiveReloadServerResult.value!} 'unsafe-inline'; connect-src http://localhost:${createLiveReloadServerResult.value!}`
-      );
-    });
+    this.app.use(express.static(generatedPortalPath, { extensions: ["html"] }));
 
     return Result.success(`Server is set up and serving files from ${generatedPortalPath}`);
   }
