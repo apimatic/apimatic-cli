@@ -48,7 +48,7 @@ export class ServeHandler {
       this.server = this.app
         .listen(requestedPort, async () => {
           if (flags.open) {
-            open(`http://localhost:${requestedPort}`);
+            await open(`http://localhost:${requestedPort}`);
           }
 
           await this.portalWatcher.watchAndRegeneratePortal(paths, flags, ignoredPaths, configDirectoryPath);

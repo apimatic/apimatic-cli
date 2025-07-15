@@ -47,7 +47,7 @@ export default class PortalServe extends Command {
   };
 
   static examples = [
-    '$ apimatic portal:serve --source="./" --destination="./generated_portal" --port=3000 --open --no-reload'
+    '$ apimatic portal:serve --folder="./" --destination="./generated_portal" --port=3000 --open --no-reload'
   ];
 
   async run() {
@@ -61,14 +61,14 @@ export default class PortalServe extends Command {
     if (validationResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(validationResult.error!));
       // this.error(validationResult.error!);
-      process.exit(1);
+      process.exit(0);
     }
 
     const servePortalResult = await portalServeAction.servePortal(flags as ServeFlags, paths, this.config.configDir);
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
       // this.error(servePortalResult.error!);
-      process.exit(1);
+      process.exit(0);
     }
   }
 
@@ -77,7 +77,7 @@ export default class PortalServe extends Command {
     const GENERATED_PORTAL_ARTIFACTS_ZIP_FILE = ".generated_portal.zip";
 
     return {
-      sourceDirectoryPath: flags.folder,
+      sourceDirectoryPath: path.resolve(flags.folder),
       destinationDirectoryPath: flags.destination,
       generatedPortalArtifactsDirectoryPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
       generatedPortalArtifactsZipFilePath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP_FILE)
