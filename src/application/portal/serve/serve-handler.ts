@@ -65,10 +65,10 @@ export class ServeHandler {
         })
         .on("error", (err: NodeJS.ErrnoException) => {
           if (err.code === "EADDRINUSE") {
-            reject(Result.failure(`Port ${requestedPort} is not available. Unable to serve your portal.`));
+            reject(new Error(`Port ${requestedPort} is not available. Unable to serve your portal.`));
           } else {
             reject(
-              Result.failure(
+              new Error(
                 `Something went wrong while serving your portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
               )
             );
@@ -130,7 +130,7 @@ export class ServeHandler {
       this.liveReloadServer.watch(generatedPortalPath);
 
       return Result.success(availablePort);
-    } catch (error) {
+    } catch {
       return Result.failure(
         "An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance."
       );

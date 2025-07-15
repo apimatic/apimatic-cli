@@ -18,8 +18,7 @@ export class WatcherHandler {
       while (this.latestHandler) {
         const currentHandler = this.latestHandler;
         this.latestHandler = null;
-
-        // console.log("Executing latest handler");
+        
         await currentHandler();
       }
     } finally {

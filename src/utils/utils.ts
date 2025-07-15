@@ -362,17 +362,6 @@ export async function validateAndZipPortalSource(
   });
 }
 
-// export async function cleanUpGeneratedPortalFiles(sourceDir: string) {
-//   const generatedPortalZipFilePath = path.join(sourceDir, ".generated_portal.zip");
-//   const generatedPortalSourceZipFilePath = path.join(sourceDir, ".portal_source.zip");
-//   if (fs.existsSync(generatedPortalZipFilePath)) {
-//     await deleteFile(generatedPortalZipFilePath);
-//   }
-//   if (fs.existsSync(generatedPortalSourceZipFilePath)) {
-//     await deleteFile(generatedPortalSourceZipFilePath);
-//   }
-// }
-
 export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
   const chunks: Buffer[] = [];
   for await (const chunk of body) {

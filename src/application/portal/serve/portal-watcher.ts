@@ -169,7 +169,7 @@ export class PortalWatcher {
       data
         .pipe(writeStream)
         .on("finish", () => resolve())
-        .on("error", (error) => reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`)));
+        .on("error", () => reject(new Error(`An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`)));
     });
   }
 }

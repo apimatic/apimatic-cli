@@ -60,14 +60,12 @@ export default class PortalServe extends Command {
     const validationResult = await portalServeValidator.validateFlagsAndPaths(flags as ServeFlags, paths);
     if (validationResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(validationResult.error!));
-      // this.error(validationResult.error!);
       process.exit(0);
     }
 
     const servePortalResult = await portalServeAction.servePortal(flags as ServeFlags, paths, this.config.configDir);
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
-      // this.error(servePortalResult.error!);
       process.exit(0);
     }
   }
