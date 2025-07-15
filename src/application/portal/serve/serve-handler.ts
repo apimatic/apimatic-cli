@@ -51,7 +51,9 @@ export class ServeHandler {
             await open(`http://localhost:${requestedPort}`);
           }
 
-          await this.portalWatcher.watchAndRegeneratePortal(paths, flags, ignoredPaths, configDirectoryPath);
+          if (!flags["no-reload"]) {
+            await this.portalWatcher.watchAndRegeneratePortal(paths, flags, ignoredPaths, configDirectoryPath);
+          }
 
           if (process.platform !== "darwin") {
             //For non-macOS users.

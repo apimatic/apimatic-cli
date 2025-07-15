@@ -46,11 +46,6 @@ export class PortalServeAction {
       return Result.failure(setupServerResult.error!);
     }
 
-    if (flags["no-reload"]) {
-      this.prompts.displayOutroMessage(flags.port);
-      return Result.success(`Portal was successfully served without hot-reload.`);
-    }
-
     const startServerResult = await this.serverService.startServer(paths, flags, ignoredPaths, configDirectoryPath);
     if (startServerResult.isFailed()) {
       return Result.failure(startServerResult.error!);
