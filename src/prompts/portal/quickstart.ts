@@ -88,15 +88,14 @@ export class PortalQuickstartPrompts {
   }
 
   removeQuotes(str: string) {
-    const trimmed = str.trim();
     const quotes = ['"', "'"];
     
     for (const quote of quotes) {
-        if (trimmed.startsWith(quote) && trimmed.endsWith(quote) && trimmed.length > 1) {
-            return trimmed.slice(1, -1);
+        if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
+            return str.slice(1, -1);
         }
     }
-    return trimmed;
+    return str;
 }
 
   async specPrompt(): Promise<string> {
@@ -111,7 +110,7 @@ export class PortalQuickstartPrompts {
 
         if (isValidUrl(input)) return;
 
-        const cleanedPath = this.removeQuotes(input ?? "");
+        const cleanedPath = this.removeQuotes(input.trim() ?? "");
         const dirPath = path.resolve(cleanedPath);
 
         if (fs.existsSync(dirPath)) {
@@ -219,7 +218,7 @@ export class PortalQuickstartPrompts {
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const cleanedPath = this.removeQuotes(input ?? "");
+        const cleanedPath = this.removeQuotes(input?.trim() ?? "");
         const dirPath = path.resolve(cleanedPath);
 
         if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
