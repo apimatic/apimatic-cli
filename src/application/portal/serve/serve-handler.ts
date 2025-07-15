@@ -2,11 +2,11 @@ import express from "express";
 import livereload from "livereload";
 import connectLivereload from "connect-livereload";
 import open from "open";
-import net from "net";
 import { Server } from "http";
 import { Result } from "../../../types/common/result.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { PortalWatcher } from "./portal-watcher.js";
+import { isPortInUse } from "../../../utils/utils.js";
 
 export class ServeHandler {
   private server!: Server;
@@ -109,7 +109,7 @@ export class ServeHandler {
     const maxPort = startPort + 10; // Limit the port search range
 
     while (port < maxPort) {
-      if (!(await this.isPortInUse(port))) {
+      if (!(await isPortInUse(port))) {
         return port;
       }
       port++;
@@ -135,26 +135,5 @@ export class ServeHandler {
         "An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance."
       );
     }
-  }
-
-  private async isPortInUse(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-      const server = net.createServer();
-
-      server.once("error", (err: any) => {
-        if (err.code === "EADDRINUSE") {
-          resolve(true);
-        } else {
-          resolve(false);
-        }
-      });
-
-      server.once("listening", () => {
-        server.close();
-        resolve(false);
-      });
-
-      server.listen(port);
-    });
   }
 }

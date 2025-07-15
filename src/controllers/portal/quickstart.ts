@@ -28,7 +28,6 @@ import { AuthenticationError } from "../../types/utils.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GeneratePortalParams } from "../../types/portal/generate.js";
-import { Result } from "../../types/common/result.js";
 
 export class PortalQuickstartController {
   private readonly specUrl =

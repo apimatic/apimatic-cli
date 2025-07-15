@@ -2,7 +2,6 @@ import * as path from "path";
 import fsExtra from "fs-extra";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalPaths, GeneratePortalParams, GenerateFlags } from "../../types/portal/generate.js";
-import { Result } from "../../types/common/result.js";
 import {
   validateAndZipPortalSource,
   deleteFile,

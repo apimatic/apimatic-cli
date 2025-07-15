@@ -362,6 +362,27 @@ export async function validateAndZipPortalSource(
   });
 }
 
+export async function isPortInUse(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+
+    server.once("error", (err: any) => {
+      if (err.code === "EADDRINUSE") {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+
+    server.once("listening", () => {
+      server.close();
+      resolve(false);
+    });
+
+    server.listen(port);
+  });
+}
+
 export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
   const chunks: Buffer[] = [];
   for await (const chunk of body) {

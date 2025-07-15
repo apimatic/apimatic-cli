@@ -12,7 +12,6 @@ import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { GeneratePortalParams } from "../../../types/portal/generate.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { WatcherHandler } from "./watcher-handler.js";
-import { Result } from "../../../types/common/result.js";
 
 export class PortalWatcher {
   private readonly docsPortalService: PortalService;

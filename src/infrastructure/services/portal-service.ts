@@ -1,4 +1,5 @@
 import * as path from "path";
+import * as os from "os";
 import fsExtra from "fs-extra";
 import fs from "fs";
 import {
@@ -21,7 +22,6 @@ import { Result } from "../../types/common/result.js";
 import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Sdl } from "../../types/sdl/sdl.js";
-import * as os from "os";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
