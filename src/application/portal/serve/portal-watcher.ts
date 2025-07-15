@@ -1,6 +1,7 @@
 import * as path from "path";
 import fsExtra from "fs-extra";
 import chokidar from "chokidar";
+import crypto from "crypto";
 import {
   deleteFile,
   extractZipFile,
@@ -94,7 +95,7 @@ export class PortalWatcher {
         }
 
         eventQueue.clear();
-        const eventId: string = `${Date.now()}-${Math.random()}`;
+        const eventId: string = `${Date.now()}-${crypto.randomUUID()}`;
         eventQueue.set(eventId, path);
 
         await handler.execute(async () => {
