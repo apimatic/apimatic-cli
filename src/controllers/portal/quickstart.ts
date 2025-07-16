@@ -309,10 +309,7 @@ export class PortalQuickstartController {
       throw new Error(getMessageInRedColor(generateOnPremPortalResult.error!));
     }
 
-    await this.saveGeneratedPortalStreamToZipFile(
-      generateOnPremPortalResult.value!, 
-      generatedPortalZipFilePath
-    );
+    await this.saveGeneratedPortalStreamToZipFile(generateOnPremPortalResult.value!, generatedPortalZipFilePath);
 
     await extractZipFile(generatedPortalZipFilePath, generatedPortalPath);
     await deleteFile(generatedPortalZipFilePath);
@@ -322,6 +319,7 @@ export class PortalQuickstartController {
 
   async servePortal(generatedPortalPath: string, sourceDirectoryPath: string, configDir: string): Promise<boolean> {
     const server = new ServeHandler();
+    const ignoredPaths = this.getGeneratedFilesPaths(path.resolve(sourceDirectoryPath), path.resolve(generatedPortalPath));
 
     await server.setupServer(generatedPortalPath);
 
@@ -329,9 +327,10 @@ export class PortalQuickstartController {
 
     const result = await server.startServer(
       {
-        sourceDirectoryPath: sourceDirectoryPath,
-        destinationDirectoryPath: generatedPortalPath,
-        generatedPortalArtifactsDirectoryPath: generatedPortalPath
+        sourceDirectoryPath: path.resolve(sourceDirectoryPath),
+        destinationDirectoryPath: path.resolve(generatedPortalPath),
+        generatedPortalArtifactsDirectoryPath: path.resolve(generatedPortalPath),
+        generatedPortalArtifactsZipFilePath: path.join(generatedPortalPath, ".generated_portal.zip")
       } as ServePaths,
       {
         folder: sourceDirectoryPath,
@@ -342,7 +341,7 @@ export class PortalQuickstartController {
         "auth-key": "",
         ignore: ""
       } as ServeFlags,
-      [],
+      ignoredPaths,
       configDir
     );
 
@@ -375,7 +374,27 @@ export class PortalQuickstartController {
       data
         .pipe(writeStream)
         .on("finish", () => resolve())
-        .on("error", () => reject(new Error(`An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`)));
+        .on("error", () =>
+          reject(
+            new Error(
+              `An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
+            )
+          )
+        );
     });
+  }
+
+  private getGeneratedFilesPaths(
+    sourceDirectoryPath: string,
+    generatedPortalArtifactsDirectoryPath: string
+  ): string[] {
+    const generatedBuildInputZipPath = path.join(sourceDirectoryPath, ".portal_source.zip");
+    const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
+    const generatedPortalArtifactsFolderPath = path.join(
+      path.dirname(generatedPortalArtifactsDirectoryPath),
+      "generated_portal"
+    );
+
+    return [generatedBuildInputZipPath, generatedPortalArtifactsFolderPath, generatedPortalArtifactsZipFilePath];
   }
 }

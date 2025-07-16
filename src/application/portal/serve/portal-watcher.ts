@@ -169,7 +169,13 @@ export class PortalWatcher {
       data
         .pipe(writeStream)
         .on("finish", () => resolve())
-        .on("error", () => reject(new Error(`An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`)));
+        .on("error", () =>
+          reject(
+            new Error(
+              `An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
+            )
+          )
+        );
     });
   }
 }
