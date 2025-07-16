@@ -15,7 +15,6 @@ export default class PortalServe extends Command {
     port: Flags.integer({
       char: "p",
       description: "Port to serve the portal.",
-      default: 3000
     }),
     destination: Flags.string({
       char: "d",
@@ -65,17 +64,14 @@ export default class PortalServe extends Command {
     const allIgnoredPaths = [...ignoredPaths, ...getGeneratedFilesPaths(sourceDir, portalDir)];
     const defaultPorts = [3000, 3001, 3002];
     
-    // Check if user explicitly provided the port flag
-    const userProvidedPort = process.argv.some(arg => arg.startsWith('--port') || arg.startsWith('-p'));
-    
-    const preferredPorts = flags.port
+    const preferredPorts = typeof flags.port === 'number'
       ? [flags.port, ...defaultPorts.filter(p => p !== flags.port)]
       : defaultPorts;
 
     const availablePort = await getPort({ port: preferredPorts });
 
-    // Show warning only if user explicitly provided --port and it is not available
-    if (userProvidedPort && availablePort !== flags.port) {
+    // Show warning only if user provided --port and it is not available
+    if (typeof flags.port === 'number' && availablePort !== flags.port) {
       this.log(`⚠️ Port ${flags.port} is already in use. Using available port ${availablePort}.`);
     }
     const port = availablePort;

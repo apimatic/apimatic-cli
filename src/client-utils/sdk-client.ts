@@ -57,8 +57,6 @@ export class SDKClient {
       );
 
       return "✅ Logged in successfully as " + email;
-    } else if (authKey === storedAuthInfo.authKey) {
-      return `🔐 You are already logged in as '${email}'.`;
     } else {
       setAuthInfo(
         {
