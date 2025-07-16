@@ -54,7 +54,7 @@ export default class PortalServe extends Command {
   ];
 
   async run() {
-    const { flags } = await this.parse(PortalServe);
+    const { flags, argv } = await this.parse(PortalServe);
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
     const portalDir = path.resolve(flags.destination);
     const sourceDir = path.resolve(flags.source);
@@ -64,14 +64,19 @@ export default class PortalServe extends Command {
     const validator = new PortalServeValidator(this.error);
     const allIgnoredPaths = [...ignoredPaths, ...getGeneratedFilesPaths(sourceDir, portalDir)];
     const defaultPorts = [3000, 3001, 3002];
+    
+    // Check if user explicitly provided the port flag
+    const userProvidedPort = process.argv.some(arg => arg.startsWith('--port') || arg.startsWith('-p'));
+    
     const preferredPorts = flags.port
       ? [flags.port, ...defaultPorts.filter(p => p !== flags.port)]
       : defaultPorts;
 
     const availablePort = await getPort({ port: preferredPorts });
 
-    if (!preferredPorts.includes(availablePort)) {
-      this.log(`⚠️  None of the preferred ports ${preferredPorts.join(', ')} are available. Falling back to port ${availablePort}.`);
+    // Show warning only if user explicitly provided --port and it is not available
+    if (userProvidedPort && availablePort !== flags.port) {
+      this.log(`⚠️ Port ${flags.port} is already in use. Using available port ${availablePort}.`);
     }
     const port = availablePort;
 

@@ -101,8 +101,8 @@ export class PortalQuickstartPrompts {
     log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
 
     const spec = await text({
-      message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
-      placeholder: "Provide Absolute URL/Local Path or Press Enter to use sample OpenAPI file from APIMatic",
+      message: `Provide a local path or a public URL for your OpenAPI definition file:`,
+      placeholder: "Provide absolute URL/local path or press Enter to use sample OpenAPI file from APIMatic.",
       defaultValue: "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
       validate: (input) => {
         if (!input) return;
@@ -214,7 +214,7 @@ export class PortalQuickstartPrompts {
 
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
-      placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
+      placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
         const cleanedPath = this.removeQuotes(input?.trim() ?? "");

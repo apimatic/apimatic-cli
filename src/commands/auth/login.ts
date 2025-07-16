@@ -38,7 +38,7 @@ Authentication key successfully set`
         const storedAuthInfo = await getAuthInfo(configDir);
         if (storedAuthInfo && storedAuthInfo.email && storedAuthInfo.authKey) {
           return this.log(
-            `You are already logged in as '${storedAuthInfo.email}'. Use auth:logout before logging in again.`
+            `You are already logged in as '${storedAuthInfo.email}'. Use auth:logout to logout before logging in again.`
           );
         }
         // If user logs in with email and password
