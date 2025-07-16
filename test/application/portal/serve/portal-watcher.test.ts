@@ -11,6 +11,27 @@ describe("PortalWatcher", () => {
   let TEST_CONFIG_DIR: string;
   let tmpDirResult: DirectoryResult;
 
+  function getServeFlags(): ServeFlags {
+    return {
+      port: 3000,
+      folder: TEST_WORKING_DIR,
+      destination: TEST_DEST_DIR,
+      ignore: "",
+      open: false,
+      "auth-key": "",
+      "no-reload": false
+    };
+  }
+
+  function getServePaths(flags: ServeFlags): ServePaths {
+    return {
+      sourceDirectoryPath: flags.folder,
+      destinationDirectoryPath: flags.destination,
+      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
+      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
+    };
+  }
+
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     TEST_WORKING_DIR = tmpDirResult.path;
@@ -31,31 +52,15 @@ describe("PortalWatcher", () => {
   });
 
   it("sets up watcher and returns a chokidar watcher object", async () => {
-    // We'll override handleFileChange to avoid side effects
     class TestPortalWatcher extends PortalWatcher {
       // @ts-ignore
-      async handleFileChange() {
-        // no-op for test
-      }
+      async handleFileChange() {}
     }
     const watcher = new TestPortalWatcher();
-    const flags: ServeFlags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths: ServePaths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags();
+    const paths = getServePaths(flags);
     const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
-    expect(watcherObj).to.have.property("on"); // chokidar watcher
+    expect(watcherObj).to.have.property("on");
     await watcherObj.close();
   });
 
@@ -65,24 +70,10 @@ describe("PortalWatcher", () => {
       async handleFileChange() { called = true; }
     }
     const watcher = new TestPortalWatcher();
-    const flags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags();
+    const paths = getServePaths(flags);
     const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
     watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo.md"));
-    // Wait for async event
     await new Promise(res => setTimeout(res, 100));
     expect(called).to.be.true;
     await watcherObj.close();
@@ -93,23 +84,9 @@ describe("PortalWatcher", () => {
       async handleFileChange() { throw new Error("fail"); }
     }
     const watcher = new TestPortalWatcher();
-    const flags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags();
+    const paths = getServePaths(flags);
     const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
-    // Should not throw uncaught
     watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo.md"));
     await new Promise(res => setTimeout(res, 100));
     await watcherObj.close();
@@ -122,29 +99,15 @@ describe("PortalWatcher", () => {
       async handleFileChange() { callCount++; }
     }
     const watcher = new TestPortalWatcher();
-    const flags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags();
+    const paths = getServePaths(flags);
     const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
-    // Simulate rapid events
     watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo1.md"));
     watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo2.md"));
     watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo3.md"));
     await new Promise(res => setTimeout(res, 300));
     expect(callCount).to.be.at.least(1);
-    expect(callCount).to.be.below(4); // Should not call for every event
+    expect(callCount).to.be.below(4);
     await watcherObj.close();
   });
 
@@ -153,25 +116,10 @@ describe("PortalWatcher", () => {
       async handleFileChange() {}
     }
     const watcher = new TestPortalWatcher();
-    const flags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags();
+    const paths = getServePaths(flags);
     const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
-    // Simulate error event
     watcherObj.emit("error", new Error("fail"));
-    // Simulate close event
     await watcherObj.close();
     expect(true).to.be.true;
   });

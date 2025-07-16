@@ -11,6 +11,8 @@ describe("ServeHandler", () => {
   let TEST_DEST_DIR: string;
   let TEST_CONFIG_DIR: string;
   let tmpDirResult: DirectoryResult;
+  let flags: ServeFlags;
+  let paths: ServePaths;
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
@@ -20,11 +22,41 @@ describe("ServeHandler", () => {
     await fsExtra.ensureDir(TEST_WORKING_DIR);
     await fsExtra.ensureDir(TEST_DEST_DIR);
     await fsExtra.ensureDir(TEST_CONFIG_DIR);
+
+    flags = {
+      port: 3000,
+      folder: TEST_WORKING_DIR,
+      destination: TEST_DEST_DIR,
+      ignore: "",
+      open: false,
+      "auth-key": "",
+      "no-reload": false
+    };
+    paths = {
+      sourceDirectoryPath: flags.folder,
+      destinationDirectoryPath: flags.destination,
+      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
+      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
+    };
   });
 
   afterEach(async () => {
     await tmpDirResult.cleanup();
   });
+
+  function createTestServeHandler(listenImpl: any, liveReloadResult = Result.success(35729)) {
+    return new (class extends ServeHandler {
+      // @ts-ignore
+      app = {
+        use: () => {},
+        listen: listenImpl
+      };
+      // @ts-ignore
+      async createLiveReloadServer() { return liveReloadResult; }
+      // @ts-ignore
+      async stopServer() {}
+    })();
+  }
 
   it("can be constructed", () => {
     const handler = new ServeHandler();
@@ -32,108 +64,39 @@ describe("ServeHandler", () => {
   });
 
   it("setupServer returns success for valid path (simulate live reload success)", async () => {
-    class TestServeHandler extends ServeHandler {
-      // @ts-ignore
-      async createLiveReloadServer() {
-        return Result.success(35729);
-      }
-    }
-    const handler = new TestServeHandler();
+    const handler = createTestServeHandler(() => ({}));
     const result = await handler.setupServer(TEST_DEST_DIR);
     expect(result.isSuccess()).to.be.true;
     expect(result.value).to.include("Server is set up");
   });
 
   it("setupServer returns failure if createLiveReloadServer fails", async () => {
-    class TestServeHandler extends ServeHandler {
-      // @ts-ignore
-      async createLiveReloadServer() {
-        return Result.failure("fail");
-      }
-    }
-    const handler = new TestServeHandler();
+    const handler = createTestServeHandler(() => ({}), Result.failure("fail"));
     const result = await handler.setupServer(TEST_DEST_DIR);
     expect(result.isFailed()).to.be.true;
     expect(result.error).to.include("fail");
   });
 
   it("startServer returns success (simulate listen)", async () => {
-    class TestServeHandler extends ServeHandler {
-      // @ts-ignore
-      app = {
-        use: () => {},
-        listen: (port: number, cb: () => void) => {
-          setTimeout(cb, 10);
-          return {
-            on: () => ({})
-          };
-        }
-      };
-      // @ts-ignore
-      async createLiveReloadServer() {
-        return Result.success(35729);
+    const handler = createTestServeHandler(
+      (port: number, cb: () => void) => {
+        setTimeout(cb, 10);
+        return { on: () => ({}) };
       }
-      // @ts-ignore
-      async stopServer() {}
-    }
-    const handler = new TestServeHandler();
-    const flags: ServeFlags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths: ServePaths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    );
     const result = await handler.startServer(paths, flags, [], TEST_CONFIG_DIR, false);
     expect(result.isSuccess()).to.be.true;
   });
 
   it("startServer returns failure if port is in use (EADDRINUSE)", async () => {
-    class TestServeHandler extends ServeHandler {
-      // @ts-ignore
-      app = {
-        use: () => {},
-        listen: (port: number, cb: () => void) => {
-          // Simulate error event
-          return {
-            on: (event: string, handler: (err: any) => void) => {
-              if (event === "error") {
-                setTimeout(() => handler({ code: "EADDRINUSE" }), 10);
-              }
-              return {};
-            }
-          };
+    const handler = createTestServeHandler(
+      (port: number, cb: () => void) => ({
+        on: (event: string, handler: (err: any) => void) => {
+          if (event === "error") setTimeout(() => handler({ code: "EADDRINUSE" }), 10);
+          return {};
         }
-      };
-      // @ts-ignore
-      async createLiveReloadServer() { return Result.success(35729); }
-      // @ts-ignore
-      async stopServer() {}
-    }
-    const handler = new TestServeHandler();
-    const flags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+      })
+    );
     try {
       await handler.startServer(paths, flags, [], TEST_CONFIG_DIR, false);
       expect.fail("Should throw for EADDRINUSE");
@@ -143,43 +106,14 @@ describe("ServeHandler", () => {
   });
 
   it("startServer returns failure for generic listen error", async () => {
-    class TestServeHandler extends ServeHandler {
-      // @ts-ignore
-      app = {
-        use: () => {},
-        listen: (port: number, cb: () => void) => {
-          // Simulate error event
-          return {
-            on: (event: string, handler: (err: any) => void) => {
-              if (event === "error") {
-                setTimeout(() => handler({ code: "SOME_ERROR" }), 10);
-              }
-              return {};
-            }
-          };
+    const handler = createTestServeHandler(
+      (port: number, cb: () => void) => ({
+        on: (event: string, handler: (err: any) => void) => {
+          if (event === "error") setTimeout(() => handler({ code: "SOME_ERROR" }), 10);
+          return {};
         }
-      };
-      // @ts-ignore
-      async createLiveReloadServer() { return Result.success(35729); }
-      // @ts-ignore
-      async stopServer() {}
-    }
-    const handler = new TestServeHandler();
-    const flags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+      })
+    );
     try {
       await handler.startServer(paths, flags, [], TEST_CONFIG_DIR, false);
       expect.fail("Should throw for generic error");

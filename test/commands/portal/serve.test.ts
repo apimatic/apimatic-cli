@@ -11,6 +11,28 @@ describe("PortalServeValidator", () => {
   let validator: PortalServeValidator;
   let tmpDirResult: DirectoryResult;
 
+  function getServeFlags(overrides: Partial<ServeFlags> = {}): ServeFlags {
+    return {
+      port: 3000,
+      folder: TEST_WORKING_DIR,
+      destination: TEST_DEST_DIR,
+      ignore: "",
+      open: false,
+      "auth-key": "",
+      "no-reload": false,
+      ...overrides
+    };
+  }
+
+  function getServePaths(flags: ServeFlags): ServePaths {
+    return {
+      sourceDirectoryPath: flags.folder,
+      destinationDirectoryPath: flags.destination,
+      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
+      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
+    };
+  }
+
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     TEST_WORKING_DIR = tmpDirResult.path;
@@ -28,62 +50,24 @@ describe("PortalServeValidator", () => {
   });
 
   it("should validate correct flags and paths", async () => {
-    const flags: ServeFlags = {
-      port: 3000,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths: ServePaths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags();
+    const paths = getServePaths(flags);
     const result = await validator.validateFlagsAndPaths(flags, paths);
     expect(result.isSuccess()).to.be.true;
   });
 
   it("should fail for invalid port", async () => {
-    const flags: ServeFlags = {
-      port: -1,
-      folder: TEST_WORKING_DIR,
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths: ServePaths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags({ port: -1 });
+    const paths = getServePaths(flags);
     const result = await validator.validateFlagsAndPaths(flags, paths);
     expect(result.isFailed()).to.be.true;
     expect(result.error).to.include("port");
   });
 
   it("should fail for non-existent source directory", async () => {
-    const flags: ServeFlags = {
-      port: 3000,
-      folder: path.join(TEST_WORKING_DIR, "does-not-exist"),
-      destination: TEST_DEST_DIR,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths: ServePaths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const nonExistentFolder = path.join(TEST_WORKING_DIR, "does-not-exist");
+    const flags = getServeFlags({ folder: nonExistentFolder });
+    const paths = getServePaths(flags);
     const result = await validator.validateFlagsAndPaths(flags, paths);
     expect(result.isFailed()).to.be.true;
     expect(result.error).to.include("does not exist");
@@ -96,21 +80,8 @@ describe("PortalServeValidator", () => {
     await fsExtra.ensureDir(dest);
     await fsExtra.writeFile(path.join(src, "APIMATIC-BUILD.json"), "{}", "utf8");
     // Do NOT create spec directory
-    const flags: ServeFlags = {
-      port: 3000,
-      folder: src,
-      destination: dest,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths: ServePaths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags({ folder: src, destination: dest });
+    const paths = getServePaths(flags);
     const result = await validator.validateFlagsAndPaths(flags, paths);
     expect(result.isFailed()).to.be.true;
     expect(result.error).to.include("The source directory is missing a 'spec' directory.");
@@ -126,21 +97,8 @@ describe("PortalServeValidator", () => {
     await fsExtra.ensureDir(path.join(src, "spec"));
     await fsExtra.writeFile(path.join(src, "spec", "spec.json"), "{}", "utf8");
     // Do NOT create APIMATIC-BUILD.json
-    const flags: ServeFlags = {
-      port: 3000,
-      folder: src,
-      destination: dest,
-      ignore: "",
-      open: false,
-      "auth-key": "",
-      "no-reload": false
-    };
-    const paths: ServePaths = {
-      sourceDirectoryPath: flags.folder,
-      destinationDirectoryPath: flags.destination,
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, "generated_portal"),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, ".generated_portal.zip")
-    };
+    const flags = getServeFlags({ folder: src, destination: dest });
+    const paths = getServePaths(flags);
     const result = await validator.validateFlagsAndPaths(flags, paths);
     expect(result.isFailed()).to.be.true;
     expect(result.error).to.include("The source directory is missing the 'APIMATIC-BUILD.json' file.");
