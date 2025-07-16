@@ -63,15 +63,18 @@ export default class PortalServe extends Command {
     const prompts = new PortalServePrompts();
     const validator = new PortalServeValidator(this.error);
     const allIgnoredPaths = [...ignoredPaths, ...getGeneratedFilesPaths(sourceDir, portalDir)];
-    const preferredPort = flags.port ?? 3000;
+    const defaultPorts = [3000, 3001, 3002];
+    const preferredPorts = flags.port
+      ? [flags.port, ...defaultPorts.filter(p => p !== flags.port)]
+      : defaultPorts;
 
-    const availablePort = await getPort({ port: preferredPort });
+    const availablePort = await getPort({ port: preferredPorts });
 
-    if (availablePort !== preferredPort) {
-      this.log(`⚠️  Port ${preferredPort} is already in use. Falling back to available port ${availablePort}.`);
+    if (!preferredPorts.includes(availablePort)) {
+      this.log(`⚠️  None of the preferred ports ${preferredPorts.join(', ')} are available. Falling back to port ${availablePort}.`);
     }
-
     const port = availablePort;
+
 
     await validator.validate(port, flags.destination, sourceDir, portalDir);
 

@@ -3,6 +3,7 @@ import { Flags, Command } from "@oclif/core";
 import { outro, password, text } from "@clack/prompts";
 import { getMessageInRedColor, replaceHTML } from "../../utils/utils.js";
 import { SDKClient } from "../../client-utils/sdk-client.js";
+import { getAuthInfo } from "../../client-utils/auth-manager.js";
 
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";
@@ -33,6 +34,13 @@ Authentication key successfully set`
         const response = client.setAuthKey(flags["auth-key"], configDir);
         return this.log(response);
       } else {
+        // Check if already logged in
+        const storedAuthInfo = await getAuthInfo(configDir);
+        if (storedAuthInfo && storedAuthInfo.email && storedAuthInfo.authKey) {
+          return this.log(
+            `You are already logged in as '${storedAuthInfo.email}'. Use auth:logout before logging in again.`
+          );
+        }
         // If user logs in with email and password
         const email = await text({
           message: "Enter your registered email:",

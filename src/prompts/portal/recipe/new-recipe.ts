@@ -208,11 +208,10 @@ export class PortalRecipePrompts {
   }
 
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
-    log.message(`📦 Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
+    log.message(`🎉 Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
     outro(
       `▶ Run the command 'apimatic portal:serve' to preview your documentation portal.`
     );
-    log.message(`💡 Modify the toc.yml file to change the position of the API Recipes section in the navbar.`);
   }
 
   public startProgressIndicatorWithMessage(message: string): void {

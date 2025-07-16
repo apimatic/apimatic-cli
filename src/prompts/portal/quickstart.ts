@@ -29,7 +29,6 @@ export class PortalQuickstartPrompts {
       `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.`
     );
     log.message(`Let's get started! 🚀`);
-    log.message(`Note: Quickstart requires an empty directory.`)
   }
 
   async loginPrompt(): Promise<{ email: string; password: string }> {
@@ -103,7 +102,7 @@ export class PortalQuickstartPrompts {
 
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
-      placeholder: "Enter Absolute URL or Press Enter to use sample OpenAPI file for APIMatic",
+      placeholder: "Provide Absolute URL/Local Path or Press Enter to use sample OpenAPI file from APIMatic",
       defaultValue: "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
       validate: (input) => {
         if (!input) return;
@@ -214,7 +213,7 @@ export class PortalQuickstartPrompts {
     log.step(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
 
     const directory = await text({
-      message: "Enter the directory path where you would like to setup the API Portal :",
+      message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
