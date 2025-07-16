@@ -110,7 +110,7 @@ export class PortalWatcher {
     return watcher;
   }
 
-  private async handleFileChange(
+  protected async handleFileChange(
     paths: ServePaths,
     flags: ServeFlags,
     eventQueue: Map<string, string>,

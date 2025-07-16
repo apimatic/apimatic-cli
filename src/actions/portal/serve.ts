@@ -56,7 +56,7 @@ export class PortalServeAction {
     return Result.success(`Portal was successfully served.`);
   }
 
-  private async generatePortal(
+  protected async generatePortal(
     flags: ServeFlags,
     paths: ServePaths,
     ignoredPaths: string[],
