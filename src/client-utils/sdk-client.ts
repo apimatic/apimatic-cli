@@ -37,17 +37,8 @@ export class SDKClient {
    */
 
   public async login(email: string, password: string, configDir: string): Promise<string> {
-    let storedAuthInfo: AuthInfo | null = await getAuthInfo(configDir);
-
-    // If no config file or no credentials exist in the config file
-    if (!storedAuthInfo) {
-      storedAuthInfo = { email: "", authKey: "" };
-    }
-
     const credentials: Credentials = { email, password };
     const authKey: string = await this.getAuthKey(credentials);
-
-    if (storedAuthInfo.email !== email) {
       setAuthInfo(
         {
           email,
@@ -57,16 +48,6 @@ export class SDKClient {
       );
 
       return "✅ Logged in successfully as " + email;
-    } else {
-      setAuthInfo(
-        {
-          email,
-          authKey
-        },
-        configDir
-      );
-      return "🔁 Session updated. Logged in as " + email;
-    }
 
   }
 

@@ -27,50 +27,55 @@ Authentication key successfully set`
     const { flags } = await this.parse(Login);
     const configDir: string = this.config.configDir;
     try {
-      const client: SDKClient = SDKClient.getInstance();
-
-      // If user is setting auth key
-      if (flags["auth-key"]) {
-        const response = client.setAuthKey(flags["auth-key"], configDir);
-        return this.log(response);
-      } else {
-        // Check if already logged in
-        const storedAuthInfo = await getAuthInfo(configDir);
-        if (storedAuthInfo && storedAuthInfo.email && storedAuthInfo.authKey) {
+      // Check if already logged in
+      const storedAuthInfo = await getAuthInfo(configDir);
+      if (storedAuthInfo && storedAuthInfo.authKey) {
+        if (storedAuthInfo.email) {
           return this.log(
             `You are already logged in as '${storedAuthInfo.email}'. Use auth:logout to logout before logging in again.`
           );
         }
-        // If user logs in with email and password
-        const email = await text({
-          message: "Enter your registered email:",
-          validate: (input) => {
-            if (!input) {
-              return getMessageInRedColor("Email is required.");
-            }
-
-            const emailRegex =
-              /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-            if (!emailRegex.test(input)) {
-              return getMessageInRedColor("Please enter a valid email address.");
-            }
-          }
-        });
-
-        const pass = await password({
-          message: "Please enter your password:",
-          validate: (input) => {
-            if (!input) {
-              return getMessageInRedColor("Password is required.");
-            }
-          }
-        });
-
-        const response: string = await client.login(email as string, pass as string, configDir);
-
-        outro(response);
+        return this.log(
+            `You are already logged in with authentication key. Use auth:logout to logout before logging in again.`
+          );
       }
+
+      const client: SDKClient = SDKClient.getInstance();
+      // If user is setting auth key
+      if (flags["auth-key"]) {
+        const response = client.setAuthKey(flags["auth-key"], configDir);
+        return this.log(response);
+      }
+
+      // If user logs in with email and password
+      const email = await text({
+        message: "Enter your registered email:",
+        validate: (input) => {
+          if (!input) {
+            return getMessageInRedColor("Email is required.");
+          }
+
+          const emailRegex =
+            /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+          if (!emailRegex.test(input)) {
+            return getMessageInRedColor("Please enter a valid email address.");
+          }
+        }
+      });
+
+      const pass = await password({
+        message: "Please enter your password:",
+        validate: (input) => {
+          if (!input) {
+            return getMessageInRedColor("Password is required.");
+          }
+        }
+      });
+
+      const response: string = await client.login(email as string, pass as string, configDir);
+
+      outro(response);
     } catch (error) {
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;

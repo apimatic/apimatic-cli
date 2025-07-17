@@ -319,6 +319,11 @@ export async function validateAndZipPortalSource(
   outputPath: string,
   ignoredPaths: string[] = []
 ): Promise<string> {
+  
+  if (await fs.pathExists(outputPath)){
+    await deleteFile(outputPath);
+  }
+
   const output = fs.createWriteStream(outputPath);
   const archive = archiver("zip", {
     zlib: { level: 9 }
