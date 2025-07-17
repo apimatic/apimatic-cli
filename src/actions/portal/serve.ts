@@ -9,6 +9,7 @@ import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GeneratePortalParams } from "../../types/portal/generate.js";
 import { deleteFile, extractZipFile, zipPortalSource } from "../../utils/utils.js";
 import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
+import getPort from "get-port";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts;
@@ -34,12 +35,16 @@ export class PortalServeAction {
       ...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.generatedPortalArtifactsDirectoryPath)
     ];
 
-    const createDestinationDirectoryResult = await this.createDestinationDirectory(paths.generatedPortalArtifactsDirectoryPath);
+    const getPortResult = await this.getServerPort(flags.port);
+
+    const createDestinationDirectoryResult = await this.createDestinationDirectory(
+      paths.generatedPortalArtifactsDirectoryPath
+    );
     if (createDestinationDirectoryResult.isFailed()) {
       return Result.failure(createDestinationDirectoryResult.error!);
     }
 
-    const validateSourceDirectoryAndPortResult = await portalServeValidator.validateSourceDirectoryAndPort(flags as ServeFlags, paths);
+    const validateSourceDirectoryAndPortResult = await portalServeValidator.validateSourceDirectory(paths);
     if (validateSourceDirectoryAndPortResult.isFailed()) {
       return Result.failure(validateSourceDirectoryAndPortResult.error!);
     }
@@ -114,6 +119,24 @@ export class PortalServeAction {
     await deleteFile(paths.generatedPortalArtifactsZipFilePath);
 
     return Result.success(paths.generatedPortalArtifactsDirectoryPath);
+  }
+
+  private async getServerPort(port: number): Promise<number> {
+    const defaultPorts = [3000, 3001, 3002];
+
+    const preferredPorts =
+      typeof port === "number" ? [port, ...defaultPorts.filter((p) => p !== port)] : defaultPorts;
+
+    const availablePort = await getPort({ port: preferredPorts });
+
+    // Show warning only if user provided --port and it is not available
+    if (typeof port === "number" && availablePort !== port) {
+      this.prompts.displayInfo(
+        `⚠️ Port ${port} is already in use. Available port ${availablePort} will be used.`
+      );
+    }
+
+    return availablePort;
   }
 
   private async checkExistingPortal(generatedPortalArtifactsDirectoryPath: string) {

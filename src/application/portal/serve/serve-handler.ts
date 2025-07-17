@@ -2,6 +2,7 @@ import express from "express";
 import livereload from "livereload";
 import connectLivereload from "connect-livereload";
 import open from "open";
+import getPort from "get-port";
 import { Server } from "http";
 import { Result } from "../../../types/common/result.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
@@ -13,8 +14,6 @@ export class ServeHandler {
   private liveReloadServer!: livereload.LiveReloadServer;
   private readonly app: express.Application;
   private readonly portalWatcher: PortalWatcher;
-  private readonly DEFAULT_SERVER_PORT = 3000;
-  private readonly DEFAULT_LIVE_RELOAD_SERVER_PORT = 35729;
 
   constructor() {
     this.app = express();
@@ -40,15 +39,14 @@ export class ServeHandler {
     flags: ServeFlags,
     ignoredPaths: string[],
     configDirectoryPath: string,
+    port: number,
     displayShutdownMessages = true
   ): Promise<Result<boolean, string>> {
-    const requestedPort = flags.port ?? this.DEFAULT_SERVER_PORT;
-
     return new Promise<Result<boolean, string>>((resolve, reject) => {
       this.server = this.app
-        .listen(requestedPort, async () => {
+        .listen(port, async () => {
           if (flags.open) {
-            await open(`http://localhost:${requestedPort}`);
+            await open(`http://localhost:${port}`);
           }
 
           if (!flags["no-reload"]) {
@@ -63,16 +61,12 @@ export class ServeHandler {
           }
           resolve(Result.success(true));
         })
-        .on("error", (err: NodeJS.ErrnoException) => {
-          if (err.code === "EADDRINUSE") {
-            reject(new Error(`Port ${requestedPort} is not available. Unable to serve your portal.`));
-          } else {
-            reject(
-              new Error(
-                `Something went wrong while serving your portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
-              )
-            );
-          }
+        .on("error", () => {
+          reject(
+            new Error(
+              `Something went wrong while serving your portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
+            )
+          );
         });
 
       const shutdown = async () => {
@@ -104,24 +98,24 @@ export class ServeHandler {
     }
   }
 
-  private async findAvailablePort(startPort: number): Promise<number> {
-    let port = startPort;
-    const maxPort = startPort + 10; // Limit the port search range
+  // private async findAvailablePort(startPort: number): Promise<number> {
+  //   let port = startPort;
+  //   const maxPort = startPort + 10; // Limit the port search range
 
-    while (port < maxPort) {
-      if (!(await isPortInUse(port))) {
-        return port;
-      }
-      port++;
-    }
+  //   while (port < maxPort) {
+  //     if (!(await isPortInUse(port))) {
+  //       return port;
+  //     }
+  //     port++;
+  //   }
 
-    // If no port is found in the range, return the original port
-    return startPort;
-  }
+  //   // If no port is found in the range, return the original port
+  //   return startPort;
+  // }
 
   private async createLiveReloadServer(generatedPortalPath: string): Promise<Result<number, string>> {
     try {
-      const availablePort = await this.findAvailablePort(this.DEFAULT_LIVE_RELOAD_SERVER_PORT);
+      const availablePort = await this.getPortForReloadServer();
 
       this.liveReloadServer = livereload.createServer({
         port: availablePort
@@ -135,5 +129,10 @@ export class ServeHandler {
         "An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance."
       );
     }
+  }
+
+  private async getPortForReloadServer() : Promise<number> {
+    const defaultPorts = [35729, 35730, 35731];
+    return await getPort({ port: defaultPorts });
   }
 }

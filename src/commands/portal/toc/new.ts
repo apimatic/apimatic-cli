@@ -18,7 +18,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
   static flags = {
     destination: Flags.string({
       parse: async (input: string) => path.resolve(input),
-      description: "optional path where the generated TOC file will be saved. Defaults to the current working directory if not provided.",
+      description: "optional path where the generated toc.yml file will be saved. Defaults to the current working directory if not provided.",
     }),
     folder: Flags.string({
       parse: async (input: string) => path.resolve(input),
@@ -27,15 +27,15 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
     }),
     force: Flags.boolean({
       default: false,
-      description: "overwrite the TOC file if one already exists at the destination.",
+      description: "overwrite the toc.yml file if one already exists at the destination.",
     }),
     "expand-endpoints": Flags.boolean({
       default: false,
-      description: "include individual entries for each endpoint in the generated TOC. Requires a valid API specification in the working directory."
+      description: "include individual entries for each endpoint in the generated toc.yml. Requires a valid API specification in the working directory."
     }),
     "expand-models": Flags.boolean({
       default: false,
-      description: "include individual entries for each model in the generated TOC. Requires a valid API specification in the working directory."
+      description: "include individual entries for each model in the generated toc.yml. Requires a valid API specification in the working directory."
     })
   };
 

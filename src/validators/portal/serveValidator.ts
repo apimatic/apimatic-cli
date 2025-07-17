@@ -1,24 +1,15 @@
 import { Result } from "../../types/common/result.js";
-import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import { ServePaths } from "../../types/portal/serve.js";
 import { DirectoryValidator } from "../common/directoryValidator.js";
-import { PortValidator } from "../common/portValidator.js";
 
 export class PortalServeValidator {
-  private readonly portValidator: PortValidator;
   private readonly directoryValidator: DirectoryValidator;
 
   constructor() {
-    this.portValidator = new PortValidator();
     this.directoryValidator = new DirectoryValidator();
   }
 
-  public async validateSourceDirectoryAndPort(flags: ServeFlags, paths: ServePaths) : Promise<Result<string, string>> {
-    const portValidationResult = await this.portValidator.validate(flags.port);
-    if (portValidationResult.isFailed())
-    {
-      return Result.failure(portValidationResult.error!);
-    }
-    
+  public async validateSourceDirectory(paths: ServePaths) : Promise<Result<string, string>> {
     const sourceDirectoryValidationResult = this.directoryValidator.validateSourceDirectory(paths.sourceDirectoryPath);
     if (sourceDirectoryValidationResult.isFailed()) {
       return Result.failure(sourceDirectoryValidationResult.error!);

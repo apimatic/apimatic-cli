@@ -306,6 +306,10 @@ export async function zipPortalSource(
   generatedZipFilePath: string,
   ignoredPaths: string[] = []
 ): Promise<string> {
+  if (await fs.pathExists(generatedZipFilePath)) {
+    await deleteFile(generatedZipFilePath);
+  }
+
   const output = fs.createWriteStream(generatedZipFilePath);
   const archive = archiver("zip", {
     zlib: { level: 9 }

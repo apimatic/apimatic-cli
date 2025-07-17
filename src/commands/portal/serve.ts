@@ -12,7 +12,6 @@ export default class PortalServe extends Command {
     port: Flags.integer({
       char: "p",
       description: "Port to serve the portal.",
-      default: 3000
     }),
     destination: Flags.string({
       char: "d",
