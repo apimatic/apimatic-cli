@@ -53,7 +53,7 @@ export default class PortalServe extends Command {
   ];
 
   async run() {
-    const { flags, argv } = await this.parse(PortalServe);
+    const { flags } = await this.parse(PortalServe);
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
     const portalDir = path.resolve(flags.destination);
     const sourceDir = path.resolve(flags.source);
@@ -72,7 +72,7 @@ export default class PortalServe extends Command {
 
     // Show warning only if user provided --port and it is not available
     if (typeof flags.port === 'number' && availablePort !== flags.port) {
-      this.log(`⚠️ Port ${flags.port} is already in use. Using available port ${availablePort}.`);
+      this.log(`⚠️ Port ${flags.port} is already in use. Available port ${availablePort} will be used.`);
     }
     const port = availablePort;
 
