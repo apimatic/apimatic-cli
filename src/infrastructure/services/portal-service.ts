@@ -21,10 +21,31 @@ import { Result } from "../../types/common/result.js";
 import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Sdl } from "../../types/sdl/sdl.js";
+import { FilePath } from "../../models/filePath.js";
+import { DirectoryPath } from "../../models/directoryPath.js";
+import { FileService } from "../fileService.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly TIMEOUT = 0;
+  private readonly fileService = new FileService();
+
+
+  async generatePortal(buildPath: FilePath, configDir: DirectoryPath) {
+    const buildFileStream = await this.fileService.getStream(buildPath);
+    const file = new FileWrapper(buildFileStream);
+    const client = await this.getApiClient(configDir);
+    const docsPortalManagementController = new DocsPortalManagementController(client);
+    const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
+    return response.result;
+  }
+
+  private async getApiClient(configDir: DirectoryPath) {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    // TODO: Add auth key
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
+    return this.createApiClient(authorizationHeader);
+  }
 
   async generateOnPremPortal(
     params: GeneratePortalParams,
