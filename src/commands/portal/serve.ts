@@ -1,6 +1,7 @@
 import * as path from "path";
 import axios from "axios";
 import { Command, Flags } from "@oclif/core";
+import getPort from 'get-port';
 import { generatePortal } from "../../controllers/portal/serve.js";
 import { PortalServerService } from "../../services/portal/server.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
@@ -14,7 +15,6 @@ export default class PortalServe extends Command {
     port: Flags.integer({
       char: "p",
       description: "Port to serve the portal.",
-      default: 3000
     }),
     destination: Flags.string({
       char: "d",
@@ -57,12 +57,25 @@ export default class PortalServe extends Command {
     const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
     const portalDir = path.resolve(flags.destination);
     const sourceDir = path.resolve(flags.source);
-    const port = flags.port;
     const overrideAuthKey = flags["auth-key"] ?? null;
     const serverService = new PortalServerService();
     const prompts = new PortalServePrompts();
     const validator = new PortalServeValidator(this.error);
     const allIgnoredPaths = [...ignoredPaths, ...getGeneratedFilesPaths(sourceDir, portalDir)];
+    const defaultPorts = [3000, 3001, 3002];
+    
+    const preferredPorts = typeof flags.port === 'number'
+      ? [flags.port, ...defaultPorts.filter(p => p !== flags.port)]
+      : defaultPorts;
+
+    const availablePort = await getPort({ port: preferredPorts });
+
+    // Show warning only if user provided --port and it is not available
+    if (typeof flags.port === 'number' && availablePort !== flags.port) {
+      this.log(`⚠️ Port ${flags.port} is already in use. Available port ${availablePort} will be used.`);
+    }
+    const port = availablePort;
+
 
     await validator.validate(port, flags.destination, sourceDir, portalDir);
 
