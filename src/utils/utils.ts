@@ -301,18 +301,18 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
 }
 
 //TODO: Refactor this method, carries dual responsibility.
-export async function validateAndZipPortalSource(
-  sourceDir: string,
-  outputPath: string,
+export async function zipPortalSource(
+  sourceDirectoryPath: string,
+  generatedZipFilePath: string,
   ignoredPaths: string[] = []
 ): Promise<string> {
-  const output = fs.createWriteStream(outputPath);
+  const output = fs.createWriteStream(generatedZipFilePath);
   const archive = archiver("zip", {
     zlib: { level: 9 }
   });
 
   return new Promise((resolve, reject) => {
-    output.on("close", () => resolve(outputPath));
+    output.on("close", () => resolve(generatedZipFilePath));
     output.on("error", (err) => {
       return reject(new Error(`Failed to zip the source directory: ${err.message}`));
     });
@@ -328,7 +328,7 @@ export async function validateAndZipPortalSource(
 
       for (const item of items) {
         const fullPath = path.join(currentPath, item);
-        const relativePath = path.relative(sourceDir, fullPath);
+        const relativePath = path.relative(sourceDirectoryPath, fullPath);
 
         // Check if the path is ignored.
         const isIgnored = ignoredPaths.some(
@@ -352,7 +352,7 @@ export async function validateAndZipPortalSource(
     };
 
     // Start adding items from the source directory
-    addItemsToArchive(sourceDir, false)
+    addItemsToArchive(sourceDirectoryPath, false)
       .then(() => {
         archive.finalize();
       })

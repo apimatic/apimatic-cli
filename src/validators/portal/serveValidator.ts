@@ -12,7 +12,7 @@ export class PortalServeValidator {
     this.directoryValidator = new DirectoryValidator();
   }
 
-  public async validateFlagsAndPaths(flags: ServeFlags, paths: ServePaths) : Promise<Result<string, string>> {
+  public async validateSourceDirectoryAndPort(flags: ServeFlags, paths: ServePaths) : Promise<Result<string, string>> {
     const portValidationResult = await this.portValidator.validate(flags.port);
     if (portValidationResult.isFailed())
     {
@@ -22,16 +22,6 @@ export class PortalServeValidator {
     const sourceDirectoryValidationResult = this.directoryValidator.validateSourceDirectory(paths.sourceDirectoryPath);
     if (sourceDirectoryValidationResult.isFailed()) {
       return Result.failure(sourceDirectoryValidationResult.error!);
-    }
-
-    const destinationDirectoryValidationResult = await this.directoryValidator.validateDestinationDirectory(paths.destinationDirectoryPath);
-    if (destinationDirectoryValidationResult.isFailed()) {
-      return Result.failure(destinationDirectoryValidationResult.error!);
-    }
-
-    const specDirectoryValidationResult = this.directoryValidator.validateSpecDirectory(paths.sourceDirectoryPath);
-    if (specDirectoryValidationResult.isFailed()) {
-      return Result.failure(specDirectoryValidationResult.error!);
     }
 
     return Result.success("Serve flags validated successfully.");

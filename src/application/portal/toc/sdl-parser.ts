@@ -1,6 +1,6 @@
 import * as path from "path";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
-import { validateAndZipPortalSource, deleteFile } from "../../../utils/utils.js";
+import { zipPortalSource, deleteFile } from "../../../utils/utils.js";
 import { TocEndpoint, TocModel } from "../../../types/toc/toc.js";
 import { Result } from "../../../types/common/result.js";
 import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl.js";
@@ -13,7 +13,7 @@ export class SdlParser {
     workingDirectory: string,
     configDir: string
   ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
-    const sourceSpecInputZipFilePath = await validateAndZipPortalSource(
+    const sourceSpecInputZipFilePath = await zipPortalSource(
       specFolderPath,
       path.join(workingDirectory, ".spec_source.zip")
     );
@@ -42,7 +42,7 @@ export class SdlParser {
     contentFolderPath: string,
     configDir: string
   ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    const sourceSpecInputZipFilePath = await validateAndZipPortalSource(
+    const sourceSpecInputZipFilePath = await zipPortalSource(
       specFolderPath,
       path.join(contentFolderPath, ".spec_source.zip")
     );

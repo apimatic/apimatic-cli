@@ -3,7 +3,7 @@ import fsExtra from "fs-extra";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalPaths, GeneratePortalParams, GenerateFlags } from "../../types/portal/generate.js";
 import {
-  validateAndZipPortalSource,
+  zipPortalSource,
   deleteFile,
   extractZipFile,
   getMessageInRedColor
@@ -24,7 +24,7 @@ export class PortalGenerateAction {
     const pathsToIgnore = this.getGeneratedFilesPaths(paths.sourceFolderPath, paths.generatedPortalArtifactsFolderPath);
 
     //TODO: Refactor this method, carries dual responsibility.
-    const sourceBuildInputZipFilePath = await validateAndZipPortalSource(
+    const sourceBuildInputZipFilePath = await zipPortalSource(
       paths.sourceFolderPath,
       path.join(paths.sourceFolderPath, ".portal_source.zip"),
       pathsToIgnore

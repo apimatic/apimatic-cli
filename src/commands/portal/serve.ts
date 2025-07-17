@@ -1,7 +1,6 @@
 import * as path from "path";
 import { Command, Flags } from "@oclif/core";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { PortalServeAction } from "../../actions/portal/serve.js";
 import { getMessageInRedColor } from "../../utils/utils.js";
@@ -38,7 +37,7 @@ export default class PortalServe extends Command {
     }),
     ignore: Flags.string({
       char: "i",
-      description: "Comma-separated list of files/directories to ignore.",
+      description: "Comma-separated list of file and directory paths to exclude from portal generation and hot reload.",
       default: ""
     }),
     "auth-key": Flags.string({
@@ -50,23 +49,19 @@ export default class PortalServe extends Command {
     '$ apimatic portal:serve --folder="./" --destination="./generated_portal" --port=3000 --open --no-reload'
   ];
 
-  async run() {
+  public async run() {
     const { flags } = await this.parse(PortalServe);
     const paths = this.getServePaths(flags as ServeFlags);
     const portalServePrompts = new PortalServePrompts();
-    const portalServeValidator = new PortalServeValidator();
     const portalServeAction = new PortalServeAction();
-
-    const validationResult = await portalServeValidator.validateFlagsAndPaths(flags as ServeFlags, paths);
-    if (validationResult.isFailed()) {
-      portalServePrompts.logError(getMessageInRedColor(validationResult.error!));
-      process.exit(0);
-    }
 
     const servePortalResult = await portalServeAction.servePortal(flags as ServeFlags, paths, this.config.configDir);
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
-      process.exit(0);
+    }
+
+    if (servePortalResult.isCancelled()) {
+      portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
     }
   }
 
@@ -76,7 +71,7 @@ export default class PortalServe extends Command {
 
     return {
       sourceDirectoryPath: path.resolve(flags.folder),
-      destinationDirectoryPath: flags.destination,
+      destinationDirectoryPath: path.resolve(flags.destination),
       generatedPortalArtifactsDirectoryPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
       generatedPortalArtifactsZipFilePath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP_FILE)
     };

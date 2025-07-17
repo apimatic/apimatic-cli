@@ -16,7 +16,7 @@ import {
   getMessageInRedColor,
   clearDirectory,
   deleteFile,
-  validateAndZipPortalSource,
+  zipPortalSource,
   extractZipFile
 } from "../../utils/utils.js";
 import { getValidationSummary } from "../api/validate.js";
@@ -292,7 +292,7 @@ export class PortalQuickstartController {
     const generatedPortalZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
     const docsPortalService = new PortalService();
 
-    const sourceBuildInputZipFilePath = await validateAndZipPortalSource(sourceDirectoryPath, generatedPortalPath);
+    const sourceBuildInputZipFilePath = await zipPortalSource(sourceDirectoryPath, generatedPortalPath);
 
     //TODO: Remove usage of empty string and null.
     const generatePortalParams: GeneratePortalParams = {

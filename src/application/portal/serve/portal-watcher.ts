@@ -6,7 +6,7 @@ import {
   deleteFile,
   extractZipFile,
   getMessageInMagentaColor,
-  validateAndZipPortalSource
+  zipPortalSource
 } from "../../../utils/utils.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { GeneratePortalParams } from "../../../types/portal/generate.js";
@@ -120,7 +120,7 @@ export class PortalWatcher {
   ): Promise<void> {
     this.progressSpinner.start();
 
-    const sourceBuildInputZipFilePath = await validateAndZipPortalSource(
+    const sourceBuildInputZipFilePath = await zipPortalSource(
       paths.sourceDirectoryPath,
       path.join(paths.sourceDirectoryPath, ".portal_source.zip"),
       absoluteIgnoredPaths
