@@ -40,10 +40,10 @@ export class GeneratePortalAction {
     }
 
     await withDir(
-      async (o) => {
+      async (tempDirResult) => {
         this.prompts.displayPortalGenerationMessage();
 
-        const tempDirectory = new DirectoryPath(o.path);
+        const tempDirectory = new DirectoryPath(tempDirResult.path);
 
         const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
         await this.zipArchiver.archive(buildDirectory, buildZipPath);

@@ -1,4 +1,4 @@
-import { Command, Config, Flags } from "@oclif/core";
+import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
 
@@ -34,10 +34,6 @@ export class PortalGenerate extends Command {
 Your portal has been generated at D:/
 `
   ];
-
-  constructor(argv: string[], config: Config) {
-    super(argv, config);
-  }
 
   async run(): Promise<void> {
     const {
