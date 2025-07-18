@@ -1,6 +1,5 @@
 import path from "path";
-import fsExtra from "fs-extra";
-import fs from "fs";
+import fs from "fs-extra";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
@@ -17,11 +16,7 @@ export class PortalServeAction {
   private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
   private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
 
-  public constructor(
-    prompts: PortalServePrompts,
-    serveHandler: ServeHandler,
-    docsPortalService: PortalService
-  ) {
+  public constructor(prompts: PortalServePrompts, serveHandler: ServeHandler, docsPortalService: PortalService) {
     this.prompts = prompts;
     this.serveHandler = serveHandler;
     this.docsPortalService = docsPortalService;
@@ -45,7 +40,9 @@ export class PortalServeAction {
       return Result.failure(createDestinationDirectoryResult.error!);
     }
 
-    const validateSourceDirectoryAndPortResult = await portalServeValidator.validateSourceDirectory(paths.sourceDirectoryPath);
+    const validateSourceDirectoryAndPortResult = await portalServeValidator.validateSourceDirectory(
+      paths.sourceDirectoryPath
+    );
     if (validateSourceDirectoryAndPortResult.isFailed()) {
       return Result.failure(validateSourceDirectoryAndPortResult.error!);
     }
@@ -123,7 +120,7 @@ export class PortalServeAction {
   }
 
   private async checkExistingPortal(generatedPortalArtifactsDirectoryPath: string) {
-    const items = this.getDirectoryItems(generatedPortalArtifactsDirectoryPath);
+    const items = await this.getDirectoryItems(generatedPortalArtifactsDirectoryPath);
     if (items.length > 0) {
       const overwriteExistingPortal = await this.prompts.overwriteExistingPortalArtifactsPrompt();
       if (!overwriteExistingPortal) {
@@ -148,7 +145,7 @@ export class PortalServeAction {
     data: NodeJS.ReadableStream,
     generatedPortalArtifactsZipFilePath: string
   ): Promise<void> {
-    const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
+    const writeStream = fs.createWriteStream(generatedPortalArtifactsZipFilePath);
     await new Promise<void>((resolve, reject) => {
       data
         .pipe(writeStream)
@@ -165,7 +162,7 @@ export class PortalServeAction {
 
   private async createDestinationDirectory(destination: string): Promise<Result<string, string>> {
     try {
-      await fsExtra.ensureDir(destination);
+      await fs.ensureDir(destination);
       return Result.success("Destination directory created successfully.");
     } catch {
       return Result.failure(
@@ -174,7 +171,8 @@ export class PortalServeAction {
     }
   }
 
-  private getDirectoryItems(directoryPath: string): string[] {
-    return fs.readdirSync(directoryPath).filter((item) => !item.startsWith("."));
+  private async getDirectoryItems(directoryPath: string): Promise<string[]> {
+    const items = (await fs.readdir(directoryPath)).filter((item) => !item.startsWith("."));
+    return items;
   }
 }
