@@ -5,8 +5,6 @@ import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
-import { GeneratePortalParams } from "../../types/portal/generate.js";
-import { deleteFile, extractZipFile, zipPortalSource } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../actionResult.js";
 
@@ -26,7 +24,6 @@ export class PortalServeAction {
   public async servePortal(
     flags: ServeFlags,
     paths: ServePaths,
-    configDirectoryPath: string,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
@@ -36,17 +33,17 @@ export class PortalServeAction {
   ): Promise<Result<string, string>> {
     const ignoredPaths = [
       ...flags.ignore.split(",").map((path) => path.trim()),
-      ...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.generatedPortalArtifactsDirectoryPath)
+      ...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.destinationDirectoryPath)
     ];
 
     const result = await generatePortal(
       new DirectoryPath(paths.sourceDirectoryPath),
-      new DirectoryPath(paths.generatedPortalArtifactsDirectoryPath),
+      new DirectoryPath(paths.destinationDirectoryPath),
       true, false);
 
     return result.mapAll<Promise<Result<string, string>>>(
       async () => {
-        const setupServerResult = await this.serveHandler.setupServer(paths.generatedPortalArtifactsDirectoryPath);
+        const setupServerResult = await this.serveHandler.setupServer(paths.destinationDirectoryPath);
         if (setupServerResult.isFailed()) {
           return Result.failure(setupServerResult.error!);
         }
@@ -64,47 +61,6 @@ export class PortalServeAction {
     );
   }
 
-  protected async generatePortal(
-    flags: ServeFlags,
-    paths: ServePaths,
-    ignoredPaths: string[],
-    configDirectoryPath: string
-  ): Promise<Result<string, string>> {
-    //TODO: Refactor this method, it carries dual responsibility.
-    const sourceBuildInputZipFilePath = await zipPortalSource(
-      paths.sourceDirectoryPath,
-      path.join(paths.sourceDirectoryPath, this.GENERATED_BUILD_INPUT_ZIP_FILENAME),
-      ignoredPaths
-    );
-
-    //TODO: Remove usage of empty string and null.
-    const generatePortalParams: GeneratePortalParams = {
-      sourceBuildInputZipFilePath: sourceBuildInputZipFilePath,
-      generatedPortalArtifactsFolderPath: paths.generatedPortalArtifactsDirectoryPath,
-      generatedPortalArtifactsZipFilePath: "",
-      overrideAuthKey: flags["auth-key"] ?? null,
-      generateZipFile: false
-    };
-
-    const generateOnPremPortalResult = await this.docsPortalService.generateOnPremPortal(
-      generatePortalParams,
-      configDirectoryPath
-    );
-    await deleteFile(sourceBuildInputZipFilePath);
-    if (generateOnPremPortalResult.isFailed()) {
-      return Result.failure(generateOnPremPortalResult.error!);
-    }
-
-    await this.saveGeneratedPortalStreamToZipFile(
-      generateOnPremPortalResult.value!,
-      paths.generatedPortalArtifactsZipFilePath
-    );
-
-    await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsDirectoryPath);
-    await deleteFile(paths.generatedPortalArtifactsZipFilePath);
-
-    return Result.success(paths.generatedPortalArtifactsDirectoryPath);
-  }
 
   private async checkExistingPortal(generatedPortalArtifactsDirectoryPath: string) {
     const items = await this.getDirectoryItems(generatedPortalArtifactsDirectoryPath);

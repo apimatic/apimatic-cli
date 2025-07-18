@@ -9,6 +9,8 @@ import { Server } from "http";
 import { Result } from "../../../types/common/result.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { PortalWatcher } from "./portal-watcher.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { ActionResult } from "../../../actions/actionResult.js";
 
 export class ServeHandler {
   private server!: Server;
@@ -38,7 +40,12 @@ export class ServeHandler {
     paths: ServePaths,
     flags: ServeFlags,
     ignoredPaths: string[],
-    configDirectoryPath: string,
+    generatePortal: (
+      buildDirectory: DirectoryPath,
+      portalDirectory: DirectoryPath,
+      force: boolean,
+      zipPortal: boolean
+    ) => Promise<ActionResult>,
     displayShutdownMessages = true
   ): Promise<Result<boolean, string>> {
     return new Promise<Result<boolean, string>>((resolve, reject) => {
@@ -49,7 +56,7 @@ export class ServeHandler {
           }
 
           if (!flags["no-reload"]) {
-            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, flags, ignoredPaths, configDirectoryPath);
+            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, flags, ignoredPaths, generatePortal);
           }
 
           if (process.platform !== "darwin") {

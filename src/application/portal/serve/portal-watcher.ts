@@ -6,11 +6,12 @@ import process from "process";
 import console from "console";
 import { clearInterval, setInterval } from "timers";
 import { Mutex } from "async-mutex";
-import { deleteFile, extractZipFile, getMessageInMagentaColor, zipPortalSource } from "../../../utils/utils.js";
+import { getMessageInMagentaColor } from "../../../utils/utils.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
-import { GeneratePortalParams } from "../../../types/portal/generate.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { WatcherHandler } from "./watcher-handler.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { ActionResult } from "../../../actions/actionResult.js";
 
 export class PortalWatcher {
   private readonly docsPortalService: PortalService;
@@ -58,7 +59,12 @@ export class PortalWatcher {
     paths: ServePaths,
     flags: ServeFlags,
     ignoredPaths: string[],
-    configDirectoryPath: string
+    generatePortal: (
+      buildDirectory: DirectoryPath,
+      portalDirectory: DirectoryPath,
+      force: boolean,
+      zipPortal: boolean
+    ) => Promise<ActionResult>
   ) {
     // Convert ignoredPaths to absolute paths for consistent comparison
     const absoluteIgnoredPaths = [...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== "")].map(
@@ -102,7 +108,7 @@ export class PortalWatcher {
         });
 
         await handler.execute(async () => {
-          await this.handleFileChange(paths, flags, eventQueue, absoluteIgnoredPaths, eventId, configDirectoryPath);
+          await this.handleFileChange(paths, flags, eventQueue, absoluteIgnoredPaths, eventId, generatePortal);
         });
       })
       .on("error", () => {
@@ -121,7 +127,12 @@ export class PortalWatcher {
     eventQueue: Map<string, string>,
     absoluteIgnoredPaths: string[],
     eventId: string,
-    configDirectoryPath: string
+    generatePortal: (
+      buildDirectory: DirectoryPath,
+      portalDirectory: DirectoryPath,
+      force: boolean,
+      zipPortal: boolean
+    ) => Promise<ActionResult>
   ): Promise<void> {
     if (!eventQueue.has(eventId)) {
       return;
@@ -129,7 +140,9 @@ export class PortalWatcher {
 
     this.progressSpinner.start();
 
-    
+    const result = await generatePortal(new DirectoryPath(paths.sourceDirectoryPath), new DirectoryPath(paths.destinationDirectoryPath), true, false);
+
+    result.map(error => console.log(error));
 
     this.progressSpinner.stop();
   }

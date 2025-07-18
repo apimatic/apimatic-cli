@@ -25,7 +25,6 @@ export class PortalGenerate extends Command {
       description: "download the generated portal as a .zip archive",
     }),
     "auth-key": Flags.string({
-      default: "",
       description: "override current authentication state with an authentication key"
     })
   };

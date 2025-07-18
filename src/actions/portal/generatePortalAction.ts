@@ -21,12 +21,12 @@ export class GeneratePortalAction {
     this.authKey = authKey;
   }
 
-  public async execute(
+  public readonly execute = async (
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
     force: boolean,
     zipPortal: boolean
-  ): Promise<ActionResult> {
+  ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(portalDirectory)) {
       return ActionResult.error("build directory and portal directory cannot be the same")
     }

@@ -4,6 +4,7 @@ import { expect } from "chai";
 import { dir as tmpDir, DirectoryResult } from "tmp-promise";
 import { PortalWatcher } from "../../../../src/application/portal/serve/portal-watcher.js";
 import { ServeFlags, ServePaths } from "../../../../src/types/portal/serve.js";
+import { ActionResult } from "../../../../lib/actions/actionResult";
 
 describe("PortalWatcher", () => {
   let TEST_WORKING_DIR: string;
@@ -102,8 +103,13 @@ describe("PortalWatcher", () => {
         eventQueue: Map<string, string>,
         absoluteIgnoredPaths: string[],
         eventId: string,
-        configDirectoryPath: string
-      ) {
+        configDirectoryPath: (
+          buildDirectory: DirectoryPath,
+          portalDirectory: DirectoryPath,
+          force: boolean,
+          zipPortal: boolean
+        ) => Promise<ActionResult>
+      ): Promise<void> {
         if (!eventQueue.has(eventId)) {
           return;
         }
@@ -111,7 +117,6 @@ describe("PortalWatcher", () => {
         if (eventQueue.has(eventId)) {
           callCount++;
         }
-          
       }
     }
     const portalWatcher = new TestPortalWatcher();
@@ -139,4 +144,4 @@ describe("PortalWatcher", () => {
     // Smoke test, should throw.
     expect(true).to.be.true;
   });
-}); 
+});
