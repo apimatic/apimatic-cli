@@ -31,19 +31,19 @@ export class PortalService {
   private readonly fileService = new FileService();
 
 
-  async generatePortal(buildPath: FilePath, configDir: DirectoryPath) {
+  async generatePortal(buildPath: FilePath, configDir: DirectoryPath, authKey: string | null): Promise<NodeJS.ReadableStream> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
-    const client = await this.getApiClient(configDir);
+    const client = await this.getApiClient(configDir, authKey);
     const docsPortalManagementController = new DocsPortalManagementController(client);
     const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
-    return response.result;
+    return response.result as NodeJS.ReadableStream;
   }
 
-  private async getApiClient(configDir: DirectoryPath) {
+  private async getApiClient(configDir: DirectoryPath, authKey: string | null): Promise<Client> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     // TODO: Add auth key
-    const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
     return this.createApiClient(authorizationHeader);
   }
 

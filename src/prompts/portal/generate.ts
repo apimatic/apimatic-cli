@@ -9,9 +9,9 @@ export class PortalGeneratePrompts {
     const overwrite = await select({
       message: `The destination '${directory}' is not empty, do you want to overwrite?`,
       options: [
-        { value: true, label: "Yes", hint: "yes i want to overwrite" },
-        { value: false, label: "No", hint: "stop! i want to keep files" }
-      ]
+        { value: true, label: "Yes" },
+        { value: false, label: "No" }
+      ], initialValue: false,
     });
 
     if (isCancel(overwrite)) {
@@ -24,7 +24,9 @@ export class PortalGeneratePrompts {
     }
 
     outro("Please enter a different destination folder or remove the existing files and try again.");
-    return false;
+    process.exit(1);
+
+    // TODO: it should return false (no process exit);
   }
 
   async overwriteExistingPortalArtifactsPrompt(): Promise<boolean> {
