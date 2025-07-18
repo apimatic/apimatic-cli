@@ -93,7 +93,7 @@ export default class PortalQuickstart extends Command {
         await controller.userLogin(credentials, SDKClient.getInstance(), this.config.configDir);
         loggedIn = true;
         prompts.displayLoggedInMessage();
-      } catch (error) {
+      } catch {
         prompts.displayLoggingInErrorMessage();
       }
     }
@@ -120,7 +120,7 @@ export default class PortalQuickstart extends Command {
       const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory);
 
       const serverStarted = await controller.servePortal(generatedPortalPath, directory, this.config.configDir);
-      
+
       if (serverStarted) {
         prompts.displayOutroMessage(directory);
       }

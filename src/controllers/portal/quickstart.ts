@@ -16,19 +16,24 @@ import {
   getMessageInRedColor,
   clearDirectory,
   deleteFile,
-  cleanUpGeneratedPortalFiles
+  zipPortalSource,
+  extractZipFile
 } from "../../utils/utils.js";
 import { getValidationSummary } from "../api/validate.js";
 import { AuthorizationError, GetValidationParams } from "../../types/api/validate.js";
-import { generatePortal } from "./serve.js";
 import { metadataFileContent, staticPortalRepoUrl } from "../../config/env.js";
-import { PortalServerService } from "../../services/portal/server.js";
+import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { AuthenticationError } from "../../types/utils.js";
+import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { GeneratePortalParams } from "../../types/portal/generate.js";
 
 export class PortalQuickstartController {
   private readonly specUrl =
-    "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json";
+    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
+  private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
+  private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);
@@ -282,95 +287,114 @@ export class PortalQuickstartController {
     }
   }
 
-  async generatePortalArtifacts(targetFolder: string, configDir: string): Promise<string> {
-    const generatedPortalPath = path.join(targetFolder, "generated_portal");
+  async generatePortalArtifacts(sourceDirectoryPath: string, configDir: string): Promise<string> {
+    const generatedPortalPath = path.join(sourceDirectoryPath, "generated_portal");
+    const generatedPortalZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
+    const docsPortalService = new PortalService();
 
-    try {
-      await generatePortal(targetFolder, generatedPortalPath, configDir);
-      return generatedPortalPath;
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          if (error.response.status === 400) {
-            throw new Error(
-              getMessageInRedColor(
-                `The provided input is not valid. Please ensure the zip file contains a valid build file at the root level.`
-              )
-            );
-          } else if (error.response.status === 403) {
-            throw new Error(
-              getMessageInRedColor(
-                `Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`
-              )
-            );
-          } else if (error.response.status === 422) {
-            throw new Error(
-              getMessageInRedColor(
-                `Unable to process the build input. Please verify that your zip file is correctly structured and your build file is a valid JSON file.`
-              )
-            );
-          } else if (error.response.status === 500) {
-            throw new Error(
-              getMessageInRedColor(
-                `The server encountered an error while generating your portal, please try again. If the issue persists, contact our team at support@apimatic.io`
-              )
-            );
-          } else {
-            throw new Error(
-              getMessageInRedColor(
-                `Something went wrong while generating the portal. The server returned the following error ${error.response.status} ${error.response.statusText}. Please try again later. If the issue persists, contact our team at support@apimatic.io`
-              )
-            );
-          }
-        } else if (error.request) {
-          if (error.code === "ECONNABORTED") {
-            throw new Error(
-              getMessageInRedColor(
-                `The portal generation request timed out. Please try again. If the issue persists, try out our Async API for Docs as Code: https://docs.apimatic.io/platform-api/#/http/api-endpoints/docs-portal-management/generate-on-prem-portal-via-build-input`
-              )
-            );
-          } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
-            throw new Error(
-              getMessageInRedColor(
-                `Network error encountered while generating the portal. Please check your connection and try again.`
-              )
-            );
-          } else {
-            throw new Error(
-              getMessageInRedColor(
-                `Something went wrong while generating the portal, please try again. If the issue persists, reach out to our support team at support@apimatic.io`
-              )
-            );
-          }
-        } else {
-          throw new Error(getMessageInRedColor(`Failed to generate portal: ${error.message}`));
-        }
-      } else {
-        throw new Error(
-          getMessageInRedColor(
-            `Something went wrong while generating the portal, please try again later. If the issue persists, contact our team at support@apimatic.io`
-          )
-        );
-      }
+    const sourceBuildInputZipFilePath = await zipPortalSource(sourceDirectoryPath, generatedPortalPath);
+
+    //TODO: Remove usage of empty string and null.
+    const generatePortalParams: GeneratePortalParams = {
+      sourceBuildInputZipFilePath: sourceBuildInputZipFilePath,
+      generatedPortalArtifactsFolderPath: generatedPortalPath,
+      generatedPortalArtifactsZipFilePath: "",
+      generateZipFile: false,
+      overrideAuthKey: null
+    };
+
+    const generateOnPremPortalResult = await docsPortalService.generateOnPremPortal(generatePortalParams, configDir);
+    await deleteFile(sourceBuildInputZipFilePath);
+    if (generateOnPremPortalResult.isFailed()) {
+      throw new Error(getMessageInRedColor(generateOnPremPortalResult.error!));
+    }
+
+    await this.saveGeneratedPortalStreamToZipFile(generateOnPremPortalResult.value!, generatedPortalZipFilePath);
+
+    await extractZipFile(generatedPortalZipFilePath, generatedPortalPath);
+    await deleteFile(generatedPortalZipFilePath);
+
+    return generatedPortalPath;
+  }
+
+  async servePortal(generatedPortalPath: string, sourceDirectoryPath: string, configDir: string): Promise<boolean> {
+    const server = new ServeHandler();
+    const ignoredPaths = this.getGeneratedFilesPaths(path.resolve(sourceDirectoryPath), path.resolve(generatedPortalPath));
+
+    await server.setupServer(generatedPortalPath);
+
+    await this.cleanUpGeneratedPortalFiles(sourceDirectoryPath);
+
+    const result = await server.startServer(
+      {
+        sourceDirectoryPath: path.resolve(sourceDirectoryPath),
+        destinationDirectoryPath: path.resolve(generatedPortalPath),
+        generatedPortalArtifactsDirectoryPath: path.resolve(generatedPortalPath),
+        generatedPortalArtifactsZipFilePath: path.join(generatedPortalPath, ".generated_portal.zip")
+      } as ServePaths,
+      {
+        folder: sourceDirectoryPath,
+        destination: generatedPortalPath,
+        port: 3000,
+        open: false,
+        "no-reload": false,
+        "auth-key": "",
+        ignore: ""
+      } as ServeFlags,
+      ignoredPaths,
+      configDir
+    );
+
+    return result.isSuccess();
+  }
+
+  private async cleanUpGeneratedPortalFiles(sourceDirectoryPath: string) {
+    const generatedPortalArtifactsZipFilePath = path.join(
+      sourceDirectoryPath,
+      this.GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME
+    );
+    const generatedPortalBuildInputZipFilePath = path.join(
+      sourceDirectoryPath,
+      this.GENERATED_BUILD_INPUT_ZIP_FILENAME
+    );
+    if (fs.existsSync(generatedPortalArtifactsZipFilePath)) {
+      await deleteFile(generatedPortalArtifactsZipFilePath);
+    }
+    if (fs.existsSync(generatedPortalBuildInputZipFilePath)) {
+      await deleteFile(generatedPortalBuildInputZipFilePath);
     }
   }
 
-  async servePortal(generatedPortalPath: string, targetFolder: string, configDir: string): Promise<boolean> {
-    const server = new PortalServerService();
+  private async saveGeneratedPortalStreamToZipFile(
+    data: NodeJS.ReadableStream,
+    generatedPortalArtifactsZipFilePath: string
+  ): Promise<void> {
+    const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
+    await new Promise<void>((resolve, reject) => {
+      data
+        .pipe(writeStream)
+        .on("finish", () => resolve())
+        .on("error", () =>
+          reject(
+            new Error(
+              `An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
+            )
+          )
+        );
+    });
+  }
 
-    server.setupServer(generatedPortalPath);
-
-    await cleanUpGeneratedPortalFiles(targetFolder);
-
-    return await server.startServer(
-      {
-        generatedPortalPath,
-        targetFolder,
-        configDir,
-        authKey: null
-      },
-      false,
-      false
+  private getGeneratedFilesPaths(
+    sourceDirectoryPath: string,
+    generatedPortalArtifactsDirectoryPath: string
+  ): string[] {
+    const generatedBuildInputZipPath = path.join(sourceDirectoryPath, ".portal_source.zip");
+    const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
+    const generatedPortalArtifactsFolderPath = path.join(
+      path.dirname(generatedPortalArtifactsDirectoryPath),
+      "generated_portal"
     );
+
+    return [generatedBuildInputZipPath, generatedPortalArtifactsFolderPath, generatedPortalArtifactsZipFilePath];
   }
 }

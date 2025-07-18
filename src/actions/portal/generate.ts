@@ -2,10 +2,8 @@ import * as path from "path";
 import fsExtra from "fs-extra";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalPaths, GeneratePortalParams, GenerateFlags } from "../../types/portal/generate.js";
-import { Result } from "../../types/common/result.js";
 import {
-  getGeneratedFilesPaths,
-  validateAndZipPortalSource,
+  zipPortalSource,
   deleteFile,
   extractZipFile,
   getMessageInRedColor
@@ -14,6 +12,8 @@ import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 
 export class PortalGenerateAction {
   private readonly prompts: PortalGeneratePrompts;
+  private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
+  private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
 
   constructor() {
     this.prompts = new PortalGeneratePrompts();
@@ -21,10 +21,10 @@ export class PortalGenerateAction {
 
   async generatePortal(paths: PortalPaths, flags: GenerateFlags, configDir: string): Promise<void> {
     this.prompts.displayPortalGenerationMessage();
-    const pathsToIgnore = getGeneratedFilesPaths(paths.sourceFolderPath, paths.generatedPortalArtifactsFolderPath);
+    const pathsToIgnore = this.getGeneratedFilesPaths(paths.sourceFolderPath, paths.generatedPortalArtifactsFolderPath);
 
     //TODO: Refactor this method, carries dual responsibility.
-    const sourceBuildInputZipFilePath = await validateAndZipPortalSource(
+    const sourceBuildInputZipFilePath = await zipPortalSource(
       paths.sourceFolderPath,
       path.join(paths.sourceFolderPath, ".portal_source.zip"),
       pathsToIgnore
@@ -74,7 +74,14 @@ export class PortalGenerateAction {
       data
         .pipe(writeStream)
         .on("finish", () => resolve())
-        .on("error", (error) => reject(Result.failure(`Failed to save downloaded portal to file: ${error.message}`)));
+        .on("error", () => reject(new Error(`An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`)));
     });
+  }
+
+  private getGeneratedFilesPaths(sourceDirectoryPath: string, generatedPortalArtifactsDirectoryPath: string): string[] {
+    const generatedBuildInputZipPath = path.join(sourceDirectoryPath, this.GENERATED_BUILD_INPUT_ZIP_FILENAME);
+    const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, this.GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME);
+
+    return [generatedBuildInputZipPath, generatedPortalArtifactsDirectoryPath, generatedPortalArtifactsZipFilePath];
   }
 }
