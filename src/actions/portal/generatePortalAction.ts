@@ -6,6 +6,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { withDir } from "tmp-promise";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
+import { ActionResult } from "../actionResult.js";
 
 export class GeneratePortalAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
@@ -13,12 +14,10 @@ export class GeneratePortalAction {
   private readonly fileService: FileService = new FileService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
-  private readonly onError: (error: string) => void;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, authKey: string | null = null, onError: (error: string) => void) {
+  constructor(configDir: DirectoryPath, authKey: string | null = null) {
     this.configDir = configDir;
-    this.onError = onError;
     this.authKey = authKey;
   }
 
@@ -27,17 +26,17 @@ export class GeneratePortalAction {
     portalDirectory: DirectoryPath,
     force: boolean,
     zipPortal: boolean
-  ): Promise<void> {
+  ): Promise<ActionResult> {
     if (buildDirectory.isEqual(portalDirectory)) {
-      this.onError("build directory and portal directory cannot be the same");
+      return ActionResult.error("build directory and portal directory cannot be the same")
     }
 
     if (!(await this.validateBuild(buildDirectory))) {
-      this.onError("build directory is empty or not valid");
+      return ActionResult.error("build directory is empty or not valid")
     }
 
     if (!(await this.validatePortal(portalDirectory, force))) {
-      this.onError("portal directory is empty or not valid");
+      return ActionResult.error("portal directory is empty or not valid")
     }
 
     await withDir(
@@ -64,7 +63,9 @@ export class GeneratePortalAction {
         }
       },
       { unsafeCleanup: true }
-    ); // also removes nested files & dirs
+    );
+
+    return ActionResult.success();
   }
 
 

@@ -55,12 +55,9 @@ Your portal has been generated at D:/
     const buildDirectory = folder ? new DirectoryPath(folder, "build") : workingDirectory.join("build");
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
 
-    const action = new GeneratePortalAction(this.getConfigDir(), authKey, this.onError);
-    await action.execute(buildDirectory, portalDirectory, force, zipPortal);
-  }
-
-  public onError(error: string){
-    this.error(error);
+    const action = new GeneratePortalAction(this.getConfigDir(), authKey);
+    const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
+    result.map((message) =>  this.error(message));
   }
 
   private getConfigDir = () => {
