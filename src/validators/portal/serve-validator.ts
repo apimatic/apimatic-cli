@@ -1,5 +1,4 @@
 import { Result } from "../../types/common/result.js";
-import { ServePaths } from "../../types/portal/serve.js";
 import { DirectoryValidator } from "../common/directoryValidator.js";
 
 export class PortalServeValidator {
@@ -9,8 +8,8 @@ export class PortalServeValidator {
     this.directoryValidator = new DirectoryValidator();
   }
 
-  public async validateSourceDirectory(paths: ServePaths) : Promise<Result<string, string>> {
-    const sourceDirectoryValidationResult = this.directoryValidator.validateSourceDirectory(paths.sourceDirectoryPath);
+  public async validateSourceDirectory(sourceDirectoryPath: string) : Promise<Result<string, string>> {
+    const sourceDirectoryValidationResult = this.directoryValidator.validateSourceDirectory(sourceDirectoryPath);
     if (sourceDirectoryValidationResult.isFailed()) {
       return Result.failure(sourceDirectoryValidationResult.error!);
     }

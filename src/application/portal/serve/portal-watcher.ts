@@ -2,12 +2,11 @@ import * as path from "path";
 import fsExtra from "fs-extra";
 import chokidar from "chokidar";
 import crypto from "crypto";
-import {
-  deleteFile,
-  extractZipFile,
-  getMessageInMagentaColor,
-  zipPortalSource
-} from "../../../utils/utils.js";
+import process from "process";
+import console from "console";
+import { clearInterval, setInterval } from "timers";
+import { Mutex } from "async-mutex";
+import { deleteFile, extractZipFile, getMessageInMagentaColor, zipPortalSource } from "../../../utils/utils.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { GeneratePortalParams } from "../../../types/portal/generate.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
@@ -55,7 +54,7 @@ export class PortalWatcher {
     }
   };
 
-  public async watchAndRegeneratePortal(
+  public async watchAndRegeneratePortalOnChange(
     paths: ServePaths,
     flags: ServeFlags,
     ignoredPaths: string[],
@@ -66,6 +65,7 @@ export class PortalWatcher {
       (ignoredPath) => path.resolve(paths.sourceDirectoryPath, ignoredPath)
     );
 
+    //Regex matches any hidden files and folders.
     const watcher = chokidar.watch(paths.sourceDirectoryPath, {
       ignored: [...absoluteIgnoredPaths, /(^|[/\\])\..+/],
       ignoreInitial: true,
@@ -77,6 +77,7 @@ export class PortalWatcher {
     const deletedDirectories = new Set<string>();
     const eventQueue = new Map();
     const handler = new WatcherHandler();
+    const mutex = new Mutex();
 
     //TODO: Add debounce delay for reducing number of events (greater than 300 ms, already tried that value).
     watcher
@@ -93,9 +94,12 @@ export class PortalWatcher {
           }
         }
 
-        eventQueue.clear();
         const eventId: string = `${Date.now()}-${crypto.randomUUID()}`;
-        eventQueue.set(eventId, path);
+
+        await mutex.runExclusive(async () => {
+          eventQueue.clear();
+          eventQueue.set(eventId, path);
+        });
 
         await handler.execute(async () => {
           await this.handleFileChange(paths, flags, eventQueue, absoluteIgnoredPaths, eventId, configDirectoryPath);
@@ -110,6 +114,7 @@ export class PortalWatcher {
     return watcher;
   }
 
+  //TODO: This could be logically better.
   protected async handleFileChange(
     paths: ServePaths,
     flags: ServeFlags,
@@ -118,6 +123,10 @@ export class PortalWatcher {
     eventId: string,
     configDirectoryPath: string
   ): Promise<void> {
+    if (!eventQueue.has(eventId)) {
+      return;
+    }
+
     this.progressSpinner.start();
 
     const sourceBuildInputZipFilePath = await zipPortalSource(
@@ -135,6 +144,10 @@ export class PortalWatcher {
       generateZipFile: false
     };
 
+    if (!eventQueue.has(eventId)) {
+      return;
+    }
+
     const generateOnPremPortalResult = await this.docsPortalService.generateOnPremPortal(
       generatePortalParams,
       configDirectoryPath
@@ -145,19 +158,19 @@ export class PortalWatcher {
       console.error(generateOnPremPortalResult.error!);
     }
 
-    if (eventQueue.has(eventId)) {
-      await this.saveGeneratedPortalStreamToZipFile(
-        generateOnPremPortalResult.value!,
-        paths.generatedPortalArtifactsZipFilePath
-      );
-
-      await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsDirectoryPath);
-      await deleteFile(paths.generatedPortalArtifactsZipFilePath);
-
-      eventQueue.clear();
-
-      this.progressSpinner.stop();
+    if (!eventQueue.has(eventId)) {
+      return;
     }
+
+    await this.saveGeneratedPortalStreamToZipFile(
+      generateOnPremPortalResult.value!,
+      paths.generatedPortalArtifactsZipFilePath
+    );
+
+    await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsDirectoryPath);
+    await deleteFile(paths.generatedPortalArtifactsZipFilePath);
+
+    this.progressSpinner.stop();
   }
 
   private async saveGeneratedPortalStreamToZipFile(

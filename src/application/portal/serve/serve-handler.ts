@@ -2,12 +2,13 @@ import express from "express";
 import livereload from "livereload";
 import connectLivereload from "connect-livereload";
 import open from "open";
+import process from "process";
 import getPort from "get-port";
+import console from "console";
 import { Server } from "http";
 import { Result } from "../../../types/common/result.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { PortalWatcher } from "./portal-watcher.js";
-import { isPortInUse } from "../../../utils/utils.js";
 
 export class ServeHandler {
   private server!: Server;
@@ -20,37 +21,35 @@ export class ServeHandler {
     this.portalWatcher = new PortalWatcher();
   }
 
-  public async setupServer(generatedPortalPath: string): Promise<Result<string, string>> {
-    const createLiveReloadServerResult = await this.createLiveReloadServer(generatedPortalPath);
+  //TODO: Needs to be refactored after refactoring quickstart.
+  public async setupServer(generatedPortalArtifactsDirectoryPath: string): Promise<Result<string, string>> {
+    const createLiveReloadServerResult = await this.createLiveReloadServer(generatedPortalArtifactsDirectoryPath);
     if (createLiveReloadServerResult.isFailed()) {
       return Result.failure(createLiveReloadServerResult.error!);
     }
 
-    if (this.liveReloadServer) {
-      this.app.use(connectLivereload());
-    }
-    this.app.use(express.static(generatedPortalPath, { extensions: ["html"] }));
+    this.app.use(express.static(generatedPortalArtifactsDirectoryPath, { extensions: ["html"] }));
 
-    return Result.success(`Server is set up and serving files from ${generatedPortalPath}`);
+    return Result.success(`Server is set up and serving files from ${generatedPortalArtifactsDirectoryPath}`);
   }
 
+  //TODO: Needs to be refactored after refactoring quickstart.
   public async startServer(
     paths: ServePaths,
     flags: ServeFlags,
     ignoredPaths: string[],
     configDirectoryPath: string,
-    port: number,
     displayShutdownMessages = true
   ): Promise<Result<boolean, string>> {
     return new Promise<Result<boolean, string>>((resolve, reject) => {
       this.server = this.app
-        .listen(port, async () => {
+        .listen(flags.port, async () => {
           if (flags.open) {
-            await open(`http://localhost:${port}`);
+            await open(`http://localhost:${flags.port}`);
           }
 
           if (!flags["no-reload"]) {
-            await this.portalWatcher.watchAndRegeneratePortal(paths, flags, ignoredPaths, configDirectoryPath);
+            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, flags, ignoredPaths, configDirectoryPath);
           }
 
           if (process.platform !== "darwin") {
@@ -98,32 +97,17 @@ export class ServeHandler {
     }
   }
 
-  // private async findAvailablePort(startPort: number): Promise<number> {
-  //   let port = startPort;
-  //   const maxPort = startPort + 10; // Limit the port search range
-
-  //   while (port < maxPort) {
-  //     if (!(await isPortInUse(port))) {
-  //       return port;
-  //     }
-  //     port++;
-  //   }
-
-  //   // If no port is found in the range, return the original port
-  //   return startPort;
-  // }
-
-  private async createLiveReloadServer(generatedPortalPath: string): Promise<Result<number, string>> {
+  private async createLiveReloadServer(generatedPortalPath: string): Promise<Result<string, string>> {
     try {
       const availablePort = await this.getPortForReloadServer();
-
       this.liveReloadServer = livereload.createServer({
         port: availablePort
       });
 
       this.liveReloadServer.watch(generatedPortalPath);
+      this.app.use(connectLivereload());
 
-      return Result.success(availablePort);
+      return Result.success("Live Reload Server setup successfully.");
     } catch {
       return Result.failure(
         "An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance."
@@ -131,7 +115,7 @@ export class ServeHandler {
     }
   }
 
-  private async getPortForReloadServer() : Promise<number> {
+  private async getPortForReloadServer(): Promise<number> {
     const defaultPorts = [35729, 35730, 35731];
     return await getPort({ port: defaultPorts });
   }

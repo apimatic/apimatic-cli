@@ -8,20 +8,23 @@ import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GeneratePortalParams } from "../../types/portal/generate.js";
 import { deleteFile, extractZipFile, zipPortalSource } from "../../utils/utils.js";
-import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
-import getPort from "get-port";
+import { PortalServeValidator } from "../../validators/portal/serve-validator.js";
 
 export class PortalServeAction {
-  private readonly prompts: PortalServePrompts;
-  private readonly serveHandler: ServeHandler;
-  private readonly docsPortalService: PortalService;
+  protected readonly prompts: PortalServePrompts;
+  protected readonly serveHandler: ServeHandler;
+  protected readonly docsPortalService: PortalService;
   private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
   private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
 
-  public constructor() {
-    this.prompts = new PortalServePrompts();
-    this.serveHandler = new ServeHandler();
-    this.docsPortalService = new PortalService();
+  public constructor(
+    prompts: PortalServePrompts,
+    serveHandler: ServeHandler,
+    docsPortalService: PortalService
+  ) {
+    this.prompts = prompts;
+    this.serveHandler = serveHandler;
+    this.docsPortalService = docsPortalService;
   }
 
   public async servePortal(
@@ -35,8 +38,6 @@ export class PortalServeAction {
       ...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.generatedPortalArtifactsDirectoryPath)
     ];
 
-    const getPortResult = await this.getServerPort(flags.port);
-
     const createDestinationDirectoryResult = await this.createDestinationDirectory(
       paths.generatedPortalArtifactsDirectoryPath
     );
@@ -44,7 +45,7 @@ export class PortalServeAction {
       return Result.failure(createDestinationDirectoryResult.error!);
     }
 
-    const validateSourceDirectoryAndPortResult = await portalServeValidator.validateSourceDirectory(paths);
+    const validateSourceDirectoryAndPortResult = await portalServeValidator.validateSourceDirectory(paths.sourceDirectoryPath);
     if (validateSourceDirectoryAndPortResult.isFailed()) {
       return Result.failure(validateSourceDirectoryAndPortResult.error!);
     }
@@ -64,7 +65,7 @@ export class PortalServeAction {
 
     this.prompts.stopProgressIndicator(`Portal generated successfully at ${flags.destination}`);
 
-    const setupServerResult = await this.serveHandler.setupServer(generatePortalResult.value!);
+    const setupServerResult = await this.serveHandler.setupServer(paths.generatedPortalArtifactsDirectoryPath);
     if (setupServerResult.isFailed()) {
       return Result.failure(setupServerResult.error!);
     }
@@ -119,24 +120,6 @@ export class PortalServeAction {
     await deleteFile(paths.generatedPortalArtifactsZipFilePath);
 
     return Result.success(paths.generatedPortalArtifactsDirectoryPath);
-  }
-
-  private async getServerPort(port: number): Promise<number> {
-    const defaultPorts = [3000, 3001, 3002];
-
-    const preferredPorts =
-      typeof port === "number" ? [port, ...defaultPorts.filter((p) => p !== port)] : defaultPorts;
-
-    const availablePort = await getPort({ port: preferredPorts });
-
-    // Show warning only if user provided --port and it is not available
-    if (typeof port === "number" && availablePort !== port) {
-      this.prompts.displayInfo(
-        `⚠️ Port ${port} is already in use. Available port ${availablePort} will be used.`
-      );
-    }
-
-    return availablePort;
   }
 
   private async checkExistingPortal(generatedPortalArtifactsDirectoryPath: string) {

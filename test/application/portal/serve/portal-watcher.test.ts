@@ -47,21 +47,20 @@ describe("PortalWatcher", () => {
   });
 
   it("can be constructed", () => {
-    const watcher = new PortalWatcher();
-    expect(watcher).to.be.instanceOf(PortalWatcher);
+    const portalWatcher = new PortalWatcher();
+    expect(portalWatcher).to.be.instanceOf(PortalWatcher);
   });
 
   it("sets up watcher and returns a chokidar watcher object", async () => {
     class TestPortalWatcher extends PortalWatcher {
-      // @ts-ignore
       async handleFileChange() {}
     }
-    const watcher = new TestPortalWatcher();
+    const portalWatcher = new TestPortalWatcher();
     const flags = getServeFlags();
     const paths = getServePaths(flags);
-    const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
-    expect(watcherObj).to.have.property("on");
-    await watcherObj.close();
+    const chokidarWatcher = await portalWatcher.watchAndRegeneratePortalOnChange(paths, flags, [], TEST_CONFIG_DIR);
+    expect(chokidarWatcher).to.have.property("on");
+    await chokidarWatcher.close();
   });
 
   it("calls handleFileChange on file change event", async () => {
@@ -69,14 +68,14 @@ describe("PortalWatcher", () => {
     class TestPortalWatcher extends PortalWatcher {
       async handleFileChange() { called = true; }
     }
-    const watcher = new TestPortalWatcher();
+    const portalWatcher = new TestPortalWatcher();
     const flags = getServeFlags();
     const paths = getServePaths(flags);
-    const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
-    watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo.md"));
+    const chokidarWatcher = await portalWatcher.watchAndRegeneratePortalOnChange(paths, flags, [], TEST_CONFIG_DIR);
+    chokidarWatcher.emit("all", "change", path.join(TEST_WORKING_DIR, "foo.md"));
     await new Promise(res => setTimeout(res, 100));
     expect(called).to.be.true;
-    await watcherObj.close();
+    await chokidarWatcher.close();
   });
 
   it("handles errors in watcher event callback gracefully", async () => {
@@ -86,29 +85,45 @@ describe("PortalWatcher", () => {
     const watcher = new TestPortalWatcher();
     const flags = getServeFlags();
     const paths = getServePaths(flags);
-    const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
+    const watcherObj = await watcher.watchAndRegeneratePortalOnChange(paths, flags, [], TEST_CONFIG_DIR);
     watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo.md"));
     await new Promise(res => setTimeout(res, 100));
     await watcherObj.close();
+    // Smoke test: should not throw or crash
     expect(true).to.be.true;
   });
 
   it("debounces rapid file changes (event queue logic)", async () => {
     let callCount = 0;
     class TestPortalWatcher extends PortalWatcher {
-      async handleFileChange() { callCount++; }
+      async handleFileChange(
+        paths: ServePaths,
+        flags: ServeFlags,
+        eventQueue: Map<string, string>,
+        absoluteIgnoredPaths: string[],
+        eventId: string,
+        configDirectoryPath: string
+      ) {
+        if (!eventQueue.has(eventId)) {
+          return;
+        }
+
+        if (eventQueue.has(eventId)) {
+          callCount++;
+        }
+          
+      }
     }
-    const watcher = new TestPortalWatcher();
+    const portalWatcher = new TestPortalWatcher();
     const flags = getServeFlags();
     const paths = getServePaths(flags);
-    const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
-    watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo1.md"));
-    watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo2.md"));
-    watcherObj.emit("all", "change", path.join(TEST_WORKING_DIR, "foo3.md"));
+    const chokidarWatcher = await portalWatcher.watchAndRegeneratePortalOnChange(paths, flags, [], TEST_CONFIG_DIR);
+    chokidarWatcher.emit("all", "change", path.join(TEST_WORKING_DIR, "foo1.md"));
+    chokidarWatcher.emit("all", "change", path.join(TEST_WORKING_DIR, "foo2.md"));
+    chokidarWatcher.emit("all", "change", path.join(TEST_WORKING_DIR, "foo3.md"));
     await new Promise(res => setTimeout(res, 300));
-    expect(callCount).to.be.at.least(1);
-    expect(callCount).to.be.below(4);
-    await watcherObj.close();
+    expect(callCount).to.equal(1);
+    await chokidarWatcher.close();
   });
 
   it("handles watcher close and error events", async () => {
@@ -118,9 +133,10 @@ describe("PortalWatcher", () => {
     const watcher = new TestPortalWatcher();
     const flags = getServeFlags();
     const paths = getServePaths(flags);
-    const watcherObj = await watcher.watchAndRegeneratePortal(paths, flags, [], TEST_CONFIG_DIR);
+    const watcherObj = await watcher.watchAndRegeneratePortalOnChange(paths, flags, [], TEST_CONFIG_DIR);
     watcherObj.emit("error", new Error("fail"));
     await watcherObj.close();
+    // Smoke test, should throw.
     expect(true).to.be.true;
   });
 }); 

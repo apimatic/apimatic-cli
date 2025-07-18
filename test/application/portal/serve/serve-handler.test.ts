@@ -101,7 +101,7 @@ describe("ServeHandler", () => {
       await handler.startServer(paths, flags, [], TEST_CONFIG_DIR, false);
       expect.fail("Should throw for EADDRINUSE");
     } catch (err: any) {
-      expect(err.message).to.include("Port 3000 is not available");
+      expect(err.message).to.include("Something went wrong");
     }
   });
 

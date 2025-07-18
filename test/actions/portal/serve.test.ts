@@ -42,14 +42,11 @@ describe("PortalServeAction", () => {
 
   class TestPortalServeAction extends PortalServeAction {
     constructor(
-      prompts = new TestPrompts(),
-      serverService = new TestServerService(),
-      docsPortalService = new TestDocsPortalService()
+      prompts: TestPrompts,
+      serverService: TestServerService,
+      docsPortalService: TestDocsPortalService
     ) {
-      super();
-      (this as any).prompts = prompts;
-      (this as any).serverService = serverService;
-      (this as any).docsPortalService = docsPortalService;
+      super(prompts, serverService, docsPortalService);
     }
     protected async generatePortal(
       _flags: ServeFlags,
@@ -57,15 +54,21 @@ describe("PortalServeAction", () => {
       _ignoredPaths: string[],
       configDirectoryPath: string
     ): Promise<Result<string, string>> {
-      const docsPortalService = (this as any).docsPortalService as TestDocsPortalService;
-      if (await docsPortalService.generateOnPremPortal({}, configDirectoryPath).then((r) => r.isFailed())) {
-        return Result.failure(docsPortalService.generateResult.error!);
+      const dummyParams = {
+        sourceBuildInputZipFilePath: '',
+        generatedPortalArtifactsFolderPath: '',
+        generatedPortalArtifactsZipFilePath: '',
+        overrideAuthKey: null,
+        generateZipFile: false
+      };
+      if (await this.docsPortalService.generateOnPremPortal(dummyParams, configDirectoryPath).then((r) => r.isFailed())) {
+        return Result.failure((this.docsPortalService as TestDocsPortalService).generateResult.error!);
       }
       await fsExtra.ensureDir(paths.generatedPortalArtifactsDirectoryPath);
       return Result.success(paths.generatedPortalArtifactsDirectoryPath);
     }
     // Helper for tests to access prompts
-    getTestPrompts() { return (this as any).prompts as TestPrompts; }
+    getTestPrompts() { return this.prompts as TestPrompts; }
   }
 
   beforeEach(async () => {
@@ -107,7 +110,7 @@ describe("PortalServeAction", () => {
   }
 
   it("should return success result for valid serve", async () => {
-    const action = new TestPortalServeAction();
+    const action = new TestPortalServeAction(new TestPrompts(), new TestServerService(), new TestDocsPortalService());
     const flags = getFlags();
     const paths = getPaths(flags);
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
@@ -124,7 +127,7 @@ describe("PortalServeAction", () => {
     const prompts = new TestPrompts();
     const docsPortalService = new TestDocsPortalService();
     docsPortalService.generateResult = Result.failure("Simulated failure");
-    const action = new TestPortalServeAction(prompts, undefined, docsPortalService);
+    const action = new TestPortalServeAction(prompts, new TestServerService(), docsPortalService);
     const flags = getFlags();
     const paths = getPaths(flags);
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
@@ -137,7 +140,7 @@ describe("PortalServeAction", () => {
     const prompts = new TestPrompts();
     const serverService = new TestServerService();
     serverService.setupResult = Result.failure("setup fail");
-    const action = new TestPortalServeAction(prompts, serverService);
+    const action = new TestPortalServeAction(prompts, serverService, new TestDocsPortalService());
     const flags = getFlags();
     const paths = getPaths(flags);
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
@@ -149,7 +152,7 @@ describe("PortalServeAction", () => {
     const prompts = new TestPrompts();
     const serverService = new TestServerService();
     serverService.startResult = Result.failure("start fail");
-    const action = new TestPortalServeAction(prompts, serverService);
+    const action = new TestPortalServeAction(prompts, serverService, new TestDocsPortalService());
     const flags = getFlags();
     const paths = getPaths(flags);
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
@@ -175,7 +178,14 @@ describe("PortalServeAction", () => {
         _ignoredPaths: string[],
         configDirectoryPath: string
       ): Promise<Result<string, string>> {
-        await (this as any).docsPortalService.generateOnPremPortal({ overrideAuthKey: flags["auth-key"] }, configDirectoryPath);
+        const dummyParams = {
+          sourceBuildInputZipFilePath: '',
+          generatedPortalArtifactsFolderPath: '',
+          generatedPortalArtifactsZipFilePath: '',
+          overrideAuthKey: flags["auth-key"],
+          generateZipFile: false
+        };
+        await this.docsPortalService.generateOnPremPortal(dummyParams, configDirectoryPath);
         return Result.success(paths.generatedPortalArtifactsDirectoryPath);
       }
     }
@@ -196,7 +206,7 @@ describe("PortalServeAction", () => {
     await fsExtra.writeFile(path.join(relSource, "spec", "spec.json"), "{}", "utf8");
     const flags = getFlags({ folder: relSource, destination: relDest });
     const paths = getPaths(flags);
-    const action = new TestPortalServeAction();
+    const action = new TestPortalServeAction(new TestPrompts(), new TestServerService(), new TestDocsPortalService());
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
     expect(result.isSuccess()).to.be.true;
     expect(await fsExtra.pathExists(paths.generatedPortalArtifactsDirectoryPath)).to.be.true;
@@ -214,7 +224,7 @@ describe("PortalServeAction", () => {
     await fsExtra.writeFile(path.join(absSource, "spec", "spec.json"), "{}", "utf8");
     const flags = getFlags({ folder: absSource, destination: absDest });
     const paths = getPaths(flags);
-    const action = new TestPortalServeAction();
+    const action = new TestPortalServeAction(new TestPrompts(), new TestServerService(), new TestDocsPortalService());
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
     expect(result.isSuccess()).to.be.true;
     expect(await fsExtra.pathExists(paths.generatedPortalArtifactsDirectoryPath)).to.be.true;
@@ -231,7 +241,7 @@ describe("PortalServeAction", () => {
     await fsExtra.ensureDir(dest);
     const flags = getFlags({ folder: ".", destination: dest });
     const paths = getPaths(flags);
-    const action = new TestPortalServeAction();
+    const action = new TestPortalServeAction(new TestPrompts(), new TestServerService(), new TestDocsPortalService());
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
     expect(result.isSuccess()).to.be.true;
     expect(await fsExtra.pathExists(paths.generatedPortalArtifactsDirectoryPath)).to.be.true;
@@ -250,7 +260,7 @@ describe("PortalServeAction", () => {
     await fsExtra.writeFile(path.join(src, "spec", "spec.json"), "{}", "utf8");
     const flags = getFlags({ folder: src, destination: "." });
     const paths = getPaths(flags);
-    const action = new TestPortalServeAction();
+    const action = new TestPortalServeAction(new TestPrompts(), new TestServerService(), new TestDocsPortalService());
     const result = await action.servePortal(flags, paths, TEST_CONFIG_DIR);
     expect(result.isSuccess()).to.be.true;
     expect(await fsExtra.pathExists(paths.generatedPortalArtifactsDirectoryPath)).to.be.true;

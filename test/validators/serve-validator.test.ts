@@ -2,8 +2,8 @@ import * as path from "path";
 import fsExtra from "fs-extra";
 import { expect } from "chai";
 import { dir as tmpDir, DirectoryResult } from "tmp-promise";
-import { PortalServeValidator } from "../../../src/validators/portal/serveValidator.js";
-import { ServeFlags, ServePaths } from "../../../src/types/portal/serve.js";
+import { PortalServeValidator } from "../../src/validators/portal/serve-validator.js";
+import { ServeFlags, ServePaths } from "../../src/types/portal/serve.js";
 
 describe("PortalServeValidator", () => {
   let TEST_WORKING_DIR: string;
@@ -49,42 +49,32 @@ describe("PortalServeValidator", () => {
     await tmpDirResult.cleanup();
   });
 
-  it("should validate correct flags and paths", async () => {
+  it("should validate existing source directory", async () => {
     const flags = getServeFlags();
     const paths = getServePaths(flags);
-    const result = await validator.validateFlagsAndPaths(flags, paths);
+    const result = await validator.validateSourceDirectory(paths.sourceDirectoryPath);
     expect(result.isSuccess()).to.be.true;
   });
 
-  it("should fail for invalid port", async () => {
-    const flags = getServeFlags({ port: -1 });
-    const paths = getServePaths(flags);
-    const result = await validator.validateFlagsAndPaths(flags, paths);
-    expect(result.isFailed()).to.be.true;
-    expect(result.error).to.include("port");
-  });
-
-  it("should fail for non-existent source directory", async () => {
+  it("should validate non-existent source directory", async () => {
     const nonExistentFolder = path.join(TEST_WORKING_DIR, "does-not-exist");
     const flags = getServeFlags({ folder: nonExistentFolder });
     const paths = getServePaths(flags);
-    const result = await validator.validateFlagsAndPaths(flags, paths);
+    const result = await validator.validateSourceDirectory(paths.sourceDirectoryPath);
     expect(result.isFailed()).to.be.true;
-    expect(result.error).to.include("does not exist");
+    expect(result.error).to.include("The specified source directory does not exist");
   });
 
-  it("should fail if spec directory is missing", async () => {
-    const src = path.join(TEST_WORKING_DIR, "no-spec-src");
-    const dest = path.join(TEST_WORKING_DIR, "no-spec-dest");
+  it("should fail if source directory is empty", async () => {
+    const src = path.join(TEST_WORKING_DIR, "no-buildfile-src");
+    const dest = path.join(TEST_WORKING_DIR, "no-buildfile-dest");
     await fsExtra.ensureDir(src);
     await fsExtra.ensureDir(dest);
-    await fsExtra.writeFile(path.join(src, "APIMATIC-BUILD.json"), "{}", "utf8");
-    // Do NOT create spec directory
     const flags = getServeFlags({ folder: src, destination: dest });
     const paths = getServePaths(flags);
-    const result = await validator.validateFlagsAndPaths(flags, paths);
+    const result = await validator.validateSourceDirectory(paths.sourceDirectoryPath);
     expect(result.isFailed()).to.be.true;
-    expect(result.error).to.include("The source directory is missing a 'spec' directory.");
+    expect(result.error).to.include("The source directory is empty.");
     await fsExtra.remove(src);
     await fsExtra.remove(dest);
   });
@@ -96,10 +86,9 @@ describe("PortalServeValidator", () => {
     await fsExtra.ensureDir(dest);
     await fsExtra.ensureDir(path.join(src, "spec"));
     await fsExtra.writeFile(path.join(src, "spec", "spec.json"), "{}", "utf8");
-    // Do NOT create APIMATIC-BUILD.json
     const flags = getServeFlags({ folder: src, destination: dest });
     const paths = getServePaths(flags);
-    const result = await validator.validateFlagsAndPaths(flags, paths);
+    const result = await validator.validateSourceDirectory(paths.sourceDirectoryPath);
     expect(result.isFailed()).to.be.true;
     expect(result.error).to.include("The source directory is missing the 'APIMATIC-BUILD.json' file.");
     await fsExtra.remove(src);
