@@ -18,4 +18,12 @@ export class ActionResult {
       onError(this.message);
     }
   }
+
+  mapAll<T>(onSuccess:() => T, onError: (message: string) => T) {
+    if (this.message) {
+      return onError(this.message);
+    }else {
+      return onSuccess();
+    }
+  }
 }

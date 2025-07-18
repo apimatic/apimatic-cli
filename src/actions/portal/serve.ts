@@ -7,7 +7,8 @@ import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GeneratePortalParams } from "../../types/portal/generate.js";
 import { deleteFile, extractZipFile, zipPortalSource } from "../../utils/utils.js";
-import { PortalServeValidator } from "../../validators/portal/serve-validator.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { ActionResult } from "../actionResult.js";
 
 export class PortalServeAction {
   protected readonly prompts: PortalServePrompts;
@@ -25,56 +26,42 @@ export class PortalServeAction {
   public async servePortal(
     flags: ServeFlags,
     paths: ServePaths,
-    configDirectoryPath: string
+    configDirectoryPath: string,
+    generatePortal: (
+      buildDirectory: DirectoryPath,
+      portalDirectory: DirectoryPath,
+      force: boolean,
+      zipPortal: boolean
+    ) => Promise<ActionResult>
   ): Promise<Result<string, string>> {
-    const portalServeValidator = new PortalServeValidator();
     const ignoredPaths = [
       ...flags.ignore.split(",").map((path) => path.trim()),
       ...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.generatedPortalArtifactsDirectoryPath)
     ];
 
-    const createDestinationDirectoryResult = await this.createDestinationDirectory(
-      paths.generatedPortalArtifactsDirectoryPath
+    const result = await generatePortal(
+      new DirectoryPath(paths.sourceDirectoryPath),
+      new DirectoryPath(paths.generatedPortalArtifactsDirectoryPath),
+      true, false);
+
+    return result.mapAll<Promise<Result<string, string>>>(
+      async () => {
+        const setupServerResult = await this.serveHandler.setupServer(paths.generatedPortalArtifactsDirectoryPath);
+        if (setupServerResult.isFailed()) {
+          return Result.failure(setupServerResult.error!);
+        }
+
+        const startServerResult = await this.serveHandler.startServer(paths, flags, ignoredPaths, generatePortal);
+        if (startServerResult.isFailed()) {
+          return Result.failure(startServerResult.error!);
+        }
+
+        this.prompts.displayOutroMessage(flags.port);
+
+        return Result.success(`Portal was successfully served.`);
+      },
+      async (message) => Result.failure(message)
     );
-    if (createDestinationDirectoryResult.isFailed()) {
-      return Result.failure(createDestinationDirectoryResult.error!);
-    }
-
-    const validateSourceDirectoryAndPortResult = await portalServeValidator.validateSourceDirectory(
-      paths.sourceDirectoryPath
-    );
-    if (validateSourceDirectoryAndPortResult.isFailed()) {
-      return Result.failure(validateSourceDirectoryAndPortResult.error!);
-    }
-
-    const checkExistingPortalResult = await this.checkExistingPortal(paths.generatedPortalArtifactsDirectoryPath);
-    if (checkExistingPortalResult?.isCancelled()) {
-      return Result.cancelled(checkExistingPortalResult.value!);
-    }
-
-    this.prompts.startProgressIndicator("Generating portal");
-
-    const generatePortalResult = await this.generatePortal(flags, paths, ignoredPaths, configDirectoryPath);
-    if (generatePortalResult.isFailed()) {
-      this.prompts.stopProgressIndicator("There was an error while generating the portal.");
-      return Result.failure(generatePortalResult.error!);
-    }
-
-    this.prompts.stopProgressIndicator(`Portal generated successfully at ${flags.destination}`);
-
-    const setupServerResult = await this.serveHandler.setupServer(paths.generatedPortalArtifactsDirectoryPath);
-    if (setupServerResult.isFailed()) {
-      return Result.failure(setupServerResult.error!);
-    }
-
-    const startServerResult = await this.serveHandler.startServer(paths, flags, ignoredPaths, configDirectoryPath);
-    if (startServerResult.isFailed()) {
-      return Result.failure(startServerResult.error!);
-    }
-
-    this.prompts.displayOutroMessage(flags.port);
-
-    return Result.success(`Portal was successfully served.`);
   }
 
   protected async generatePortal(

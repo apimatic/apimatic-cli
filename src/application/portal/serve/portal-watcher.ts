@@ -129,46 +129,7 @@ export class PortalWatcher {
 
     this.progressSpinner.start();
 
-    const sourceBuildInputZipFilePath = await zipPortalSource(
-      paths.sourceDirectoryPath,
-      path.join(paths.sourceDirectoryPath, ".portal_source.zip"),
-      absoluteIgnoredPaths
-    );
-
-    //TODO: Remove usage of empty string and null.
-    const generatePortalParams: GeneratePortalParams = {
-      sourceBuildInputZipFilePath: sourceBuildInputZipFilePath,
-      generatedPortalArtifactsFolderPath: paths.generatedPortalArtifactsDirectoryPath,
-      generatedPortalArtifactsZipFilePath: "",
-      overrideAuthKey: flags["auth-key"] ?? null,
-      generateZipFile: false
-    };
-
-    if (!eventQueue.has(eventId)) {
-      return;
-    }
-
-    const generateOnPremPortalResult = await this.docsPortalService.generateOnPremPortal(
-      generatePortalParams,
-      configDirectoryPath
-    );
-    await deleteFile(sourceBuildInputZipFilePath);
-    if (generateOnPremPortalResult.isFailed()) {
-      this.progressSpinner.error();
-      console.error(generateOnPremPortalResult.error!);
-    }
-
-    if (!eventQueue.has(eventId)) {
-      return;
-    }
-
-    await this.saveGeneratedPortalStreamToZipFile(
-      generateOnPremPortalResult.value!,
-      paths.generatedPortalArtifactsZipFilePath
-    );
-
-    await extractZipFile(paths.generatedPortalArtifactsZipFilePath, paths.generatedPortalArtifactsDirectoryPath);
-    await deleteFile(paths.generatedPortalArtifactsZipFilePath);
+    
 
     this.progressSpinner.stop();
   }
