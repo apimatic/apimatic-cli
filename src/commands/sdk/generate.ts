@@ -3,7 +3,7 @@ import fsExtra from "fs-extra";
 
 import { Command, Flags } from "@oclif/core";
 import { SDKClient } from "../../client-utils/sdk-client.js";
-import { ApiError, CodeGenerationExternalApisController, Client } from "@apimatic/sdk";
+import { ApiError, Client, CodeGenerationExternalApisController } from "@apimatic/sdk";
 
 import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/utils.js";
 import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate.js";

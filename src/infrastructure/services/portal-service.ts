@@ -1,6 +1,7 @@
+import * as path from "path";
+import * as os from "os";
 import fsExtra from "fs-extra";
 import fs from "fs";
-import * as path from "path";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -47,7 +48,7 @@ export class PortalService {
     return this.createApiClient(authorizationHeader);
   }
 
-  async generateOnPremPortal(
+  public async generateOnPremPortal(
     params: GeneratePortalParams,
     configDir: string
   ): Promise<Result<NodeJS.ReadableStream, string>> {
@@ -56,6 +57,10 @@ export class PortalService {
     }
 
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+    if (authInfo === null && !params.overrideAuthKey) {
+      return Result.failure("You are not logged in, please login using `apimatic auth:login` first.");
+    }
+
     const authorizationHeader = this.createAuthorizationHeader(authInfo, params.overrideAuthKey);
     const client = this.createApiClient(authorizationHeader);
     const docsPortalManagementController = new DocsPortalManagementController(client);
@@ -71,7 +76,7 @@ export class PortalService {
     }
   }
 
-  async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
+  public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
     if (!(await fsExtra.pathExists(specPath))) {
       return Result.failure("Spec file doesn't exist");
     }
@@ -114,11 +119,20 @@ export class PortalService {
     return `X-Auth-Key ${key ?? ""}`;
   };
 
+  private getUserAgent(): string {
+      const osInfo = `${os.platform()} ${os.release()}`;
+      const engine = "Node.js";
+      const engineVersion = process.version;
+      
+      return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
+    }
+    
   private createApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
+      userAgent: this.getUserAgent(),
       timeout: this.TIMEOUT
     });
   };
@@ -151,10 +165,12 @@ export class PortalService {
       //500
       const body = await this.parseErrorResponse(error);
       return getMessageInRedColor(
-        `${body.message} Please try again or reach out to our team at support@apimatic.io for help if your problem persists.`
+        `${body.message} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
-      return getMessageInRedColor(error instanceof Error ? error.message : String(error));
+      return getMessageInRedColor(
+        "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
+      );
     }
   };
 

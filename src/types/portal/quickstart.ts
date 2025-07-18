@@ -4,13 +4,13 @@ export type LoginCredentials = {
 }
 
 export type SpecFile = {
-    filePath: string;
+    localPath: string;
     url: string;
 }
 
 export type PortalServerConfig = {
     generatedPortalPath: string;
-    targetFolder: string;
+    sourceDirectoryPath: string;
     configDir: string;
     authKey: string | null;
     ignoredPaths?: string[];

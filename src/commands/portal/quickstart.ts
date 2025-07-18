@@ -93,7 +93,7 @@ export default class PortalQuickstart extends Command {
         await controller.userLogin(credentials, SDKClient.getInstance(), this.config.configDir);
         loggedIn = true;
         prompts.displayLoggedInMessage();
-      } catch (error) {
+      } catch {
         prompts.displayLoggingInErrorMessage();
       }
     }
