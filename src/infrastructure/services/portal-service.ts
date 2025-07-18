@@ -21,9 +21,9 @@ import { Result } from "../../types/common/result.js";
 import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Sdl } from "../../types/sdl/sdl.js";
-import { FilePath } from "../../models/filePath.js";
-import { DirectoryPath } from "../../models/directoryPath.js";
-import { FileService } from "../fileService.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FileService } from "../file-service.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;

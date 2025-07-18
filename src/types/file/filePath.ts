@@ -10,7 +10,7 @@ export class FilePath {
     this.fileName = name;
     this.directoryPath = path;
   }
-
+  
   public toString(): string {
     return path.join(this.directoryPath.toString() , this.fileName.toString());
   }

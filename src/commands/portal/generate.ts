@@ -1,18 +1,14 @@
-import * as path from "path";
 import { Command, Config, Flags } from "@oclif/core";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
-import { DirectoryPath } from "../../models/directoryPath.js";
-import { ZipArchiver } from "../../infrastructure/zipArchiver.js";
-import { FilePath } from "../../models/filePath.js";
-import { FileService } from "../../infrastructure/fileService.js";
-import { FileName } from "../../models/fileName.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { ZipService } from "../../infrastructure/zip-service.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { FileName } from "../../types/file/fileName.js";
+import { FileService } from "../../infrastructure/file-service.js";
+import { withDir } from "tmp-promise";
 
-
-const DEFAULT_FOLDER = "./";
-const DEFAULT_DESTINATION = "./";
-const GENERATED_PORTAL_ARTIFACTS_FOLDER = "generated_portal";
-const GENERATED_PORTAL_ARTIFACTS_ZIP = ".generated_portal.zip";
+const DEFAULT_WORKING_DIRECTORY = "./";
 
 export class PortalGenerate extends Command {
   static description =
@@ -20,11 +16,9 @@ export class PortalGenerate extends Command {
 
   static flags = {
     folder: Flags.string({
-      default: DEFAULT_FOLDER,
       description: "path to the input directory containing API specifications and config files"
     }),
     destination: Flags.string({
-      default: DEFAULT_DESTINATION,
       description: "path to the downloaded portal"
     }),
     force: Flags.boolean({
@@ -49,73 +43,73 @@ Your portal has been generated at D:/
   ];
 
   private readonly prompts: PortalGeneratePrompts;
-  private readonly zipArchiver: ZipArchiver;
+  private readonly zipArchiver: ZipService;
   private readonly fileService: FileService;
   private readonly portalService: PortalService;
 
   constructor(argv: string[], config: Config) {
     super(argv, config);
     this.prompts = new PortalGeneratePrompts();
-    this.zipArchiver = new ZipArchiver();
+    this.zipArchiver = new ZipService();
     this.fileService = new FileService();
-    this.portalService = new PortalService()
+    this.portalService = new PortalService();
   }
 
   async run(): Promise<void> {
-    const {
-      flags: { folder, destination, force }
-    } = await this.parse(PortalGenerate);
+    const { flags: { folder, destination, force, zip: zipPortal } } = await this.parse(PortalGenerate);
 
-    const workingDirectory = new DirectoryPath(path.resolve(folder));
-    const buildDirectory = workingDirectory.join("build");
+    const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = folder ? new DirectoryPath(folder) : workingDirectory.join("build");
+    const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
 
-    if (!(await this.validateBuild(buildDirectory))) {
+    if (buildDirectory.isEqual(portalDirectory)) {
+      this.error("build directory and portal directory cannot be the same");
+    }
+
+    if (!await this.validateBuild(buildDirectory)) {
       this.error("build directory is empty or not valid");
     }
 
-    const destinationDirectory = destination == DEFAULT_DESTINATION ? workingDirectory : new DirectoryPath(destination);
-    const portalDirectory = destinationDirectory.join("portal");
-
-    if (await this.validatePortal(portalDirectory, force)) {
+    if (!await this.validatePortal(portalDirectory, force)) {
       this.error("portal directory is empty or not valid");
     }
 
-    // TODO: move this to temp directory
-    const buildZipPath = new FilePath(workingDirectory, new FileName('build.zip'));
-    // this.prompts.displayPortalGenerationMessage();
+    await withDir(async (o) => {
+      this.prompts.displayPortalGenerationMessage();
 
-    await this.fileService.deleteFile(buildZipPath);
-    // Delete zip
-    await this.zipArchiver.archive(buildDirectory, buildZipPath);
+      const tempDirectory = new DirectoryPath(o.path);
 
-    const buildStream = await this.portalService.generatePortal(buildZipPath, this.getConfigDir());
+      const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
+      await this.zipArchiver.archive(buildDirectory, buildZipPath);
 
-    const portalFilePath = new FilePath(workingDirectory, new FileName('portal.zip'));
+      const buildStream = await this.portalService.generatePortal(buildZipPath, this.getConfigDir());
+      this.prompts.displayPortalGenerationSuccessMessage();
 
-    await this.fileService.writeFile(portalFilePath, <NodeJS.ReadableStream>buildStream);
+      const tempPortalFilePath = new FilePath(tempDirectory, new FileName("portal.zip"));
+      await this.fileService.writeFile(tempPortalFilePath, <NodeJS.ReadableStream>buildStream);
+
+      await this.fileService.cleanDirectory(portalDirectory);
+      if (zipPortal) {
+        const portalFilePath = new FilePath(portalDirectory, new FileName("portal.zip"));
+        await this.fileService.copy(tempPortalFilePath, portalFilePath);
+      } else {
+        await this.zipArchiver.unArchive(tempPortalFilePath, portalDirectory);
+      }
+    }, { unsafeCleanup: true }); // also removes nested files & dirs
   }
 
   private getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
-  }
+  };
 
-  // New methods go here
   private async validateBuild(buildDirectory: DirectoryPath) {
     // TODO: add more checks here
     return await this.fileService.directoryExists(buildDirectory);
   }
 
   private async validatePortal(portalDirectory: DirectoryPath, forceCleanup: boolean): Promise<boolean> {
-    const exists = await this.fileService.directoryExists(portalDirectory);
-    if (exists && forceCleanup) {
-      await this.fileService.deleteDirectory(portalDirectory);
-      return false;
-    }
-    return exists;
+    const isEmptyOrNotExists = await this.fileService.directoryEmpty(portalDirectory);
+    if (isEmptyOrNotExists) return true;
+    return forceCleanup || await this.prompts.overwritePortal(portalDirectory);
   }
 }
-
-
-
-
-
