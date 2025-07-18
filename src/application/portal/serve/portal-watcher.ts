@@ -1,63 +1,17 @@
 import * as path from "path";
-import fsExtra from "fs-extra";
 import chokidar from "chokidar";
 import crypto from "crypto";
-import process from "process";
 import console from "console";
-import { clearInterval, setInterval } from "timers";
 import { Mutex } from "async-mutex";
-import { getMessageInMagentaColor } from "../../../utils/utils.js";
-import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
-import { PortalService } from "../../../infrastructure/services/portal-service.js";
+import { ServePaths } from "../../../types/portal/serve.js";
 import { WatcherHandler } from "./watcher-handler.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ActionResult } from "../../../actions/actionResult.js";
 
 export class PortalWatcher {
-  private readonly docsPortalService: PortalService;
-
-  public constructor() {
-    this.docsPortalService = new PortalService();
-  }
-
-  private readonly progressSpinner = {
-    frames: ["◒", "◐", "◓", "◑"].map((frame) => getMessageInMagentaColor(frame)),
-    isRunning: false,
-    interval: null as NodeJS.Timeout | null,
-    frameIndex: 0,
-    text: "Regenerating portal... ",
-    start() {
-      if (this.interval) {
-        return;
-      }
-
-      this.interval = setInterval(() => {
-        this.frameIndex = (this.frameIndex + 1) % this.frames.length;
-        process.stdout.write(`\r\u001b[K${this.format()}`);
-      }, 100);
-    },
-    stop() {
-      if (this.interval !== null) {
-        clearInterval(this.interval);
-        this.interval = null;
-      }
-      process.stdout.write("\r\u001b[K  ✅  Portal regenerated successfully. ");
-    },
-    error() {
-      if (this.interval !== null) {
-        clearInterval(this.interval);
-        this.interval = null;
-      }
-      process.stdout.write("\r\u001b[K  ❌  Portal regeneration unsuccessful. ");
-    },
-    format() {
-      return `   ${this.frames[this.frameIndex]}  ${this.text}`;
-    }
-  };
 
   public async watchAndRegeneratePortalOnChange(
     paths: ServePaths,
-    flags: ServeFlags,
     ignoredPaths: string[],
     generatePortal: (
       buildDirectory: DirectoryPath,
@@ -108,7 +62,7 @@ export class PortalWatcher {
         });
 
         await handler.execute(async () => {
-          await this.handleFileChange(paths, flags, eventQueue, absoluteIgnoredPaths, eventId, generatePortal);
+          await this.handleFileChange(paths, eventQueue, eventId, generatePortal);
         });
       })
       .on("error", () => {
@@ -123,9 +77,7 @@ export class PortalWatcher {
   //TODO: This could be logically better.
   protected async handleFileChange(
     paths: ServePaths,
-    flags: ServeFlags,
     eventQueue: Map<string, string>,
-    absoluteIgnoredPaths: string[],
     eventId: string,
     generatePortal: (
       buildDirectory: DirectoryPath,
@@ -137,32 +89,8 @@ export class PortalWatcher {
     if (!eventQueue.has(eventId)) {
       return;
     }
-
-    this.progressSpinner.start();
-
     const result = await generatePortal(new DirectoryPath(paths.sourceDirectoryPath), new DirectoryPath(paths.destinationDirectoryPath), true, false);
-
     result.map(error => console.log(error));
-
-    this.progressSpinner.stop();
   }
 
-  private async saveGeneratedPortalStreamToZipFile(
-    data: NodeJS.ReadableStream,
-    generatedPortalArtifactsZipFilePath: string
-  ): Promise<void> {
-    const writeStream = fsExtra.createWriteStream(generatedPortalArtifactsZipFilePath);
-    await new Promise<void>((resolve, reject) => {
-      data
-        .pipe(writeStream)
-        .on("finish", () => resolve())
-        .on("error", () =>
-          reject(
-            new Error(
-              `An unexpected error occurred while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
-            )
-          )
-        );
-    });
-  }
 }

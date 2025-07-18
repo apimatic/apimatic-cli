@@ -1,5 +1,4 @@
 import path from "path";
-import fs from "fs-extra";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
@@ -61,19 +60,6 @@ export class PortalServeAction {
     );
   }
 
-
-  private async checkExistingPortal(generatedPortalArtifactsDirectoryPath: string) {
-    const items = await this.getDirectoryItems(generatedPortalArtifactsDirectoryPath);
-    if (items.length > 0) {
-      const overwriteExistingPortal = await this.prompts.overwriteExistingPortalArtifactsPrompt();
-      if (!overwriteExistingPortal) {
-        return Result.cancelled(
-          "Please enter a different destination folder or remove the existing files and try again."
-        );
-      }
-    }
-  }
-
   private getGeneratedFilesPaths(sourceDirectoryPath: string, generatedPortalArtifactsDirectoryPath: string): string[] {
     const generatedBuildInputZipPath = path.join(sourceDirectoryPath, this.GENERATED_BUILD_INPUT_ZIP_FILENAME);
     const generatedPortalArtifactsZipFilePath = path.join(
@@ -82,40 +68,5 @@ export class PortalServeAction {
     );
 
     return [generatedBuildInputZipPath, generatedPortalArtifactsZipFilePath, generatedPortalArtifactsDirectoryPath];
-  }
-
-  private async saveGeneratedPortalStreamToZipFile(
-    data: NodeJS.ReadableStream,
-    generatedPortalArtifactsZipFilePath: string
-  ): Promise<void> {
-    const writeStream = fs.createWriteStream(generatedPortalArtifactsZipFilePath);
-    await new Promise<void>((resolve, reject) => {
-      data
-        .pipe(writeStream)
-        .on("finish", () => resolve())
-        .on("error", () =>
-          reject(
-            new Error(
-              `Something went wrong while generating the portal. Please try again later. If the issue persists, contact our team at support@apimatic.io`
-            )
-          )
-        );
-    });
-  }
-
-  private async createDestinationDirectory(destination: string): Promise<Result<string, string>> {
-    try {
-      await fs.ensureDir(destination);
-      return Result.success("Destination directory created successfully.");
-    } catch {
-      return Result.failure(
-        "Failed to create the destination directory. Please check if you have sufficient permissions for the specified directory, or specify another location."
-      );
-    }
-  }
-
-  private async getDirectoryItems(directoryPath: string): Promise<string[]> {
-    const items = (await fs.readdir(directoryPath)).filter((item) => !item.startsWith("."));
-    return items;
   }
 }

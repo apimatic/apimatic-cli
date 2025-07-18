@@ -56,7 +56,7 @@ export class ServeHandler {
           }
 
           if (!flags["no-reload"]) {
-            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, flags, ignoredPaths, generatePortal);
+            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, ignoredPaths, generatePortal);
           }
 
           if (process.platform !== "darwin") {
