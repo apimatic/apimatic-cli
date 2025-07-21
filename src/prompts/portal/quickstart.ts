@@ -11,9 +11,9 @@ import {
   isValidUrl,
   directoryToJson
 } from "../../utils/utils.js";
+import { BasePrompts } from "./common/base-prompts.js";
 
-export class PortalQuickstartPrompts {
-  private readonly spin = spinner();
+export class PortalQuickstartPrompts extends BasePrompts {
   private readonly vscodeExtensionUrl =
     "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
   private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
@@ -273,7 +273,7 @@ export class PortalQuickstartPrompts {
       .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
       .join("\n");
 
-    log.info(coloredLogString);
+    log.step(coloredLogString);
   }
 
   displayPortalGenerationMessage(): void {
