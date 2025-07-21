@@ -111,21 +111,24 @@ export default class PortalQuickstart extends Command {
 
       const languages = await prompts.sdkLanguagesPrompt();
 
-      const workingDirectory = await this.getWorkingDirectory(prompts, controller, specFile, apiValidationSummary, languages);
-
+      const workingDirectory = await this.getWorkingDirectory(
+        prompts,
+        controller,
+        specFile,
+        apiValidationSummary,
+        languages
+      );
 
       const portalServePrompts = new PortalServePrompts();
-      const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService())
+      const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService());
 
       //TODO: This needs to be moved within the action. Port should not be initialized again here.
       const port = await this.getServerPort(3000);
 
       const buildDirectory = new DirectoryPath(workingDirectory, "build");
-      const portalDirectory =  new DirectoryPath(workingDirectory,"portal");
-
+      const portalDirectory = new DirectoryPath(workingDirectory, "portal");
 
       const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.config.configDir), null);
-      //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
 
       const serveFlags: ServeFlags = {
         folder: buildDirectory.toString(),
@@ -133,16 +136,21 @@ export default class PortalQuickstart extends Command {
         port: port,
         open: true,
         "no-reload": false,
-        ignore: '',
+        ignore: "",
         "auth-key": undefined
       };
 
       const serverPaths: ServePaths = {
-        sourceDirectoryPath : buildDirectory.toString(),
+        sourceDirectoryPath: buildDirectory.toString(),
         destinationDirectoryPath: portalDirectory.toString()
       };
 
-      const servePortalResult = await portalServeAction.servePortal(serveFlags, serverPaths, generatePortalAction.execute);
+      const servePortalResult = await portalServeAction.servePortal(
+        serveFlags,
+        serverPaths,
+        generatePortalAction.execute
+      );
+      
       if (servePortalResult.isFailed()) {
         portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
         return;
