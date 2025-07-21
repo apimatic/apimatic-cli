@@ -1,7 +1,6 @@
 import * as path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
-import which from "which";
 import { parse } from "yaml";
 import { TreeObject } from "treeify";
 import { tmpdir } from "os";
@@ -14,6 +13,7 @@ import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;
@@ -26,7 +26,7 @@ export class PortalRecipeAction {
   }
 
   public async createRecipe(
-    buildDirectoryPath: string,
+    buildDirectoryPath: DirectoryPath,
     configDir: string,
     buildConfigFilePath?: string,
     name?: string
@@ -109,9 +109,9 @@ export class PortalRecipeAction {
       .join("");
   }
 
-  private async validateBuildDirectoryPath(buildDirectoryPath: string): Promise<Result<string, string>> {
-    if (!(await fsExtra.pathExists(buildDirectoryPath))) {
-      return Result.failure(`Portal build input folder ${buildDirectoryPath} does not exist.`);
+  private async validateBuildDirectoryPath(buildDirectoryPath: DirectoryPath): Promise<Result<string, string>> {
+    if (!(await fsExtra.pathExists(buildDirectoryPath.toString()))) {
+      return Result.failure(`Portal build input folder ${buildDirectoryPath.toString()} does not exist.`);
     }
 
     return Result.success("Portal build input folder path validated successfully.");
@@ -253,17 +253,17 @@ export class PortalRecipeAction {
   }
 
   private async getResolvedBuildConfigFilePath(
-    buildDirectoryPath: string,
+    buildDirectoryPath: DirectoryPath,
     buildConfigFilePath?: string
   ): Promise<string> {
     if (!buildConfigFilePath) {
-      const files = await fs.promises.readdir(buildDirectoryPath);
+      const files = await fs.promises.readdir(buildDirectoryPath.toString());
       const buildFileExists = files.find((file) => file === this.BUILD_FILE_NAME);
       if (!buildFileExists) {
-        return await this.prompts.buildConfigFilePathPrompt(buildDirectoryPath);
+        return await this.prompts.buildConfigFilePathPrompt(buildDirectoryPath.toString());
       }
 
-      return path.join(buildDirectoryPath, this.BUILD_FILE_NAME);
+      return path.join(buildDirectoryPath.toString(), this.BUILD_FILE_NAME);
     }
 
     return buildConfigFilePath;
@@ -357,12 +357,12 @@ export class PortalRecipeAction {
   }
 
   //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
-  private getContentFolderPath(buildConfig: any, buildDirectoryPath: string): string {
+  private getContentFolderPath(buildConfig: any, buildDirectoryPath: DirectoryPath): string {
     const contentFolder = buildConfig.generatePortal?.contentFolder;
     if (contentFolder) {
-      return path.join(buildDirectoryPath, contentFolder);
+      return path.join(buildDirectoryPath.toString(), contentFolder);
     }
 
-    return buildDirectoryPath;
+    return buildDirectoryPath.toString();
   }
 }
