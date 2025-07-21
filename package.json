@@ -72,7 +72,6 @@
         "treeify": "^1.1.0",
         "tslib": "^2.8.1",
         "unzipper": "^0.12.3",
-        "which": "^5.0.0",
         "yaml": "^2.8.0"
     },
     "devDependencies": {
@@ -94,7 +93,6 @@
         "@types/sinon": "^17.0.4",
         "@types/treeify": "^1.0.3",
         "@types/unzipper": "^0.10.4",
-        "@types/which": "^3.0.4",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
         "chai": "^4.5.0",
