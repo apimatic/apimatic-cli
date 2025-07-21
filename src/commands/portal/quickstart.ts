@@ -5,6 +5,14 @@ import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
 import { SpecFile } from "../../types/portal/quickstart.js";
 import { getMessageInRedColor } from "../../utils/utils.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { PortalServeAction } from "../../actions/portal/serve.js";
+import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
+import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { PortalServePrompts } from "../../prompts/portal/serve.js";
+import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
+import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import getPort from "get-port";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -42,38 +50,26 @@ export default class PortalQuickstart extends Command {
     return apiValidationSummary;
   }
 
-  private async getBuildDirectory(
+  private async getWorkingDirectory(
     prompts: PortalQuickstartPrompts,
     controller: PortalQuickstartController,
     specFile: SpecFile,
     apiValidationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<string> {
-    const buildDirectoryPath = await prompts.buildDirectoryPrompt();
+    const workingDirectory = await prompts.workingDirectoryPrompt();
 
     prompts.displayBuildDirectoryGenerationMessage();
 
-    await controller.setupBuildDirectory(prompts, buildDirectoryPath, specFile, apiValidationSummary, languages);
+    const buildDirectory = new DirectoryPath(workingDirectory, "build").toString();
 
-    prompts.displayBuildDirectoryGenerationSuccessMessage(buildDirectoryPath);
+    await controller.setupBuildDirectory(prompts, buildDirectory, specFile, apiValidationSummary, languages);
 
-    prompts.displayBuildDirectoryAsTree(buildDirectoryPath);
+    prompts.displayBuildDirectoryGenerationSuccessMessage(buildDirectory);
 
-    return buildDirectoryPath;
-  }
+    prompts.displayBuildDirectoryAsTree(buildDirectory);
 
-  private async getGeneratedPortalPath(
-    prompts: PortalQuickstartPrompts,
-    controller: PortalQuickstartController,
-    directory: string
-  ): Promise<string> {
-    prompts.displayPortalGenerationMessage();
-
-    const generatedPortalPath = await controller.generatePortalArtifacts(directory, this.config.configDir);
-
-    prompts.displayPortalGenerationSuccessMessage();
-
-    return generatedPortalPath;
+    return workingDirectory;
   }
 
   async run() {
@@ -115,17 +111,59 @@ export default class PortalQuickstart extends Command {
 
       const languages = await prompts.sdkLanguagesPrompt();
 
-      const directory = await this.getBuildDirectory(prompts, controller, specFile, apiValidationSummary, languages);
+      const workingDirectory = await this.getWorkingDirectory(prompts, controller, specFile, apiValidationSummary, languages);
 
-      const generatedPortalPath = await this.getGeneratedPortalPath(prompts, controller, directory);
 
-      const serverStarted = await controller.servePortal(generatedPortalPath, directory, this.config.configDir);
+      const portalServePrompts = new PortalServePrompts();
+      const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService())
 
-      if (serverStarted) {
-        prompts.displayOutroMessage(directory);
+      //TODO: This needs to be moved within the action. Port should not be initialized again here.
+      const port = await this.getServerPort(3000);
+
+      const buildDirectory = new DirectoryPath(workingDirectory, "build");
+      const portalDirectory =  new DirectoryPath(workingDirectory,"portal");
+
+
+      const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.config.configDir), null);
+      //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+
+      const serveFlags: ServeFlags = {
+        folder: buildDirectory.toString(),
+        destination: portalDirectory.toString(),
+        port: port,
+        open: true,
+        "no-reload": false,
+        ignore: '',
+        "auth-key": undefined
+      };
+
+      const serverPaths: ServePaths = {
+        sourceDirectoryPath : buildDirectory.toString(),
+        destinationDirectoryPath: portalDirectory.toString()
+      };
+
+      const servePortalResult = await portalServeAction.servePortal(serveFlags, serverPaths, generatePortalAction.execute);
+      if (servePortalResult.isFailed()) {
+        portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
+        return;
       }
+
+      if (servePortalResult.isCancelled()) {
+        portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
+        return;
+      }
+
+      prompts.displayOutroMessage(workingDirectory);
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }
+  }
+
+  private async getServerPort(port: number | undefined): Promise<number> {
+    const defaultPorts = [3000, 3001, 3002];
+
+    const preferredPorts = typeof port === "number" ? [port, ...defaultPorts.filter((p) => p !== port)] : defaultPorts;
+
+    return await getPort({ port: preferredPorts });
   }
 }

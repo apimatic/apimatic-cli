@@ -88,7 +88,7 @@ export class PortalQuickstartPrompts {
 
   removeQuotes(str: string) {
     const quotes = ['"', "'"];
-    
+
     for (const quote of quotes) {
         if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
             return str.slice(1, -1);
@@ -209,7 +209,7 @@ export class PortalQuickstartPrompts {
     return languages;
   }
 
-  async buildDirectoryPrompt(): Promise<string> {
+  async workingDirectoryPrompt(): Promise<string> {
     log.step(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
 
     const directory = await text({

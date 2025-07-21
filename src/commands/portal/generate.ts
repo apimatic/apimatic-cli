@@ -1,31 +1,19 @@
-import * as path from "path";
-import fsExtra from "fs-extra";
 import { Command, Flags } from "@oclif/core";
-import { GenerateFlags, PortalPaths } from "../../types/portal/generate.js";
-import { getMessageInRedColor } from "../../utils/utils.js";
-import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
-import { PortalGenerateAction } from "../../actions/portal/generate.js";
-import { Result } from "../../types/common/result.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
 
-const DEFAULT_FOLDER = "./";
-const DEFAULT_DESTINATION = path.resolve("./");
-const GENERATED_PORTAL_ARTIFACTS_FOLDER = "generated_portal";
-const GENERATED_PORTAL_ARTIFACTS_ZIP = ".generated_portal.zip";
+const DEFAULT_WORKING_DIRECTORY = "./";
 
-export default class PortalGenerate extends Command {
+export class PortalGenerate extends Command {
   static description =
     "Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)";
 
   static flags = {
     folder: Flags.string({
-      parse: async (input: string) => path.resolve(input),
-      default: DEFAULT_FOLDER,
-      description: "path to the input directory containing API specifications and config files"
+      description: "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      parse: async (input: string) => path.resolve(input),
-      default: DEFAULT_DESTINATION,
-      description: "path to the downloaded portal"
+      description: "[default: ./portal] path where the portal will be downloaded",
     }),
     force: Flags.boolean({
       char: "f",
@@ -34,10 +22,9 @@ export default class PortalGenerate extends Command {
     }),
     zip: Flags.boolean({
       default: false,
-      description: "download the generated portal as a .zip archive"
+      description: "download the generated portal as a .zip archive",
     }),
     "auth-key": Flags.string({
-      default: "",
       description: "override current authentication state with an authentication key"
     })
   };
@@ -48,67 +35,27 @@ Your portal has been generated at D:/
 `
   ];
 
-  private readonly prompts: PortalGeneratePrompts;
-
-  constructor(argv: string[], config: any) {
-    super(argv, config);
-    this.prompts = new PortalGeneratePrompts();
-  }
-
   async run(): Promise<void> {
-    const { flags } = await this.parse(PortalGenerate);
-    const paths = await this.getPortalPaths(flags as GenerateFlags);
-    const portalGenerateAction = new PortalGenerateAction();
-
-    const shouldContinueWithExistingPortal = await this.checkExistingPortal(paths, flags as GenerateFlags);
-    if (!shouldContinueWithExistingPortal) {
-      process.exit(1);
-    }
-
-    const validationResult = await this.validatePaths(paths);
-    if (validationResult.isFailed()) {
-      this.error(validationResult.error!);
-    }
-
-    await portalGenerateAction.generatePortal(paths, flags as GenerateFlags, this.config.configDir);
-  }
-
-  private async getPortalPaths(flags: GenerateFlags): Promise<PortalPaths> {
-    return {
-      sourceFolderPath: flags.folder,
-      destinationFolderPath: flags.destination,
-      generatedPortalArtifactsFolderPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP)
-    };
-  }
-
-  private async validatePaths(paths: PortalPaths): Promise<Result<string, string>> {
-    if (!(await fsExtra.pathExists(paths.sourceFolderPath))) {
-      return Result.failure(
-        getMessageInRedColor(`Portal build input folder ${paths.sourceFolderPath} does not exist.`)
-      );
-    }
-    if (!(await fsExtra.pathExists(path.dirname(paths.generatedPortalArtifactsFolderPath)))) {
-      return Result.failure(
-        getMessageInRedColor(
-          `Destination path ${path.dirname(paths.generatedPortalArtifactsFolderPath)} does not exist.`
-        )
-      );
-    }
-
-    return Result.success("Paths validated successfully.");
-  }
-
-  private async checkExistingPortal(paths: PortalPaths, flags: GenerateFlags): Promise<boolean> {
-    if (fsExtra.existsSync(paths.generatedPortalArtifactsFolderPath) && !flags.force && !flags.zip) {
-      if (!(await this.prompts.overwriteExistingPortalArtifactsPrompt())) {
-        return false;
+    const {
+      flags: {
+        folder,
+        destination,
+        force,
+        zip: zipPortal,
+        'auth-key': authKey
       }
-    } else if (fsExtra.existsSync(paths.generatedPortalArtifactsZipFilePath) && !flags.force && flags.zip) {
-      if (!(await this.prompts.existingDestinationPortalZipPrompt())) {
-        return false;
-      }
-    }
-    return true;
+    } = await this.parse(PortalGenerate);
+
+    const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = folder ? new DirectoryPath(folder, "build") : workingDirectory.join("build");
+    const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
+
+    const action = new GeneratePortalAction(this.getConfigDir(), authKey);
+    const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
+    result.map((message) =>  this.error(message));
   }
+
+  private getConfigDir = () => {
+    return new DirectoryPath(this.config.configDir);
+  };
 }

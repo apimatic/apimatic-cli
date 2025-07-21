@@ -1,13 +1,15 @@
-import * as path from "path";
 import getPort from "get-port";
 import { Command, Config, Flags } from "@oclif/core";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { PortalServeAction } from "../../actions/portal/serve.js";
 import { getMessageInRedColor } from "../../utils/utils.js";
+import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
+import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 
-const DEFAULT_FOLDER = "./";
-const DEFAULT_DESTINATION = path.resolve("./");
+const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
@@ -17,17 +19,11 @@ export default class PortalServe extends Command {
       char: "p",
       description: "Port to serve the portal."
     }),
-    destination: Flags.string({
-      char: "d",
-      description: "Directory to store and serve the generated portal.",
-      default: DEFAULT_DESTINATION,
-      parse: async (input) => path.resolve(input)
-    }),
     folder: Flags.string({
-      description:
-        "Source directory containing specs, content, and build file. By default, the current directory is used.",
-      default: DEFAULT_FOLDER,
-      parse: async (input) => path.resolve(input)
+      description: "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
+    }),
+    destination: Flags.string({
+      description: "[default: ./portal] path where the portal will be downloaded",
     }),
     open: Flags.boolean({
       char: "o",
@@ -61,14 +57,36 @@ export default class PortalServe extends Command {
 
   public async run() {
     const { flags } = await this.parse(PortalServe);
-    const paths = this.getServePaths(flags as ServeFlags);
     const portalServePrompts = new PortalServePrompts();
-    const portalServeAction = new PortalServeAction();
+    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService())
 
     //TODO: This needs to be moved within the action. Port should not be initialized again here.
-    flags.port = await this.getServerPort(flags.port);
+    const port = await this.getServerPort(flags.port);
 
-    const servePortalResult = await portalServeAction.servePortal(flags as ServeFlags, paths, this.config.configDir);
+    const workingDirectory = new DirectoryPath(flags.folder ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = flags.folder ? new DirectoryPath(flags.folder, "build") : workingDirectory.join("build");
+    const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
+
+
+    const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
+    //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+
+    const serveFlags: ServeFlags = {
+      folder: buildDirectory.toString(),
+      destination: portalDirectory.toString(),
+      "auth-key": flags["auth-key"],
+      port: port,
+      open: flags.open,
+      "no-reload": flags["no-reload"],
+      ignore: flags.ignore
+    }
+
+    const serverPaths: ServePaths = {
+      sourceDirectoryPath : buildDirectory.toString(),
+      destinationDirectoryPath: portalDirectory.toString()
+    };
+
+    const servePortalResult = await portalServeAction.servePortal(serveFlags, serverPaths, generatePortalAction.execute);
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
     }
@@ -76,18 +94,6 @@ export default class PortalServe extends Command {
     if (servePortalResult.isCancelled()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
     }
-  }
-
-  private getServePaths(flags: ServeFlags): ServePaths {
-    const GENERATED_PORTAL_ARTIFACTS_FOLDER = "generated_portal";
-    const GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
-
-    return {
-      sourceDirectoryPath: path.resolve(flags.folder),
-      destinationDirectoryPath: path.resolve(flags.destination),
-      generatedPortalArtifactsDirectoryPath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_FOLDER),
-      generatedPortalArtifactsZipFilePath: path.join(flags.destination, GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME)
-    };
   }
 
   private async getServerPort(port: number | undefined): Promise<number> {
