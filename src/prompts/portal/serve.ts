@@ -20,7 +20,12 @@ export class PortalServePrompts extends BasePrompts {
     return useExistingFolder === "yes";
   }
 
-  public displayOutroMessage(port: number): void {
+  public displayOutroMessage(buildDirectory: string, portalDirectory:string, port: number, hotReloadDisabled: boolean): void {
+    log.message(`The generated portal can be found at ${portalDirectory}`);
+    if (!hotReloadDisabled)
+    {
+      log.message(`🔍 Hot-Reload enabled. Watching the ${buildDirectory} folder for any changes.`);
+    }
     log.message(`Server started at http://localhost:${port}`);
     outro(`Press CTRL+C to stop the server.`);
   }
