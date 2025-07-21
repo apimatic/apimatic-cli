@@ -1,6 +1,7 @@
-import { Command, Flags } from "@oclif/core";
+import { Command, Config, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
+import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -35,6 +36,13 @@ Your portal has been generated at D:/
 `
   ];
 
+  private readonly prompts: PortalGeneratePrompts;
+
+  constructor(argv: string[], config: Config) {
+    super(argv, config);
+    this.prompts = new PortalGeneratePrompts();
+  }
+
   async run(): Promise<void> {
     const {
       flags: {
@@ -52,7 +60,7 @@ Your portal has been generated at D:/
 
     const action = new GeneratePortalAction(this.getConfigDir(), authKey);
     const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
-    result.map((message) =>  this.error(message));
+    result.map((message) => this.prompts.logError(message));
   }
 
   private getConfigDir = () => {
