@@ -20,7 +20,7 @@ export default class PortalServe extends Command {
       description: "Port to serve the portal."
     }),
     folder: Flags.string({
-      description: "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
+      description: "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
       description: "[default: ./portal] path where the portal will be downloaded",
@@ -52,7 +52,7 @@ export default class PortalServe extends Command {
     }
 
   static examples = [
-    '$ apimatic portal:serve --folder="./" --destination="./generated_portal" --port=3000 --open --no-reload'
+    '$ apimatic portal:serve --folder="./" --destination="./portal" --port=3000 --open --no-reload'
   ];
 
   public async run() {
@@ -67,9 +67,7 @@ export default class PortalServe extends Command {
     const buildDirectory = flags.folder ? new DirectoryPath(flags.folder, "build") : workingDirectory.join("build");
     const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
 
-
     const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
-    //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
 
     const serveFlags: ServeFlags = {
       folder: buildDirectory.toString(),
@@ -94,6 +92,8 @@ export default class PortalServe extends Command {
     if (servePortalResult.isCancelled()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
     }
+
+    this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), port, flags["no-reload"]);
   }
 
   private async getServerPort(port: number | undefined): Promise<number> {
