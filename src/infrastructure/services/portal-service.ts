@@ -32,47 +32,24 @@ export class PortalService {
   private readonly fileService = new FileService();
 
 
-  async generatePortal(buildPath: FilePath, configDir: DirectoryPath, authKey: string | null): Promise<NodeJS.ReadableStream> {
+  async generatePortal(buildPath: FilePath, configDir: DirectoryPath, authKey: string | null): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
-    const client = await this.getApiClient(configDir, authKey);
-    const docsPortalManagementController = new DocsPortalManagementController(client);
-    const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
-    return response.result as NodeJS.ReadableStream;
-  }
 
-  private async getApiClient(configDir: DirectoryPath, authKey: string | null): Promise<Client> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    // TODO: Add auth key
+    if (authInfo === null && !authKey) {
+      return Result.failure("You are not logged in, please login using `auth:login` first.");
+    }
+
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    return this.createApiClient(authorizationHeader);
-  }
-
-  public async generateOnPremPortal(
-    params: GeneratePortalParams,
-    configDir: string
-  ): Promise<Result<NodeJS.ReadableStream, string>> {
-    if (!(await fsExtra.pathExists(params.sourceBuildInputZipFilePath))) {
-      return Result.failure("Build file doesn't exist");
-    }
-
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir);
-    if (authInfo === null && !params.overrideAuthKey) {
-      return Result.failure("You are not logged in, please login using `apimatic auth:login` first.");
-    }
-
-    const authorizationHeader = this.createAuthorizationHeader(authInfo, params.overrideAuthKey);
     const client = this.createApiClient(authorizationHeader);
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
-      const stream = await this.generatePortalFromSyncEndpoint(
-        docsPortalManagementController,
-        params.sourceBuildInputZipFilePath
-      );
-      return Result.success(stream);
+      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
+      return Result.success(response.result as NodeJS.ReadableStream);
     } catch (error) {
-      return Result.failure(await this.handlePortalGenerationErrors(error, params));
+      return Result.failure(await this.handlePortalGenerationErrors(error));
     }
   }
 
@@ -120,13 +97,13 @@ export class PortalService {
   };
 
   private getUserAgent(): string {
-      const osInfo = `${os.platform()} ${os.release()}`;
-      const engine = "Node.js";
-      const engineVersion = process.version;
-      
-      return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
-    }
-    
+    const osInfo = `${os.platform()} ${os.release()}`;
+    const engine = "Node.js";
+    const engineVersion = process.version;
+
+    return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
+  }
+
   private createApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
@@ -137,18 +114,7 @@ export class PortalService {
     });
   };
 
-  private generatePortalFromSyncEndpoint = async (
-    docsPortalManagementController: DocsPortalManagementController,
-    zippedBuildFilePath: string
-  ): Promise<NodeJS.ReadableStream> => {
-    const file = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
-    const response: ApiResponse<NodeJS.ReadableStream | Blob> =
-      await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
-
-    return response.result as NodeJS.ReadableStream;
-  };
-
-  private handlePortalGenerationErrors = async (error: unknown, params: GeneratePortalParams): Promise<string> => {
+  private handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
     if (error instanceof UnauthorizedResponseError) {
       //401
       const body = await this.parseErrorResponse(error);
@@ -160,7 +126,7 @@ export class PortalService {
       return getMessageInRedColor(body.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
-      return await this.saveAndExtractErrorZipFile(error, params);
+      return error.body as NodeJS.ReadableStream;
     } else if (error instanceof InternalServerErrorResponseError) {
       //500
       const body = await this.parseErrorResponse(error);
@@ -197,7 +163,7 @@ export class PortalService {
           resolve(
             getMessageInRedColor(
               "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-                path.join(params.generatedPortalArtifactsFolderPath, "apimatic-debug")
+              path.join(params.generatedPortalArtifactsFolderPath, "apimatic-debug")
             )
           );
         })
