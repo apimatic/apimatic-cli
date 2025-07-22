@@ -1,3 +1,4 @@
+import getPort from "get-port";
 import { Command } from "@oclif/core";
 import { ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 import { SDKClient } from "../../client-utils/sdk-client.js";
@@ -12,7 +13,6 @@ import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
-import getPort from "get-port";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -161,7 +161,7 @@ export default class PortalQuickstart extends Command {
         return;
       }
 
-      prompts.displayOutroMessage(workingDirectory);
+      prompts.displayOutroMessage(buildDirectory.toString());
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

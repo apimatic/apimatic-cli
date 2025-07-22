@@ -23,10 +23,6 @@ Generated recipe has been added to build directory at: C:/build-folder/`
     folder: Flags.string({
       description:
         "[default: ./] Path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
-    }),
-    "build-config": Flags.string({
-      description:
-        "path to the 'APIMATIC-BUILD.json' file. Defaults to the 'APIMATIC-BUILD.json' file in the build directory if not provided."
     })
   };
 
@@ -41,7 +37,6 @@ Generated recipe has been added to build directory at: C:/build-folder/`
     const createRecipeResult = await portalRecipeAction.createRecipe(
       buildDirectory,
       this.config.configDir,
-      flags["build-config"],
       flags.name
     );
     if (createRecipeResult.isFailed()) {

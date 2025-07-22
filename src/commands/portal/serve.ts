@@ -17,13 +17,13 @@ export default class PortalServe extends Command {
   static flags = {
     port: Flags.integer({
       char: "p",
-      description: "Port to serve the portal."
+      description: "[default: 3000] port to serve the portal."
     }),
     folder: Flags.string({
       description: "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      description: "[default: ./portal] path where the portal will be downloaded",
+      description: "[default: ./portal] path where the portal will be generated.",
     }),
     open: Flags.boolean({
       char: "o",
@@ -79,12 +79,12 @@ export default class PortalServe extends Command {
       ignore: flags.ignore
     }
 
-    const serverPaths: ServePaths = {
+    const servePaths: ServePaths = {
       sourceDirectoryPath : buildDirectory.toString(),
       destinationDirectoryPath: portalDirectory.toString()
     };
 
-    const servePortalResult = await portalServeAction.servePortal(serveFlags, serverPaths, generatePortalAction.execute);
+    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, generatePortalAction.execute);
     //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));

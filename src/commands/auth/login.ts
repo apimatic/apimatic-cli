@@ -32,11 +32,11 @@ Authentication key successfully set`
       if (storedAuthInfo && storedAuthInfo.authKey) {
         if (storedAuthInfo.email) {
           return this.log(
-            `You are already logged in as '${storedAuthInfo.email}'. Use auth:logout to logout before logging in again.`
+            `You are already logged in as '${storedAuthInfo.email}'. Use 'auth:logout' to logout before logging in again.`
           );
         }
         return this.log(
-            `You are already logged in with authentication key. Use auth:logout to logout before logging in again.`
+            `You are already logged in with authentication key. Use 'auth:logout' to logout before logging in again.`
           );
       }
 

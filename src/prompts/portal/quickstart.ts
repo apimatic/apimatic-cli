@@ -90,12 +90,12 @@ export class PortalQuickstartPrompts extends BasePrompts {
     const quotes = ['"', "'"];
 
     for (const quote of quotes) {
-        if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-            return str.slice(1, -1);
-        }
+      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
+        return str.slice(1, -1);
+      }
     }
     return str;
-}
+  }
 
   async specPrompt(): Promise<string> {
     log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
@@ -103,7 +103,8 @@ export class PortalQuickstartPrompts extends BasePrompts {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI definition file:`,
       placeholder: "Provide absolute URL/local path or press Enter to use sample OpenAPI file from APIMatic.",
-      defaultValue: "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
+      defaultValue:
+        "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
       validate: (input) => {
         if (!input) return;
 
@@ -276,19 +277,11 @@ export class PortalQuickstartPrompts extends BasePrompts {
     log.step(coloredLogString);
   }
 
-  displayPortalGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Setting up portal"));
-  }
-
-  displayPortalGenerationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor("✅  Portal setup complete!"));
-  }
-
-  displayOutroMessage(directory: string): void {
+  displayOutroMessage(buildDirectory: string): void {
     log.step(
       getMessageInCyanColor(`📢  Your API Portal is live at: ${this.serverUrl}\n`) +
         getMessageInCyanColor(
-          `Hot reload enabled! Edit files in ${directory} to see changes instantly reflected in your API Portal.\n`
+          `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
         ) +
         getMessageInCyanColor(`Press CTRL+C to stop the server.`)
     );

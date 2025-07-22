@@ -15,7 +15,7 @@ export class PortalGenerate extends Command {
         "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      description: "[default: ./portal] path where the portal will be downloaded"
+      description: "[default: ./portal] path where the portal will be generated."
     }),
     force: Flags.boolean({
       char: "f",
