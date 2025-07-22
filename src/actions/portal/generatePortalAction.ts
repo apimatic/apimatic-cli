@@ -28,7 +28,7 @@ export class GeneratePortalAction {
     zipPortal: boolean
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(portalDirectory)) {
-      return ActionResult.error("'build' directory and portal directory cannot be the same.");
+      return ActionResult.error("'build' directory and 'portal' directory cannot be the same.");
     }
 
     if (!(await this.validateBuild(buildDirectory))) {
@@ -36,7 +36,7 @@ export class GeneratePortalAction {
     }
 
     if (!(await this.validatePortal(portalDirectory, force))) {
-      return ActionResult.error("'portal' directory is empty or not valid");
+      return ActionResult.error("'portal' directory is not empty.");
     }
 
     return await withDir(
