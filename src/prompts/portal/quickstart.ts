@@ -252,7 +252,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
   }
 
   displayBuildDirectoryGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Generating build directory... ⚙️"));
+    this.spin.start(getMessageInMagentaColor("Generating build directory ⚙️"));
   }
 
   displayBuildDirectoryGenerationErrorMessage(): void {

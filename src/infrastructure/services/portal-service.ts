@@ -37,7 +37,7 @@ export class PortalService {
     const file = new FileWrapper(buildFileStream);
 
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    if (authInfo === null && !authKey) {
+    if (authInfo === null || authInfo.authKey === '' && !authKey) {
       return Result.failure("You are not logged in, please login using `auth:login` first.");
     }
 
@@ -146,34 +146,5 @@ export class PortalService {
       return await parseStreamBodyToJson(stream);
     }
     throw error;
-  };
-
-  private saveAndExtractErrorZipFile = async (error: ApiError, params: GeneratePortalParams): Promise<string> => {
-    const data = error.body as NodeJS.ReadableStream;
-    const writeStream = fs.createWriteStream(params.generatedPortalArtifactsZipFilePath);
-
-    //TODO: Extract zip to temp folder and only copy the the debug report.
-    return await new Promise<string>((resolve, reject) => {
-      data
-        .pipe(writeStream)
-        .on("finish", async () => {
-          await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
-          await deleteFile(params.generatedPortalArtifactsZipFilePath);
-          await deleteFile(path.join(params.generatedPortalArtifactsFolderPath, "static"));
-          resolve(
-            getMessageInRedColor(
-              "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-              path.join(params.generatedPortalArtifactsFolderPath, "apimatic-debug")
-            )
-          );
-        })
-        .on("error", async () => {
-          reject(
-            getMessageInRedColor(
-              "An error occurred during portal generation due to an issue with the input. The error report could not be generated. Please try again later."
-            )
-          );
-        });
-    });
   };
 }

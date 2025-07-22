@@ -24,7 +24,7 @@ export class PortalServePrompts extends BasePrompts {
     log.message(`The generated portal can be found at ${portalDirectory}`);
     if (!hotReloadDisabled)
     {
-      log.message(`🔍 Hot-Reload enabled. Watching the ${buildDirectory} folder for any changes.`);
+      log.message(`🔍 Hot reload enabled. Watching the ${buildDirectory} folder for any changes.`);
     }
     log.message(`Server started at http://localhost:${port}`);
     outro(`Press CTRL+C to stop the server.`);
