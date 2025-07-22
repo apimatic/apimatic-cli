@@ -1,4 +1,4 @@
-import { Command, Flags, Config } from "@oclif/core";
+import { Command, Config, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
