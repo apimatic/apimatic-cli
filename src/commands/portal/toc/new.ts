@@ -23,21 +23,21 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
     }),
     folder: Flags.string({
       description:
-        "[default: ./] path to the parent directory containing the build folder, which includes API specifications and configuration files."
+        "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     force: Flags.boolean({
       default: false,
-      description: "overwrite the toc.yml file if one already exists at the destination."
+      description: "overwrite the 'toc.yml' file if one already exists at the destination."
     }),
     "expand-endpoints": Flags.boolean({
       default: false,
       description:
-        "include individual entries for each endpoint in the generated toc.yml. Requires a valid API specification in the working directory."
+        "include individual entries for each endpoint in the generated 'toc.yml'. Requires a valid API specification in the working directory."
     }),
     "expand-models": Flags.boolean({
       default: false,
       description:
-        "include individual entries for each model in the generated toc.yml. Requires a valid API specification in the working directory."
+        "include individual entries for each model in the generated 'toc.yml'. Requires a valid API specification in the working directory."
     })
   };
 

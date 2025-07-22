@@ -85,6 +85,7 @@ export default class PortalServe extends Command {
     };
 
     const servePortalResult = await portalServeAction.servePortal(serveFlags, serverPaths, generatePortalAction.execute);
+    //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
     }
@@ -93,7 +94,9 @@ export default class PortalServe extends Command {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
     }
 
-    this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), port, flags["no-reload"]);
+    if (servePortalResult.isSuccess()) {
+      this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), port, flags["no-reload"]);
+    }
   }
 
   private async getServerPort(port: number | undefined): Promise<number> {

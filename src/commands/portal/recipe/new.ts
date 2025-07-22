@@ -22,11 +22,11 @@ Generated recipe has been added to build directory at: C:/build-folder/`
     name: Flags.string({ description: "name for the recipe" }),
     folder: Flags.string({
       description:
-        "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
+        "[default: ./] Path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     "build-config": Flags.string({
       description:
-        "path to the APIMATIC-BUILD.json file. Defaults to the APIMATIC-BUILD.json file in the build directory if not provided."
+        "path to the 'APIMATIC-BUILD.json' file. Defaults to the 'APIMATIC-BUILD.json' file in the build directory if not provided."
     })
   };
 
