@@ -48,9 +48,17 @@ export class FileService {
     return fs.createReadStream(filePath.toString());
   }
 
+  public async getContents(filePath: FilePath): Promise<string> {
+    return await fs.readFile(filePath.toString(), 'utf-8');
+  }
+
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
     const writeStream = fs.createWriteStream(filePath.toString());
     await streamPipeline(stream, writeStream);
+  }
+
+  public async writeContents(filePath: FilePath, contents: string) {
+    await fs.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
   public async copy(source: FilePath, destination: FilePath) {
