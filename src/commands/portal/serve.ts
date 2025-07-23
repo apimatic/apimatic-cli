@@ -23,7 +23,7 @@ export default class PortalServe extends Command {
       description: "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      description: "[default: ./portal] path where the portal will be generated.",
+      description: "[default: <folder>/portal] path where the portal will be generated.",
     }),
     open: Flags.boolean({
       char: "o",
