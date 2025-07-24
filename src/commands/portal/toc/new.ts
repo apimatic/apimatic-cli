@@ -18,7 +18,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
 
   static flags = {
     destination: Flags.string({
-      description: "[default: ./build/content] optional path where the generated 'toc.yml' file will be saved."
+      description: "[default: <folder>/build/content] optional path where the generated 'toc.yml' file will be saved."
     }),
     folder: Flags.string({
       description:
