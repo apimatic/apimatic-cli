@@ -15,7 +15,7 @@ export default class PortalRecipeNew extends Command {
   static override examples = [
     `$ apimatic portal:recipe:new
 Generated recipe has been added to build directory at: C:/`,
-    `$ apimatic portal:recipe:new --name="My API Recipe" --folder="./build-folder" --build-config-file="./build-folder/APIMATIC-BUILD.json"
+    `$ apimatic portal:recipe:new --name="My API Recipe" --folder="./build-folder"
 Generated recipe has been added to build directory at: C:/build-folder/`
   ];
   static override flags = {
