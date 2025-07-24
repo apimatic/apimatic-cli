@@ -5,11 +5,12 @@ export class PortalNewTocPrompts {
 
   async overwriteExistingTocPrompt(): Promise<boolean> {
     const useExistingFile = await select({
-      message: `A toc.yml file already exists at the specified destination path, do you want to overwrite it?`,
+      message: `⚠️  A toc.yml file already exists at the specified destination path, do you want to overwrite it?`,
       options: [
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" }
-      ]
+      ],
+      initialValue: "no"
     });
 
     if (isCancel(useExistingFile)) {
@@ -28,7 +29,7 @@ export class PortalNewTocPrompts {
     this.spin.start(message);
   }
 
-  stopProgressIndicatorWithMessage(message: string) : void {
+  stopProgressIndicatorWithMessage(message: string): void {
     this.spin.stop(message);
   }
 
@@ -47,4 +48,4 @@ export class PortalNewTocPrompts {
   displayInfo(message: string): void {
     log.step(message);
   }
-} 
+}

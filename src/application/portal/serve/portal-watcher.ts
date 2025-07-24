@@ -9,7 +9,6 @@ import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ActionResult } from "../../../actions/actionResult.js";
 
 export class PortalWatcher {
-
   public async watchAndRegeneratePortalOnChange(
     paths: ServePaths,
     ignoredPaths: string[],
@@ -89,8 +88,12 @@ export class PortalWatcher {
     if (!eventQueue.has(eventId)) {
       return;
     }
-    const result = await generatePortal(new DirectoryPath(paths.sourceDirectoryPath), new DirectoryPath(paths.destinationDirectoryPath), true, false);
-    result.map(error => console.log(error));
+    const result = await generatePortal(
+      new DirectoryPath(paths.sourceDirectoryPath),
+      new DirectoryPath(paths.destinationDirectoryPath),
+      true,
+      false
+    );
+    result.map((error) => console.log(error));
   }
-
 }

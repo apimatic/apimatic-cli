@@ -41,7 +41,7 @@ export class PortalRecipePrompts {
 
   public async buildConfigFilePathPrompt(buildDirectoryPath: string): Promise<string> {
     const buildConfigFilePath = await text({
-      message: `⚠️ APIMATIC-BUILD.json is required and was not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
+      message: `⚠️  APIMATIC-BUILD.json is required and was not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
       validate: (filePath) => {
         if (!filePath) {
           return "Build config file path cannot be empty. Please provide a valid file path.";
@@ -175,7 +175,8 @@ export class PortalRecipePrompts {
       options: [
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" }
-      ]
+      ],
+      initialValue: "yes"
     });
 
     if (isCancel(addAnotherStep)) {

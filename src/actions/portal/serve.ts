@@ -38,7 +38,9 @@ export class PortalServeAction {
     const result = await generatePortal(
       new DirectoryPath(paths.sourceDirectoryPath),
       new DirectoryPath(paths.destinationDirectoryPath),
-      true, false);
+      true,
+      false
+    );
 
     return result.mapAll<Promise<Result<string, string>>>(
       async () => {
@@ -51,8 +53,6 @@ export class PortalServeAction {
         if (startServerResult.isFailed()) {
           return Result.failure(startServerResult.error!);
         }
-
-        this.prompts.displayOutroMessage(flags.port);
 
         return Result.success(`Portal was successfully served.`);
       },

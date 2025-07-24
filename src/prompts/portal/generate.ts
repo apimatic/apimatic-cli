@@ -1,5 +1,5 @@
 import { cancel, outro, select, spinner, isCancel } from "@clack/prompts";
-import { getMessageInRedColor } from "../../utils/utils.js";
+import { getMessageInCyanColor, getMessageInMagentaColor, getMessageInRedColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 export class PortalGeneratePrompts {
@@ -7,11 +7,12 @@ export class PortalGeneratePrompts {
 
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await select({
-      message: `The destination '${directory}' is not empty, do you want to overwrite?`,
+      message: `⚠️  The destination '${directory}' is not empty, do you want to overwrite?`,
       options: [
         { value: true, label: "Yes" },
         { value: false, label: "No" }
-      ], initialValue: false,
+      ],
+      initialValue: false
     });
 
     if (isCancel(overwrite)) {
@@ -29,34 +30,14 @@ export class PortalGeneratePrompts {
     // TODO: it should return false (no process exit);
   }
 
-  async overwriteExistingPortalArtifactsPrompt(): Promise<boolean> {
-    const useExistingFolder = await select({
-      message: `The destination folder is not empty, do you want to overwrite the existing files?`,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" }
-      ]
-    });
-
-    if (isCancel(useExistingFolder)) {
-      cancel("Operation cancelled.");
-      return process.exit(1);
-    }
-
-    if (useExistingFolder === "no") {
-      outro("Please enter a different destination folder or remove the existing files and try again.");
-    }
-
-    return useExistingFolder === "yes";
-  }
-
   async existingDestinationPortalZipPrompt(): Promise<boolean> {
     const useExistingZip = await select({
-      message: `A zip file already exists at the specified destination path, do you want to overwrite it?`,
+      message: `⚠️  A zip file already exists at the specified destination path, do you want to overwrite it?`,
       options: [
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" }
-      ]
+      ],
+      initialValue: "no"
     });
 
     if (isCancel(useExistingZip)) {
@@ -72,15 +53,17 @@ export class PortalGeneratePrompts {
   }
 
   displayPortalGenerationMessage(): void {
-    this.spin.start("Generating portal...");
+    this.spin.start(getMessageInMagentaColor("Generating portal"));
   }
 
   displayPortalGenerationSuccessMessage(): void {
-    this.spin.stop("✅ Portal generated successfully.");
+    this.spin.stop(getMessageInCyanColor("✅  Portal generated successfully."));
+    this.cleanUpStandardInput();
   }
 
   displayPortalGenerationErrorMessage(): void {
     this.spin.stop(getMessageInRedColor(`Portal Generation failed.`));
+    this.cleanUpStandardInput();
   }
 
   displayOutroMessage(generatedPortalPath: string): void {
@@ -89,5 +72,13 @@ export class PortalGeneratePrompts {
 
   logError(error: string): void {
     outro(error);
+  }
+
+  //This clears the standard input to allow interrupts like CTRL+C to work properly.
+  private cleanUpStandardInput(): void {
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+    }
   }
 }

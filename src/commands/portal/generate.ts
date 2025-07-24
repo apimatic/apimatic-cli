@@ -11,10 +11,11 @@ export class PortalGenerate extends Command {
 
   static flags = {
     folder: Flags.string({
-      description: "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
+      description:
+        "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      description: "[default: ./portal] path where the portal will be downloaded",
+      description: "[default: <folder>/portal] path where the portal will be generated."
     }),
     force: Flags.boolean({
       char: "f",
@@ -23,18 +24,14 @@ export class PortalGenerate extends Command {
     }),
     zip: Flags.boolean({
       default: false,
-      description: "download the generated portal as a .zip archive",
+      description: "download the generated portal as a .zip archive"
     }),
     "auth-key": Flags.string({
       description: "override current authentication state with an authentication key"
     })
   };
 
-  static examples = [
-    `$ apimatic portal:generate --folder="./portal/" --destination="D:/"
-Your portal has been generated at D:/
-`
-  ];
+  static examples = [`$ apimatic portal:generate`, `$ apimatic portal:generate --folder="./" --destination="./portal"`];
 
   private readonly prompts: PortalGeneratePrompts;
 
@@ -45,13 +42,7 @@ Your portal has been generated at D:/
 
   async run(): Promise<void> {
     const {
-      flags: {
-        folder,
-        destination,
-        force,
-        zip: zipPortal,
-        'auth-key': authKey
-      }
+      flags: { folder, destination, force, zip: zipPortal, "auth-key": authKey }
     } = await this.parse(PortalGenerate);
 
     const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
@@ -60,7 +51,10 @@ Your portal has been generated at D:/
 
     const action = new GeneratePortalAction(this.getConfigDir(), authKey);
     const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
-    result.map((message) => this.prompts.logError(message));
+    result.mapAll(
+      () => this.prompts.displayOutroMessage(portalDirectory.toString()),
+      (message) => this.prompts.logError(message)
+    );
   }
 
   private getConfigDir = () => {
