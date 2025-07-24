@@ -29,6 +29,7 @@ export class CopilotConfigAction {
     const buildFileContent = await this.fileService.getContents(buildFile);
 
     const buildJson = JSON.parse(buildFileContent) as BuildConfig;
+    // TODO: add prompt for overwriting if existing config found
 
     const response = await this.apiService.getAccountInfo(this.configDir, this.authKey);
     if (!response.isSuccess()) {
@@ -43,15 +44,15 @@ export class CopilotConfigAction {
       isEnabled: enable,
       key: apiCopilotKey,
       welcomeMessage: welcomeMessage,
-      llm: "open_ai",
     };
 
     await this.fileService.writeContents(buildFile, JSON.stringify(buildJson, null, 2));
 
-    this.prompts.copilotConfigured()
+    this.prompts.copilotConfigured(apiCopilotKey);
     return ActionResult.success();
   }
 
+  // TODO: add build file validator class and logic
   private async validateBuild(buildDirectory: DirectoryPath) {
     // TODO: add more checks here
     if (!(await this.fileService.directoryExists(buildDirectory))) return false;
@@ -63,9 +64,6 @@ export class CopilotConfigAction {
   private async selectCopilotKey(subscription: SubscriptionInfo | undefined): Promise<string | null> {
     if (subscription === undefined || subscription.ApiCopilotKeys === undefined || subscription.ApiCopilotKeys.length === 0) {
       return null;
-    }
-    if (subscription.ApiCopilotKeys.length === 1) {
-      return subscription.ApiCopilotKeys[0];
     }
 
     return await this.prompts.selectCopilotKey(subscription.ApiCopilotKeys);

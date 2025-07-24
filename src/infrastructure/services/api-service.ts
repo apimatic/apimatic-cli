@@ -1,17 +1,13 @@
 import axios from "axios";
-import { ContentType } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FileService } from "../file-service.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import os from "os";
 
 export class ApiService {
-  private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
-  private readonly TIMEOUT = 0;
-  private readonly fileService = new FileService();
-  private readonly apiBaseUrl = "https://api.apimatic.io";
+  //private readonly apiBaseUrl = "https://api.apimatic.io";
+  private readonly apiBaseUrl = "https://localhost:44301/api";
 
   public async getAccountInfo(
     configDir: DirectoryPath,
@@ -26,10 +22,16 @@ export class ApiService {
       const token = authKey || authInfo?.authKey;
       const response = await axios.get(`${this.apiBaseUrl}/account/profile`, {
         headers: {
-          Authorization: `X-Auth-Key ${token}`,
+          // Authorization: `X-Auth-Key ${token}`,
+          Authorization: `X-Auth-Key wnpezdkv_S1zA8u_Jssl3O8p8OjqAWriMzYRied32ez2iQpnWxRICubu6qo3zB0v`,
           "Content-Type": "application/json",
           "User-Agent": this.getUserAgent()
-        }
+        },
+        httpsAgent: new (
+          await import("https")
+        ).Agent({
+          rejectUnauthorized: false
+        })
       });
 
       if (response.status === 200) {
