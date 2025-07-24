@@ -8,16 +8,7 @@ import { getAuthInfo } from "../../client-utils/auth-manager.js";
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";
 
-  static examples = [
-    `$ apimatic auth:login
-Enter your registered email: apimatic-user@gmail.com
-Please enter your password: *********
-
-You have successfully logged into APIMatic
-`,
-    `$ apimatic auth:login --auth-key=xxxxxx
-Authentication key successfully set`
-  ];
+  static examples = [`$ apimatic auth:login`, `$ apimatic auth:login --auth-key=xxxxxx`];
 
   static flags = {
     "auth-key": Flags.string({ default: "", description: "Set authentication key for all commands" })
@@ -36,8 +27,8 @@ Authentication key successfully set`
           );
         }
         return this.log(
-            `You are already logged in with authentication key. Use 'auth:logout' to logout before logging in again.`
-          );
+          `You are already logged in with authentication key. Use 'auth:logout' to logout before logging in again.`
+        );
       }
 
       const client: SDKClient = SDKClient.getInstance();

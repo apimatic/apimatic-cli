@@ -1,4 +1,3 @@
-import * as path from "path";
 import { Command, Flags } from "@oclif/core";
 import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
@@ -42,15 +41,9 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
   };
 
   static examples = [
-    `$ apimatic portal:toc:new --destination="./portal/content/"
-A new toc file has been created at ./portal/content/toc.yml
-`,
-    `$ apimatic portal:toc:new --folder="./my-project" 
-A new toc file has been created at ./my-project/content/toc.yml
-`,
-    `$ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"
-A new toc file has been created at ./portal/content/toc.yml
-`
+    `$ apimatic portal:toc:new --destination="./portal/content/"`,
+    `$ apimatic portal:toc:new --folder="./my-project"`,
+    `$ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"` 
   ];
 
   constructor(argv: string[], config: any) {

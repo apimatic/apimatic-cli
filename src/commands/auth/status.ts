@@ -5,11 +5,7 @@ import { SDKClient } from "../../client-utils/sdk-client.js";
 export default class Status extends Command {
   static description = "View current authentication state";
 
-  static examples = [
-    `$ apimatic auth:status
-Currently logged in as apimatic-client@gmail.com
-`
-  ];
+  static examples = [`$ apimatic auth:status`];
 
   async run() {
     try {

@@ -181,7 +181,7 @@ export class PortalRecipeAction {
           editor = "vim";
           try {
             await execa(editor, [tempFilePath], { stdio: "inherit" });
-          } catch (error) {
+          } catch {
             // User exiting vim can throw a non-zero exit code leading to exception, ignore it.
           }
         }

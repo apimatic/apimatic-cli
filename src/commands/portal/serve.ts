@@ -20,10 +20,11 @@ export default class PortalServe extends Command {
       description: "[default: 3000] port to serve the portal."
     }),
     folder: Flags.string({
-      description: "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
+      description:
+        "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      description: "[default: <folder>/portal] path where the portal will be generated.",
+      description: "[default: <folder>/portal] path where the portal will be generated."
     }),
     open: Flags.boolean({
       char: "o",
@@ -47,18 +48,19 @@ export default class PortalServe extends Command {
   private readonly prompts: PortalServePrompts;
 
   constructor(argv: string[], config: Config) {
-      super(argv, config);
-      this.prompts = new PortalServePrompts();
-    }
+    super(argv, config);
+    this.prompts = new PortalServePrompts();
+  }
 
   static examples = [
+    "$ apimatic portal:serve",
     '$ apimatic portal:serve --folder="./" --destination="./portal" --port=3000 --open --no-reload'
   ];
 
   public async run() {
     const { flags } = await this.parse(PortalServe);
     const portalServePrompts = new PortalServePrompts();
-    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService())
+    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService());
 
     //TODO: This needs to be moved within the action. Port should not be initialized again here.
     const port = await this.getServerPort(flags.port);
@@ -77,10 +79,10 @@ export default class PortalServe extends Command {
       open: flags.open,
       "no-reload": flags["no-reload"],
       ignore: flags.ignore
-    }
+    };
 
     const servePaths: ServePaths = {
-      sourceDirectoryPath : buildDirectory.toString(),
+      sourceDirectoryPath: buildDirectory.toString(),
       destinationDirectoryPath: portalDirectory.toString()
     };
 

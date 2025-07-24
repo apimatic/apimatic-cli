@@ -31,7 +31,7 @@ export class PortalGenerate extends Command {
     })
   };
 
-  static examples = [`$ apimatic portal:generate --folder="./" --destination="./portal"`];
+  static examples = [`$ apimatic portal:generate`, `$ apimatic portal:generate --folder="./" --destination="./portal"`];
 
   private readonly prompts: PortalGeneratePrompts;
 

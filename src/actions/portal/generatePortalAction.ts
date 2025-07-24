@@ -32,7 +32,7 @@ export class GeneratePortalAction {
     }
 
     if (!(await this.validateBuild(buildDirectory))) {
-      return ActionResult.error("'build' directory does not exist, is empty or not valid");
+      return ActionResult.error("'build' directory does not exist, is empty, or not valid");
     }
 
     if (!(await this.validatePortal(portalDirectory, force))) {
