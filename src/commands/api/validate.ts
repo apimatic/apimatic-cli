@@ -13,12 +13,8 @@ export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
 
   static examples = [
-    `$ apimatic api:validate --file="./specs/sample.json"
-Specification file provided is valid
-`,
-    `$ apimatic api:validate --url=https://petstore.swagger.io/v2/swagger.json
-Specification file provided is valid
-`
+    `$ apimatic api:validate --file="./specs/sample.json"`,
+    `$ apimatic api:validate --url=https://petstore.swagger.io/v2/swagger.json`
   ];
 
   static flags = {

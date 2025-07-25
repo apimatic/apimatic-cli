@@ -13,6 +13,7 @@ import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts;
@@ -25,9 +26,8 @@ export class PortalRecipeAction {
   }
 
   public async createRecipe(
-    buildDirectoryPath: string,
+    buildDirectoryPath: DirectoryPath,
     configDir: string,
-    buildConfigFilePath?: string,
     name?: string
   ): Promise<Result<string, string>> {
     this.prompts.displayWelcomeMessage();
@@ -40,17 +40,9 @@ export class PortalRecipeAction {
       return Result.failure(`Unable to generate API Recipe: ${validateBuildDirectoryPathResult.error!}`);
     }
 
-    const validateBuildConfigFilePathResult = await this.validateBuildConfigFilePath(buildConfigFilePath);
-    if (validateBuildConfigFilePathResult.isFailed()) {
-      return Result.failure(`Unable to generate API Recipe: ${validateBuildConfigFilePathResult}`);
-    }
-
     //TODO: Create a type for the build config and use that here instead of any.
-    const resolvedBuildConfigFilePath = await this.getResolvedBuildConfigFilePath(
-      buildDirectoryPath,
-      buildConfigFilePath
-    );
-    const buildConfigResult = await this.parseBuildConfig(resolvedBuildConfigFilePath);
+    const buildConfigFilePath = await this.getBuildConfigFilePath(buildDirectoryPath);
+    const buildConfigResult = await this.parseBuildConfig(buildConfigFilePath);
     if (buildConfigResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${buildConfigResult.error!}`);
     }
@@ -86,7 +78,7 @@ export class PortalRecipeAction {
       tocFilePath,
       recipeName,
       recipeFileName,
-      resolvedBuildConfigFilePath,
+      buildConfigFilePath,
       contentFolderPath
     );
 
@@ -108,9 +100,9 @@ export class PortalRecipeAction {
       .join("");
   }
 
-  private async validateBuildDirectoryPath(buildDirectoryPath: string): Promise<Result<string, string>> {
-    if (!(await fsExtra.pathExists(buildDirectoryPath))) {
-      return Result.failure(`Portal build input folder ${buildDirectoryPath} does not exist.`);
+  private async validateBuildDirectoryPath(buildDirectoryPath: DirectoryPath): Promise<Result<string, string>> {
+    if (!(await fsExtra.pathExists(buildDirectoryPath.toString()))) {
+      return Result.failure(`Portal build input folder ${buildDirectoryPath.toString()} does not exist.`);
     }
 
     return Result.success("Portal build input folder path validated successfully.");
@@ -249,21 +241,14 @@ export class PortalRecipeAction {
     return `$e/${pathPieces.map(encodeURIComponent).join("/")}`;
   }
 
-  private async getResolvedBuildConfigFilePath(
-    buildDirectoryPath: string,
-    buildConfigFilePath?: string
-  ): Promise<string> {
-    if (!buildConfigFilePath) {
-      const files = await fs.promises.readdir(buildDirectoryPath);
-      const buildFileExists = files.find((file) => file === this.BUILD_FILE_NAME);
-      if (!buildFileExists) {
-        return await this.prompts.buildConfigFilePathPrompt(buildDirectoryPath);
-      }
-
-      return path.join(buildDirectoryPath, this.BUILD_FILE_NAME);
+  private async getBuildConfigFilePath(buildDirectoryPath: DirectoryPath): Promise<string> {
+    const files = await fs.promises.readdir(buildDirectoryPath.toString());
+    const buildFileExists = files.find((file) => file === this.BUILD_FILE_NAME);
+    if (!buildFileExists) {
+      return await this.prompts.buildConfigFilePathPrompt(buildDirectoryPath.toString());
     }
 
-    return buildConfigFilePath;
+    return path.join(buildDirectoryPath.toString(), this.BUILD_FILE_NAME);
   }
 
   //TODO: Create a type for the build config and use that here instead of any.
@@ -352,12 +337,12 @@ export class PortalRecipeAction {
   }
 
   //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
-  private getContentFolderPath(buildConfig: any, buildDirectoryPath: string): string {
+  private getContentFolderPath(buildConfig: any, buildDirectoryPath: DirectoryPath): string {
     const contentFolder = buildConfig.generatePortal?.contentFolder;
     if (contentFolder) {
-      return path.join(buildDirectoryPath, contentFolder);
+      return path.join(buildDirectoryPath.toString(), contentFolder);
     }
 
-    return buildDirectoryPath;
+    return buildDirectoryPath.toString();
   }
 }

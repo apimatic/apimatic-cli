@@ -179,3 +179,4 @@ tmp/
 test-source/
 test-destination/
 test-portal/
+/.idea/

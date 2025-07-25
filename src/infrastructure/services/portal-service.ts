@@ -1,7 +1,5 @@
-import * as path from "path";
 import * as os from "os";
-import fsExtra from "fs-extra";
-import fs from "fs";
+import fs from "fs-extra";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -17,46 +15,44 @@ import {
   InternalServerErrorResponseError
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { GeneratePortalParams, ErrorResponse } from "../../types/portal/generate.js";
+import { ErrorResponse } from "../../types/portal/generate.js";
 import { Result } from "../../types/common/result.js";
-import { getMessageInRedColor, parseStreamBodyToJson, extractZipFile, deleteFile } from "../../utils/utils.js";
+import { getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Sdl } from "../../types/sdl/sdl.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FileService } from "../file-service.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly TIMEOUT = 0;
+  private readonly fileService = new FileService();
 
-  public async generateOnPremPortal(
-    params: GeneratePortalParams,
-    configDir: string
-  ): Promise<Result<NodeJS.ReadableStream, string>> {
-    if (!(await fsExtra.pathExists(params.sourceBuildInputZipFilePath))) {
-      return Result.failure("Build file doesn't exist");
-    }
-
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir);
-    if (authInfo === null && !params.overrideAuthKey) {
-      return Result.failure("You are not logged in, please login using `apimatic auth:login` first.");
-    }
-
-    const authorizationHeader = this.createAuthorizationHeader(authInfo, params.overrideAuthKey);
+  async generatePortal(
+    buildPath: FilePath,
+    configDir: DirectoryPath,
+    authKey: string | null
+  ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
+    const buildFileStream = await this.fileService.getStream(buildPath);
+    const file = new FileWrapper(buildFileStream);
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
     const client = this.createApiClient(authorizationHeader);
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
-      const stream = await this.generatePortalFromSyncEndpoint(
-        docsPortalManagementController,
-        params.sourceBuildInputZipFilePath
-      );
-      return Result.success(stream);
+      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
+      return Result.success(response.result as NodeJS.ReadableStream);
     } catch (error) {
-      return Result.failure(await this.handlePortalGenerationErrors(error, params));
+      return Result.failure(await this.handlePortalGenerationErrors(error));
+    } finally {
+      buildFileStream.close();
     }
   }
 
   public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
-    if (!(await fsExtra.pathExists(specPath))) {
+    if (!(await fs.pathExists(specPath))) {
       return Result.failure("Spec file doesn't exist");
     }
 
@@ -116,18 +112,7 @@ export class PortalService {
     });
   };
 
-  private generatePortalFromSyncEndpoint = async (
-    docsPortalManagementController: DocsPortalManagementController,
-    zippedBuildFilePath: string
-  ): Promise<NodeJS.ReadableStream> => {
-    const file = new FileWrapper(fs.createReadStream(zippedBuildFilePath));
-    const response: ApiResponse<NodeJS.ReadableStream | Blob> =
-      await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
-
-    return response.result as NodeJS.ReadableStream;
-  };
-
-  private handlePortalGenerationErrors = async (error: unknown, params: GeneratePortalParams): Promise<string> => {
+  private handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
     if (error instanceof UnauthorizedResponseError) {
       //401
       const body = await this.parseErrorResponse(error);
@@ -139,7 +124,7 @@ export class PortalService {
       return getMessageInRedColor(body.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
-      return await this.saveAndExtractErrorZipFile(error, params);
+      return error.body as NodeJS.ReadableStream;
     } else if (error instanceof InternalServerErrorResponseError) {
       //500
       const body = await this.parseErrorResponse(error);
@@ -159,34 +144,5 @@ export class PortalService {
       return await parseStreamBodyToJson(stream);
     }
     throw error;
-  };
-
-  private saveAndExtractErrorZipFile = async (error: ApiError, params: GeneratePortalParams): Promise<string> => {
-    const data = error.body as NodeJS.ReadableStream;
-    const writeStream = fs.createWriteStream(params.generatedPortalArtifactsZipFilePath);
-
-    //TODO: Extract zip to temp folder and only copy the the debug report.
-    return await new Promise<string>((resolve, reject) => {
-      data
-        .pipe(writeStream)
-        .on("finish", async () => {
-          await extractZipFile(params.generatedPortalArtifactsZipFilePath, params.generatedPortalArtifactsFolderPath);
-          await deleteFile(params.generatedPortalArtifactsZipFilePath);
-          await deleteFile(path.join(params.generatedPortalArtifactsFolderPath, "static"));
-          resolve(
-            getMessageInRedColor(
-              "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-                path.join(params.generatedPortalArtifactsFolderPath, "apimatic-debug")
-            )
-          );
-        })
-        .on("error", async () => {
-          reject(
-            getMessageInRedColor(
-              "An error occurred during portal generation due to an issue with the input. The error report could not be generated. Please try again later."
-            )
-          );
-        });
-    });
   };
 }

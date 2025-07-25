@@ -48,16 +48,8 @@ Legacy: CS_NET_STANDARD_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB_V2|PYTHON_GENER
   };
 
   static examples = [
-    `$ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"
-Generating SDK... done
-Downloading SDK... done
-Success! Your SDK is located at swagger_sdk_csharp`,
-    `
-$ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json
-Generating SDK... done
-Downloading SDK... done
-Success! Your SDK is located at swagger_sdk_csharp
-`
+    `$ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"`,
+    `$ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json`
   ];
 
   async run() {
