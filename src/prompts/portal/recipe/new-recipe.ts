@@ -41,7 +41,7 @@ export class PortalRecipePrompts {
 
   public async buildConfigFilePathPrompt(buildDirectoryPath: string): Promise<string> {
     const buildConfigFilePath = await text({
-      message: `⚠️ APIMATIC-BUILD.json is required and was not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
+      message: `⚠️  APIMATIC-BUILD.json is required and was not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
       validate: (filePath) => {
         if (!filePath) {
           return "Build config file path cannot be empty. Please provide a valid file path.";
@@ -175,7 +175,8 @@ export class PortalRecipePrompts {
       options: [
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" }
-      ]
+      ],
+      initialValue: "yes"
     });
 
     if (isCancel(addAnotherStep)) {
@@ -208,8 +209,7 @@ export class PortalRecipePrompts {
   }
 
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
-    log.step(`🎉 Recipe has been added successfully!`);
-    log.message(`📦 Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
+    log.message(`🎉 Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
     outro(
       `▶ Run the command 'apimatic portal:serve' to preview your documentation portal.`
     );
@@ -232,7 +232,6 @@ export class PortalRecipePrompts {
       .join("\n");
 
     log.step(`🛠️  You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
-    log.message(`💡 Modify the TOC file to change the position of the API Recipes section in the navbar.`);
   }
 
   public logError(error: string): void {

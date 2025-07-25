@@ -229,20 +229,6 @@ export const isJSONParsable = (json: string) => {
   }
 };
 
-export const getGeneratedFilesPaths = (
-  sourceDirectoryPath: string,
-  generatedPortalArtifactsDirectoryPath: string
-): string[] => {
-  const generatedBuildInputZipPath = path.join(sourceDirectoryPath, ".portal_source.zip");
-  const generatedPortalArtifactsZipFilePath = path.join(sourceDirectoryPath, ".generated_portal.zip");
-  const generatedPortalArtifactsFolderPath = path.join(
-    path.dirname(generatedPortalArtifactsDirectoryPath),
-    "generated_portal"
-  );
-
-  return [generatedBuildInputZipPath, generatedPortalArtifactsFolderPath, generatedPortalArtifactsZipFilePath];
-};
-
 export const getFileNameFromPath = (filePath: string) => {
   return path.basename(filePath).split(".")[0];
 };
@@ -314,18 +300,23 @@ export async function extractZipFile(zipFilePath: string, destinationDir: string
   });
 }
 
-export async function validateAndZipPortalSource(
-  sourceDir: string,
-  outputPath: string,
+//TODO: Refactor this method, carries dual responsibility.
+export async function zipPortalSource(
+  sourceDirectoryPath: string,
+  generatedZipFilePath: string,
   ignoredPaths: string[] = []
 ): Promise<string> {
-  const output = fs.createWriteStream(outputPath);
+  if (await fs.pathExists(generatedZipFilePath)) {
+    await deleteFile(generatedZipFilePath);
+  }
+
+  const output = fs.createWriteStream(generatedZipFilePath);
   const archive = archiver("zip", {
     zlib: { level: 9 }
   });
 
   return new Promise((resolve, reject) => {
-    output.on("close", () => resolve(outputPath));
+    output.on("close", () => resolve(generatedZipFilePath));
     output.on("error", (err) => {
       return reject(new Error(`Failed to zip the source directory: ${err.message}`));
     });
@@ -341,7 +332,7 @@ export async function validateAndZipPortalSource(
 
       for (const item of items) {
         const fullPath = path.join(currentPath, item);
-        const relativePath = path.relative(sourceDir, fullPath);
+        const relativePath = path.relative(sourceDirectoryPath, fullPath);
 
         // Check if the path is ignored.
         const isIgnored = ignoredPaths.some(
@@ -365,7 +356,7 @@ export async function validateAndZipPortalSource(
     };
 
     // Start adding items from the source directory
-    addItemsToArchive(sourceDir, false)
+    addItemsToArchive(sourceDirectoryPath, false)
       .then(() => {
         archive.finalize();
       })
@@ -375,18 +366,7 @@ export async function validateAndZipPortalSource(
   });
 }
 
-export async function cleanUpGeneratedPortalFiles(sourceDir: string) {
-  const generatedPortalZipFilePath = path.join(sourceDir, ".generated_portal.zip");
-  const generatedPortalSourceZipFilePath = path.join(sourceDir, ".portal_source.zip");
-  if (fs.existsSync(generatedPortalZipFilePath)) {
-    await deleteFile(generatedPortalZipFilePath);
-  }
-  if (fs.existsSync(generatedPortalSourceZipFilePath)) {
-    await deleteFile(generatedPortalSourceZipFilePath);
-  }
-}
-
-export function isPortInUse(port: number): Promise<boolean> {
+export async function isPortInUse(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer();
 
@@ -415,10 +395,6 @@ export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promis
   const text = Buffer.concat(chunks).toString("utf-8");
   return JSON.parse(text);
 }
-
-export const getNonHiddenItemsFromDirectory = (directoryPath: string): string[] => {
-  return fs.readdirSync(directoryPath).filter((item) => !item.startsWith("."));
-};
 
 export const getMessageInOrangeColor = (message: string) => {
   return colors.yellow(message);

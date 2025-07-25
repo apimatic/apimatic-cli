@@ -1,11 +1,15 @@
-import * as path from "path";
-import axios from "axios";
-import { Command, Flags } from "@oclif/core";
-import { generatePortal } from "../../controllers/portal/serve.js";
-import { PortalServerService } from "../../services/portal/server.js";
+import getPort from "get-port";
+import { Command, Config, Flags } from "@oclif/core";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { cleanUpGeneratedPortalFiles, getGeneratedFilesPaths, getMessageInRedColor } from "../../utils/utils.js";
-import { PortalServeValidator } from "../../validators/portal/serveValidator.js";
+import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import { PortalServeAction } from "../../actions/portal/serve.js";
+import { getMessageInRedColor } from "../../utils/utils.js";
+import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
+import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+
+const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalServe extends Command {
   static description = "Generate and deploy a Docs as Code portal with hot reload.";
@@ -13,21 +17,14 @@ export default class PortalServe extends Command {
   static flags = {
     port: Flags.integer({
       char: "p",
-      description: "Port to serve the portal.",
-      default: 3000
+      description: "[default: 3000] port to serve the portal."
+    }),
+    folder: Flags.string({
+      description:
+        "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      char: "d",
-      description: "Directory to store and serve the generated portal.",
-      default: "./generated_portal",
-      parse: async (input) => path.resolve(input)
-    }),
-    source: Flags.string({
-      char: "s",
-      description:
-        "Source directory containing specs, content, and build file. By default, the current directory is used.",
-      default: "./",
-      parse: async (input) => path.resolve(input)
+      description: "[default: <folder>/portal] path where the portal will be generated."
     }),
     open: Flags.boolean({
       char: "o",
@@ -40,7 +37,7 @@ export default class PortalServe extends Command {
     }),
     ignore: Flags.string({
       char: "i",
-      description: "Comma-separated list of files/directories to ignore.",
+      description: "Comma-separated list of file and directory paths to exclude from portal generation and hot reload.",
       default: ""
     }),
     "auth-key": Flags.string({
@@ -48,107 +45,74 @@ export default class PortalServe extends Command {
     })
   };
 
-  static examples = [
-    '$ apimatic portal:serve --source="./" --destination="./generated_portal" --port=3000 --open --no-reload'
-  ];
+  private readonly prompts: PortalServePrompts;
 
-  async run() {
-    const { flags } = await this.parse(PortalServe);
-    const ignoredPaths = flags.ignore.split(",").map((path) => path.trim());
-    const portalDir = path.resolve(flags.destination);
-    const sourceDir = path.resolve(flags.source);
-    const port = flags.port;
-    const overrideAuthKey = flags["auth-key"] ?? null;
-    const serverService = new PortalServerService();
-    const prompts = new PortalServePrompts();
-    const validator = new PortalServeValidator(this.error);
-    const allIgnoredPaths = [...ignoredPaths, ...getGeneratedFilesPaths(sourceDir, portalDir)];
-
-    await validator.validate(port, flags.destination, sourceDir, portalDir);
-
-    try {
-      prompts.displayGeneratingPortalMessage();
-      await generatePortal(sourceDir, portalDir, this.config.configDir, allIgnoredPaths, overrideAuthKey);
-      prompts.displayGeneratedPortalMessage(portalDir);
-      await cleanUpGeneratedPortalFiles(sourceDir);
-    } catch (error) {
-      prompts.displayGeneratingPortalErrorMessage();
-      await cleanUpGeneratedPortalFiles(sourceDir);
-      this.handleError(error);
-    }
-
-    serverService.setupServer(portalDir);
-
-    serverService.startServer(
-      {
-        generatedPortalPath: portalDir,
-        targetFolder: sourceDir,
-        configDir: this.config.configDir,
-        authKey: overrideAuthKey,
-        ignoredPaths: allIgnoredPaths,
-        port,
-        openInBrowser: flags.open
-      },
-      flags["no-reload"]
-    );
-
-    prompts.displayOutroMessage(port);
+  constructor(argv: string[], config: Config) {
+    super(argv, config);
+    this.prompts = new PortalServePrompts();
   }
 
-  private handleError(error: unknown) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error;
-      if (axiosError.response) {
-        if (axiosError.response.status === 400) {
-          this.error(
-            getMessageInRedColor(
-              `Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files.`
-            )
-          );
-        } else if (axiosError.response.status === 401) {
-          this.error(
-            getMessageInRedColor(
-              `Failed to generate the portal. Please ensure that you are logged in or have provided a valid Auth key.`
-            )
-          );
-        } else if (axiosError.response.status === 403) {
-          this.error(getMessageInRedColor(`Access denied. It looks like you don't have access to APIMatic's Docs as Code offering. Check your subscription details and contact our team at support@apimatic.io if you believe this is a mistake.`));
-        } else if (axiosError.response.status === 422) {
-          this.error(
-            getMessageInRedColor(
-              `Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files.`
-            )
-          );
-        } else if (axiosError.response.status === 500) {
-          this.error(
-            getMessageInRedColor(`Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files. If the issue persists, reach out to our team at support@apimatic.io`)
-          );
-        } else {
-          this.error(
-            getMessageInRedColor(
-              `Failed to generate the portal. Please ensure that the provided build directory follows the correct structure and contains valid API definition and build files. If the issue persists, reach out to our team at support@apimatic.io`
-            )
-          );
-        }
-      } else if (axiosError.request) {
-        if (axiosError.code === "ECONNABORTED") {
-          this.error(
-            getMessageInRedColor(
-              `Your request timed out. Please try again or reach out to our team at support@apimatic.io for help if your problem persists.`
-            )
-          );
-        } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
-          this.error(getMessageInRedColor(`Network error. Please check your internet connection and try again.`));
-        } else {
-          this.error(getMessageInRedColor(`No response received from the server. Please try again later.`));
-        }
-      } else {
-        this.error(getMessageInRedColor(`Failed to generate the portal: ${axiosError.message}`));
-      }
-    } else if (error instanceof Error) {
-      this.error(getMessageInRedColor(`Failed to generate the portal: ${error.message}`));
-    } else {
-      this.error(getMessageInRedColor(`Something went wrong while generating the portal, please try again later. If the issue persists, contact our team at support@apimatic.io`));
+  static examples = [
+    "$ apimatic portal:serve",
+    '$ apimatic portal:serve --folder="./" --destination="./portal" --port=3000 --open --no-reload'
+  ];
+
+  public async run() {
+    const { flags } = await this.parse(PortalServe);
+    const portalServePrompts = new PortalServePrompts();
+    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService());
+
+    //TODO: This needs to be moved within the action. Port should not be initialized again here.
+    const port = await this.getServerPort(flags.port);
+
+    const workingDirectory = new DirectoryPath(flags.folder ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = flags.folder ? new DirectoryPath(flags.folder, "build") : workingDirectory.join("build");
+    const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
+
+    const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
+
+    const serveFlags: ServeFlags = {
+      folder: buildDirectory.toString(),
+      destination: portalDirectory.toString(),
+      "auth-key": flags["auth-key"],
+      port: port,
+      open: flags.open,
+      "no-reload": flags["no-reload"],
+      ignore: flags.ignore
+    };
+
+    const servePaths: ServePaths = {
+      sourceDirectoryPath: buildDirectory.toString(),
+      destinationDirectoryPath: portalDirectory.toString()
+    };
+
+    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, generatePortalAction.execute);
+    //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
+    if (servePortalResult.isFailed()) {
+      portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
     }
+
+    if (servePortalResult.isCancelled()) {
+      portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
+    }
+
+    if (servePortalResult.isSuccess()) {
+      this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), port, flags["no-reload"]);
+    }
+  }
+
+  private async getServerPort(port: number | undefined): Promise<number> {
+    const defaultPorts = [3000, 3001, 3002];
+
+    const preferredPorts = typeof port === "number" ? [port, ...defaultPorts.filter((p) => p !== port)] : defaultPorts;
+
+    const availablePort = await getPort({ port: preferredPorts });
+
+    // Show warning only if user provided --port and it is not available
+    if (typeof port === "number" && availablePort !== port) {
+      this.prompts.displayInfo(`⚠️ Port ${port} is already in use. Available port ${availablePort} will be used.`);
+    }
+
+    return availablePort;
   }
 }

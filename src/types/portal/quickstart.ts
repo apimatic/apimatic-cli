@@ -10,7 +10,7 @@ export type SpecFile = {
 
 export type PortalServerConfig = {
     generatedPortalPath: string;
-    targetFolder: string;
+    sourceDirectoryPath: string;
     configDir: string;
     authKey: string | null;
     ignoredPaths?: string[];

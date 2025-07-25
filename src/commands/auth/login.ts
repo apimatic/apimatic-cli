@@ -3,20 +3,12 @@ import { Flags, Command } from "@oclif/core";
 import { outro, password, text } from "@clack/prompts";
 import { getMessageInRedColor, replaceHTML } from "../../utils/utils.js";
 import { SDKClient } from "../../client-utils/sdk-client.js";
+import { getAuthInfo } from "../../client-utils/auth-manager.js";
 
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";
 
-  static examples = [
-    `$ apimatic auth:login
-Enter your registered email: apimatic-user@gmail.com
-Please enter your password: *********
-
-You have successfully logged into APIMatic
-`,
-    `$ apimatic auth:login --auth-key=xxxxxx
-Authentication key successfully set`
-  ];
+  static examples = [`$ apimatic auth:login`, `$ apimatic auth:login --auth-key=xxxxxx`];
 
   static flags = {
     "auth-key": Flags.string({ default: "", description: "Set authentication key for all commands" })
@@ -26,43 +18,55 @@ Authentication key successfully set`
     const { flags } = await this.parse(Login);
     const configDir: string = this.config.configDir;
     try {
-      const client: SDKClient = SDKClient.getInstance();
+      // Check if already logged in
+      const storedAuthInfo = await getAuthInfo(configDir);
+      if (storedAuthInfo && storedAuthInfo.authKey) {
+        if (storedAuthInfo.email) {
+          return this.log(
+            `You are already logged in as '${storedAuthInfo.email}'. Use 'auth:logout' to logout before logging in again.`
+          );
+        }
+        return this.log(
+          `You are already logged in with authentication key. Use 'auth:logout' to logout before logging in again.`
+        );
+      }
 
+      const client: SDKClient = SDKClient.getInstance();
       // If user is setting auth key
       if (flags["auth-key"]) {
         const response = client.setAuthKey(flags["auth-key"], configDir);
         return this.log(response);
-      } else {
-        // If user logs in with email and password
-        const email = await text({
-          message: "Enter your registered email:",
-          validate: (input) => {
-            if (!input) {
-              return getMessageInRedColor("Email is required.");
-            }
-
-            const emailRegex =
-              /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-            if (!emailRegex.test(input)) {
-              return getMessageInRedColor("Please enter a valid email address.");
-            }
-          }
-        });
-
-        const pass = await password({
-          message: "Please enter your password:",
-          validate: (input) => {
-            if (!input) {
-              return getMessageInRedColor("Password is required.");
-            }
-          }
-        });
-
-        const response: string = await client.login(email as string, pass as string, configDir);
-
-        outro(response);
       }
+
+      // If user logs in with email and password
+      const email = await text({
+        message: "Enter your registered email:",
+        validate: (input) => {
+          if (!input) {
+            return getMessageInRedColor("Email is required.");
+          }
+
+          const emailRegex =
+            /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+          if (!emailRegex.test(input)) {
+            return getMessageInRedColor("Please enter a valid email address.");
+          }
+        }
+      });
+
+      const pass = await password({
+        message: "Please enter your password:",
+        validate: (input) => {
+          if (!input) {
+            return getMessageInRedColor("Password is required.");
+          }
+        }
+      });
+
+      const response: string = await client.login(email as string, pass as string, configDir);
+
+      outro(response);
     } catch (error) {
       if (error && (error as AxiosError).response) {
         const apiError = error as AxiosError;

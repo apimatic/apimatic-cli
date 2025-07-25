@@ -16,12 +16,8 @@ export default class Transform extends Command {
   static description = `Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.`;
 
   static examples = [
-    `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
-Success! Your transformed file is located at D:/Transformed_OpenApi3Json.json
-`,
-    `$ apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"
-Success! Your transformed file is located at D:/swagger_raml.yaml
-`
+    `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"`,
+    `$ apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"`
   ];
 
   static flags = {

@@ -11,9 +11,9 @@ import {
   isValidUrl,
   directoryToJson
 } from "../../utils/utils.js";
+import { BasePrompts } from "./common/base-prompts.js";
 
-export class PortalQuickstartPrompts {
-  private readonly spin = spinner();
+export class PortalQuickstartPrompts extends BasePrompts {
   private readonly vscodeExtensionUrl =
     "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
   private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
@@ -86,19 +86,32 @@ export class PortalQuickstartPrompts {
     this.spin.stop(getMessageInCyanColor("✅  Login successful!"));
   }
 
+  removeQuotes(str: string) {
+    const quotes = ['"', "'"];
+
+    for (const quote of quotes) {
+      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
+        return str.slice(1, -1);
+      }
+    }
+    return str;
+  }
+
   async specPrompt(): Promise<string> {
     log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
 
     const spec = await text({
-      message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
-      placeholder: "Press Enter to use a sample OpenAPI file for APIMatic",
-      defaultValue: "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
+      message: `Provide a local path or a public URL for your OpenAPI definition file:`,
+      placeholder: "Provide absolute URL/local path or press Enter to use sample OpenAPI file from APIMatic.",
+      defaultValue:
+        "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
       validate: (input) => {
         if (!input) return;
 
         if (isValidUrl(input)) return;
 
-        const dirPath = path.resolve((input ?? "").trim());
+        const cleanedPath = this.removeQuotes(input.trim() ?? "");
+        const dirPath = path.resolve(cleanedPath);
 
         if (fs.existsSync(dirPath)) {
           if (fs.statSync(dirPath).isFile()) {
@@ -197,15 +210,16 @@ export class PortalQuickstartPrompts {
     return languages;
   }
 
-  async buildDirectoryPrompt(): Promise<string> {
+  async workingDirectoryPrompt(): Promise<string> {
     log.step(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
 
     const directory = await text({
-      message: "Enter the directory path where you would like to setup the API Portal :",
-      placeholder: "Enter absolute path to the directory or leave it empty to use the current directory.",
+      message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
+      placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const dirPath = path.resolve((input ?? "").trim());
+        const cleanedPath = this.removeQuotes(input?.trim() ?? "");
+        const dirPath = path.resolve(cleanedPath);
 
         if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
           return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
@@ -239,7 +253,7 @@ export class PortalQuickstartPrompts {
   }
 
   displayBuildDirectoryGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Generating build directory... ⚙️"));
+    this.spin.start(getMessageInMagentaColor("Generating build directory ⚙️"));
   }
 
   displayBuildDirectoryGenerationErrorMessage(): void {
@@ -260,22 +274,14 @@ export class PortalQuickstartPrompts {
       .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
       .join("\n");
 
-    log.info(coloredLogString);
+    log.step(coloredLogString);
   }
 
-  displayPortalGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Setting up portal"));
-  }
-
-  displayPortalGenerationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor("✅  Portal setup complete!"));
-  }
-
-  displayOutroMessage(directory: string): void {
+  displayOutroMessage(buildDirectory: string): void {
     log.step(
       getMessageInCyanColor(`📢  Your API Portal is live at: ${this.serverUrl}\n`) +
         getMessageInCyanColor(
-          `Hot reload enabled! Edit files in ${directory} to see changes instantly reflected in your API Portal.\n`
+          `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
         ) +
         getMessageInCyanColor(`Press CTRL+C to stop the server.`)
     );

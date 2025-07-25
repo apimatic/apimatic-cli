@@ -61,6 +61,8 @@
         "${workspaceFolder}/node_modules/mocha/bin/_mocha",
         "--forbid-only",
         "test/**/*.test.ts",
+        // "--ignore",
+        // "test/commands/portal/generate.test.ts",
         // "${file}", // Run Tests for the currently open test file.
         "--timeout",
         "99999"
