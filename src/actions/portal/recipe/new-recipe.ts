@@ -1,7 +1,6 @@
 import * as path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
-import which from "which";
 import { parse } from "yaml";
 import { TreeObject } from "treeify";
 import { tmpdir } from "os";
@@ -190,9 +189,8 @@ export class PortalRecipeAction {
           editor = "vim";
           try {
             await execa(editor, [tempFilePath], { stdio: "inherit" });
-          }
-          catch (error) {
-            // User exiting vim can throw a non-zero exit code leading to exception, ignore it. 
+          } catch {
+            // User exiting vim can throw a non-zero exit code leading to exception, ignore it.
           }
         }
       } else {
@@ -205,13 +203,12 @@ export class PortalRecipeAction {
 
       const fileContent = await fsExtra.readFile(tempFilePath, "utf-8");
       recipe.addContentStep(stepName, stepName, fileContent);
-      
+
       this.prompts.displayStepAddedSuccessfullyMessage();
       return Result.success("Added content step successfully.");
     } catch (error) {
       return Result.failure(`Unable to add content step. Please try again later.`);
-    }
-    finally {
+    } finally {
       await fsExtra.unlink(tempFilePath);
     }
   }
@@ -298,9 +295,7 @@ export class PortalRecipeAction {
     return false;
   }
 
-  private async getBuildDirectoryStructure(
-    recipeFileName: string
-  ): Promise<DirectoryNode> {
+  private async getBuildDirectoryStructure(recipeFileName: string): Promise<DirectoryNode> {
     return {
       content: {
         "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null

@@ -5,6 +5,8 @@ import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { PortalServeAction } from "../../actions/portal/serve.js";
 import { getMessageInRedColor } from "../../utils/utils.js";
+import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
+import { PortalService } from "../../infrastructure/services/portal-service.js";
 
 const DEFAULT_FOLDER = "./";
 const DEFAULT_DESTINATION = path.resolve("./");
@@ -63,7 +65,7 @@ export default class PortalServe extends Command {
     const { flags } = await this.parse(PortalServe);
     const paths = this.getServePaths(flags as ServeFlags);
     const portalServePrompts = new PortalServePrompts();
-    const portalServeAction = new PortalServeAction();
+    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService());
 
     //TODO: This needs to be moved within the action. Port should not be initialized again here.
     flags.port = await this.getServerPort(flags.port);

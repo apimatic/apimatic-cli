@@ -4,6 +4,7 @@ import fsExtra from "fs-extra";
 export type AuthInfo = {
   email: string;
   authKey: string;
+  APIMATIC_CLI_TELEMETRY_OPTOUT?: string;
 };
 /**
  *

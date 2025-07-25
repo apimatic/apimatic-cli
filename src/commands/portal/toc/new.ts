@@ -1,6 +1,8 @@
 import * as path from "path";
 import { Command, Flags } from "@oclif/core";
 import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc.js";
+import { TelemetryService } from "../../../infrastructure/services/telemetry-service.js";
+import { TocCreationFailedEvent } from "../../../application/tracking-events/toc-creation-failed.js";
 
 const DEFAULT_FOLDER = process.cwd();
 
@@ -57,6 +59,7 @@ A new toc file has been created at ./portal/content/toc.yml
 
   async run(): Promise<void> {
     const { flags } = await this.parse(PortalTocNew);
+    const telemetryService = new TelemetryService(this.config.configDir);
     const portalNewTocAction = new PortalNewTocAction();
     const result = await portalNewTocAction.createToc(
       flags.folder,
@@ -67,7 +70,9 @@ A new toc file has been created at ./portal/content/toc.yml
       flags["expand-models"]
     );
 
+    //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (result.isFailed()) {
+      telemetryService.trackEvent(new TocCreationFailedEvent(result.error!, flags));
       this.error(result.error!);
     }
   }

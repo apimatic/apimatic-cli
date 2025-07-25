@@ -99,13 +99,13 @@ export class PortalService {
   };
 
   private getUserAgent(): string {
-      const osInfo = `${os.platform()} ${os.release()}`;
-      const engine = "Node.js";
-      const engineVersion = process.version;
-      
-      return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
-    }
-    
+    const osInfo = `${os.platform()} ${os.release()}`;
+    const engine = "Node.js";
+    const engineVersion = process.version;
+
+    return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
+  }
+
   private createApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {

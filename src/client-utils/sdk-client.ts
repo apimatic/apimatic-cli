@@ -39,10 +39,12 @@ export class SDKClient {
   public async login(email: string, password: string, configDir: string): Promise<string> {
     const credentials: Credentials = { email, password };
     const authKey: string = await this.getAuthKey(credentials);
+    const isTelemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
       setAuthInfo(
         {
           email,
-          authKey
+          authKey,
+          APIMATIC_CLI_TELEMETRY_OPTOUT: isTelemetryOptedOut ? "1" : "0" // Enable telemetry when logging in.
         },
         configDir
       );
@@ -119,10 +121,12 @@ export class SDKClient {
     return authKey;
   }
   public setAuthKey = (authKey: string, configDir: string) => {
+    const isTelemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
     setAuthInfo(
       {
         email: "",
-        authKey
+        authKey,
+        APIMATIC_CLI_TELEMETRY_OPTOUT: isTelemetryOptedOut ? "1" : "0" // Enable telemetry when setting auth key.
       },
       configDir
     );
