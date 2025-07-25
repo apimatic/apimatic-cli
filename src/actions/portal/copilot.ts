@@ -1,15 +1,11 @@
-import { FileService } from "../../infrastructure/file-service.js";
 import { ApiService } from "../../infrastructure/services/api-service.js";
 import { PortalCopilotPrompts } from "../../prompts/portal/copilot.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../actionResult.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { FileName } from "../../types/file/fileName.js";
-import { BuildConfig } from "../../types/build/build.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
+import { BuildContext } from "../../types/build-context.js";
 
-export class CopilotConfigAction {
-  private readonly fileService = new FileService();
+export class Copilot {
   private readonly apiService = new ApiService();
   private readonly prompts = new PortalCopilotPrompts();
   private readonly configDir: DirectoryPath;
@@ -21,15 +17,16 @@ export class CopilotConfigAction {
   }
 
   public async execute(buildDirectory: DirectoryPath, welcomeMessage: string, enable: boolean): Promise<ActionResult> {
-    if (!(await this.validateBuild(buildDirectory))) {
+    const buildContext = new BuildContext(buildDirectory);
+
+    if (!(await buildContext.validate())) {
       return ActionResult.error("build directory is empty or not valid");
     }
 
-    const buildFile = new FilePath(buildDirectory, new FileName("APIMATIC-BUILD.json"));
-    const buildFileContent = await this.fileService.getContents(buildFile);
+    const buildJson = await buildContext.getBuildFileContents();
 
-    const buildJson = JSON.parse(buildFileContent) as BuildConfig;
-    // TODO: add prompt for overwriting if existing config found
+    if (buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite()))
+      return ActionResult.error("API Copilot configuration already exists");
 
     const response = await this.apiService.getAccountInfo(this.configDir, this.authKey);
     if (!response.isSuccess()) {
@@ -43,26 +40,21 @@ export class CopilotConfigAction {
     buildJson.apiCopilotConfig = {
       isEnabled: enable,
       key: apiCopilotKey,
-      welcomeMessage: welcomeMessage,
+      welcomeMessage: welcomeMessage
     };
 
-    await this.fileService.writeContents(buildFile, JSON.stringify(buildJson, null, 2));
+    await buildContext.updateBuildFileContents(buildJson);
 
     this.prompts.copilotConfigured(apiCopilotKey);
     return ActionResult.success();
   }
 
-  // TODO: add build file validator class and logic
-  private async validateBuild(buildDirectory: DirectoryPath) {
-    // TODO: add more checks here
-    if (!(await this.fileService.directoryExists(buildDirectory))) return false;
-
-    const buildFile = new FilePath(buildDirectory, new FileName("APIMATIC-BUILD.json"));
-    return await this.fileService.fileExists(buildFile);
-  }
-
   private async selectCopilotKey(subscription: SubscriptionInfo | undefined): Promise<string | null> {
-    if (subscription === undefined || subscription.ApiCopilotKeys === undefined || subscription.ApiCopilotKeys.length === 0) {
+    if (
+      subscription === undefined ||
+      subscription.ApiCopilotKeys === undefined ||
+      subscription.ApiCopilotKeys.length === 0
+    ) {
       return null;
     }
 

@@ -64,6 +64,7 @@ export class FileService {
   public async copy(source: FilePath, destination: FilePath) {
     await fs.copyFile(source.toString(), destination.toString());
   }
+
 }
 
 const streamPipeline = promisify(pipeline);

@@ -3,12 +3,15 @@ import { ZipService } from "../../infrastructure/zip-service.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { withDir } from "tmp-promise";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { ActionResult } from "../actionResult.js";
+import { BuildContext } from "../../types/build-context.js";
+import { PortalContext } from "../../types/portal-context.js";
+import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 
-export class GeneratePortalAction {
+
+export class Generate {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly zipArchiver: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
@@ -27,68 +30,52 @@ export class GeneratePortalAction {
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
+
     if (buildDirectory.isEqual(portalDirectory)) {
       return ActionResult.error("build directory and portal directory cannot be the same.");
     }
 
-    if (!(await this.validateBuild(buildDirectory))) {
+    const buildContext = new BuildContext(buildDirectory);
+    if (!await buildContext.validate()) {
       return ActionResult.error("build directory is empty or not valid");
     }
 
-    if (!(await this.validatePortal(portalDirectory, force))) {
-      return ActionResult.error("portal directory is empty or not valid");
+    const portalContext = new PortalContext(portalDirectory);
+    if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
+      return ActionResult.error(
+        "Please enter a different destination folder or remove the existing files and try again."
+      );
     }
 
-    return await withDir(
-      async (tempDirResult) => {
-        this.prompts.displayPortalGenerationMessage();
+    return await withDirPath(async (tempDirectory) => {
+      this.prompts.displayPortalGenerationMessage();
 
-        const tempDirectory = new DirectoryPath(tempDirResult.path);
+      const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
+      await this.zipArchiver.archive(buildDirectory, buildZipPath);
 
-        const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
-        await this.zipArchiver.archive(buildDirectory, buildZipPath);
+      const response = await this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey);
 
-        const response = await this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey);
+      if (!response.isSuccess()) {
+        this.prompts.displayPortalGenerationErrorMessage();
+        return ActionResult.error(await this.parseError(response.error!, portalDirectory, tempDirectory));
+      }
 
-        if (!response.isSuccess()) {
-          this.prompts.displayPortalGenerationErrorMessage();
-          return ActionResult.error(await this.parseError(response.error!, portalDirectory, tempDirectory));
-        }
+      this.prompts.displayPortalGenerationSuccessMessage();
 
-        this.prompts.displayPortalGenerationSuccessMessage();
+      const tempPortalFilePath = new FilePath(tempDirectory, new FileName("portal.zip"));
+      await this.fileService.writeFile(tempPortalFilePath, <NodeJS.ReadableStream>response.value);
 
-        const tempPortalFilePath = new FilePath(tempDirectory, new FileName("portal.zip"));
-        await this.fileService.writeFile(tempPortalFilePath, <NodeJS.ReadableStream>response.value);
+      await portalContext.save(tempPortalFilePath, zipPortal);
 
-        await this.fileService.cleanDirectory(portalDirectory);
-        if (zipPortal) {
-          const portalFilePath = new FilePath(portalDirectory, new FileName("portal.zip"));
-          await this.fileService.copy(tempPortalFilePath, portalFilePath);
-        } else {
-          await this.zipArchiver.unArchive(tempPortalFilePath, portalDirectory);
-        }
-        return ActionResult.success();
-      },
-      { unsafeCleanup: true }
-    );
-  }
-
-  private async validateBuild(buildDirectory: DirectoryPath) {
-    // TODO: add more checks here
-    return await this.fileService.directoryExists(buildDirectory);
-  }
-
-  private async validatePortal(portalDirectory: DirectoryPath, forceCleanup: boolean): Promise<boolean> {
-    const isEmptyOrNotExists = await this.fileService.directoryEmpty(portalDirectory);
-    if (isEmptyOrNotExists) return true;
-    return forceCleanup || (await this.prompts.overwritePortal(portalDirectory));
+      return ActionResult.success();
+    });
   }
 
   private async parseError(error: string | NodeJS.ReadableStream, portalDirectory: DirectoryPath, tempDirectory: DirectoryPath): Promise<string> {
     if (typeof error === 'string') {
       return error;
     }
-    
+
     const tempErrorFilePath = new FilePath(tempDirectory, new FileName("error.zip"));
     await this.fileService.writeFile(tempErrorFilePath, <NodeJS.ReadableStream>error);
 

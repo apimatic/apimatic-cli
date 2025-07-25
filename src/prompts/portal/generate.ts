@@ -1,4 +1,4 @@
-import { cancel, outro, select, spinner, isCancel } from "@clack/prompts";
+import { cancel, outro, select, spinner, isCancel, confirm } from "@clack/prompts";
 import { getMessageInRedColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
@@ -6,27 +6,16 @@ export class PortalGeneratePrompts {
   private readonly spin = spinner();
 
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
-    const overwrite = await select({
+    const overwrite = await confirm({
       message: `The destination '${directory}' is not empty, do you want to overwrite?`,
-      options: [
-        { value: true, label: "Yes" },
-        { value: false, label: "No" }
-      ], initialValue: false,
+      initialValue: false,
     });
 
     if (isCancel(overwrite)) {
-      cancel("Operation cancelled.");
-      process.exit(1);
+      return false;
     }
 
-    if (overwrite) {
-      return true;
-    }
-
-    outro("Please enter a different destination folder or remove the existing files and try again.");
-    process.exit(1);
-
-    // TODO: it should return false (no process exit);
+    return overwrite;
   }
 
   async overwriteExistingPortalArtifactsPrompt(): Promise<boolean> {

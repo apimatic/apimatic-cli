@@ -6,7 +6,7 @@ import { PortalServeAction } from "../../actions/portal/serve.js";
 import { getMessageInRedColor } from "../../utils/utils.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
-import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
+import { Generate } from "../../actions/portal/generate.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
@@ -68,7 +68,7 @@ export default class PortalServe extends Command {
     const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
 
 
-    const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
+    const generatePortalAction = new Generate(new DirectoryPath(this.config.configDir), flags["auth-key"]);
     //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
 
     const serveFlags: ServeFlags = {

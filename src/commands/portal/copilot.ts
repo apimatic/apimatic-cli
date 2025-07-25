@@ -2,7 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { PortalCopilotPrompts } from "../../prompts/portal/copilot.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
-import { CopilotConfigAction } from "../../actions/portal/copilotConfigAction.js";
+import { Copilot } from "../../actions/portal/copilot.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -37,7 +37,7 @@ export default class PortalCopilotEnable extends Command {
 
     const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = folder ? new DirectoryPath(folder, "build") : workingDirectory.join("build");
-    const copilotConfigAction = new CopilotConfigAction(new DirectoryPath(this.config.configDir), authKey);
+    const copilotConfigAction = new Copilot(new DirectoryPath(this.config.configDir), authKey);
     const result = await copilotConfigAction.execute(buildDirectory, welcomeMessage, !disable);
     result.map((message) => this.prompts.logError(message));
   }

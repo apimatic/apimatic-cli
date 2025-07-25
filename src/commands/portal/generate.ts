@@ -1,6 +1,6 @@
 import { Command, Config, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
+import { Generate } from "../../actions/portal/generate.js";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
@@ -58,7 +58,7 @@ Your portal has been generated at D:/
     const buildDirectory = folder ? new DirectoryPath(folder, "build") : workingDirectory.join("build");
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
 
-    const action = new GeneratePortalAction(this.getConfigDir(), authKey);
+    const action = new Generate(this.getConfigDir(), authKey);
     const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
     result.map((message) => this.prompts.logError(message));
   }
