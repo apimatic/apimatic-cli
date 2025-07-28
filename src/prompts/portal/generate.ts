@@ -1,4 +1,4 @@
-import { cancel, outro, select, spinner, isCancel, confirm } from "@clack/prompts";
+import { cancel, outro, select, spinner, isCancel, confirm, log } from "@clack/prompts";
 import { getMessageInRedColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
@@ -16,27 +16,6 @@ export class PortalGeneratePrompts {
     }
 
     return overwrite;
-  }
-
-  async overwriteExistingPortalArtifactsPrompt(): Promise<boolean> {
-    const useExistingFolder = await select({
-      message: `The destination folder is not empty, do you want to overwrite the existing files?`,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" }
-      ]
-    });
-
-    if (isCancel(useExistingFolder)) {
-      cancel("Operation cancelled.");
-      return process.exit(1);
-    }
-
-    if (useExistingFolder === "no") {
-      outro("Please enter a different destination folder or remove the existing files and try again.");
-    }
-
-    return useExistingFolder === "yes";
   }
 
   async existingDestinationPortalZipPrompt(): Promise<boolean> {
@@ -77,6 +56,6 @@ export class PortalGeneratePrompts {
   }
 
   logError(error: string): void {
-    outro(error);
+    log.error(error);
   }
 }

@@ -5,7 +5,7 @@ import { ActionResult } from "../actionResult.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { BuildContext } from "../../types/build-context.js";
 
-export class Copilot {
+export class CopilotAction {
   private readonly apiService = new ApiService();
   private readonly prompts = new PortalCopilotPrompts();
   private readonly configDir: DirectoryPath;

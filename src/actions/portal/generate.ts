@@ -11,7 +11,7 @@ import { PortalContext } from "../../types/portal-context.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 
 
-export class Generate {
+export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly zipArchiver: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();

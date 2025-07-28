@@ -10,7 +10,7 @@ import { PortalServeAction } from "../../actions/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { Generate } from "../../actions/portal/generate.js";
+import { GenerateAction } from "../../actions/portal/generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import getPort from "get-port";
 
@@ -124,7 +124,7 @@ export default class PortalQuickstart extends Command {
       const portalDirectory =  new DirectoryPath(workingDirectory,"portal");
 
 
-      const generatePortalAction = new Generate(new DirectoryPath(this.config.configDir), null);
+      const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), null);
       //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
 
       const serveFlags: ServeFlags = {

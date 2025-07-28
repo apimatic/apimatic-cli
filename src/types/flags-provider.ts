@@ -4,9 +4,16 @@ export class FlagsProvider {
   // Common folder flag group
   public static folder = {
     folder: Flags.string({
-      char: "f",
       description:
         "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
+    })
+  };
+
+  public static destination = {
+    folder: Flags.string({
+      char: "d",
+      description:
+        "[default: ./portal] path where the portal will be downloaded",
     })
   };
 
@@ -18,5 +25,14 @@ export class FlagsProvider {
       env: "API_COPILOT_AUTH_KEY"
     })
   };
+
+  public static force = {
+    force: Flags.boolean({
+      char: "f",
+      default: false,
+      description: "overwrite if a portal exists in the destination",
+    })
+  };
 }
+
 
