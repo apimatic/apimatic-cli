@@ -34,7 +34,6 @@ export class TelemetryService {
       return;
     }
 
-    //TODO: This needs to send userId, otherwise tracking will not work.
     const payload: TelemetryPayload = {
       payload: event,
       timestamp: new Date().toISOString(),
