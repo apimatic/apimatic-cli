@@ -5,7 +5,7 @@ import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../actionResult.js";
+import { ActionResult } from "../action-result.js";
 
 export class PortalServeAction {
   protected readonly prompts: PortalServePrompts;

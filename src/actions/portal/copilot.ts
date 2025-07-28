@@ -1,7 +1,7 @@
 import { ApiService } from "../../infrastructure/services/api-service.js";
 import { PortalCopilotPrompts } from "../../prompts/portal/copilot.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../actionResult.js";
+import { ActionResult } from "../action-result.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { BuildContext } from "../../types/build-context.js";
 

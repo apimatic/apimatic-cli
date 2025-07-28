@@ -5,7 +5,7 @@ import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
-import { ActionResult } from "../actionResult.js";
+import { ActionResult } from "../action-result.js";
 import { BuildContext } from "../../types/build-context.js";
 import { PortalContext } from "../../types/portal-context.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";

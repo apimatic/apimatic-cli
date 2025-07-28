@@ -14,7 +14,7 @@ export class PortalContext {
 
   public get ZipPath(): FilePath {
     // TODO: add checks for build file path
-    return new FilePath(this.portalDirectory, new FileName("APIMATIC-BUILD.json"));
+    return new FilePath(this.portalDirectory, new FileName("portal.zip"));
   }
 
   public async exists() {
