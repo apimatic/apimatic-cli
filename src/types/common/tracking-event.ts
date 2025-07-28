@@ -1,11 +1,12 @@
 export abstract class DomainEvent {
   protected abstract readonly eventName: string;
-  protected abstract readonly commandName: string;
   private readonly message: string;
+  private readonly commandName: string;
   private readonly flags: Record<string, string>;
 
-  constructor(message: string, flags: Record<string, unknown>) {
+  constructor(message: string, commandName: string, flags: Record<string, unknown>) {
     this.message = message;
+    this.commandName = commandName;
     this.flags = this.redactFlags(flags);
   }
 
