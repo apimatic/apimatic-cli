@@ -1,10 +1,18 @@
 export abstract class DomainEvent {
   protected abstract readonly eventName: string;
   private readonly message: string;
-  private readonly flags: object;
+  private readonly flags: Record<string, string>;
 
-  constructor(message: string, flags: object) {
+  constructor(message: string, flags: Record<string, unknown>) {
     this.message = message;
-    this.flags = flags;
+    this.flags = this.redactFlags(flags);
+  }
+
+  private redactFlags(flags: Record<string, unknown>): Record<string, string> {
+    const redactedFlags: Record<string, string> = {};
+    for (const key in flags) {
+      redactedFlags[key] = "REDACTED";
+    }
+    return redactedFlags;
   }
 }
