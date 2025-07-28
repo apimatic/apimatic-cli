@@ -1,5 +1,6 @@
 export abstract class DomainEvent {
   protected abstract readonly eventName: string;
+  protected abstract readonly commandName: string;
   private readonly message: string;
   private readonly flags: Record<string, string>;
 
