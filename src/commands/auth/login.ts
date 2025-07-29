@@ -1,88 +1,57 @@
-import { AxiosError } from "axios";
+
 import { Flags, Command } from "@oclif/core";
-import { outro, password, text } from "@clack/prompts";
-import { getMessageInRedColor, replaceHTML } from "../../utils/utils.js";
-import { SDKClient } from "../../client-utils/sdk-client.js";
-import { getAuthInfo } from "../../client-utils/auth-manager.js";
+import { v4 as uuidv4 } from "uuid";
+import open from "open";
+import axios, { AxiosRequestConfig } from "axios";
+import https from "https";
+import { setAuthInfo } from "../../client-utils/auth-manager.js";
 
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";
 
-  static examples = [`$ apimatic auth:login`, `$ apimatic auth:login --auth-key=xxxxxx`];
+  static examples = [`apimatic auth:login`, `apimatic auth:login --auth-key={api-key}`];
+
+  private static readonly AUTH_TIMEOUT = 5 * 60 * 1000; // 5 minutes timeout
 
   static flags = {
-    "auth-key": Flags.string({ default: "", description: "Set authentication key for all commands" })
+    "auth-key": Flags.string({ default: "", description: "Sets authentication key for all commands." })
   };
 
   async run() {
-    const { flags } = await this.parse(Login);
-    const configDir: string = this.config.configDir;
-    try {
-      // Check if already logged in
-      const storedAuthInfo = await getAuthInfo(configDir);
-      if (storedAuthInfo && storedAuthInfo.authKey) {
-        if (storedAuthInfo.email) {
-          return this.log(
-            `You are already logged in as '${storedAuthInfo.email}'. Use 'auth:logout' to logout before logging in again.`
-          );
-        }
-        return this.log(
-          `You are already logged in with authentication key. Use 'auth:logout' to logout before logging in again.`
-        );
+    const {
+      flags: { "auth-key": authKey }
+    } = await this.parse(Login);
+
+    if (authKey) {
+      this.log("Using provided authentication key");
+      return authKey;
+    }
+
+    const state = uuidv4();
+    this.log("Opening browser for authentication...");
+    await open(`https://localhost:44000/deviceauth/login?state=${state}`);
+
+    while (true) {
+      const httpsConfig: AxiosRequestConfig = {
+        httpsAgent: new https.Agent({ rejectUnauthorized: false })
+      };
+      const response = await axios.get(`https://localhost:44000/deviceauth/token?state=${state}`, httpsConfig);
+
+      if (response.data && typeof response.data.apiKey === "string") {
+        this.log("Successfully authenticated!");
+        const apiKey = response.data.apiKey;
+
+
+        await setAuthInfo("myeamil", apiKey, false, this.config.configDir);
+        this.log("api-key saved");
+        return;
+        // TODO: call subscription info to validate apiKey;
+
+      } else {
+        this.log("Invalid token format received");
       }
 
-      const client: SDKClient = SDKClient.getInstance();
-      // If user is setting auth key
-      if (flags["auth-key"]) {
-        const response = client.setAuthKey(flags["auth-key"], configDir);
-        return this.log(response);
-      }
-
-      // If user logs in with email and password
-      const email = await text({
-        message: "Enter your registered email:",
-        validate: (input) => {
-          if (!input) {
-            return getMessageInRedColor("Email is required.");
-          }
-
-          const emailRegex =
-            /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-          if (!emailRegex.test(input)) {
-            return getMessageInRedColor("Please enter a valid email address.");
-          }
-        }
-      });
-
-      const pass = await password({
-        message: "Please enter your password:",
-        validate: (input) => {
-          if (!input) {
-            return getMessageInRedColor("Password is required.");
-          }
-        }
-      });
-
-      const response: string = await client.login(email as string, pass as string, configDir);
-
-      outro(response);
-    } catch (error) {
-      if (error && (error as AxiosError).response) {
-        const apiError = error as AxiosError;
-        const apiResponse = apiError.response;
-
-        if (apiResponse) {
-          const responseData = apiResponse.data;
-
-          if (apiResponse.status === 403 && responseData) {
-            return this.error(replaceHTML(JSON.stringify(responseData)));
-          } else {
-            return this.error(apiError.message);
-          }
-        }
-      }
-      this.error((error as Error).message);
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay between polls
     }
   }
 }

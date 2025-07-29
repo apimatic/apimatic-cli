@@ -8,6 +8,7 @@ import os from "os";
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io";
 
+
   public async getAccountInfo(
     configDir: DirectoryPath,
     authKey: string | null
