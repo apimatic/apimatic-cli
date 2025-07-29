@@ -93,6 +93,7 @@ export class ServeHandler {
   }
 
   private async stopServer(): Promise<void> {
+    this.portalWatcher.cancelPendingOperations();
     if (this.liveReloadServer) {
       this.liveReloadServer.close();
     }
