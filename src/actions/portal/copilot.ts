@@ -20,13 +20,13 @@ export class CopilotAction {
     const buildContext = new BuildContext(buildDirectory);
 
     if (!(await buildContext.validate())) {
-      return ActionResult.error("build directory is empty or not valid");
+      return ActionResult.error("build directory is empty or not valid.");
     }
 
     const buildJson = await buildContext.getBuildFileContents();
 
     if (buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite()))
-      return ActionResult.error("API Copilot configuration already exists");
+      return ActionResult.error("Exiting without making any change.");
 
     const response = await this.apiService.getAccountInfo(this.configDir, this.authKey);
     if (!response.isSuccess()) {
@@ -34,7 +34,7 @@ export class CopilotAction {
     }
     const apiCopilotKey = await this.selectCopilotKey(response.value);
     if (apiCopilotKey === null) {
-      return ActionResult.error("No copilot key found for the current subscription. Please contact support.");
+      return ActionResult.error("No copilot key found for the current subscription. Please contact support at support@apimatic.io.");
     }
 
     buildJson.apiCopilotConfig = {

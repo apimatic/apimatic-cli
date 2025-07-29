@@ -13,7 +13,7 @@ export default class PortalCopilotEnable extends Command {
     ...FlagsProvider.folder,
     "welcome-message": Flags.string({
       char: "m",
-      default: "Hello! I'm your API assistant. How can I help you today?",
+      default: "",
       description: "welcome message for the API copilot"
     }),
     disable : Flags.boolean({
