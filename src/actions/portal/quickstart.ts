@@ -8,7 +8,7 @@ import { PortalServeAction } from "./serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { GeneratePortalAction } from "./generatePortalAction.js";
+import { GenerateAction } from "./generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { getAuthInfo } from "../../client-utils/auth-manager.js";
 import { staticPortalRepoUrl, metadataFileContent } from "../../config/env.js";
@@ -51,7 +51,7 @@ export class QuickstartAction {
     const port = await this.getServerPort(3000);
     const buildDirectory = new DirectoryPath(workingDirectory, "build");
     const portalDirectory = new DirectoryPath(workingDirectory, "portal");
-    const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.configDir), null);
+    const generatePortalAction = new GenerateAction(new DirectoryPath(this.configDir), null);
     const serveFlags: ServeFlags = {
       folder: buildDirectory.toString(),
       destination: portalDirectory.toString(),

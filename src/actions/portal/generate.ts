@@ -60,12 +60,11 @@ export class GenerateAction {
         return ActionResult.error(await this.parseError(response.error!, portalDirectory, tempDirectory));
       }
 
-      this.prompts.displayPortalGenerationSuccessMessage();
-
       const tempPortalFilePath = new FilePath(tempDirectory, new FileName("portal.zip"));
       await this.fileService.writeFile(tempPortalFilePath, <NodeJS.ReadableStream>response.value);
 
       await portalContext.save(tempPortalFilePath, zipPortal);
+      this.prompts.displayPortalGenerationSuccessMessage();
 
       return ActionResult.success();
     });
