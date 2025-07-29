@@ -10,7 +10,7 @@ import { Result } from "../../../types/common/result.js";
 import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
 import { PortalWatcher } from "./portal-watcher.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
-import { ActionResult } from "../../../actions/actionResult.js";
+import { ActionResult } from "../../../actions/action-result.js";
 
 export class ServeHandler {
   private server!: Server;
