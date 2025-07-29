@@ -37,7 +37,7 @@ export class TelemetryService {
     const payload: TelemetryPayload = {
       payload: event,
       timestamp: new Date().toISOString(),
-      cliVersion: await this.getCLIVersion(),
+      cliVersion: this.getCLIVersion(),
       platform: os.platform(),
       releaseVersion: os.release(),
       nodeVersion: process.version,
