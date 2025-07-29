@@ -1,7 +1,7 @@
-import { DomainEvent } from "../../types/common/tracking-event.js";
+import { DomainEvent } from "../../types/events/domain-event.js";
 
 export class RecipeCreationFailedEvent extends DomainEvent {
-  protected readonly eventName = "RecipeCreationFailed" as const;
+  protected readonly eventName = RecipeCreationFailedEvent.name;
 
   constructor(message: string, commandName: string, flags: Record<string, unknown>) {
     super(message, commandName, flags);

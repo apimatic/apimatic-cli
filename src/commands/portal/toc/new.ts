@@ -1,7 +1,7 @@
 import { Command, Config, Flags } from "@oclif/core";
 import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc.js";
 import { TelemetryService } from "../../../infrastructure/services/telemetry-service.js";
-import { TocCreationFailedEvent } from "../../../application/tracking-events/toc-creation-failed.js";
+import { TocCreationFailedEvent } from "../../../types/events/toc-creation-failed.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";

@@ -3,7 +3,7 @@ import { PortalRecipeAction } from "../../../actions/portal/recipe/new-recipe.js
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
 import { getMessageInRedColor } from "../../../utils/utils.js";
 import { TelemetryService } from "../../../infrastructure/services/telemetry-service.js";
-import { RecipeCreationFailedEvent } from "../../../application/tracking-events/recipe-creation-failed.js";
+import { RecipeCreationFailedEvent } from "../../../types/events/recipe-creation-failed.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
