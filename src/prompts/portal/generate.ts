@@ -1,5 +1,5 @@
 import { cancel, outro, select, spinner, isCancel, confirm, log } from "@clack/prompts";
-import { getMessageInRedColor } from "../../utils/utils.js";
+import { getMessageInRedColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 export class PortalGeneratePrompts {
@@ -8,7 +8,7 @@ export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
       message: `The destination '${directory}' is not empty, do you want to overwrite?`,
-      initialValue: false,
+      initialValue: false
     });
 
     if (isCancel(overwrite)) {
