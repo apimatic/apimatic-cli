@@ -1,5 +1,5 @@
 import * as path from "path";
-import fsExtra from "fs-extra";
+import fs from "fs-extra";
 
 import { Command, Flags } from "@oclif/core";
 import { SDKClient } from "../../client-utils/sdk-client.js";
@@ -9,6 +9,7 @@ import { replaceHTML, isJSONParsable, getFileNameFromPath } from "../../utils/ut
 import { getSDKGenerationId, downloadGeneratedSDK } from "../../controllers/sdk/generate.js";
 import { DownloadSDKParams, SDKGenerateUnprocessableError } from "../../types/sdk/generate.js";
 import { AuthenticationError } from "../../types/utils.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 export default class SdkGenerate extends Command {
   static description = "Generate SDK for your APIs";
@@ -17,59 +18,52 @@ export default class SdkGenerate extends Command {
       parse: async (input) => input.toUpperCase(),
       required: true,
       description: `language platform for sdk
-Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT|GO
-Legacy: CS_NET_STANDARD_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB_V2|PYTHON_GENERIC_LIB|RUBY_GENERIC_LIB|TS_GENERIC_LIB|GO_GENERIC_LIB`
+Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT|GO`
     }),
-    file: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: "",
-      description: "path to the API specification to generate SDKs for"
-    }),
-    url: Flags.string({
-      default: "",
-      description:
-        "URL to the API specification to generate SDKs for. Can be used in place of the --file option if the API specification is publicly available."
+    spec: Flags.string({
+      description: "path to the folder containing the API specification file.",
+      default: "./build/spec"
     }),
     destination: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: path.resolve("./"),
-      description: "directory to download the generated SDK to"
+      description: "[default: <folder>/sdk] path where the sdk will be generated."
     }),
     force: Flags.boolean({
       char: "f",
       default: false,
       description: "overwrite if an SDK already exists in the destination"
     }),
-    zip: Flags.boolean({ default: false, description: "download the generated SDK as a .zip archive" }),
+    zip: Flags.boolean({
+      default: false,
+      description: "download the generated SDK as a .zip archive"
+    }),
     "auth-key": Flags.string({
-      default: "",
       description: "override current authentication state with an authentication key"
     })
   };
 
   static examples = [
-    `$ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"`,
-    `$ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json`
+    `$ apimatic sdk:generate --platform="JAVA"`,
+    `$ apimatic sdk:generate --platform="CSHARP" --spec="./build/spec"`
   ];
 
   async run() {
-    const { flags } = await this.parse(SdkGenerate);
-    const zip = flags.zip;
+    const { flags: { platform, spec, destination, force, zipSdk, "auth-key": authKey } } = await this.parse(SdkGenerate);
+    const specDirectory = new DirectoryPath()
     const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
     const sdkFolderPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}`.toLowerCase());
     const zippedSDKPath: string = path.join(flags.destination, `${fileName}_sdk_${flags.platform}.zip`.toLowerCase());
 
     // Check if at destination, SDK already exists and throw error if force flag is not set for both zip and extracted
-    if (fsExtra.existsSync(sdkFolderPath) && !flags.force && !zip) {
+    if (await fs.pathExists(sdkFolderPath) && !flags.force && !zip) {
       throw new Error(`Can't download SDK to path ${sdkFolderPath}, because it already exists`);
-    } else if (fsExtra.existsSync(zippedSDKPath) && !flags.force && zip) {
+    } else if (await fs.pathExists(zippedSDKPath) && !flags.force && zip) {
       throw new Error(`Can't download SDK to path ${zippedSDKPath}, because it already exists`);
     }
 
     try {
-      if (!(await fsExtra.pathExists(path.resolve(flags.destination)))) {
+      if (!(await fs.pathExists(path.resolve(flags.destination)))) {
         throw new Error(`Destination path ${flags.destination} does not exist`);
-      } else if (!(await fsExtra.pathExists(path.resolve(flags.file)))) {
+      } else if (!(await fs.pathExists(path.resolve(flags.file)))) {
         throw new Error(`Specification file ${flags.file} does not exist`);
       }
 
