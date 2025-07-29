@@ -10,14 +10,13 @@ import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
-const DEFAULT_TOC_FILENAME = "toc.yml";
-const APIMATIC_BUILD_FILENAME = "APIMATIC-BUILD.json";
-
 export class PortalNewTocAction {
   private readonly prompts: PortalNewTocPrompts;
   private readonly sdlParser: SdlParser;
   private readonly tocGenerator: TocStructureGenerator;
   private readonly contentParser: TocContentParser;
+  private readonly DEFAULT_TOC_FILENAME: string = "toc.yml" as const;
+  private readonly APIMATIC_BUILD_FILENAME: string = "APIMATIC-BUILD.json" as const;
 
   constructor() {
     this.prompts = new PortalNewTocPrompts();
@@ -26,7 +25,7 @@ export class PortalNewTocAction {
     this.contentParser = new TocContentParser();
   }
 
-  async createToc(
+  public async createToc(
     buildDirectory: DirectoryPath,
     configDir: string,
     tocDirectory?: DirectoryPath,
@@ -36,7 +35,7 @@ export class PortalNewTocAction {
   ): Promise<Result<string, string>> {
     try {
       const tocDir = await this.getDestinationPath(buildDirectory, tocDirectory);
-      const tocPath = path.join(tocDir, DEFAULT_TOC_FILENAME);
+      const tocPath = path.join(tocDir, this.DEFAULT_TOC_FILENAME);
       const tocCheckResult = await this.handleExistingToc(tocPath, force);
       if (!tocCheckResult.isSuccess()) {
         return tocCheckResult;
@@ -64,7 +63,7 @@ export class PortalNewTocAction {
       this.prompts.displayOutroMessage(tocPath);
       return Result.success(tocPath);
     } catch (error) {
-      this.prompts.logError(getMessageInRedColor(`${error}`));
+      this.prompts.logError(getMessageInRedColor(`${(error as Error).message}`));
       return Result.failure(`❌ An unexpected error occurred while generating the TOC file.`);
     }
   }
@@ -143,7 +142,7 @@ export class PortalNewTocAction {
   }
 
   private async getContentFolderPath(buildDirectory: DirectoryPath): Promise<string> {
-    const buildFilePath = path.join(buildDirectory.toString(), APIMATIC_BUILD_FILENAME);
+    const buildFilePath = path.join(buildDirectory.toString(), this.APIMATIC_BUILD_FILENAME);
     const defaultContentFolder = path.join(buildDirectory.toString(), "content");
 
     if (!(await fsExtra.pathExists(buildFilePath))) {
@@ -163,7 +162,7 @@ export class PortalNewTocAction {
   }
 
   private async getSpecFolderPath(buildDirectory: DirectoryPath): Promise<string> {
-    const buildFilePath = path.join(buildDirectory.toString(), APIMATIC_BUILD_FILENAME);
+    const buildFilePath = path.join(buildDirectory.toString(), this.APIMATIC_BUILD_FILENAME);
     const defaultSpecFolder = path.join(buildDirectory.toString(), "spec");
 
     if (!(await fsExtra.pathExists(buildFilePath))) {

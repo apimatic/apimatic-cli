@@ -1,33 +1,21 @@
-import { cancel, outro, select, spinner, isCancel } from "@clack/prompts";
-import { getMessageInCyanColor, getMessageInMagentaColor, getMessageInRedColor } from "../../utils/utils.js";
+import { cancel, outro, select, spinner, isCancel, confirm, log } from "@clack/prompts";
+import { getMessageInRedColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 export class PortalGeneratePrompts {
   private readonly spin = spinner();
 
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
-    const overwrite = await select({
-      message: `⚠️  The destination '${directory}' is not empty, do you want to overwrite?`,
-      options: [
-        { value: true, label: "Yes" },
-        { value: false, label: "No" }
-      ],
+    const overwrite = await confirm({
+      message: `The destination '${directory}' is not empty, do you want to overwrite?`,
       initialValue: false
     });
 
     if (isCancel(overwrite)) {
-      cancel("Operation cancelled.");
-      process.exit(1);
+      return false;
     }
 
-    if (overwrite) {
-      return true;
-    }
-
-    outro("Please enter a different destination folder or remove the existing files and try again.");
-    process.exit(1);
-
-    // TODO: it should return false (no process exit);
+    return overwrite;
   }
 
   async existingDestinationPortalZipPrompt(): Promise<boolean> {
@@ -71,7 +59,7 @@ export class PortalGeneratePrompts {
   }
 
   logError(error: string): void {
-    outro(error);
+    log.error(error);
   }
 
   //This clears the standard input to allow interrupts like CTRL+C to work properly.

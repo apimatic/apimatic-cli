@@ -1,5 +1,7 @@
-import { Command, Flags } from "@oclif/core";
+import { Command, Config, Flags } from "@oclif/core";
 import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc.js";
+import { TelemetryService } from "../../../infrastructure/services/telemetry-service.js";
+import { TocCreationFailedEvent } from "../../../types/events/toc-creation-failed.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
@@ -43,15 +45,16 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
   static examples = [
     `$ apimatic portal:toc:new --destination="./portal/content/"`,
     `$ apimatic portal:toc:new --folder="./my-project"`,
-    `$ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"` 
+    `$ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"`
   ];
 
-  constructor(argv: string[], config: any) {
+  constructor(argv: string[], config: Config) {
     super(argv, config);
   }
 
   async run(): Promise<void> {
     const { flags } = await this.parse(PortalTocNew);
+    const telemetryService = new TelemetryService(this.config.configDir);
     const portalNewTocAction = new PortalNewTocAction();
 
     const workingDirectory = new DirectoryPath(flags.folder ?? DEFAULT_WORKING_DIRECTORY);
@@ -72,7 +75,9 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
       flags["expand-models"]
     );
 
+    //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (result.isFailed()) {
+      telemetryService.trackEvent(new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags));
       this.error(result.error!);
     }
   }

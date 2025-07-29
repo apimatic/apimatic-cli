@@ -6,7 +6,7 @@ import { Mutex } from "async-mutex";
 import { ServePaths } from "../../../types/portal/serve.js";
 import { WatcherHandler } from "./watcher-handler.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
-import { ActionResult } from "../../../actions/actionResult.js";
+import { ActionResult } from "../../../actions/action-result.js";
 
 export class PortalWatcher {
   public async watchAndRegeneratePortalOnChange(
