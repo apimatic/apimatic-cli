@@ -1,9 +1,10 @@
 import * as path from "path";
-import fsExtra from "fs-extra";
+import fs from "fs-extra";
 
 export type AuthInfo = {
   email: string;
   authKey: string;
+  APIMATIC_CLI_TELEMETRY_OPTOUT?: string;
 };
 /**
  *
@@ -12,7 +13,7 @@ export type AuthInfo = {
  */
 export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
   try {
-    const data: AuthInfo | null = JSON.parse(await fsExtra.readFile(path.join(configDir, "config.json"), "utf8"));
+    const data: AuthInfo | null = JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
     return data;
   } catch (e) {
     return null;
@@ -21,14 +22,38 @@ export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
 
 /**
  *
- * @param {AuthInfo} credentials
+ * @param {string} email
+ * @param {string} authKey
+ * @param {string} isTelemetryOptedOut
  * @param {string} configDir <- Directory with user configuration
  * //Function to set credentials.
  */
-export async function setAuthInfo(credentials: AuthInfo, configDir: string): Promise<void> {
+export async function setAuthInfo(
+  email: string,
+  authKey: string,
+  isTelemetryOptedOut: boolean,
+  configDir: string
+): Promise<void> {
+  const credentials: AuthInfo = {
+    email,
+    authKey,
+    APIMATIC_CLI_TELEMETRY_OPTOUT: isTelemetryOptedOut ? "1" : "0"
+  };
   const configFilePath = path.join(configDir, "config.json");
 
-  if (!fsExtra.existsSync(configFilePath)) fsExtra.createFileSync(configFilePath);
+  if (!fs.existsSync(configFilePath)) fs.createFileSync(configFilePath);
 
-  return await fsExtra.writeFile(configFilePath, JSON.stringify(credentials));
+  return await fs.writeFile(configFilePath, JSON.stringify(credentials));
+}
+
+export async function removeAuthInfo(configDir: string): Promise<void> {
+  const credentials: AuthInfo = {
+    email: "",
+    authKey: ""
+  };
+  const configFilePath = path.join(configDir, "config.json");
+
+  if (!fs.existsSync(configFilePath)) fs.createFileSync(configFilePath);
+
+  return await fs.writeFile(configFilePath, JSON.stringify(credentials));
 }

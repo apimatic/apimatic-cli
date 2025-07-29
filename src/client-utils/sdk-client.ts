@@ -3,7 +3,7 @@ import axios, { AxiosResponse } from "axios";
 
 import { Client } from "@apimatic/sdk";
 import { baseURL } from "../config/env.js";
-import { setAuthInfo, getAuthInfo, AuthInfo } from "./auth-manager.js";
+import { setAuthInfo, getAuthInfo, AuthInfo, removeAuthInfo } from "./auth-manager.js";
 /**
  * The Singleton class defines the `getInstance` method that lets clients access
  * the unique singleton instance.
@@ -39,26 +39,16 @@ export class SDKClient {
   public async login(email: string, password: string, configDir: string): Promise<string> {
     const credentials: Credentials = { email, password };
     const authKey: string = await this.getAuthKey(credentials);
-      setAuthInfo(
-        {
-          email,
-          authKey
-        },
-        configDir
-      );
+    const isTelemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
 
-      return "✅ Logged in successfully as " + email;
+    await setAuthInfo(email, authKey, isTelemetryOptedOut, configDir);
 
+    return "✅ Logged in successfully as " + email;
   }
 
   public async logout(configDir: string): Promise<string> {
-    setAuthInfo(
-      {
-        email: "",
-        authKey: ""
-      },
-      configDir
-    );
+    await removeAuthInfo(configDir);
+
     return "Logged out";
   }
 
@@ -118,14 +108,12 @@ export class SDKClient {
     const authKey: string = response.data.EncryptedValue;
     return authKey;
   }
+
   public setAuthKey = (authKey: string, configDir: string) => {
-    setAuthInfo(
-      {
-        email: "",
-        authKey
-      },
-      configDir
-    );
+    const isTelemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
+    
+    setAuthInfo("", authKey, isTelemetryOptedOut, configDir);
+    
     return "Authentication key successfully set";
   };
 }
