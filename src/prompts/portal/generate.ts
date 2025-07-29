@@ -20,11 +20,12 @@ export class PortalGeneratePrompts {
 
   async existingDestinationPortalZipPrompt(): Promise<boolean> {
     const useExistingZip = await select({
-      message: `A zip file already exists at the specified destination path, do you want to overwrite it?`,
+      message: `⚠️  A zip file already exists at the specified destination path, do you want to overwrite it?`,
       options: [
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" }
-      ]
+      ],
+      initialValue: "no"
     });
 
     if (isCancel(useExistingZip)) {
@@ -40,15 +41,17 @@ export class PortalGeneratePrompts {
   }
 
   displayPortalGenerationMessage(): void {
-    this.spin.start("Generating portal...");
+    this.spin.start(getMessageInMagentaColor("Generating portal"));
   }
 
   displayPortalGenerationSuccessMessage(): void {
-    this.spin.stop("✅ Portal generated successfully.");
+    this.spin.stop(getMessageInCyanColor("✅  Portal generated successfully."));
+    this.cleanUpStandardInput();
   }
 
   displayPortalGenerationErrorMessage(): void {
     this.spin.stop(getMessageInRedColor(`Portal Generation failed.`));
+    this.cleanUpStandardInput();
   }
 
   displayOutroMessage(generatedPortalPath: string): void {
@@ -57,5 +60,13 @@ export class PortalGeneratePrompts {
 
   logError(error: string): void {
     log.error(error);
+  }
+
+  //This clears the standard input to allow interrupts like CTRL+C to work properly.
+  private cleanUpStandardInput(): void {
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+    }
   }
 }

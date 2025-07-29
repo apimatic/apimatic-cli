@@ -16,16 +16,12 @@ export class PortalGenerate extends Command {
     ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
-      description: "download the generated portal as a .zip archive",
+      description: "download the generated portal as a .zip archive"
     }),
     ...FlagsProvider["auth-key"]
   };
 
-  static examples = [
-    `$ apimatic portal:generate --folder="./portal/" --destination="D:/"
-Your portal has been generated at D:/
-`
-  ];
+  static examples = [`$ apimatic portal:generate`, `$ apimatic portal:generate --folder="./" --destination="./portal"`];
 
   private readonly prompts: PortalGeneratePrompts;
 
@@ -36,13 +32,7 @@ Your portal has been generated at D:/
 
   async run(): Promise<void> {
     const {
-      flags: {
-        folder,
-        destination,
-        force,
-        zip: zipPortal,
-        'auth-key': authKey
-      }
+      flags: { folder, destination, force, zip: zipPortal, "auth-key": authKey }
     } = await this.parse(PortalGenerate);
 
     const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
@@ -51,7 +41,10 @@ Your portal has been generated at D:/
 
     const action = new GenerateAction(this.getConfigDir(), authKey);
     const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
-    result.map((message) => this.prompts.logError(message));
+    result.mapAll(
+      () => this.prompts.displayOutroMessage(portalDirectory.toString()),
+      (message) => this.prompts.logError(message)
+    );
   }
 
   private getConfigDir = () => {

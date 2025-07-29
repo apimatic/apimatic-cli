@@ -17,13 +17,14 @@ export default class PortalServe extends Command {
   static flags = {
     port: Flags.integer({
       char: "p",
-      description: "Port to serve the portal."
+      description: "[default: 3000] port to serve the portal."
     }),
     folder: Flags.string({
-      description: "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
+      description:
+        "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
     }),
     destination: Flags.string({
-      description: "[default: ./portal] path where the portal will be downloaded",
+      description: "[default: <folder>/portal] path where the portal will be generated."
     }),
     open: Flags.boolean({
       char: "o",
@@ -47,18 +48,19 @@ export default class PortalServe extends Command {
   private readonly prompts: PortalServePrompts;
 
   constructor(argv: string[], config: Config) {
-      super(argv, config);
-      this.prompts = new PortalServePrompts();
-    }
+    super(argv, config);
+    this.prompts = new PortalServePrompts();
+  }
 
   static examples = [
-    '$ apimatic portal:serve --folder="./" --destination="./generated_portal" --port=3000 --open --no-reload'
+    "$ apimatic portal:serve",
+    '$ apimatic portal:serve --folder="./" --destination="./portal" --port=3000 --open --no-reload'
   ];
 
   public async run() {
     const { flags } = await this.parse(PortalServe);
     const portalServePrompts = new PortalServePrompts();
-    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService())
+    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService());
 
     //TODO: This needs to be moved within the action. Port should not be initialized again here.
     const port = await this.getServerPort(flags.port);
@@ -79,20 +81,25 @@ export default class PortalServe extends Command {
       open: flags.open,
       "no-reload": flags["no-reload"],
       ignore: flags.ignore
-    }
+    };
 
-    const serverPaths: ServePaths = {
-      sourceDirectoryPath : buildDirectory.toString(),
+    const servePaths: ServePaths = {
+      sourceDirectoryPath: buildDirectory.toString(),
       destinationDirectoryPath: portalDirectory.toString()
     };
 
-    const servePortalResult = await portalServeAction.servePortal(serveFlags, serverPaths, generatePortalAction.execute);
+    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, generatePortalAction.execute);
+    //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
     }
 
     if (servePortalResult.isCancelled()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
+    }
+
+    if (servePortalResult.isSuccess()) {
+      this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), port, flags["no-reload"]);
     }
   }
 

@@ -4,18 +4,19 @@ import { zipPortalSource, deleteFile } from "../../../utils/utils.js";
 import { TocEndpoint, TocModel } from "../../../types/toc/toc.js";
 import { Result } from "../../../types/common/result.js";
 import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 export class SdlParser {
   constructor(private readonly portalService: PortalService) {}
 
   public async getTocComponentsFromSdl(
     specFolderPath: string,
-    workingDirectory: string,
+    buildDirectory: DirectoryPath,
     configDir: string
   ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
     const sourceSpecInputZipFilePath = await zipPortalSource(
       specFolderPath,
-      path.join(workingDirectory, ".spec_source.zip")
+      path.join(buildDirectory.toString(), ".spec_source.zip")
     );
 
     try {

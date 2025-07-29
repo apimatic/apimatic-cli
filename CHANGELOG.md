@@ -1,3 +1,10 @@
+# [1.1.0-alpha.14](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.13...v1.1.0-alpha.14) (2025-07-25)
+
+
+### Features
+
+* restructure working directory usage across all portal commands ([#123](https://github.com/apimatic/apimatic-cli/issues/123)) ([a842d8f](https://github.com/apimatic/apimatic-cli/commit/a842d8ff05d198a35e0630d8dd3971e4f39ebabd))
+
 # [1.1.0-alpha.13](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.12...v1.1.0-alpha.13) (2025-07-11)
 
 
