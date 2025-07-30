@@ -232,10 +232,13 @@ export class PortalQuickstartPrompts extends BasePrompts {
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
             );
           }
-        } else if (fs.existsSync(dirPath) && fs.readdirSync(dirPath).length > 0) {
-          return getMessageInRedColor(
-            "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-          );
+        } else if (fs.existsSync(dirPath)) {
+          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
+          if (files.length > 0) {
+            return getMessageInRedColor(
+              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
+            );
+          }
         }
       }
     });
