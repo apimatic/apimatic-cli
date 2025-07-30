@@ -86,15 +86,15 @@ export class PortalQuickstartPrompts extends BasePrompts {
     this.spin.stop(getMessageInCyanColor("✅  Login successful!"));
   }
 
-  removeQuotes(str: string) {
+  removeQuotes(str: string): string {
     const quotes = ['"', "'"];
-
+    
     for (const quote of quotes) {
       if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-        return str.slice(1, -1);
+        return this.removeQuotes(str.slice(1, -1)); // Recursive call
       }
     }
-    return str;
+     return str;
   }
 
   async specPrompt(): Promise<string> {
@@ -132,7 +132,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
       return process.exit(0);
     }
 
-    return String(spec).trim();
+    return this.removeQuotes(String(spec).trim());
   }
 
   displaySpecValidationMessage(): void {
@@ -248,7 +248,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
     if (directory === "./") {
       return this.defaultPortalDirectoryPath;
     } else {
-      return String(directory).trim();
+      return this.removeQuotes(String(directory).trim());
     }
   }
 
