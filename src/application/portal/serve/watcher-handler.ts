@@ -9,11 +9,6 @@ export class WatcherHandler {
   }
 
   async execute(handler: () => Promise<void>): Promise<void> {
-    // Clear any existing timer
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-    }
-
     // Always store the latest handler
     this.latestHandler = handler;
 
@@ -22,7 +17,16 @@ export class WatcherHandler {
       return;
     }
 
+    // Clear any existing timer
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+
     // Set up debounced execution
+    this.scheduleExecution();
+  }
+
+  private scheduleExecution(): void {
     this.debounceTimer = setTimeout(async () => {
       if (this.isProcessing) {
         return;
@@ -40,11 +44,6 @@ export class WatcherHandler {
         }
       } finally {
         this.isProcessing = false;
-        
-        // If new handlers arrived while processing, schedule another execution
-        if (this.latestHandler) {
-          this.execute(this.latestHandler);
-        }
       }
     }, this.debounceMs);
   }
