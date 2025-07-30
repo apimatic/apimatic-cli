@@ -1,5 +1,6 @@
 import * as os from "os";
-import fs from "fs-extra";
+import fs from "fs";
+import fsExtra from "fs-extra";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -52,7 +53,7 @@ export class PortalService {
   }
 
   public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
-    if (!(await fs.pathExists(specPath))) {
+    if (!(await fsExtra.pathExists(specPath))) {
       return Result.failure("Spec file doesn't exist");
     }
 
