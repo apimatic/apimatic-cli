@@ -1,5 +1,6 @@
 import * as os from "os";
 import fs from "fs-extra";
+import process from "process";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -12,7 +13,9 @@ import {
   TransformationController,
   Transformation,
   ExportFormats,
-  InternalServerErrorResponseError
+  InternalServerErrorResponseError,
+  CodeGenerationExternalApisController,
+  Platforms
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { ErrorResponse } from "../../types/portal/generate.js";
@@ -48,6 +51,30 @@ export class PortalService {
       return Result.failure(await this.handlePortalGenerationErrors(error));
     } finally {
       buildFileStream.close();
+    }
+  }
+
+  async generateSdk(
+    specPath: FilePath,
+    sdkPlatform: Platforms,
+    configDir: DirectoryPath,
+    authKey: string | null
+  ): Promise<Result<NodeJS.ReadableStream, string>> {
+    const specFileStream = await this.fileService.getStream(specPath);
+    const file = new FileWrapper(specFileStream);
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
+    const client = this.createApiClient(authorizationHeader);
+    const sdkGenerationController = new CodeGenerationExternalApisController(client);
+
+    try {
+      const response = await sdkGenerationController.generateSdkViaFile(file, sdkPlatform);
+      const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
+      return Result.success(sdkResponse.result as NodeJS.ReadableStream);
+    } catch (error) {
+      return Result.failure(await this.handleSdkGenerationErrors(error));
+    } finally {
+      specFileStream.close();
     }
   }
 
@@ -144,5 +171,34 @@ export class PortalService {
       return await parseStreamBodyToJson(stream);
     }
     throw error;
+  };
+
+  private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
+    //TODO: Update the spec file to define different error code response types so that they can be handled here. Currently all failures go to the last else statement
+    if (error instanceof UnauthorizedResponseError) {
+      //401
+      const body = await this.parseErrorResponse(error);
+      return getMessageInRedColor(body.message ?? "Unauthorized access.");
+    } else if (error instanceof ProblemDetailsError) {
+      //400 & 403
+      const body = await this.parseErrorResponse(error);
+      const message = body.errors[Object.keys(body.errors)[0]][0];
+      return getMessageInRedColor(body.title + "\n- " + message);
+    } else if (error instanceof ApiError && error.statusCode === 422) {
+      const body = await this.parseErrorResponse(error);
+      return getMessageInRedColor(
+        `${body.message}`
+      );
+    } else if (error instanceof InternalServerErrorResponseError) {
+      //500
+      const body = await this.parseErrorResponse(error);
+      return getMessageInRedColor(
+        `${body.message} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
+      );
+    } else {
+      return getMessageInRedColor(
+        "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
+      );
+    }
   };
 }
