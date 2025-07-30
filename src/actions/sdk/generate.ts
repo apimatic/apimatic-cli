@@ -34,12 +34,12 @@ export class GenerateAction {
   ): Promise<ActionResult> => {
 
     if (specDirectory.isEqual(sdkDirectory)) {
-      return ActionResult.error("spec directory and sdk directory cannot be the same.");
+      return ActionResult.error(`The spec directory and sdk directory cannot be the same: "${specDirectory}"`);
     }
 
     const specContext = new SpecContext(specDirectory);
     if (!await specContext.validate()) {
-      return ActionResult.error("spec directory is empty or not valid");
+      return ActionResult.error(`The spec directory is either empty or invalid: "${specDirectory}"`);
     }
 
     const sdkContext = new SdkContext(sdkDirectory, platform);

@@ -11,9 +11,7 @@ export class SpecContext {
 
   public async validate(): Promise<boolean> {
     // TODO: add more checks here
-    if (!(await this.fileService.directoryExists(this.specDirectory))) return false;
-
-    return true;
+    return await this.fileService.directoryExists(this.specDirectory)
   }
 }
 

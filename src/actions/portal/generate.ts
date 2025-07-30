@@ -32,12 +32,12 @@ export class GenerateAction {
   ): Promise<ActionResult> => {
 
     if (buildDirectory.isEqual(portalDirectory)) {
-      return ActionResult.error("build directory and portal directory cannot be the same.");
+      return ActionResult.error(`The build and portal directory cannot be the same: "${portalDirectory}"`);
     }
 
     const buildContext = new BuildContext(buildDirectory);
     if (!await buildContext.validate()) {
-      return ActionResult.error("build directory is empty or not valid");
+      return ActionResult.error(`The build directory is either empty or invalid: "${buildDirectory}"`);
     }
 
     const portalContext = new PortalContext(portalDirectory);

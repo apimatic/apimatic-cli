@@ -14,8 +14,6 @@ import {
   Transformation,
   ExportFormats,
   InternalServerErrorResponseError,
-  ApiValidationSummary,
-  ApiValidationExternalApisController,
   CodeGenerationExternalApisController,
   Platforms
 } from "@apimatic/sdk";
@@ -28,13 +26,6 @@ import { Sdl } from "../../types/sdl/sdl.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
-import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
-import { GetValidationParams, AuthorizationError } from "../../types/api/validate.js";
-import { createTempDirectory, isValidUrl, unzipFile, deleteFile, zipDirectory } from "../../utils/utils.js";
-import * as path from "path";
-import filetype from "file-type";
-import axios from "axios";
-import { LoginCredentials, SpecFile } from "../../types/portal/quickstart.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -121,196 +112,6 @@ export class PortalService {
     }
   }
 
-  public async userLogin(credentials: LoginCredentials, configDir: string): Promise<void> {
-    // Use SDKClient for login
-    const { SDKClient } = await import("../../client-utils/sdk-client.js");
-    await SDKClient.getInstance().login(credentials.email, credentials.password, configDir);
-  }
-
-  public async getSpecFile(spec: string): Promise<SpecFile> {
-    const tempSpecDir = await createTempDirectory();
-    if (spec) {
-      let specPath = String(spec);
-      if (isValidUrl(specPath)) {
-        try {
-          const response = await axios.head(specPath);
-          if (response.headers["content-type"].includes("text/html")) {
-            throw new Error(
-              getMessageInRedColor(
-                `Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`
-              )
-            );
-          }
-          const specFile = await axios.get(specPath, { responseType: "arraybuffer" });
-          const fileName = path.basename(specPath);
-          const filePath = path.join(tempSpecDir, fileName);
-          await fs.writeFile(filePath, specFile.data);
-        } catch (error) {
-          if (axios.isAxiosError(error)) {
-            if (error.response) {
-              if (error.response.status === 404) {
-                throw new Error(
-                  getMessageInRedColor(
-                    `Unable to download the API Definition. The server returned a 404 Not Found error. Please verify that the provided URL is correct and publicly accessible.`
-                  )
-                );
-              } else {
-                throw new Error(
-                  getMessageInRedColor(
-                    `Unable to download the API Definition. The server returned ${error.response.status} ${error.response.statusText}`
-                  )
-                );
-              }
-            } else if (error.request) {
-              if (error.code === "ECONNABORTED") {
-                throw new Error(
-                  getMessageInRedColor(
-                    `Unable to download the API Definition, your request timed out. Please check your internet connection and try again, or contact APIMatic support for help if your problem persists.`
-                  )
-                );
-              } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
-                throw new Error(
-                  getMessageInRedColor(
-                    `Failed to download the API Definition file due to network issues. Please check your internet connection and try again.`
-                  )
-                );
-              } else {
-                throw new Error(
-                  getMessageInRedColor(
-                    `Failed to download the API Definition file, no response was received from the server. Please try again later.`
-                  )
-                );
-              }
-            } else {
-              throw new Error(getMessageInRedColor(`Failed to download API Definition: ${error.message}`));
-            }
-          } else {
-            throw new Error(
-              getMessageInRedColor(
-                `Unable to save API Definition : ${error instanceof Error ? error.message : "Unknown error"}`
-              )
-            );
-          }
-        }
-      } else {
-        specPath = path.normalize(specPath);
-        const fileType = await filetype.fromFile(specPath);
-        if (fileType?.ext === "zip") {
-          await unzipFile(fs.createReadStream(specPath), tempSpecDir);
-        } else {
-          const destinationPath = path.join(tempSpecDir, path.basename(specPath));
-          await fs.copy(specPath, destinationPath);
-        }
-      }
-    }
-    // Use the static URL as in the original controller
-    return { localPath: tempSpecDir, url: "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json" };
-  }
-
-  //TODO: update spec 
-  public async getSpecValidationSummary(
-    prompts: PortalQuickstartPrompts,
-    specFile: SpecFile,
-    configDir: string,
-    authKey: string | null
-  ): Promise<ApiValidationSummary> {
-    // Create SDK client and controller
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = this.createApiClient(authorizationHeader);
-    const apiValidationController = new ApiValidationExternalApisController(client);
-    const validationFlags: GetValidationParams = {
-      file: specFile.localPath,
-      url: specFile.url
-    };
-    try {
-      const validation = await this.getValidationSummaryInternal(validationFlags, apiValidationController);
-      return validation;
-    } catch (error) {
-      prompts.displaySpecValidationErrorMessage();
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          if (error.response.status === 400) {
-            throw new Error(
-              getMessageInRedColor(
-                `The provided spec file is not valid. Please ensure that the spec you have provided is a valid API definition file.`
-              )
-            );
-          } else if (error.response.status === 500) {
-            throw new Error(
-              getMessageInRedColor(
-                `The server encountered an error while validating your spec file, please try again later. If the issue persists, contact our team at support@apimatic.io`
-              )
-            );
-          } else {
-            throw new Error(
-              getMessageInRedColor(
-                `Something went wrong while validating your spec file. The server returned the following error ${error.response.status} ${error.response.statusText}. Please try again later. If the issue persists, contact our team at support@apimatic.io`
-              )
-            );
-          }
-        } else if (error.request) {
-          if (error.code === "ECONNABORTED") {
-            throw new Error(getMessageInRedColor(`The spec validation request timed out. Please try again.`));
-          } else if (error.code === "ENOTFOUND" || error.code === "ERR_NETWORK") {
-            throw new Error(
-              getMessageInRedColor(
-                `Network error encountered while validating the spec file. Please check your connection and try again.`
-              )
-            );
-          } else {
-            throw new Error(
-              getMessageInRedColor(
-                `Something went wrong while validating the spec file, please try again. If the issue persists, reach out to our support team at support@apimatic.io`
-              )
-            );
-          }
-        } else {
-          throw new Error(getMessageInRedColor(`Failed to validate spec file: ${error.message}`));
-        }
-      } else if ((error as ApiError).result) {
-        const apiError = error as ApiError;
-        if ((error as AuthorizationError).body && apiError.statusCode === 401) {
-          throw new Error("You are not authorized to perform this action.");
-        } else {
-          throw new Error((error as Error).message);
-        }
-      } else {
-        throw new Error(
-          getMessageInRedColor(
-            `Something went wrong while validating the spec file, please try again later. If the issue persists, contact our team at support@apimatic.io`
-          )
-        );
-      }
-    }
-  }
-
-  private async getValidationSummaryInternal(
-    { file, url }: GetValidationParams,
-    apiValidationController: ApiValidationExternalApisController
-  ): Promise<ApiValidationSummary> {
-    let validation: ApiResponse<ApiValidationSummary>;
-    if (file) {
-      const fileStatus = fs.statSync(file);
-      if (fileStatus.isDirectory()) {
-        const tempDir = await createTempDirectory();
-        const zipPath = await zipDirectory(file, tempDir);
-        const zipFile = new FileWrapper(fs.createReadStream(zipPath));
-        validation = await apiValidationController.validateApiViaFile(ContentType.EnumMultipartformdata, zipFile);
-        await deleteFile(zipPath);
-        await fs.remove(tempDir);
-      } else {
-        const fileDescriptor = new FileWrapper(fs.createReadStream(file));
-        validation = await apiValidationController.validateApiViaFile(ContentType.EnumMultipartformdata, fileDescriptor);
-      }
-    } else if (url) {
-      validation = await apiValidationController.validateApiViaUrl(url);
-    } else {
-      throw new Error("Please provide a specification file");
-    }
-    return validation.result;
-  }
-
   private createGenericErrorResult() {
     return Result.failure<Sdl, string>("An unexpected error occurred");
   }
@@ -373,6 +174,7 @@ export class PortalService {
   };
 
   private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
+    //TODO: Update the spec file to define different error code response types so that they can be handled here. Currently all failures go to the last else statement
     if (error instanceof UnauthorizedResponseError) {
       //401
       const body = await this.parseErrorResponse(error);

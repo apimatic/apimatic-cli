@@ -1,4 +1,4 @@
-import { Command, Config, Flags } from "@oclif/core";
+import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
@@ -9,10 +9,9 @@ import { LanguagePlatform } from "../../types/sdk/generate.js";
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class SdkGenerate extends Command {
-  static description = "Generate SDK for your APIs";
+  static description = "Generates SDK for your API";
   static flags = {
     platform: Flags.string({
-      parse: async (input) => input,
       required: true,
       options: Object.values(LanguagePlatform).map(p => p.toString()),
       description: `language platform for sdk`
@@ -22,7 +21,7 @@ export default class SdkGenerate extends Command {
       default: "./build/spec"
     }),
     destination: Flags.string({
-      description: "[default: <folder>/sdk] path where the sdk will be generated."
+      description: "[default: ./sdk] path where the sdk will be generated."
     }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
@@ -37,12 +36,7 @@ export default class SdkGenerate extends Command {
     `$ apimatic sdk:generate --platform="csharp" --spec="./build/spec"`
   ];
 
-  private readonly prompts: SdkGeneratePrompts;
-
-  constructor(argv: string[], config: Config) {
-    super(argv, config);
-    this.prompts = new SdkGeneratePrompts();
-  }
+  private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
 
   async run() {
     const { flags: { platform, spec, destination, force, zip: zipSdk, "auth-key": authKey } } = await this.parse(SdkGenerate);
@@ -56,7 +50,7 @@ export default class SdkGenerate extends Command {
     var action = new GenerateAction(this.getConfigDir(), authKey);
     const result = await action.execute(specDirectory, sdkDirectory, sdkPlatform, force, zipSdk);
     result.mapAll(
-      () => this.prompts.displayOutroMessage(sdkDirectory.toString()),
+      () => this.prompts.displayOutroMessage(sdkDirectory),
       (message) => this.prompts.logError(message)
     );
   }
