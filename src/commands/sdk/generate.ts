@@ -33,8 +33,8 @@ export default class SdkGenerate extends Command {
   };
 
   static examples = [
-    `$ apimatic sdk:generate --platform="JAVA"`,
-    `$ apimatic sdk:generate --platform="CSHARP" --spec="./build/spec"`
+    `$ apimatic sdk:generate --platform="java"`,
+    `$ apimatic sdk:generate --platform="csharp" --spec="./build/spec"`
   ];
 
   private readonly prompts: SdkGeneratePrompts;
