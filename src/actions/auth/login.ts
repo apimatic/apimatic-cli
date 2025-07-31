@@ -15,7 +15,7 @@ export class LoginAction {
 
   constructor(private readonly configDir: DirectoryPath) {}
 
-  public async execute(apiKey: string | undefined): Promise<Result<string, string>> {
+  public async execute(apiKey: string | undefined = undefined): Promise<Result<string, string>> {
     if (!apiKey) {
       const result = await this.poolDeviceToken();
       return (

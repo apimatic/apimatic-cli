@@ -72,19 +72,6 @@ export class PortalQuickstartPrompts extends BasePrompts {
     return { email: String(email).trim(), password: String(pass).trim() };
   }
 
-  displayLoggingInMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Logging in"));
-  }
-
-  displayLoggingInErrorMessage(): void {
-    this.spin.stop(
-      getMessageInRedColor(`There was a problem logging in. Please verify your credentials and try again.`)
-    );
-  }
-
-  displayLoggedInMessage(): void {
-    this.spin.stop(getMessageInCyanColor("✅  Login successful!"));
-  }
 
   removeQuotes(str: string) {
     const quotes = ['"', "'"];
@@ -299,5 +286,17 @@ export class PortalQuickstartPrompts extends BasePrompts {
           `- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`
         )
     );
+  }
+
+  getLoggedInFirst() {
+    log.step("You need to be logged in to continue.")
+  }
+
+  displayLoggedInMessage(email: string): void {
+    log.success(`Successfully logged in as ${email}`);
+  }
+
+  logError(error: string) {
+    log.error(error);
   }
 }
