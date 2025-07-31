@@ -56,7 +56,7 @@ export class PortalRecipePrompts {
         if (!filePath) {
           return "Build config file path cannot be empty. Please provide a valid file path.";
         }
-        const cleanedPath = this.removeQuotes(filePath.trim() ?? "");
+        const cleanedPath = this.removeQuotes(filePath.trim());
         const resolvedPath = path.resolve(buildDirectoryPath, cleanedPath);
         
         if (!resolvedPath.endsWith(".json")) {
