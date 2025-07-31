@@ -1,56 +1,65 @@
 import axios from "axios";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
-import os from "os";
+import { envInfo } from "../env-info.js";
+import { err, ok, Result } from "neverthrow";
+import { handleServiceError, ServiceError } from "../api-utils.js";
+import https from "https";
 
 export class ApiService {
-  private readonly apiBaseUrl = "https://api.apimatic.io";
-
+  //private readonly apiBaseUrl = "https://api.apimatic.io" as const;
+  private readonly apiBaseUrl = "https://localhost:44301/api" as const;
 
   public async getAccountInfo(
     configDir: DirectoryPath,
     authKey: string | null
-  ): Promise<Result<SubscriptionInfo, string>> {
+  ): Promise<Result<SubscriptionInfo, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     if (authInfo === null && !authKey) {
-      return Result.failure("You are not logged in, please login using `auth:login` first.");
+      return err(ServiceError.UnAuthorized);
     }
 
     try {
       const token = authKey || authInfo?.authKey;
-      const response = await axios.get(`${this.apiBaseUrl}/account/profile`, {
-        headers: {
-          Authorization: `X-Auth-Key ${token}`,
-            "Content-Type": "application/json",
-          "User-Agent": this.getUserAgent()
-        }
-      });
+      const response = await this.axiosInstance(token).get("/account/profile");
 
       if (response.status === 200) {
-        return Result.success(response.data as SubscriptionInfo);
+        return ok(response.data as SubscriptionInfo);
       }
-      return Result.failure("Failed to fetch account information");
+      return err(ServiceError.InvalidResponse);
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) {
-          return Result.failure("Unauthorized access. Please check your authentication credentials.");
-        }
-        if (error.response?.status === 404) {
-          return Result.failure("Account information not found.");
-        }
-        return Result.failure(`Error fetching account information: ${error.response?.data?.message || error.message}`);
-      }
-      return Result.failure("An unexpected error occurred while fetching account information.");
+      return err(handleServiceError(error));
     }
   }
 
-  private getUserAgent(): string {
-    const osInfo = `${os.platform()} ${os.release()}`;
-    const engine = "Node.js";
-    const engineVersion = process.version;
+  public async sendTelemetry(payload: string, authKey: string): Promise<Result<string, string>> {
+    try {
+      const response = await this.axiosInstance(authKey).post("/telemetry/track", payload);
 
-    return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
+      if (response.status === 200) {
+        return ok("telemetry sent");
+      }
+      return err("Failed to send telemetry data");
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
+    }
+  }
+
+  private axiosInstance(apiKey: string | undefined) {
+    const headers: Record<string, string> = {
+      "User-Agent": envInfo.getUserAgent()
+    };
+
+    if (apiKey) {
+      headers.Authorization = `X-Auth-Key ${apiKey}`;
+    }
+
+    return axios.create({
+      baseURL: this.apiBaseUrl,
+      headers,
+      // TODO: remove this before pushing to prod
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    });
   }
 }
