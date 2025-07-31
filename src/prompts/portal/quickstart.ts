@@ -1,7 +1,7 @@
 import fs from "fs";
 import * as path from "path";
 import treeify from "treeify";
-import { intro, outro, text, spinner, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
+import { intro, outro, text, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
 import {
   getMessageInCyanColor,
   getMessageInGreenColor,
@@ -73,15 +73,15 @@ export class PortalQuickstartPrompts extends BasePrompts {
   }
 
 
-  removeQuotes(str: string) {
+  removeQuotes(str: string): string {
     const quotes = ['"', "'"];
-
+    
     for (const quote of quotes) {
       if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-        return str.slice(1, -1);
+        return this.removeQuotes(str.slice(1, -1)); // Recursive call
       }
     }
-    return str;
+     return str;
   }
 
   async specPrompt(): Promise<string> {
@@ -119,7 +119,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
       return process.exit(0);
     }
 
-    return String(spec).trim();
+    return this.removeQuotes(String(spec).trim());
   }
 
   displaySpecValidationMessage(): void {
@@ -219,10 +219,14 @@ export class PortalQuickstartPrompts extends BasePrompts {
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
             );
           }
-        } else if (fs.existsSync(dirPath) && fs.readdirSync(dirPath).length > 0) {
-          return getMessageInRedColor(
-            "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-          );
+        } else if (fs.existsSync(dirPath)) { 
+          // For ignoring hidden files and folders in the current directory in MacOS.
+          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
+          if (files.length > 0) {
+            return getMessageInRedColor(
+              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
+            );
+          }
         }
       }
     });
@@ -235,7 +239,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
     if (directory === "./") {
       return this.defaultPortalDirectoryPath;
     } else {
-      return String(directory).trim();
+      return this.removeQuotes(String(directory).trim());
     }
   }
 

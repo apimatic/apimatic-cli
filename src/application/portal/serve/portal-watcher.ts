@@ -9,6 +9,12 @@ import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ActionResult } from "../../../actions/action-result.js";
 
 export class PortalWatcher {
+  private watcherHandler: WatcherHandler;
+
+  constructor() {
+    this.watcherHandler = new WatcherHandler();
+  }
+
   public async watchAndRegeneratePortalOnChange(
     paths: ServePaths,
     ignoredPaths: string[],
@@ -35,10 +41,8 @@ export class PortalWatcher {
 
     const deletedDirectories = new Set<string>();
     const eventQueue = new Map();
-    const handler = new WatcherHandler();
     const mutex = new Mutex();
 
-    //TODO: Add debounce delay for reducing number of events (greater than 300 ms, already tried that value).
     watcher
       .on("all", async (event, path) => {
         if (event == "unlinkDir") {
@@ -60,7 +64,7 @@ export class PortalWatcher {
           eventQueue.set(eventId, path);
         });
 
-        await handler.execute(async () => {
+        await this.watcherHandler.execute(async () => {
           await this.handleFileChange(paths, eventQueue, eventId, generatePortal);
         });
       })
@@ -68,12 +72,19 @@ export class PortalWatcher {
         console.error(
           "An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at support@apimatic.io"
         );
+        watcher.close();
       });
 
     return watcher;
   }
 
-  //TODO: This could be logically better.
+  // TODO: Remove this method. Figure out a better way to do this.
+  public cancelPendingOperations(): void {
+    if (this.watcherHandler) {
+      this.watcherHandler.cancel();
+    }
+  }
+
   protected async handleFileChange(
     paths: ServePaths,
     eventQueue: Map<string, string>,

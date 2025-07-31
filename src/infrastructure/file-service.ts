@@ -1,4 +1,5 @@
-import fs from "fs-extra";
+import fs from "fs";
+import fsExtra from "fs-extra";
 import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
@@ -7,7 +8,7 @@ import { promisify } from "util";
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
-      const stat = await fs.stat(file.toString());
+      const stat = await fsExtra.stat(file.toString());
       return stat.isFile();
     } catch {
       return false;
@@ -16,7 +17,7 @@ export class FileService {
 
   public async directoryExists(dir: DirectoryPath): Promise<boolean> {
     try {
-      const stat = await fs.stat(dir.toString());
+      const stat = await fsExtra.stat(dir.toString());
       return stat.isDirectory();
     } catch {
       return false;
@@ -25,7 +26,7 @@ export class FileService {
 
   public async directoryEmpty(dir: DirectoryPath): Promise<boolean> {
     try {
-      const files = await fs.readdir(dir.toString());
+      const files = await fsExtra.readdir(dir.toString());
       return files.length === 0;
     } catch (error) {
       return error instanceof Error && 'code' in error && error.code === "ENOENT";
@@ -33,14 +34,14 @@ export class FileService {
   }
 
   public async cleanDirectory(dir: DirectoryPath): Promise<void> {
-    await fs.ensureDir(dir.toString());
-    await fs.emptyDir(dir.toString()); // removes everything inside, keeps the dir
+    await fsExtra.ensureDir(dir.toString());
+    await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
   public async deleteFile(filePath: FilePath): Promise<void> {
     const exists = await this.fileExists(filePath);
     if (exists) {
-      await fs.remove(filePath.toString());
+      await fsExtra.remove(filePath.toString());
     }
   }
 
@@ -49,7 +50,7 @@ export class FileService {
   }
 
   public async getContents(filePath: FilePath): Promise<string> {
-    return await fs.readFile(filePath.toString(), 'utf-8');
+    return await fsExtra.readFile(filePath.toString(), 'utf-8');
   }
 
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
@@ -58,11 +59,11 @@ export class FileService {
   }
 
   public async writeContents(filePath: FilePath, contents: string) {
-    await fs.writeFile(filePath.toString(), contents, 'utf-8');
+    await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
   public async copy(source: FilePath, destination: FilePath) {
-    await fs.copyFile(source.toString(), destination.toString());
+    await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
 }

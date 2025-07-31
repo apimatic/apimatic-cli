@@ -1,28 +1,25 @@
-import { cancel, outro, select, spinner, isCancel, log } from "@clack/prompts";
+import { cancel, outro, confirm, spinner, isCancel, log } from "@clack/prompts";
+import { FilePath } from "../../../types/file/filePath.js";
 
 export class PortalNewTocPrompts {
   private readonly spin = spinner();
 
-  async overwriteExistingTocPrompt(): Promise<boolean> {
-    const useExistingFile = await select({
-      message: `⚠️  A toc.yml file already exists at the specified destination path, do you want to overwrite it?`,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" }
-      ],
-      initialValue: "no"
+  async overwriteExistingTocPrompt(tocPath: FilePath): Promise<boolean> {
+    const overwrite = await confirm({
+      message: `⚠️ The destination file '${tocPath}' already exists, do you want to overwrite it?`,
+      initialValue: false
     });
 
-    if (isCancel(useExistingFile)) {
+    if (isCancel(overwrite)) {
       cancel("Operation cancelled.");
-      return process.exit(1);
+      return false;
     }
 
-    if (useExistingFile === "no") {
+    if (!overwrite) {
       outro("Please enter a different destination path or delete the existing toc.yml file and try again.");
     }
 
-    return useExistingFile === "yes";
+    return overwrite;
   }
 
   startProgressIndicatorWithMessage(message: string): void {
@@ -33,7 +30,7 @@ export class PortalNewTocPrompts {
     this.spin.stop(message);
   }
 
-  displayOutroMessage(tocPath: string): void {
+  displayOutroMessage(tocPath: FilePath): void {
     outro(`✅ toc.yml file successfully created at: ${tocPath}`);
   }
 
