@@ -38,7 +38,17 @@ export class PortalRecipePrompts {
 
     return (recipeName as string).trim();
   }
+  //Todo: Find a better place for this function
+  removeQuotes(str: string): string {
+    const quotes = ['"', "'"];
 
+    for (const quote of quotes) {
+      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
+        return this.removeQuotes(str.slice(1, -1)); // Recursive call
+      }
+    }
+    return str;
+  }
   public async buildConfigFilePathPrompt(buildDirectoryPath: string): Promise<string> {
     const buildConfigFilePath = await text({
       message: `⚠️  APIMATIC-BUILD.json is required and was not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
@@ -46,12 +56,14 @@ export class PortalRecipePrompts {
         if (!filePath) {
           return "Build config file path cannot be empty. Please provide a valid file path.";
         }
-
-        if (!filePath.endsWith(".json")) {
+        const cleanedPath = this.removeQuotes(filePath.trim());
+        const resolvedPath = path.resolve(buildDirectoryPath, cleanedPath);
+        
+        if (!resolvedPath.endsWith(".json")) {
           return "The content file must be a JSON (.json) file. Please provide a valid file path.";
         }
 
-        const resolvedPath = path.resolve(buildDirectoryPath, filePath);
+      
         if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
           return;
         }
@@ -65,7 +77,7 @@ export class PortalRecipePrompts {
       return process.exit(0);
     }
 
-    return path.resolve(buildDirectoryPath, (buildConfigFilePath as string).trim());
+    return path.resolve(buildDirectoryPath, this.removeQuotes((buildConfigFilePath as string).trim()));
   }
 
   public async stepNamePrompt(defaultStepName: string): Promise<string> {
