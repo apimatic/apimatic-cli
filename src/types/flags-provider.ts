@@ -30,7 +30,7 @@ export class FlagsProvider {
     force: Flags.boolean({
       char: "f",
       default: false,
-      description: "overwrite if a portal exists in the destination",
+      description: "overwrite if the destination is not empty",
     })
   };
 }
