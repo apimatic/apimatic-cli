@@ -2,10 +2,10 @@ import { outro, spinner, isCancel, confirm, log } from "@clack/prompts";
 import { getMessageInRedColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
-export class PortalGeneratePrompts {
+export class SdkGeneratePrompts {
   private readonly spin = spinner();
 
-  public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
+  public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
       message: `The destination '${directory}' is not empty, do you want to overwrite?`,
       initialValue: false
@@ -18,22 +18,22 @@ export class PortalGeneratePrompts {
     return overwrite;
   }
 
-  displayPortalGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Generating portal"));
+  displaySdkGenerationMessage(): void {
+    this.spin.start(getMessageInMagentaColor("Generating SDK"));
   }
 
-  displayPortalGenerationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor("✅  Portal generated successfully."));
+  displaySdkGenerationSuccessMessage(): void {
+    this.spin.stop(getMessageInCyanColor("✅  SDK generated successfully."));
     this.cleanUpStandardInput();
   }
 
-  displayPortalGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Portal Generation failed.`));
+  displaySdkGenerationErrorMessage(): void {
+    this.spin.stop(getMessageInRedColor(`Sdk Generation failed.`));
     this.cleanUpStandardInput();
   }
 
-  displayOutroMessage(generatedPortalPath: string): void {
-    outro(`The generated portal can be found at ${generatedPortalPath}`);
+  displayOutroMessage(generatedSdkPath: DirectoryPath): void {
+    outro(`The generated SDK can be found at ${generatedSdkPath}`);
   }
 
   logError(error: string): void {
