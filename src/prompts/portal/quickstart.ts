@@ -1,7 +1,7 @@
 import fs from "fs";
 import * as path from "path";
 import treeify from "treeify";
-import { intro, outro, text, spinner, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
+import { intro, outro, text, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
 import {
   getMessageInCyanColor,
   getMessageInGreenColor,
@@ -232,7 +232,8 @@ export class PortalQuickstartPrompts extends BasePrompts {
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
             );
           }
-        } else if (fs.existsSync(dirPath)) {
+        } else if (fs.existsSync(dirPath)) { 
+          // For ignoring hidden files and folders in the current directory in MacOS.
           const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
             return getMessageInRedColor(
