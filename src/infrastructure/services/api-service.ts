@@ -5,11 +5,9 @@ import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../api-utils.js";
-import https from "https";
 
 export class ApiService {
-  //private readonly apiBaseUrl = "https://api.apimatic.io" as const;
-  private readonly apiBaseUrl = "https://localhost:44301/api" as const;
+  private readonly apiBaseUrl = "https://api.apimatic.io" as const;
 
   public async getAccountInfo(
     configDir: DirectoryPath,
@@ -57,9 +55,7 @@ export class ApiService {
 
     return axios.create({
       baseURL: this.apiBaseUrl,
-      headers,
-      // TODO: remove this before pushing to prod
-      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+      headers
     });
   }
 }

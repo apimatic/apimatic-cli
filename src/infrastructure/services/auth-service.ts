@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from "axios";
 import { envInfo } from "../env-info.js";
-import https from "https";
 import { err, ok, Result } from "neverthrow";
 import { ServiceError, handleServiceError } from "../api-utils.js";
 
@@ -10,17 +9,14 @@ export interface DeviceAuthToken {
 }
 
 export class AuthService {
-  private readonly apiBaseUrl = "https://localhost:44000" as const;
-  //private readonly apiBaseUrl = "https://auth.apimatic.io" as const;
+  private readonly apiBaseUrl = "https://auth.apimatic.io" as const;
 
   private axiosInstance: AxiosInstance = axios.create({
     baseURL: this.apiBaseUrl,
     timeout: 20000,
     headers: {
       "User-Agent": envInfo.getUserAgent()
-    },
-    // TODO: remove this before moving to production
-    httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    }
   });
 
   public getDeviceLoginUrl(state: string): string {
