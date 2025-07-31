@@ -29,10 +29,10 @@ export class CopilotAction {
       return ActionResult.error("Exiting without making any change.");
 
     const response = await this.apiService.getAccountInfo(this.configDir, this.authKey);
-    if (!response.isSuccess()) {
-      return ActionResult.error(response.error!);
+    if (!response.isErr()) {
+      return ActionResult.error(response._unsafeUnwrapErr());
     }
-    const apiCopilotKey = await this.selectCopilotKey(response.value);
+    const apiCopilotKey = await this.selectCopilotKey(response._unsafeUnwrap());
     if (apiCopilotKey === null) {
       return ActionResult.error("No copilot key found for the current subscription. Please contact support at support@apimatic.io.");
     }

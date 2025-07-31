@@ -13,6 +13,7 @@ import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import { LoginAction } from "../../actions/auth/login.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -80,18 +81,18 @@ export default class PortalQuickstart extends Command {
 
     let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
 
-    while (!loggedIn) {
-      const credentials = await prompts.loginPrompt();
+    if (!loggedIn) {
+      prompts.getLoggedInFirst();
+      const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
+      const loginResult = await loginAction.execute();
 
-      prompts.displayLoggingInMessage();
+      loginResult.match(
+        e => prompts.displayLoggedInMessage(e),
+          error => prompts.logError(error)
+      );
 
-      try {
-        await controller.userLogin(credentials, SDKClient.getInstance(), this.config.configDir);
-        loggedIn = true;
-        prompts.displayLoggedInMessage();
-      } catch {
-        prompts.displayLoggingInErrorMessage();
-      }
+      if (loginResult.isErr())
+        return;
     }
 
     const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
@@ -151,7 +152,7 @@ export default class PortalQuickstart extends Command {
         serverPaths,
         generatePortalAction.execute
       );
-      
+
       if (servePortalResult.isFailed()) {
         portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
         return;

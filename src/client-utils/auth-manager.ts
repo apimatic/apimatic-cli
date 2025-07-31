@@ -1,5 +1,6 @@
 import * as path from "path";
 import fs from "fs-extra";
+import { DirectoryPath } from "../types/file/directoryPath.js";
 
 export type AuthInfo = {
   email: string;
@@ -32,14 +33,14 @@ export async function setAuthInfo(
   email: string,
   authKey: string,
   isTelemetryOptedOut: boolean,
-  configDir: string
+  configDir: DirectoryPath
 ): Promise<void> {
   const credentials: AuthInfo = {
     email,
     authKey,
     APIMATIC_CLI_TELEMETRY_OPTOUT: isTelemetryOptedOut ? "1" : "0"
   };
-  const configFilePath = path.join(configDir, "config.json");
+  const configFilePath = path.join(configDir.toString(), "config.json");
 
   if (!fs.existsSync(configFilePath)) fs.createFileSync(configFilePath);
 

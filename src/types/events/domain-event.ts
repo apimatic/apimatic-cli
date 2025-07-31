@@ -14,3 +14,4 @@ export abstract class DomainEvent {
     return Object.keys(flags);
   }
 }
+
