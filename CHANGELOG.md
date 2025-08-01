@@ -1,3 +1,10 @@
+# [1.1.0-alpha.15](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.14...v1.1.0-alpha.15) (2025-08-01)
+
+
+### Features
+
+* update input directory structure for most commands and device login flow ([#134](https://github.com/apimatic/apimatic-cli/issues/134)) ([e172aa8](https://github.com/apimatic/apimatic-cli/commit/e172aa80c7978aa5b20591befceb09f70198f9a6)), closes [#111](https://github.com/apimatic/apimatic-cli/issues/111) [#113](https://github.com/apimatic/apimatic-cli/issues/113) [#116](https://github.com/apimatic/apimatic-cli/issues/116) [#117](https://github.com/apimatic/apimatic-cli/issues/117) [#119](https://github.com/apimatic/apimatic-cli/issues/119) [#124](https://github.com/apimatic/apimatic-cli/issues/124) [#125](https://github.com/apimatic/apimatic-cli/issues/125) [#126](https://github.com/apimatic/apimatic-cli/issues/126) [#130](https://github.com/apimatic/apimatic-cli/issues/130) [#129](https://github.com/apimatic/apimatic-cli/issues/129) [#127](https://github.com/apimatic/apimatic-cli/issues/127)
+
 # [1.1.0-alpha.14](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.13...v1.1.0-alpha.14) (2025-07-25)
 
 
