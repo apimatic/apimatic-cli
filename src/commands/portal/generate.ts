@@ -11,17 +11,17 @@ export class PortalGenerate extends Command {
     "Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)";
 
   static flags = {
-    ...FlagsProvider.folder,
-    ...FlagsProvider.destination,
+    ...FlagsProvider.input,
+    ...FlagsProvider.destination("portal", "portal"),
     ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
       description: "download the generated portal as a .zip archive"
     }),
-    ...FlagsProvider["auth-key"]
+    ...FlagsProvider.authKey
   };
 
-  static examples = [`$ apimatic portal:generate`, `$ apimatic portal:generate --folder="./" --destination="./portal"`];
+  static examples = [`apimatic portal:generate`, `apimatic portal:generate --input="./" --destination="./portal"`];
 
   private readonly prompts: PortalGeneratePrompts;
 
@@ -36,7 +36,7 @@ export class PortalGenerate extends Command {
     } = await this.parse(PortalGenerate);
 
     const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
-    const buildDirectory = folder ? new DirectoryPath(folder, "build") : workingDirectory.join("build");
+    const buildDirectory = folder ? new DirectoryPath(folder, "src") : workingDirectory.join("src");
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
 
     const action = new GenerateAction(this.getConfigDir(), authKey);

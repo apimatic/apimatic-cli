@@ -7,10 +7,10 @@ import { CopilotAction } from "../../actions/portal/copilot.js";
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalCopilotEnable extends Command {
-  static description = "adds the API Copilot configuration in APIMATIC-BUILD.json";
+  static description = "Adds the API Copilot configuration in APIMATIC-BUILD.json";
 
   static flags = {
-    ...FlagsProvider.folder,
+    ...FlagsProvider.input,
     "welcome-message": Flags.string({
       char: "m",
       default: "",
@@ -20,23 +20,23 @@ export default class PortalCopilotEnable extends Command {
       default: false,
       description: "marks the API Copilot as disabled in the configuration"
     }),
-    ...FlagsProvider["auth-key"]
+    ...FlagsProvider.authKey
   };
 
   static examples = [
-    `$ apimatic portal:copilot --folder="./portal/" --welcome-message="Welcome to our API!"`,
-    `$ apimatic portal:copilot --folder="./portal/"`
+    `apimatic portal:copilot --input="./" --welcome-message="Welcome to our API!"`,
+    `apimatic portal:copilot --input="./"`
   ];
 
   private readonly prompts = new PortalCopilotPrompts();
 
   async run(): Promise<void> {
     const {
-      flags: { folder, "auth-key": authKey, disable, 'welcome-message': welcomeMessage }
+      flags: { folder, "auth-key": authKey, disable, 'welcome-message': welcomeMessage}
     } = await this.parse(PortalCopilotEnable);
 
     const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
-    const buildDirectory = folder ? new DirectoryPath(folder, "build") : workingDirectory.join("build");
+    const buildDirectory = folder ? new DirectoryPath(folder, "src") : workingDirectory.join("src");
     const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), authKey);
     const result = await copilotConfigAction.execute(buildDirectory, welcomeMessage, !disable);
     result.map((message) => this.prompts.logError(message));

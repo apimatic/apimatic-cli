@@ -10,6 +10,7 @@ export default class Login extends Command {
 
   static flags = {
     "auth-key": Flags.string({
+      char: "k",
       description: "Sets authentication key for all commands.",
     })
   };

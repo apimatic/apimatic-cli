@@ -10,14 +10,15 @@ import { printValidationMessages } from "../../utils/utils.js";
 import { getFileNameFromPath, replaceHTML } from "../../utils/utils.js";
 import { DestinationFormats, TransformationFormats } from "../../types/api/transform.js";
 import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform.js";
+import { FlagsProvider } from "../../types/flags-provider.js";
 
 const formats: string = Object.keys(TransformationFormats).join("|");
 export default class Transform extends Command {
   static description = `Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.`;
 
   static examples = [
-    `$ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"`,
-    `$ apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"`
+    `apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"`,
+    `apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"`
   ];
 
   static flags = {
@@ -40,10 +41,11 @@ ${formats}`
     destination: Flags.string({
       parse: async (input) => path.resolve(input),
       default: path.resolve("./"),
-      description: "directory to download transformed file to"
+      description: "directory to download transformed file to",
+      char: "d"
     }),
-    force: Flags.boolean({ char: "f", default: false, description: "overwrite if same file exist in the destination" }),
-    "auth-key": Flags.string({ description: "override current authentication state with an authentication key" })
+    ...FlagsProvider.force,
+    ...FlagsProvider.authKey
   };
 
   async run() {

@@ -41,6 +41,7 @@ USAGE
 * [`apimatic auth:status`](#apimatic-authstatus)
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
+* [`apimatic portal:copilot`](#apimatic-portalcopilot)
 * [`apimatic portal:generate`](#apimatic-portalgenerate)
 * [`apimatic portal:quickstart`](#apimatic-portalquickstart)
 * [`apimatic portal:recipe:new`](#apimatic-portalrecipenew)
@@ -54,13 +55,12 @@ Transform API specifications from one format to another. Supports [10+ different
 
 ```
 USAGE
-  $ apimatic api:transform --format <value> [--file <value>] [--url <value>] [--destination <value>] [-f]
-    [--auth-key <value>]
+  $ apimatic api:transform --format <value> [--file <value>] [--url <value>] [-d <value>] [-f] [-k <value>]
 
 FLAGS
-  -f, --force                overwrite if same file exist in the destination
-      --auth-key=<value>     override current authentication state with an authentication key
-      --destination=<value>  [default: ./] directory to download transformed file to
+  -d, --destination=<value>  [default: ./] directory to download transformed file to
+  -f, --force                overwrite changes without asking for user consent.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
       --file=<value>         path to the API specification file to transform
       --format=<value>       (required) specification format to transform API specification into
                              APIMATIC|WADL2009|WSDL|SWAGGER10|SWAGGER20|SWAGGERYAML|OAS3|OPENAPI3YAML|APIBLUEPRINT|RAML|
@@ -87,13 +87,13 @@ Validate the syntactic and semantic correctness of an API specification
 
 ```
 USAGE
-  $ apimatic api:validate [--file <value>] [--url <value>] [--auth-key <value>]
+  $ apimatic api:validate [--file <value>] [--url <value>] [-k <value>]
 
 FLAGS
-  --auth-key=<value>  override current authentication state with an authentication key
-  --file=<value>      Path to the API specification file to validate
-  --url=<value>       URL to the specification file to validate. Can be used in place of the --file option if the API
-                      specification is publicly available.
+  -k, --auth-key=<value>  override current authentication state with an authentication key.
+      --file=<value>      Path to the API specification file to validate
+      --url=<value>       URL to the specification file to validate. Can be used in place of the --file option if the
+                          API specification is publicly available.
 
 DESCRIPTION
   Validate the syntactic and semantic correctness of an API specification
@@ -112,10 +112,10 @@ Login using your APIMatic credentials or an API Key
 
 ```
 USAGE
-  $ apimatic auth:login [--auth-key <value>]
+  $ apimatic auth:login [-k <value>]
 
 FLAGS
-  --auth-key=<value>  Set authentication key for all commands
+  -k, --auth-key=<value>  Sets authentication key for all commands.
 
 DESCRIPTION
   Login using your APIMatic credentials or an API Key
@@ -123,21 +123,21 @@ DESCRIPTION
 EXAMPLES
   $ apimatic auth:login
 
-  $ apimatic auth:login --auth-key=xxxxxx
+  $ apimatic auth:login --auth-key={api-key}
 ```
 
 _See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/auth/login.ts)_
 
 ## `apimatic auth:logout`
 
-Clear local login credentials
+Clears the local login credentials.
 
 ```
 USAGE
   $ apimatic auth:logout
 
 DESCRIPTION
-  Clear local login credentials
+  Clears the local login credentials.
 
 EXAMPLES
   $ apimatic auth:logout
@@ -147,14 +147,14 @@ _See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cl
 
 ## `apimatic auth:status`
 
-View current authentication state
+View the currently logged in user.
 
 ```
 USAGE
   $ apimatic auth:status
 
 DESCRIPTION
-  View current authentication state
+  View the currently logged in user.
 
 EXAMPLES
   $ apimatic auth:status
@@ -208,20 +208,46 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/main/src/commands/help.ts)_
 
+## `apimatic portal:copilot`
+
+Adds the API Copilot configuration in APIMATIC-BUILD.json
+
+```
+USAGE
+  $ apimatic portal:copilot [-i <value>] [-m <value>] [--disable] [-k <value>]
+
+FLAGS
+  -i, --input=<value>            [default: ./] path to the parent directory containing the 'src' directory, which
+                                 includes API specifications and configuration files.
+  -k, --auth-key=<value>         override current authentication state with an authentication key.
+  -m, --welcome-message=<value>  welcome message for the API copilot
+      --disable                  marks the API Copilot as disabled in the configuration
+
+DESCRIPTION
+  Adds the API Copilot configuration in APIMATIC-BUILD.json
+
+EXAMPLES
+  $ apimatic portal:copilot --input="./" --welcome-message="Welcome to our API!"
+
+  $ apimatic portal:copilot --input="./"
+```
+
+_See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/copilot.ts)_
+
 ## `apimatic portal:generate`
 
 Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)
 
 ```
 USAGE
-  $ apimatic portal:generate [--folder <value>] [--destination <value>] [-f] [--zip] [--auth-key <value>]
+  $ apimatic portal:generate [-i <value>] [-d <value>] [-f] [--zip] [-k <value>]
 
 FLAGS
-  -f, --force                overwrite if a portal exists in the destination
-      --auth-key=<value>     override current authentication state with an authentication key
-      --destination=<value>  [default: <folder>/portal] path to the generated portal
-      --folder=<value>       [default: ./] path to the parent directory containing the 'build' folder, 
-                             which includes API specifications and configuration files.
+  -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
+  -f, --force                overwrite changes without asking for user consent.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
       --zip                  download the generated portal as a .zip archive
 
 DESCRIPTION
@@ -230,7 +256,9 @@ DESCRIPTION
   rm-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)
 
 EXAMPLES
-  $ apimatic portal:generate --folder="./portal/" --destination="D:/"
+  $ apimatic portal:generate
+
+  $ apimatic portal:generate --input="./" --destination="./portal"
 ```
 
 _See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/generate.ts)_
@@ -258,12 +286,12 @@ Generate an API Recipe for a static API Documentation portal.
 
 ```
 USAGE
-  $ apimatic portal:recipe:new [--name <value>] [--folder <value>]
+  $ apimatic portal:recipe:new [--name <value>] [-i <value>]
 
 FLAGS
-  --folder=<value>        [default: ./] path to the parent directory containing the 
-                          'build' folder, which includes API specifications and configuration files.
-  --name=<value>          name for the recipe
+  -i, --input=<value>  [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                       specifications and configuration files.
+      --name=<value>   name for the recipe
 
 DESCRIPTION
   Generate an API Recipe for a static API Documentation portal.
@@ -272,9 +300,9 @@ DESCRIPTION
   https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes
 
 EXAMPLES
-  $ apimatic portal:recipe:new --name="My API Recipe" --folder="./build-folder"
-
   $ apimatic portal:recipe:new
+
+  $ apimatic portal:recipe:new --name="My API Recipe" --input="./"
 ```
 
 _See code: [src/commands/portal/recipe/new.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/recipe/new.ts)_
@@ -285,25 +313,26 @@ Generate and deploy a Docs as Code portal with hot reload.
 
 ```
 USAGE
-  $ apimatic portal:serve [-p <value>] [-destination <value>] [--folder <value>] [-o] [--no-reload] [-i <value>] [--auth-key
-    <value>]
+  $ apimatic portal:serve [-p <value>] [-i <value>] [-d <value>] [-o] [--no-reload] [-i <value>] [-k <value>]
 
 FLAGS
+  -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
   -i, --ignore=<value>       Comma-separated list of file and directory paths to exclude from portal generation and hot
                              reload.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
   -o, --open                 Open the portal in the default browser.
-  -p, --port=<value>         Port to serve the portal.
-      --auth-key=<value>     Override current authentication state with an authentication key.
-      --folder=<value>       [default: ./] Path to the parent directory containing the 'build' folder, 
-                             which includes API specifications and configuration files.
-      --destination=<value>  [default: <folder>/portal] Path to the generated portal.
+  -p, --port=<value>         [default: 3000] port to serve the portal.
       --no-reload            Disable hot reload.
 
 DESCRIPTION
   Generate and deploy a Docs as Code portal with hot reload.
 
 EXAMPLES
-  $ apimatic portal:serve --folder="./" --destination="./portal" --port=3000 --open --no-reload
+  $ apimatic portal:serve
+
+  $ apimatic portal:serve --input="./" --destination="./portal" --port=3000 --open --no-reload
 ```
 
 _See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/serve.ts)_
@@ -314,18 +343,17 @@ Generates a TOC file based on the content directory and spec folder provided in 
 
 ```
 USAGE
-  $ apimatic portal:toc:new [--destination <value>] [--folder <value>] [--force] [--expand-endpoints]
-    [--expand-models]
+  $ apimatic portal:toc:new [-d <value>] [-i <value>] [-f] [--expand-endpoints] [--expand-models]
 
 FLAGS
-  --destination=<value>  [default: <folder>/build/content] optional path where the generated toc.yml file will be saved.
-  --expand-endpoints     include individual entries for each endpoint in the generated toc.yml. Requires a valid API
-                         specification in the working directory.
-  --expand-models        include individual entries for each model in the generated toc.yml. Requires a valid API
-                         specification in the working directory.
-  --folder=<value>       [default: ./] Path to the parent directory containing the 'build' folder, 
-                         which includes API specifications and configuration files.
-  --force                overwrite the toc.yml file if one already exists at the destination.
+  -d, --destination=<value>  [default: <input>/src/content] path where the 'toc.yml' will be generated.
+  -f, --force                overwrite changes without asking for user consent.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+      --expand-endpoints     include individual entries for each endpoint in the generated 'toc.yml'. Requires a valid
+                             API specification in the working directory.
+      --expand-models        include individual entries for each model in the generated 'toc.yml'. Requires a valid API
+                             specification in the working directory.
 
 DESCRIPTION
   Generates a TOC file based on the content directory and spec folder provided in your working directory
@@ -339,44 +367,40 @@ DESCRIPTION
   https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal
 
 EXAMPLES
-  $ apimatic portal:toc:new --destination="./portal/content/"
+  $ apimatic portal:toc:new --destination="./src/content/"
 
-  $ apimatic portal:toc:new --folder="./my-project" 
+  $ apimatic portal:toc:new --input="./"
 
-  $ apimatic portal:toc:new --folder="./my-project" --destination="./portal/content/"
+  $ apimatic portal:toc:new --input="./" --destination="./src/content/"
 ```
 
 _See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/toc/new.ts)_
 
 ## `apimatic sdk:generate`
 
-Generate SDK for your APIs
+Generates SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk:generate --platform <value> [--file <value>] [--url <value>] [--destination <value>] [-f] [--zip]
-    [--auth-key <value>]
+  $ apimatic sdk:generate --platform csharp|java|php|python|ruby|typescript|go [--spec <value>] [-d <value>] [-f]
+    [--zip] [-k <value>]
 
 FLAGS
-  -f, --force                overwrite if an SDK already exists in the destination
-      --auth-key=<value>     override current authentication state with an authentication key
-      --destination=<value>  [default: ./] directory to download the generated SDK to
-      --file=<value>         path to the API specification to generate SDKs for
-      --platform=<value>     (required) language platform for sdk
-                             Simple: CSHARP|JAVA|PYTHON|RUBY|PHP|TYPESCRIPT|GO
-                             Legacy: CS_NET_STANDARD_LIB|JAVA_ECLIPSE_JRE_LIB|PHP_GENERIC_LIB_V2|PYTHON_GENERIC_LIB|RUBY
-                             _GENERIC_LIB|TS_GENERIC_LIB|GO_GENERIC_LIB
-      --url=<value>          URL to the API specification to generate SDKs for. Can be used in place of the --file
-                             option if the API specification is publicly available.
+  -d, --destination=<value>  [default: <input>/sdk] path where the sdk will be generated.
+  -f, --force                overwrite changes without asking for user consent.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
+      --platform=<option>    (required) language platform for sdk
+                             <options: csharp|java|php|python|ruby|typescript|go>
+      --spec=<value>         [default: ./src/spec] path to the folder containing the API specification file.
       --zip                  download the generated SDK as a .zip archive
 
 DESCRIPTION
-  Generate SDK for your APIs
+  Generates SDK for your API
 
 EXAMPLES
-  $ apimatic sdk:generate --platform="CSHARP" --file="./specs/sample.json"
+  $ apimatic sdk:generate --platform="java"
 
-  $ apimatic sdk:generate --platform="CSHARP" --url=https://petstore.swagger.io/v2/swagger.json
+  $ apimatic sdk:generate --platform="csharp" --spec="./src/spec"
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/sdk/generate.ts)_

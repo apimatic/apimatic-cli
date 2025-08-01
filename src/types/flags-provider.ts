@@ -1,28 +1,30 @@
 import { Flags } from "@oclif/core";
 
 export class FlagsProvider {
+  private static readonly inputFlagName: string = "input" as const;
   // Common folder flag group
-  public static folder = {
-    folder: Flags.string({
+  public static input = {
+    [FlagsProvider.inputFlagName]: Flags.string({
+      char: "i",
       description:
-        "[default: ./] Path to the parent directory containing the build folder, which includes API specifications and configuration files."
+        "[default: ./] path to the parent directory containing the 'src' directory, which includes API specifications and configuration files."
     })
   };
 
-  public static destination = {
-    folder: Flags.string({
-      char: "d",
-      description:
-        "[default: ./portal] path where the portal will be downloaded",
-    })
-  };
+  public static destination(artifact: string, artifactName: string) {
+    return {
+      destination: Flags.string({
+        char: "d",
+        description: `[default: <${FlagsProvider.inputFlagName}>/${artifact}] path where the ${artifactName} will be generated.`
+      })
+    };
+  }
 
   // Auth key group
-  public static ["auth-key"] = {
+  public static authKey = {
     "auth-key": Flags.string({
       char: "k",
-      description: "override current authentication state with an authentication key",
-      env: "API_COPILOT_AUTH_KEY"
+      description: "override current authentication state with an authentication key."
     })
   };
 
@@ -30,9 +32,7 @@ export class FlagsProvider {
     force: Flags.boolean({
       char: "f",
       default: false,
-      description: "overwrite if the destination is not empty",
+      description: "overwrite changes without asking for user consent."
     })
   };
 }
-
-
