@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-alpha.14 win32-x64 node-v20.18.3
+@apimatic/cli/1.1.0-alpha.16 win32-x64 node-v20.18.3
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -236,7 +236,7 @@ _See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic
 
 ## `apimatic portal:generate`
 
-Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)
+Generate an API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)
 
 ```
 USAGE
@@ -251,9 +251,9 @@ FLAGS
       --zip                  download the generated portal as a .zip archive
 
 DESCRIPTION
-  Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a
-  config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platfo
-  rm-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)
+  Generate an API Documentation portal. Requires an input directory containing API specifications, a config file and
+  optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/gu
+  ides/generating-on-prem-api-portal/build-file-reference)
 
 EXAMPLES
   $ apimatic portal:generate
@@ -282,7 +282,7 @@ _See code: [src/commands/portal/quickstart.ts](https://github.com/apimatic/apima
 
 ## `apimatic portal:recipe:new`
 
-Generate an API Recipe for a static API Documentation portal.
+Add an API Recipe to your API Documentation portal.
 
 ```
 USAGE
@@ -294,7 +294,7 @@ FLAGS
       --name=<value>   name for the recipe
 
 DESCRIPTION
-  Generate an API Recipe for a static API Documentation portal.
+  Add an API Recipe to your API Documentation portal.
 
   To learn more about API Recipes, visit:
   https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes
@@ -339,7 +339,7 @@ _See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-c
 
 ## `apimatic portal:toc:new`
 
-Generates a TOC file based on the content directory and spec folder provided in your working directory
+Generate a Table of Contents (TOC) file for your API documentation portal
 
 ```
 USAGE
@@ -356,7 +356,7 @@ FLAGS
                              specification in the working directory.
 
 DESCRIPTION
-  Generates a TOC file based on the content directory and spec folder provided in your working directory
+  Generate a Table of Contents (TOC) file for your API documentation portal
 
   This command generates a new Table of Contents (TOC) file used in the
   generation of your API documentation portal.
@@ -378,7 +378,7 @@ _See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic
 
 ## `apimatic sdk:generate`
 
-Generates SDK for your API
+Generate an SDK for your API
 
 ```
 USAGE
@@ -386,7 +386,7 @@ USAGE
     [--zip] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: <input>/sdk] path where the sdk will be generated.
+  -d, --destination=<value>  [default: ./sdk/<platform>] path where the sdk will be generated.
   -f, --force                overwrite changes without asking for user consent.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
       --platform=<option>    (required) language platform for sdk
@@ -395,7 +395,7 @@ FLAGS
       --zip                  download the generated SDK as a .zip archive
 
 DESCRIPTION
-  Generates SDK for your API
+  Generate an SDK for your API
 
 EXAMPLES
   $ apimatic sdk:generate --platform="java"
