@@ -12,6 +12,7 @@ import {
   directoryToJson
 } from "../../utils/utils.js";
 import { BasePrompts } from "./common/base-prompts.js";
+import axios from "axios";
 
 export class PortalQuickstartPrompts extends BasePrompts {
   private readonly vscodeExtensionUrl =
@@ -75,18 +76,19 @@ export class PortalQuickstartPrompts extends BasePrompts {
 
   removeQuotes(str: string): string {
     const quotes = ['"', "'"];
-    
+
     for (const quote of quotes) {
       if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
         return this.removeQuotes(str.slice(1, -1)); // Recursive call
       }
     }
-     return str;
+    return str;
   }
 
   async specPrompt(): Promise<string> {
-    log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
+  log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
 
+  while (true) {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI definition file:`,
       placeholder: "Provide absolute URL/local path or press Enter to use sample OpenAPI file from APIMatic.",
@@ -95,32 +97,59 @@ export class PortalQuickstartPrompts extends BasePrompts {
       validate: (input) => {
         if (!input) return;
 
-        if (isValidUrl(input)) return;
-
         const cleanedPath = this.removeQuotes(input.trim() ?? "");
-        const dirPath = path.resolve(cleanedPath);
 
-        if (fs.existsSync(dirPath)) {
-          if (fs.statSync(dirPath).isFile()) {
-            return;
+        if (!isValidUrl(cleanedPath)) {
+          const dirPath = path.resolve(cleanedPath);
+
+          if (!fs.existsSync(dirPath)) {
+            return getMessageInRedColor("Error: The specified file does not exist. Please enter a valid file path.");
           }
 
-          return getMessageInRedColor(
-            "Error: The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again."
-          );
+          if (!fs.statSync(dirPath).isFile()) {
+            return getMessageInRedColor(
+              "Error: The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again."
+            );
+          }
         }
 
-        return getMessageInRedColor("Error: The specified file does not exist. Please enter a valid file path.");
-      }
+        return; // pass sync validation
+      },
     });
 
     if (isCancel(spec)) {
       cancel("Operation cancelled.");
-      return process.exit(0);
+      process.exit(0);
     }
 
-    return this.removeQuotes(String(spec).trim());
+    const cleanedPath = this.removeQuotes(String(spec).trim());
+
+    // Async validation for URLs
+    if (isValidUrl(cleanedPath)) {
+      try {
+        const response = await axios.head(cleanedPath);
+        const contentType = response.headers["content-type"];
+
+        if (contentType?.includes("text/html")) {
+          log.error(
+            getMessageInRedColor(
+              `Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`
+            )
+          );
+          continue; // re-prompt
+        }
+      } catch (err) {
+        log.error(
+          getMessageInRedColor(`Failed to reach the URL. Please check your internet connection or the URL.`)
+        );
+        continue; // re-prompt
+      }
+    }
+
+    return cleanedPath; // valid local file or valid URL
   }
+}
+
 
   displaySpecValidationMessage(): void {
     log.step(getMessageInOrangeColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
@@ -219,7 +248,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
             );
           }
-        } else if (fs.existsSync(dirPath)) { 
+        } else if (fs.existsSync(dirPath)) {
           // For ignoring hidden files and folders in the current directory in MacOS.
           const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
@@ -271,24 +300,24 @@ export class PortalQuickstartPrompts extends BasePrompts {
   displayOutroMessage(buildDirectory: string): void {
     log.step(
       getMessageInCyanColor(`📢  Your API Portal is live at: ${this.serverUrl}\n`) +
-        getMessageInCyanColor(
-          `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
-        ) +
-        getMessageInCyanColor(`Press CTRL+C to stop the server.`)
+      getMessageInCyanColor(
+        `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
+      ) +
+      getMessageInCyanColor(`Press CTRL+C to stop the server.`)
     );
     outro(
       getMessageInCyanColor(`What's next?\n`) +
-        getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
-        getMessageInCyanColor(
-          `- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentationUrl}`
-        ) +
-        getMessageInCyanColor(` \n`) +
-        getMessageInCyanColor(
-          `- Review the SDK Documentation for your favourite programming language and download an SDK from the API Portal.\n`
-        ) +
-        getMessageInCyanColor(
-          `- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`
-        )
+      getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
+      getMessageInCyanColor(
+        `- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentationUrl}`
+      ) +
+      getMessageInCyanColor(` \n`) +
+      getMessageInCyanColor(
+        `- Review the SDK Documentation for your favourite programming language and download an SDK from the API Portal.\n`
+      ) +
+      getMessageInCyanColor(
+        `- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`
+      )
     );
   }
 
