@@ -4,7 +4,6 @@ import { dirname, join } from "path";
 import fs from "fs-extra";
 
 class EnvInfo {
-
   private static cachedCliVersion: string | null = null;
   private static cachedUserAgent: string | null = null;
 
@@ -13,12 +12,12 @@ class EnvInfo {
       const osInfo = `${os.platform()} ${os.release()}`;
       const engine = "Node.js";
       const engineVersion = process.version;
-      EnvInfo.cachedUserAgent = `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
+      EnvInfo.cachedUserAgent = `APIMATIC CLI/${this.getCLIVersion()} - (OS: ${osInfo}, Engine: ${engine}/${engineVersion})`;
     }
     return EnvInfo.cachedUserAgent;
   }
 
-  public  getCLIVersion(): string {
+  public getCLIVersion(): string {
     if (EnvInfo.cachedCliVersion) {
       return EnvInfo.cachedCliVersion;
     }
