@@ -8,13 +8,14 @@ import { SDKClient } from "../../client-utils/sdk-client.js";
 import { getValidationSummary } from "../../controllers/api/validate.js";
 import { printValidationMessages, replaceHTML } from "../../utils/utils.js";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate.js";
+import { FlagsProvider } from "../../types/flags-provider.js";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
 
   static examples = [
-    `$ apimatic api:validate --file="./specs/sample.json"`,
-    `$ apimatic api:validate --url=https://petstore.swagger.io/v2/swagger.json`
+    `apimatic api:validate --file="./specs/sample.json"`,
+    `apimatic api:validate --url=https://petstore.swagger.io/v2/swagger.json`
   ];
 
   static flags = {
@@ -25,7 +26,7 @@ export default class Validate extends Command {
         "URL to the specification file to validate. Can be used in place of the --file option if the API specification is publicly available."
     }),
     // docs: flags.boolean({ default: false, description: "Validate specification for docs generation" }), // Next tier, not included in API spec
-    "auth-key": Flags.string({ description: "override current authentication state with an authentication key" })
+    ...FlagsProvider.authKey
   };
 
   async run() {

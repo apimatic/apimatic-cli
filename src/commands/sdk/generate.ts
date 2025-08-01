@@ -18,22 +18,23 @@ export default class SdkGenerate extends Command {
     }),
     spec: Flags.string({
       description: "path to the folder containing the API specification file.",
-      default: "./build/spec"
+      default: "./src/spec"
     }),
-    destination: Flags.string({
-      description: "[default: ./sdk] path where the sdk will be generated."
-    }),
+    // destination: Flags.string({
+    //   description: "[default: ./sdk] path where the sdk will be generated."
+    // }),
+    ...FlagsProvider.destination("sdk", "sdk"),
     ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
       description: "download the generated SDK as a .zip archive"
     }),
-    ...FlagsProvider["auth-key"]
+    ...FlagsProvider.authKey
   };
 
   static examples = [
-    `$ apimatic sdk:generate --platform="java"`,
-    `$ apimatic sdk:generate --platform="csharp" --spec="./build/spec"`
+    `apimatic sdk:generate --platform="java"`,
+    `apimatic sdk:generate --platform="csharp" --spec="./src/spec"`
   ];
 
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();

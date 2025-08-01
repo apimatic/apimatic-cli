@@ -20,7 +20,7 @@ export class CopilotAction {
     const buildContext = new BuildContext(buildDirectory);
 
     if (!(await buildContext.validate())) {
-      return ActionResult.error("build directory is empty or not valid.");
+      return ActionResult.error("'src' directory is empty or not valid.");
     }
 
     const buildJson = await buildContext.getBuildFileContents();

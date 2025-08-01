@@ -8,6 +8,7 @@ import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FlagsProvider } from "../../types/flags-provider.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -19,13 +20,8 @@ export default class PortalServe extends Command {
       char: "p",
       description: "[default: 3000] port to serve the portal."
     }),
-    folder: Flags.string({
-      description:
-        "[default: ./] path to the parent directory containing the 'build' folder, which includes API specifications and configuration files."
-    }),
-    destination: Flags.string({
-      description: "[default: <folder>/portal] path where the portal will be generated."
-    }),
+    ...FlagsProvider.input,
+    ...FlagsProvider.destination("portal", "portal"),
     open: Flags.boolean({
       char: "o",
       description: "Open the portal in the default browser.",
@@ -40,9 +36,7 @@ export default class PortalServe extends Command {
       description: "Comma-separated list of file and directory paths to exclude from portal generation and hot reload.",
       default: ""
     }),
-    "auth-key": Flags.string({
-      description: "Override current authentication state with an authentication key."
-    })
+    ...FlagsProvider.authKey
   };
 
   private readonly prompts: PortalServePrompts;
@@ -53,8 +47,8 @@ export default class PortalServe extends Command {
   }
 
   static examples = [
-    "$ apimatic portal:serve",
-    '$ apimatic portal:serve --folder="./" --destination="./portal" --port=3000 --open --no-reload'
+    "apimatic portal:serve",
+    'apimatic portal:serve --input="./" --destination="./portal" --port=3000 --open --no-reload'
   ];
 
   public async run() {
@@ -65,13 +59,12 @@ export default class PortalServe extends Command {
     //TODO: This needs to be moved within the action. Port should not be initialized again here.
     const port = await this.getServerPort(flags.port);
 
-    const workingDirectory = new DirectoryPath(flags.folder ?? DEFAULT_WORKING_DIRECTORY);
-    const buildDirectory = flags.folder ? new DirectoryPath(flags.folder, "build") : workingDirectory.join("build");
+    const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
     const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
 
 
     const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
-    //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
 
     const serveFlags: ServeFlags = {
       folder: buildDirectory.toString(),

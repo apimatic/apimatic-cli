@@ -18,7 +18,7 @@ import { LoginAction } from "../../actions/auth/login.js";
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
-  static examples = ["$ apimatic portal:quickstart"];
+  static examples = ["apimatic portal:quickstart"];
 
   private async getSpecFile(
     prompts: PortalQuickstartPrompts,
@@ -62,7 +62,7 @@ export default class PortalQuickstart extends Command {
 
     prompts.displayBuildDirectoryGenerationMessage();
 
-    const buildDirectory = new DirectoryPath(workingDirectory, "build").toString();
+    const buildDirectory = new DirectoryPath(workingDirectory, "src").toString();
 
     await controller.setupBuildDirectory(prompts, buildDirectory, specFile, apiValidationSummary, languages);
 
@@ -126,11 +126,10 @@ export default class PortalQuickstart extends Command {
       //TODO: This needs to be moved within the action. Port should not be initialized again here.
       const port = await this.getServerPort(3000);
 
-      const buildDirectory = new DirectoryPath(workingDirectory, "build");
+      const buildDirectory = new DirectoryPath(workingDirectory, "src");
       const portalDirectory = new DirectoryPath(workingDirectory, "portal");
 
       const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), null);
-      //const generatePortal = () => generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
 
       const serveFlags: ServeFlags = {
         folder: buildDirectory.toString(),
