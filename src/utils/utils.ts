@@ -1,6 +1,7 @@
 import * as path from "path";
 import net from "net";
-import fs from "fs-extra";
+import fs from "fs";
+import fsExtra from "fs-extra";
 import os from "os";
 import archiver from "archiver";
 import unzipper from "unzipper";
@@ -34,7 +35,7 @@ export const clearDirectory = async (folderPath: string) => {
     throw new Error(`Directory ${folderPath} does not exist`);
   }
 
-  const files = await fs.readdir(folderPath);
+  const files = await fsExtra.readdir(folderPath);
 
   for (const file of files) {
     const filePath = path.join(folderPath, file);
@@ -146,7 +147,7 @@ export const isValidUrl = (input: string): boolean => {
 };
 
 export const deleteFile = async (filePath: string) => {
-  return await fs.remove(filePath);
+  return await fsExtra.remove(filePath);
 };
 
 export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, destinationPath: string) => {
@@ -161,7 +162,7 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
 
 export const zipDirectoryToStream = async (sourcePath: string): Promise<NodeJS.ReadableStream> => {
   // Check if the directory exists for the user or not
-  await fs.ensureDir(sourcePath);
+  await fsExtra.ensureDir(sourcePath);
 
   const archive = archiver("zip");
 
@@ -190,7 +191,7 @@ export const zipDirectoryToStream = async (sourcePath: string): Promise<NodeJS.R
  */
 export const zipDirectory = async (sourcePath: string, destinationPath: string): Promise<string> => {
   // Check if the directory exists for the user or not
-  await fs.ensureDir(sourcePath);
+  await fsExtra.ensureDir(sourcePath);
 
   const zipPath = path.join(destinationPath, ".target.zip");
   const output = fs.createWriteStream(zipPath);
@@ -306,7 +307,7 @@ export async function zipPortalSource(
   generatedZipFilePath: string,
   ignoredPaths: string[] = []
 ): Promise<string> {
-  if (await fs.pathExists(generatedZipFilePath)) {
+  if (await fsExtra.pathExists(generatedZipFilePath)) {
     await deleteFile(generatedZipFilePath);
   }
 
@@ -328,7 +329,7 @@ export async function zipPortalSource(
 
     // Function to recursively add files and directories to the archive, excluding ignored paths
     const addItemsToArchive = async (currentPath: string, archivePath: string | false) => {
-      const items = await fs.readdir(currentPath);
+      const items = await fsExtra.readdir(currentPath);
 
       for (const item of items) {
         const fullPath = path.join(currentPath, item);
@@ -345,7 +346,7 @@ export async function zipPortalSource(
         );
 
         if (!isIgnored) {
-          const stats = await fs.stat(fullPath);
+          const stats = await fsExtra.stat(fullPath);
           if (stats.isDirectory()) {
             await addItemsToArchive(fullPath, archivePath ? path.join(archivePath, item) : item);
           } else {

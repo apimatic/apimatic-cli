@@ -108,14 +108,6 @@ export class PortalRecipeAction {
     return Result.success("Portal build input folder path validated successfully.");
   }
 
-  private async validateBuildConfigFilePath(buildConfigFilePath?: string): Promise<Result<string, string>> {
-    if (buildConfigFilePath && !(await fsExtra.pathExists(buildConfigFilePath))) {
-      return Result.failure(`Portal build config file ${buildConfigFilePath} does not exist.`);
-    }
-
-    return Result.success("Portal build config file path validated successfully.");
-  }
-
   //TODO: Figure out a better way to do this without the while loop.
   private async promptUserAndBuildNewRecipe(
     buildConfig: any,

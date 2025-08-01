@@ -11,13 +11,14 @@ import { PortalServeAction } from "../../actions/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { GeneratePortalAction } from "../../actions/portal/generatePortalAction.js";
+import { GenerateAction } from "../../actions/portal/generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import { LoginAction } from "../../actions/auth/login.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
-  static examples = ["$ apimatic portal:quickstart"];
+  static examples = ["apimatic portal:quickstart"];
 
   private async getSpecFile(
     prompts: PortalQuickstartPrompts,
@@ -61,7 +62,7 @@ export default class PortalQuickstart extends Command {
 
     prompts.displayBuildDirectoryGenerationMessage();
 
-    const buildDirectory = new DirectoryPath(workingDirectory, "build").toString();
+    const buildDirectory = new DirectoryPath(workingDirectory, "src").toString();
 
     await controller.setupBuildDirectory(prompts, buildDirectory, specFile, apiValidationSummary, languages);
 
@@ -80,18 +81,18 @@ export default class PortalQuickstart extends Command {
 
     let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
 
-    while (!loggedIn) {
-      const credentials = await prompts.loginPrompt();
+    if (!loggedIn) {
+      prompts.getLoggedInFirst();
+      const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
+      const loginResult = await loginAction.execute();
 
-      prompts.displayLoggingInMessage();
+      loginResult.match(
+        e => prompts.displayLoggedInMessage(e),
+          error => prompts.logError(error)
+      );
 
-      try {
-        await controller.userLogin(credentials, SDKClient.getInstance(), this.config.configDir);
-        loggedIn = true;
-        prompts.displayLoggedInMessage();
-      } catch {
-        prompts.displayLoggingInErrorMessage();
-      }
+      if (loginResult.isErr())
+        return;
     }
 
     const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
@@ -125,10 +126,10 @@ export default class PortalQuickstart extends Command {
       //TODO: This needs to be moved within the action. Port should not be initialized again here.
       const port = await this.getServerPort(3000);
 
-      const buildDirectory = new DirectoryPath(workingDirectory, "build");
+      const buildDirectory = new DirectoryPath(workingDirectory, "src");
       const portalDirectory = new DirectoryPath(workingDirectory, "portal");
 
-      const generatePortalAction = new GeneratePortalAction(new DirectoryPath(this.config.configDir), null);
+      const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), null);
 
       const serveFlags: ServeFlags = {
         folder: buildDirectory.toString(),
@@ -150,7 +151,7 @@ export default class PortalQuickstart extends Command {
         serverPaths,
         generatePortalAction.execute
       );
-      
+
       if (servePortalResult.isFailed()) {
         portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
         return;

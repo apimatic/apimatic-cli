@@ -1,7 +1,7 @@
 import fs from "fs";
 import * as path from "path";
 import treeify from "treeify";
-import { intro, outro, text, spinner, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
+import { intro, outro, text, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
 import {
   getMessageInCyanColor,
   getMessageInGreenColor,
@@ -72,29 +72,16 @@ export class PortalQuickstartPrompts extends BasePrompts {
     return { email: String(email).trim(), password: String(pass).trim() };
   }
 
-  displayLoggingInMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Logging in"));
-  }
 
-  displayLoggingInErrorMessage(): void {
-    this.spin.stop(
-      getMessageInRedColor(`There was a problem logging in. Please verify your credentials and try again.`)
-    );
-  }
-
-  displayLoggedInMessage(): void {
-    this.spin.stop(getMessageInCyanColor("✅  Login successful!"));
-  }
-
-  removeQuotes(str: string) {
+  removeQuotes(str: string): string {
     const quotes = ['"', "'"];
-
+    
     for (const quote of quotes) {
       if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-        return str.slice(1, -1);
+        return this.removeQuotes(str.slice(1, -1)); // Recursive call
       }
     }
-    return str;
+     return str;
   }
 
   async specPrompt(): Promise<string> {
@@ -132,7 +119,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
       return process.exit(0);
     }
 
-    return String(spec).trim();
+    return this.removeQuotes(String(spec).trim());
   }
 
   displaySpecValidationMessage(): void {
@@ -232,10 +219,14 @@ export class PortalQuickstartPrompts extends BasePrompts {
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
             );
           }
-        } else if (fs.existsSync(dirPath) && fs.readdirSync(dirPath).length > 0) {
-          return getMessageInRedColor(
-            "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-          );
+        } else if (fs.existsSync(dirPath)) { 
+          // For ignoring hidden files and folders in the current directory in MacOS.
+          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
+          if (files.length > 0) {
+            return getMessageInRedColor(
+              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
+            );
+          }
         }
       }
     });
@@ -248,7 +239,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
     if (directory === "./") {
       return this.defaultPortalDirectoryPath;
     } else {
-      return String(directory).trim();
+      return this.removeQuotes(String(directory).trim());
     }
   }
 
@@ -299,5 +290,17 @@ export class PortalQuickstartPrompts extends BasePrompts {
           `- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`
         )
     );
+  }
+
+  getLoggedInFirst() {
+    log.step("You need to be logged in to continue.")
+  }
+
+  displayLoggedInMessage(email: string): void {
+    log.success(`Successfully logged in as ${email}`);
+  }
+
+  logError(error: string) {
+    log.error(error);
   }
 }
