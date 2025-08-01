@@ -4,7 +4,6 @@ import { dirname, join } from "path";
 import fs from "fs-extra";
 
 class EnvInfo {
-
   private static cachedCliVersion: string | null = null;
   private static cachedUserAgent: string | null = null;
 
@@ -18,7 +17,7 @@ class EnvInfo {
     return EnvInfo.cachedUserAgent;
   }
 
-  public  getCLIVersion(): string {
+  public getCLIVersion(): string {
     if (EnvInfo.cachedCliVersion) {
       return EnvInfo.cachedCliVersion;
     }
