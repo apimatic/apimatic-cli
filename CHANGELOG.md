@@ -1,3 +1,10 @@
+# [1.1.0-alpha.16](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.15...v1.1.0-alpha.16) (2025-08-01)
+
+
+### Bug Fixes
+
+* update user-agent format in api calls ([#135](https://github.com/apimatic/apimatic-cli/issues/135)) ([b16e374](https://github.com/apimatic/apimatic-cli/commit/b16e3747f9f62851c4d4b0cc975bfecdd7076d5d))
+
 # [1.1.0-alpha.15](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.14...v1.1.0-alpha.15) (2025-08-01)
 
 
