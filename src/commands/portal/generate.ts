@@ -32,11 +32,11 @@ export class PortalGenerate extends Command {
 
   async run(): Promise<void> {
     const {
-      flags: { folder, destination, force, zip: zipPortal, "auth-key": authKey }
+      flags: { input, destination, force, zip: zipPortal, "auth-key": authKey }
     } = await this.parse(PortalGenerate);
 
-    const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
-    const buildDirectory = folder ? new DirectoryPath(folder, "src") : workingDirectory.join("src");
+    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
 
     const action = new GenerateAction(this.getConfigDir(), authKey);

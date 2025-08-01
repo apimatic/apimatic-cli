@@ -32,11 +32,11 @@ export default class PortalCopilotEnable extends Command {
 
   async run(): Promise<void> {
     const {
-      flags: { folder, "auth-key": authKey, disable, 'welcome-message': welcomeMessage}
+      flags: { input, "auth-key": authKey, disable, 'welcome-message': welcomeMessage}
     } = await this.parse(PortalCopilotEnable);
 
-    const workingDirectory = new DirectoryPath(folder ?? DEFAULT_WORKING_DIRECTORY);
-    const buildDirectory = folder ? new DirectoryPath(folder, "src") : workingDirectory.join("src");
+    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), authKey);
     const result = await copilotConfigAction.execute(buildDirectory, welcomeMessage, !disable);
     result.map((message) => this.prompts.logError(message));
