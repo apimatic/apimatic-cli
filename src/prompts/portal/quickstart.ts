@@ -91,7 +91,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
       message: `Provide a local path or a public URL for your OpenAPI definition file:`,
       placeholder: "Provide absolute URL/local path or press Enter to use sample OpenAPI file from APIMatic.",
       defaultValue:
-        "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/Apimatic-Calculator.json",
+        "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json",
       validate: (input) => {
         if (!input) return;
 
