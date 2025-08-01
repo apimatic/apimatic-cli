@@ -142,13 +142,13 @@ export class PortalService {
   private handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
     if (error instanceof UnauthorizedResponseError) {
       //401
-      const body = await this.parseErrorResponse(error);
-      return getMessageInRedColor(body.message ?? "Unauthorized access.");
+      const unAuthError = error as UnauthorizedResponseError;
+      return getMessageInRedColor(unAuthError.result?.message ?? "Authorization has been denied for this request.");
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
-      const body = await this.parseErrorResponse(error);
-      const message = body.errors[Object.keys(body.errors)[0]][0];
-      return getMessageInRedColor(body.title + "\n- " + message);
+      const probDetailsError = error as ProblemDetailsError;
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
       return error.body as NodeJS.ReadableStream;
@@ -177,18 +177,13 @@ export class PortalService {
     //TODO: Update the spec file to define different error code response types so that they can be handled here. Currently all failures go to the last else statement
     if (error instanceof UnauthorizedResponseError) {
       //401
-      const body = await this.parseErrorResponse(error);
-      return getMessageInRedColor(body.message ?? "Unauthorized access.");
+      const unAuthError = error as UnauthorizedResponseError;
+      return getMessageInRedColor(unAuthError.result?.message ?? "Authorization has been denied for this request.");
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
-      const body = await this.parseErrorResponse(error);
-      const message = body.errors[Object.keys(body.errors)[0]][0];
-      return getMessageInRedColor(body.title + "\n- " + message);
-    } else if (error instanceof ApiError && error.statusCode === 422) {
-      const body = await this.parseErrorResponse(error);
-      return getMessageInRedColor(
-        `${body.message}`
-      );
+      const probDetailsError = error as ProblemDetailsError;
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
     } else if (error instanceof InternalServerErrorResponseError) {
       //500
       const body = await this.parseErrorResponse(error);
