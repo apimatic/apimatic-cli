@@ -4,7 +4,7 @@ export class PortalCopilotPrompts {
 
   public async selectCopilotKey(keys: string[]): Promise<string> {
     const selectedKey = await select({
-      message: 'Select API Copilot key form your subscription:',
+      message: 'Select the ID for the API Copilot you would like to add to this API Portal:',
       maxItems: 10,
       options: keys.map((key) => ({
         value: key,
@@ -22,7 +22,7 @@ export class PortalCopilotPrompts {
 
   public copilotConfigured(apiCopilotKey: string) {
     outro(
-      `API Copilot is configured successfully with key '${apiCopilotKey}'. You can now generate a portal using the command 'apimatic portal:generate'`
+      `API Copilot configured successfully with ID '${apiCopilotKey}'. Run 'apimatic portal:serve' to preview your API Portal and try out the Copilot.`
     );
   }
 

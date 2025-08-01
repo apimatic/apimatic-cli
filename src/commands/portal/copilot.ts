@@ -7,7 +7,10 @@ import { CopilotAction } from "../../actions/portal/copilot.js";
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalCopilotEnable extends Command {
-  static description = "Adds the API Copilot configuration in APIMATIC-BUILD.json";
+
+  static summary = "Configure API Copilot for your API Documentation portal";
+
+  static description = "Displays available API Copilots associated with your account and allows you to select which one to integrate with your portal. Each APIMatic account includes one Copilot by default. The selected Copilot will be added to your APIMATIC-BUILD.json file";
 
   static flags = {
     ...FlagsProvider.input,
