@@ -313,7 +313,7 @@ export class PortalRecipeAction {
     }
 
     this.prompts.stopProgressIndicatorWithMessage(
-      "✅  Successfully extracted endpoint groups and endpoints from the API specification."
+      "Successfully extracted endpoint groups and endpoints from the API specification."
     );
     return Result.success(endpointGroupsResult.value!);
   }

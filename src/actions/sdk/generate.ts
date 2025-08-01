@@ -10,7 +10,7 @@ import { SdkContext } from "../../types/sdk-context.js";
 import { Platforms } from "@apimatic/sdk";
 import { SpecContext } from "../../types/spec-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
-
+import { LanguagePlatform } from "../../types/sdk/generate.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -28,17 +28,16 @@ export class GenerateAction {
   public readonly execute = async (
     specDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
-    platform: Platforms,
+    platform: LanguagePlatform,
     force: boolean,
     zipSdk: boolean
   ): Promise<ActionResult> => {
-
     if (specDirectory.isEqual(sdkDirectory)) {
       return ActionResult.error(`The spec directory and sdk directory cannot be the same: "${specDirectory}"`);
     }
 
     const specContext = new SpecContext(specDirectory);
-    if (!await specContext.validate()) {
+    if (!(await specContext.validate())) {
       return ActionResult.error(`The spec directory is either empty or invalid: "${specDirectory}"`);
     }
 
@@ -55,7 +54,8 @@ export class GenerateAction {
       const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
       await this.zipArchiver.archive(specDirectory, specZipPath);
 
-      const response = await this.portalService.generateSdk(specZipPath, platform, this.configDir, this.authKey);
+      const sdkPlatform = this.convertSimplePlatformToPlatform(platform as LanguagePlatform);
+      const response = await this.portalService.generateSdk(specZipPath, sdkPlatform, this.configDir, this.authKey);
 
       if (!response.isSuccess()) {
         this.prompts.displaySdkGenerationErrorMessage();
@@ -70,5 +70,26 @@ export class GenerateAction {
 
       return ActionResult.success();
     });
+  };
+
+  private convertSimplePlatformToPlatform(languagePlatform: LanguagePlatform): Platforms {
+    switch (languagePlatform) {
+      case LanguagePlatform.CSHARP:
+        return Platforms.CsNetStandardLib;
+      case LanguagePlatform.JAVA:
+        return Platforms.JavaEclipseJreLib;
+      case LanguagePlatform.PHP:
+        return Platforms.PhpGenericLibV2;
+      case LanguagePlatform.PYTHON:
+        return Platforms.PythonGenericLib;
+      case LanguagePlatform.RUBY:
+        return Platforms.RubyGenericLib;
+      case LanguagePlatform.TYPESCRIPT:
+        return Platforms.TsGenericLib;
+      case LanguagePlatform.GO:
+        return Platforms.GoGenericLib;
+      default:
+        throw new Error(`Unknown LanguagePlatform: ${languagePlatform}`);
+    }
   }
 }

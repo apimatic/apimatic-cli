@@ -8,7 +8,7 @@ const DEFAULT_WORKING_DIRECTORY = "./";
 
 export class PortalGenerate extends Command {
   static description =
-    "Generate and download a static API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)";
+    "Generate an API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)";
 
   static flags = {
     ...FlagsProvider.input,

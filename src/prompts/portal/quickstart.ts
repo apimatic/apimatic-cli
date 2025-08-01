@@ -19,7 +19,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
     "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
   private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
   private readonly referenceDocumentationUrl =
-    "\u001b[4mhttps://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal\u001b[0m";
+    "\u001b[4mhttps://docs.apimatic.io/cli-getting-started/advanced-portal-setup\u001b[0m";
   private readonly customizeTheSdksUrl =
     "\u001b[4mhttps://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview\u001b[0m";
   private readonly defaultPortalDirectoryPath = process.cwd();
@@ -91,7 +91,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
   while (true) {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI definition file:`,
-      placeholder: "Provide absolute URL/local path or press Enter to use sample OpenAPI file from APIMatic.",
+      placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
       defaultValue:
         "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json",
       validate: (input) => {
@@ -161,15 +161,15 @@ export class PortalQuickstartPrompts extends BasePrompts {
   }
 
   displaySpecValidationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor(`✅  Validation Successful.`));
+    this.spin.stop(getMessageInCyanColor(`Validation Successful.`));
   }
 
   displaySpecValidationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while validating your spec.`));
+    this.spin.stop(getMessageInRedColor(`Something went wrong while validating your spec.`), 1);
   }
 
   displaySpecValidationFailureMessage(): void {
-    this.spin.stop(getMessageInRedColor(`❗ Oops, it looks like there are some errors in your API Definition.`));
+    this.spin.stop(getMessageInRedColor(`❗ Oops, it looks like there are some errors in your API Definition.`), 1);
   }
 
   async specValidationFailurePrompt(): Promise<void> {
@@ -277,7 +277,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
   }
 
   displayBuildDirectoryGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while setting up your build directory.`));
+    this.spin.stop(getMessageInRedColor(`Something went wrong while setting up your build directory.`), 1);
   }
 
   displayBuildDirectoryGenerationSuccessMessage(targetFolder: string): void {
@@ -307,16 +307,9 @@ export class PortalQuickstartPrompts extends BasePrompts {
     );
     outro(
       getMessageInCyanColor(`What's next?\n`) +
-      getMessageInCyanColor(`- Check out the Interactive Playground in your API Portal.\n`) +
+      getMessageInCyanColor(`- Use the API Playground or an SDK to call your API.\n`) +
       getMessageInCyanColor(
-        `- Read the reference documentation to learn more about how you can customize this API Portal: ${this.referenceDocumentationUrl}`
-      ) +
-      getMessageInCyanColor(` \n`) +
-      getMessageInCyanColor(
-        `- Review the SDK Documentation for your favourite programming language and download an SDK from the API Portal.\n`
-      ) +
-      getMessageInCyanColor(
-        `- Check out how you can customize the SDKs using Code Generation settings: ${this.customizeTheSdksUrl}`
+        `- Customize the Portal theme, add API recipes and enable AI features: ${this.referenceDocumentationUrl}`
       )
     );
   }

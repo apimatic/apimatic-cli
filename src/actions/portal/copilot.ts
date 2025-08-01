@@ -29,7 +29,7 @@ export class CopilotAction {
       return ActionResult.error("Exiting without making any change.");
 
     const response = await this.apiService.getAccountInfo(this.configDir, this.authKey);
-    if (!response.isErr()) {
+    if (response.isErr()) {
       return ActionResult.error(response._unsafeUnwrapErr());
     }
     const apiCopilotKey = await this.selectCopilotKey(response._unsafeUnwrap());

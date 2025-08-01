@@ -23,12 +23,12 @@ export class PortalGeneratePrompts {
   }
 
   displayPortalGenerationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor("✅  Portal generated successfully."));
+    this.spin.stop(getMessageInCyanColor("Portal generated successfully."));
     this.cleanUpStandardInput();
   }
 
   displayPortalGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Portal Generation failed.`));
+    this.spin.stop(getMessageInRedColor(`Portal Generation failed.`), 1);
     this.cleanUpStandardInput();
   }
 

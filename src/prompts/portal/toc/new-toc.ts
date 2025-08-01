@@ -31,7 +31,7 @@ export class PortalNewTocPrompts {
   }
 
   displayOutroMessage(tocPath: FilePath): void {
-    outro(`✅ toc.yml file successfully created at: ${tocPath}`);
+    outro(`toc.yml file successfully created at: ${tocPath}`);
   }
 
   logError(error: string): void {

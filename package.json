@@ -137,6 +137,9 @@
             },
             "sdk": {
                 "description": "Generate SDKs for your APIs in multiple languages."
+            },
+            "portal:toc": {
+                "description": "Generate a Table of Contents (TOC) file for your API documentation portal"
             }
         },
         "state": "Alpha"

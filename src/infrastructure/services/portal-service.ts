@@ -184,7 +184,7 @@ export class PortalService {
       );
     } else {
       return getMessageInRedColor(
-        "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
+        "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
       );
     }
   };

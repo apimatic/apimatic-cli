@@ -3,7 +3,7 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { ZipService } from "../infrastructure/zip-service.js";
-import { Platforms } from "@apimatic/sdk";
+import { LanguagePlatform } from "./sdk/generate.js";
 
 export class SdkContext {
 
@@ -11,7 +11,7 @@ export class SdkContext {
   private readonly zipService = new ZipService();
 
   constructor(private readonly sdkDirectory: DirectoryPath, 
-    private readonly platform: Platforms) {
+    private readonly platform: LanguagePlatform) {
   }
 
   public get ZipPath(): FilePath {
