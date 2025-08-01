@@ -1,3 +1,10 @@
+# [1.1.0-alpha.17](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.16...v1.1.0-alpha.17) (2025-08-01)
+
+
+### Bug Fixes
+
+* resolve multiple visual issues and minor fixes  ([#136](https://github.com/apimatic/apimatic-cli/issues/136)) ([4589a6e](https://github.com/apimatic/apimatic-cli/commit/4589a6e988f0cddfa49fb9e7a995f41912c9451d))
+
 # [1.1.0-alpha.16](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.15...v1.1.0-alpha.16) (2025-08-01)
 
 
