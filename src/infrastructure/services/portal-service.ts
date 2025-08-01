@@ -1,6 +1,4 @@
-import * as os from "os";
 import fs from "fs-extra";
-import process from "process";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -26,6 +24,7 @@ import { Sdl } from "../../types/sdl/sdl.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
+import { envInfo } from "../env-info.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -121,20 +120,12 @@ export class PortalService {
     return `X-Auth-Key ${key ?? ""}`;
   };
 
-  private getUserAgent(): string {
-    const osInfo = `${os.platform()} ${os.release()}`;
-    const engine = "Node.js";
-    const engineVersion = process.version;
-
-    return `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
-  }
-
   private createApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
-      userAgent: this.getUserAgent(),
+      userAgent: envInfo.getUserAgent(),
       timeout: this.TIMEOUT
     });
   };

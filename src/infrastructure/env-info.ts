@@ -13,7 +13,7 @@ class EnvInfo {
       const osInfo = `${os.platform()} ${os.release()}`;
       const engine = "Node.js";
       const engineVersion = process.version;
-      EnvInfo.cachedUserAgent = `APIMATIC CLI - [OS: ${osInfo}, Engine: ${engine}/${engineVersion}]`;
+      EnvInfo.cachedUserAgent = `APIMATIC CLI/${this.getCLIVersion()} - (OS: ${osInfo}, Engine: ${engine}/${engineVersion})`;
     }
     return EnvInfo.cachedUserAgent;
   }
