@@ -12,7 +12,7 @@ export const metadataFileContent = {
     ValidateRequiredParameters: true,
     AddSingleAuthDeprecatedCode: false,
     EnableGlobalUserAgent: true,
-    UserAgent: "{language}-SDK/{version} [OS: {os-info}, Engine: {engine}/{engine-version}]",
+    UserAgent: "{language}-SDK/{version} (OS: {os-info}, Engine: {engine}/{engine-version})",
     EnableLogging: true,
     EnableModelKeywordArgsInRuby: true,
     SymbolizeHashKeysInRuby: true,

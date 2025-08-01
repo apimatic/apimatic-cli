@@ -151,7 +151,7 @@ export class PortalRecipeGenerator {
     generatedRecipeScript: string,
     generatedRecipeScriptsDirectoryPath: string,
     recipeFileName: string,
-    format: boolean = true
+    format: boolean = false
   ): Promise<void> {
     if (format) {
       generatedRecipeScript = await this.formatScript(generatedRecipeScript);
@@ -170,7 +170,7 @@ export class PortalRecipeGenerator {
   }
 
   private addContentStepToScript(contentConfig: ContentStepConfig): string {
-    return `return workflowCtx.showContent(\`${contentConfig.content}\`);`;
+    return `return workflowCtx.showContent(${JSON.stringify(contentConfig.content)});`;
   }
 
   private addEndpointStepToScript(endpointConfig: EndpointStepConfig): string {

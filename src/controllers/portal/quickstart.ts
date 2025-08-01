@@ -25,7 +25,7 @@ import { AuthenticationError } from "../../types/utils.js";
 
 export class PortalQuickstartController {
   private readonly specUrl =
-    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/Apimatic-Calculator.json";
+    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);

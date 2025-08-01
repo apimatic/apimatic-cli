@@ -161,9 +161,9 @@ export class PortalRecipeAction {
     this.prompts.displayContentStepInfo();
     let editor = process.env.EDITOR;
     let editorArgs: string[] = [];
-    const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.md`);
+    const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.txt`);
     const template = `# The Heading Goes Here\n\nThis is placeholder text for your API Recipe content step. Feel free to edit this. Save your changes and then close the file once you're done.`;
-    await fsExtra.writeFile(tempFilePath, template);
+    await fsExtra.writeFile(tempFilePath, template, 'utf-8');
 
     try {
       if (!editor) {
@@ -313,7 +313,7 @@ export class PortalRecipeAction {
     }
 
     this.prompts.stopProgressIndicatorWithMessage(
-      "✅  Successfully extracted endpoint groups and endpoints from the API specification."
+      "Successfully extracted endpoint groups and endpoints from the API specification."
     );
     return Result.success(endpointGroupsResult.value!);
   }

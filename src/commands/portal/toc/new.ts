@@ -9,7 +9,7 @@ const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalTocNew extends Command {
   static summary =
-    "Generates a TOC file based on the content directory and spec folder provided in your working directory";
+    "Generate a Table of Contents (TOC) file for your API documentation portal";
 
   static description = `This command generates a new Table of Contents (TOC) file used in the
 generation of your API documentation portal.

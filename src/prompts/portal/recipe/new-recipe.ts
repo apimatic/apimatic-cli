@@ -23,7 +23,7 @@ export class PortalRecipePrompts {
   public async recipeNamePrompt(): Promise<string> {
     const recipeName = await text({
       message: `📘 Enter a name for your API Recipe:`,
-      placeholder: "There will be a tab in the navbar of your API Documentation portal of this name.",
+      placeholder: "This name will be displayed in your API Documentation portal sidebar.",
       validate: (name) => {
         if (!name) {
           return "Recipe name cannot be empty. Please provide a name for your API Recipe.";
@@ -96,7 +96,7 @@ export class PortalRecipePrompts {
   }
 
   public displayStepsInformation(): void {
-    log.step(`🔧 Add Steps to your Recipe:`);
+    log.step(`🔧 Add Steps to your API Recipe:`);
     log.message(`You can add:`)
     log.message(
       `1. 📄 Content Step: Display custom content, such as instructions or information related to your API.`
@@ -201,7 +201,7 @@ export class PortalRecipePrompts {
 
   public async overwriteApiRecipeInTocPrompt(): Promise<boolean> {
     const overwriteApiRecipeInToc = await select({
-      message: `⚠️  A recipe with this name already exists. Do you want to overwrite it?`,
+      message: `⚠️  An API Recipe with this name already exists. Do you want to overwrite it?`,
       options: [
         { value: "yes", label: "Yes" },
         { value: "no", label: "No" }
@@ -217,11 +217,11 @@ export class PortalRecipePrompts {
   }
 
   public displayStepAddedSuccessfullyMessage() {
-    log.step(`✅  Step has been added successfully.`);
+    log.step(`Step has been added successfully.`);
   }
 
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
-    log.message(`🎉 Generated recipe has been added to build directory at: ${buildDirectoryPath}`);
+    log.message(`🎉 Your new API Recipe has been added to the source directory at: ${buildDirectoryPath}`);
     outro(
       `▶ Run the command 'apimatic portal:serve' to preview your documentation portal.`
     );

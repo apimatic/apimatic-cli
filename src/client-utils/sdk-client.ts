@@ -45,7 +45,7 @@ export class SDKClient {
 
     await setAuthInfo(email, authKey, isTelemetryOptedOut, new DirectoryPath(configDir));
 
-    return "✅ Logged in successfully as " + email;
+    return "Logged in successfully as " + email;
   }
 
   public async logout(configDir: string): Promise<string> {

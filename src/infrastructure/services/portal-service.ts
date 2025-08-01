@@ -145,9 +145,10 @@ export class PortalService {
       return error.body as NodeJS.ReadableStream;
     } else if (error instanceof InternalServerErrorResponseError) {
       //500
-      const body = await this.parseErrorResponse(error);
+      const internalServerError = error as InternalServerErrorResponseError;
+      const message = internalServerError.result?.message;
       return getMessageInRedColor(
-        `${body.message} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
+        `${message ?? "An unkown error occurred."} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
       return getMessageInRedColor(
@@ -183,7 +184,7 @@ export class PortalService {
       );
     } else {
       return getMessageInRedColor(
-        "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
+        "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
       );
     }
   };

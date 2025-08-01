@@ -10,7 +10,7 @@ import { FlagsProvider } from "../../../types/flags-provider.js";
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalRecipeNew extends Command {
-  static override summary = "Generate an API Recipe for a static API Documentation portal.";
+  static override summary = "Add an API Recipe to your API Documentation portal.";
 
   static override description =
     "To learn more about API Recipes, visit: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes";

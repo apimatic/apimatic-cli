@@ -23,12 +23,12 @@ export class SdkGeneratePrompts {
   }
 
   displaySdkGenerationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor("✅  SDK generated successfully."));
+    this.spin.stop(getMessageInCyanColor("SDK generated successfully."));
     this.cleanUpStandardInput();
   }
 
   displaySdkGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Sdk Generation failed.`));
+    this.spin.stop(getMessageInRedColor(`SDK Generation failed.`), 1);
     this.cleanUpStandardInput();
   }
 

@@ -67,7 +67,7 @@ export class PortalNewTocAction {
       return Result.success(tocPath.toString());
     } catch (error) {
       this.prompts.logError(getMessageInRedColor(`${(error as Error).message}`));
-      return Result.failure(`❌ An unexpected error occurred while generating the TOC file.`);
+      return Result.failure(`An unexpected error occurred while generating the TOC file.`);
     }
   }
 
@@ -112,7 +112,7 @@ export class PortalNewTocAction {
     }
 
     this.prompts.stopProgressIndicatorWithMessage(
-      "✅ Successfully extracted endpoints and/or models from the specification."
+      "Successfully extracted endpoints and/or models from the specification."
     );
     return sdlResult.value!;
   }
