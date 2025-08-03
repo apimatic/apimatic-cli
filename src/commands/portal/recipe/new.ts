@@ -37,7 +37,7 @@ export default class PortalRecipeNew extends Command {
 
     //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (createRecipeResult.isFailed()) {
-      telemetryService.trackEvent(new RecipeCreationFailedEvent(createRecipeResult.error!, PortalRecipeNew.id, flags));
+      await telemetryService.trackEvent(new RecipeCreationFailedEvent(createRecipeResult.error!, PortalRecipeNew.id, flags));
       portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.error!));
     }
     if (createRecipeResult.isCancelled()) {

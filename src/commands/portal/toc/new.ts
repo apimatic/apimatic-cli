@@ -70,7 +70,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
 
     //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (result.isFailed()) {
-      telemetryService.trackEvent(new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags));
+      await telemetryService.trackEvent(new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags));
       this.error(result.error!);
     }
   }
