@@ -214,22 +214,25 @@ Adds the API Copilot configuration in APIMATIC-BUILD.json
 
 ```
 USAGE
-  $ apimatic portal:copilot [-i <value>] [-m <value>] [--disable] [-k <value>]
+  $ apimatic portal:copilot [-i <value>] [--disable] [-k <value>]
 
 FLAGS
-  -i, --input=<value>            [default: ./] path to the parent directory containing the 'src' directory, which
-                                 includes API specifications and configuration files.
-  -k, --auth-key=<value>         override current authentication state with an authentication key.
-  -m, --welcome-message=<value>  welcome message for the API copilot
-      --disable                  marks the API Copilot as disabled in the configuration
+  -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
+                          specifications and configuration files.
+  -k, --auth-key=<value>  override current authentication state with an authentication key.
+      --disable           marks the API Copilot as disabled in the configuration
 
 DESCRIPTION
-  Adds the API Copilot configuration in APIMATIC-BUILD.json
+  Configure API Copilot for your API Documentation portal
+
+  Displays available API Copilots associated with your account and allows you to select which one to integrate with your
+  portal. Each APIMatic account includes one Copilot by default. The selected Copilot will be added to your
+  APIMATIC-BUILD.json file
 
 EXAMPLES
-  $ apimatic portal:copilot --input="./" --welcome-message="Welcome to our API!"
-
   $ apimatic portal:copilot --input="./"
+
+  $ apimatic portal:copilot --input="./" --disable
 ```
 
 _See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/copilot.ts)_
