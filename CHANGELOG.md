@@ -1,3 +1,10 @@
+# [1.1.0-alpha.18](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.17...v1.1.0-alpha.18) (2025-08-03)
+
+
+### Features
+
+* improve copilot prompts and messages ([#137](https://github.com/apimatic/apimatic-cli/issues/137)) ([a0906a6](https://github.com/apimatic/apimatic-cli/commit/a0906a641f631f7d9f4043eb27935122c16b52af))
+
 # [1.1.0-alpha.17](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.16...v1.1.0-alpha.17) (2025-08-01)
 
 
