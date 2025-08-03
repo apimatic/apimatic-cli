@@ -16,7 +16,7 @@ export class CopilotAction {
     this.authKey = authKey;
   }
 
-  public async execute(buildDirectory: DirectoryPath, welcomeMessage: string, enable: boolean): Promise<ActionResult> {
+  public async execute(buildDirectory: DirectoryPath, enable: boolean): Promise<ActionResult> {
     const buildContext = new BuildContext(buildDirectory);
 
     if (!(await buildContext.validate())) {
@@ -37,6 +37,10 @@ export class CopilotAction {
       return ActionResult.error("No copilot key found for the current subscription. Please contact support at support@apimatic.io.");
     }
 
+    const welcomeMessage = await this.prompts.getWelcomeMessage();
+    if (welcomeMessage === undefined)
+      return ActionResult.error("Exiting without making any change.");
+
     buildJson.apiCopilotConfig = {
       isEnabled: enable,
       key: apiCopilotKey,
@@ -45,7 +49,7 @@ export class CopilotAction {
 
     await buildContext.updateBuildFileContents(buildJson);
 
-    this.prompts.copilotConfigured(apiCopilotKey);
+    this.prompts.copilotConfigured(buildJson.apiCopilotConfig);
     return ActionResult.success();
   }
 
