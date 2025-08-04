@@ -316,7 +316,7 @@ Generate and deploy a Docs as Code portal with hot reload.
 
 ```
 USAGE
-  $ apimatic portal:serve [-p <value>] [-i <value>] [-d <value>] [-o] [--no-reload] [--ignore <value>] [-k <value>]
+  $ apimatic portal:serve [-p <value>] [-i <value>] [-d <value>] [-o] [--no-reload] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
@@ -325,8 +325,6 @@ FLAGS
   -k, --auth-key=<value>     override current authentication state with an authentication key.
   -o, --open                 Open the portal in the default browser.
   -p, --port=<value>         [default: 3000] port to serve the portal.
-      --ignore=<value>       Comma-separated list of file and directory paths to exclude from portal generation and hot
-                             reload.
       --no-reload            Disable hot reload.
 
 DESCRIPTION

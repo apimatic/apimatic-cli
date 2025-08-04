@@ -31,10 +31,6 @@ export default class PortalServe extends Command {
       description: "Disable hot reload.",
       default: false
     }),
-    ignore: Flags.string({
-      description: "Comma-separated list of file and directory paths to exclude from portal generation and hot reload.",
-      default: ""
-    }),
     ...FlagsProvider.authKey
   };
 
@@ -62,7 +58,6 @@ export default class PortalServe extends Command {
     const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
     const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
 
-
     const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
 
     const serveFlags: ServeFlags = {
@@ -71,8 +66,7 @@ export default class PortalServe extends Command {
       "auth-key": flags["auth-key"],
       port: port,
       open: flags.open,
-      "no-reload": flags["no-reload"],
-      ignore: flags.ignore
+      "no-reload": flags["no-reload"]
     };
 
     const servePaths: ServePaths = {

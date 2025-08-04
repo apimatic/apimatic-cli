@@ -13,6 +13,7 @@ export class PortalServeAction {
   protected readonly docsPortalService: PortalService;
   private readonly GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME = ".generated_portal.zip";
   private readonly GENERATED_BUILD_INPUT_ZIP_FILENAME = ".portal_source.zip";
+  private readonly GENERATED_SPEC_SOURCE_ZIP_FILENAME = ".spec_source.zip";
 
   public constructor(prompts: PortalServePrompts, serveHandler: ServeHandler, docsPortalService: PortalService) {
     this.prompts = prompts;
@@ -30,15 +31,12 @@ export class PortalServeAction {
       zipPortal: boolean
     ) => Promise<ActionResult>
   ): Promise<Result<string, string>> {
-    const ignoredPaths = [
-      ...flags.ignore.split(",").map((path) => path.trim()),
-      ...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.destinationDirectoryPath)
-    ];
+    const ignoredPaths = [...this.getGeneratedFilesPaths(paths.sourceDirectoryPath, paths.destinationDirectoryPath)];
 
     const result = await generatePortal(
       new DirectoryPath(paths.sourceDirectoryPath),
       new DirectoryPath(paths.destinationDirectoryPath),
-      true,
+      false,
       false
     );
 
@@ -66,7 +64,13 @@ export class PortalServeAction {
       sourceDirectoryPath,
       this.GENERATED_PORTAL_ARTIFACTS_ZIP_FILENAME
     );
+    const generatedSpecSourceZipFilePath = path.join(sourceDirectoryPath, this.GENERATED_SPEC_SOURCE_ZIP_FILENAME);
 
-    return [generatedBuildInputZipPath, generatedPortalArtifactsZipFilePath, generatedPortalArtifactsDirectoryPath];
+    return [
+      generatedBuildInputZipPath,
+      generatedPortalArtifactsZipFilePath,
+      generatedSpecSourceZipFilePath,
+      generatedPortalArtifactsDirectoryPath
+    ];
   }
 }
