@@ -33,7 +33,9 @@ export class ApiService {
 
   public async sendTelemetry(payload: string, authKey: string): Promise<Result<string, string>> {
     try {
-      const response = await this.axiosInstance(authKey).post("/telemetry/track", payload);
+      const response = await this.axiosInstance(authKey).post("/telemetry/track", payload, {
+        headers: { "Content-Type": "application/json" }
+      });
 
       if (response.status === 200) {
         return ok("telemetry sent");

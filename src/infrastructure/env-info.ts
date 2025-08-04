@@ -25,7 +25,7 @@ class EnvInfo {
     try {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = dirname(__filename);
-      const pkgPath = join(__dirname, "../../../package.json");
+      const pkgPath = join(__dirname, "../../package.json");
       const pkgJson = fs.readFileSync(pkgPath, "utf-8");
       const pkg = JSON.parse(pkgJson);
       const version = pkg.version || "unknown";
