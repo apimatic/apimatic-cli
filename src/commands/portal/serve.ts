@@ -32,9 +32,7 @@ export default class PortalServe extends Command {
       default: false
     }),
     ignore: Flags.string({
-      char: "i",
       description: "Comma-separated list of file and directory paths to exclude from portal generation and hot reload.",
-      default: ""
     }),
     ...FlagsProvider.authKey
   };
