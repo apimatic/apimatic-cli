@@ -13,7 +13,8 @@ import {
   ExportFormats,
   InternalServerErrorResponseError,
   CodeGenerationExternalApisController,
-  Platforms
+  Platforms,
+  Accept
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { ErrorResponse } from "../../types/portal/generate.js";
@@ -67,7 +68,7 @@ export class PortalService {
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
-      const response = await sdkGenerationController.generateSdkViaFile(file, sdkPlatform);
+      const response = await sdkGenerationController.generateSdkViaFile(Accept.EnumApplicationjson, file, sdkPlatform);
       const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
       return Result.success(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {

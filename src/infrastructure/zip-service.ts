@@ -1,6 +1,6 @@
 import fs from "fs";
 import archiver from "archiver";
-import unzipper from "unzipper";
+import extract from "extract-zip";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FilePath } from "../types/file/filePath.js";
 
@@ -19,12 +19,7 @@ export class ZipService {
     });
   }
 
-  async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void>  {
-    return new Promise((resolve, reject) => {
-      fs.createReadStream(sourceFile.toString())
-        .pipe(unzipper.Extract({ path: destinationDirectory.toString() }))
-        .on("close", () => resolve())
-        .on("error", (err) => reject(err));
-    });
+  async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
+    await extract(sourceFile.toString(), { dir: destinationDirectory.toString() });
   }
 }

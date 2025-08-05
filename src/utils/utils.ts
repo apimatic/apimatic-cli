@@ -4,7 +4,6 @@ import fs from "fs";
 import fsExtra from "fs-extra";
 import os from "os";
 import archiver from "archiver";
-import unzipper from "unzipper";
 import stripTags from "striptags";
 import AdmZip from "adm-zip";
 import colors from "picocolors";
@@ -12,19 +11,6 @@ import { PassThrough } from "stream";
 
 import { loggers, ValidationMessages } from "../types/utils.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
-
-export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
-  return new Promise((resolve, reject) => {
-    const extractStream = unzipper.Extract({ path: destination });
-
-    stream
-      .pipe(extractStream)
-      .on("error", (error: Error) => reject(new Error("Error during extraction: " + error.message)));
-
-    extractStream.on("close", () => resolve("Extracted"));
-    extractStream.on("error", (error: Error) => reject(new Error("Error during extraction: " + error.message)));
-  });
-};
 
 export const createTempDirectory = async () => {
   return fs.mkdtempSync(path.join(os.tmpdir(), "apimatic-cli-"));
