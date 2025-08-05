@@ -6,7 +6,10 @@
     "bin": {
         "apimatic": "./bin/run.js"
     },
-    "bugs": "https://github.com/apimatic/apimatic-cli/issues",
+    "bugs": {
+        "url": "https://github.com/apimatic/apimatic-cli/issues",
+        "email": "support@apimatic.io"
+    },
     "publishConfig": {
         "access": "public"
     },
@@ -20,7 +23,7 @@
         "/oclif.manifest.json"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
-    "homepage": "https://github.com/apimatic/apimatic-cli",
+    "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
     "keywords": [
         "apimatic",
         "cli",
@@ -139,7 +142,7 @@
                 "description": "Generate SDKs for your APIs in multiple languages."
             },
             "portal:toc": {
-                "description": "Generate a Table of Contents (TOC) file for your API documentation portal"
+                "description": "Generate a Table of Contents (TOC) file for your API documentation portal."
             }
         },
         "state": "Alpha"
