@@ -103,7 +103,7 @@ export class PortalNewTocAction {
       return { endpointGroups: new Map(), models: [] };
     }
 
-    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, buildDirectory, configDir);
+    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, configDir);
 
     if (!sdlResult.isSuccess()) {
       this.prompts.stopProgressIndicatorWithMessage(`⚠️ ${sdlResult.error!}`);

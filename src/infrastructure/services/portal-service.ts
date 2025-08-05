@@ -77,8 +77,8 @@ export class PortalService {
     }
   }
 
-  public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
-    if (!(await fs.pathExists(specPath))) {
+  public async generateSdl(specPath: FilePath, configDir: string): Promise<Result<Sdl, string>> {
+    if (!(await fs.pathExists(specPath.toString()))) {
       return Result.failure("Spec file doesn't exist");
     }
 
@@ -88,7 +88,8 @@ export class PortalService {
     const transformationController = new TransformationController(client);
 
     try {
-      const file = new FileWrapper(fs.createReadStream(specPath));
+      const specFileStream = await this.fileService.getStream(specPath);
+      const file = new FileWrapper(specFileStream);
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         ContentType.EnumMultipartformdata,
         file,
