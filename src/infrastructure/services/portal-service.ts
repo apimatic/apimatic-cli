@@ -78,10 +78,6 @@ export class PortalService {
   }
 
   public async generateSdl(specPath: FilePath, configDir: string): Promise<Result<Sdl, string>> {
-    if (!(await fs.pathExists(specPath.toString()))) {
-      return Result.failure("Spec file doesn't exist");
-    }
-
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
     const client = this.createApiClient(authorizationHeader);
