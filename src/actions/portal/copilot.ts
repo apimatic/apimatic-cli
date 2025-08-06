@@ -9,6 +9,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileService } from "../../infrastructure/file-service.js";
+import * as os from 'os';
 
 
 
@@ -79,15 +80,27 @@ export class CopilotAction {
   private async getWelcomeMessage(): Promise<string> {
     return await withDirPath(async (tempDir) => {
       const tempFile = new FilePath(tempDir, new FileName("welcome-message.md"));
-      const defaultContent = "Enter your welcome message here...";
+      const defaultContent = "[//]: # (Enter your welcome message here...)";
       await this.fileService.writeContents(tempFile, defaultContent);
 
-      try {
-        await execa("code", ["--wait", tempFile.toString()]);
-      } catch {
-        const editor = process.platform === "win32" ? "notepad" : "nano";
-        await execa(editor, [tempFile.toString()]);
+      if (process.platform === "win32") {
+        await execa("notepad", [tempFile.toString()]);
+      } else if (process.platform === "darwin") {
+        await execa("open", ["-t", tempFile.toString()]);
+      } else {
+        await execa("xdg-open", [tempFile.toString()]);
       }
+
+
+      // try {
+      //   await execa("code", ["--wait", tempFile.toString()]);
+      // } catch {
+      //   if (process.platform === "win32") {
+      //     await execa("notepad", [tempFile.toString()], { stdio: "ignore"});
+      //   } else {
+      //     await execa("vim", [tempFile.toString()], { stdio: "inherit"});
+      //   }
+      // }
       const welcomeMessage = await this.fileService.getContents(tempFile);
       return welcomeMessage.replace(/\r\n|\r/g, "\n");
     });
