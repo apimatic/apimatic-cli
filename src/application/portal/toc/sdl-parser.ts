@@ -58,8 +58,13 @@ export class SdlParser {
       await this.zipArchiver.archive(new DirectoryPath(specFolderPath), specZipPath);
 
       const specFileStream = await this.fileService.getStream(specZipPath);
-      const result = await this.portalService.generateSdl(specFileStream, configDir);
-      specFileStream.close();
+      let result: Result<Sdl, string>;
+
+      try {
+        result = await this.portalService.generateSdl(specFileStream, configDir);
+      } finally {
+        specFileStream.close();
+      }
       
       if (!result.isSuccess()) {
         return Result.failure(
