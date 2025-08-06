@@ -6,7 +6,10 @@
     "bin": {
         "apimatic": "./bin/run.js"
     },
-    "bugs": "https://github.com/apimatic/apimatic-cli/issues",
+    "bugs": {
+        "url": "https://github.com/apimatic/apimatic-cli/issues",
+        "email": "support@apimatic.io"
+    },
     "publishConfig": {
         "access": "public"
     },
@@ -20,7 +23,7 @@
         "/oclif.manifest.json"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
-    "homepage": "https://github.com/apimatic/apimatic-cli",
+    "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
     "keywords": [
         "apimatic",
         "cli",
@@ -50,7 +53,6 @@
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",
         "@oclif/plugin-not-found": "^3.2.44",
-        "adm-zip": "^0.5.14",
         "archiver": "^7.0.1",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
@@ -59,6 +61,7 @@
         "connect-livereload": "^0.6.1",
         "execa": "^9.6.0",
         "express": "^4.17.1",
+        "extract-zip": "^2.0.1",
         "file-type": "^15.0.0",
         "form-data": "^4.0.2",
         "fs-extra": "^11.3.0",
@@ -72,7 +75,6 @@
         "tmp-promise": "^3.0.3",
         "treeify": "^1.1.0",
         "tslib": "^2.8.1",
-        "unzipper": "^0.12.3",
         "uuid": "^11.1.0",
         "yaml": "^2.8.0"
     },
@@ -80,14 +82,13 @@
         "@commitlint/cli": "^15.0.0",
         "@commitlint/config-conventional": "^15.0.0",
         "@oclif/test": "^4.1.13",
-        "@types/adm-zip": "^0.5.5",
         "@types/archiver": "^5.1.1",
         "@types/base-64": "^1.0.0",
         "@types/chai": "^4.3.20",
-        "@types/connect-livereload": "^0.5.1",
-        "@types/express": "^4.17.13",
+        "@types/connect-livereload": "^0.5.32",
+        "@types/express": "^4.17.23",
         "@types/fs-extra": "^9.0.13",
-        "@types/livereload": "^0.9.2",
+        "@types/livereload": "^0.9.5",
         "@types/mocha": "^5.2.7",
         "@types/mock-fs": "^4.13.4",
         "@types/node": "^20.17.50",
@@ -139,7 +140,7 @@
                 "description": "Generate SDKs for your APIs in multiple languages."
             },
             "portal:toc": {
-                "description": "Generate a Table of Contents (TOC) file for your API documentation portal"
+                "description": "Generate a Table of Contents (TOC) file for your API documentation portal."
             }
         },
         "state": "Alpha"
