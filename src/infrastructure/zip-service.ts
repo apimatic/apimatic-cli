@@ -23,7 +23,6 @@ export class ZipService {
   }
 
   async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
-    // await extract(sourceFile.toString(), { dir: destinationDirectory.toString() });
     let fileCount = 0;
     let totalSize = 0;
 
@@ -32,23 +31,15 @@ export class ZipService {
       onEntry: function (entry) {
         fileCount++;
         if (fileCount > MAX_FILES) {
-          throw "Reached max. number of files";
+          throw new Error("Reached max. file count");
         }
-
         // The uncompressedSize comes from the zip headers, so it might not be trustworthy.
         // Alternatively, calculate the size from the readStream.
         let entrySize = entry.uncompressedSize;
         totalSize += entrySize;
         if (totalSize > MAX_SIZE) {
-          throw "Reached max. size";
+          throw new Error("Reached max. size");
         }
-
-        // if (entry.compressedSize > 0) {
-        //   let compressionRatio = entrySize / entry.compressedSize;
-        //   if (compressionRatio > THRESHOLD_RATIO) {
-        //     throw "Reached max. compression ratio";
-        //   }
-        // }
       }
     });
   }
