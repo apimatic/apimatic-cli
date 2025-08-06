@@ -18,7 +18,6 @@ import {
   Accept
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { ErrorResponse } from "../../types/portal/generate.js";
 import { Result } from "../../types/common/result.js";
 import { getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
@@ -27,7 +26,6 @@ import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { envInfo } from "../env-info.js";
-import { err } from "neverthrow";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -173,7 +171,7 @@ export class PortalService {
         // Get the first error and clean it up
         const firstError = parsedResult.Errors[0];
         // Split on <br/> and take first part, then strip remaining HTML tags
-        const cleanError = firstError.split('<br/>')[0].replace(/<[^>]*>/g, '');
+        const cleanError = firstError.split('<br/>')[0].replace(/<[^>]+?>/g, '');
         return cleanError;
       } else if (parsedResult.Success === false) {
         return "API definition file validation failed.";
