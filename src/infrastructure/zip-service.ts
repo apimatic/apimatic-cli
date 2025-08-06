@@ -1,6 +1,6 @@
 import fs from "fs";
 import archiver from "archiver";
-import unzipper from "unzipper";
+import extract from "extract-zip";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FilePath } from "../types/file/filePath.js";
 
@@ -19,12 +19,27 @@ export class ZipService {
     });
   }
 
-  async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void>  {
-    return new Promise((resolve, reject) => {
-      fs.createReadStream(sourceFile.toString())
-        .pipe(unzipper.Extract({ path: destinationDirectory.toString() }))
-        .on("close", () => resolve())
-        .on("error", (err) => reject(err));
+  public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
+    const MAX_FILES = 100_000;
+    const MAX_SIZE = 1_000_000_000; // 1 GB
+    let fileCount = 0;
+    let totalSize = 0;
+
+    await extract(sourceFile.toString(), {
+      dir: destinationDirectory.toString(),
+      onEntry: function (entry) {
+        fileCount++;
+        if (fileCount > MAX_FILES) {
+          throw new Error("Reached max. file count");
+        }
+        // The uncompressedSize comes from the zip headers, so it might not be trustworthy.
+        // Alternatively, calculate the size from the readStream.
+        let entrySize = entry.uncompressedSize;
+        totalSize += entrySize;
+        if (totalSize > MAX_SIZE) {
+          throw new Error("Reached max. size");
+        }
+      }
     });
   }
 }
