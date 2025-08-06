@@ -160,7 +160,7 @@ export class PortalService {
     }
   };
 
-  private parseErrorResponse(errorMessage: string | undefined): string {
+  private parseBadRequestResponse(errorMessage: string | undefined): string {
     // #TODO: Fix server-side error message and simplify this function
     if (!errorMessage) {
       return "Bad request.";
@@ -185,7 +185,7 @@ export class PortalService {
     if (error instanceof BadRequestResponseSdkError) {
       //400
       const badRequestError = error as BadRequestResponseSdkError;
-      const errorMessage = this.parseErrorResponse(badRequestError.result?.message);
+      const errorMessage = this.parseBadRequestResponse(badRequestError.result?.message);
       return getMessageInRedColor(errorMessage);
     } else if (error instanceof UnauthorizedResponseError) {
       //401
