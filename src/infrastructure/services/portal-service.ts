@@ -139,7 +139,7 @@ export class PortalService {
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
       return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
@@ -149,7 +149,9 @@ export class PortalService {
       const internalServerError = error as InternalServerErrorResponseError;
       const message = internalServerError.result?.message;
       return getMessageInRedColor(
-        `${message ?? "An unkown error occurred."} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
+        `${
+          message ?? "An unkown error occurred."
+        } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
       return getMessageInRedColor(
@@ -163,41 +165,38 @@ export class PortalService {
     if (!errorMessage) {
       return "Bad request.";
     }
-      // Parse the JSON string
-      const parsedResult = JSON.parse(errorMessage);
-      
-      // Check if it has the expected structure with Errors array
-      if (parsedResult.Errors && Array.isArray(parsedResult.Errors) && parsedResult.Errors.length > 0) {
-        // Get the first error and clean it up
-        const firstError = parsedResult.Errors[0];
-        // Split on <br/> and take first part, then strip remaining HTML tags
-        const cleanError = firstError.split('<br/>')[0].replace(/<[^>]+?>/g, '');
-        return cleanError;
-      } else if (parsedResult.Success === false) {
-        return "API definition file validation failed.";
-      }
+    // Parse the JSON string
+    const parsedResult = JSON.parse(errorMessage);
+
+    // Check if it has the expected structure with Errors array
+    if (parsedResult.Errors && Array.isArray(parsedResult.Errors) && parsedResult.Errors.length > 0) {
+      // Get the first error and clean it up
+      const firstError = parsedResult.Errors[0];
+      // Split on <br/> and take first part, then strip remaining HTML tags
+      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
+      return cleanError;
+    } else if (parsedResult.Success === false) {
+      return "API definition file validation failed.";
+    }
     return errorMessage;
   }
 
   private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
-    if(error instanceof BadRequestResponseSdkError) {
+    if (error instanceof BadRequestResponseSdkError) {
       //400
       const badRequestError = error as BadRequestResponseSdkError;
       const errorMessage = this.parseErrorResponse(badRequestError.result?.message);
       return getMessageInRedColor(errorMessage);
-    }
-    else if (error instanceof UnauthorizedResponseError) {
-    //401
+    } else if (error instanceof UnauthorizedResponseError) {
+      //401
       const unAuthError = error as UnauthorizedResponseError;
       return getMessageInRedColor(unAuthError.result?.message ?? "Authorization has been denied for this request.");
-    }
-    else if (error instanceof ProblemDetailsError) {
+    } else if (error instanceof ProblemDetailsError) {
       // 403
       const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
       return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
-    }
-    else {
+    } else {
       return getMessageInRedColor(
         "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
       );
