@@ -1,4 +1,3 @@
-import fs from "fs-extra";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -13,10 +12,11 @@ import {
   ExportFormats,
   InternalServerErrorResponseError,
   CodeGenerationExternalApisController,
-  Platforms
+  Platforms,
+  BadRequestResponseSdkError,
+  Accept
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { ErrorResponse } from "../../types/portal/generate.js";
 import { Result } from "../../types/common/result.js";
 import { getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
@@ -25,12 +25,14 @@ import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { envInfo } from "../env-info.js";
+import { ReadStream } from "fs";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly TIMEOUT = 0;
   private readonly fileService = new FileService();
 
+  //TODO: Pass stream as parameter instead of file path.
   async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
@@ -53,6 +55,7 @@ export class PortalService {
     }
   }
 
+  //TODO: Pass stream as parameter instead of file path.
   async generateSdk(
     specPath: FilePath,
     sdkPlatform: Platforms,
@@ -67,7 +70,7 @@ export class PortalService {
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
-      const response = await sdkGenerationController.generateSdkViaFile(file, sdkPlatform);
+      const response = await sdkGenerationController.generateSdkViaFile(Accept.EnumApplicationjson, file, sdkPlatform);
       const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
       return Result.success(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
@@ -77,18 +80,14 @@ export class PortalService {
     }
   }
 
-  public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
-    if (!(await fs.pathExists(specPath))) {
-      return Result.failure("Spec file doesn't exist");
-    }
-
+  public async generateSdl(specFileStream: ReadStream, configDir: string): Promise<Result<Sdl, string>> {
+    const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
     const client = this.createApiClient(authorizationHeader);
     const transformationController = new TransformationController(client);
 
     try {
-      const file = new FileWrapper(fs.createReadStream(specPath));
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         ContentType.EnumMultipartformdata,
         file,
@@ -138,7 +137,7 @@ export class PortalService {
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
       return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
@@ -148,7 +147,9 @@ export class PortalService {
       const internalServerError = error as InternalServerErrorResponseError;
       const message = internalServerError.result?.message;
       return getMessageInRedColor(
-        `${message ?? "An unkown error occurred."} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
+        `${
+          message ?? "An unkown error occurred."
+        } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
       return getMessageInRedColor(
@@ -157,31 +158,42 @@ export class PortalService {
     }
   };
 
-  private parseErrorResponse = async (error: unknown): Promise<ErrorResponse> => {
-    if (error instanceof Error && "body" in error) {
-      const stream = (error as { body: NodeJS.ReadableStream }).body;
-      return await parseStreamBodyToJson(stream);
+  private parseBadRequestResponse(errorMessage: string | undefined): string {
+    // #TODO: Fix server-side error message and simplify this function
+    if (!errorMessage) {
+      return "Bad request.";
     }
-    throw error;
-  };
+    // Parse the JSON string
+    const parsedResult = JSON.parse(errorMessage);
+
+    // Check if it has the expected structure with Errors array
+    if (parsedResult.Errors && Array.isArray(parsedResult.Errors) && parsedResult.Errors.length > 0) {
+      // Get the first error and clean it up
+      const firstError = parsedResult.Errors[0];
+      // Split on <br/> and take first part, then strip remaining HTML tags
+      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, ""); 
+      return cleanError;
+    } else if (parsedResult.Success === false) {
+      return "API definition file validation failed.";
+    }
+    return errorMessage;
+  }
 
   private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
-    //TODO: Update the spec file to define different error code response types so that they can be handled here. Currently all failures go to the last else statement
-    if (error instanceof UnauthorizedResponseError) {
+    if (error instanceof BadRequestResponseSdkError) {
+      //400
+      const badRequestError = error as BadRequestResponseSdkError;
+      const errorMessage = this.parseBadRequestResponse(badRequestError.result?.message);
+      return getMessageInRedColor(errorMessage);
+    } else if (error instanceof UnauthorizedResponseError) {
       //401
       const unAuthError = error as UnauthorizedResponseError;
       return getMessageInRedColor(unAuthError.result?.message ?? "Authorization has been denied for this request.");
     } else if (error instanceof ProblemDetailsError) {
-      //400 & 403
+      // 403
       const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
       return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
-    } else if (error instanceof InternalServerErrorResponseError) {
-      //500
-      const body = await this.parseErrorResponse(error);
-      return getMessageInRedColor(
-        `${body.message} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
-      );
     } else {
       return getMessageInRedColor(
         "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"

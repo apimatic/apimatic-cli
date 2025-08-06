@@ -16,7 +16,7 @@ export class PortalNewTocPrompts {
     }
 
     if (!overwrite) {
-      outro("Please enter a different destination path or delete the existing toc.yml file and try again.");
+      log.error("Please enter a different destination path or delete the existing toc.yml file and try again.");
     }
 
     return overwrite;

@@ -1,4 +1,4 @@
-import { log, outro, spinner } from "@clack/prompts";
+import { log, spinner } from "@clack/prompts";
 
 export abstract class BasePrompts {
     protected readonly spin = spinner();
@@ -16,6 +16,6 @@ export abstract class BasePrompts {
     }
 
     public logError(errorMessage: string): void {
-        outro(errorMessage);
+        log.error(errorMessage);
     }
 }

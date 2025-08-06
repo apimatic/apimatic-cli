@@ -39,7 +39,6 @@ export class ServeHandler {
   public async startServer(
     paths: ServePaths,
     flags: ServeFlags,
-    ignoredPaths: string[],
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
@@ -56,7 +55,7 @@ export class ServeHandler {
           }
 
           if (!flags["no-reload"]) {
-            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, ignoredPaths, generatePortal);
+            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, generatePortal);
           }
 
           if (process.platform !== "darwin") {
