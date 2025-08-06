@@ -4,6 +4,8 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
+import { exec } from "child_process";
+import os from "os";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -64,6 +66,28 @@ export class FileService {
 
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
+  }
+
+  public async openFile(filePath: FilePath): Promise<void> {
+    let openCommand: string;
+        switch (os.platform()) {
+          case "win32":
+            openCommand = `start "" "${filePath.toString()}"`;
+            break;
+          case "darwin":
+            openCommand = `open "${filePath.toString()}"`;
+            break;
+          default:
+            // Linux and other Unix-like
+            openCommand = `xdg-open "${filePath.toString()}"`;
+            break;
+        }
+
+        try {
+          exec(openCommand, () => {});
+        } catch {
+          /* silently ignore */
+        }
   }
 
 }

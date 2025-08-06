@@ -10,7 +10,6 @@ import { BuildContext } from "../../types/build-context.js";
 import { PortalContext } from "../../types/portal-context.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 
-
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly zipArchiver: ZipService = new ZipService();
@@ -30,13 +29,12 @@ export class GenerateAction {
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
-
     if (buildDirectory.isEqual(portalDirectory)) {
       return ActionResult.error(`The 'src' and 'portal' directory cannot be the same: "${portalDirectory}"`);
     }
 
     const buildContext = new BuildContext(buildDirectory);
-    if (!await buildContext.validate()) {
+    if (!(await buildContext.validate())) {
       return ActionResult.error(`The 'src' directory is either empty or invalid: "${buildDirectory}"`);
     }
 
@@ -68,10 +66,14 @@ export class GenerateAction {
 
       return ActionResult.success();
     });
-  }
+  };
 
-  private async parseError(error: string | NodeJS.ReadableStream, portalDirectory: DirectoryPath, tempDirectory: DirectoryPath): Promise<string> {
-    if (typeof error === 'string') {
+  private async parseError(
+    error: string | NodeJS.ReadableStream,
+    portalDirectory: DirectoryPath,
+    tempDirectory: DirectoryPath
+  ): Promise<string> {
+    if (typeof error === "string") {
       return error;
     }
 
@@ -82,7 +84,14 @@ export class GenerateAction {
     await this.zipArchiver.unArchive(tempErrorFilePath, portalDirectory);
 
     const errorReportPath = portalDirectory.join("apimatic-debug");
-    return "An error occurred during portal generation due to an issue with the input. An error report has been written at the destination path: " +
-      errorReportPath;
+
+    const htmlFilePath = new FilePath(errorReportPath, new FileName("apimatic-report.html"));
+    await this.fileService.openFile(htmlFilePath); // Open the error report in the default browser
+
+    return (
+      "An error occurred during portal generation due to an issue with the input. " +
+      "An error report has been written at the destination path: " +
+      errorReportPath
+    );
   }
 }
