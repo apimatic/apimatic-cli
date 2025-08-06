@@ -12,7 +12,8 @@ export class SdlParser {
   public async getTocComponentsFromSdl(
     specFolderPath: string,
     buildDirectory: DirectoryPath,
-    configDir: string
+    configDir: string,
+    commandName: string
   ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
     const sourceSpecInputZipFilePath = await zipPortalSource(
       specFolderPath,
@@ -20,7 +21,7 @@ export class SdlParser {
     );
 
     try {
-      const result = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir);
+      const result = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir, commandName);
 
       if (!result.isSuccess()) {
         return Result.failure(
@@ -41,14 +42,15 @@ export class SdlParser {
   public async getEndpointGroupsFromSdl(
     specFolderPath: string,
     contentFolderPath: string,
-    configDir: string
+    configDir: string,
+    commandName: string
   ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     const sourceSpecInputZipFilePath = await zipPortalSource(
       specFolderPath,
       path.join(contentFolderPath, ".spec_source.zip")
     );
 
-    const sdlResult = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir);
+    const sdlResult = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir, commandName);
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(

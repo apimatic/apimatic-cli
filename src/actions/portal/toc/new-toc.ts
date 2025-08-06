@@ -31,6 +31,7 @@ export class PortalNewTocAction {
   public async createToc(
     buildDirectory: DirectoryPath,
     configDir: string,
+    commandName: string,
     tocDirectory?: DirectoryPath,
     force: boolean = false,
     expandEndpoints: boolean = false,
@@ -47,6 +48,7 @@ export class PortalNewTocAction {
       const { endpointGroups, models } = await this.extractSdlComponents(
         buildDirectory,
         configDir,
+        commandName,
         expandEndpoints,
         expandModels
       );
@@ -87,6 +89,7 @@ export class PortalNewTocAction {
   private async extractSdlComponents(
     buildDirectory: DirectoryPath,
     configDir: string,
+    commandName: string,
     expandEndpoints: boolean,
     expandModels: boolean
   ): Promise<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }> {
@@ -103,7 +106,7 @@ export class PortalNewTocAction {
       return { endpointGroups: new Map(), models: [] };
     }
 
-    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, buildDirectory, configDir);
+    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, buildDirectory, configDir, commandName);
 
     if (!sdlResult.isSuccess()) {
       this.prompts.stopProgressIndicatorWithMessage(`⚠️ ${sdlResult.error!}`);

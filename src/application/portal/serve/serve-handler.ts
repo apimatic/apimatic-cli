@@ -40,9 +40,11 @@ export class ServeHandler {
     paths: ServePaths,
     flags: ServeFlags,
     ignoredPaths: string[],
+    commandName: string,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
+      commandName: string,
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>,
@@ -56,7 +58,7 @@ export class ServeHandler {
           }
 
           if (!flags["no-reload"]) {
-            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, ignoredPaths, generatePortal);
+            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, ignoredPaths, commandName, generatePortal);
           }
 
           if (process.platform !== "darwin") {

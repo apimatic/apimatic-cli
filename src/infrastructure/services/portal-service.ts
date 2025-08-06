@@ -34,6 +34,7 @@ export class PortalService {
   async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
+    commandName: string,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
@@ -44,7 +45,11 @@ export class PortalService {
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
-      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
+      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(
+        this.CONTENT_TYPE,
+        file,
+        this.createCommandNameQueryParameter(commandName)
+      );
       return Result.success(response.result as NodeJS.ReadableStream);
     } catch (error) {
       return Result.failure(await this.handlePortalGenerationErrors(error));
@@ -57,6 +62,7 @@ export class PortalService {
     specPath: FilePath,
     sdkPlatform: Platforms,
     configDir: DirectoryPath,
+    commandName: string,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
@@ -67,8 +73,15 @@ export class PortalService {
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
-      const response = await sdkGenerationController.generateSdkViaFile(file, sdkPlatform);
-      const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
+      const response = await sdkGenerationController.generateSdkViaFile(
+        file,
+        sdkPlatform,
+        this.createCommandNameQueryParameter(commandName)
+      );
+      const sdkResponse = await sdkGenerationController.downloadSdk(
+        response.result.id,
+        this.createCommandNameQueryParameter(commandName)
+      );
       return Result.success(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
       return Result.failure(await this.handleSdkGenerationErrors(error));
@@ -77,7 +90,7 @@ export class PortalService {
     }
   }
 
-  public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
+  public async generateSdl(specPath: string, configDir: string, commandName: string): Promise<Result<Sdl, string>> {
     if (!(await fs.pathExists(specPath))) {
       return Result.failure("Spec file doesn't exist");
     }
@@ -92,7 +105,8 @@ export class PortalService {
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         ContentType.EnumMultipartformdata,
         file,
-        ExportFormats.Apimatic
+        ExportFormats.Apimatic,
+        this.createCommandNameQueryParameter(commandName)
       );
 
       if (!generation.result.success) {
@@ -100,7 +114,10 @@ export class PortalService {
       }
 
       const transformationId = generation.result.id;
-      const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
+      const { result }: TransformationData = await transformationController.downloadTransformedFile(
+        transformationId,
+        this.createCommandNameQueryParameter(commandName)
+      );
       if ((result as NodeJS.ReadableStream).readable) {
         return Result.success((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
       } else {
@@ -130,6 +147,12 @@ export class PortalService {
     });
   };
 
+  private createCommandNameQueryParameter = (commandName: string): Record<string, string> => {
+    return {
+      commandName: commandName
+    };
+  };
+
   private handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
     if (error instanceof UnauthorizedResponseError) {
       //401
@@ -138,7 +161,7 @@ export class PortalService {
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
       return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
@@ -148,7 +171,9 @@ export class PortalService {
       const internalServerError = error as InternalServerErrorResponseError;
       const message = internalServerError.result?.message;
       return getMessageInRedColor(
-        `${message ?? "An unkown error occurred."} Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
+        `${
+          message ?? "An unkown error occurred."
+        } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
       );
     } else {
       return getMessageInRedColor(
@@ -174,7 +199,7 @@ export class PortalService {
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.['']?.[0];
+      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
       return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
     } else if (error instanceof InternalServerErrorResponseError) {
       //500

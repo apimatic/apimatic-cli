@@ -14,6 +14,9 @@ import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { LoginAction } from "../../actions/auth/login.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
+import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -76,7 +79,9 @@ export default class PortalQuickstart extends Command {
   async run() {
     const prompts = new PortalQuickstartPrompts();
     const controller = new PortalQuickstartController();
+    const telemetryService = new TelemetryService(this.config.configDir);
 
+    await telemetryService.trackEvent(new QuickstartInitiatedEvent());
     prompts.displayWelcomeMessage();
 
     let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
@@ -87,12 +92,11 @@ export default class PortalQuickstart extends Command {
       const loginResult = await loginAction.execute();
 
       loginResult.match(
-        e => prompts.displayLoggedInMessage(e),
-          error => prompts.logError(error)
+        (e) => prompts.displayLoggedInMessage(e),
+        (error) => prompts.logError(error)
       );
 
-      if (loginResult.isErr())
-        return;
+      if (loginResult.isErr()) return;
     }
 
     const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
@@ -149,6 +153,7 @@ export default class PortalQuickstart extends Command {
       const servePortalResult = await portalServeAction.servePortal(
         serveFlags,
         serverPaths,
+        PortalQuickstart.id,
         generatePortalAction.execute
       );
 
@@ -163,6 +168,7 @@ export default class PortalQuickstart extends Command {
       }
 
       prompts.displayOutroMessage(buildDirectory.toString());
+      await telemetryService.trackEvent(new QuickstartCompletedEvent());
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }
