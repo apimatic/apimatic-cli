@@ -1,4 +1,3 @@
-import fs from "fs-extra";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -25,12 +24,14 @@ import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { envInfo } from "../env-info.js";
+import { ReadStream } from "fs";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly TIMEOUT = 0;
   private readonly fileService = new FileService();
 
+  //TODO: Pass stream as parameter instead of file path.
   async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
@@ -53,6 +54,7 @@ export class PortalService {
     }
   }
 
+  //TODO: Pass stream as parameter instead of file path.
   async generateSdk(
     specPath: FilePath,
     sdkPlatform: Platforms,
@@ -77,18 +79,14 @@ export class PortalService {
     }
   }
 
-  public async generateSdl(specPath: string, configDir: string): Promise<Result<Sdl, string>> {
-    if (!(await fs.pathExists(specPath))) {
-      return Result.failure("Spec file doesn't exist");
-    }
-
+  public async generateSdl(specFileStream: ReadStream, configDir: string): Promise<Result<Sdl, string>> {
+    const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
     const client = this.createApiClient(authorizationHeader);
     const transformationController = new TransformationController(client);
 
     try {
-      const file = new FileWrapper(fs.createReadStream(specPath));
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         ContentType.EnumMultipartformdata,
         file,

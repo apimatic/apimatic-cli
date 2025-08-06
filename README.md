@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-alpha.16 win32-x64 node-v20.18.3
+@apimatic/cli/1.1.0-alpha.19 win32-x64 node-v20.18.3
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -210,7 +210,7 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/main/s
 
 ## `apimatic portal:copilot`
 
-Adds the API Copilot configuration in APIMATIC-BUILD.json
+Configure API Copilot for your API Documentation portal
 
 ```
 USAGE
@@ -316,12 +316,10 @@ Generate and deploy a Docs as Code portal with hot reload.
 
 ```
 USAGE
-  $ apimatic portal:serve [-p <value>] [-i <value>] [-d <value>] [-o] [--no-reload] [-i <value>] [-k <value>]
+  $ apimatic portal:serve [-p <value>] [-i <value>] [-d <value>] [-o] [--no-reload] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
-  -i, --ignore=<value>       Comma-separated list of file and directory paths to exclude from portal generation and hot
-                             reload.
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.

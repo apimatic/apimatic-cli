@@ -1,4 +1,3 @@
-import * as path from "path";
 import chokidar from "chokidar";
 import crypto from "crypto";
 import console from "console";
@@ -17,7 +16,6 @@ export class PortalWatcher {
 
   public async watchAndRegeneratePortalOnChange(
     paths: ServePaths,
-    ignoredPaths: string[],
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
@@ -25,14 +23,9 @@ export class PortalWatcher {
       zipPortal: boolean
     ) => Promise<ActionResult>
   ) {
-    // Convert ignoredPaths to absolute paths for consistent comparison
-    const absoluteIgnoredPaths = [...ignoredPaths.filter((ignoredPath) => ignoredPath.trim() !== "")].map(
-      (ignoredPath) => path.resolve(paths.sourceDirectoryPath, ignoredPath)
-    );
-
     //Regex matches any hidden files and folders.
     const watcher = chokidar.watch(paths.sourceDirectoryPath, {
-      ignored: [...absoluteIgnoredPaths, /(^|[/\\])\..+/],
+      ignored: [/(^|[/\\])\..+/],
       ignoreInitial: true,
       persistent: true,
       awaitWriteFinish: true,
