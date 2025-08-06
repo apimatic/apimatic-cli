@@ -4,9 +4,6 @@ import extract from "extract-zip";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FilePath } from "../types/file/filePath.js";
 
-const MAX_FILES = 10000;
-const MAX_SIZE = 1000000000; // 1 GB
-
 export class ZipService {
   public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -22,7 +19,9 @@ export class ZipService {
     });
   }
 
-  async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
+  public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
+    const MAX_FILES = 100_000;
+    const MAX_SIZE = 1_000_000_000; // 1 GB
     let fileCount = 0;
     let totalSize = 0;
 
