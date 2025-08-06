@@ -7,9 +7,11 @@ import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 import { FileName } from "../../../types/file/fileName.js";
 import { ZipService } from "../../../infrastructure/zip-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
+import { FileService } from "../../../infrastructure/file-service.js";
 
 export class SdlParser {
   private readonly zipArchiver: ZipService = new ZipService();
+  private readonly fileService = new FileService();
 
   constructor(private readonly portalService: PortalService) {}
 
@@ -55,8 +57,10 @@ export class SdlParser {
       const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
       await this.zipArchiver.archive(new DirectoryPath(specFolderPath), specZipPath);
 
-      const result = await this.portalService.generateSdl(specZipPath, configDir);
-
+      const specFileStream = await this.fileService.getStream(specZipPath);
+      const result = await this.portalService.generateSdl(specFileStream, configDir);
+      specFileStream.close();
+      
       if (!result.isSuccess()) {
         return Result.failure(
           "Failed to generate SDL from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension."
