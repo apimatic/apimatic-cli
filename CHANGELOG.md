@@ -1,3 +1,19 @@
+# [1.1.0-alpha.19](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.18...v1.1.0-alpha.19) (2025-08-06)
+
+
+### Bug Fixes
+
+* add missing content header to telemetry api call ([#139](https://github.com/apimatic/apimatic-cli/issues/139)) ([f2b0e64](https://github.com/apimatic/apimatic-cli/commit/f2b0e64826d987ca844b285d8862ebf25e0fe286))
+* remove ignore flag from portal serve ([#140](https://github.com/apimatic/apimatic-cli/issues/140)) ([336f5b7](https://github.com/apimatic/apimatic-cli/commit/336f5b750997dd6d1a8b5a1da4f85137283bb3ad))
+* removed existing spec in quickstart when providing spec explicitly ([#147](https://github.com/apimatic/apimatic-cli/issues/147)) ([126318f](https://github.com/apimatic/apimatic-cli/commit/126318f0c497fc105a51ede3febe07731c09b41f))
+* resolve bug in unarchive method ([#144](https://github.com/apimatic/apimatic-cli/issues/144)) ([e70b7d2](https://github.com/apimatic/apimatic-cli/commit/e70b7d2c03069297a1c0fba1cf7529a74eadd2bd))
+
+
+### Features
+
+* add better error messaging for sdk generation failures ([bac2b62](https://github.com/apimatic/apimatic-cli/commit/bac2b623a2a3efd2a78c711c731cb6c2764913cd))
+* add responses for generate-via-file ([#143](https://github.com/apimatic/apimatic-cli/issues/143)) ([386be66](https://github.com/apimatic/apimatic-cli/commit/386be66c7f24df2b0fe9a9456bf23c998f9c00c3))
+
 # [1.1.0-alpha.18](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.17...v1.1.0-alpha.18) (2025-08-03)
 
 
