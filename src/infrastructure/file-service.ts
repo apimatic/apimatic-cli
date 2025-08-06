@@ -4,7 +4,7 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import os from "os";
 
 export class FileService {
@@ -31,7 +31,7 @@ export class FileService {
       const files = await fsExtra.readdir(dir.toString());
       return files.length === 0;
     } catch (error) {
-      return error instanceof Error && 'code' in error && error.code === "ENOENT";
+      return error instanceof Error && "code" in error && error.code === "ENOENT";
     }
   }
 
@@ -52,7 +52,7 @@ export class FileService {
   }
 
   public async getContents(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), 'utf-8');
+    return await fsExtra.readFile(filePath.toString(), "utf-8");
   }
 
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
@@ -69,27 +69,34 @@ export class FileService {
   }
 
   public async openFile(filePath: FilePath): Promise<void> {
-    let openCommand: string;
-        switch (os.platform()) {
-          case "win32":
-            openCommand = `start "" "${filePath.toString()}"`;
-            break;
-          case "darwin":
-            openCommand = `open "${filePath.toString()}"`;
-            break;
-          default:
-            // Linux and other Unix-like
-            openCommand = `xdg-open "${filePath.toString()}"`;
-            break;
-        }
+    const targetPath = filePath.toString();
 
-        try {
-          exec(openCommand, () => {});
-        } catch {
-          /* silently ignore */
-        }
+    // Determine the command and args without using the shell
+    let command: string;
+    let args: string[];
+
+    switch (os.platform()) {
+      case "win32":
+        command = "cmd";
+        args = ["/c", "start", "", targetPath];
+        break;
+      case "darwin":
+        command = "open";
+        args = [targetPath];
+        break;
+      default:
+        command = "xdg-open";
+        args = [targetPath];
+        break;
+    }
+
+    try {
+      const child = spawn(command, args, { stdio: "ignore", detached: true });
+      child.unref(); // Let it run without blocking
+    } catch {
+      // Silently ignore errors
+    }
   }
-
 }
 
 const streamPipeline = promisify(pipeline);
