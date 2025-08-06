@@ -251,7 +251,7 @@ export class PortalQuickstartController {
 
     if (specFile.localPath && validationSummary.success) {
       const specFolder = path.join(targetFolder, "spec");
-      await deleteFile(path.join(specFolder, "Apimatic-Calculator.json"));
+      await deleteFile(path.join(specFolder, "openapi.json"));
 
       const files = await readdir(specFile.localPath);
       for (const file of files) {
