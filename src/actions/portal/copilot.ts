@@ -4,18 +4,16 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { BuildContext } from "../../types/build-context.js";
-import { execa } from "execa";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileService } from "../../infrastructure/file-service.js";
-import * as os from 'os';
-
-
+import { LauncherService } from "../../infrastructure/launcher-service.js";
 
 export class CopilotAction {
   private readonly apiService = new ApiService();
   private readonly fileService = new FileService();
+  private readonly launcherService = new LauncherService();
   private readonly prompts = new PortalCopilotPrompts();
   private readonly configDir: DirectoryPath;
   private readonly authKey: string | null;
@@ -82,25 +80,7 @@ export class CopilotAction {
       const tempFile = new FilePath(tempDir, new FileName("welcome-message.md"));
       const defaultContent = "[//]: # (Enter your welcome message here...)";
       await this.fileService.writeContents(tempFile, defaultContent);
-
-      if (process.platform === "win32") {
-        await execa("notepad", [tempFile.toString()]);
-      } else if (process.platform === "darwin") {
-        await execa("open", ["-t", tempFile.toString()]);
-      } else {
-        await execa("xdg-open", [tempFile.toString()]);
-      }
-
-
-      // try {
-      //   await execa("code", ["--wait", tempFile.toString()]);
-      // } catch {
-      //   if (process.platform === "win32") {
-      //     await execa("notepad", [tempFile.toString()], { stdio: "ignore"});
-      //   } else {
-      //     await execa("vim", [tempFile.toString()], { stdio: "inherit"});
-      //   }
-      // }
+      await this.launcherService.openFile(tempFile);
       const welcomeMessage = await this.fileService.getContents(tempFile);
       return welcomeMessage.replace(/\r\n|\r/g, "\n");
     });
