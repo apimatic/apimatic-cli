@@ -29,7 +29,7 @@ export class FileService {
       const files = await fsExtra.readdir(dir.toString());
       return files.length === 0;
     } catch (error) {
-      return error instanceof Error && 'code' in error && error.code === "ENOENT";
+      return error instanceof Error && "code" in error && error.code === "ENOENT";
     }
   }
 
@@ -50,7 +50,7 @@ export class FileService {
   }
 
   public async getContents(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), 'utf-8');
+    return await fsExtra.readFile(filePath.toString(), "utf-8");
   }
 
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
@@ -59,13 +59,12 @@ export class FileService {
   }
 
   public async writeContents(filePath: FilePath, contents: string) {
-    await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
+    await fsExtra.writeFile(filePath.toString(), contents, "utf-8");
   }
 
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
-
 }
 
 const streamPipeline = promisify(pipeline);

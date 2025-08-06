@@ -18,6 +18,7 @@ export default class PortalCopilotEnable extends Command {
       default: false,
       description: "marks the API Copilot as disabled in the configuration"
     }),
+    ...FlagsProvider.force,
     ...FlagsProvider.authKey
   };
 
@@ -30,13 +31,13 @@ export default class PortalCopilotEnable extends Command {
 
   async run(): Promise<void> {
     const {
-      flags: { input, "auth-key": authKey, disable}
+      flags: { input, "auth-key": authKey, disable, force}
     } = await this.parse(PortalCopilotEnable);
 
     const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), authKey);
-    const result = await copilotConfigAction.execute(buildDirectory, !disable);
+    const result = await copilotConfigAction.execute(buildDirectory, force, !disable);
     result.map((message) => this.prompts.logError(message));
   }
 }

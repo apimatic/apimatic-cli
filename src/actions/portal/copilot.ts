@@ -4,9 +4,17 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { BuildContext } from "../../types/build-context.js";
+import { execa } from "execa";
+import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { FileName } from "../../types/file/fileName.js";
+import { FileService } from "../../infrastructure/file-service.js";
+
+
 
 export class CopilotAction {
   private readonly apiService = new ApiService();
+  private readonly fileService = new FileService();
   private readonly prompts = new PortalCopilotPrompts();
   private readonly configDir: DirectoryPath;
   private readonly authKey: string | null;
@@ -16,7 +24,7 @@ export class CopilotAction {
     this.authKey = authKey;
   }
 
-  public async execute(buildDirectory: DirectoryPath, enable: boolean): Promise<ActionResult> {
+  public async execute(buildDirectory: DirectoryPath, force: boolean, enable: boolean): Promise<ActionResult> {
     const buildContext = new BuildContext(buildDirectory);
 
     if (!(await buildContext.validate())) {
@@ -25,21 +33,22 @@ export class CopilotAction {
 
     const buildJson = await buildContext.getBuildFileContents();
 
-    if (buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite()))
+    if (!force && buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite()))
       return ActionResult.error("Exiting without making any change.");
 
     const response = await this.apiService.getAccountInfo(this.configDir, this.authKey);
     if (response.isErr()) {
       return ActionResult.error(response._unsafeUnwrapErr());
     }
-    const apiCopilotKey = await this.selectCopilotKey(response._unsafeUnwrap());
+    const apiCopilotKey = await this.selectCopilotKey(response._unsafeUnwrap(), force);
     if (apiCopilotKey === null) {
-      return ActionResult.error("No copilot key found for the current subscription. Please contact support at support@apimatic.io.");
+      return ActionResult.error(
+        "No copilot key found for the current subscription. Please contact support at support@apimatic.io."
+      );
     }
 
-    const welcomeMessage = await this.prompts.getWelcomeMessage();
-    if (welcomeMessage === undefined)
-      return ActionResult.error("Exiting without making any change.");
+    const welcomeMessage = await this.getWelcomeMessage();
+    if (welcomeMessage === undefined) return ActionResult.error("Exiting without making any change.");
 
     buildJson.apiCopilotConfig = {
       isEnabled: enable,
@@ -53,7 +62,7 @@ export class CopilotAction {
     return ActionResult.success();
   }
 
-  private async selectCopilotKey(subscription: SubscriptionInfo | undefined): Promise<string | null> {
+  private async selectCopilotKey(subscription: SubscriptionInfo | undefined, force: boolean): Promise<string | null> {
     if (
       subscription === undefined ||
       subscription.ApiCopilotKeys === undefined ||
@@ -62,6 +71,25 @@ export class CopilotAction {
       return null;
     }
 
+    if (force && subscription.ApiCopilotKeys.length === 1) return subscription.ApiCopilotKeys[0];
+
     return await this.prompts.selectCopilotKey(subscription.ApiCopilotKeys);
+  }
+
+  private async getWelcomeMessage(): Promise<string> {
+    return await withDirPath(async (tempDir) => {
+      const tempFile = new FilePath(tempDir, new FileName("welcome-message.md"));
+      const defaultContent = "Enter your welcome message here...";
+      await this.fileService.writeContents(tempFile, defaultContent);
+
+      try {
+        await execa("code", ["--wait", tempFile.toString()]);
+      } catch {
+        const editor = process.platform === "win32" ? "notepad" : "nano";
+        await execa(editor, [tempFile.toString()]);
+      }
+      const welcomeMessage = await this.fileService.getContents(tempFile);
+      return welcomeMessage.replace(/\r\n|\r/g, "\n");
+    });
   }
 }
