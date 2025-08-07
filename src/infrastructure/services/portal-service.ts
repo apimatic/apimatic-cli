@@ -127,7 +127,7 @@ export class PortalService {
     return this.createProductionApiClient(authorizationHeader);
   };
 
-  private createProductionApiClient = (authorizationHeader: string): Client => {
+  readonly createProductionApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
@@ -138,7 +138,7 @@ export class PortalService {
     });
   };
 
-  private createTestingApiClient = (authorizationHeader: string): Client => {
+  readonly createTestingApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
