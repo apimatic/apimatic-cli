@@ -14,7 +14,8 @@ import {
   CodeGenerationExternalApisController,
   Platforms,
   BadRequestResponseSdkError,
-  Accept
+  Accept,
+  Environment
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { Result } from "../../types/common/result.js";
@@ -120,12 +121,32 @@ export class PortalService {
   };
 
   private createApiClient = (authorizationHeader: string): Client => {
+    if (process.env.APIMATIC_TESTING === "true") {
+      return this.createTestingApiClient(authorizationHeader);
+    }
+    return this.createProductionApiClient(authorizationHeader);
+  };
+
+  private createProductionApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
       userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT
+      timeout: this.TIMEOUT,
+      environment: Environment.Production
+    });
+  };
+
+  private createTestingApiClient = (authorizationHeader: string): Client => {
+    return new Client({
+      customHeaderAuthenticationCredentials: {
+        Authorization: authorizationHeader
+      },
+      userAgent: envInfo.getUserAgent(),
+      timeout: this.TIMEOUT,
+      environment: Environment.Testing,
+      customUrl: envInfo.getBaseUrl()
     });
   };
 
@@ -171,7 +192,7 @@ export class PortalService {
       // Get the first error and clean it up
       const firstError = parsedResult.Errors[0];
       // Split on <br/> and take first part, then strip remaining HTML tags
-      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, ""); 
+      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
       return cleanError;
     } else if (parsedResult.Success === false) {
       return "API definition file validation failed.";
