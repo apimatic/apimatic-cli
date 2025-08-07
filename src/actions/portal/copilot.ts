@@ -80,7 +80,7 @@ export class CopilotAction {
       const tempFile = new FilePath(tempDir, new FileName("welcome-message.md"));
       const defaultContent = "[//]: # (Enter your welcome message here...)";
       await this.fileService.writeContents(tempFile, defaultContent);
-      await this.launcherService.openFile(tempFile);
+      await this.launcherService.openInEditor(tempFile);
       const welcomeMessage = await this.fileService.getContents(tempFile);
       return welcomeMessage.replace(/\r\n|\r/g, "\n");
     });
