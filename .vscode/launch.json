@@ -8,7 +8,6 @@
         "skipFiles": ["<node_internals>/"],
         "program": "${workspaceFolder}/bin/run",
          "args": [
-            // Uncomment the args you want to use globally
             // "api:validate",
             // "--file=C:/Users/User/Desktop/spec/Errors.yaml"
             // "api:transform",
@@ -18,7 +17,7 @@
             // "auth:logout",
             // "auth:login", 
             // "auth:status"
-             "portal:quickstart",
+            // "portal:quickstart",
             // "portal:generate",
             // "portal:toc:new",
             // "--expand-endpoints",
@@ -57,7 +56,6 @@
         "skipFiles": ["<node_internals>/"],
         "program": "${workspaceFolder}/bin/run",
         "args": [
-            // Uncomment the args you want to use globally
             // "api:validate",
             // "--file=C:/Users/User/Desktop/spec/Errors.yaml"
             // "api:transform",
@@ -67,7 +65,7 @@
             // "auth:logout",
             // "auth:login", 
             // "auth:status",
-             "portal:quickstart",
+            // "portal:quickstart",
             // "portal:generate",
             // "portal:toc:new",
             // "--expand-endpoints",
@@ -112,6 +110,9 @@
           "${workspaceFolder}/node_modules/mocha/bin/_mocha",
           "--forbid-only",
           "test/**/*.test.ts",
+          // "--ignore",
+          // "test/commands/portal/generate.test.ts",
+          // "${file}", // Run Tests for the currently open test file.
           "--timeout",
           "99999"
         ],
