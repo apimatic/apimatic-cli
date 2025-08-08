@@ -37,14 +37,15 @@ class EnvInfo {
     }
   }
 
-  public getBaseUrl(): string {
-  if (!EnvInfo.cachedBaseUrl) {
-    if (!process.env.APIMATIC_BASE_URL) {
-      throw new Error("APIMATIC_BASE_URL environment variable is required");
+  public getBaseUrl(): string | undefined {
+    if (EnvInfo.cachedBaseUrl) {
+      return EnvInfo.cachedBaseUrl;
     }
-    EnvInfo.cachedBaseUrl = process.env.APIMATIC_BASE_URL;
+    const envBaseUrl = process.env.APIMATIC_BASE_URL;
+    if (envBaseUrl) {
+      EnvInfo.cachedBaseUrl = envBaseUrl;
+    }
+    return EnvInfo.cachedBaseUrl;
   }
-  return EnvInfo.cachedBaseUrl;
-}
 }
 export const envInfo = new EnvInfo();

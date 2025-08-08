@@ -121,7 +121,7 @@ export class PortalService {
   };
 
   private createApiClient = (authorizationHeader: string): Client => {
-    if (process.env.APIMATIC_TESTING === "true") {
+    if (envInfo.getBaseUrl()) {
       return this.createTestingApiClient(authorizationHeader);
     }
     return this.createProductionApiClient(authorizationHeader);

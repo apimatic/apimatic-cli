@@ -95,7 +95,6 @@
             // "--auth-key=\"invalidApiKey\""
          ],
         "env": {
-            "APIMATIC_TESTING": "true",
             "APIMATIC_BASE_URL": "https://localhost:44301/api"
         },
         "console": "externalTerminal",
