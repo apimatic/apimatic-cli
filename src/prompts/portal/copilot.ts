@@ -21,13 +21,12 @@ export class PortalCopilotPrompts {
     return selectedKey;
   }
 
-  public copilotConfigured(apiCopilotConfig: CopilotConfig) {
+  public copilotConfigured(status: boolean, copilotId: string): void {
     outro(
       `API Copilot configured successfully!
 
-    Copilot ID: ${getMessageInCyanColor(apiCopilotConfig.key)}
-    Welcome Message: ${getMessageInCyanColor(apiCopilotConfig.welcomeMessage)}
-    Status: ${getMessageInCyanColor(apiCopilotConfig.isEnabled ? "Enabled" : "Disabled")}
+    Copilot ID: ${getMessageInCyanColor(copilotId)}
+    Status: ${getMessageInCyanColor(status ? "Enabled" : "Disabled")}
 
   Configuration saved to: APIMATIC-BUILD.json
 
@@ -37,7 +36,7 @@ Run 'apimatic portal:serve' to preview your API Portal and try out the API Copil
 
   public async confirmOverwrite(): Promise<boolean> {
     const shouldOverwrite = await confirm({
-      message: "API Copilot configuration already exists. Do you want to overwrite?",
+      message: "API Copilot is already configured for this Portal, do you want to overwrite it?",
       initialValue: false
     });
 
