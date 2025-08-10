@@ -12,7 +12,6 @@ import { SDKClient } from "../../client-utils/sdk-client.js";
 import {
   createTempDirectory,
   isValidUrl,
-  unzipFile,
   getMessageInRedColor,
   clearDirectory,
   deleteFile
@@ -22,8 +21,13 @@ import { AuthorizationError, GetValidationParams } from "../../types/api/validat
 import { metadataFileContent, staticPortalRepoUrl } from "../../config/env.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { AuthenticationError } from "../../types/utils.js";
+import { ZipService } from "../../infrastructure/zip-service.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FileName } from "../../types/file/fileName.js";
 
 export class PortalQuickstartController {
+  private readonly zipService = new ZipService();
   private readonly specUrl =
     "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json";
 
@@ -110,10 +114,10 @@ export class PortalQuickstartController {
         }
       } else {
         specPath = path.normalize(specPath);
-        const fileType = await filetype.fromFile(specPath);
+        const fileType = await filetype.fromFile(specPath); 
 
         if (fileType?.ext === "zip") {
-          await unzipFile(fs.createReadStream(specPath), tempSpecDir);
+          await this.zipService.unArchive(new FilePath(new DirectoryPath(path.dirname(specPath)), new FileName(path.basename(specPath))), new DirectoryPath(tempSpecDir));
         } else {
           const destinationPath = path.join(tempSpecDir, path.basename(specPath));
           await fsExtra.copy(specPath, destinationPath);
@@ -247,7 +251,7 @@ export class PortalQuickstartController {
 
     if (specFile.localPath && validationSummary.success) {
       const specFolder = path.join(targetFolder, "spec");
-      await deleteFile(path.join(specFolder, "Apimatic-Calculator.json"));
+      await deleteFile(path.join(specFolder, "openapi.json"));
 
       const files = await readdir(specFile.localPath);
       for (const file of files) {

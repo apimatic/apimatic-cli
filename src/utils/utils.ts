@@ -1,30 +1,12 @@
 import * as path from "path";
-import net from "net";
 import fs from "fs";
 import fsExtra from "fs-extra";
 import os from "os";
 import archiver from "archiver";
-import unzipper from "unzipper";
 import stripTags from "striptags";
-import AdmZip from "adm-zip";
 import colors from "picocolors";
-import { PassThrough } from "stream";
 
 import { loggers, ValidationMessages } from "../types/utils.js";
-import { ApiValidationSummary } from "@apimatic/sdk";
-
-export const unzipFile = (stream: NodeJS.ReadableStream, destination: string) => {
-  return new Promise((resolve, reject) => {
-    const extractStream = unzipper.Extract({ path: destination });
-
-    stream
-      .pipe(extractStream)
-      .on("error", (error: Error) => reject(new Error("Error during extraction: " + error.message)));
-
-    extractStream.on("close", () => resolve("Extracted"));
-    extractStream.on("error", (error: Error) => reject(new Error("Error during extraction: " + error.message)));
-  });
-};
 
 export const createTempDirectory = async () => {
   return fs.mkdtempSync(path.join(os.tmpdir(), "apimatic-cli-"));
@@ -43,34 +25,6 @@ export const clearDirectory = async (folderPath: string) => {
   }
 
   await deleteFile(folderPath);
-};
-
-export const validationMessagesToJson = (validationMessages: ApiValidationSummary): object => {
-  const structuredValidationMessages: { [key: string]: { [key: string]: string[] } } = {
-    "Validation Messages": {
-      Errors: [],
-      Warnings: [],
-      Messages: []
-    }
-  };
-
-  if (validationMessages.errors) {
-    validationMessages.errors.forEach((error) => {
-      structuredValidationMessages["Validation Messages"]["Errors"].push(replaceHTML(error));
-    });
-  }
-  if (validationMessages.warnings) {
-    validationMessages.warnings.forEach((warning) => {
-      structuredValidationMessages["Validation Messages"]["Warnings"].push(replaceHTML(warning));
-    });
-  }
-  if (validationMessages.messages) {
-    validationMessages.messages.forEach((message) => {
-      structuredValidationMessages["Validation Messages"]["Messages"].push(replaceHTML(message));
-    });
-  }
-
-  return structuredValidationMessages;
 };
 
 // TODO: Move to types folder.
@@ -160,28 +114,6 @@ export const writeFileUsingReadableStream = (stream: NodeJS.ReadableStream, dest
   });
 };
 
-export const zipDirectoryToStream = async (sourcePath: string): Promise<NodeJS.ReadableStream> => {
-  // Check if the directory exists for the user or not
-  await fsExtra.ensureDir(sourcePath);
-
-  const archive = archiver("zip");
-
-  return new Promise((resolve, reject) => {
-    archive.on("error", (err) => {
-      reject(new Error(err.message));
-    });
-
-    const passThroughStream = new PassThrough();
-    archive.pipe(passThroughStream);
-
-    archive.directory(sourcePath, false);
-
-    archive.finalize().catch(reject);
-
-    resolve(passThroughStream);
-  });
-};
-
 /**
  * Packages local files into a ZIP archive
  *
@@ -221,15 +153,6 @@ export const replaceHTML = (string: string) => {
   return stripTags(string);
 };
 
-export const isJSONParsable = (json: string) => {
-  try {
-    JSON.parse(json);
-    return true;
-  } catch (e) {
-    return false;
-  }
-};
-
 export const getFileNameFromPath = (filePath: string) => {
   return path.basename(filePath).split(".")[0];
 };
@@ -252,141 +175,6 @@ export const printValidationMessages = (
     error(replaceHTML(singleError));
   }
 };
-
-/**
- * Extracts a ZIP file to a specified destination directory.
- *
- * @param zipFilePath Path to the ZIP file.
- * @param destinationDir Path to the destination directory where files will be extracted.
- */
-export async function extractZipFile(zipFilePath: string, destinationDir: string): Promise<void> {
-  const MAX_ZIP_SIZE = 300 * 1024 * 1024;
-
-  return new Promise((resolve, reject) => {
-    try {
-      const zip = new AdmZip(zipFilePath);
-      const zipEntries = zip.getEntries();
-      let totalSize = 0;
-
-      zipEntries.forEach((entry) => {
-        totalSize += entry.getData().length;
-
-        const normalizedPath = path.normalize(entry.entryName);
-        if (normalizedPath.startsWith("..") || path.isAbsolute(normalizedPath)) {
-          return reject(new Error(`Blocked potentially unsafe path: ${normalizedPath}`));
-        }
-      });
-
-      if (totalSize > MAX_ZIP_SIZE) {
-        return reject(new Error(getMessageInRedColor("Archive size is too large for safe extraction.")));
-      }
-
-      if (!fs.existsSync(destinationDir)) {
-        fs.mkdirSync(destinationDir, { recursive: true });
-      }
-
-      zipEntries.forEach((entry) => {
-        const resolvedPath = path.resolve(destinationDir, entry.entryName);
-
-        if (!resolvedPath.startsWith(path.resolve(destinationDir))) {
-          return reject(new Error("An error occurred while extracting zip file."));
-        }
-
-        zip.extractEntryTo(entry, destinationDir, true, true);
-      });
-      resolve();
-    } catch (error) {
-      return reject(new Error(`Failed to extract ZIP File: ${error}`));
-    }
-  });
-}
-
-//TODO: Refactor this method, carries dual responsibility.
-export async function zipPortalSource(
-  sourceDirectoryPath: string,
-  generatedZipFilePath: string,
-  ignoredPaths: string[] = []
-): Promise<string> {
-  if (await fsExtra.pathExists(generatedZipFilePath)) {
-    await deleteFile(generatedZipFilePath);
-  }
-
-  const output = fs.createWriteStream(generatedZipFilePath);
-  const archive = archiver("zip", {
-    zlib: { level: 9 }
-  });
-
-  return new Promise((resolve, reject) => {
-    output.on("close", () => resolve(generatedZipFilePath));
-    output.on("error", (err) => {
-      return reject(new Error(`Failed to zip the source directory: ${err.message}`));
-    });
-    archive.on("error", (err) => {
-      return reject(new Error(`Failed to zip the source directory: ${err.message}`));
-    });
-
-    archive.pipe(output);
-
-    // Function to recursively add files and directories to the archive, excluding ignored paths
-    const addItemsToArchive = async (currentPath: string, archivePath: string | false) => {
-      const items = await fsExtra.readdir(currentPath);
-
-      for (const item of items) {
-        const fullPath = path.join(currentPath, item);
-        const relativePath = path.relative(sourceDirectoryPath, fullPath);
-
-        // Check if the path is ignored.
-        const isIgnored = ignoredPaths.some(
-          (ignoredPath) =>
-            fullPath === ignoredPath ||
-            relativePath === ignoredPath ||
-            fullPath === path.resolve(ignoredPath) ||
-            relativePath.startsWith(ignoredPath + "/") ||
-            relativePath.startsWith(ignoredPath + "\\")
-        );
-
-        if (!isIgnored) {
-          const stats = await fsExtra.stat(fullPath);
-          if (stats.isDirectory()) {
-            await addItemsToArchive(fullPath, archivePath ? path.join(archivePath, item) : item);
-          } else {
-            archive.file(fullPath, { name: archivePath ? path.join(archivePath, item) : item });
-          }
-        }
-      }
-    };
-
-    // Start adding items from the source directory
-    addItemsToArchive(sourceDirectoryPath, false)
-      .then(() => {
-        archive.finalize();
-      })
-      .catch((err) => {
-        return reject(new Error(`Failed to add items to the zip created for source directory: ${err.message}`));
-      });
-  });
-}
-
-export async function isPortInUse(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-
-    server.once("error", (err: any) => {
-      if (err.code === "EADDRINUSE") {
-        resolve(true);
-      } else {
-        resolve(false);
-      }
-    });
-
-    server.once("listening", () => {
-      server.close();
-      resolve(false);
-    });
-
-    server.listen(port);
-  });
-}
 
 export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
   const chunks: Buffer[] = [];

@@ -167,7 +167,7 @@ export class PortalRecipeAction {
     let editorArgs: string[] = [];
     const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.txt`);
     const template = `# The Heading Goes Here\n\nThis is placeholder text for your API Recipe content step. Feel free to edit this. Save your changes and then close the file once you're done.`;
-    await fsExtra.writeFile(tempFilePath, template, 'utf-8');
+    await fsExtra.writeFile(tempFilePath, template, "utf-8");
 
     try {
       if (!editor) {
@@ -306,12 +306,7 @@ export class PortalRecipeAction {
       "Extracting endpoint groups and endpoints from the API specification."
     );
 
-    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(
-      specFolderPath,
-      contentFolderPath,
-      configDir,
-      commandName
-    );
+    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(specFolderPath, configDir, commandName);
 
     if (endpointGroupsResult.isFailed()) {
       this.prompts.stopProgressIndicatorWithMessage("Unable to extract endpoints from your API specification.");

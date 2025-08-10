@@ -1,56 +1,46 @@
-import * as path from "path";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
-import { zipPortalSource, deleteFile } from "../../../utils/utils.js";
 import { TocEndpoint, TocModel } from "../../../types/toc/toc.js";
 import { Result } from "../../../types/common/result.js";
 import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
+import { FileName } from "../../../types/file/fileName.js";
+import { ZipService } from "../../../infrastructure/zip-service.js";
+import { FilePath } from "../../../types/file/filePath.js";
+import { FileService } from "../../../infrastructure/file-service.js";
 
 export class SdlParser {
+  private readonly zipArchiver: ZipService = new ZipService();
+  private readonly fileService = new FileService();
+
   constructor(private readonly portalService: PortalService) {}
 
   public async getTocComponentsFromSdl(
     specFolderPath: string,
-    buildDirectory: DirectoryPath,
     configDir: string,
     commandName: string
   ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
-    const sourceSpecInputZipFilePath = await zipPortalSource(
-      specFolderPath,
-      path.join(buildDirectory.toString(), ".spec_source.zip")
-    );
+    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir, commandName);
 
-    try {
-      const result = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir, commandName);
-
-      if (!result.isSuccess()) {
-        return Result.failure(
-          "Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic's interactive VS Code Extension."
-        );
-      }
-
-      const sdl: Sdl = result.value!;
-      const endpointGroups = this.extractEndpointGroupsForToc(sdl);
-      const models = this.extractModelsForToc(sdl);
-
-      return Result.success({ endpointGroups, models });
-    } finally {
-      await deleteFile(sourceSpecInputZipFilePath);
+    if (!sdlResult.isSuccess()) {
+      return Result.failure(
+        "Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
+      );
     }
+
+    const sdl: Sdl = sdlResult.value!;
+    const endpointGroups = this.extractEndpointGroupsForToc(sdl);
+    const models = this.extractModelsForToc(sdl);
+
+    return Result.success({ endpointGroups, models });
   }
 
   public async getEndpointGroupsFromSdl(
     specFolderPath: string,
-    contentFolderPath: string,
     configDir: string,
     commandName: string
   ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    const sourceSpecInputZipFilePath = await zipPortalSource(
-      specFolderPath,
-      path.join(contentFolderPath, ".spec_source.zip")
-    );
-
-    const sdlResult = await this.portalService.generateSdl(sourceSpecInputZipFilePath, configDir, commandName);
+    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir, commandName);
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(
@@ -61,9 +51,31 @@ export class SdlParser {
     const sdl: Sdl = sdlResult.value!;
     const endpointGroups = this.extractEndpointGroupsForRecipe(sdl);
 
-    await deleteFile(sourceSpecInputZipFilePath);
-
     return Result.success(endpointGroups);
+  }
+
+  private async generateSdlFromSpec(specFolderPath: string, configDir: string, commandName: string): Promise<Result<Sdl, string>> {
+    return await withDirPath(async (tempDirectory) => {
+      const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
+      await this.zipArchiver.archive(new DirectoryPath(specFolderPath), specZipPath);
+
+      const specFileStream = await this.fileService.getStream(specZipPath);
+      let result: Result<Sdl, string>;
+
+      try {
+        result = await this.portalService.generateSdl(specFileStream, configDir, commandName);
+      } finally {
+        specFileStream.close();
+      }
+      
+      if (!result.isSuccess()) {
+        return Result.failure(
+          "Failed to generate SDL from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension."
+        );
+      }
+
+      return Result.success(result.value!);
+    });
   }
 
   private extractEndpointGroupsForRecipe(sdl: Sdl): Map<string, SdlEndpoint[]> {

@@ -141,7 +141,6 @@ export default class PortalQuickstart extends Command {
         port: port,
         open: true,
         "no-reload": false,
-        ignore: "",
         "auth-key": undefined
       };
 
