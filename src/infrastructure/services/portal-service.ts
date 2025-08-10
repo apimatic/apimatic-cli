@@ -48,7 +48,7 @@ export class PortalService {
       const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(
         this.CONTENT_TYPE,
         file,
-        this.createCommandNameQueryParameter(commandName)
+        this.createOriginQueryParameter(commandName)
       );
       return Result.success(response.result as NodeJS.ReadableStream);
     } catch (error) {
@@ -76,11 +76,10 @@ export class PortalService {
       const response = await sdkGenerationController.generateSdkViaFile(
         file,
         sdkPlatform,
-        this.createCommandNameQueryParameter(commandName)
+        this.createOriginQueryParameter(commandName)
       );
       const sdkResponse = await sdkGenerationController.downloadSdk(
-        response.result.id,
-        this.createCommandNameQueryParameter(commandName)
+        response.result.id
       );
       return Result.success(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
@@ -106,7 +105,7 @@ export class PortalService {
         ContentType.EnumMultipartformdata,
         file,
         ExportFormats.Apimatic,
-        this.createCommandNameQueryParameter(commandName)
+        this.createOriginQueryParameter(commandName)
       );
 
       if (!generation.result.success) {
@@ -115,8 +114,7 @@ export class PortalService {
 
       const transformationId = generation.result.id;
       const { result }: TransformationData = await transformationController.downloadTransformedFile(
-        transformationId,
-        this.createCommandNameQueryParameter(commandName)
+        transformationId
       );
       if ((result as NodeJS.ReadableStream).readable) {
         return Result.success((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
@@ -147,9 +145,9 @@ export class PortalService {
     });
   };
 
-  private createCommandNameQueryParameter = (commandName: string): Record<string, string> => {
+  private createOriginQueryParameter = (commandName: string): Record<string, string> => {
     return {
-      commandName: commandName
+      origin: `APIMATIC CLI ${commandName}`
     };
   };
 
