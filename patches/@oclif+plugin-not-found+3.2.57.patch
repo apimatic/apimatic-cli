@@ -1,0 +1,76 @@
+diff --git a/node_modules/@oclif/plugin-not-found/lib/utils.js b/node_modules/@oclif/plugin-not-found/lib/utils.js
+index be4e333..7dd6d1e 100644
+--- a/node_modules/@oclif/plugin-not-found/lib/utils.js
++++ b/node_modules/@oclif/plugin-not-found/lib/utils.js
+@@ -1,32 +1,47 @@
+-import { confirm } from '@inquirer/prompts';
++import readline from 'node:readline';
+ import { blueBright, reset } from 'ansis';
+-import { default as levenshtein } from 'fast-levenshtein';
+-import { setTimeout } from 'node:timers/promises';
++import levenshtein from 'fast-levenshtein';
++
+ const getConfirmation = async (suggestion) => {
+-    const ac = new AbortController();
+-    const { signal } = ac;
+-    const confirmation = confirm({
+-        default: true,
+-        message: `Did you mean ${blueBright(suggestion)}?`,
+-        theme: {
+-            prefix: '',
+-            style: {
+-                message: (text) => reset(text),
+-            },
+-        },
++  if (!process.stdin.isTTY) return false;
++
++  const question = `${reset(`Did you mean ${blueBright(suggestion)}?`)} (Y/n) `;
++
++  return await new Promise((resolve) => {
++    const rl = readline.createInterface({
++      input: process.stdin,
++      output: process.stdout,
+     });
+-    setTimeout(10_000, 'timeout', { signal })
+-        .catch(() => false)
+-        .then(() => confirmation.cancel());
+-    return confirmation.then((value) => {
+-        ac.abort();
+-        return value;
++
++    let answered = false;
++
++    // Timeout after 10 seconds
++    const timeout = setTimeout(() => {
++      if (!answered) {
++        rl.close();
++        resolve(false);
++      }
++    }, 10_000);
++
++    rl.question(question, (answer) => {
++      answered = true;
++      clearTimeout(timeout);
++      rl.close();
++      const a = (answer ?? '').trim().toLowerCase();
++      resolve(a === '' || a === 'y' || a === 'yes');
+     });
++  });
+ };
+-const closest = (target, possibilities) => possibilities
+-    .map((id) => ({ distance: levenshtein.get(target, id, { useCollator: true }), id }))
++
++const closest = (target, possibilities) =>
++  possibilities
++    .map((id) => ({
++      distance: levenshtein.get(target, id, { useCollator: true }),
++      id,
++    }))
+     .sort((a, b) => a.distance - b.distance)[0]?.id ?? '';
++
+ export default {
+-    closest,
+-    getConfirmation,
++  closest,
++  getConfirmation,
+ };

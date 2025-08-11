@@ -44,7 +44,8 @@
         "format": "prettier --write \"src/**/*.{js,ts}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
-        "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
+        "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999",
+        "postinstall": "patch-package"
     },
     "dependencies": {
         "@apimatic/sdk": "^0.2.0-alpha.3",
@@ -109,6 +110,8 @@
         "nock": "^14.0.4",
         "nyc": "^17.1.0",
         "oclif": "^4.17.34",
+        "patch-package": "^8.0.0",
+        "postinstall-postinstall": "^2.1.0",
         "rimraf": "^6.0.1",
         "sinon": "^21.0.0",
         "tmp-promise": "^3.0.3",
