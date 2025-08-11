@@ -4,7 +4,7 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
-import { exec, spawn } from "child_process";
+import { spawn } from "child_process";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
