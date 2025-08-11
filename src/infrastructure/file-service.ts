@@ -1,5 +1,6 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
+import * as path from "path";
 import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
@@ -36,6 +37,21 @@ export class FileService {
   public async cleanDirectory(dir: DirectoryPath): Promise<void> {
     await fsExtra.ensureDir(dir.toString());
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
+  }
+
+  public async copyDirectory(source: DirectoryPath, destination: DirectoryPath) {
+    await fsExtra.copy(source.toString(), destination.toString());
+  }
+
+  public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
+    const entries = await fsExtra.readdir(source.toString());
+    await Promise.all(
+      entries.map(async (entry) => {
+        const srcEntry = path.join(source.toString(), entry);
+        const destEntry = path.join(destination.toString(), entry);
+        await fsExtra.copy(srcEntry, destEntry);
+      })
+    );
   }
 
   public async deleteFile(filePath: FilePath): Promise<void> {

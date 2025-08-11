@@ -216,6 +216,7 @@ export class PortalQuickstartController {
     return await withDirPath(async (tempDirectory) => {
       const zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`;
       const response = await fetch(zipUrl);
+      const repositoryFolderName = "static-portal-workflow-master";
 
       if (!response.ok) {
         throw new Error(`Unable to setup your portal, please try again later.`);
@@ -223,19 +224,11 @@ export class PortalQuickstartController {
       const arrayBuffer = await response.arrayBuffer();
       const tempZipPath = new FilePath(tempDirectory, new FileName("static-repo.zip"));
       await this.fileService.writeBuffer(tempZipPath, Buffer.from(arrayBuffer));
-      await this.zipService.unArchive(tempZipPath, new DirectoryPath(targetFolder));
 
-      // Move contents to root of the directory.
-      const extractedFolder = path.join(targetFolder, "static-portal-workflow-master");
-      if (await fsExtra.pathExists(extractedFolder)) {
-        const contents = await fsExtra.readdir(extractedFolder);
-        for (const item of contents) {
-          const srcPath = path.join(extractedFolder, item);
-          const destPath = path.join(targetFolder, item);
-          await fsExtra.move(srcPath, destPath);
-        }
-        await fsExtra.remove(extractedFolder);
-      }
+      await this.zipService.unArchive(tempZipPath, tempDirectory);
+
+      const extractedFolderPath = new DirectoryPath(tempDirectory.toString(), repositoryFolderName);
+      await this.fileService.copyDirectoryContents(extractedFolderPath, new DirectoryPath(targetFolder));
     });
   }
 
