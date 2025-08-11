@@ -9,6 +9,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
+import { taskLog } from "@clack/prompts";
 
 export class CopilotAction {
   private readonly apiService = new ApiService();
@@ -35,15 +36,16 @@ export class CopilotAction {
     if (!force && buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite()))
       return ActionResult.error("Exiting without making any change.");
 
-    const response = await this.apiService.getAccountInfo(this.configDir, this.authKey);
+    const response = await this.prompts.spinnerAccountInfo(
+      () => this.apiService.getAccountInfo(this.configDir, this.authKey));
+
     if (response.isErr()) {
       return ActionResult.error(response._unsafeUnwrapErr());
     }
+
     const apiCopilotKey = await this.selectCopilotKey(response._unsafeUnwrap(), force);
-    if (apiCopilotKey === null) {
-      return ActionResult.error(
-        "No copilot key found for the current subscription. Please contact support at support@apimatic.io."
-      );
+    if (apiCopilotKey instanceof Error) {
+      return ActionResult.error(apiCopilotKey.message);
     }
 
     const welcomeMessage = await this.getWelcomeMessage();
@@ -57,25 +59,32 @@ export class CopilotAction {
 
     await buildContext.updateBuildFileContents(buildJson);
 
-    // TODO: remove message from prompt
     this.prompts.copilotConfigured(enable, apiCopilotKey);
+
+
     return ActionResult.success();
   }
 
-  private async selectCopilotKey(subscription: SubscriptionInfo | undefined, force: boolean): Promise<string | null> {
+  private async selectCopilotKey(subscription: SubscriptionInfo | undefined, force: boolean): Promise<string | Error> {
     if (
       subscription === undefined ||
       subscription.ApiCopilotKeys === undefined ||
       subscription.ApiCopilotKeys.length === 0
     ) {
-      return null;
+      return new Error("No copilot key found for the current subscription. Please contact support at support@apimatic.io.");
     }
 
-    if (force && subscription.ApiCopilotKeys.length === 1) return subscription.ApiCopilotKeys[0];
+    if (subscription.ApiCopilotKeys.length === 1) {
+      if (force || (await this.prompts.confirmSingleKeyUsage(subscription.ApiCopilotKeys[0])))
+        return subscription.ApiCopilotKeys[0];
+      return new Error("Operation cancelled. No API Copilot key was selected.");
+    }
 
-    return await this.prompts.selectCopilotKey(subscription.ApiCopilotKeys);
+    const key = await this.prompts.selectCopilotKey(subscription.ApiCopilotKeys);
+    if (key === null) return new Error("Operation cancelled. No API Copilot key was selected.");
+    await this.prompts.displayApiCopilotKeyUsageWarning();
 
-    // TODO: add message here (warning
+    return key;
   }
 
   private async getWelcomeMessage(): Promise<string> {
