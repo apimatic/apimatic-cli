@@ -1,4 +1,3 @@
-import { simpleGit } from "simple-git";
 import axios from "axios";
 import * as path from "path";
 import filetype from "file-type";
@@ -18,18 +17,20 @@ import {
 } from "../../utils/utils.js";
 import { getValidationSummary } from "../api/validate.js";
 import { AuthorizationError, GetValidationParams } from "../../types/api/validate.js";
-import { metadataFileContent, staticPortalRepoUrl } from "../../config/env.js";
+import { metadataFileContent } from "../../config/env.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { AuthenticationError } from "../../types/utils.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileName } from "../../types/file/fileName.js";
+import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { FileService } from "../../infrastructure/file-service.js";
 
 export class PortalQuickstartController {
   private readonly zipService = new ZipService();
-  private readonly specUrl =
-    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json";
+  private readonly fileService = new FileService();
+  private readonly specUrl = "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);
@@ -114,10 +115,13 @@ export class PortalQuickstartController {
         }
       } else {
         specPath = path.normalize(specPath);
-        const fileType = await filetype.fromFile(specPath); 
+        const fileType = await filetype.fromFile(specPath);
 
         if (fileType?.ext === "zip") {
-          await this.zipService.unArchive(new FilePath(new DirectoryPath(path.dirname(specPath)), new FileName(path.basename(specPath))), new DirectoryPath(tempSpecDir));
+          await this.zipService.unArchive(
+            new FilePath(new DirectoryPath(path.dirname(specPath)), new FileName(path.basename(specPath))),
+            new DirectoryPath(tempSpecDir)
+          );
         } else {
           const destinationPath = path.join(tempSpecDir, path.basename(specPath));
           await fsExtra.copy(specPath, destinationPath);
@@ -208,6 +212,33 @@ export class PortalQuickstartController {
     }
   }
 
+  private async downloadRepositoryFromGitHub(targetFolder: string): Promise<void> {
+    return await withDirPath(async (tempDirectory) => {
+      const zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`;
+      const response = await fetch(zipUrl);
+
+      if (!response.ok) {
+        throw new Error(`Unable to setup your portal, please try again later.`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const tempZipPath = new FilePath(tempDirectory, new FileName("static-repo.zip"));
+      await this.fileService.writeBuffer(tempZipPath, Buffer.from(arrayBuffer));
+      await this.zipService.unArchive(tempZipPath, new DirectoryPath(targetFolder));
+
+      // Move contents to root of the directory.
+      const extractedFolder = path.join(targetFolder, "static-portal-workflow-master");
+      if (await fsExtra.pathExists(extractedFolder)) {
+        const contents = await fsExtra.readdir(extractedFolder);
+        for (const item of contents) {
+          const srcPath = path.join(extractedFolder, item);
+          const destPath = path.join(targetFolder, item);
+          await fsExtra.move(srcPath, destPath);
+        }
+        await fsExtra.remove(extractedFolder);
+      }
+    });
+  }
+
   async setupBuildDirectory(
     prompts: PortalQuickstartPrompts,
     targetFolder: string,
@@ -215,20 +246,14 @@ export class PortalQuickstartController {
     validationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<void> {
-    const git = simpleGit({
-      timeout: {
-        block: 60 * 1000 // 1 minute timeout.
-      }
-    });
-
     fsExtra.emptyDirSync(targetFolder);
 
     try {
-      await git.clone(staticPortalRepoUrl, targetFolder);
+      await this.downloadRepositoryFromGitHub(targetFolder);
     } catch (error) {
       prompts.displayBuildDirectoryGenerationErrorMessage();
       if (error instanceof Error) {
-        if (error.message.includes("timed out")) {
+        if (error.message.includes("timed out") || error.message.includes("timeout")) {
           throw new Error(
             getMessageInRedColor(
               "The operation timed out while setting up the build directory. Please check your internet connection and try again."
@@ -246,7 +271,6 @@ export class PortalQuickstartController {
       }
     }
 
-    await clearDirectory(path.join(targetFolder, ".git"));
     await clearDirectory(path.join(targetFolder, ".github"));
 
     if (specFile.localPath && validationSummary.success) {

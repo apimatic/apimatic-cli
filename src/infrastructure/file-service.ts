@@ -62,6 +62,10 @@ export class FileService {
     await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
+  public async writeBuffer(filePath: FilePath, buffer: Buffer) {
+    await fsExtra.writeFile(filePath.toString(), buffer);
+  }
+
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
