@@ -1,3 +1,10 @@
+# [1.1.0-alpha.20](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.19...v1.1.0-alpha.20) (2025-08-11)
+
+
+### Bug Fixes
+
+* remove simple-git dependency ([#151](https://github.com/apimatic/apimatic-cli/issues/151)) ([04d4669](https://github.com/apimatic/apimatic-cli/commit/04d466994722c116422d7e0d281a308c5c7dc355))
+
 # [1.1.0-alpha.19](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.18...v1.1.0-alpha.19) (2025-08-06)
 
 
