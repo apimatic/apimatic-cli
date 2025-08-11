@@ -70,7 +70,6 @@
         "neverthrow": "^8.2.0",
         "open": "^8.4.0",
         "prettier": "^2.8.8",
-        "simple-git": "^3.27.0",
         "striptags": "^3.2.0",
         "tmp-promise": "^3.0.3",
         "treeify": "^1.1.0",
