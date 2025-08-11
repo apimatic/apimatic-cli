@@ -47,7 +47,7 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.2.0-alpha.2",
+        "@apimatic/sdk": "^0.2.0-alpha.3",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
@@ -61,6 +61,7 @@
         "connect-livereload": "^0.6.1",
         "execa": "^9.6.0",
         "express": "^4.17.1",
+        "extract-zip": "^2.0.1",
         "file-type": "^15.0.0",
         "form-data": "^4.0.2",
         "fs-extra": "^11.3.0",
@@ -69,12 +70,10 @@
         "neverthrow": "^8.2.0",
         "open": "^8.4.0",
         "prettier": "^2.8.8",
-        "simple-git": "^3.27.0",
         "striptags": "^3.2.0",
         "tmp-promise": "^3.0.3",
         "treeify": "^1.1.0",
         "tslib": "^2.8.1",
-        "unzipper": "^0.12.3",
         "uuid": "^11.1.0",
         "yaml": "^2.8.0"
     },

@@ -1,4 +1,3 @@
-import { simpleGit } from "simple-git";
 import axios from "axios";
 import * as path from "path";
 import filetype from "file-type";
@@ -12,20 +11,26 @@ import { SDKClient } from "../../client-utils/sdk-client.js";
 import {
   createTempDirectory,
   isValidUrl,
-  unzipFile,
   getMessageInRedColor,
   clearDirectory,
   deleteFile
 } from "../../utils/utils.js";
 import { getValidationSummary } from "../api/validate.js";
 import { AuthorizationError, GetValidationParams } from "../../types/api/validate.js";
-import { metadataFileContent, staticPortalRepoUrl } from "../../config/env.js";
+import { metadataFileContent } from "../../config/env.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { AuthenticationError } from "../../types/utils.js";
+import { ZipService } from "../../infrastructure/zip-service.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FileName } from "../../types/file/fileName.js";
+import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { FileService } from "../../infrastructure/file-service.js";
 
 export class PortalQuickstartController {
-  private readonly specUrl =
-    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json";
+  private readonly zipService = new ZipService();
+  private readonly fileService = new FileService();
+  private readonly specUrl = "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json";
 
   async isUserAuthenticated(configDir: string): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir);
@@ -113,7 +118,10 @@ export class PortalQuickstartController {
         const fileType = await filetype.fromFile(specPath);
 
         if (fileType?.ext === "zip") {
-          await unzipFile(fs.createReadStream(specPath), tempSpecDir);
+          await this.zipService.unArchive(
+            new FilePath(new DirectoryPath(path.dirname(specPath)), new FileName(path.basename(specPath))),
+            new DirectoryPath(tempSpecDir)
+          );
         } else {
           const destinationPath = path.join(tempSpecDir, path.basename(specPath));
           await fsExtra.copy(specPath, destinationPath);
@@ -204,6 +212,26 @@ export class PortalQuickstartController {
     }
   }
 
+  private async downloadRepositoryFromGitHub(targetFolder: string): Promise<void> {
+    return await withDirPath(async (tempDirectory) => {
+      const zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`;
+      const response = await fetch(zipUrl);
+      const repositoryFolderName = "static-portal-workflow-master";
+
+      if (!response.ok) {
+        throw new Error(`Unable to setup your portal, please try again later.`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const tempZipPath = new FilePath(tempDirectory, new FileName("static-repo.zip"));
+      await this.fileService.writeBuffer(tempZipPath, Buffer.from(arrayBuffer));
+
+      await this.zipService.unArchive(tempZipPath, tempDirectory);
+
+      const extractedFolderPath = new DirectoryPath(tempDirectory.toString(), repositoryFolderName);
+      await this.fileService.copyDirectoryContents(extractedFolderPath, new DirectoryPath(targetFolder));
+    });
+  }
+
   async setupBuildDirectory(
     prompts: PortalQuickstartPrompts,
     targetFolder: string,
@@ -211,20 +239,14 @@ export class PortalQuickstartController {
     validationSummary: ApiValidationSummary,
     languages: string[]
   ): Promise<void> {
-    const git = simpleGit({
-      timeout: {
-        block: 60 * 1000 // 1 minute timeout.
-      }
-    });
-
     fsExtra.emptyDirSync(targetFolder);
 
     try {
-      await git.clone(staticPortalRepoUrl, targetFolder);
+      await this.downloadRepositoryFromGitHub(targetFolder);
     } catch (error) {
       prompts.displayBuildDirectoryGenerationErrorMessage();
       if (error instanceof Error) {
-        if (error.message.includes("timed out")) {
+        if (error.message.includes("timed out") || error.message.includes("timeout")) {
           throw new Error(
             getMessageInRedColor(
               "The operation timed out while setting up the build directory. Please check your internet connection and try again."
@@ -242,12 +264,11 @@ export class PortalQuickstartController {
       }
     }
 
-    await clearDirectory(path.join(targetFolder, ".git"));
     await clearDirectory(path.join(targetFolder, ".github"));
 
     if (specFile.localPath && validationSummary.success) {
       const specFolder = path.join(targetFolder, "spec");
-      await deleteFile(path.join(specFolder, "Apimatic-Calculator.json"));
+      await deleteFile(path.join(specFolder, "openapi.json"));
 
       const files = await readdir(specFile.localPath);
       for (const file of files) {
