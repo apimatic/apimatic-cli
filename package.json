@@ -44,8 +44,7 @@
         "format": "prettier --write \"src/**/*.{js,ts}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
-        "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999",
-        "postinstall": "patch-package"
+        "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"        
     },
     "dependencies": {
         "@apimatic/sdk": "^0.2.0-alpha.3",
@@ -124,10 +123,12 @@
         "dirname": "apimatic",
         "bin": "apimatic",
         "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
+        "hooks": {
+            "command_not_found": "./lib/hooks/not-found"
+        },
         "plugins": [
             "@oclif/plugin-autocomplete",
-            "@oclif/plugin-help",
-            "@oclif/plugin-not-found"
+            "@oclif/plugin-help"
         ],
         "topics": {
             "api": {
