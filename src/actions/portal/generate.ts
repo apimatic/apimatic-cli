@@ -35,7 +35,7 @@ export class GenerateAction {
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
-      return ActionResult.error(`The 'src' directory is either empty or invalid: "${buildDirectory}"`);
+      return ActionResult.error(`Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running apimatic portal:quickstart.`);
     }
 
     const portalContext = new PortalContext(portalDirectory);
