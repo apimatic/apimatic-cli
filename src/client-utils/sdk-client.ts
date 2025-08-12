@@ -1,19 +1,12 @@
-import base64 from "base-64";
-import axios, { AxiosResponse } from "axios";
-
 import { Client } from "@apimatic/sdk";
 import { baseURL } from "../config/env.js";
-import { AuthInfo, getAuthInfo, removeAuthInfo, setAuthInfo } from "./auth-manager.js";
-import { DirectoryPath } from "../types/file/directoryPath.js";
+import { AuthInfo, getAuthInfo, removeAuthInfo } from "./auth-manager.js";
+
 
 /**
  * The Singleton class defines the `getInstance` method that lets clients access
  * the unique singleton instance.
  */
-type Credentials = {
-  email: string;
-  password: string;
-};
 export class SDKClient {
   public static client: Client;
   private static instance: SDKClient;
@@ -31,21 +24,6 @@ export class SDKClient {
     }
 
     return SDKClient.instance;
-  }
-
-  /**
-   * Finally, any SDKClient should define some business logic, which can be
-   * executed on its instance.
-   */
-
-  public async login(email: string, password: string, configDir: string): Promise<string> {
-    const credentials: Credentials = { email, password };
-    const authKey: string = await this.getAuthKey(credentials);
-    const isTelemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
-
-    await setAuthInfo(email, authKey, isTelemetryOptedOut, new DirectoryPath(configDir));
-
-    return "Logged in successfully as " + email;
   }
 
   public async logout(configDir: string): Promise<string> {
@@ -97,15 +75,5 @@ export class SDKClient {
     } else {
       throw new Error("Please login first or provide an authKey");
     }
-  }
-
-  private async getAuthKey(credentials: Credentials): Promise<string> {
-    const config = {
-      headers: {
-        Authorization: `Basic ${base64.encode(`${credentials.email}:${credentials.password}`)}`
-      }
-    };
-    const response: AxiosResponse = await axios.get(SDKClient.authAPI, config);
-    return response.data.EncryptedValue;
   }
 }
