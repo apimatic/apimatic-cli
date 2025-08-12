@@ -1,7 +1,5 @@
 import { Client } from "@apimatic/sdk";
-import { baseURL } from "../config/env.js";
 import { AuthInfo, getAuthInfo, removeAuthInfo } from "./auth-manager.js";
-
 
 /**
  * The Singleton class defines the `getInstance` method that lets clients access
