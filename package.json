@@ -53,6 +53,7 @@
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",
         "@oclif/plugin-not-found": "^3.2.44",
+        "@oclif/plugin-warn-if-update-available": "^3.1.46",
         "archiver": "^7.0.1",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
@@ -123,8 +124,16 @@
         "plugins": [
             "@oclif/plugin-autocomplete",
             "@oclif/plugin-help",
-            "@oclif/plugin-not-found"
+            "@oclif/plugin-not-found",
+            "@oclif/plugin-warn-if-update-available"
         ],
+        "warn-if-update-available": {
+            "timeoutInDays": 7,
+            "message": "<%= config.name %> update available from <%= chalk.greenBright(config.version) %> to <%= chalk.greenBright(latest) %>.",
+            "registry": "https://registry.npmjs.org",
+            "frequency": 30,
+            "frequencyUnit": "seconds"
+        },
         "topics": {
             "api": {
                 "description": "Transform & Validate your API specifications."
