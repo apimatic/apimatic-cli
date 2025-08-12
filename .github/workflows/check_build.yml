@@ -4,9 +4,7 @@ name: Run and check build for current commit
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
-  push:
-    branches: [ alpha, dev ]
+  # Triggers the workflow on pull request events but only for the alpha and dev branches
   pull_request:
     branches: [ alpha, dev ]
   # Allows you to run this workflow manually from the Actions tab
