@@ -1,4 +1,4 @@
-// This code was originally forked from https://github.com/oclif/plugin-not-found
+// This code was originally forked from https://github.com/oclif/plugin-not-found/blob/main/src/utils.ts
 import readline from 'node:readline';
 import { blueBright, reset } from 'ansis';
 import levenshtein from 'fast-levenshtein';

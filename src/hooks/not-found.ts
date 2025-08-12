@@ -1,4 +1,4 @@
-// This code was originally forked from https://github.com/oclif/plugin-not-found
+// This code was originally forked from https://github.com/oclif/plugin-not-found/blob/main/src/index.ts
 import { Hook, toConfiguredId } from "@oclif/core";
 import { cyan, yellow } from "ansis";
 
