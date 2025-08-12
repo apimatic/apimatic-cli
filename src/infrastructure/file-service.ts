@@ -5,6 +5,7 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
+import { spawn } from "child_process";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -30,7 +31,7 @@ export class FileService {
       const files = await fsExtra.readdir(dir.toString());
       return files.length === 0;
     } catch (error) {
-      return error instanceof Error && 'code' in error && error.code === "ENOENT";
+      return error instanceof Error && "code" in error && error.code === "ENOENT";
     }
   }
 
@@ -66,7 +67,7 @@ export class FileService {
   }
 
   public async getContents(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), 'utf-8');
+    return await fsExtra.readFile(filePath.toString(), "utf-8");
   }
 
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
@@ -86,6 +87,35 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
+  public async openFile(filePath: FilePath): Promise<void> {
+    const targetPath = filePath.toString();
+
+    // Determine the command and args without using the shell
+    let command: string;
+    let args: string[];
+
+    switch (os.platform()) {
+      case "win32":
+        command = "cmd";
+        args = ["/c", "start", "", targetPath];
+        break;
+      case "darwin":
+        command = "open";
+        args = [targetPath];
+        break;
+      default:
+        command = "xdg-open";
+        args = [targetPath];
+        break;
+    }
+
+    try {
+      const child = spawn(command, args, { stdio: "ignore", detached: true });
+      child.unref(); // Let it run without blocking
+    } catch {
+      // Silently ignore errors
+    }
+  }
 }
 
 const streamPipeline = promisify(pipeline);
