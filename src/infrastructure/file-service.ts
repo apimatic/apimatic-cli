@@ -91,7 +91,6 @@ export class FileService {
   public async openFile(filePath: FilePath): Promise<void> {
     const targetPath = filePath.toString();
 
-    // Determine the command and args without using the shell
     let command: string;
     let args: string[];
 
