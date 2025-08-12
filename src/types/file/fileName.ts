@@ -1,8 +1,8 @@
 export class FileName {
   private readonly name: string;
 
-  constructor(path: string) {
-    this.name = path;
+  constructor(name: string) {
+    this.name = name;
   }
 
   public toString(): string {
