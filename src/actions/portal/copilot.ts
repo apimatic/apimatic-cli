@@ -9,7 +9,6 @@ import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { taskLog } from "@clack/prompts";
 
 export class CopilotAction {
   private readonly apiService = new ApiService();
