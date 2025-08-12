@@ -10,7 +10,6 @@ import { AuthInfo, getAuthInfo, removeAuthInfo } from "./auth-manager.js";
 export class SDKClient {
   public static client: Client;
   private static instance: SDKClient;
-  private static authAPI = `${baseURL}/account/authkey`;
 
   /**
    * The static method that controls the access to the SDKClient instance.
