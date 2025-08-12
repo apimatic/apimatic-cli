@@ -9,11 +9,13 @@ import { ActionResult } from "../action-result.js";
 import { BuildContext } from "../../types/build-context.js";
 import { PortalContext } from "../../types/portal-context.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { LauncherService } from "../../infrastructure/launcher-service.js";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly zipArchiver: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
+  private readonly launcherService: LauncherService = new LauncherService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
   private readonly authKey: string | null;
@@ -86,7 +88,7 @@ export class GenerateAction {
     const errorReportPath = portalDirectory.join("apimatic-debug");
 
     const htmlFilePath = new FilePath(errorReportPath, new FileName("apimatic-report.html"));
-    await this.fileService.openFile(htmlFilePath); // Open the error report in the default browser
+    await this.launcherService.openFile(htmlFilePath); // Open the error report in the default browser
 
     return (
       "An error occurred during portal generation due to an issue with the input. " +
