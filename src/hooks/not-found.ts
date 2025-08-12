@@ -1,3 +1,4 @@
+// This code was originally forked from https://github.com/oclif/plugin-not-found
 import { Hook, toConfiguredId } from "@oclif/core";
 import { cyan, yellow } from "ansis";
 

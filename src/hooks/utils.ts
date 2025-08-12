@@ -1,3 +1,4 @@
+// This code was originally forked from https://github.com/oclif/plugin-not-found
 import readline from 'node:readline';
 import { blueBright, reset } from 'ansis';
 import levenshtein from 'fast-levenshtein';
