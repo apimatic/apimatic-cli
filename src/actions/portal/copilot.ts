@@ -49,7 +49,6 @@ export class CopilotAction {
     }
 
     const welcomeMessage = await this.getWelcomeMessage();
-    if (welcomeMessage === undefined) return ActionResult.error("Exiting without making any change.");
 
     buildJson.apiCopilotConfig = {
       isEnabled: enable,
