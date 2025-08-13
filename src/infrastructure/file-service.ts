@@ -1,12 +1,10 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
-import os from "os";
 import * as path from "path";
 import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
-import { spawn } from "child_process";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -77,7 +75,7 @@ export class FileService {
   }
 
   public async writeContents(filePath: FilePath, contents: string) {
-    await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
+    await fsExtra.writeFile(filePath.toString(), contents, "utf-8");
   }
 
   public async writeBuffer(filePath: FilePath, buffer: Buffer) {

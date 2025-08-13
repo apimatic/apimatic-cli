@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.19",
+    "version": "1.1.0-alpha.20",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -52,7 +52,6 @@
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",
-        "@oclif/plugin-not-found": "^3.2.44",
         "archiver": "^7.0.1",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
@@ -85,6 +84,7 @@
         "@types/chai": "^4.3.20",
         "@types/connect-livereload": "^0.5.32",
         "@types/express": "^4.17.23",
+        "@types/fast-levenshtein": "^0.0.4",
         "@types/fs-extra": "^9.0.13",
         "@types/livereload": "^0.9.5",
         "@types/mocha": "^5.2.7",
@@ -118,10 +118,12 @@
         "dirname": "apimatic",
         "bin": "apimatic",
         "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
+        "hooks": {
+            "command_not_found": "./lib/hooks/not-found"
+        },
         "plugins": [
             "@oclif/plugin-autocomplete",
-            "@oclif/plugin-help",
-            "@oclif/plugin-not-found"
+            "@oclif/plugin-help"
         ],
         "topics": {
             "api": {

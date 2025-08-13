@@ -9,11 +9,13 @@ import { ActionResult } from "../action-result.js";
 import { BuildContext } from "../../types/build-context.js";
 import { PortalContext } from "../../types/portal-context.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { LauncherService } from "../../infrastructure/launcher-service.js";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly zipArchiver: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
+  private readonly launcherService: LauncherService = new LauncherService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
   private readonly authKey: string | null;
@@ -26,6 +28,7 @@ export class GenerateAction {
   public readonly execute = async (
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
+    commandName: string,
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
@@ -35,7 +38,7 @@ export class GenerateAction {
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
-      return ActionResult.error(`The 'src' directory is either empty or invalid: "${buildDirectory}"`);
+      return ActionResult.error(`Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running apimatic portal:quickstart.`);
     }
 
     const portalContext = new PortalContext(portalDirectory);
@@ -51,7 +54,7 @@ export class GenerateAction {
       const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
       await this.zipArchiver.archive(buildDirectory, buildZipPath);
 
-      const response = await this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey);
+      const response = await this.portalService.generatePortal(buildZipPath, this.configDir, commandName, this.authKey);
 
       if (!response.isSuccess()) {
         this.prompts.displayPortalGenerationErrorMessage();
@@ -86,7 +89,7 @@ export class GenerateAction {
     const errorReportPath = portalDirectory.join("apimatic-debug");
 
     const htmlFilePath = new FilePath(errorReportPath, new FileName("apimatic-report.html"));
-    await this.fileService.openFile(htmlFilePath); // Open the error report in the default browser
+    await this.launcherService.openFile(htmlFilePath); // Open the error report in the default browser
 
     return (
       "An error occurred during portal generation due to an issue with the input. " +
