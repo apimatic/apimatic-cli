@@ -33,7 +33,7 @@ export default class PortalRecipeNew extends Command {
     const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
 
-    const createRecipeResult = await portalRecipeAction.createRecipe(buildDirectory, this.config.configDir, flags.name);
+    const createRecipeResult = await portalRecipeAction.createRecipe(buildDirectory, this.config.configDir, PortalRecipeNew.id, flags.name);
 
     //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (createRecipeResult.isFailed()) {

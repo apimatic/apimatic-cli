@@ -28,6 +28,7 @@ export class PortalRecipeAction {
   public async createRecipe(
     buildDirectoryPath: DirectoryPath,
     configDir: string,
+    commandName: string,
     name?: string
   ): Promise<Result<string, string>> {
     this.prompts.displayWelcomeMessage();
@@ -64,7 +65,8 @@ export class PortalRecipeAction {
       buildConfigResult.value,
       contentFolderPath,
       recipeName,
-      configDir
+      configDir,
+      commandName
     );
     if (recipeResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${recipeResult.error!}`);
@@ -113,7 +115,8 @@ export class PortalRecipeAction {
     buildConfig: any,
     contentFolderPath: string,
     recipeName: string,
-    configDir: string
+    configDir: string,
+    commandName: string
   ): Promise<Result<SerializableRecipe, string>> {
     const recipe = new PortalRecipe(recipeName);
     let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
@@ -136,7 +139,8 @@ export class PortalRecipeAction {
             const extractEndpointGroupsFromSdlResult = await this.extractEndpointGroupsFromSdl(
               buildConfig,
               contentFolderPath,
-              configDir
+              configDir,
+              commandName
             );
             if (extractEndpointGroupsFromSdlResult.isFailed()) {
               return Result.failure(`${extractEndpointGroupsFromSdlResult.error!}`);
@@ -290,7 +294,8 @@ export class PortalRecipeAction {
   private async extractEndpointGroupsFromSdl(
     buildConfig: any,
     contentFolderPath: string,
-    configDir: string
+    configDir: string,
+    commandName: string
   ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     const specFolderPath = this.getSpecFolderPath(buildConfig, contentFolderPath);
     if (!(await fsExtra.pathExists(specFolderPath))) {
@@ -301,7 +306,7 @@ export class PortalRecipeAction {
       "Extracting endpoint groups and endpoints from the API specification."
     );
 
-    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(specFolderPath, configDir);
+    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(specFolderPath, configDir, commandName);
 
     if (endpointGroupsResult.isFailed()) {
       this.prompts.stopProgressIndicatorWithMessage("Unable to extract endpoints from your API specification.");
