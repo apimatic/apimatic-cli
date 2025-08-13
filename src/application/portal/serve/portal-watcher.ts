@@ -16,9 +16,11 @@ export class PortalWatcher {
 
   public async watchAndRegeneratePortalOnChange(
     paths: ServePaths,
+    commandName: string,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
+      commandName: string,
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>
@@ -58,7 +60,7 @@ export class PortalWatcher {
         });
 
         await this.watcherHandler.execute(async () => {
-          await this.handleFileChange(paths, eventQueue, eventId, generatePortal);
+          await this.handleFileChange(paths, eventQueue, eventId, commandName, generatePortal);
         });
       })
       .on("error", () => {
@@ -82,9 +84,11 @@ export class PortalWatcher {
     paths: ServePaths,
     eventQueue: Map<string, string>,
     eventId: string,
+    commandName: string,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
+      commandName: string,
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>
@@ -95,6 +99,7 @@ export class PortalWatcher {
     const result = await generatePortal(
       new DirectoryPath(paths.sourceDirectoryPath),
       new DirectoryPath(paths.destinationDirectoryPath),
+      commandName,
       true,
       false
     );

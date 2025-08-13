@@ -62,6 +62,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
     const result = await portalNewTocAction.createToc(
       buildDirectory,
       this.config.configDir,
+      PortalTocNew.id,
       tocDirectory,
       flags.force,
       flags["expand-endpoints"],

@@ -28,6 +28,7 @@ export class GenerateAction {
   public readonly execute = async (
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
+    commandName: string,
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
@@ -53,7 +54,7 @@ export class GenerateAction {
       const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
       await this.zipArchiver.archive(buildDirectory, buildZipPath);
 
-      const response = await this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey);
+      const response = await this.portalService.generatePortal(buildZipPath, this.configDir, commandName, this.authKey);
 
       if (!response.isSuccess()) {
         this.prompts.displayPortalGenerationErrorMessage();

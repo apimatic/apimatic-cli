@@ -29,6 +29,7 @@ export class GenerateAction {
     specDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     platform: LanguagePlatform,
+    commandName: string,
     force: boolean,
     zipSdk: boolean
   ): Promise<ActionResult> => {
@@ -55,7 +56,7 @@ export class GenerateAction {
       await this.zipArchiver.archive(specDirectory, specZipPath);
 
       const sdkPlatform = this.convertSimplePlatformToPlatform(platform as LanguagePlatform);
-      const response = await this.portalService.generateSdk(specZipPath, sdkPlatform, this.configDir, this.authKey);
+      const response = await this.portalService.generateSdk(specZipPath, sdkPlatform, this.configDir, commandName, this.authKey);
 
       if (!response.isSuccess()) {
         this.prompts.displaySdkGenerationErrorMessage();

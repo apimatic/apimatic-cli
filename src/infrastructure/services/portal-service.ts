@@ -36,6 +36,7 @@ export class PortalService {
   async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
+    commandName: string,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
@@ -46,7 +47,11 @@ export class PortalService {
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
-      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
+      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(
+        this.CONTENT_TYPE,
+        file,
+        this.createOriginQueryParameter(commandName)
+      );
       return Result.success(response.result as NodeJS.ReadableStream);
     } catch (error) {
       return Result.failure(await this.handlePortalGenerationErrors(error));
@@ -60,6 +65,7 @@ export class PortalService {
     specPath: FilePath,
     sdkPlatform: Platforms,
     configDir: DirectoryPath,
+    commandName: string,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
@@ -70,7 +76,12 @@ export class PortalService {
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
-      const response = await sdkGenerationController.generateSdkViaFile(Accept.EnumApplicationjson, file, sdkPlatform);
+      const response = await sdkGenerationController.generateSdkViaFile(
+        Accept.EnumApplicationjson,
+        file,
+        sdkPlatform,
+        this.createOriginQueryParameter(commandName)
+      );
       const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
       return Result.success(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
@@ -80,7 +91,11 @@ export class PortalService {
     }
   }
 
-  public async generateSdl(specFileStream: ReadStream, configDir: string): Promise<Result<Sdl, string>> {
+  public async generateSdl(
+    specFileStream: ReadStream,
+    configDir: string,
+    commandName: string
+  ): Promise<Result<Sdl, string>> {
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
@@ -91,7 +106,8 @@ export class PortalService {
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         ContentType.EnumMultipartformdata,
         file,
-        ExportFormats.Apimatic
+        ExportFormats.Apimatic,
+        this.createOriginQueryParameter(commandName)
       );
 
       if (!generation.result.success) {
@@ -127,6 +143,12 @@ export class PortalService {
       userAgent: envInfo.getUserAgent(),
       timeout: this.TIMEOUT
     });
+  };
+
+  private createOriginQueryParameter = (commandName: string): Record<string, string> => {
+    return {
+      origin: `APIMATIC CLI ${commandName}`
+    };
   };
 
   private handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
@@ -171,7 +193,7 @@ export class PortalService {
       // Get the first error and clean it up
       const firstError = parsedResult.Errors[0];
       // Split on <br/> and take first part, then strip remaining HTML tags
-      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, ""); 
+      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
       return cleanError;
     } else if (parsedResult.Success === false) {
       return "API definition file validation failed.";
