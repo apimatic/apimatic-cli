@@ -1,14 +1,21 @@
 import fsExtra from "fs-extra";
 
 import { ux, Flags, Command } from "@oclif/core";
-import { ApiError, ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
+import {
+  ApiError,
+  ApiValidationExternalApisController,
+  ApiValidationSummary,
+  Client,
+  Environment
+} from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils.js";
-import { SDKClient } from "../../client-utils/sdk-client.js";
 import { getValidationSummary } from "../../controllers/api/validate.js";
 import { printValidationMessages, replaceHTML } from "../../utils/utils.js";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { envInfo } from "../../infrastructure/env-info.js";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
@@ -37,7 +44,9 @@ export default class Validate extends Command {
         throw new Error(`Validation file: ${flags.file} does not exist`);
       }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+      const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+      const authorizationHeader = this.createAuthorizationHeader(authInfo, overrideAuthKey);
+      const client: Client = await this.createApiClient(authorizationHeader);
 
       const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
         client
@@ -53,9 +62,11 @@ export default class Validate extends Command {
       };
       printValidationMessages(validationSummary, logFunctions);
 
-      validationSummary.success
-        ? this.log("Specification file provided is valid")
-        : this.error("Specification file provided is invalid");
+      if (validationSummary.success) {
+        this.log("Specification file provided is valid");
+      } else {
+        this.error("Specification file provided is invalid");
+      }
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
@@ -80,4 +91,40 @@ export default class Validate extends Command {
       }
     }
   }
+
+  //TODO: Remove all code below this line when refactoring.
+  private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
+    const key = overrideAuthKey || authInfo?.authKey;
+    return `X-Auth-Key ${key ?? ""}`;
+  };
+
+  private async createApiClient(authorizationHeader: string): Promise<Client> {
+    if (envInfo.getBaseUrl()) {
+      return this.createTestingApiClient(authorizationHeader);
+    }
+    return this.createProductionApiClient(authorizationHeader);
+  }
+
+  private readonly createProductionApiClient = (authorizationHeader: string): Client => {
+    return new Client({
+      customHeaderAuthenticationCredentials: {
+        Authorization: authorizationHeader
+      },
+      userAgent: envInfo.getUserAgent(),
+      timeout: 0,
+      environment: Environment.Production
+    });
+  };
+
+  private readonly createTestingApiClient = (authorizationHeader: string): Client => {
+    return new Client({
+      customHeaderAuthenticationCredentials: {
+        Authorization: authorizationHeader
+      },
+      userAgent: envInfo.getUserAgent(),
+      timeout: 0,
+      environment: Environment.Testing,
+      customUrl: envInfo.getBaseUrl()
+    });
+  };
 }

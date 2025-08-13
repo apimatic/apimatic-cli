@@ -1,7 +1,6 @@
 import getPort from "get-port";
 import { Command } from "@oclif/core";
-import { ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
-import { SDKClient } from "../../client-utils/sdk-client.js";
+import { ApiValidationExternalApisController, ApiValidationSummary, Client, Environment } from "@apimatic/sdk";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
 import { SpecFile } from "../../types/portal/quickstart.js";
@@ -17,6 +16,8 @@ import { LoginAction } from "../../actions/auth/login.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
 import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { envInfo } from "../../infrastructure/env-info.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -99,7 +100,9 @@ export default class PortalQuickstart extends Command {
       if (loginResult.isErr()) return;
     }
 
-    const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
+    const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
+    const client: Client = await this.createApiClient(authorizationHeader);
     const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
       client
     );
@@ -172,6 +175,42 @@ export default class PortalQuickstart extends Command {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }
   }
+
+  //TODO: Remove all the code below this line when refactoring.
+  private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
+    const key = overrideAuthKey || authInfo?.authKey;
+    return `X-Auth-Key ${key ?? ""}`;
+  };
+
+  private async createApiClient(authorizationHeader: string): Promise<Client> {
+    if (envInfo.getBaseUrl()) {
+      return this.createTestingApiClient(authorizationHeader);
+    }
+    return this.createProductionApiClient(authorizationHeader);
+  }
+
+  readonly createProductionApiClient = (authorizationHeader: string): Client => {
+    return new Client({
+      customHeaderAuthenticationCredentials: {
+        Authorization: authorizationHeader
+      },
+      userAgent: envInfo.getUserAgent(),
+      timeout: 0,
+      environment: Environment.Production
+    });
+  };
+
+  readonly createTestingApiClient = (authorizationHeader: string): Client => {
+    return new Client({
+      customHeaderAuthenticationCredentials: {
+        Authorization: authorizationHeader
+      },
+      userAgent: envInfo.getUserAgent(),
+      timeout: 0,
+      environment: Environment.Testing,
+      customUrl: envInfo.getBaseUrl()
+    });
+  };
 
   private async getServerPort(port: number | undefined): Promise<number> {
     const defaultPorts = [3000, 3001, 3002];
