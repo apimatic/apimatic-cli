@@ -1,6 +1,7 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
 import * as path from "path";
+import * as os from "os";
 import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
