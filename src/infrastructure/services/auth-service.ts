@@ -12,7 +12,7 @@ export class AuthService {
   private readonly apiBaseUrl = "https://auth.apimatic.io" as const;
 
   private axiosInstance: AxiosInstance = axios.create({
-    baseURL: this.apiBaseUrl,
+    baseURL: envInfo.getAuthBaseUrl() ?? this.apiBaseUrl,
     timeout: 20000,
     headers: {
       "User-Agent": envInfo.getUserAgent()
@@ -20,7 +20,7 @@ export class AuthService {
   });
 
   public getDeviceLoginUrl(state: string): string {
-    return `${this.apiBaseUrl}/device-auth/login?state=${state}`;
+    return `${envInfo.getAuthBaseUrl() ?? this.apiBaseUrl}/device-auth/login?state=${state}`;
   }
   public async getDeviceLoginToken(state: string): Promise<Result<DeviceAuthToken, ServiceError>> {
     try {
