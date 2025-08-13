@@ -14,7 +14,8 @@ import {
   CodeGenerationExternalApisController,
   Platforms,
   BadRequestResponseSdkError,
-  Accept
+  Accept,
+  Environment
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { Result } from "../../types/common/result.js";
@@ -136,12 +137,32 @@ export class PortalService {
   };
 
   private createApiClient = (authorizationHeader: string): Client => {
+    if (envInfo.getBaseUrl()) {
+      return this.createTestingApiClient(authorizationHeader);
+    }
+    return this.createProductionApiClient(authorizationHeader);
+  };
+
+  readonly createProductionApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
       userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT
+      timeout: this.TIMEOUT,
+      environment: Environment.Production
+    });
+  };
+
+  readonly createTestingApiClient = (authorizationHeader: string): Client => {
+    return new Client({
+      customHeaderAuthenticationCredentials: {
+        Authorization: authorizationHeader
+      },
+      userAgent: envInfo.getUserAgent(),
+      timeout: this.TIMEOUT,
+      environment: Environment.Testing,
+      customUrl: envInfo.getBaseUrl()
     });
   };
 
