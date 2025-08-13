@@ -6,8 +6,7 @@ import fsExtra from "fs-extra";
 import { readdir } from "fs/promises";
 import { getAuthInfo } from "../../client-utils/auth-manager.js";
 import { ApiError, ApiValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
-import { LoginCredentials, SpecFile } from "../../types/portal/quickstart.js";
-import { SDKClient } from "../../client-utils/sdk-client.js";
+import { SpecFile } from "../../types/portal/quickstart.js";
 import {
   createTempDirectory,
   isValidUrl,
@@ -38,10 +37,6 @@ export class PortalQuickstartController {
       return false;
     }
     return true;
-  }
-
-  async userLogin(credentials: LoginCredentials, client: SDKClient, configDir: string): Promise<void> {
-    await client.login(credentials.email, credentials.password, configDir);
   }
 
   async getSpecFile(spec: string): Promise<SpecFile> {
