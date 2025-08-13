@@ -1,7 +1,6 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
 import * as path from "path";
-import * as os from "os";
 import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
@@ -87,34 +86,6 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
-  public async openFile(filePath: FilePath): Promise<void> {
-    const targetPath = filePath.toString();
-
-    let command: string;
-    let args: string[];
-
-    switch (os.platform()) {
-      case "win32":
-        command = "cmd";
-        args = ["/c", "start", "", targetPath];
-        break;
-      case "darwin":
-        command = "open";
-        args = [targetPath];
-        break;
-      default:
-        command = "xdg-open";
-        args = [targetPath];
-        break;
-    }
-
-    try {
-      const child = spawn(command, args, { stdio: "ignore", detached: true });
-      child.unref(); // Let it run without blocking
-    } catch {
-      // Silently ignore errors
-    }
-  }
 }
 
 const streamPipeline = promisify(pipeline);
