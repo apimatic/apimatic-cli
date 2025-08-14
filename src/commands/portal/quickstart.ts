@@ -1,10 +1,7 @@
 import getPort from "get-port";
 import { Command } from "@oclif/core";
-import { ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
-import { SDKClient } from "../../client-utils/sdk-client.js";
+import { ApiValidationExternalApisController, ApiValidationSummary } from "@apimatic/sdk";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
-import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
-import { SpecFile } from "../../types/portal/quickstart.js";
 import { getMessageInRedColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { PortalServeAction } from "../../actions/portal/serve.js";
@@ -13,108 +10,30 @@ import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
-import { LoginAction } from "../../actions/auth/login.js";
+import { PortalQuickstartAction } from "../../actions/portal/quickstart.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
   static examples = ["apimatic portal:quickstart"];
 
-  private async getSpecFile(
-    prompts: PortalQuickstartPrompts,
-    controller: PortalQuickstartController
-  ): Promise<SpecFile> {
-    const specPath = await prompts.specPrompt();
-
-    const specFile = await controller.getSpecFile(specPath);
-
-    prompts.displaySpecValidationMessage();
-
-    return specFile;
-  }
-
-  private async getSpecValidationSummary(
-    prompts: PortalQuickstartPrompts,
-    controller: PortalQuickstartController,
-    specFile: SpecFile,
-    apiValidationController: ApiValidationExternalApisController
-  ): Promise<ApiValidationSummary> {
-    const apiValidationSummary = await controller.getSpecValidationSummary(prompts, specFile, apiValidationController);
-
-    if (!apiValidationSummary.success) {
-      prompts.displaySpecValidationFailureMessage();
-      await prompts.specValidationFailurePrompt();
-    } else {
-      prompts.displaySpecValidationSuccessMessage();
-    }
-
-    return apiValidationSummary;
-  }
-
-  private async getWorkingDirectory(
-    prompts: PortalQuickstartPrompts,
-    controller: PortalQuickstartController,
-    specFile: SpecFile,
-    apiValidationSummary: ApiValidationSummary,
-    languages: string[]
-  ): Promise<string> {
-    const workingDirectory = await prompts.workingDirectoryPrompt();
-
-    prompts.displayBuildDirectoryGenerationMessage();
-
-    const buildDirectory = new DirectoryPath(workingDirectory, "src").toString();
-
-    await controller.setupBuildDirectory(prompts, buildDirectory, specFile, apiValidationSummary, languages);
-
-    prompts.displayBuildDirectoryGenerationSuccessMessage(buildDirectory);
-
-    prompts.displayBuildDirectoryAsTree(buildDirectory);
-
-    return workingDirectory;
-  }
-
   async run() {
     const prompts = new PortalQuickstartPrompts();
-    const controller = new PortalQuickstartController();
-
-    prompts.displayWelcomeMessage();
-
-    let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
-
-    if (!loggedIn) {
-      prompts.getLoggedInFirst();
-      const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
-      const loginResult = await loginAction.execute();
-
-      loginResult.match(
-        e => prompts.displayLoggedInMessage(e),
-          error => prompts.logError(error)
-      );
-
-      if (loginResult.isErr())
-        return;
-    }
-
-    const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
-    const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
-      client
-    );
+    const action = new PortalQuickstartAction();
 
     try {
-      const specFile = await this.getSpecFile(prompts, controller);
-
       const apiValidationSummary = await this.getSpecValidationSummary(
         prompts,
-        controller,
+        action,
         specFile,
         apiValidationController
       );
 
-      const languages = await prompts.sdkLanguagesPrompt();
+      const languages = await prompts.selectLanguagesPrompt();
 
       const workingDirectory = await this.getWorkingDirectory(
         prompts,
-        controller,
+        action,
         specFile,
         apiValidationSummary,
         languages
@@ -165,6 +84,56 @@ export default class PortalQuickstart extends Command {
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }
+  }
+
+  private async getSpecFile(prompts: PortalQuickstartPrompts, controller: PortalQuickstartAction): Promise<SpecFile> {
+    const specPath = await prompts.specPathPrompt();
+
+    const specFile = await controller.getSpecFile(specPath);
+
+    prompts.displaySpecValidationMessage();
+
+    return specFile;
+  }
+
+  private async getSpecValidationSummary(
+    prompts: PortalQuickstartPrompts,
+    controller: PortalQuickstartAction,
+    specFile: SpecFile,
+    apiValidationController: ApiValidationExternalApisController
+  ): Promise<ApiValidationSummary> {
+    const apiValidationSummary = await controller.getSpecValidationSummary(prompts, specFile, apiValidationController);
+
+    if (!apiValidationSummary.success) {
+      prompts.displaySpecValidationFailureMessage();
+      await prompts.useDefaultSpecPrompt();
+    } else {
+      prompts.displaySpecValidationSuccessMessage();
+    }
+
+    return apiValidationSummary;
+  }
+
+  private async getWorkingDirectory(
+    prompts: PortalQuickstartPrompts,
+    controller: PortalQuickstartAction,
+    specFile: SpecFile,
+    apiValidationSummary: ApiValidationSummary,
+    languages: string[]
+  ): Promise<string> {
+    const workingDirectory = await prompts.buildDirectoryPathPrompt();
+
+    prompts.displayBuildDirectoryGenerationMessage();
+
+    const buildDirectory = new DirectoryPath(workingDirectory, "src").toString();
+
+    await controller.setupBuildDirectory(prompts, buildDirectory, specFile, apiValidationSummary, languages);
+
+    prompts.displayBuildDirectoryGenerationSuccessMessage(buildDirectory);
+
+    prompts.displayBuildDirectoryAsTree(buildDirectory);
+
+    return workingDirectory;
   }
 
   private async getServerPort(port: number | undefined): Promise<number> {

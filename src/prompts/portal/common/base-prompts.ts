@@ -15,6 +15,10 @@ export abstract class BasePrompts {
         log.step(message);
     }
 
+    public displaySuccess(message: string) : void {
+        log.success(message);
+    }
+
     public logError(errorMessage: string): void {
         log.error(errorMessage);
     }

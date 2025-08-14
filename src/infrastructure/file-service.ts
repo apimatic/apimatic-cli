@@ -78,14 +78,14 @@ export class FileService {
     await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
-  public async writeBuffer(filePath: FilePath, buffer: Buffer) {
-    await fsExtra.writeFile(filePath.toString(), buffer);
-  }
-
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
+  public async copyToDirectory(source: FilePath, destination: DirectoryPath)
+  {
+    await fsExtra.copyFile(source.toString(), destination.toString());
+  }
 }
 
 const streamPipeline = promisify(pipeline);

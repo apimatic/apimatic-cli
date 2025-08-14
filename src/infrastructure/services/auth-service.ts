@@ -3,7 +3,6 @@ import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { ServiceError, handleServiceError } from "../api-utils.js";
 
-
 export interface DeviceAuthToken {
   apiKey: string;
 }
@@ -22,6 +21,7 @@ export class AuthService {
   public getDeviceLoginUrl(state: string): string {
     return `${this.apiBaseUrl}/device-auth/login?state=${state}`;
   }
+
   public async getDeviceLoginToken(state: string): Promise<Result<DeviceAuthToken, ServiceError>> {
     try {
       const response = await this.axiosInstance.get(`/device-auth/token?state=${state}`);
@@ -34,4 +34,3 @@ export class AuthService {
     }
   }
 }
-
