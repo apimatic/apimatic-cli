@@ -1,4 +1,3 @@
-import getPort from "get-port";
 import { Command, Config, Flags } from "@oclif/core";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
@@ -51,9 +50,6 @@ export default class PortalServe extends Command {
     const portalServePrompts = new PortalServePrompts();
     const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService());
 
-    //TODO: This needs to be moved within the action. Port should not be initialized again here.
-    const port = await this.getServerPort(flags.port);
-
     const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
     const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
@@ -61,10 +57,10 @@ export default class PortalServe extends Command {
     const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
 
     const serveFlags: ServeFlags = {
-      folder: buildDirectory.toString(),
+      input: buildDirectory.toString(),
       destination: portalDirectory.toString(),
       "auth-key": flags["auth-key"],
-      port: port,
+      port: flags.port,
       open: flags.open,
       "no-reload": flags["no-reload"]
     };
@@ -85,22 +81,7 @@ export default class PortalServe extends Command {
     }
 
     if (servePortalResult.isSuccess()) {
-      this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), port, flags["no-reload"]);
+      this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), servePortalResult.value!, flags["no-reload"]);
     }
-  }
-
-  private async getServerPort(port: number | undefined): Promise<number> {
-    const defaultPorts = [3000, 3001, 3002];
-
-    const preferredPorts = typeof port === "number" ? [port, ...defaultPorts.filter((p) => p !== port)] : defaultPorts;
-
-    const availablePort = await getPort({ port: preferredPorts });
-
-    // Show warning only if user provided --port and it is not available
-    if (typeof port === "number" && availablePort !== port) {
-      this.prompts.displayInfo(`⚠️ Port ${port} is already in use. Available port ${availablePort} will be used.`);
-    }
-
-    return availablePort;
   }
 }
