@@ -59,7 +59,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
 
       if (isCancel(spec)) {
         cancel("Operation cancelled.");
-        process.exit(0);
+        process.exit(1);
       }
 
       const cleanedPath = this.removeQuotes(String(spec).trim());
@@ -119,7 +119,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
 
     if (isCancel(useDefaultSpec)) {
       cancel("Operation cancelled.");
-      return process.exit(0);
+      return process.exit(1);
     }
 
     return useDefaultSpec === "yes";
@@ -143,7 +143,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
 
     if (isCancel(languages)) {
       cancel("Operation cancelled.");
-      return process.exit(0);
+      return process.exit(1);
     }
 
     return languages;
@@ -183,7 +183,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
 
     if (isCancel(directory)) {
       cancel("Operation cancelled.");
-      return process.exit(0);
+      return process.exit(1);
     }
 
     if (directory === "./") {
@@ -205,10 +205,10 @@ export class PortalQuickstartPrompts extends BasePrompts {
     this.spin.stop(getMessageInCyanColor(`📁 Directory created at ${targetFolder}`));
   }
 
-  public displayBuildDirectoryAsTree(targetFolder: string): void {
-    const buildDirectory = directoryToJson(targetFolder) as treeify.TreeObject;
+  public displayBuildDirectoryAsTree(buildDirectory: string): void {
+    const structuredBuildDirectory = directoryToJson(buildDirectory) as treeify.TreeObject;
 
-    const tree = treeify.asTree(buildDirectory, true, true);
+    const tree = treeify.asTree(structuredBuildDirectory, true, true);
 
     const coloredLogString = tree
       .split("\n")

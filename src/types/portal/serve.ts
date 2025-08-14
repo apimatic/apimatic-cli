@@ -1,6 +1,6 @@
 export interface ServeFlags {
-    readonly port: number,
-    readonly folder: string;
+    readonly port: number | undefined,
+    readonly input: string;
     readonly destination: string;
     readonly open: boolean;
     readonly "auth-key": string | undefined;

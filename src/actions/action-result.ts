@@ -17,8 +17,8 @@ export class ActionResult {
     return new ActionResult(ActionResultType.Error, message);
   }
 
-  static success() {
-    return new ActionResult(ActionResultType.Success);
+  static success(message?: string) {
+    return new ActionResult(ActionResultType.Success, message);
   }
 
   static cancelled(message?: string) {
@@ -31,14 +31,14 @@ export class ActionResult {
     }
   }
 
-  mapAll<T>(onSuccess: () => T, onError: (message: string) => T, onCancelled: (message: string) => T) {
+  mapAll<T>(onSuccess: (message?: string) => T, onError: (message: string) => T, onCancelled: (message: string) => T) {
     switch (this.type) {
       case ActionResultType.Success:
-        return onSuccess();
+        return onSuccess(this.message);
       case ActionResultType.Error:
-        return onError(this.message || 'Unknown error');
+        return onError(this.message || "Unknown error");
       case ActionResultType.Cancelled:
-        return onCancelled(this.message || 'Operation cancelled');
+        return onCancelled(this.message || "Operation cancelled");
       default:
         throw new Error(`Unknown ActionResultType: ${this.type}`);
     }

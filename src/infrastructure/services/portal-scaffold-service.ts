@@ -1,10 +1,11 @@
+import path from "path";
 import axios, { AxiosInstance } from "axios";
-import { ActionResult } from "../../actions/action-result.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { ZipService } from "../zip-service.js";
+import { Result } from "../../types/common/result.js";
 
 export class PortalScaffoldService {
   private readonly fileService: FileService = new FileService();
@@ -21,20 +22,61 @@ export class PortalScaffoldService {
     }
   });
 
-  public async setupRepository(tempDirectory: DirectoryPath, buildDirectory: DirectoryPath): Promise<ActionResult> {
-    const response = await this.axiosInstance.get(this.zipUrl);
-    const tempZipPath = new FilePath(tempDirectory, new FileName("static-portal.zip"));
+  public async scaffoldBuildDirectory(
+    tempDirectory: DirectoryPath,
+    buildDirectory: DirectoryPath,
+    specFilePath: FilePath,
+    selectedLanguages: string[]
+  ): Promise<Result<string, string>> {
+    try {
+      const response = await this.axiosInstance.get(this.zipUrl);
+      const tempZipPath = new FilePath(tempDirectory, new FileName("static-portal.zip"));
 
-    if (response.status !== 200) {
-      return ActionResult.error("Unable to setup the portal, please try again later.");
+      if (response.status !== 200) {
+        return Result.failure("Unable to setup the portal, please try again later.");
+      }
+
+      await this.fileService.writeFile(tempZipPath, response.data as NodeJS.ReadableStream);
+      await this.zipService.unArchive(tempZipPath, tempDirectory);
+
+      const extractedFolder = new DirectoryPath(tempDirectory.toString(), this.repositoryFolderName);
+
+      await this.fileService.deleteFile(
+        new FilePath(extractedFolder, new FileName(path.join(extractedFolder.toString(), ".github")))
+      );
+
+      const specDirectory = new DirectoryPath(extractedFolder.toString(), "spec");
+
+      await this.fileService.deleteFile(
+        new FilePath(specDirectory, new FileName(path.join(specDirectory.toString(), "openapi.json")))
+      );
+
+      await this.fileService.copy(
+        specFilePath,
+        new FilePath(specDirectory, new FileName(path.basename(specFilePath.toString())))
+      );
+
+      const buildConfigFile = new FilePath(
+        extractedFolder,
+        new FileName(path.join(extractedFolder.toString(), "APIMATIC-BUILD.json"))
+      );
+
+      const buildConfigFileContent = JSON.parse(await this.fileService.getContents(buildConfigFile));
+
+      buildConfigFileContent.generatePortal.languageConfig = selectedLanguages.reduce((config, lang) => {
+        config[lang] = {};
+        return config;
+      }, {} as { [key: string]: object });
+
+      await this.fileService.writeContents(buildConfigFile, buildConfigFileContent);
+
+      await this.fileService.copyDirectoryContents(extractedFolder, buildDirectory);
+
+      return Result.success("Portal scaffolded successfully.");
+    } catch {
+      return Result.failure(
+        "There was an error setting up your portal. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io "
+      );
     }
-
-    await this.fileService.writeFile(tempZipPath, response.data as NodeJS.ReadableStream);
-    await this.zipService.unArchive(tempZipPath, tempDirectory);
-
-    const extractedFolderPath = new DirectoryPath(tempDirectory.toString(), this.repositoryFolderName);
-    await this.fileService.copyDirectoryContents(extractedFolderPath, buildDirectory);
-
-    return ActionResult.success();
   }
 }

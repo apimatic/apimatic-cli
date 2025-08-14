@@ -1,11 +1,8 @@
 import path from "path";
-import fs from "fs";
-import fsExtra from "fs-extra";
 import axios from "axios";
 import filetype from "file-type";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { getAuthInfo } from "../../client-utils/auth-manager.js";
-import { metadataFileContent } from "../../config/env.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
@@ -13,18 +10,18 @@ import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FilePath } from "../../types/file/filePath.js";
-import {
-  isValidUrl,
-  getMessageInRedColor,
-  clearDirectory,
-  deleteFile,
-  getMessageInOrangeColor
-} from "../../utils/utils.js";
+import { isValidUrl, getMessageInOrangeColor } from "../../utils/utils.js";
 import { PortalScaffoldService } from "../../infrastructure/services/portal-scaffold-service.js";
 import { LoginAction } from "../auth/login.js";
 import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { ActionResult } from "../action-result.js";
+import { GenerateAction } from "./generate.js";
+import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import getPort from "get-port";
+import { PortalServeAction } from "./serve.js";
+import { PortalServePrompts } from "../../prompts/portal/serve.js";
+import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -33,7 +30,8 @@ export class PortalQuickstartAction {
   private readonly portalScaffoldService: PortalScaffoldService = new PortalScaffoldService();
   private readonly portalService: PortalService = new PortalService();
   private readonly defaultSpecUrl: string =
-    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json";
+    "https://github.com/apimatic/static-portal-workflow/blob/master/spec/openapi.json" as const;
+  private readonly defaultPort: number = 3000 as const;
 
   public readonly execute = async (configDir: string): Promise<ActionResult> => {
     this.prompts.displayWelcomeMessage();
@@ -45,7 +43,9 @@ export class PortalQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
-      const specFilePathResult = await this.setupSpecFile(tempDirectory);
+      const specPath = await this.getSpecPath();
+
+      const specFilePathResult = await this.setupSpecFile(tempDirectory, specPath);
 
       if (specFilePathResult.isFailed()) {
         return ActionResult.error(specFilePathResult.error!);
@@ -60,9 +60,59 @@ export class PortalQuickstartAction {
 
       const selectedLanguages = await this.getSelectedLanguages();
 
-      const setupBuildDirectory = await this.setupBuildDirectory(selectedLanguages);
+      const buildDirectoryPath = await this.getBuildDirectoryPath();
 
-      return ActionResult.success();
+      const setupBuildDirectory = await this.setupBuildDirectory(
+        tempDirectory,
+        specFilePathResult.value!,
+        selectedLanguages,
+        buildDirectoryPath
+      );
+
+      if (setupBuildDirectory.isFailed()) {
+        return ActionResult.error(setupBuildDirectory.error!);
+      }
+
+      const portalDirectoryPath = path.join(buildDirectoryPath, "portal");
+
+      const portalServeAction = new PortalServeAction(
+        new PortalServePrompts(),
+        new ServeHandler(),
+        new PortalService()
+      );
+      const generatePortalAction = new GenerateAction(new DirectoryPath(configDir), null);
+
+      const serveFlags: ServeFlags = {
+        input: buildDirectoryPath,
+        destination: portalDirectoryPath,
+        port: await this.getServerPort(this.defaultPort),
+        open: true,
+        "no-reload": false,
+        "auth-key": undefined
+      };
+
+      const servePaths: ServePaths = {
+        sourceDirectoryPath: buildDirectoryPath,
+        destinationDirectoryPath: portalDirectoryPath
+      };
+
+      const servePortalResult = await portalServeAction.servePortal(
+        serveFlags,
+        servePaths,
+        generatePortalAction.execute
+      );
+
+      if (servePortalResult.isFailed()) {
+        return ActionResult.error(servePortalResult.error!);
+      }
+
+      if (servePortalResult.isCancelled()) {
+        return ActionResult.cancelled(servePortalResult.value!);
+      }
+
+      this.prompts.displayOutroMessage(buildDirectoryPath.toString());
+
+      return ActionResult.success(buildDirectoryPath);
     });
   };
 
@@ -94,10 +144,12 @@ export class PortalQuickstartAction {
     return true;
   }
 
-  private async setupSpecFile(tempDirectory: DirectoryPath): Promise<Result<FilePath, string>> {
+  private async getSpecPath(): Promise<string> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
-    const specPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
+    return await this.prompts.specPathPrompt(this.defaultSpecUrl);
+  }
 
+  private async setupSpecFile(tempDirectory: DirectoryPath, specPath: string): Promise<Result<FilePath, string>> {
     if (isValidUrl(specPath)) {
       const response = await axios.get(specPath, { responseType: "stream" });
 
@@ -163,83 +215,42 @@ export class PortalQuickstartAction {
     return await this.prompts.selectLanguagesPrompt();
   }
 
-  private async setupBuildDirectory(selectedLanguages: string[]) {
+  private async getBuildDirectoryPath() {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
-
-    const buildDirectoryPath = await this.prompts.buildDirectoryPathPrompt();
+    return await this.prompts.buildDirectoryPathPrompt();
   }
 
-  private async downloadRepositoryFromGitHub(buildDirectory: DirectoryPath): Promise<void> {
-    return await withDirPath(async (tempDirectory) => {
-      await this.portalScaffoldService.setupRepository(tempDirectory, buildDirectory);
-    });
+  private async setupBuildDirectory(
+    tempDirectory: DirectoryPath,
+    specFilePath: FilePath,
+    selectedLanguages: string[],
+    buildDirectoryPath: string
+  ): Promise<Result<string, string>> {
+    this.prompts.startProgressIndicator("Gennerating build directory ⚙️");
+
+    const buildDirectory = new DirectoryPath(buildDirectoryPath, "src");
+
+    const scaffoldBuildDirectoryResult = await this.portalScaffoldService.scaffoldBuildDirectory(
+      tempDirectory,
+      buildDirectory,
+      specFilePath,
+      selectedLanguages
+    );
+
+    if (scaffoldBuildDirectoryResult.isFailed()) {
+      return Result.failure(scaffoldBuildDirectoryResult.error!);
+    }
+
+    this.prompts.displayBuildDirectoryAsTree(buildDirectory.toString());
+
+    return Result.success(buildDirectoryPath);
   }
 
-  private async setupBuildDirectory2(
-    prompts: PortalQuickstartPrompts,
-    targetFolder: string,
-    specFile: SpecFile,
-    validationSummary: ApiValidationSummary,
-    languages: string[]
-  ): Promise<void> {
-    fsExtra.emptyDirSync(targetFolder);
+  private async getServerPort(port: number | undefined): Promise<number> {
+    const defaultPorts = [3000, 3001, 3002];
 
-    try {
-      await this.downloadRepositoryFromGitHub(targetFolder);
-    } catch (error) {
-      prompts.displayBuildDirectoryGenerationErrorMessage();
-      if (error instanceof Error) {
-        if (error.message.includes("timed out") || error.message.includes("timeout")) {
-          throw new Error(
-            getMessageInRedColor(
-              "The operation timed out while setting up the build directory. Please check your internet connection and try again."
-            )
-          );
-        } else if (error.message.includes("Could not resolve host")) {
-          throw new Error(
-            getMessageInRedColor("Unable to resolve the host. Please check your network settings and try again.")
-          );
-        } else {
-          throw new Error(getMessageInRedColor(`Failed to set up the build directory. ${error.message}`));
-        }
-      } else {
-        throw new Error(getMessageInRedColor(`Failed to set up the build directory. ${error}`));
-      }
-    }
+    const preferredPorts = typeof port === "number" ? [port, ...defaultPorts.filter((p) => p !== port)] : defaultPorts;
 
-    await clearDirectory(path.join(targetFolder, ".github"));
-
-    if (specFile.localPath && validationSummary.success) {
-      const specFolder = path.join(targetFolder, "spec");
-      await deleteFile(path.join(specFolder, "openapi.json"));
-
-      const files = await fsExtra.readdir(specFile.localPath);
-      for (const file of files) {
-        const srcPath = path.join(specFile.localPath, file);
-        const destPath = path.join(specFolder, file);
-        await fsExtra.copy(srcPath, destPath);
-      }
-    }
-
-    const buildFilePath = path.join(targetFolder, "APIMATIC-BUILD.json");
-    const buildFileContent = JSON.parse(fs.readFileSync(buildFilePath, "utf8"));
-
-    const languageConfig = languages.reduce((config, lang) => {
-      config[lang] = {};
-      return config;
-    }, {} as { [key: string]: object });
-
-    buildFileContent.generatePortal.languageConfig = languageConfig;
-
-    fs.writeFileSync(buildFilePath, JSON.stringify(buildFileContent, null, 2));
-
-    const specFolder = path.join(targetFolder, "spec");
-
-    const metadataFile = fs.readdirSync(specFolder).find((file) => file.startsWith("APIMATIC-META"));
-
-    if (!metadataFile) {
-      const newMetadataFilePath = path.join(specFolder, "APIMATIC-META.json");
-      fs.writeFileSync(newMetadataFilePath, JSON.stringify(metadataFileContent, null, 2));
-    }
+    return await getPort({ port: preferredPorts });
   }
 }
