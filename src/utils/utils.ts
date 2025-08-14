@@ -2,6 +2,8 @@ import * as path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
 import os from "os";
+import { URL } from "url";
+import { Buffer } from "buffer";
 import archiver from "archiver";
 import stripTags from "striptags";
 import colors from "picocolors";
@@ -95,7 +97,7 @@ export const isValidUrl = (input: string): boolean => {
     }
 
     return true;
-  } catch (_) {
+  } catch {
     return false;
   }
 };
@@ -130,7 +132,7 @@ export const zipDirectory = async (sourcePath: string, destinationPath: string):
   const archive = archiver("zip");
 
   return new Promise((resolve, reject) => {
-    archive.on("error", (err) => {
+    archive.on("error", (err: Error) => {
       reject(new Error(err.message));
     });
 

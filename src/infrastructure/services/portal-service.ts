@@ -15,6 +15,8 @@ import {
   Platforms,
   BadRequestResponseSdkError,
   Accept,
+  ApiValidationExternalApisController,
+  ApiValidationSummary,
   Environment
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
@@ -34,7 +36,7 @@ export class PortalService {
   private readonly fileService = new FileService();
 
   //TODO: Pass stream as parameter instead of file path.
-  async generatePortal(
+  public async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
     commandName: string,
@@ -62,7 +64,7 @@ export class PortalService {
   }
 
   //TODO: Pass stream as parameter instead of file path.
-  async generateSdk(
+  public async generateSdk(
     specPath: FilePath,
     sdkPlatform: Platforms,
     configDir: DirectoryPath,
@@ -124,6 +126,24 @@ export class PortalService {
       }
     } catch {
       return this.createGenericErrorResult();
+    }
+  }
+
+  public async validateSpec(
+    specFileStream: ReadStream,
+    configDir: string
+  ): Promise<Result<ApiValidationSummary, string>> {
+    const file = new FileWrapper(specFileStream);
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
+    const client = this.createApiClient(authorizationHeader);
+    const validationController = new ApiValidationExternalApisController(client);
+
+    try {
+      const response = await validationController.validateApiViaFile(ContentType.EnumMultipartformdata, file);
+      return Result.success(response.result as ApiValidationSummary);
+    } catch (error) {
+      return Result.failure(await this.handleSpecValidationErrors(error));
     }
   }
 
@@ -241,6 +261,15 @@ export class PortalService {
       return getMessageInRedColor(
         "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
       );
+    }
+  };
+
+  private handleSpecValidationErrors = async (error: unknown): Promise<string> => {
+    if (error instanceof ApiError) {
+      const apiError = error as ApiError;
+      return `${apiError.statusCode} ${apiError.message}`;
+    } else {
+      return "An unexpected error occurred while validating your API Definition. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
     }
   };
 }

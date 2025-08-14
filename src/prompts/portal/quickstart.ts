@@ -20,11 +20,9 @@ export class PortalQuickstartPrompts extends BasePrompts {
   private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
   private readonly referenceDocumentationUrl =
     "\u001b[4mhttps://docs.apimatic.io/cli-getting-started/advanced-portal-setup\u001b[0m";
-  private readonly customizeTheSdksUrl =
-    "\u001b[4mhttps://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview\u001b[0m";
   private readonly defaultPortalDirectoryPath = process.cwd();
 
-  displayWelcomeMessage(): void {
+  public displayWelcomeMessage(): void {
     intro(`Hello there 👋`);
     log.message(
       `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.`
@@ -32,126 +30,61 @@ export class PortalQuickstartPrompts extends BasePrompts {
     log.message(`Let's get started! 🚀`);
   }
 
-  async loginPrompt(): Promise<{ email: string; password: string }> {
-    log.message(`Please log in to continue.`);
+  public async specPathPrompt(defaultSpecUrl: string): Promise<string> {
+    while (true) {
+      const spec = await text({
+        message: `Provide a local path or a public URL for your OpenAPI definition file:`,
+        placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
+        defaultValue: defaultSpecUrl,
+        validate: (input) => {
+          if (!input) return;
 
-    const email = await text({
-      message: "Enter your registered email:",
-      validate: (input) => {
-        if (!input) {
-          return getMessageInRedColor("Email is required.");
-        }
+          const cleanedPath = this.removeQuotes(input.trim() ?? "");
 
-        const emailRegex =
-          /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+          if (!isValidUrl(cleanedPath)) {
+            const dirPath = path.resolve(cleanedPath);
 
-        if (!emailRegex.test(input)) {
-          return getMessageInRedColor("Please enter a valid email address.");
-        }
-      }
-    });
+            if (!fs.existsSync(dirPath)) {
+              return "The specified file does not exist. Please enter a valid file path.";
+            }
 
-    if (isCancel(email)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
-    }
-
-    const pass = await password({
-      message: "Enter your password:",
-      validate: (input) => {
-        if (!input) {
-          return getMessageInRedColor("Password is required.");
-        }
-      }
-    });
-
-    if (isCancel(pass)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
-    }
-
-    return { email: String(email).trim(), password: String(pass).trim() };
-  }
-
-
-  removeQuotes(str: string): string {
-    const quotes = ['"', "'"];
-
-    for (const quote of quotes) {
-      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-        return this.removeQuotes(str.slice(1, -1)); // Recursive call
-      }
-    }
-    return str;
-  }
-
-  async specPrompt(): Promise<string> {
-  log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
-
-  while (true) {
-    const spec = await text({
-      message: `Provide a local path or a public URL for your OpenAPI definition file:`,
-      placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
-      defaultValue:
-        "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json",
-      validate: (input) => {
-        if (!input) return;
-
-        const cleanedPath = this.removeQuotes(input.trim() ?? "");
-
-        if (!isValidUrl(cleanedPath)) {
-          const dirPath = path.resolve(cleanedPath);
-
-          if (!fs.existsSync(dirPath)) {
-            return getMessageInRedColor("Error: The specified file does not exist. Please enter a valid file path.");
+            if (!fs.statSync(dirPath).isFile()) {
+              return "The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again.";
+            }
           }
 
-          if (!fs.statSync(dirPath).isFile()) {
-            return getMessageInRedColor(
-              "Error: The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again."
-            );
-          }
+          return; // pass sync validation
         }
+      });
 
-        return; // pass sync validation
-      },
-    });
+      if (isCancel(spec)) {
+        cancel("Operation cancelled.");
+        process.exit(0);
+      }
 
-    if (isCancel(spec)) {
-      cancel("Operation cancelled.");
-      process.exit(0);
-    }
+      const cleanedPath = this.removeQuotes(String(spec).trim());
 
-    const cleanedPath = this.removeQuotes(String(spec).trim());
+      // Async validation for URLs
+      if (isValidUrl(cleanedPath)) {
+        try {
+          const response = await axios.head(cleanedPath);
+          const contentType = response.headers["content-type"];
 
-    // Async validation for URLs
-    if (isValidUrl(cleanedPath)) {
-      try {
-        const response = await axios.head(cleanedPath);
-        const contentType = response.headers["content-type"];
-
-        if (contentType?.includes("text/html")) {
-          log.error(
-            getMessageInRedColor(
-              `Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`
-            )
-          );
+          if (contentType?.includes("text/html")) {
+            this.logError(`Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`);
+            continue; // re-prompt
+          }
+        } catch {
+          this.logError(`Failed to reach the URL. Please check your internet connection or the URL.`);
           continue; // re-prompt
         }
-      } catch (err) {
-        log.error(
-          getMessageInRedColor(`Failed to reach the URL. Please check your internet connection or the URL.`)
-        );
-        continue; // re-prompt
       }
+
+      return cleanedPath; // valid local file or valid URL
     }
-
-    return cleanedPath; // valid local file or valid URL
   }
-}
 
-
-  displaySpecValidationMessage(): void {
+  public displaySpecValidationMessage(): void {
     log.step(getMessageInOrangeColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
     this.spin.start(
       getMessageInMagentaColor(
@@ -172,41 +105,31 @@ export class PortalQuickstartPrompts extends BasePrompts {
     this.spin.stop(getMessageInRedColor(`❗ Oops, it looks like there are some errors in your API Definition.`), 1);
   }
 
-  async specValidationFailurePrompt(): Promise<void> {
-    const useSampleSpec = await select({
+  public async useDefaultSpecPrompt(): Promise<boolean> {
+    const useDefaultSpec = await select({
       message: `How would you like to proceed?`,
       options: [
         {
-          value: "exit",
+          value: "no",
           label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${this.vscodeExtensionUrl}`
         },
-        { value: "continue", label: `2. Use an example API spec instead (recommended)` }
+        { value: "yes", label: `2. Use an example API spec instead (recommended)` }
       ]
     });
 
-    if (isCancel(useSampleSpec)) {
+    if (isCancel(useDefaultSpec)) {
       cancel("Operation cancelled.");
       return process.exit(0);
     }
 
-    if (useSampleSpec === "exit") {
-      outro(
-        getMessageInCyanColor(
-          "Good luck fixing your API definition! 🛠️  Feel free to run this command again once you're done."
-        )
-      );
-      return process.exit(0);
-    }
+    return useDefaultSpec === "yes";
   }
 
-  async sdkLanguagesPrompt(): Promise<string[]> {
-    log.step(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
-
+  async selectLanguagesPrompt(): Promise<string[]> {
     const languages = (await multiselect({
       message:
         "💻 Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
       options: [
-        { label: "HTTP", value: "http" },
         { label: "Typescript", value: "typescript" },
         { label: "Ruby", value: "ruby" },
         { label: "Python", value: "python" },
@@ -215,7 +138,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
         { label: "PHP", value: "php" },
         { label: "Go", value: "go" }
       ],
-      initialValues: ["http", "typescript", "ruby", "python", "java", "csharp", "php", "go"]
+      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"]
     })) as string[];
 
     if (isCancel(languages)) {
@@ -226,9 +149,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
     return languages;
   }
 
-  async workingDirectoryPrompt(): Promise<string> {
-    log.step(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
-
+  async buildDirectoryPathPrompt(): Promise<string> {
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
@@ -280,11 +201,11 @@ export class PortalQuickstartPrompts extends BasePrompts {
     this.spin.stop(getMessageInRedColor(`Something went wrong while setting up your build directory.`), 1);
   }
 
-  displayBuildDirectoryGenerationSuccessMessage(targetFolder: string): void {
+  public displayBuildDirectoryGenerationSuccessMessage(targetFolder: string): void {
     this.spin.stop(getMessageInCyanColor(`📁 Directory created at ${targetFolder}`));
   }
 
-  displayBuildDirectoryAsTree(targetFolder: string): void {
+  public displayBuildDirectoryAsTree(targetFolder: string): void {
     const buildDirectory = directoryToJson(targetFolder) as treeify.TreeObject;
 
     const tree = treeify.asTree(buildDirectory, true, true);
@@ -297,32 +218,31 @@ export class PortalQuickstartPrompts extends BasePrompts {
     log.step(coloredLogString);
   }
 
-  displayOutroMessage(buildDirectory: string): void {
+  public displayOutroMessage(buildDirectory: string): void {
     log.step(
       getMessageInCyanColor(`📢  Your API Portal is live at: ${this.serverUrl}\n`) +
-      getMessageInCyanColor(
-        `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
-      ) +
-      getMessageInCyanColor(`Press CTRL+C to stop the server.`)
+        getMessageInCyanColor(
+          `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
+        ) +
+        getMessageInCyanColor(`Press CTRL+C to stop the server.`)
     );
     outro(
       getMessageInCyanColor(`What's next?\n`) +
-      getMessageInCyanColor(`- Use the API Playground or an SDK to call your API.\n`) +
-      getMessageInCyanColor(
-        `- Customize the Portal theme, add API recipes and enable AI features: ${this.referenceDocumentationUrl}`
-      )
+        getMessageInCyanColor(`- Use the API Playground or an SDK to call your API.\n`) +
+        getMessageInCyanColor(
+          `- Customize the Portal theme, add API recipes and enable AI features: ${this.referenceDocumentationUrl}`
+        )
     );
   }
 
-  getLoggedInFirst() {
-    log.step("You need to be logged in to continue.")
-  }
+  private removeQuotes(str: string): string {
+    const quotes = ['"', "'"];
 
-  displayLoggedInMessage(email: string): void {
-    log.success(`Successfully logged in as ${email}`);
-  }
-
-  logError(error: string) {
-    log.error(error);
+    for (const quote of quotes) {
+      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
+        return this.removeQuotes(str.slice(1, -1)); // Recursive call
+      }
+    }
+    return str;
   }
 }
