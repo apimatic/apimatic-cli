@@ -12,7 +12,7 @@ export class BuildContext {
     this.buildDirectory = buildDirectory;
   }
 
-  public get BuildFile(): FilePath {
+  private get BuildFile(): FilePath {
     // TODO: add checks for build file path
     return new FilePath(this.buildDirectory, new FileName("APIMATIC-BUILD.json"));
   }

@@ -48,6 +48,7 @@ export class PortalServeAction {
 
         return Result.success(`Portal was successfully served.`);
       },
+      async (message) => Result.failure(message),
       async (message) => Result.failure(message)
     );
   }

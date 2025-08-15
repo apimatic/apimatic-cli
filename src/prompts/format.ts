@@ -1,0 +1,44 @@
+import pc from "picocolors";
+import { Result } from "neverthrow";
+import { intro as i, outro as o, spinner } from '@clack/prompts';
+
+
+export const format = {
+  // Core element types
+  var: (text: string) => pc.magenta(`'${text}'`),
+  path: (text: string) => pc.cyan(`'${text}'`),
+
+  // Common message styles
+  success: (text: string) => pc.green(text),
+  warning: (text: string) => pc.yellow(text),
+  error: (text: string) => pc.red(text),
+  info: (text: string) => pc.cyan(text),
+
+  intro: (text: string) => pc.bgCyan(text),
+  outroSuccess: (text: string) => pc.bgGreen(text),
+  outroFailure: (text: string) => pc.bgRed(text),
+  outroWarning: (text: string) => pc.bgYellow(text)
+};
+
+export function intro(text: string) {
+  i(format.intro(` ${text} `));
+}
+
+export function outro(exitCode: number) {
+  const message =
+    exitCode === 0 ? format.outroSuccess(' success ') : exitCode === 2 ? format.outroFailure(' failure ') : format.outroWarning(' warning ');
+  o(message);
+  process.exitCode = exitCode;
+}
+
+
+export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
+  const s = spinner();
+  s.start(intro);
+  const result = await fn;
+  result.match(
+    () => s.stop(success, 0),
+    () => s.stop(failure, 1)
+  );
+  return result;
+}

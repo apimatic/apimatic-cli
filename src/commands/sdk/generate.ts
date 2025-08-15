@@ -48,10 +48,11 @@ export default class SdkGenerate extends Command {
 
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(platform);
 
-    var action = new GenerateAction(this.getConfigDir(), authKey);
+    const action = new GenerateAction(this.getConfigDir(), authKey);
     const result = await action.execute(specDirectory, sdkDirectory, platform as LanguagePlatform, force, zipSdk);
     result.mapAll(
       () => this.prompts.displayOutroMessage(sdkDirectory),
+      (message) => this.prompts.logError(message),
       (message) => this.prompts.logError(message)
     );
   }

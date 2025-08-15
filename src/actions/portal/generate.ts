@@ -1,20 +1,15 @@
 import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
-import { ZipService } from "../../infrastructure/zip-service.js";
-import { FileService } from "../../infrastructure/file-service.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { FileName } from "../../types/file/fileName.js";
 import { ActionResult } from "../action-result.js";
 import { BuildContext } from "../../types/build-context.js";
 import { PortalContext } from "../../types/portal-context.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
+import { TempContext } from "../../types/temp-context.js";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
-  private readonly zipArchiver: ZipService = new ZipService();
-  private readonly fileService: FileService = new FileService();
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
@@ -32,68 +27,48 @@ export class GenerateAction {
     zipPortal: boolean
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(portalDirectory)) {
-      return ActionResult.error(`The 'src' and 'portal' directory cannot be the same: "${portalDirectory}"`);
+      this.prompts.directoryCannotBeSame(portalDirectory);
+      return ActionResult.error2();
     }
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
-      return ActionResult.error(`The 'src' directory is either empty or invalid: "${buildDirectory}"`);
+      this.prompts.srcDirectoryEmpty(buildDirectory);
+      return ActionResult.error2();
     }
 
     const portalContext = new PortalContext(portalDirectory);
     if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
-      return ActionResult.error(
-        "Please enter a different destination folder or remove the existing files and try again."
-      );
+      this.prompts.portalDirectoryNotEmpty();
+      return ActionResult.error2();
     }
 
     return await withDirPath(async (tempDirectory) => {
-      this.prompts.displayPortalGenerationMessage();
+      const tempContext = new TempContext(tempDirectory);
+      const buildZipPath = await tempContext.zip(buildDirectory);
 
-      const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
-      await this.zipArchiver.archive(buildDirectory, buildZipPath);
+      const response = await this.prompts.generatePortal(
+        this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey)
+      );
 
-      const response = await this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey);
-
-      if (!response.isSuccess()) {
-        this.prompts.displayPortalGenerationErrorMessage();
-        return ActionResult.error(await this.parseError(response.error!, portalDirectory, tempDirectory));
-      }
-
-      const tempPortalFilePath = new FilePath(tempDirectory, new FileName("portal.zip"));
-      await this.fileService.writeFile(tempPortalFilePath, <NodeJS.ReadableStream>response.value);
-
-      await portalContext.save(tempPortalFilePath, zipPortal);
-      this.prompts.displayPortalGenerationSuccessMessage();
-
-      return ActionResult.success();
+      return response.match(
+        async (portalStream) => {
+          const tempPortalZipPath = await tempContext.save(portalStream);
+          await portalContext.save(tempPortalZipPath, zipPortal);
+          return ActionResult.success();
+        },
+        async (error) => {
+          if (typeof error === "string") {
+            this.prompts.portalGenerationError(error);
+          } else {
+            const errorZipPath = await tempContext.save(error);
+            const reportPath = await portalContext.saveError(errorZipPath);
+            await this.launcherService.openFile(reportPath);
+            this.prompts.portalGenerationErrorWithReport(reportPath);
+          }
+          return ActionResult.error2();
+        }
+      );
     });
   };
-
-  private async parseError(
-    error: string | NodeJS.ReadableStream,
-    portalDirectory: DirectoryPath,
-    tempDirectory: DirectoryPath
-  ): Promise<string> {
-    if (typeof error === "string") {
-      return error;
-    }
-
-    const tempErrorFilePath = new FilePath(tempDirectory, new FileName("error.zip"));
-    await this.fileService.writeFile(tempErrorFilePath, <NodeJS.ReadableStream>error);
-
-    await this.fileService.cleanDirectory(portalDirectory);
-    await this.zipArchiver.unArchive(tempErrorFilePath, portalDirectory);
-
-    const errorReportPath = portalDirectory.join("apimatic-debug");
-
-    const htmlFilePath = new FilePath(errorReportPath, new FileName("apimatic-report.html"));
-    await this.launcherService.openFile(htmlFilePath); // Open the error report in the default browser
-
-    return (
-      "An error occurred during portal generation due to an issue with the input. " +
-      "An error report has been written at the destination path: " +
-      errorReportPath
-    );
-  }
 }

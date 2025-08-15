@@ -26,18 +26,19 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { envInfo } from "../env-info.js";
 import { ReadStream } from "fs";
+import { err, ok, Result as ResultEx } from "neverthrow";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly TIMEOUT = 0;
   private readonly fileService = new FileService();
 
-  //TODO: Pass stream as parameter instead of file path.
-  async generatePortal(
+  // TODO: Pass stream as parameter instead of file path.
+  public async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
+  ): Promise<ResultEx<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
@@ -47,15 +48,15 @@ export class PortalService {
 
     try {
       const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
-      return Result.success(response.result as NodeJS.ReadableStream);
+      return ok(response.result as NodeJS.ReadableStream);
     } catch (error) {
-      return Result.failure(await this.handlePortalGenerationErrors(error));
+      return err(await this.handlePortalGenerationErrors(error));
     } finally {
       buildFileStream.close();
     }
   }
 
-  //TODO: Pass stream as parameter instead of file path.
+  // TODO: Pass stream as parameter instead of file path.
   async generateSdk(
     specPath: FilePath,
     sdkPlatform: Platforms,
@@ -133,12 +134,12 @@ export class PortalService {
     if (error instanceof UnauthorizedResponseError) {
       //401
       const unAuthError = error as UnauthorizedResponseError;
-      return getMessageInRedColor(unAuthError.result?.message ?? "Authorization has been denied for this request.");
+      return unAuthError.result?.message ?? "Authorization has been denied for this request.";
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const probDetailsError = error as ProblemDetailsError;
       const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
-      return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
+      return probDetailsError.result!.title + "\n- " + message;
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
       return error.body as NodeJS.ReadableStream;
@@ -146,15 +147,11 @@ export class PortalService {
       //500
       const internalServerError = error as InternalServerErrorResponseError;
       const message = internalServerError.result?.message;
-      return getMessageInRedColor(
-        `${
-          message ?? "An unkown error occurred."
-        } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
-      );
+      return `${
+          message ?? "An unknown error occurred."
+        } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`;
     } else {
-      return getMessageInRedColor(
-        "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
-      );
+      return "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
     }
   };
 
@@ -171,7 +168,7 @@ export class PortalService {
       // Get the first error and clean it up
       const firstError = parsedResult.Errors[0];
       // Split on <br/> and take first part, then strip remaining HTML tags
-      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, ""); 
+      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
       return cleanError;
     } else if (parsedResult.Success === false) {
       return "API definition file validation failed.";
