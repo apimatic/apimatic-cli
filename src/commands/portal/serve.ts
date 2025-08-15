@@ -70,7 +70,7 @@ export default class PortalServe extends Command {
       destinationDirectoryPath: portalDirectory.toString()
     };
 
-    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, generatePortalAction.execute);
+    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, PortalServe.id, generatePortalAction.execute);
     //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));

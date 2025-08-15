@@ -6,6 +6,7 @@ import fs from "fs-extra";
 class EnvInfo {
   private static cachedCliVersion: string | null = null;
   private static cachedUserAgent: string | null = null;
+  private static cachedBaseUrl: string;
 
   public getUserAgent(): string {
     if (!EnvInfo.cachedUserAgent) {
@@ -34,6 +35,17 @@ class EnvInfo {
     } catch {
       return "unknown";
     }
+  }
+
+  public getBaseUrl(): string | undefined {
+    if (EnvInfo.cachedBaseUrl) {
+      return EnvInfo.cachedBaseUrl;
+    }
+    const envBaseUrl = process.env.APIMATIC_BASE_URL;
+    if (envBaseUrl) {
+      EnvInfo.cachedBaseUrl = envBaseUrl;
+    }
+    return EnvInfo.cachedBaseUrl;
   }
 }
 export const envInfo = new EnvInfo();

@@ -40,7 +40,7 @@ export class PortalGenerate extends Command {
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
 
     const action = new GenerateAction(this.getConfigDir(), authKey);
-    const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
+    const result = await action.execute(buildDirectory, portalDirectory, PortalGenerate.id, force, zipPortal);
     result.mapAll(
       () => this.prompts.displayOutroMessage(portalDirectory.toString()),
       (message) => this.prompts.logError(message),

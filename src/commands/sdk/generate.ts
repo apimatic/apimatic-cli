@@ -32,8 +32,8 @@ export default class SdkGenerate extends Command {
   };
 
   static examples = [
-    `apimatic sdk:generate --platform="java"`,
-    `apimatic sdk:generate --platform="csharp" --spec="./src/spec"`
+    `apimatic sdk:generate --platform=java`,
+    `apimatic sdk:generate --platform=csharp --spec="./src/spec"`
   ];
 
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -49,7 +49,7 @@ export default class SdkGenerate extends Command {
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(platform);
 
     var action = new GenerateAction(this.getConfigDir(), authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, platform as LanguagePlatform, force, zipSdk);
+    const result = await action.execute(specDirectory, sdkDirectory, platform as LanguagePlatform, SdkGenerate.id, force, zipSdk);
     result.mapAll(
       () => this.prompts.displayOutroMessage(sdkDirectory),
       (message) => this.prompts.logError(message),

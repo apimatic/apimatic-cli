@@ -27,6 +27,9 @@ import { PortalServeAction } from "./serve.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
+import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -34,6 +37,7 @@ export class PortalQuickstartAction {
   private readonly fileService: FileService = new FileService();
   private readonly portalScaffoldService: PortalScaffoldService = new PortalScaffoldService();
   private readonly validationService: ValidationService = new ValidationService();
+  private readonly telemetryService: TelemetryService;
   private readonly defaultSpecUrl: string =
     "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json" as const;
   private readonly defaultPort: number = 3000 as const;
@@ -41,10 +45,13 @@ export class PortalQuickstartAction {
 
   constructor(configDir: DirectoryPath) {
     this.configDir = configDir;
+    this.telemetryService = new TelemetryService(this.configDir.toString());
   }
 
-  public readonly execute = async (): Promise<ActionResult> => {
+  public readonly execute = async (commandName: string): Promise<ActionResult> => {
     this.prompts.displayWelcomeMessage();
+
+    await this.telemetryService.trackEvent(new QuickstartInitiatedEvent());
 
     const authenticateUserResult = await this.authenticateUser(this.configDir);
 
@@ -115,6 +122,7 @@ export class PortalQuickstartAction {
       const servePortalResult = await portalServeAction.servePortal(
         serveFlags,
         servePaths,
+        commandName,
         generatePortalAction.execute
       );
 
@@ -125,6 +133,8 @@ export class PortalQuickstartAction {
       if (servePortalResult.isCancelled()) {
         return ActionResult.cancelled(servePortalResult.value!);
       }
+
+      await this.telemetryService.trackEvent(new QuickstartCompletedEvent());
 
       return ActionResult.success(buildDirectoryPath);
     });
