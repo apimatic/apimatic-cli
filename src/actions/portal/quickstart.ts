@@ -110,8 +110,6 @@ export class PortalQuickstartAction {
         return ActionResult.cancelled(servePortalResult.value!);
       }
 
-      this.prompts.displayOutroMessage(buildDirectoryPath.toString());
-
       return ActionResult.success(buildDirectoryPath);
     });
   };

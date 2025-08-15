@@ -29,7 +29,7 @@ export class PortalServeAction {
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>
-  ): Promise<Result<number | string, string>> {
+  ): Promise<Result<string, string>> {
     //TODO: This needs to be moved within the action. Port should not be initialized again here.
     const serverPort: number = await this.getServerPort(flags.port);
 
@@ -41,7 +41,7 @@ export class PortalServeAction {
       false
     );
 
-    return result.mapAll<Promise<Result<number | string, string>>>(
+    return result.mapAll<Promise<Result<string, string>>>(
       async () => {
         const setupServerResult = await this.serveHandler.setupServer(paths.destinationDirectoryPath);
         if (setupServerResult.isFailed()) {
@@ -53,7 +53,8 @@ export class PortalServeAction {
           return Result.failure(startServerResult.error!);
         }
 
-        return Result.success(serverPort);
+        //TODO: Figure out a better way for this.
+        return Result.success(serverPort.toString());
       },
       async (message) => Result.failure(message),
       async (message) => Result.cancelled(message)
