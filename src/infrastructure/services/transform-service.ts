@@ -8,10 +8,8 @@ import {
   FileWrapper,
   TransformationController,
   Transformation,
-  UnauthorizedResponseError,
   ApiError,
-  InternalServerErrorResponseError,
-  ProblemDetailsError
+  Environment
 } from "@apimatic/sdk";
 
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
@@ -98,42 +96,48 @@ export class TransformationService {
     return `X-Auth-Key ${key ?? ""}`;
   }
 
-  private createApiClient(authorizationHeader: string): Client {
+    private createApiClient = (authorizationHeader: string): Client => {
+    if (envInfo.getBaseUrl()) {
+      return this.createTestingApiClient(authorizationHeader);
+    }
+    return this.createProductionApiClient(authorizationHeader);
+  };
+
+  readonly createProductionApiClient = (authorizationHeader: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
       userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT
+      timeout: this.TIMEOUT,
+      environment: Environment.Production
     });
-  }
+  };
+
+  readonly createTestingApiClient = (authorizationHeader: string): Client => {
+    return new Client({
+      customHeaderAuthenticationCredentials: {
+        Authorization: authorizationHeader
+      },
+      userAgent: envInfo.getUserAgent(),
+      timeout: this.TIMEOUT,
+      environment: Environment.Testing,
+      customUrl: envInfo.getBaseUrl()
+    });
+  };
 
   private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
-    if (error instanceof UnauthorizedResponseError) {
-      //401
-      const unAuthError = error as UnauthorizedResponseError;
-      return getMessageInRedColor(unAuthError.result?.message ?? "Authorization has been denied for this request.");
-    } else if (error instanceof ProblemDetailsError) {
-      //400 & 403
-      const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
-      return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
-    } else if (error instanceof ApiError && error.statusCode === 422) {
-      //422
-      return "Validation error occurred during transformation. Please check your API specification.";
-    } else if (error instanceof InternalServerErrorResponseError) {
-      //500
-      const internalServerError = error as InternalServerErrorResponseError;
-      const message = internalServerError.result?.message;
-      return getMessageInRedColor(
-        `${
-          message ?? "An unkown error occurred."
-        } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`
-      );
+    if (error instanceof ApiError) {
+      const apiError = error as ApiError;
+      if (apiError.statusCode === 400) {
+        return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
+      } else if (apiError.statusCode === 401) {
+        const message = JSON.parse(apiError.body as string).message;
+        return `${message} Please run the 'auth:login' command and try again or reach out to our team at support@apimatic.io.`;
+      }
+      return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
     } else {
-      return getMessageInRedColor(
-        "An unexpected error occurred while transforming the spec file, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
-      );
+      return "An unexpected error occurred while validating your API Definition. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
     }
   };
 }
