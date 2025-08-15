@@ -16,10 +16,9 @@ import {
 
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { envInfo } from "../env-info.js";
-import { getMessageInRedColor } from "../../utils/utils.js";
+import { getMessageInRedColor, writeFileUsingReadableStream  } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Result } from "../../types/common/result.js";
-import { writeFileUsingReadableStream } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
 
@@ -109,7 +108,7 @@ export class TransformationService {
     });
   }
 
-  private handleTransformationErrors = async (error: unknown): Promise<string> => {
+  private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof UnauthorizedResponseError) {
       //401
       const unAuthError = error as UnauthorizedResponseError;
