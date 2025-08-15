@@ -2,23 +2,20 @@ import fsExtra from "fs-extra";
 import path from "path";
 import {
   ApiResponse,
-  Client,
   ContentType,
   ExportFormats,
   FileWrapper,
   TransformationController,
   Transformation,
   ApiError,
-  Environment
 } from "@apimatic/sdk";
 
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { envInfo } from "../env-info.js";
-import { getMessageInRedColor, writeFileUsingReadableStream  } from "../../utils/utils.js";
+import { writeFileUsingReadableStream } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ApiTransformPrompts } from "../../prompts/api/transform.js";
+import { apiClientFactory } from "./api-client-factory.js"; 
 
 export interface TransformationParams {
   file?: string;
@@ -32,9 +29,7 @@ export interface TransformationParams {
 
 export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
-  private readonly TIMEOUT = 0;
-  private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
-
+  
   async transformAndDownload({
     file,
     url,
@@ -46,7 +41,7 @@ export class TransformationService {
   }: TransformationParams): Promise<Result<string, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = this.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader);
     const transformationController = new TransformationController(client);
 
     try {
@@ -96,35 +91,6 @@ export class TransformationService {
     return `X-Auth-Key ${key ?? ""}`;
   }
 
-    private createApiClient = (authorizationHeader: string): Client => {
-    if (envInfo.getBaseUrl()) {
-      return this.createTestingApiClient(authorizationHeader);
-    }
-    return this.createProductionApiClient(authorizationHeader);
-  };
-
-  readonly createProductionApiClient = (authorizationHeader: string): Client => {
-    return new Client({
-      customHeaderAuthenticationCredentials: {
-        Authorization: authorizationHeader
-      },
-      userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT,
-      environment: Environment.Production
-    });
-  };
-
-  readonly createTestingApiClient = (authorizationHeader: string): Client => {
-    return new Client({
-      customHeaderAuthenticationCredentials: {
-        Authorization: authorizationHeader
-      },
-      userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT,
-      environment: Environment.Testing,
-      customUrl: envInfo.getBaseUrl()
-    });
-  };
 
   private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof ApiError) {

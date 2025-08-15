@@ -1,7 +1,6 @@
 import {
   ContentType,
   DocsPortalManagementController,
-  Client,
   UnauthorizedResponseError,
   ProblemDetailsError,
   FileWrapper,
@@ -15,7 +14,6 @@ import {
   Platforms,
   BadRequestResponseSdkError,
   Accept,
-  Environment
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { Result } from "../../types/common/result.js";
@@ -25,8 +23,8 @@ import { Sdl } from "../../types/sdl/sdl.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
-import { envInfo } from "../env-info.js";
 import { ReadStream } from "fs";
+import { apiClientFactory } from "./api-client-factory.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -44,7 +42,7 @@ export class PortalService {
     const file = new FileWrapper(buildFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = this.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader);
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
@@ -73,7 +71,7 @@ export class PortalService {
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = this.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader);
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
@@ -100,7 +98,7 @@ export class PortalService {
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
-    const client = this.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader);
     const transformationController = new TransformationController(client);
 
     try {
@@ -134,36 +132,6 @@ export class PortalService {
   private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
     const key = overrideAuthKey || authInfo?.authKey;
     return `X-Auth-Key ${key ?? ""}`;
-  };
-
-  private createApiClient = (authorizationHeader: string): Client => {
-    if (envInfo.getBaseUrl()) {
-      return this.createTestingApiClient(authorizationHeader);
-    }
-    return this.createProductionApiClient(authorizationHeader);
-  };
-
-  readonly createProductionApiClient = (authorizationHeader: string): Client => {
-    return new Client({
-      customHeaderAuthenticationCredentials: {
-        Authorization: authorizationHeader
-      },
-      userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT,
-      environment: Environment.Production
-    });
-  };
-
-  readonly createTestingApiClient = (authorizationHeader: string): Client => {
-    return new Client({
-      customHeaderAuthenticationCredentials: {
-        Authorization: authorizationHeader
-      },
-      userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT,
-      environment: Environment.Testing,
-      customUrl: envInfo.getBaseUrl()
-    });
   };
 
   private createOriginQueryParameter = (commandName: string): Record<string, string> => {
