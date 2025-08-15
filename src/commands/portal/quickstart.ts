@@ -26,7 +26,7 @@ export default class PortalQuickstart extends Command {
     );
   }
 
-  private getConfigDir = () => {
+  private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
   };
 }

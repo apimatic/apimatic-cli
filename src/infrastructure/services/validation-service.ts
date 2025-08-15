@@ -32,7 +32,7 @@ export class ValidationService {
     }
   }
 
-  private handleSpecValidationErrors = async (error: unknown): Promise<string> => {
+  private readonly handleSpecValidationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof ApiError) {
       const apiError = error as ApiError;
       if (apiError.statusCode === 400) {

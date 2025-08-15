@@ -11,9 +11,9 @@ export class PortalScaffoldService {
   private readonly fileService: FileService = new FileService();
   private readonly zipService: ZipService = new ZipService();
   private readonly zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip` as const;
-  private repositoryFolderName = "static-portal-workflow-master" as const;
+  private readonly repositoryFolderName = "static-portal-workflow-master" as const;
 
-  private axiosInstance: AxiosInstance = axios.create({
+  private readonly axiosInstance: AxiosInstance = axios.create({
     baseURL: this.zipUrl,
     responseType: "stream",
     timeout: 30000,
