@@ -8,7 +8,7 @@ import { TransformationFormats } from "../../types/api/transform.js";
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class Transform extends Command {
-  static description = `Transform API specifications from one format to another.
+  static readonly description = `Transform API specifications from one format to another.
 Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.`;
 
   static examples = [
@@ -48,13 +48,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     const action = new TransformAction(this.getConfigDir(), authKey);
 
-    const result = await action.execute(
-      format,
-      destinationDir,
-      force,
-      file,
-      url
-    );
+    const result = await action.execute(format, destinationDir, force, file, url);
 
     result.mapAll(
       () => this.prompts.displayOutroMessage(destinationDir),
@@ -62,7 +56,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
     );
   }
 
-  private getConfigDir = () => {
+  private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
   };
 }
