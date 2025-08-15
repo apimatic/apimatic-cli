@@ -61,6 +61,13 @@ export class FileService {
     }
   }
 
+  public async deleteDirectory(dirPath: DirectoryPath): Promise<void> {
+    const exists = await this.directoryExists(dirPath);
+    if (exists) {
+      await fsExtra.remove(dirPath.toString());
+    }
+  }
+
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }
@@ -82,9 +89,8 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
-  public async copyToDirectory(source: FilePath, destination: DirectoryPath)
-  {
-    await fsExtra.copyFile(source.toString(), destination.toString());
+  public async copyToDirectory(source: FilePath, destination: DirectoryPath) {
+    await fsExtra.copy(source.toString(), path.join(destination.toString(), path.basename(source.toString())));
   }
 }
 

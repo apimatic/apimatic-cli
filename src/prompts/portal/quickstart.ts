@@ -1,18 +1,11 @@
-import fs from "fs";
 import * as path from "path";
-import treeify from "treeify";
-import { intro, outro, text, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
-import {
-  getMessageInCyanColor,
-  getMessageInGreenColor,
-  getMessageInOrangeColor,
-  getMessageInMagentaColor,
-  getMessageInRedColor,
-  isValidUrl,
-  directoryToJson
-} from "../../utils/utils.js";
-import { BasePrompts } from "./common/base-prompts.js";
+import fs from "fs";
 import axios from "axios";
+import treeify from "treeify";
+import { intro, outro, text, select, multiselect, log, isCancel, cancel } from "@clack/prompts";
+import { getMessageInCyanColor, getMessageInGreenColor, getMessageInRedColor, isValidUrl } from "../../utils/utils.js";
+import { BasePrompts } from "./common/base-prompts.js";
+import { DirectoryNode } from "../../types/portal/quickstart.js";
 
 export class PortalQuickstartPrompts extends BasePrompts {
   private readonly vscodeExtensionUrl =
@@ -21,6 +14,17 @@ export class PortalQuickstartPrompts extends BasePrompts {
   private readonly referenceDocumentationUrl =
     "\u001b[4mhttps://docs.apimatic.io/cli-getting-started/advanced-portal-setup\u001b[0m";
   private readonly defaultPortalDirectoryPath = process.cwd();
+  private readonly descriptions: { [key: string]: string } = Object.entries({
+    "APIMATIC-BUILD.json":
+      "# Defines all configurations for the API portal, including programming languages and themes",
+    spec: "# Contains all API definition files",
+    content: "# Includes custom documentation pages in Markdown",
+    "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal",
+    static: "# Includes all static files, such as images, GIFs, and PDFs"
+  }).reduce((acc, [key, value]) => {
+    acc[path.normalize(key)] = value;
+    return acc;
+  }, {} as { [key: string]: string });
 
   public displayWelcomeMessage(): void {
     intro(`Hello there 👋`);
@@ -84,27 +88,6 @@ export class PortalQuickstartPrompts extends BasePrompts {
     }
   }
 
-  public displaySpecValidationMessage(): void {
-    log.step(getMessageInOrangeColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
-    this.spin.start(
-      getMessageInMagentaColor(
-        `Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules 🔍 `
-      )
-    );
-  }
-
-  displaySpecValidationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor(`Validation Successful.`));
-  }
-
-  displaySpecValidationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while validating your spec.`), 1);
-  }
-
-  displaySpecValidationFailureMessage(): void {
-    this.spin.stop(getMessageInRedColor(`❗ Oops, it looks like there are some errors in your API Definition.`), 1);
-  }
-
   public async useDefaultSpecPrompt(): Promise<boolean> {
     const useDefaultSpec = await select({
       message: `How would you like to proceed?`,
@@ -146,7 +129,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
       return process.exit(1);
     }
 
-    return languages;
+    return ["http", ...languages];
   }
 
   async buildDirectoryPathPrompt(): Promise<string> {
@@ -193,20 +176,8 @@ export class PortalQuickstartPrompts extends BasePrompts {
     }
   }
 
-  displayBuildDirectoryGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Generating build directory ⚙️"));
-  }
-
-  displayBuildDirectoryGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while setting up your build directory.`), 1);
-  }
-
-  public displayBuildDirectoryGenerationSuccessMessage(targetFolder: string): void {
-    this.spin.stop(getMessageInCyanColor(`📁 Directory created at ${targetFolder}`));
-  }
-
   public displayBuildDirectoryAsTree(buildDirectory: string): void {
-    const structuredBuildDirectory = directoryToJson(buildDirectory) as treeify.TreeObject;
+    const structuredBuildDirectory = this.convertDirectoryStructureToJson(buildDirectory) as treeify.TreeObject;
 
     const tree = treeify.asTree(structuredBuildDirectory, true, true);
 
@@ -244,5 +215,36 @@ export class PortalQuickstartPrompts extends BasePrompts {
       }
     }
     return str;
+  }
+
+  private convertDirectoryStructureToJson(dirPath: string, parentPath = ""): DirectoryNode {
+    const directoryStructure: DirectoryNode = {};
+
+    const items = fs.readdirSync(dirPath);
+    items.forEach((item) => {
+      if (item === ".git") return; // Skip .git directory
+
+      const itemPath = path.join(dirPath, item);
+      const relativePath = path.join(parentPath, item);
+      const stats = fs.statSync(itemPath);
+
+      if (stats.isDirectory()) {
+        const subdirectoryStructure = this.convertDirectoryStructureToJson(itemPath, relativePath);
+
+        const folderName = this.descriptions[path.normalize(relativePath)]
+          ? `${item} : ${this.descriptions[path.normalize(relativePath)]}`
+          : item;
+
+        directoryStructure[folderName] = subdirectoryStructure;
+      } else {
+        directoryStructure[
+          this.descriptions[path.normalize(relativePath)]
+            ? `${item} : ${this.descriptions[path.normalize(relativePath)]}`
+            : item
+        ] = null;
+      }
+    });
+
+    return directoryStructure;
   }
 }

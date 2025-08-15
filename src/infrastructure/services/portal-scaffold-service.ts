@@ -26,7 +26,8 @@ export class PortalScaffoldService {
     tempDirectory: DirectoryPath,
     buildDirectory: DirectoryPath,
     specFilePath: FilePath,
-    selectedLanguages: string[]
+    selectedLanguages: string[],
+    useDefaultSpec: boolean
   ): Promise<Result<string, string>> {
     try {
       const response = await this.axiosInstance.get(this.zipUrl);
@@ -41,25 +42,19 @@ export class PortalScaffoldService {
 
       const extractedFolder = new DirectoryPath(tempDirectory.toString(), this.repositoryFolderName);
 
-      await this.fileService.deleteFile(
-        new FilePath(extractedFolder, new FileName(path.join(extractedFolder.toString(), ".github")))
-      );
+      await this.fileService.deleteDirectory(new DirectoryPath(extractedFolder.toString(), ".github"));
 
       const specDirectory = new DirectoryPath(extractedFolder.toString(), "spec");
 
-      await this.fileService.deleteFile(
-        new FilePath(specDirectory, new FileName(path.join(specDirectory.toString(), "openapi.json")))
-      );
+      if (!useDefaultSpec) {
+        await this.fileService.deleteFile(new FilePath(specDirectory, new FileName("openapi.json")));
+        await this.fileService.copy(
+          specFilePath,
+          new FilePath(specDirectory, new FileName(path.basename(specFilePath.toString())))
+        );
+      }
 
-      await this.fileService.copy(
-        specFilePath,
-        new FilePath(specDirectory, new FileName(path.basename(specFilePath.toString())))
-      );
-
-      const buildConfigFile = new FilePath(
-        extractedFolder,
-        new FileName(path.join(extractedFolder.toString(), "APIMATIC-BUILD.json"))
-      );
+      const buildConfigFile = new FilePath(extractedFolder, new FileName("APIMATIC-BUILD.json"));
 
       const buildConfigFileContent = JSON.parse(await this.fileService.getContents(buildConfigFile));
 
@@ -68,7 +63,7 @@ export class PortalScaffoldService {
         return config;
       }, {} as { [key: string]: object });
 
-      await this.fileService.writeContents(buildConfigFile, buildConfigFileContent);
+      await this.fileService.writeContents(buildConfigFile, JSON.stringify(buildConfigFileContent));
 
       await this.fileService.copyDirectoryContents(extractedFolder, buildDirectory);
 

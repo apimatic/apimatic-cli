@@ -43,6 +43,7 @@ export class PortalGenerate extends Command {
     const result = await action.execute(buildDirectory, portalDirectory, PortalGenerate.id, force, zipPortal);
     result.mapAll(
       () => this.prompts.displayOutroMessage(portalDirectory.toString()),
+      (message) => this.prompts.logError(message),
       (message) => this.prompts.logError(message)
     );
   }

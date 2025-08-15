@@ -30,7 +30,6 @@ export class PortalServeAction {
       zipPortal: boolean
     ) => Promise<ActionResult>
   ): Promise<Result<string, string>> {
-    //TODO: This needs to be moved within the action. Port should not be initialized again here.
     const serverPort: number = await this.getServerPort(flags.port);
 
     const result = await generatePortal(

@@ -53,6 +53,7 @@ export default class SdkGenerate extends Command {
     const result = await action.execute(specDirectory, sdkDirectory, language as Language, SdkGenerate.id, force, zipSdk);
     result.mapAll(
       () => this.prompts.displayOutroMessage(sdkDirectory),
+      (message) => this.prompts.logError(message),
       (message) => this.prompts.logError(message)
     );
   }
