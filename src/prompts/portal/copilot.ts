@@ -6,7 +6,7 @@ import { ServiceError } from "../../infrastructure/api-utils.js";
 
 export class PortalCopilotPrompts {
   public openWelcomeMessageEditor() {
-    log.step("Opening markdown editor for you to welcome message in...");
+    log.step("Opening markdown editor for you to enter welcome message in...");
   }
   public async displayApiCopilotKeyUsageWarning() {
       log.warn('API Copilot can only be active on one Portal at a time. Configuring it on this Portal will disable it on any previously configured Portal.')
