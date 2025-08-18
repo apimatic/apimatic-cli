@@ -95,6 +95,7 @@ export class CopilotAction {
         "`- What authentication methods does this API support?`\n" +
         "`- [Enter another prompt here]`";
       await this.fileService.writeContents(tempFile, defaultContent);
+      this.prompts.openWelcomeMessageEditor();  
       await this.launcherService.openInEditor(tempFile);
       const welcomeMessage = await this.fileService.getContents(tempFile);
       return welcomeMessage.replace(/\r\n|\r/g, "\n");
