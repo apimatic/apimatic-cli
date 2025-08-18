@@ -7,30 +7,30 @@ export function createAuthorizationHeader(authInfo: AuthInfo | null, overrideAut
   return `X-Auth-Key ${key ?? ""}`;
 }
 
-export function createApiClient(authorizationHeader: string, timeout: number): Client {
+export function createApiClient(authorizationHeader: string, shell: string, timeout: number): Client {
   if (envInfo.getBaseUrl()) {
-    return createTestingApiClient(authorizationHeader, timeout);
+    return createTestingApiClient(authorizationHeader, shell, timeout);
   }
-  return createProductionApiClient(authorizationHeader, timeout);
+  return createProductionApiClient(authorizationHeader, shell, timeout);
 }
 
-export function createProductionApiClient(authorizationHeader: string, timeout: number): Client {
+export function createProductionApiClient(authorizationHeader: string, shell: string, timeout: number): Client {
   return new Client({
     customHeaderAuthenticationCredentials: {
       Authorization: authorizationHeader
     },
-    userAgent: envInfo.getUserAgent(),
+    userAgent: envInfo.getUserAgent(shell),
     timeout: timeout,
     environment: Environment.Production
   });
 }
 
-export function createTestingApiClient(authorizationHeader: string, timeout: number): Client {
+export function createTestingApiClient(authorizationHeader: string, shell: string, timeout: number): Client {
   return new Client({
     customHeaderAuthenticationCredentials: {
       Authorization: authorizationHeader
     },
-    userAgent: envInfo.getUserAgent(),
+    userAgent: envInfo.getUserAgent(shell),
     timeout: timeout,
     environment: Environment.Testing,
     customUrl: envInfo.getBaseUrl()
