@@ -56,7 +56,7 @@ export class ApiService {
     }
 
     return axios.create({
-      baseURL: this.apiBaseUrl,
+      baseURL: envInfo.getBaseUrl() ?? this.apiBaseUrl,
       headers
     });
   }

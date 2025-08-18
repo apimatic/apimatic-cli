@@ -1,7 +1,6 @@
 import getPort from "get-port";
 import { Command } from "@oclif/core";
 import { ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
-import { SDKClient } from "../../client-utils/sdk-client.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
 import { SpecFile } from "../../types/portal/quickstart.js";
@@ -14,6 +13,11 @@ import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { LoginAction } from "../../actions/auth/login.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
+import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -76,7 +80,9 @@ export default class PortalQuickstart extends Command {
   async run() {
     const prompts = new PortalQuickstartPrompts();
     const controller = new PortalQuickstartController();
+    const telemetryService = new TelemetryService(this.config.configDir);
 
+    await telemetryService.trackEvent(new QuickstartInitiatedEvent());
     prompts.displayWelcomeMessage();
 
     let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
@@ -87,15 +93,16 @@ export default class PortalQuickstart extends Command {
       const loginResult = await loginAction.execute();
 
       loginResult.match(
-        e => prompts.displayLoggedInMessage(e),
-          error => prompts.logError(error)
+        (e) => prompts.displayLoggedInMessage(e),
+        (error) => prompts.logError(error)
       );
 
-      if (loginResult.isErr())
-        return;
+      if (loginResult.isErr()) return;
     }
 
-    const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
+    const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+    const authorizationHeader = createAuthorizationHeader(authInfo, null);
+    const client: Client = createApiClient(authorizationHeader, 0);
     const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
       client
     );
@@ -148,6 +155,7 @@ export default class PortalQuickstart extends Command {
       const servePortalResult = await portalServeAction.servePortal(
         serveFlags,
         serverPaths,
+        PortalQuickstart.id,
         generatePortalAction.execute
       );
 
@@ -162,6 +170,7 @@ export default class PortalQuickstart extends Command {
       }
 
       prompts.displayOutroMessage(buildDirectory.toString());
+      await telemetryService.trackEvent(new QuickstartCompletedEvent());
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

@@ -1,23 +1,22 @@
 import * as path from "path";
 import fsExtra from "fs-extra";
-
 import { Flags, Command } from "@oclif/core";
 import { TransformationController, Transformation, Client, ApiError } from "@apimatic/sdk";
-
 import { AuthenticationError, loggers } from "../../types/utils.js";
-import { SDKClient } from "../../client-utils/sdk-client.js";
 import { printValidationMessages } from "../../utils/utils.js";
 import { getFileNameFromPath, replaceHTML } from "../../utils/utils.js";
 import { DestinationFormats, TransformationFormats } from "../../types/api/transform.js";
 import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
 
 const formats: string = Object.keys(TransformationFormats).join("|");
 export default class Transform extends Command {
   static description = `Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.`;
 
   static examples = [
-    `apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"`,
+    `apimatic api:transform --format=OPENAPI3YAML --file="./specs/sample.json" --destination="D:/"`,
     `apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"`
   ];
 
@@ -70,7 +69,10 @@ ${formats}`
         throw new Error(`Destination path: ${flags.destination} does not exist`);
       }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+
+      const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+      const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
+      const client: Client = createApiClient(authorizationHeader, 0);
       const transformationController: TransformationController = new TransformationController(client);
 
       const { id, apiValidationSummary }: Transformation = await getTransformationId(flags, transformationController);
