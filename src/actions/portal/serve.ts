@@ -26,7 +26,7 @@ export class PortalServeAction {
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>
-  ): Promise<Result<string, string>> {
+  ): Promise<ActionResult> {
     const result = await generatePortal(
       new DirectoryPath(paths.sourceDirectoryPath),
       new DirectoryPath(paths.destinationDirectoryPath),
@@ -34,24 +34,26 @@ export class PortalServeAction {
       false
     );
 
-    if (result.)
 
     return await result.mapAll(async () => {
         const setupServerResult = await this.serveHandler.setupServer(paths.destinationDirectoryPath);
-            if (setupServerResult.isFailed()) {
-              return Result.failure(setupServerResult.error!);
-            }
+        if (setupServerResult.isFailed()) {
+          //return Result.failure(setupServerResult.error!);
+          return ActionResult.failed();
+        }
 
-            const startServerResult = await this.serveHandler.startServer(paths, flags, generatePortal);
-            if (startServerResult.isFailed()) {
-              return Result.failure(startServerResult.error!);
-            }
+        const startServerResult = await this.serveHandler.startServer(paths, flags, generatePortal);
+        if (startServerResult.isFailed()) {
+          // return Result.failure(startServerResult.error!);
+          return ActionResult.failed();
+        }
 
-            return Result.success(`Portal was successfully served.`);
-    },
-      async () => Result.failure("Failed to generate portal."),
-      async () => Result.failure("Failed to start server."),
-      async () => Result.failure("Failed to serve portal."));
+        return ActionResult.success();
+        // return Result.success(`Portal was successfully served.`);
+      },
+      async () => result,
+      async () => result,
+      async () => result);
 
 
     // return result.mapAll<Promise<Result<string, string>>>(

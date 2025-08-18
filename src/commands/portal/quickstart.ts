@@ -151,15 +151,18 @@ export default class PortalQuickstart extends Command {
         generatePortalAction.execute
       );
 
-      if (servePortalResult.isFailed()) {
-        portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
-        return;
-      }
+      // TODO: Shield fix errors;
 
-      if (servePortalResult.isCancelled()) {
-        portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
-        return;
-      }
+
+      // if (servePortalResult.isFailed()) {
+      //   portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
+      //   return;
+      // }
+      //
+      // if (servePortalResult.isCancelled()) {
+      //   portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
+      //   return;
+      // }
 
       prompts.displayOutroMessage(buildDirectory.toString());
     } catch (error) {
