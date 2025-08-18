@@ -4,6 +4,7 @@ import { FlagsProvider } from "../../types/flags-provider.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
 import { LanguagePlatform } from "../../types/sdk/generate.js";
+import { outro } from "../../prompts/format.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -50,11 +51,7 @@ export default class SdkGenerate extends Command {
 
     const action = new GenerateAction(this.getConfigDir(), authKey);
     const result = await action.execute(specDirectory, sdkDirectory, platform as LanguagePlatform, force, zipSdk);
-    result.mapAll(
-      () => this.prompts.displayOutroMessage(sdkDirectory),
-      (message) => this.prompts.logError(message),
-      (message) => this.prompts.logError(message)
-    );
+    outro(result);
   }
 
   private getConfigDir = () => {

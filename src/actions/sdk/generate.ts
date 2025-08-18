@@ -33,19 +33,22 @@ export class GenerateAction {
     zipSdk: boolean
   ): Promise<ActionResult> => {
     if (specDirectory.isEqual(sdkDirectory)) {
-      return ActionResult.error(`The spec directory and sdk directory cannot be the same: "${specDirectory}"`);
+      // return ActionResult.error(`The spec directory and sdk directory cannot be the same: "${specDirectory}"`);
+      return ActionResult.failed();
     }
 
     const specContext = new SpecContext(specDirectory);
     if (!(await specContext.validate())) {
-      return ActionResult.error(`The spec directory is either empty or invalid: "${specDirectory}"`);
+      // return ActionResult.error(`The spec directory is either empty or invalid: "${specDirectory}"`);
+      return ActionResult.failed();
     }
 
     const sdkContext = new SdkContext(sdkDirectory, platform);
     if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
-      return ActionResult.error(
-        "Please enter a different destination folder or remove the existing files and try again."
-      );
+      // return ActionResult.error(
+      //   "Please enter a different destination folder or remove the existing files and try again."
+      // );
+      return ActionResult.failed();
     }
 
     return await withDirPath(async (tempDirectory) => {
@@ -59,7 +62,8 @@ export class GenerateAction {
 
       if (!response.isSuccess()) {
         this.prompts.displaySdkGenerationErrorMessage();
-        return ActionResult.error(response.error!);
+       // return ActionResult.error(response.error!);
+        return ActionResult.failed();
       }
 
       const tempSdkFilePath = new FilePath(tempDirectory, new FileName("sdk.zip"));

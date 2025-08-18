@@ -1,8 +1,9 @@
-import { confirm, isCancel, log, outro, select, spinner } from "@clack/prompts";
-import { getMessageInCyanColor } from "../../utils/utils.js";
+import { confirm, isCancel, log, outro, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { ServiceError } from "../../infrastructure/api-utils.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { format as f, withSpinner } from "../format.js";
 
 export class PortalCopilotPrompts {
   public async displayApiCopilotKeyUsageWarning() {
@@ -29,8 +30,8 @@ export class PortalCopilotPrompts {
     outro(
       `API Copilot configured successfully!
 
-    Copilot ID: ${getMessageInCyanColor(copilotId)}
-    Status: ${getMessageInCyanColor(status ? "Enabled" : "Disabled")}
+    Copilot ID: ${f.var(copilotId)}
+    Status: ${f.var(status ? "Enabled" : "Disabled")}
 
   Configuration saved to: APIMATIC-BUILD.json
 
@@ -53,12 +54,9 @@ To see your copilot: If your portal is already running, refresh the page. Otherw
     return shouldOverwrite;
   }
 
-  public logError(error: string): void {
-    log.error(error);
-  }
 
-  public async spinnerAccountInfo(fn: () => Promise<Result<SubscriptionInfo, ServiceError>>) {
-    return this.withSpinner(
+  public async spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
+    return withSpinner(
       "Retrieving your subscription info",
       "Retrieved subscription info",
       "Error retrieving subscription info",
@@ -66,22 +64,11 @@ To see your copilot: If your portal is already running, refresh the page. Otherw
     );
   }
 
-  private async withSpinner<T, E>(intro: string, success: string, failure: string, fn: () => Promise<Result<T, E>>) {
-    const s = spinner();
-    s.start(intro);
-    const result = await fn();
-    result.match(
-      () => s.stop(success, 0),
-      () => s.stop(failure, 1)
-    );
-    return result;
-  }
-
   public async confirmSingleKeyUsage(apiCopilotKey: string) {
     const confirmKeyUsage = await confirm({
       message:
         "API Copilot can only be active on one Portal at a time. Configuring it on this Portal will disable it on any previously configured Portal.\n" +
-        `Do you want to use this key: '${apiCopilotKey}'?`,
+        `Do you want to use this key: '${f.var(apiCopilotKey)}'?`,
       initialValue: true
     });
 
@@ -90,5 +77,14 @@ To see your copilot: If your portal is already running, refresh the page. Otherw
     }
 
     return confirmKeyUsage;
+  }
+
+  public srcDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    log.error(message);
+  }
+
+  public cancelled() {
+    log.warning('Exiting without making any change.');
   }
 }

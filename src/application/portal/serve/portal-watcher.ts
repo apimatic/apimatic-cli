@@ -98,6 +98,7 @@ export class PortalWatcher {
       true,
       false
     );
-    result.map((error) => console.log(error));
+
+    //result.map((error) => console.log(error));
   }
 }

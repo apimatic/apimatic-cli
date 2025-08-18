@@ -3,6 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { PortalCopilotPrompts } from "../../prompts/portal/copilot.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { CopilotAction } from "../../actions/portal/copilot.js";
+import { outro } from "../../prompts/format.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -38,6 +39,5 @@ export default class PortalCopilotEnable extends Command {
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), authKey);
     const result = await copilotConfigAction.execute(buildDirectory, force, !disable);
-    result.map((message) => this.prompts.logError(message));
-  }
+    outro(result);}
 }

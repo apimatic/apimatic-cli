@@ -9,6 +9,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
+import { format } from "../../prompts/format.js";
 
 export class CopilotAction {
   private readonly apiService = new ApiService();
@@ -26,25 +27,31 @@ export class CopilotAction {
   public async execute(buildDirectory: DirectoryPath, force: boolean, enable: boolean): Promise<ActionResult> {
     const buildContext = new BuildContext(buildDirectory);
 
-    if (!(await buildContext.validate())) {
-      return ActionResult.error("'src' directory is empty or not valid.");
+    if (!await buildContext.validate()) {
+      this.prompts.srcDirectoryEmpty(buildDirectory);
+      return ActionResult.failed();
     }
 
     const buildJson = await buildContext.getBuildFileContents();
 
-    if (!force && buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite()))
-      return ActionResult.error("Exiting without making any change.");
+    if (!force && buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite())) {
+      this.prompts.cancelled();
+      return ActionResult.cancelled();
+    }
 
     const response = await this.prompts.spinnerAccountInfo(
-      () => this.apiService.getAccountInfo(this.configDir, this.authKey));
+       this.apiService.getAccountInfo(this.configDir, this.authKey));
 
     if (response.isErr()) {
-      return ActionResult.error(response._unsafeUnwrapErr());
+      // TODO: add error prompt response._unsafeUnwrapErr()
+      return ActionResult.failed();
     }
 
     const apiCopilotKey = await this.selectCopilotKey(response._unsafeUnwrap(), force);
     if (apiCopilotKey instanceof Error) {
-      return ActionResult.error(apiCopilotKey.message);
+
+     // return ActionResult.error(apiCopilotKey.message);
+      return ActionResult.failed();
     }
 
     const welcomeMessage = await this.getWelcomeMessage();
@@ -59,7 +66,6 @@ export class CopilotAction {
 
     this.prompts.copilotConfigured(enable, apiCopilotKey);
 
-
     return ActionResult.success();
   }
 
@@ -69,7 +75,7 @@ export class CopilotAction {
       subscription.ApiCopilotKeys === undefined ||
       subscription.ApiCopilotKeys.length === 0
     ) {
-      return new Error("No copilot key found for the current subscription. Please contact support at support@apimatic.io.");
+      return new Error(`No copilot key found for the current subscription. Please contact support at ${format.var('support@apimatic.io')}.`);
     }
 
     if (subscription.ApiCopilotKeys.length === 1) {

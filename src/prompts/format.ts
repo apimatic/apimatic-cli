@@ -1,6 +1,7 @@
 import pc from "picocolors";
 import { Result } from "neverthrow";
 import { intro as i, outro as o, spinner } from '@clack/prompts';
+import { ActionResult } from "../actions/action-result.js";
 
 
 export const format = {
@@ -24,10 +25,15 @@ export function intro(text: string) {
   i(format.intro(` ${text} `));
 }
 
-export function outro(exitCode: number) {
-  const message =
-    exitCode === 0 ? format.outroSuccess(' success ') : exitCode === 2 ? format.outroFailure(' failure ') : format.outroWarning(' warning ');
-  o(message);
+export function outro(result: ActionResult) {
+
+  const exitCode = result.getExitCode();
+  const message = result.getMessage();
+  const outroMessage = result.mapAll(() => format.outroSuccess(message),
+    () => format.outroFailure(message),
+    () => format.outroFailure(message),
+    () => format.outroWarning(message));
+  o(outroMessage);
   process.exitCode = exitCode;
 }
 

@@ -44,9 +44,7 @@ export class PortalGenerate extends Command {
     intro('Generate Portal');
     const action = new GenerateAction(this.getConfigDir(), authKey);
     const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
-    const exitCode = result.mapAll(() => 0, () => 1, ()=> 2);
-    //outro(exitCode);
-    this.error("some error" + exitCode);
+    outro(result);
   }
 
 

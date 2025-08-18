@@ -28,19 +28,19 @@ export class GenerateAction {
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
-      return ActionResult.error2();
+      return ActionResult.failed();
     }
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
       this.prompts.srcDirectoryEmpty(buildDirectory);
-      return ActionResult.error2();
+      return ActionResult.failed();
     }
 
     const portalContext = new PortalContext(portalDirectory);
     if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
       this.prompts.portalDirectoryNotEmpty();
-      return ActionResult.error2();
+      return ActionResult.failed();
     }
 
     return await withDirPath(async (tempDirectory) => {
@@ -66,7 +66,7 @@ export class GenerateAction {
             await this.launcherService.openFile(reportPath);
             this.prompts.portalGenerationErrorWithReport(reportPath);
           }
-          return ActionResult.error2();
+          return ActionResult.failed();
         }
       );
     });
