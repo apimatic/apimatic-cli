@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-alpha.19 win32-x64 node-v20.18.3
+@apimatic/cli/1.1.0-alpha.21 win32-x64 node-v23.4.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -74,7 +74,7 @@ DESCRIPTION
   Collections.
 
 EXAMPLES
-  $ apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="D:/"
+  $ apimatic api:transform --format=OPENAPI3YAML --file="./specs/sample.json" --destination="D:/"
 
   $ apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"
 ```
@@ -171,7 +171,7 @@ USAGE
   $ apimatic autocomplete [SHELL] [-r]
 
 ARGUMENTS
-  SHELL  shell type
+  SHELL  (zsh|bash|powershell) Shell type
 
 FLAGS
   -r, --refresh-cache  Refresh cache (ignores displaying instructions)
@@ -181,8 +181,13 @@ DESCRIPTION
 
 EXAMPLES
   $ apimatic autocomplete
+
   $ apimatic autocomplete bash
+
   $ apimatic autocomplete zsh
+
+  $ apimatic autocomplete powershell
+
   $ apimatic autocomplete --refresh-cache
 ```
 
@@ -214,9 +219,10 @@ Configure API Copilot for your API Documentation portal
 
 ```
 USAGE
-  $ apimatic portal:copilot [-i <value>] [--disable] [-k <value>]
+  $ apimatic portal:copilot [-i <value>] [--disable] [-f] [-k <value>]
 
 FLAGS
+  -f, --force             overwrite changes without asking for user consent.
   -i, --input=<value>     [default: ./] path to the parent directory containing the 'src' directory, which includes API
                           specifications and configuration files.
   -k, --auth-key=<value>  override current authentication state with an authentication key.
@@ -399,9 +405,9 @@ DESCRIPTION
   Generate an SDK for your API
 
 EXAMPLES
-  $ apimatic sdk:generate --platform="java"
+  $ apimatic sdk:generate --platform=java
 
-  $ apimatic sdk:generate --platform="csharp" --spec="./src/spec"
+  $ apimatic sdk:generate --platform=csharp --spec="./src/spec"
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/sdk/generate.ts)_
