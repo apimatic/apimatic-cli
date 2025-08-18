@@ -15,20 +15,20 @@ export class LoginAction {
 
   constructor(private readonly configDir: DirectoryPath) {}
 
-  public async execute(apiKey: string | undefined = undefined): Promise<Result<string, string>> {
+  public async execute(shell: string, apiKey: string | undefined = undefined): Promise<Result<string, string>> {
     if (!apiKey) {
-      const result = await this.poolDeviceToken();
+      const result = await this.poolDeviceToken(shell);
       return (
         await result.asyncMap(async (token) => {
-          return await this.verifyKeyAndSave(token);
+          return await this.verifyKeyAndSave(token, shell);
         })
       ).andThen((r) => r);
     } else {
-      return await this.verifyKeyAndSave(apiKey);
+      return await this.verifyKeyAndSave(apiKey, shell);
     }
   }
 
-  private async poolDeviceToken(): Promise<Result<string, string>> {
+  private async poolDeviceToken(shell: string): Promise<Result<string, string>> {
     const state = uuid();
     this.prompts.openBrowser();
     await open(this.authService.getDeviceLoginUrl(state));
@@ -42,7 +42,7 @@ export class LoginAction {
         return err("Authentication timed out. Please try again.");
       }
 
-      const result = await this.authService.getDeviceLoginToken(state);
+      const result = await this.authService.getDeviceLoginToken(state, shell);
       const token = result.match(
         (res) => res.apiKey,
         () => {
@@ -56,8 +56,8 @@ export class LoginAction {
     }
   }
 
-  private async verifyKeyAndSave(apiKey: string): Promise<Result<string, string>> {
-    const result = await this.apiService.getAccountInfo(this.configDir, apiKey);
+  private async verifyKeyAndSave(apiKey: string, shell: string): Promise<Result<string, string>> {
+    const result = await this.apiService.getAccountInfo(this.configDir, shell, apiKey);
     return result.asyncMap(async (info) => {
       await setAuthInfo(info.Email, apiKey, false, this.configDir);
       return info.Email;

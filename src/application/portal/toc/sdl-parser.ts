@@ -18,9 +18,10 @@ export class SdlParser {
   public async getTocComponentsFromSdl(
     specFolderPath: string,
     configDir: string,
-    commandName: string
+    commandName: string,
+    shell: string
   ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
-    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir, commandName);
+    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir, commandName, shell);
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(
@@ -38,9 +39,10 @@ export class SdlParser {
   public async getEndpointGroupsFromSdl(
     specFolderPath: string,
     configDir: string,
-    commandName: string
+    commandName: string,
+    shell: string
   ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir, commandName);
+    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir, commandName, shell);
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(
@@ -54,7 +56,12 @@ export class SdlParser {
     return Result.success(endpointGroups);
   }
 
-  private async generateSdlFromSpec(specFolderPath: string, configDir: string, commandName: string): Promise<Result<Sdl, string>> {
+  private async generateSdlFromSpec(
+    specFolderPath: string,
+    configDir: string,
+    commandName: string,
+    shell: string
+  ): Promise<Result<Sdl, string>> {
     return await withDirPath(async (tempDirectory) => {
       const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
       await this.zipArchiver.archive(new DirectoryPath(specFolderPath), specZipPath);
@@ -63,11 +70,11 @@ export class SdlParser {
       let result: Result<Sdl, string>;
 
       try {
-        result = await this.portalService.generateSdl(specFileStream, configDir, commandName);
+        result = await this.portalService.generateSdl(specFileStream, configDir, commandName, shell);
       } finally {
         specFileStream.close();
       }
-      
+
       if (!result.isSuccess()) {
         return Result.failure(
           "Failed to generate SDL from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension."

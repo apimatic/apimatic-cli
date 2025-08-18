@@ -81,7 +81,7 @@ export default class PortalQuickstart extends Command {
     const controller = new PortalQuickstartController();
     const telemetryService = new TelemetryService(this.config.configDir);
 
-    await telemetryService.trackEvent(new QuickstartInitiatedEvent());
+    await telemetryService.trackEvent(new QuickstartInitiatedEvent(), this.config.shell);
     prompts.displayWelcomeMessage();
 
     let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
@@ -89,7 +89,7 @@ export default class PortalQuickstart extends Command {
     if (!loggedIn) {
       prompts.getLoggedInFirst();
       const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
-      const loginResult = await loginAction.execute();
+      const loginResult = await loginAction.execute(this.config.shell);
 
       loginResult.match(
         (e) => prompts.displayLoggedInMessage(e),
@@ -153,6 +153,7 @@ export default class PortalQuickstart extends Command {
         serveFlags,
         serverPaths,
         PortalQuickstart.id,
+        this.config.shell,
         generatePortalAction.execute
       );
 
@@ -167,7 +168,7 @@ export default class PortalQuickstart extends Command {
       }
 
       prompts.displayOutroMessage(buildDirectory.toString());
-      await telemetryService.trackEvent(new QuickstartCompletedEvent());
+      await telemetryService.trackEvent(new QuickstartCompletedEvent(), this.config.shell);
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

@@ -19,10 +19,9 @@ type TelemetryPayload = {
 export class TelemetryService {
   private readonly apiService = new ApiService();
 
-  constructor(private readonly configDirectory: string) {
-  }
+  constructor(private readonly configDirectory: string) {}
 
-  public async trackEvent<T extends DomainEvent>(event: T): Promise<void> {
+  public async trackEvent<T extends DomainEvent>(event: T, shell: string): Promise<void> {
     const authInfo = await this.getAuthInfo(this.configDirectory);
     const telemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
     const authKey = authInfo?.authKey;
@@ -37,10 +36,10 @@ export class TelemetryService {
       cliVersion: envInfo.getCLIVersion(),
       platform: os.platform(),
       releaseVersion: os.release(),
-      nodeVersion: process.version,
+      nodeVersion: process.version
     };
 
-    const result = await this.apiService.sendTelemetry(JSON.stringify(payload), authKey);
+    const result = await this.apiService.sendTelemetry(JSON.stringify(payload), authKey, shell);
     // eslint-disable-next-line no-undef
     result.mapErr((err) => console.log(err));
   }

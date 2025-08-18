@@ -8,12 +8,12 @@ class EnvInfo {
   private static cachedUserAgent: string | null = null;
   private static cachedBaseUrl: string;
 
-  public getUserAgent(): string {
+  public getUserAgent(shell: string): string {
     if (!EnvInfo.cachedUserAgent) {
       const osInfo = `${os.platform()} ${os.release()}`;
       const engine = "Node.js";
       const engineVersion = process.version;
-      EnvInfo.cachedUserAgent = `APIMATIC CLI/${this.getCLIVersion()} - (OS: ${osInfo}, Engine: ${engine}/${engineVersion})`;
+      EnvInfo.cachedUserAgent = `APIMATIC CLI/${this.getCLIVersion()} - (OS: ${osInfo}, Engine: ${engine}/${engineVersion}, Shell: ${shell})`;
     }
     return EnvInfo.cachedUserAgent;
   }

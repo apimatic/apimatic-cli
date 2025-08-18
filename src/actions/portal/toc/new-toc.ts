@@ -32,6 +32,7 @@ export class PortalNewTocAction {
     buildDirectory: DirectoryPath,
     configDir: string,
     commandName: string,
+    shell: string,
     tocDirectory?: DirectoryPath,
     force: boolean = false,
     expandEndpoints: boolean = false,
@@ -39,7 +40,7 @@ export class PortalNewTocAction {
   ): Promise<Result<string, string>> {
     try {
       const tocDir = await this.getDestinationPath(buildDirectory, tocDirectory);
-      const tocPath = new FilePath(tocDir, new FileName(this.DEFAULT_TOC_FILENAME))
+      const tocPath = new FilePath(tocDir, new FileName(this.DEFAULT_TOC_FILENAME));
       const tocCheckResult = await this.handleExistingToc(tocPath, force);
       if (!tocCheckResult.isSuccess()) {
         return Result.cancelled(tocCheckResult.value!);
@@ -49,6 +50,7 @@ export class PortalNewTocAction {
         buildDirectory,
         configDir,
         commandName,
+        shell,
         expandEndpoints,
         expandModels
       );
@@ -90,6 +92,7 @@ export class PortalNewTocAction {
     buildDirectory: DirectoryPath,
     configDir: string,
     commandName: string,
+    shell: string,
     expandEndpoints: boolean,
     expandModels: boolean
   ): Promise<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }> {
@@ -106,7 +109,7 @@ export class PortalNewTocAction {
       return { endpointGroups: new Map(), models: [] };
     }
 
-    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, configDir, commandName);
+    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, configDir, commandName, shell);
 
     if (!sdlResult.isSuccess()) {
       this.prompts.stopProgressIndicatorWithMessage(`⚠️ ${sdlResult.error!}`);
@@ -132,7 +135,10 @@ export class PortalNewTocAction {
     return await this.contentParser.parseContentFolder(contentFolderPath.toString(), contentFolderPath.toString());
   }
 
-  private async getDestinationPath(buildDirectory: DirectoryPath, providedTocDirectory?: DirectoryPath): Promise<DirectoryPath> {
+  private async getDestinationPath(
+    buildDirectory: DirectoryPath,
+    providedTocDirectory?: DirectoryPath
+  ): Promise<DirectoryPath> {
     if (providedTocDirectory === undefined) {
       const inferredDestination = await this.getContentFolderPath(buildDirectory);
       return inferredDestination;

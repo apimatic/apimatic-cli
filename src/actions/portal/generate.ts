@@ -29,6 +29,7 @@ export class GenerateAction {
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
     commandName: string,
+    shell: string,
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
@@ -38,7 +39,9 @@ export class GenerateAction {
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
-      return ActionResult.error(`Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running apimatic portal:quickstart.`);
+      return ActionResult.error(
+        `Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running apimatic portal:quickstart.`
+      );
     }
 
     const portalContext = new PortalContext(portalDirectory);
@@ -54,7 +57,13 @@ export class GenerateAction {
       const buildZipPath = new FilePath(tempDirectory, new FileName("build.zip"));
       await this.zipArchiver.archive(buildDirectory, buildZipPath);
 
-      const response = await this.portalService.generatePortal(buildZipPath, this.configDir, commandName, this.authKey);
+      const response = await this.portalService.generatePortal(
+        buildZipPath,
+        this.configDir,
+        commandName,
+        shell,
+        this.authKey
+      );
 
       if (!response.isSuccess()) {
         this.prompts.displayPortalGenerationErrorMessage();
