@@ -102,7 +102,7 @@ export default class PortalQuickstart extends Command {
 
     const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
     const authorizationHeader = createAuthorizationHeader(authInfo, null);
-    const client: Client = createApiClient(authorizationHeader, 0);
+    const client: Client = createApiClient(authorizationHeader, this.config.shell, 0);
     const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
       client
     );

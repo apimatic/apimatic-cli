@@ -72,7 +72,7 @@ ${formats}`
 
       const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
       const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
-      const client: Client = createApiClient(authorizationHeader, 0);
+      const client: Client = createApiClient(authorizationHeader, this.config.shell, 0);
       const transformationController: TransformationController = new TransformationController(client);
 
       const { id, apiValidationSummary }: Transformation = await getTransformationId(flags, transformationController);

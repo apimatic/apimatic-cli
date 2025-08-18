@@ -40,7 +40,7 @@ export default class Validate extends Command {
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
       const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
-      const client: Client = createApiClient(authorizationHeader, 0);
+      const client: Client = createApiClient(authorizationHeader, this.config.shell, 0);
 
       const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
         client
