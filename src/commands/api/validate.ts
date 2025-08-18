@@ -1,13 +1,7 @@
 import fsExtra from "fs-extra";
 
 import { ux, Flags, Command } from "@oclif/core";
-import {
-  ApiError,
-  ApiValidationExternalApisController,
-  ApiValidationSummary,
-  Client,
-  Environment
-} from "@apimatic/sdk";
+import { ApiError, ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils.js";
 import { getValidationSummary } from "../../controllers/api/validate.js";
@@ -15,7 +9,7 @@ import { printValidationMessages, replaceHTML } from "../../utils/utils.js";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { envInfo } from "../../infrastructure/env-info.js";
+import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
@@ -45,8 +39,8 @@ export default class Validate extends Command {
       }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
       const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
-      const authorizationHeader = this.createAuthorizationHeader(authInfo, overrideAuthKey);
-      const client: Client = await this.createApiClient(authorizationHeader);
+      const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
+      const client: Client = createApiClient(authorizationHeader, 0);
 
       const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
         client
@@ -91,40 +85,4 @@ export default class Validate extends Command {
       }
     }
   }
-
-  //TODO: Remove all code below this line when refactoring.
-  private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
-    const key = overrideAuthKey || authInfo?.authKey;
-    return `X-Auth-Key ${key ?? ""}`;
-  };
-
-  private async createApiClient(authorizationHeader: string): Promise<Client> {
-    if (envInfo.getBaseUrl()) {
-      return this.createTestingApiClient(authorizationHeader);
-    }
-    return this.createProductionApiClient(authorizationHeader);
-  }
-
-  private readonly createProductionApiClient = (authorizationHeader: string): Client => {
-    return new Client({
-      customHeaderAuthenticationCredentials: {
-        Authorization: authorizationHeader
-      },
-      userAgent: envInfo.getUserAgent(),
-      timeout: 0,
-      environment: Environment.Production
-    });
-  };
-
-  private readonly createTestingApiClient = (authorizationHeader: string): Client => {
-    return new Client({
-      customHeaderAuthenticationCredentials: {
-        Authorization: authorizationHeader
-      },
-      userAgent: envInfo.getUserAgent(),
-      timeout: 0,
-      environment: Environment.Testing,
-      customUrl: envInfo.getBaseUrl()
-    });
-  };
 }
