@@ -180,7 +180,7 @@ export class PortalService {
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
       const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
+      const message = Object.values(probDetailsError.result!.errors as Record<string, string[]>)[0]?.[0] ?? null; 
       return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
