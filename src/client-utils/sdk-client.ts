@@ -46,31 +46,4 @@ export class SDKClient {
       throw error as Error;
     }
   }
-
-  public async getClient(overrideAuthKey: string | null, configDir: string): Promise<Client> {
-    if (overrideAuthKey) {
-      return new Client({
-        timeout: 0,
-        customHeaderAuthenticationCredentials: {
-          Authorization: `X-Auth-Key ${overrideAuthKey}`
-        }
-      });
-    }
-    let storedAuthInfo: AuthInfo | null = await getAuthInfo(configDir);
-
-    if (!storedAuthInfo) {
-      // If no config file or no credentials exist in the config file
-      storedAuthInfo = { email: "", authKey: "" };
-    }
-    if (storedAuthInfo.authKey !== "") {
-      return new Client({
-        timeout: 0,
-        customHeaderAuthenticationCredentials: {
-          Authorization: `X-Auth-Key ${storedAuthInfo.authKey}`
-        }
-      });
-    } else {
-      throw new Error("Please login first or provide an authKey");
-    }
-  }
 }
