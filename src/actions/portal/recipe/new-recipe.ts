@@ -38,7 +38,7 @@ export class PortalRecipeAction {
 
     const validateBuildDirectoryPathResult = await this.validateBuildDirectoryPath(buildDirectoryPath);
     if (validateBuildDirectoryPathResult.isFailed()) {
-      return Result.failure(`Unable to generate API Recipe: ${validateBuildDirectoryPathResult.error!}`);
+      return Result.failure(`Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running apimatic portal:quickstart.`);
     }
 
     //TODO: Create a type for the build config and use that here instead of any.
