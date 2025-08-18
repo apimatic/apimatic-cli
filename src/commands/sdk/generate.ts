@@ -11,7 +11,7 @@ export default class SdkGenerate extends Command {
   static description = "Generate an SDK for your API";
   static flags = {
     language: Flags.string({
-      char: 'l',
+      char: "l",
       required: true,
       options: Object.values(Language).map((p) => p.toString()),
       description: `language for which the sdk will be generated.`
@@ -50,7 +50,15 @@ export default class SdkGenerate extends Command {
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(language);
 
     var action = new GenerateAction(this.getConfigDir(), authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, language as Language, SdkGenerate.id, force, zipSdk);
+    const result = await action.execute(
+      specDirectory,
+      sdkDirectory,
+      language as Language,
+      SdkGenerate.id,
+      this.config.shell,
+      force,
+      zipSdk
+    );
     result.mapAll(
       () => this.prompts.displayOutroMessage(sdkDirectory),
       (message) => this.prompts.logError(message)

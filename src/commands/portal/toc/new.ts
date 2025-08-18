@@ -8,8 +8,7 @@ import { FlagsProvider } from "../../../types/flags-provider.js";
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalTocNew extends Command {
-  static summary =
-    "Generate a Table of Contents (TOC) file for your API documentation portal";
+  static summary = "Generate a Table of Contents (TOC) file for your API documentation portal";
 
   static description = `This command generates a new Table of Contents (TOC) file used in the
 generation of your API documentation portal.
@@ -63,6 +62,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
       buildDirectory,
       this.config.configDir,
       PortalTocNew.id,
+      this.config.shell,
       tocDirectory,
       flags.force,
       flags["expand-endpoints"],
@@ -71,7 +71,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
 
     //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (result.isFailed()) {
-      await telemetryService.trackEvent(new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags));
+      await telemetryService.trackEvent(new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags), this.config.shell);
       this.error(result.error!);
     }
   }

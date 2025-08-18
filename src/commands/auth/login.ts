@@ -11,7 +11,7 @@ export default class Login extends Command {
   static flags = {
     "auth-key": Flags.string({
       char: "k",
-      description: "Sets authentication key for all commands.",
+      description: "Sets authentication key for all commands."
     })
   };
 
@@ -27,7 +27,7 @@ export default class Login extends Command {
     }
 
     const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
-    const result = await loginAction.execute(authKey);
+    const result = await loginAction.execute(this.config.shell, authKey);
     result.match(
       (email) => this.prompts.loginSuccessful(email),
       (error) => this.prompts.logError(error)

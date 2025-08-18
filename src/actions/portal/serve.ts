@@ -21,10 +21,12 @@ export class PortalServeAction {
     flags: ServeFlags,
     paths: ServePaths,
     commandName: string,
+    shell: string,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
       commandName: string,
+      shell: string,
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>
@@ -33,6 +35,7 @@ export class PortalServeAction {
       new DirectoryPath(paths.sourceDirectoryPath),
       new DirectoryPath(paths.destinationDirectoryPath),
       commandName,
+      shell,
       false,
       false
     );
@@ -44,7 +47,7 @@ export class PortalServeAction {
           return Result.failure(setupServerResult.error!);
         }
 
-        const startServerResult = await this.serveHandler.startServer(paths, flags, commandName, generatePortal);
+        const startServerResult = await this.serveHandler.startServer(paths, flags, commandName, shell, generatePortal);
         if (startServerResult.isFailed()) {
           return Result.failure(startServerResult.error!);
         }

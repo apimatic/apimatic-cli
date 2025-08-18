@@ -1,3 +1,4 @@
+import { ReadStream } from "fs";
 import {
   ContentType,
   DocsPortalManagementController,
@@ -26,7 +27,6 @@ import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { envInfo } from "../env-info.js";
-import { ReadStream } from "fs";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -34,17 +34,18 @@ export class PortalService {
   private readonly fileService = new FileService();
 
   //TODO: Pass stream as parameter instead of file path.
-  async generatePortal(
+  public async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
     commandName: string,
+    shell: string,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = this.createApiClient(authorizationHeader);
+    const client = this.createApiClient(authorizationHeader, shell);
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
@@ -62,18 +63,19 @@ export class PortalService {
   }
 
   //TODO: Pass stream as parameter instead of file path.
-  async generateSdk(
+  public async generateSdk(
     specPath: FilePath,
     sdkPlatform: Platforms,
     configDir: DirectoryPath,
     commandName: string,
+    shell: string,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = this.createApiClient(authorizationHeader);
+    const client = this.createApiClient(authorizationHeader, shell);
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
@@ -95,12 +97,13 @@ export class PortalService {
   public async generateSdl(
     specFileStream: ReadStream,
     configDir: string,
-    commandName: string
+    commandName: string,
+    shell: string
   ): Promise<Result<Sdl, string>> {
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir);
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
-    const client = this.createApiClient(authorizationHeader);
+    const client = this.createApiClient(authorizationHeader, shell);
     const transformationController = new TransformationController(client);
 
     try {
@@ -136,30 +139,30 @@ export class PortalService {
     return `X-Auth-Key ${key ?? ""}`;
   };
 
-  private createApiClient = (authorizationHeader: string): Client => {
+  private createApiClient = (authorizationHeader: string, shell: string): Client => {
     if (envInfo.getBaseUrl()) {
-      return this.createTestingApiClient(authorizationHeader);
+      return this.createTestingApiClient(authorizationHeader, shell);
     }
-    return this.createProductionApiClient(authorizationHeader);
+    return this.createProductionApiClient(authorizationHeader, shell);
   };
 
-  readonly createProductionApiClient = (authorizationHeader: string): Client => {
+  readonly createProductionApiClient = (authorizationHeader: string, shell: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
-      userAgent: envInfo.getUserAgent(),
+      userAgent: envInfo.getUserAgent(shell),
       timeout: this.TIMEOUT,
       environment: Environment.Production
     });
   };
 
-  readonly createTestingApiClient = (authorizationHeader: string): Client => {
+  readonly createTestingApiClient = (authorizationHeader: string, shell: string): Client => {
     return new Client({
       customHeaderAuthenticationCredentials: {
         Authorization: authorizationHeader
       },
-      userAgent: envInfo.getUserAgent(),
+      userAgent: envInfo.getUserAgent(shell),
       timeout: this.TIMEOUT,
       environment: Environment.Testing,
       customUrl: envInfo.getBaseUrl()

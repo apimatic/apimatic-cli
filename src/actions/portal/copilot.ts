@@ -23,7 +23,7 @@ export class CopilotAction {
     this.authKey = authKey;
   }
 
-  public async execute(buildDirectory: DirectoryPath, force: boolean, enable: boolean): Promise<ActionResult> {
+  public async execute(buildDirectory: DirectoryPath, shell: string, force: boolean, enable: boolean): Promise<ActionResult> {
     const buildContext = new BuildContext(buildDirectory);
 
     if (!(await buildContext.validate())) {
@@ -36,7 +36,7 @@ export class CopilotAction {
       return ActionResult.error("Exiting without making any change.");
 
     const response = await this.prompts.spinnerAccountInfo(
-      () => this.apiService.getAccountInfo(this.configDir, this.authKey));
+      () => this.apiService.getAccountInfo(this.configDir, shell, this.authKey));
 
     if (response.isErr()) {
       return ActionResult.error(response._unsafeUnwrapErr());
