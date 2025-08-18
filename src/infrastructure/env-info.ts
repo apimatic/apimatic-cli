@@ -6,7 +6,8 @@ import fs from "fs-extra";
 class EnvInfo {
   private static cachedCliVersion: string | null = null;
   private static cachedUserAgent: string | null = null;
-  private static cachedBaseUrl: string;
+  private static cachedBaseUrl: string | undefined;
+  private static cachedAuthBaseUrl: string | undefined;
 
   public getUserAgent(shell: string): string {
     if (!EnvInfo.cachedUserAgent) {
@@ -41,11 +42,23 @@ class EnvInfo {
     if (EnvInfo.cachedBaseUrl) {
       return EnvInfo.cachedBaseUrl;
     }
-    const envBaseUrl = process.env.APIMATIC_BASE_URL;
-    if (envBaseUrl) {
-      EnvInfo.cachedBaseUrl = envBaseUrl;
+    const envBaseUrls = process.env.APIMATIC_BASE_URL;
+    if (envBaseUrls) {
+      EnvInfo.cachedBaseUrl = envBaseUrls.split(";")[0];
     }
     return EnvInfo.cachedBaseUrl;
+  }
+
+  public getAuthBaseUrl(): string | undefined {
+    if (EnvInfo.cachedAuthBaseUrl) {
+      return EnvInfo.cachedAuthBaseUrl;
+    }
+    const envBaseUrls = process.env.APIMATIC_BASE_URL;
+    if (envBaseUrls) {
+      const baseUrls = envBaseUrls.split(";");
+      EnvInfo.cachedAuthBaseUrl = baseUrls.length === 2 ? baseUrls[1] : undefined;
+    }
+    return EnvInfo.cachedAuthBaseUrl;
   }
 }
 export const envInfo = new EnvInfo();

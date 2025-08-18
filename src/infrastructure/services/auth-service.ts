@@ -21,7 +21,7 @@ export class AuthService {
   }
 
   public getDeviceLoginUrl(state: string): string {
-    return `${this.apiBaseUrl}/device-auth/login?state=${state}`;
+    return `${envInfo.getAuthBaseUrl() ?? this.apiBaseUrl}/device-auth/login?state=${state}`;
   }
   public async getDeviceLoginToken(state: string, shell: string): Promise<Result<DeviceAuthToken, ServiceError>> {
     try {

@@ -1,7 +1,6 @@
 import getPort from "get-port";
 import { Command } from "@oclif/core";
 import { ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
-import { SDKClient } from "../../client-utils/sdk-client.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
 import { SpecFile } from "../../types/portal/quickstart.js";
@@ -17,6 +16,8 @@ import { LoginAction } from "../../actions/auth/login.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
 import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -99,7 +100,9 @@ export default class PortalQuickstart extends Command {
       if (loginResult.isErr()) return;
     }
 
-    const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
+    const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+    const authorizationHeader = createAuthorizationHeader(authInfo, null);
+    const client: Client = createApiClient(authorizationHeader, 0);
     const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
       client
     );

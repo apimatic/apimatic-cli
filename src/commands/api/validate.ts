@@ -4,11 +4,12 @@ import { ux, Flags, Command } from "@oclif/core";
 import { ApiError, ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
 
 import { AuthenticationError, loggers } from "../../types/utils.js";
-import { SDKClient } from "../../client-utils/sdk-client.js";
 import { getValidationSummary } from "../../controllers/api/validate.js";
 import { printValidationMessages, replaceHTML } from "../../utils/utils.js";
 import { APIValidateError, AuthorizationError } from "../../types/api/validate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
@@ -37,7 +38,9 @@ export default class Validate extends Command {
         throw new Error(`Validation file: ${flags.file} does not exist`);
       }
       const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
-      const client: Client = await SDKClient.getInstance().getClient(overrideAuthKey, this.config.configDir);
+      const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+      const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
+      const client: Client = createApiClient(authorizationHeader, 0);
 
       const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
         client
@@ -53,9 +56,11 @@ export default class Validate extends Command {
       };
       printValidationMessages(validationSummary, logFunctions);
 
-      validationSummary.success
-        ? this.log("Specification file provided is valid")
-        : this.error("Specification file provided is invalid");
+      if (validationSummary.success) {
+        this.log("Specification file provided is valid");
+      } else {
+        this.error("Specification file provided is invalid");
+      }
     } catch (error) {
       if ((error as ApiError).result) {
         const apiError = error as ApiError;
