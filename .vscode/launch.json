@@ -18,9 +18,8 @@
             // "auth:logout",
             // "auth:login",
             // "auth:status"
-            "portal:quickstart",
+            // "portal:quickstart",
             // "portal:generate",
-            // "portal:serve",
             // "portal:toc:new",
             //"--expand-endpoints",
             //"--expand-models",
@@ -32,7 +31,6 @@
             // "portal:serve",
             // "api:transform",
             // "--help"
-            // "--input=C:\\Users\\Ali\\Desktop\\test-cli-telemetry\\prod-test"
             //   "--folder=C:/Users/User/Desktop/demo/portal",
             //   "--destination=C:\\Users\\User\\Desktop\\demo\\portal\\api-portal"
             // "--source=C:/Users/User/Desktop/demo/portal/",
