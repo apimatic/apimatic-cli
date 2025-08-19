@@ -8,7 +8,7 @@ import { ZipService } from "../../infrastructure/zip-service.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FilePath } from "../../types/file/filePath.js";
-import { getMessageInOrangeColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
+import { getMessageInCyanColor, getMessageInMagentaColor, getMessageInOrangeColor } from "../../utils/utils.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { PortalScaffoldService } from "../../infrastructure/services/portal-scaffold-service.js";
 import { LoginAction } from "../auth/login.js";
@@ -26,6 +26,7 @@ import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiate
 import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
 import { SpecPathFactory } from "../../types/file/spec-path.js";
 import { FileName } from "../../types/file/fileName.js";
+import { Ok } from "neverthrow";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -50,7 +51,6 @@ export class PortalQuickstartAction {
     await this.telemetryService.trackEvent(new QuickstartInitiatedEvent());
 
     const authenticateUserResult = await this.authenticateUser(this.configDir);
-
     if (authenticateUserResult.isFailed()) {
       return ActionResult.error(authenticateUserResult.error!);
     }
@@ -93,31 +93,20 @@ export class PortalQuickstartAction {
   };
 
   private async authenticateUser(configDir: DirectoryPath): Promise<Result<string, string>> {
-    const isUserAuthenticated = await this.isUserAuthenticated(configDir);
-
-    if (!isUserAuthenticated) {
-      this.prompts.displayInfo("You need to be logged in to continue.");
-      const loginAction = new LoginAction(configDir);
-      const loginResult = await loginAction.execute();
-
-      loginResult.match(
-        (email) => this.prompts.displaySuccess(email),
-        (error) => this.prompts.logError(error)
-      );
-
-      if (loginResult.isErr())
-        return Result.failure("Unable to login, please check your credentials and try again later.");
-    }
-
-    return Result.success("Authentication was successful.");
-  }
-
-  private async isUserAuthenticated(configDir: DirectoryPath): Promise<boolean> {
     const storedAuth = await getAuthInfo(configDir.toString());
-    if (!storedAuth?.authKey) {
-      return false;
+    if (storedAuth?.authKey) {
+      return Result.success("User is already authenticated.");
     }
-    return true;
+
+    this.prompts.displayInfo("You need to be logged in to continue.");
+    const loginResult = await new LoginAction(configDir).execute();
+
+    if (loginResult.isErr()) {
+      this.prompts.logError(loginResult.error);
+      return Result.failure("Unable to login, please check your credentials and try again later.");
+    }
+    this.prompts.displaySuccess(loginResult.value);
+    return Result.success("Authentication was successful.");
   }
 
   private async getSpecPath(): Promise<string> {
