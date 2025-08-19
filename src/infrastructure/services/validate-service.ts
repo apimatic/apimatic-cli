@@ -14,6 +14,7 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { Result } from "../../types/common/result.js";
 import { printValidationMessages } from "../../utils/utils.js";
 import { loggers } from "../../types/utils.js";
+import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 
 export interface ValidationParams {
   file?: string;
@@ -23,6 +24,8 @@ export interface ValidationParams {
 }
 
 export class ValidationService {
+  private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
+
   async validate({ file, url, configDir, authKey }: ValidationParams): Promise<Result<void, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
@@ -48,12 +51,14 @@ export class ValidationService {
       const validationSummary = validation.result;
 
       // Print validation messages
-      const logFunctions: loggers = {
-        log: (msg) => console.log(msg),
-        warn: (msg) => console.warn(msg),
-        error: (msg) => console.error(msg)
-      };
-      printValidationMessages(validationSummary, logFunctions);
+    //   const logFunctions: loggers = {
+    //     log: (msg) => console.log(msg),
+    //     warn: (msg) => console.warn(msg),
+    //     error: (msg) => console.error(msg)
+    //   };
+    //   printValidationMessages(validationSummary, logFunctions);
+      this.prompts.displayValidationMessages(validationSummary);
+
 
       return validationSummary.success
         ? Result.success(undefined)

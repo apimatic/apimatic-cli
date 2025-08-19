@@ -37,7 +37,6 @@ export class ValidateAction {
       return ActionResult.error(result.error || "Validation failed with an unknown error");
     }
 
-    this.prompts.displayValidationSuccessMessage();
     return ActionResult.success();
   };
 }
