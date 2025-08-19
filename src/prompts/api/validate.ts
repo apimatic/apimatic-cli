@@ -1,9 +1,5 @@
 import { outro, spinner, log } from "@clack/prompts";
-import {
-  getMessageInCyanColor,
-  getMessageInRedColor,
-  replaceHTML,
-} from "../../utils/utils.js";
+import { getMessageInCyanColor, getMessageInGreenColor, getMessageInRedColor, replaceHTML } from "../../utils/utils.js";
 import { ValidationMessages } from "../../types/utils.js";
 
 export class ApiValidatePrompts {
@@ -14,15 +10,11 @@ export class ApiValidatePrompts {
   }
 
   displayValidationSuccessMessage(): void {
-    this.spin.stop("Specification file provided is valid");
+    this.spin.stop(getMessageInGreenColor("Specification file provided is valid"));
   }
 
   displayValidationFailureMessage(): void {
-    this.spin.stop(`Specification validation failed`);
-  }
-
-  stopSpin(): void {
-    this.spin.stop();
+    this.spin.stop(getMessageInRedColor("Specification validation failed"));
   }
 
   displayValidationMessages({ warnings = [], errors = [], messages = [] }: ValidationMessages): void {
@@ -40,10 +32,10 @@ export class ApiValidatePrompts {
   }
 
   displayOutroMessage(): void {
-    outro("Validation process completed.");
+    outro("Validation complete");
   }
 
-  logError(message: string): void {
-    log.error(getMessageInRedColor(`Error: ${message}`));
+  logError(error: string): void {
+    log.error(error);
   }
 }

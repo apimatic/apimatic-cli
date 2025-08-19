@@ -5,7 +5,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 export class ApiTransformPrompts {
   private readonly spin = spinner();
 
-   displayApiTransformationMessage(): void {
+  displayApiTransformationMessage(): void {
     this.spin.start(getMessageInMagentaColor("Transforming API"));
   }
 
@@ -17,11 +17,11 @@ export class ApiTransformPrompts {
     this.spin.stop(getMessageInRedColor("API transformation failed"));
   }
 
-  displayOutroMessage(generatedSdkPath: DirectoryPath): void {
-    outro(`The transformed API specification can be found at ${generatedSdkPath}`);
+  displayOutroMessage(transformedApiPath: DirectoryPath): void {
+    outro(`The transformed API specification can be found at ${transformedApiPath}`);
   }
 
-  logError(error: string): void {
+   logError(error: string): void {
     log.error(error);
   }
 }
