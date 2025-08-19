@@ -223,7 +223,7 @@ export class PortalRecipePrompts {
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
     log.message(`🎉 Your new API Recipe has been added to the source directory at: ${buildDirectoryPath}`);
     outro(
-      `▶ Run the command 'apimatic portal:serve' to preview your documentation portal.`
+      `▶ Run the command \`apimatic portal serve\` to preview your documentation portal.`
     );
   }
 

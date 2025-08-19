@@ -13,18 +13,18 @@ type CommandMapping = {
 };
 
 const COMMANDS: CommandMapping[] = [
-  { id: "api:transform", fileParts: ["commands", "api", "transform.js"] },
-  { id: "api:validate", fileParts: ["commands", "api", "validate.js"] },
-  { id: "auth:login", fileParts: ["commands", "auth", "login.js"] },
-  { id: "auth:logout", fileParts: ["commands", "auth", "logout.js"] },
-  { id: "auth:status", fileParts: ["commands", "auth", "status.js"] },
-  { id: "portal:generate", fileParts: ["commands", "portal", "generate.js"], exportName: "PortalGenerate" },
-  { id: "portal:recipe:new", fileParts: ["commands", "portal", "recipe", "new.js"] },
-  { id: "portal:serve", fileParts: ["commands", "portal", "serve.js"] },
-  { id: "portal:copilot", fileParts: ["commands", "portal", "copilot.js"] },
-  { id: "portal:toc:new", fileParts: ["commands", "portal", "toc", "new.js"] },
-  { id: "portal:quickstart", fileParts: ["commands", "portal", "quickstart.js"] },
-  { id: "sdk:generate", fileParts: ["commands", "sdk", "generate.js"] }
+  { id: "api transform", fileParts: ["commands", "api", "transform.js"] },
+  { id: "api validate", fileParts: ["commands", "api", "validate.js"] },
+  { id: "auth login", fileParts: ["commands", "auth", "login.js"] },
+  { id: "auth logout", fileParts: ["commands", "auth", "logout.js"] },
+  { id: "auth status", fileParts: ["commands", "auth", "status.js"] },
+  { id: "portal generate", fileParts: ["commands", "portal", "generate.js"], exportName: "PortalGenerate" },
+  { id: "portal recipe new", fileParts: ["commands", "portal", "recipe", "new.js"] },
+  { id: "portal serve", fileParts: ["commands", "portal", "serve.js"] },
+  { id: "portal copilot", fileParts: ["commands", "portal", "copilot.js"] },
+  { id: "portal toc new", fileParts: ["commands", "portal", "toc", "new.js"] },
+  { id: "portal quickstart", fileParts: ["commands", "portal", "quickstart.js"] },
+  { id: "sdk generate", fileParts: ["commands", "sdk", "generate.js"] }
 ];
 
 const BIN_NAME = "apimatic"; // matches package.json oclif.bin
