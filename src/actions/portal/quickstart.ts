@@ -25,6 +25,7 @@ import { TelemetryService } from "../../infrastructure/services/telemetry-servic
 import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
 import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
 import { SpecPathFactory } from "../../types/file/spec-path.js";
+import { FileName } from "../../types/file/fileName.js";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -124,9 +125,12 @@ export class PortalQuickstartAction {
     return await this.prompts.specPathPrompt(this.defaultSpecUrl);
   }
 
-  private async setupSpecFile(tempDirectory: DirectoryPath, specPath: string): Promise<Result<FilePath, string>> {
+  private async setupSpecFile(tempDirectory: DirectoryPath, specPath: string): Promise<Result<DirectoryPath, string>> {
     try {
       const spec = SpecPathFactory.create(specPath);
+      const userSpecDirectory = tempDirectory.join("user-spec");
+      await this.fileService.cleanDirectory(userSpecDirectory);
+
       if (spec instanceof UrlPath) {
         const response = await axios.get(spec.toString(), { responseType: "stream" });
 
@@ -136,19 +140,26 @@ export class PortalQuickstartAction {
           );
         }
 
-        const specFilePath = new FilePath(tempDirectory, spec.fileName());
+        const specFilePath = new FilePath(userSpecDirectory, spec.fileName());
         await this.fileService.writeFile(specFilePath, response.data as NodeJS.ReadableStream);
-        return Result.success(specFilePath);
+
+        const fileType = await filetype.fromFile(specFilePath.toString());
+        if (fileType?.ext === "zip") {
+          await this.zipService.unArchive(specFilePath, userSpecDirectory);
+          await this.fileService.deleteFile(specFilePath);
+        }
+
+        return Result.success(userSpecDirectory);
       }
 
       const fileType = await filetype.fromFile(spec.toString());
       if (fileType?.ext === "zip") {
-        await this.zipService.unArchive(spec, tempDirectory);
+        await this.zipService.unArchive(spec, userSpecDirectory);
       } else {
-        await this.fileService.copyToDirectory(spec, tempDirectory);
+        await this.fileService.copyToDirectory(spec, userSpecDirectory);
       }
 
-      return Result.success(spec);
+      return Result.success(userSpecDirectory);
     } catch {
       return Result.failure(
         "Something went wrong while setting up the API Definition. Please try again later. If the issue persists, contact our team at support@apimatic.io"
@@ -156,20 +167,27 @@ export class PortalQuickstartAction {
     }
   }
 
-  private async validateSpecFile(specFilePath: FilePath, configDir: DirectoryPath): Promise<Result<string, string>> {
+  private async validateSpecFile(
+    specFilePath: DirectoryPath,
+    configDir: DirectoryPath
+  ): Promise<Result<string, string>> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
     this.prompts.startProgressIndicator(
       getMessageInMagentaColor(
         `Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules 🔍 `
       )
     );
-    const specFileStream = await this.fileService.getStream(specFilePath);
+    const specZipFilePath = new FilePath(specFilePath, new FileName("spec.zip"));
+    await this.zipService.archive(specFilePath, new FilePath(specFilePath, new FileName("spec.zip")));
+
+    const specFileStream = await this.fileService.getStream(specZipFilePath);
     let result: Result<ApiValidationSummary, string>;
 
     try {
       result = await this.validationService.validateSpec(specFileStream, configDir);
     } finally {
       specFileStream.close();
+      await this.fileService.deleteFile(specZipFilePath);
     }
 
     if (result.isFailed()) {
@@ -205,7 +223,7 @@ export class PortalQuickstartAction {
 
   private async setupLanguagesAndBuildDirectory(
     tempDirectory: DirectoryPath,
-    specFilePath: FilePath,
+    specFilePath: DirectoryPath,
     useDefaultSpec: boolean
   ): Promise<Result<DirectoryPath, string>> {
     const selectedLanguages: string[] = await this.getSelectedLanguages();
@@ -228,7 +246,7 @@ export class PortalQuickstartAction {
   private async setupBuildDirectory(
     tempDirectory: DirectoryPath,
     buildDirectoryPath: DirectoryPath,
-    specFilePath: FilePath,
+    specFilePath: DirectoryPath,
     selectedLanguages: string[],
     useDefaultSpec: boolean = false
   ): Promise<Result<string, string>> {

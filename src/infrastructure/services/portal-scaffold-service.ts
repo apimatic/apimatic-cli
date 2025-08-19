@@ -1,4 +1,3 @@
-import path from "path";
 import axios, { AxiosInstance } from "axios";
 import { FileName } from "../../types/file/fileName.js";
 import { FilePath } from "../../types/file/filePath.js";
@@ -25,7 +24,7 @@ export class PortalScaffoldService {
   public async scaffoldBuildDirectory(
     tempDirectory: DirectoryPath,
     buildDirectory: DirectoryPath,
-    specFilePath: FilePath,
+    specDirectoryPath: DirectoryPath,
     selectedLanguages: string[],
     useDefaultSpec: boolean
   ): Promise<Result<string, string>> {
@@ -48,10 +47,7 @@ export class PortalScaffoldService {
 
       if (!useDefaultSpec) {
         await this.fileService.deleteFile(new FilePath(specDirectory, new FileName("openapi.json")));
-        await this.fileService.copy(
-          specFilePath,
-          new FilePath(specDirectory, new FileName(path.basename(specFilePath.toString())))
-        );
+        await this.fileService.copyDirectory(specDirectoryPath, specDirectory);
       }
 
       const buildConfigFile = new FilePath(extractedFolder, new FileName("APIMATIC-BUILD.json"));
