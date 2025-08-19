@@ -389,14 +389,14 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk:generate --platform csharp|java|php|python|ruby|typescript|go [--spec <value>] [-d <value>] [-f]
-    [--zip] [-k <value>]
+  $ apimatic sdk:generate -l csharp|java|php|python|ruby|typescript|go [--spec <value>] [-d <value>] [-f] [--zip]
+    [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: ./sdk/<platform>] path where the sdk will be generated.
+  -d, --destination=<value>  [default: ./sdk/<language>] path where the sdk will be generated.
   -f, --force                overwrite changes without asking for user consent.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --platform=<option>    (required) language platform for sdk
+  -l, --language=<option>    (required) language for sdk
                              <options: csharp|java|php|python|ruby|typescript|go>
       --spec=<value>         [default: ./src/spec] path to the folder containing the API specification file.
       --zip                  download the generated SDK as a .zip archive
@@ -405,10 +405,10 @@ DESCRIPTION
   Generate an SDK for your API
 
 EXAMPLES
-  $ apimatic sdk:generate --platform=java
+  $ apimatic sdk:generate --language=java
 
-  $ apimatic sdk:generate --platform=csharp --spec="./src/spec"
+  $ apimatic sdk:generate --language=csharp --spec="./src/spec"
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0-alpha.21/src/commands/sdk/generate.ts)_
 <!-- commandsstop -->
