@@ -24,12 +24,4 @@ export class ApiTransformPrompts {
   logError(error: string): void {
     log.error(error);
   }
-
-  //This clears the standard input to allow interrupts like CTRL+C to work properly.
-  private cleanUpStandardInput(): void {
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(false);
-      process.stdin.pause();
-    }
-  }
 }

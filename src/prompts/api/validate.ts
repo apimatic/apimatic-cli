@@ -1,18 +1,38 @@
 import { outro, spinner, log } from "@clack/prompts";
-import { getMessageInMagentaColor, getMessageInCyanColor, getMessageInRedColor } from "../../utils/utils.js";
+import {
+  getMessageInCyanColor,
+  getMessageInRedColor,
+  replaceHTML,
+} from "../../utils/utils.js";
+import { ValidationMessages } from "../../types/utils.js";
+
 export class ApiValidatePrompts {
   private readonly spin = spinner();
 
   displayValidationStartMessage(): void {
     this.spin.start(getMessageInCyanColor("🔍 Validating specification file..."));
   }
-  
+
   displayValidationSuccessMessage(): void {
-    this.spin.stop(getMessageInMagentaColor("✅ Specification file provided is valid"));
+    this.spin.stop("Specification file provided is valid");
   }
 
   displayValidationFailureMessage(): void {
-    this.spin.stop(getMessageInRedColor("❌ Specification file provided is invalid"));
+    this.spin.stop("Specification file provided is invalid");
+  }
+
+  displayValidationMessages({ warnings = [], errors = [], messages = [] }: ValidationMessages): void {
+    const singleError: string = errors.join("\n") || "";
+
+    messages.forEach((message) => {
+      log.message(getMessageInCyanColor(`ℹ️ ${replaceHTML(message)}`));
+    });
+    warnings.forEach((warning) => {
+      log.warn(`⚠️ ${replaceHTML(warning)}`);
+    });
+    if (errors.length > 0) {
+      log.error(getMessageInRedColor(`❌ ${replaceHTML(singleError)}`));
+    }
   }
 
   displayOutroMessage(): void {
