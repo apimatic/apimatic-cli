@@ -12,8 +12,6 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { Result } from "../../types/common/result.js";
-import { printValidationMessages } from "../../utils/utils.js";
-import { loggers } from "../../types/utils.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 
 export interface ValidationParams {
@@ -49,14 +47,6 @@ export class ValidationService {
       }
 
       const validationSummary = validation.result;
-
-      // Print validation messages
-    //   const logFunctions: loggers = {
-    //     log: (msg) => console.log(msg),
-    //     warn: (msg) => console.warn(msg),
-    //     error: (msg) => console.error(msg)
-    //   };
-    //   printValidationMessages(validationSummary, logFunctions);
       this.prompts.displayValidationMessages(validationSummary);
 
 

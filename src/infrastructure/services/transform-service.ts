@@ -17,6 +17,7 @@ import { TransformationData } from "../../types/api/transform.js";
 import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { apiClientFactory } from "./api-client-factory.js";
+import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 
 export interface TransformationParams {
   file?: string;
@@ -30,6 +31,7 @@ export interface TransformationParams {
 
 export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
+  private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
 
   async transformAndDownload({
     file,
@@ -65,13 +67,7 @@ export class TransformationService {
       }
 
       const { id, apiValidationSummary } = generation.result;
-      // Print validation messages
-      const logFunctions: loggers = {
-        log: (message) => console.log(message),
-        warn: (message) => console.warn(message),
-        error: (message) => console.error(message)
-      };
-      printValidationMessages(apiValidationSummary, logFunctions);
+      this.prompts.displayValidationMessages(apiValidationSummary);
 
       const tempTransformedFilePath = path.join(
         tempDirectory.toString(),
@@ -106,7 +102,7 @@ export class TransformationService {
         return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
       } else if (apiError.statusCode === 401) {
         const message = JSON.parse(apiError.body as string).message;
-        return `${message} Please run the 'auth:login' command and try again or reach out to our team at support@apimatic.io.`;
+        return `${message} You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";`;
       }
       return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
     } else {

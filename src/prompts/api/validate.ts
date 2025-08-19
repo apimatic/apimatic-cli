@@ -18,7 +18,11 @@ export class ApiValidatePrompts {
   }
 
   displayValidationFailureMessage(): void {
-    this.spin.stop("Specification file provided is invalid");
+    this.spin.stop(`Specification validation failed`);
+  }
+
+  stopSpin(): void {
+    this.spin.stop();
   }
 
   displayValidationMessages({ warnings = [], errors = [], messages = [] }: ValidationMessages): void {
