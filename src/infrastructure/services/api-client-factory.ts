@@ -1,14 +1,9 @@
 import { Client, Environment } from '@apimatic/sdk'; 
-import { envInfo } from '../env-info.js'; // Adjust path as needed
+import { envInfo } from '../env-info.js';
 
 export class ApiClientFactory {
-  private readonly TIMEOUT = 0; // 30 seconds, adjust as needed
+  private readonly TIMEOUT = 0;
 
-  /**
-   * Creates an API client with the appropriate configuration based on environment
-   * @param authorizationHeader - The authorization header value (e.g., "Bearer token")
-   * @returns Configured Client instance
-   */
   public createApiClient = (authorizationHeader: string): Client => {
     const baseConfig = {
       customHeaderAuthenticationCredentials: {
@@ -28,8 +23,6 @@ export class ApiClientFactory {
   };
 }
 
-// Export a singleton instance for convenience
 export const apiClientFactory = new ApiClientFactory();
 
-// Export the class as default for flexibility
 export default ApiClientFactory;
