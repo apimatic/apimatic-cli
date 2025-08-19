@@ -1,5 +1,7 @@
 import fsExtra from "fs-extra";
 import path from "path";
+import { printValidationMessages } from "../../utils/utils.js";
+import { loggers } from "../../types/utils.js";
 import {
   ApiResponse,
   ContentType,
@@ -7,7 +9,7 @@ import {
   FileWrapper,
   TransformationController,
   Transformation,
-  ApiError,
+  ApiError
 } from "@apimatic/sdk";
 
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
@@ -15,7 +17,7 @@ import { writeFileUsingReadableStream } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { apiClientFactory } from "./api-client-factory.js"; 
+import { apiClientFactory } from "./api-client-factory.js";
 
 export interface TransformationParams {
   file?: string;
@@ -29,7 +31,7 @@ export interface TransformationParams {
 
 export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
-  
+
   async transformAndDownload({
     file,
     url,
@@ -63,7 +65,14 @@ export class TransformationService {
         return Result.failure("Please provide a specification file or URL");
       }
 
-      const { id } = generation.result;
+      const { id, apiValidationSummary } = generation.result;
+      // Print validation messages
+      const logFunctions: loggers = {
+        log: (message) => console.log(message),
+        warn: (message) => console.warn(message),
+        error: (message) => console.error(message)
+      };
+      printValidationMessages(apiValidationSummary, logFunctions);
 
       const tempTransformedFilePath = path.join(
         tempDirectory.toString(),
@@ -90,7 +99,6 @@ export class TransformationService {
     const key = overrideAuthKey || authInfo?.authKey;
     return `X-Auth-Key ${key ?? ""}`;
   }
-
 
   private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof ApiError) {
