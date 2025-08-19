@@ -34,6 +34,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
     log.message(`Let's get started! 🚀`);
   }
 
+  //TODO: Very complex validation, needs to be improved.
   public async specPathPrompt(defaultSpecUrl: string): Promise<string> {
     while (true) {
       const spec = await text({

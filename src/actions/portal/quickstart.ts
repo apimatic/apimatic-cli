@@ -1,4 +1,3 @@
-import path from "path";
 import axios from "axios";
 import filetype from "file-type";
 import { ApiValidationSummary } from "@apimatic/sdk";
@@ -8,14 +7,9 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FileName } from "../../types/file/fileName.js";
 import { FilePath } from "../../types/file/filePath.js";
-import {
-  isValidUrl,
-  getMessageInOrangeColor,
-  getMessageInMagentaColor,
-  getMessageInCyanColor
-} from "../../utils/utils.js";
+import { getMessageInOrangeColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 import { PortalScaffoldService } from "../../infrastructure/services/portal-scaffold-service.js";
 import { LoginAction } from "../auth/login.js";
 import { Result } from "../../types/common/result.js";
@@ -27,6 +21,10 @@ import { PortalServeAction } from "./serve.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
+import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
+import { SpecPathFactory } from "../../types/file/spec-path.js";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -165,8 +163,9 @@ export class PortalQuickstartAction {
 
   private async setupSpecFile(tempDirectory: DirectoryPath, specPath: string): Promise<Result<FilePath, string>> {
     try {
-      if (isValidUrl(specPath)) {
-        const response = await axios.get(specPath, { responseType: "stream" });
+      const spec = SpecPathFactory.create(specPath);
+      if (spec instanceof UrlPath) {
+        const response = await axios.get(spec.toString(), { responseType: "stream" });
 
         if (response.status !== 200) {
           return Result.failure(
@@ -174,24 +173,19 @@ export class PortalQuickstartAction {
           );
         }
 
-        const specFilePath = new FilePath(tempDirectory, new FileName(path.basename(specPath)));
-        await this.fileService.writeFile(specFilePath, response.data as NodeJS.ReadableStream); // Add to spec folder first?
-        return Result.success(specFilePath);
-      } else {
-        const normalizedSpecPath = path.normalize(specPath);
-        const fileType = await filetype.fromFile(normalizedSpecPath);
-        const specFileDirectory = new DirectoryPath(path.dirname(normalizedSpecPath));
-        const specFileName = new FileName(path.basename(normalizedSpecPath));
-        const specFilePath = new FilePath(specFileDirectory, specFileName);
-
-        if (fileType?.ext === "zip") {
-          await this.zipService.unArchive(specFilePath, tempDirectory);
-        } else {
-          await this.fileService.copyToDirectory(specFilePath, tempDirectory);
-        }
-
+        const specFilePath = new FilePath(tempDirectory, spec.fileName());
+        await this.fileService.writeFile(specFilePath, response.data as NodeJS.ReadableStream);
         return Result.success(specFilePath);
       }
+
+      const fileType = await filetype.fromFile(spec.toString());
+      if (fileType?.ext === "zip") {
+        await this.zipService.unArchive(spec, tempDirectory);
+      } else {
+        await this.fileService.copyToDirectory(spec, tempDirectory);
+      }
+
+      return Result.success(spec);
     } catch {
       return Result.failure(
         "Something went wrong while setting up the API Definition. Please try again later. If the issue persists, contact our team at support@apimatic.io"
