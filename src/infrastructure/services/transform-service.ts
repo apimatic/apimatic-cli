@@ -80,7 +80,6 @@ export class TransformationService {
         return Result.failure("Couldn't save transformation file");
       }
 
-      // Step 4: Move to final destination
       await fsExtra.copy(tempTransformedFilePath, destinationFilePath);
 
       return Result.success(destinationFilePath);

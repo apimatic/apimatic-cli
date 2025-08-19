@@ -49,7 +49,6 @@ export class ValidationService {
       const validationSummary = validation.result;
       this.prompts.displayValidationMessages(validationSummary);
 
-
       return validationSummary.success
         ? Result.success(undefined)
         : Result.failure("Specification file provided is invalid");
@@ -74,7 +73,7 @@ export class ValidationService {
       } else if (apiError.statusCode === 403) {
         return "You do not have permission to perform this action.";
       } else if (apiError.statusCode === 500) {
-        return "Internal Server Error: Please try again later or contact support@apimatic.io.";
+        return "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
       }
 
       return `Error ${apiError.statusCode}: An error occurred during validation.`;
