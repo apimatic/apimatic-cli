@@ -58,7 +58,6 @@ export class PortalQuickstartAction {
       const specPath = await this.getSpecPath();
 
       const specFilePathResult = await this.setupSpecFile(tempDirectory, specPath);
-
       if (specFilePathResult.isFailed()) {
         return ActionResult.error(specFilePathResult.error!);
       }
@@ -68,70 +67,27 @@ export class PortalQuickstartAction {
         return ActionResult.error(validateSpecResult.error!);
       }
 
-      if (validateSpecResult.isCancelled() && !(await this.prompts.useDefaultSpecPrompt())) {
-        return ActionResult.cancelled(
-          "Good luck fixing your API definition! 🛠️  Feel free to run this command again once you're done."
-        );
-      }
-
-      const selectedLanguages = await this.getSelectedLanguages();
-
-      const buildDirectoryPath = await this.getBuildDirectoryPath();
-
-      const setupBuildDirectory = await this.setupBuildDirectory(
+      const buildDirectoryResult = await this.setupLanguagesAndBuildDirectory(
         tempDirectory,
         specFilePathResult.value!,
-        selectedLanguages,
-        buildDirectoryPath,
         validateSpecResult.isCancelled()
       );
-
-      if (setupBuildDirectory.isFailed()) {
-        return ActionResult.error(setupBuildDirectory.error!);
+      if (buildDirectoryResult.isFailed()) {
+        return ActionResult.error(buildDirectoryResult.error!);
       }
 
-      const buildDirectory = new DirectoryPath(buildDirectoryPath, "src");
-      const portalDirectory = new DirectoryPath(buildDirectoryPath, "portal");
-
-      const generatePortalAction = new GenerateAction(this.configDir, null);
-      const portalServeAction = new PortalServeAction(
-        new PortalServePrompts(),
-        new ServeHandler(),
-        new PortalService()
-      );
-
-      const serveFlags: ServeFlags = {
-        input: buildDirectory.toString(),
-        destination: portalDirectory.toString(),
-        port: this.defaultPort,
-        open: true,
-        "no-reload": false,
-        "auth-key": undefined
-      };
-
-      const servePaths: ServePaths = {
-        sourceDirectoryPath: buildDirectory.toString(),
-        destinationDirectoryPath: portalDirectory.toString()
-      };
-
-      const servePortalResult = await portalServeAction.servePortal(
-        serveFlags,
-        servePaths,
-        commandName,
-        generatePortalAction.execute
-      );
-
-      if (servePortalResult.isFailed()) {
-        return ActionResult.error(servePortalResult.error!);
+      const generateAndServePortalResult = await this.generateAndServePortal(buildDirectoryResult.value!, commandName);
+      if (generateAndServePortalResult.isFailed()) {
+        return ActionResult.error(generateAndServePortalResult.error!);
       }
 
-      if (servePortalResult.isCancelled()) {
-        return ActionResult.cancelled(servePortalResult.value!);
+      if (generateAndServePortalResult.isCancelled()) {
+        return ActionResult.cancelled(generateAndServePortalResult.value!);
       }
 
       await this.telemetryService.trackEvent(new QuickstartCompletedEvent());
 
-      return ActionResult.success(buildDirectoryPath);
+      return ActionResult.success(buildDirectoryResult.value!.toString());
     });
   };
 
@@ -226,11 +182,14 @@ export class PortalQuickstartAction {
       this.prompts.stopProgressIndicator(getMessageInCyanColor(`Validation Successful.`));
     } else {
       this.prompts.stopProgressIndicator(`❗ Oops, it looks like there are some errors in your API Definition.`, 1);
+      if (!(await this.prompts.useDefaultSpecPrompt())) {
+        return Result.cancelled(
+          "Good luck fixing your API definition! 🛠️  Feel free to run this command again once you're done."
+        );
+      }
     }
 
-    return validationPassed
-      ? Result.success("API Validation successful.")
-      : Result.cancelled("Your API Definition is not valid.");
+    return Result.success("API Validation successful.");
   }
 
   private async getSelectedLanguages(): Promise<string[]> {
@@ -241,19 +200,41 @@ export class PortalQuickstartAction {
 
   private async getBuildDirectoryPath() {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
-    return await this.prompts.buildDirectoryPathPrompt();
+    return new DirectoryPath(await this.prompts.buildDirectoryPathPrompt());
+  }
+
+  private async setupLanguagesAndBuildDirectory(
+    tempDirectory: DirectoryPath,
+    specFilePath: FilePath,
+    useDefaultSpec: boolean
+  ): Promise<Result<DirectoryPath, string>> {
+    const selectedLanguages: string[] = await this.getSelectedLanguages();
+    const buildDirectoryPath: DirectoryPath = await this.getBuildDirectoryPath();
+
+    const setupBuildDirectoryResult = await this.setupBuildDirectory(
+      tempDirectory,
+      buildDirectoryPath,
+      specFilePath,
+      selectedLanguages,
+      useDefaultSpec
+    );
+    if (setupBuildDirectoryResult.isFailed()) {
+      return Result.failure(setupBuildDirectoryResult.error!);
+    }
+
+    return Result.success(buildDirectoryPath);
   }
 
   private async setupBuildDirectory(
     tempDirectory: DirectoryPath,
+    buildDirectoryPath: DirectoryPath,
     specFilePath: FilePath,
     selectedLanguages: string[],
-    buildDirectoryPath: string,
     useDefaultSpec: boolean = false
   ): Promise<Result<string, string>> {
     this.prompts.startProgressIndicator(getMessageInMagentaColor("Generating build directory ⚙️"));
 
-    const buildDirectory = new DirectoryPath(buildDirectoryPath, "src");
+    const buildDirectory = buildDirectoryPath.join("src");
 
     const scaffoldBuildDirectoryResult = await this.portalScaffoldService.scaffoldBuildDirectory(
       tempDirectory,
@@ -272,6 +253,48 @@ export class PortalQuickstartAction {
 
     this.prompts.displayBuildDirectoryAsTree(buildDirectory.toString());
 
-    return Result.success(buildDirectoryPath);
+    return Result.success("Build directory setup successfully.");
+  }
+
+  private async generateAndServePortal(
+    buildDirectoryPath: DirectoryPath,
+    commandName: string
+  ): Promise<Result<string, string>> {
+    const buildDirectory = buildDirectoryPath.join("src");
+    const portalDirectory = buildDirectoryPath.join("portal");
+
+    const generatePortalAction = new GenerateAction(this.configDir, null);
+    const portalServeAction = new PortalServeAction(new PortalServePrompts(), new ServeHandler(), new PortalService());
+
+    const serveFlags: ServeFlags = {
+      input: buildDirectory.toString(),
+      destination: portalDirectory.toString(),
+      port: this.defaultPort,
+      open: true,
+      "no-reload": false,
+      "auth-key": undefined
+    };
+
+    const servePaths: ServePaths = {
+      sourceDirectoryPath: buildDirectory.toString(),
+      destinationDirectoryPath: portalDirectory.toString()
+    };
+
+    const servePortalResult = await portalServeAction.servePortal(
+      serveFlags,
+      servePaths,
+      commandName,
+      generatePortalAction.execute
+    );
+
+    if (servePortalResult.isFailed()) {
+      return Result.failure(servePortalResult.error!);
+    }
+
+    if (servePortalResult.isCancelled()) {
+      return Result.cancelled(servePortalResult.value!);
+    }
+
+    return Result.success("Generated portal and served it successfully.");
   }
 }
