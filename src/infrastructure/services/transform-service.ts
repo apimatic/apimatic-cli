@@ -11,8 +11,7 @@ import {
 } from "@apimatic/sdk";
 
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { writeFileUsingReadableStream, printValidationMessages } from "../../utils/utils.js";
-import { loggers } from "../../types/utils.js";
+import { writeFileUsingReadableStream } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
