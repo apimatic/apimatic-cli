@@ -22,17 +22,24 @@ export class ValidateAction {
 
     this.prompts.displayValidationStartMessage();
 
-    const result = await this.validationService.validate({
+    const validationSummaryResult = await this.validationService.validate({
       file,
       url,
       configDir: this.configDir,
       authKey: this.authKey
     });
-
-    if (!result.isSuccess()) {
-      return ActionResult.error(result.error || "Validation failed with an unknown error");
+    if (validationSummaryResult.isFailed()) {
+      return ActionResult.error(validationSummaryResult.error! || "Validation failed with an unknown error");
     }
 
+    if (!validationSummaryResult.value!.success) {
+      this.prompts.displayValidationFailureMessage();
+      this.prompts.displayValidationMessages(validationSummaryResult.value!);
+      return ActionResult.error("Specification file provided is invalid");
+    }
+
+    this.prompts.displayValidationSuccessMessage();
+    this.prompts.displayValidationMessages(validationSummaryResult.value!);  
     return ActionResult.success();
   };
 }

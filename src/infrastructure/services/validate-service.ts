@@ -24,7 +24,7 @@ export interface ValidationParams {
 export class ValidationService {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
 
-  async validate({ file, url, configDir, authKey }: ValidationParams): Promise<Result<void, string>> {
+  async validate({ file, url, configDir, authKey }: ValidationParams): Promise<Result<ApiValidationSummary, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader);
@@ -46,14 +46,7 @@ export class ValidationService {
         return Result.failure("Please provide a specification file or URL");
       }
 
-      const validationSummary = validation.result;
-      this.prompts.displayValidationMessages(validationSummary);
-
-      if (validationSummary.success) {
-        return Result.success(undefined);
-      } else {
-        return Result.failure("Specification file provided is invalid");
-      }
+      return Result.success(validation.result as ApiValidationSummary);
     } catch (error) {
       return Result.failure(await this.handleValidationErrors(error));
     }
