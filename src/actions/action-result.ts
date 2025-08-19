@@ -15,19 +15,19 @@ export class ActionResult {
   }
 
   static success() {
-    return new ActionResult(ResultType.Success, "Succeeded");
+    return new ActionResult(ResultType.Success, " Succeeded ");
   }
 
   static failed() {
-    return new ActionResult(ResultType.Failure, "Failed");
+    return new ActionResult(ResultType.Failure, " Failed ");
   }
 
   static cancelled() {
-    return new ActionResult(ResultType.Cancel, "Cancelled");
+    return new ActionResult(ResultType.Cancel, " Cancelled ");
   }
 
   static warning() {
-    return new ActionResult(ResultType.Warning, "Warning");
+    return new ActionResult(ResultType.Warning, " Warning ");
   }
 
   public getMessage() {

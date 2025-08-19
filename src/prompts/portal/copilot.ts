@@ -1,13 +1,15 @@
-import { confirm, isCancel, log, outro, select } from "@clack/prompts";
+import { confirm, isCancel, log, note, outro, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
-import { ServiceError } from "../../infrastructure/api-utils.js";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f, withSpinner } from "../format.js";
+import { format, format as f, withSpinner } from "../format.js";
 
 export class PortalCopilotPrompts {
   public async displayApiCopilotKeyUsageWarning() {
-      log.warn('API Copilot can only be active on one Portal at a time. Configuring it on this Portal will disable it on any previously configured Portal.')
+    log.warn(
+      "API Copilot can only be active on one Portal at a time. Configuring it on this Portal will disable it on any previously configured Portal."
+    );
   }
   public async selectCopilotKey(keys: string[]): Promise<string | null> {
     const selectedKey = await select({
@@ -27,17 +29,22 @@ export class PortalCopilotPrompts {
   }
 
   public copilotConfigured(status: boolean, copilotId: string): void {
-    outro(
+    log.info(
       `API Copilot configured successfully!
 
     Copilot ID: ${f.var(copilotId)}
     Status: ${f.var(status ? "Enabled" : "Disabled")}
 
-  Configuration saved to: APIMATIC-BUILD.json
+  Configuration saved to: ${f.path('APIMATIC-BUILD.json')}`);
 
-API Copilot will index your content the next time you run \`apimatic portal:generate\` or \`apimatic portal:serve\`. This process can take up to 10 minutes, depending on your API’s size.
+    note(
+      `API Copilot will index your content the next time you run ${f.cmd('apimatic', 'portal', 'generate')} or ${f.cmd('apimatic', 'portal', 'serve')}.
+This process can take up to 10 minutes, depending on your API’s size.
 
-To see your copilot: If your portal is already running, refresh the page. Otherwise, run \`apimatic portal:serve\`, select any programming language in the Portal and look for the chat icon in the bottom-right corner.`
+To see your copilot: If your portal is already running, refresh the page. Otherwise, run ${f.cmd('apimatic', 'portal', 'serve')},
+select any programming language in the Portal and look for the chat icon in the bottom-right corner.`,
+
+      `Next steps`
     );
   }
 
@@ -53,7 +60,6 @@ To see your copilot: If your portal is already running, refresh the page. Otherw
 
     return shouldOverwrite;
   }
-
 
   public async spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
     return withSpinner(
@@ -85,6 +91,22 @@ To see your copilot: If your portal is already running, refresh the page. Otherw
   }
 
   public cancelled() {
-    log.warning('Exiting without making any change.');
+    log.warning("Exiting without making any change.");
+  }
+
+  public networkError(serviceError: ServiceError) {
+    log.error(getErrorMessage(serviceError));
+  }
+
+  public noCopilotKeyFound() {
+    log.error(
+      `No copilot key found for the current subscription. Please contact support at ${format.var(
+        "support@apimatic.io"
+      )}.`
+    );
+  }
+
+  public noCopilotKeySelected() {
+    log.error("Operation cancelled. No API Copilot key was selected.");
   }
 }

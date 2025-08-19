@@ -8,6 +8,13 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: string) => pc.cyan(`'${text}'`),
+  cmd: (cmd: string, topic: string, action: string) => `${pc.blue(cmd)} ${pc.dim(topic)} ${pc.dim(action)}`,
+  flag: (name: string, value: string | undefined = undefined) => {
+    if (value) {
+      return `${pc.green(`--${name}`)}=${pc.dim(value)}`;
+    }
+    return `${pc.green(`--${name}`)}`;
+  },
 
   // Common message styles
   success: (text: string) => pc.green(text),
@@ -29,7 +36,8 @@ export function outro(result: ActionResult) {
 
   const exitCode = result.getExitCode();
   const message = result.getMessage();
-  const outroMessage = result.mapAll(() => format.outroSuccess(message),
+  const outroMessage = result.mapAll(
+    () => format.outroSuccess(message),
     () => format.outroFailure(message),
     () => format.outroFailure(message),
     () => format.outroWarning(message));
@@ -39,7 +47,11 @@ export function outro(result: ActionResult) {
 
 
 export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
-  const s = spinner();
+  const s = spinner({
+    cancelMessage: "cancelled",
+    errorMessage: "failed",
+    frames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
+  });
   s.start(intro);
   const result = await fn;
   result.match(

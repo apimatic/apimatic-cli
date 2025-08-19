@@ -40,7 +40,7 @@ export class GenerateAction {
     const portalContext = new PortalContext(portalDirectory);
     if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
       this.prompts.portalDirectoryNotEmpty();
-      return ActionResult.failed();
+      return ActionResult.cancelled();
     }
 
     return await withDirPath(async (tempDirectory) => {
@@ -51,24 +51,22 @@ export class GenerateAction {
         this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey)
       );
 
-      return response.match(
-        async (portalStream) => {
-          const tempPortalZipPath = await tempContext.save(portalStream);
-          await portalContext.save(tempPortalZipPath, zipPortal);
-          return ActionResult.success();
-        },
-        async (error) => {
-          if (typeof error === "string") {
-            this.prompts.portalGenerationError(error);
-          } else {
-            const errorZipPath = await tempContext.save(error);
-            const reportPath = await portalContext.saveError(errorZipPath);
-            await this.launcherService.openFile(reportPath);
-            this.prompts.portalGenerationErrorWithReport(reportPath);
-          }
-          return ActionResult.failed();
+      if (response.isErr()) {
+        const error = response.error;
+        if (typeof error === "string") {
+          this.prompts.portalGenerationError(error);
+        } else {
+          const errorZipPath = await tempContext.save(error);
+          const reportPath = await portalContext.saveError(errorZipPath);
+          await this.launcherService.openFile(reportPath);
+          this.prompts.portalGenerationErrorWithReport(reportPath);
         }
-      );
+        return ActionResult.failed();
+      }
+
+      const tempPortalZipPath = await tempContext.save(response.value);
+      await portalContext.save(tempPortalZipPath, zipPortal);
+      return ActionResult.success();
     });
   };
 }

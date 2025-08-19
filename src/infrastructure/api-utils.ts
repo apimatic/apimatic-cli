@@ -33,7 +33,7 @@ export function handleServiceError(error: unknown): ServiceError {
     if (error.response?.status === 500) {
       return ServiceError.ServerError;
     }
-    if (error.code === "ECONNABORTED" || error.code === "ECONNREFUSED") {
+    if (error.code === "ECONNABORTED" || error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
       return ServiceError.NetworkError;
     }
   }
