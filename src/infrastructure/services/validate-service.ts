@@ -49,9 +49,11 @@ export class ValidationService {
       const validationSummary = validation.result;
       this.prompts.displayValidationMessages(validationSummary);
 
-      return validationSummary.success
-        ? Result.success(undefined)
-        : Result.failure("Specification file provided is invalid");
+      if (validationSummary.success) {
+        return Result.success(undefined);
+      } else {
+        return Result.failure("Specification file provided is invalid");
+      }
     } catch (error) {
       return Result.failure(await this.handleValidationErrors(error));
     }

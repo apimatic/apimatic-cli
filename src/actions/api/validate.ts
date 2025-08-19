@@ -15,10 +15,7 @@ export class ValidateAction {
     this.authKey = authKey;
   }
 
-  public readonly execute = async (
-    file?: string,
-    url?: string
-  ): Promise<ActionResult> => {
+  public readonly execute = async (file?: string, url?: string): Promise<ActionResult> => {
     if (file && !(await fsExtra.pathExists(file))) {
       return ActionResult.error(`Validation file: ${file} does not exist`);
     }
@@ -33,7 +30,6 @@ export class ValidateAction {
     });
 
     if (!result.isSuccess()) {
-      this.prompts.displayValidationFailureMessage();
       return ActionResult.error(result.error || "Validation failed with an unknown error");
     }
 
