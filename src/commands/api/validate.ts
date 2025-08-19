@@ -30,7 +30,7 @@ export default class Validate extends Command {
     const result = await action.execute(file, url);
 
     result.mapAll(
-      () => this.prompts.displayValidationSuccessMessage(),
+      () => this.prompts.displayOutroMessage(),
       (message: string) => this.prompts.logError(message)
     );
   }
