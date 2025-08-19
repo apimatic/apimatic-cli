@@ -12,7 +12,7 @@ export default class PortalQuickstart extends Command {
     const prompts = new PortalQuickstartPrompts();
     const action = new PortalQuickstartAction(this.getConfigDir());
 
-    const result = await action.execute();
+    const result = await action.execute(PortalQuickstart.id);
     result.mapAll(
       (buildDirectoryPath) => {
         prompts.displayOutroMessage(buildDirectoryPath!);

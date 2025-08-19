@@ -129,6 +129,12 @@ export class PortalService {
     return Result.failure<Sdl, string>("An unexpected error occurred");
   }
 
+  private createOriginQueryParameter = (commandName: string): Record<string, string> => {
+    return {
+      origin: `APIMATIC CLI ${commandName}`
+    };
+  };
+
   private handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
     if (error instanceof UnauthorizedResponseError) {
       //401
