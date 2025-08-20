@@ -38,6 +38,7 @@ export default class Validate extends Command {
 
     result.mapAll(
       () => this.prompts.displayOutroMessage(),
+      (message: string) => this.prompts.logError(message),
       (message: string) => this.prompts.logError(message)
     );
   }

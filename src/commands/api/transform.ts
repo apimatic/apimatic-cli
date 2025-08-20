@@ -60,6 +60,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     result.mapAll(
       () => this.prompts.displayOutroMessage(destinationDir),
+      (message: string) => this.prompts.logError(message),
       (message: string) => this.prompts.logError(message)
     );
   }

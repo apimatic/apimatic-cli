@@ -1,4 +1,3 @@
-import { ApiValidationSummary } from "@apimatic/sdk";
 import { getAuthInfo } from "../../client-utils/auth-manager.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
@@ -22,7 +21,6 @@ import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
 import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
-import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -33,7 +31,6 @@ export class PortalQuickstartAction {
   private readonly defaultSpecUrl: UrlPath = new UrlPath(
     "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
   );
-  private readonly fileDownloadService: FileDownloadService = new FileDownloadService();
   private readonly defaultPort: number = 3000 as const;
   private readonly configDir: DirectoryPath;
   private readonly commandName: string;
@@ -149,14 +146,7 @@ export class PortalQuickstartAction {
     const specZipFilePath = new FilePath(tempDirectory, new FileName("spec.zip"));
     await this.zipService.archive(specDirectory, specZipFilePath);
 
-    const specFileStream = await this.fileService.getStream(specZipFilePath);
-    let result: Result<ApiValidationSummary, string>;
-
-    try {
-      result = await this.validationService.validateSpec(specFileStream);
-    } finally {
-      specFileStream.close();
-    }
+    const result = await this.validationService.validateViaFile({ file: specZipFilePath });
     // TODO: Add spinner when refactoring
     if (result.isFailed()) {
       this.prompts.stopProgressIndicator(`Something went wrong while validating your API Definition.`, 1);
