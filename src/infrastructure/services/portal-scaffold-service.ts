@@ -1,43 +1,37 @@
-import axios, { AxiosInstance } from "axios";
 import { FileName } from "../../types/file/fileName.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { ZipService } from "../zip-service.js";
 import { Result } from "../../types/common/result.js";
+import { FileDownloadService } from "./file-download-service.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 export class PortalScaffoldService {
   private readonly fileService: FileService = new FileService();
   private readonly zipService: ZipService = new ZipService();
-  private readonly zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip` as const;
+  private readonly fileDownloadService: FileDownloadService = new FileDownloadService();
+  private readonly zipUrl = new UrlPath(
+    `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`
+  );
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
 
-  private readonly axiosInstance: AxiosInstance = axios.create({
-    baseURL: this.zipUrl,
-    responseType: "stream",
-    timeout: 30000,
-    headers: {
-      Accept: "application/zip"
-    }
-  });
-
-  public async scaffoldBuildDirectory(
+  public async createBuildDirectory(
     tempDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath,
     specFileDirectoryPath: DirectoryPath,
     selectedLanguages: string[]
   ): Promise<Result<string, string>> {
     try {
-      const response = await this.axiosInstance.get(this.zipUrl);
-      const tempZipPath = new FilePath(tempDirectory, new FileName("static-portal.zip"));
+      const downloadZipResult = await this.fileDownloadService.downloadFile(this.zipUrl);
 
-      if (response.status !== 200) {
+      if (downloadZipResult.isFailed()) {
         return Result.failure("Unable to setup the portal, please try again later.");
       }
 
-      await this.fileService.writeFile(tempZipPath, response.data as NodeJS.ReadableStream);
+      const tempZipPath = new FilePath(tempDirectory, new FileName("static-portal.zip"));
+      await this.fileService.writeFile(tempZipPath, downloadZipResult.value!);
       await this.zipService.unArchive(tempZipPath, tempDirectory);
-
       const extractedFolder = new DirectoryPath(tempDirectory.toString(), this.repositoryFolderName);
 
       await this.fileService.deleteDirectory(new DirectoryPath(extractedFolder.toString(), ".github"));
@@ -48,9 +42,7 @@ export class PortalScaffoldService {
       await this.fileService.copyDirectory(specFileDirectoryPath, specDirectory);
 
       const buildConfigFile = new FilePath(extractedFolder, new FileName("APIMATIC-BUILD.json"));
-
       const buildConfigFileContent = JSON.parse(await this.fileService.getContents(buildConfigFile));
-
       buildConfigFileContent.generatePortal.languageConfig = selectedLanguages.reduce((config, lang) => {
         config[lang] = {};
         return config;

@@ -1,5 +1,6 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
+import filetype from "file-type";
 import * as path from "path";
 import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
@@ -7,6 +8,11 @@ import { pipeline } from "stream";
 import { promisify } from "util";
 
 export class FileService {
+  public async isZipFile(file: FilePath): Promise<boolean> {
+    const fileType = await filetype.fromFile(file.toString());
+    return fileType?.ext === "zip";
+  }
+
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(file.toString());

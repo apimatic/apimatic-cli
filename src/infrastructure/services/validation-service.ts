@@ -12,14 +12,18 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { createApiClient, createAuthorizationHeader } from "../api-client-utils.js";
 
 export class ValidationService {
-  private readonly TIMEOUT = 0;
+  private readonly TIMEOUT = 0 as const;
+  private readonly configDir: DirectoryPath;
+
+  constructor(config: DirectoryPath) {
+    this.configDir = config;
+  }
 
   public async validateSpec(
-    specFileStream: ReadStream,
-    configDir: DirectoryPath
+    specFileStream: ReadStream
   ): Promise<Result<ApiValidationSummary, string>> {
     const file = new FileWrapper(specFileStream);
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = createAuthorizationHeader(authInfo, null);
     const client = createApiClient(authorizationHeader, this.TIMEOUT);
     const validationController = new ApiValidationExternalApisController(client);

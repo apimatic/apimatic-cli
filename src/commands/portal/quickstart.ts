@@ -14,11 +14,11 @@ export default class PortalQuickstart extends Command {
   async run() {
     const telemetryService = new TelemetryService(this.getConfigDir.toString());
     const prompts = new PortalQuickstartPrompts();
-    const action = new PortalQuickstartAction(this.getConfigDir());
+    const action = new PortalQuickstartAction(this.getConfigDir(), PortalQuickstart.id);
 
     await telemetryService.trackEvent(new QuickstartInitiatedEvent());
 
-    const result = await action.execute(PortalQuickstart.id);
+    const result = await action.execute();
     result.mapAll(
       async (buildDirectoryPath) => {
         await telemetryService.trackEvent(new QuickstartCompletedEvent());
