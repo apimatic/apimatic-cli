@@ -19,7 +19,6 @@ export class ValidateAction {
   }
 
   public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => {
-
     const validationResult = await this.validateFileInputParams(file, url);
     
     if(!validationResult.isSuccess()) {      
