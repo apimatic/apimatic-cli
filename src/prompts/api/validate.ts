@@ -17,7 +17,7 @@ export class ApiValidatePrompts {
     this.spin.stop(getMessageInRedColor("Specification validation failed"));
   }
 
-  displayValidationMessages({ warnings = [], errors = [], messages = [] }: ValidationMessages): void {
+  displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
     const singleError: string = errors.join("\n") || "";
 
     messages.forEach((message) => {

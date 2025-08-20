@@ -95,7 +95,7 @@ export class TransformAction {
 
       this.prompts.displayApiTransformationSuccessMessage();
       this.validatePrompts.displayValidationMessages(
-        result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
+        result.value!.apiValidationSummary
       );
 
       return ActionResult.success();
