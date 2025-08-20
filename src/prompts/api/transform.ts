@@ -10,8 +10,8 @@ export class ApiTransformPrompts {
     this.spin.start(getMessageInMagentaColor("Transforming API"));
   }
 
-  displayApiTransformationSuccessMessage(destinationFilePath: string): void {
-    this.spin.stop(getMessageInCyanColor(`API transformed successfully: ${destinationFilePath}`));
+  displayApiTransformationSuccessMessage(): void {
+    this.spin.stop(getMessageInCyanColor(`API transformed successfully`));
   }
 
   displayApiTransformationFailureMessage(): void {
