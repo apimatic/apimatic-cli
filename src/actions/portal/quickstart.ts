@@ -109,7 +109,7 @@ export class PortalQuickstartAction {
       this.prompts.logError(loginResult.error);
       return Result.failure("Unable to login, please check your credentials and try again later.");
     }
-    this.prompts.displaySuccess(loginResult.value);
+    this.prompts.displaySuccess(`Logged in as: ${loginResult.value}`);
     return Result.success("Authentication was successful.");
   }
 
