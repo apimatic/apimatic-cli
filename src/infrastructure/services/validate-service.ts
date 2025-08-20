@@ -14,9 +14,14 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { Result } from "../../types/common/result.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 
-export interface ValidationParams {
-  file?: string;
-  url?: string;
+export interface ValidateViaFileParams {
+  file: string;
+  configDir: DirectoryPath;
+  authKey?: string | null;
+}
+
+export interface ValidateViaUrlParams {
+  url: string;
   configDir: DirectoryPath;
   authKey?: string | null;
 }
@@ -24,28 +29,38 @@ export interface ValidationParams {
 export class ValidationService {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
 
-  async validate({ file, url, configDir, authKey }: ValidationParams): Promise<Result<ApiValidationSummary, string>> {
+  async validateViaFile({ file, configDir, authKey }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader);
     const controller = new ApiValidationExternalApisController(client);
 
     try {
-      let validation: ApiResponse<ApiValidationSummary>;
-      if (file) {
-        const fileStatus = fsExtra.statSync(file);
-        if (fileStatus.isDirectory()) {
-          return Result.failure("The provided path is a directory. Please provide a valid specification file.");
-        } else {
-          const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file));
-          validation = await controller.validateApiViaFile(ContentType.EnumMultipartformdata, fileDescriptor);
-        }
-      } else if (url) {
-        validation = await controller.validateApiViaUrl(url);
-      } else {
-        return Result.failure("Please provide a specification file or URL");
+      const fileStatus = fsExtra.statSync(file);
+      if (fileStatus.isDirectory()) {
+        return Result.failure("The provided path is a directory. Please provide a valid specification file.");
       }
 
+      const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file));
+      const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaFile(
+        ContentType.EnumMultipartformdata, 
+        fileDescriptor
+      );
+
+      return Result.success(validation.result as ApiValidationSummary);
+    } catch (error) {
+      return Result.failure(await this.handleValidationErrors(error));
+    }
+  }
+
+  async validateViaUrl({ url, configDir, authKey }: ValidateViaUrlParams): Promise<Result<ApiValidationSummary, string>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
+    const client = apiClientFactory.createApiClient(authorizationHeader);
+    const controller = new ApiValidationExternalApisController(client);
+
+    try {
+      const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaUrl(url);
       return Result.success(validation.result as ApiValidationSummary);
     } catch (error) {
       return Result.failure(await this.handleValidationErrors(error));
@@ -68,7 +83,7 @@ export class ValidationService {
       } else if (apiError.statusCode === 403) {
         return "You do not have permission to perform this action.";
       } else if (apiError.statusCode === 500) {
-        return "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+        return "An unexpected error occurred validating the API specification, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
       }
 
       return `Error ${apiError.statusCode}: An error occurred during validation.`;

@@ -16,18 +16,36 @@ export class ValidateAction {
   }
 
   public readonly execute = async (file?: string, url?: string): Promise<ActionResult> => {
+    if (!file && !url) {
+      return ActionResult.error("Please provide either a specification file or URL");
+    }
+
+    if (file && url) {
+      return ActionResult.error("Please provide either a file or URL, not both");
+    }
+
     if (file && !(await fsExtra.pathExists(file))) {
       return ActionResult.error(`Validation file: ${file} does not exist`);
     }
 
     this.prompts.displayValidationStartMessage();
 
-    const validationSummaryResult = await this.validationService.validate({
-      file,
-      url,
-      configDir: this.configDir,
-      authKey: this.authKey
-    });
+    let validationSummaryResult;
+
+    if (file) {
+      validationSummaryResult = await this.validationService.validateViaFile({
+        file,
+        configDir: this.configDir,
+        authKey: this.authKey
+      });
+    } else {
+      validationSummaryResult = await this.validationService.validateViaUrl({
+        url: url!, 
+        configDir: this.configDir,
+        authKey: this.authKey
+      });
+    }
+
     if (validationSummaryResult.isFailed()) {
       return ActionResult.error(validationSummaryResult.error! || "Validation failed with an unknown error");
     }
