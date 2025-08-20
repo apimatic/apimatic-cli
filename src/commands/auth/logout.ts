@@ -5,7 +5,7 @@ import { SDKClient } from "../../client-utils/sdk-client.js";
 export default class Login extends Command {
   static description = "Clears the local login credentials.";
 
-  static examples = [`apimatic auth:logout`];
+  static examples = [`apimatic auth logout`];
 
   async run() {
     try {

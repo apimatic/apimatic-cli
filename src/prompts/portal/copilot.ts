@@ -37,9 +37,9 @@ export class PortalCopilotPrompts {
 
   Configuration saved to: APIMATIC-BUILD.json
 
-API Copilot will index your content the next time you run \`apimatic portal:generate\` or \`apimatic portal:serve\`. This process can take up to 10 minutes, depending on your API’s size.
+API Copilot will index your content the next time you run \`apimatic portal generate\` or \`apimatic portal serve\`. This process can take up to 10 minutes, depending on your API’s size.
 
-To see your copilot: If your portal is already running, refresh the page. Otherwise, run \`apimatic portal:serve\`, select any programming language in the Portal and look for the chat icon in the bottom-right corner.`
+To see your copilot: If your portal is already running, refresh the page. Otherwise, run \`apimatic portal serve\`, select any programming language in the Portal and look for the chat icon in the bottom-right corner.`
     );
   }
 

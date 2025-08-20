@@ -22,7 +22,7 @@ import { createApiClient, createAuthorizationHeader } from "../../infrastructure
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
-  static examples = ["apimatic portal:quickstart"];
+  static examples = ["apimatic portal quickstart"];
 
   private async getSpecFile(
     prompts: PortalQuickstartPrompts,
