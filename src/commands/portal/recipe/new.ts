@@ -16,8 +16,8 @@ export default class PortalRecipeNew extends Command {
     "To learn more about API Recipes, visit: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes";
 
   static override examples = [
-    `apimatic portal:recipe:new`,
-    `apimatic portal:recipe:new --name="My API Recipe" --input="./"`
+    `apimatic portal recipe new`,
+    `apimatic portal recipe new --name="My API Recipe" --input="./"`
   ];
   static override flags = {
     name: Flags.string({ description: "name for the recipe" }),

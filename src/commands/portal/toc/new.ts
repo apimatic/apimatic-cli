@@ -35,9 +35,9 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
   };
 
   static examples = [
-    `apimatic portal:toc:new --destination="./src/content/"`,
-    `apimatic portal:toc:new --input="./"`,
-    `apimatic portal:toc:new --input="./" --destination="./src/content/"`
+    `apimatic portal toc new --destination="./src/content/"`,
+    `apimatic portal toc new --input="./"`,
+    `apimatic portal toc new --input="./" --destination="./src/content/"`
   ];
 
   constructor(argv: string[], config: Config) {

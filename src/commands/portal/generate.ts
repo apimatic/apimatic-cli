@@ -21,7 +21,7 @@ export class PortalGenerate extends Command {
     ...FlagsProvider.authKey
   };
 
-  static examples = [`apimatic portal:generate`, `apimatic portal:generate --input="./" --destination="./portal"`];
+  static examples = [`apimatic portal generate`, `apimatic portal generate --input="./" --destination="./portal"`];
 
   private readonly prompts: PortalGeneratePrompts;
 

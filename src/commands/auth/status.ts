@@ -5,7 +5,7 @@ import { SDKClient } from "../../client-utils/sdk-client.js";
 export default class Status extends Command {
   static description = "View the currently logged in user.";
 
-  static examples = [`apimatic auth:status`];
+  static examples = [`apimatic auth status`];
 
   async run() {
     try {

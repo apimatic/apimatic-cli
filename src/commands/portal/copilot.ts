@@ -22,7 +22,10 @@ export default class PortalCopilotEnable extends Command {
     ...FlagsProvider.authKey
   };
 
-  static examples = [`apimatic portal:copilot --input="./"`, `apimatic portal:copilot --input="./" --disable`];
+  static examples = [
+    `apimatic portal copilot --input="./"`,
+    `apimatic portal copilot --input="./" --disable`,
+  ];
 
   private readonly prompts = new PortalCopilotPrompts();
 
