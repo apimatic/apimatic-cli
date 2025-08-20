@@ -4,7 +4,7 @@ import { ActionResult } from "../action-result.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
 import { DestinationFormats } from "../../types/api/transform.js";
 import { getFileNameFromPath } from "../../utils/utils.js";
-
+import { validateFileInputParams } from "../../infrastructure/api-utils.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { TransformationService } from "../../infrastructure/services/transform-service.js";
 import { FilePath } from "../../types/file/filePath.js";
@@ -29,7 +29,7 @@ export class TransformAction {
     file?: FilePath,
     url?: string
   ): Promise<ActionResult> => {
-    const validationResult = await this.validateFileInputParams(file, url);
+    const validationResult = await validateFileInputParams(file, url);
 
     if (!validationResult.isSuccess()) {
       return ActionResult.error(validationResult.error!);
@@ -85,26 +85,4 @@ export class TransformAction {
       return ActionResult.success();
     });
   };
-
-  private async validateFileInputParams(file: FilePath | undefined, url: string | undefined): Promise<Result<string, string>> {
-      if (!file && !url) {
-        return Result.failure("Please provide either a specification file or URL");
-      }
-  
-      if (file && url) {
-        return Result.failure("Please provide either a file or URL, not both");
-      }
-  
-      if (file) {
-        if (!(await fsExtra.pathExists(file.toString()))) {
-          return Result.failure(`Specification file: ${file} does not exist`);
-        }
-        const fileStatus = await fsExtra.stat(file.toString());
-        if (fileStatus.isDirectory()) {
-          return Result.failure("The provided path is a directory. Please provide a valid specification file.");
-        }
-      }
-  
-      return Result.success("");
-    }
 }
