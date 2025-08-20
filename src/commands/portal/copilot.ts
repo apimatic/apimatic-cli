@@ -23,8 +23,8 @@ export default class PortalCopilotEnable extends Command {
   };
 
   static examples = [
-    `apimatic portal:copilot --input="./"`,
-    `apimatic portal:copilot --input="./" --disable`,
+    `apimatic portal copilot --input="./"`,
+    `apimatic portal copilot --input="./" --disable`,
   ];
 
   private readonly prompts = new PortalCopilotPrompts();

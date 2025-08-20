@@ -9,7 +9,7 @@ import { QuickstartCompletedEvent } from "../../types/events/quickstart-complete
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
-  static examples = ["apimatic portal:quickstart"];
+  static examples = ["apimatic portal quickstart"];
 
   async run() {
     const telemetryService = new TelemetryService(this.getConfigDir.toString());

@@ -6,7 +6,7 @@ import { LoginAction } from "../../actions/auth/login.js";
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";
 
-  static examples = [`apimatic auth:login`, `apimatic auth:login --auth-key={api-key}`];
+  static examples = [`apimatic auth login`, `apimatic auth login --auth-key={api-key}`];
 
   static flags = {
     "auth-key": Flags.string({

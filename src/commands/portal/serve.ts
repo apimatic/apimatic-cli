@@ -41,8 +41,8 @@ export default class PortalServe extends Command {
   }
 
   static examples = [
-    "apimatic portal:serve",
-    'apimatic portal:serve --input="./" --destination="./portal" --port=3000 --open --no-reload'
+    "apimatic portal serve",
+    'apimatic portal serve --input="./" --destination="./portal" --port=3000 --open --no-reload'
   ];
 
   public async run() {
