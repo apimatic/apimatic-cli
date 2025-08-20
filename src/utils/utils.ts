@@ -106,7 +106,7 @@ export const printValidationMessages = (
   const singleError: string = errors.join("\n") || "";
 
   messages.forEach((message) => {
-    log(`Info: ${replaceHTML(message)}`);
+    log(`\nInfo: ${replaceHTML(message)}`);
   });
   warnings.forEach((warning) => {
     warn(replaceHTML(warning));
