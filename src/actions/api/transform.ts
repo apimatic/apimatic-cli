@@ -91,10 +91,10 @@ export class TransformAction {
         return ActionResult.error(result.error || "An unknown error occurred");
       }
 
-      this.prompts.displayApiTransformationSuccessMessage(destinationFilePath.toString());
       this.prompts.displayValidationMessages(
         result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
       );
+      this.prompts.displayApiTransformationSuccessMessage(destinationFilePath.toString());
 
       return ActionResult.success();
     });
