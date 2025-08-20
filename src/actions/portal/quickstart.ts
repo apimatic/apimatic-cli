@@ -21,9 +21,6 @@ import { PortalServeAction } from "./serve.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
-import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
-import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
-import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
 import { SpecPathFactory } from "../../types/file/spec-path.js";
 import { FileName } from "../../types/file/fileName.js";
 
@@ -33,21 +30,18 @@ export class PortalQuickstartAction {
   private readonly fileService: FileService = new FileService();
   private readonly portalScaffoldService: PortalScaffoldService = new PortalScaffoldService();
   private readonly validationService: ValidationService = new ValidationService();
-  private readonly telemetryService: TelemetryService;
-  private readonly defaultSpecUrl: UrlPath =
-    new UrlPath("https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json");
+  private readonly defaultSpecUrl: UrlPath = new UrlPath(
+    "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
+  );
   private readonly defaultPort: number = 3000 as const;
   private readonly configDir: DirectoryPath;
 
   constructor(configDir: DirectoryPath) {
     this.configDir = configDir;
-    this.telemetryService = new TelemetryService(this.configDir.toString());
   }
 
   public readonly execute = async (commandName: string): Promise<ActionResult> => {
     this.prompts.displayWelcomeMessage();
-
-    await this.telemetryService.trackEvent(new QuickstartInitiatedEvent());
 
     const authenticateUserResult = await this.authenticateUser(this.configDir);
     if (authenticateUserResult.isFailed()) {
@@ -55,7 +49,6 @@ export class PortalQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
-
       // Step 1/4
       const specFilePathResult = await this.setupSpecFile(tempDirectory);
       if (specFilePathResult.isFailed()) {
@@ -69,18 +62,31 @@ export class PortalQuickstartAction {
       }
 
       // Step 3/4
-      const buildDirectoryResult = await this.setupLanguagesAndBuildDirectory(
+      const selectedLanguages = await this.selectLanguages();
+
+      // Step 4/4
+      const buildDirectoryPath = await this.promptForBuildDirectory();
+
+      // Setup build directory.
+      const sourceDirectory = buildDirectoryPath.join("src");
+      const portalDirectory = buildDirectoryPath.join("portal");
+
+      const buildDirectoryResult = await this.setupBuildDirectory(
         tempDirectory,
         specFilePathResult.value!,
-        validateSpecResult.isCancelled()
+        sourceDirectory,
+        selectedLanguages
       );
       if (buildDirectoryResult.isFailed()) {
         return ActionResult.error(buildDirectoryResult.error!);
       }
-      // Step 4/4
 
-      // Final Step
-      const generateAndServePortalResult = await this.generateAndServePortal(buildDirectoryResult.value!, commandName);
+      // Generate portal and serve
+      const generateAndServePortalResult = await this.generateAndServePortal(
+        sourceDirectory,
+        portalDirectory,
+        commandName
+      );
       if (generateAndServePortalResult.isFailed()) {
         return ActionResult.error(generateAndServePortalResult.error!);
       }
@@ -88,8 +94,6 @@ export class PortalQuickstartAction {
       if (generateAndServePortalResult.isCancelled()) {
         return ActionResult.cancelled(generateAndServePortalResult.value!);
       }
-
-      await this.telemetryService.trackEvent(new QuickstartCompletedEvent());
 
       return ActionResult.success(buildDirectoryResult.value!.toString());
     });
@@ -112,15 +116,13 @@ export class PortalQuickstartAction {
     return Result.success("Authentication was successful.");
   }
 
-
   private async setupSpecFile(tempDirectory: DirectoryPath): Promise<Result<DirectoryPath, string>> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
-    const specPath =  await this.prompts.specPathPrompt(this.defaultSpecUrl);
+    const specPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
     const spec = SpecPathFactory.create(specPath);
     const userSpecDirectory = tempDirectory.join("user-spec");
 
     try {
-
       if (spec instanceof UrlPath) {
         const response = await axios.get(spec.toString(), { responseType: "stream" });
 
@@ -198,54 +200,31 @@ export class PortalQuickstartAction {
     return Result.success("API Validation successful.");
   }
 
-  private async getBuildDirectoryPath() {
-    this.prompts.displayInfo(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
-    return new DirectoryPath(await this.prompts.buildDirectoryPathPrompt());
-  }
-
-  private async setupLanguagesAndBuildDirectory(
-    tempDirectory: DirectoryPath,
-    specFilePath: DirectoryPath,
-    useDefaultSpec: boolean
-  ): Promise<Result<DirectoryPath, string>> {
-
+  private async selectLanguages(): Promise<string[]> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
 
-    const selectedLanguages: string[] = await this.prompts.selectLanguagesPrompt();
+    return await this.prompts.selectLanguagesPrompt();
+  }
 
-    const buildDirectoryPath: DirectoryPath = await this.getBuildDirectoryPath();
+  private async promptForBuildDirectory(): Promise<DirectoryPath> {
+    this.prompts.displayInfo(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
 
-    const setupBuildDirectoryResult = await this.setupBuildDirectory(
-      tempDirectory,
-      buildDirectoryPath,
-      specFilePath,
-      selectedLanguages,
-      useDefaultSpec
-    );
-    if (setupBuildDirectoryResult.isFailed()) {
-      return Result.failure(setupBuildDirectoryResult.error!);
-    }
-
-    return Result.success(buildDirectoryPath);
+    return new DirectoryPath(await this.prompts.buildDirectoryPathPrompt());
   }
 
   private async setupBuildDirectory(
     tempDirectory: DirectoryPath,
-    buildDirectoryPath: DirectoryPath,
-    specFilePath: DirectoryPath,
-    selectedLanguages: string[],
-    useDefaultSpec: boolean = false
-  ): Promise<Result<string, string>> {
+    specFileDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
+    selectedLanguages: string[]
+  ): Promise<Result<DirectoryPath, string>> {
     this.prompts.startProgressIndicator(getMessageInMagentaColor("Generating build directory ⚙️"));
-
-    const buildDirectory = buildDirectoryPath.join("src");
 
     const scaffoldBuildDirectoryResult = await this.portalScaffoldService.scaffoldBuildDirectory(
       tempDirectory,
-      buildDirectory,
-      specFilePath,
-      selectedLanguages,
-      useDefaultSpec
+      sourceDirectory,
+      specFileDirectory,
+      selectedLanguages
     );
 
     if (scaffoldBuildDirectoryResult.isFailed()) {
@@ -253,25 +232,23 @@ export class PortalQuickstartAction {
       return Result.failure(scaffoldBuildDirectoryResult.error!);
     }
 
-    this.prompts.stopProgressIndicator(getMessageInCyanColor(`📁 Directory created at ${buildDirectory.toString()}`));
+    this.prompts.stopProgressIndicator(getMessageInCyanColor(`📁 Directory created at ${sourceDirectory.toString()}`));
 
-    this.prompts.displayBuildDirectoryAsTree(buildDirectory.toString());
+    this.prompts.displayBuildDirectoryAsTree(sourceDirectory.toString());
 
-    return Result.success("Build directory setup successfully.");
+    return Result.success(sourceDirectory);
   }
 
   private async generateAndServePortal(
-    buildDirectoryPath: DirectoryPath,
+    sourceDirectory: DirectoryPath,
+    portalDirectory: DirectoryPath,
     commandName: string
   ): Promise<Result<string, string>> {
-    const buildDirectory = buildDirectoryPath.join("src");
-    const portalDirectory = buildDirectoryPath.join("portal");
-
     const generatePortalAction = new GenerateAction(this.configDir, null);
     const portalServeAction = new PortalServeAction(new PortalServePrompts(), new ServeHandler(), new PortalService());
 
     const serveFlags: ServeFlags = {
-      input: buildDirectory.toString(),
+      input: sourceDirectory.toString(),
       destination: portalDirectory.toString(),
       port: this.defaultPort,
       open: true,
@@ -280,7 +257,7 @@ export class PortalQuickstartAction {
     };
 
     const servePaths: ServePaths = {
-      sourceDirectoryPath: buildDirectory.toString(),
+      sourceDirectoryPath: sourceDirectory.toString(),
       destinationDirectoryPath: portalDirectory.toString()
     };
 

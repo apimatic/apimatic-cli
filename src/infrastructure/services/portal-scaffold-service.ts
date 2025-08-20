@@ -23,10 +23,9 @@ export class PortalScaffoldService {
 
   public async scaffoldBuildDirectory(
     tempDirectory: DirectoryPath,
-    buildDirectory: DirectoryPath,
-    specDirectoryPath: DirectoryPath,
-    selectedLanguages: string[],
-    useDefaultSpec: boolean
+    sourceDirectory: DirectoryPath,
+    specFileDirectoryPath: DirectoryPath,
+    selectedLanguages: string[]
   ): Promise<Result<string, string>> {
     try {
       const response = await this.axiosInstance.get(this.zipUrl);
@@ -45,10 +44,8 @@ export class PortalScaffoldService {
 
       const specDirectory = new DirectoryPath(extractedFolder.toString(), "spec");
 
-      if (!useDefaultSpec) {
-        await this.fileService.deleteFile(new FilePath(specDirectory, new FileName("openapi.json")));
-        await this.fileService.copyDirectory(specDirectoryPath, specDirectory);
-      }
+      await this.fileService.deleteFile(new FilePath(specDirectory, new FileName("openapi.json")));
+      await this.fileService.copyDirectory(specFileDirectoryPath, specDirectory);
 
       const buildConfigFile = new FilePath(extractedFolder, new FileName("APIMATIC-BUILD.json"));
 
@@ -61,7 +58,7 @@ export class PortalScaffoldService {
 
       await this.fileService.writeContents(buildConfigFile, JSON.stringify(buildConfigFileContent));
 
-      await this.fileService.copyDirectoryContents(extractedFolder, buildDirectory);
+      await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
 
       return Result.success("Portal scaffolded successfully.");
     } catch {
