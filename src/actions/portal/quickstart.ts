@@ -196,19 +196,17 @@ export class PortalQuickstartAction {
     this.prompts.startProgressIndicator(getMessageInMagentaColor("Generating build directory ⚙️"));
 
     //TODO: Create a separate temp directory for scaffolding, don't pass the existing temp directory.
-    // static-portal-workflow-master
     const createBuildDirectoryResult = await this.portalScaffoldService.createBuildDirectory(
       tempDirectory,
       specDirectory,
       selectedLanguages
     );
-    if (createBuildDirectoryResult.isFailed()) {
+    if (createBuildDirectoryResult.isErr()) {
       this.prompts.stopProgressIndicator(`Something went wrong while setting up your build directory.`, 1);
-      return Result.failure(createBuildDirectoryResult.error!);
+      return Result.failure(createBuildDirectoryResult.error);
     }
 
-    // user-defined-path/static-portal-workflow-master
-    await this.fileService.copyDirectory(createBuildDirectoryResult.value!, sourceDirectory);
+    await this.fileService.copyDirectoryContents(createBuildDirectoryResult.value!, sourceDirectory);
 
     this.prompts.stopProgressIndicator(getMessageInCyanColor(`📁 Directory created at ${sourceDirectory.toString()}`));
 

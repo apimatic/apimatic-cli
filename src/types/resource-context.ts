@@ -40,7 +40,7 @@ export class ResourceContext {
     return ok(destinationFilePath);
   }
 
-  public async prepare(destinationFilePath: FilePath, subPath: string) {
+  public async prepare(destinationFilePath: FilePath, subPath: string): Promise<DirectoryPath> {
     const specDirectory = this.tempDirectory.join(subPath);
 
     if (await this.fileService.isZipFile(destinationFilePath)) {
