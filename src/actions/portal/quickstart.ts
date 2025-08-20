@@ -26,7 +26,6 @@ import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiate
 import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
 import { SpecPathFactory } from "../../types/file/spec-path.js";
 import { FileName } from "../../types/file/fileName.js";
-import { Ok } from "neverthrow";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -35,8 +34,8 @@ export class PortalQuickstartAction {
   private readonly portalScaffoldService: PortalScaffoldService = new PortalScaffoldService();
   private readonly validationService: ValidationService = new ValidationService();
   private readonly telemetryService: TelemetryService;
-  private readonly defaultSpecUrl: string =
-    "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json" as const;
+  private readonly defaultSpecUrl: UrlPath =
+    new UrlPath("https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json");
   private readonly defaultPort: number = 3000 as const;
   private readonly configDir: DirectoryPath;
 
@@ -56,18 +55,20 @@ export class PortalQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
-      const specPath = await this.getSpecPath();
 
-      const specFilePathResult = await this.setupSpecFile(tempDirectory, specPath);
+      // Step 1/4
+      const specFilePathResult = await this.setupSpecFile(tempDirectory);
       if (specFilePathResult.isFailed()) {
         return ActionResult.error(specFilePathResult.error!);
       }
 
+      // Step 2/4
       const validateSpecResult = await this.validateSpecFile(specFilePathResult.value!, this.configDir);
       if (validateSpecResult.isFailed()) {
         return ActionResult.error(validateSpecResult.error!);
       }
 
+      // Step 3/4
       const buildDirectoryResult = await this.setupLanguagesAndBuildDirectory(
         tempDirectory,
         specFilePathResult.value!,
@@ -76,7 +77,9 @@ export class PortalQuickstartAction {
       if (buildDirectoryResult.isFailed()) {
         return ActionResult.error(buildDirectoryResult.error!);
       }
+      // Step 4/4
 
+      // Final Step
       const generateAndServePortalResult = await this.generateAndServePortal(buildDirectoryResult.value!, commandName);
       if (generateAndServePortalResult.isFailed()) {
         return ActionResult.error(generateAndServePortalResult.error!);
@@ -109,16 +112,14 @@ export class PortalQuickstartAction {
     return Result.success("Authentication was successful.");
   }
 
-  private async getSpecPath(): Promise<string> {
-    this.prompts.displayInfo(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
-    return await this.prompts.specPathPrompt(this.defaultSpecUrl);
-  }
 
-  private async setupSpecFile(tempDirectory: DirectoryPath, specPath: string): Promise<Result<DirectoryPath, string>> {
+  private async setupSpecFile(tempDirectory: DirectoryPath): Promise<Result<DirectoryPath, string>> {
+    this.prompts.displayInfo(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
+    const specPath =  await this.prompts.specPathPrompt(this.defaultSpecUrl);
+    const spec = SpecPathFactory.create(specPath);
+    const userSpecDirectory = tempDirectory.join("user-spec");
+
     try {
-      const spec = SpecPathFactory.create(specPath);
-      const userSpecDirectory = tempDirectory.join("user-spec");
-      await this.fileService.cleanDirectory(userSpecDirectory);
 
       if (spec instanceof UrlPath) {
         const response = await axios.get(spec.toString(), { responseType: "stream" });
@@ -135,9 +136,7 @@ export class PortalQuickstartAction {
         const fileType = await filetype.fromFile(specFilePath.toString());
         if (fileType?.ext === "zip") {
           await this.zipService.unArchive(specFilePath, userSpecDirectory);
-          await this.fileService.deleteFile(specFilePath);
         }
-
         return Result.success(userSpecDirectory);
       }
 
@@ -178,7 +177,7 @@ export class PortalQuickstartAction {
       specFileStream.close();
       await this.fileService.deleteFile(specZipFilePath);
     }
-
+    // TODO: Add spinner when refactoring
     if (result.isFailed()) {
       this.prompts.stopProgressIndicator(`Something went wrong while validating your API Definition.`, 1);
       return Result.failure(result.error!);
@@ -199,12 +198,6 @@ export class PortalQuickstartAction {
     return Result.success("API Validation successful.");
   }
 
-  private async getSelectedLanguages(): Promise<string[]> {
-    this.prompts.displayInfo(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
-
-    return await this.prompts.selectLanguagesPrompt();
-  }
-
   private async getBuildDirectoryPath() {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
     return new DirectoryPath(await this.prompts.buildDirectoryPathPrompt());
@@ -215,7 +208,11 @@ export class PortalQuickstartAction {
     specFilePath: DirectoryPath,
     useDefaultSpec: boolean
   ): Promise<Result<DirectoryPath, string>> {
-    const selectedLanguages: string[] = await this.getSelectedLanguages();
+
+    this.prompts.displayInfo(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
+
+    const selectedLanguages: string[] = await this.prompts.selectLanguagesPrompt();
+
     const buildDirectoryPath: DirectoryPath = await this.getBuildDirectoryPath();
 
     const setupBuildDirectoryResult = await this.setupBuildDirectory(

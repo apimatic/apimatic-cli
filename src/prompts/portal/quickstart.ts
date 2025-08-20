@@ -6,6 +6,7 @@ import { intro, outro, text, select, multiselect, log, isCancel, cancel } from "
 import { getMessageInCyanColor, getMessageInGreenColor, getMessageInRedColor, isValidUrl } from "../../utils/utils.js";
 import { BasePrompts } from "./common/base-prompts.js";
 import { DirectoryNode } from "../../types/portal/quickstart.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 export class PortalQuickstartPrompts extends BasePrompts {
   private readonly vscodeExtensionUrl =
@@ -35,12 +36,12 @@ export class PortalQuickstartPrompts extends BasePrompts {
   }
 
   //TODO: Very complex validation, needs to be improved.
-  public async specPathPrompt(defaultSpecUrl: string): Promise<string> {
+  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string> {
     while (true) {
       const spec = await text({
         message: `Provide a local path or a public URL for your OpenAPI definition file:`,
         placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
-        defaultValue: defaultSpecUrl,
+        defaultValue: defaultSpecUrl.toString(),
         validate: (input) => {
           if (!input) return;
 
