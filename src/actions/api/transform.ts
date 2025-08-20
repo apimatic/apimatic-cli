@@ -4,16 +4,24 @@ import { ActionResult } from "../action-result.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
 import { DestinationFormats } from "../../types/api/transform.js";
 import { getFileNameFromPath } from "../../utils/utils.js";
+import { FileService } from "../../infrastructure/file-service.js";
 import { validateFileInputParams } from "../../infrastructure/api-utils.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { TransformationService } from "../../infrastructure/services/transform-service.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { Result } from "../../types/common/result.js";
+import { ApiValidationSummary } from "@apimatic/sdk";
+
+export interface TransformationResultData {
+  stream: NodeJS.ReadableStream;
+  apiValidationSummary: ApiValidationSummary;
+}
 
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
   private readonly transformationService: TransformationService = new TransformationService();
+  private readonly fileService: FileService = new FileService();
   private readonly configDir: DirectoryPath;
   private readonly authKey: string | null;
 
@@ -35,6 +43,8 @@ export class TransformAction {
       return ActionResult.error(validationResult.error!);
     }
 
+    this.prompts.displayApiTransformationMessage();
+
     const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
 
@@ -52,16 +62,12 @@ export class TransformAction {
     }
 
     return await withDirPath(async (tempDirectory) => {
-      this.prompts.displayApiTransformationMessage();
-
-      let result: Result<string, string>;
+      let result: Result<TransformationResultData, string>;
 
       if (file) {
         result = await this.transformationService.transformViaFile({
           file,
           format,
-          tempDirectory,
-          destinationFilePath,
           configDir: this.configDir,
           authKey: this.authKey
         });
@@ -69,19 +75,27 @@ export class TransformAction {
         result = await this.transformationService.transformViaUrl({
           url: url!,
           format,
-          tempDirectory,
-          destinationFilePath,
           configDir: this.configDir,
           authKey: this.authKey
         });
       }
 
+      const tempTransformedFilePath = new FilePath(tempDirectory, new FileName(`transformed_${destinationFileName}`));
+      await this.fileService.writeFile(tempTransformedFilePath, result.value?.stream as NodeJS.ReadableStream);
+
       if (!result.isSuccess()) {
+        this.prompts.displayValidationMessages(
+          result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
+        );
         this.prompts.displayApiTransformationFailureMessage();
         return ActionResult.error(result.error || "An unknown error occurred");
       }
 
       this.prompts.displayApiTransformationSuccessMessage(destinationFilePath.toString());
+      this.prompts.displayValidationMessages(
+        result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
+      );
+
       return ActionResult.success();
     });
   };
