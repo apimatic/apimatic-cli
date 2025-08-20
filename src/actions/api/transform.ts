@@ -1,6 +1,4 @@
-import * as path from "path";
 import fsExtra from "fs-extra";
-
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
@@ -11,6 +9,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { TransformationService } from "../../infrastructure/services/transform-service.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
+import { Result } from "../../types/common/result.js";
 
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
@@ -38,12 +37,11 @@ export class TransformAction {
       return ActionResult.error("Please provide either a file or URL, not both");
     }
 
-    const destinationFileName = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
-    const destinationFormat: string = DestinationFormats[format as keyof typeof DestinationFormats];
-    const destinationFilePath: FilePath = new FilePath(
-      new DirectoryPath(path.dirname(path.join(destination.toString(), `${destinationFileName}_${format}.${destinationFormat}`.toLowerCase()))),
-      new FileName(destinationFileName)
-    );
+    const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
+    const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
+
+    const destinationFileName = `${destinationFilePrefix}_${format}.${destinationFileExt}`;
+    const destinationFilePath = new FilePath(destination, new FileName(destinationFileName));
 
     if ((await fsExtra.pathExists(destinationFilePath.toString())) && !force) {
       return ActionResult.error(
@@ -51,8 +49,14 @@ export class TransformAction {
       );
     }
 
-    if (file && !(await fsExtra.pathExists(file.toString()))) {
-      return ActionResult.error(`Spec file: ${file} does not exist`);
+    if (file) {
+      if (!(await fsExtra.pathExists(file.toString()))) {
+        return ActionResult.error(`Spec file: ${file} does not exist`);
+      }
+      const fileStatus = await fsExtra.stat(file.toString());
+      if (fileStatus.isDirectory()) {
+        return ActionResult.error("The provided path is a directory. Please provide a valid specification file.");
+      }
     }
 
     if (!(await fsExtra.pathExists(destination.toString()))) {
@@ -62,10 +66,10 @@ export class TransformAction {
     return await withDirPath(async (tempDirectory) => {
       this.prompts.displayApiTransformationMessage();
 
-      let result;
+      let result: Result<string, string>;
 
       if (file) {
-        result = await this.transformationService.transformViaFileAndDownload({
+        result = await this.transformationService.transformViaFile({
           file,
           format,
           tempDirectory,
@@ -74,7 +78,7 @@ export class TransformAction {
           authKey: this.authKey
         });
       } else {
-        result = await this.transformationService.transformViaUrlAndDownload({
+        result = await this.transformationService.transformViaUrl({
           url: url!,
           format,
           tempDirectory,

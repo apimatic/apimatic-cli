@@ -41,7 +41,8 @@ export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
 
-  async transformViaUrlAndDownload({
+  //TODO: we can remove this endpoint and use the transformViaFile in case url is given. We can download the file within the CLI from the url and pass it to the transformViaFile endpoint
+  async transformViaUrl({
     url,
     format,
     tempDirectory,
@@ -71,7 +72,7 @@ export class TransformationService {
     }
   }
 
-  async transformViaFileAndDownload({
+  async transformViaFile({
     file,
     format,
     tempDirectory,

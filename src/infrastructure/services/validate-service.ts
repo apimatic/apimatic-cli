@@ -34,11 +34,6 @@ export class ValidationService {
     const controller = new ApiValidationExternalApisController(client);
 
     try {
-      const fileStatus = fsExtra.statSync(file.toString());
-      if (fileStatus.isDirectory()) {
-        return Result.failure("The provided path is a directory. Please provide a valid specification file.");
-      }
-
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
       const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaFile(
         ContentType.EnumMultipartformdata, 
