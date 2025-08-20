@@ -22,6 +22,10 @@ export class FileService {
     }
   }
 
+  public async ensureDirectoryExists(dir: DirectoryPath): Promise<void> {
+    await fsExtra.ensureDir(dir.toString());
+  }
+
   public async directoryExists(dir: DirectoryPath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(dir.toString());

@@ -42,6 +42,7 @@ export class ResourceContext {
 
   public async prepare(destinationFilePath: FilePath, subPath: string): Promise<DirectoryPath> {
     const specDirectory = this.tempDirectory.join(subPath);
+    await this.fileService.ensureDirectoryExists(specDirectory);
 
     if (await this.fileService.isZipFile(destinationFilePath)) {
       await this.zipService.unArchive(destinationFilePath, specDirectory);

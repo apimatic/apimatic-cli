@@ -9,7 +9,7 @@ export class PortalScaffoldService {
     `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`
   );
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
-  private readonly defaultSpecFileName = new FileName("default-spec.json");
+  private readonly defaultSpecFileName = new FileName("openapi.json");
 
   public async createBuildDirectory(
     tempDirectory: DirectoryPath,
