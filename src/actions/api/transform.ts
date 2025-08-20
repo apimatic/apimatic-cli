@@ -12,6 +12,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { Result } from "../../types/common/result.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
+import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
@@ -20,6 +21,7 @@ export interface TransformationResultData {
 
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
+  private readonly validatePrompts: ApiValidatePrompts = new ApiValidatePrompts();
   private readonly transformationService: TransformationService = new TransformationService();
   private readonly fileService: FileService = new FileService();
   private readonly configDir: DirectoryPath;
@@ -84,7 +86,7 @@ export class TransformAction {
       await this.fileService.writeFile(tempTransformedFilePath, result.value?.stream as NodeJS.ReadableStream);
 
       if (!result.isSuccess()) {
-        this.prompts.displayValidationMessages(
+        this.validatePrompts.displayValidationMessages(
           result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
         );
         this.prompts.displayApiTransformationFailureMessage();
@@ -92,7 +94,7 @@ export class TransformAction {
       }
 
       this.prompts.displayApiTransformationSuccessMessage();
-      this.prompts.displayValidationMessages(
+      this.validatePrompts.displayValidationMessages(
         result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
       );
 
