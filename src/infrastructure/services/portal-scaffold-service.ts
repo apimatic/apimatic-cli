@@ -15,31 +15,32 @@ export class PortalScaffoldService {
     `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`
   );
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
+  private readonly defaultSpecFileName = new FileName("default-spec.json");
 
   public async createBuildDirectory(
     tempDirectory: DirectoryPath,
-    sourceDirectory: DirectoryPath,
-    specFileDirectoryPath: DirectoryPath,
+    specDirectory: DirectoryPath,
     selectedLanguages: string[]
-  ): Promise<Result<string, string>> {
+  ): Promise<Result<DirectoryPath, string>> {
     try {
       const downloadZipResult = await this.fileDownloadService.downloadFile(this.zipUrl);
 
-      if (downloadZipResult.isFailed()) {
+      if (downloadZipResult.isErr()) {
         return Result.failure("Unable to setup the portal, please try again later.");
       }
 
       const tempZipPath = new FilePath(tempDirectory, new FileName("static-portal.zip"));
-      await this.fileService.writeFile(tempZipPath, downloadZipResult.value!);
+      await this.fileService.writeFile(tempZipPath, downloadZipResult.value);
+
       await this.zipService.unArchive(tempZipPath, tempDirectory);
       const extractedFolder = new DirectoryPath(tempDirectory.toString(), this.repositoryFolderName);
 
       await this.fileService.deleteDirectory(new DirectoryPath(extractedFolder.toString(), ".github"));
 
-      const specDirectory = new DirectoryPath(extractedFolder.toString(), "spec");
+      const buildSpecDirectory = new DirectoryPath(extractedFolder.toString(), "spec");
 
-      await this.fileService.deleteFile(new FilePath(specDirectory, new FileName("openapi.json")));
-      await this.fileService.copyDirectory(specFileDirectoryPath, specDirectory);
+      await this.fileService.deleteFile(new FilePath(buildSpecDirectory, this.defaultSpecFileName));
+      await this.fileService.copyDirectory(specDirectory, buildSpecDirectory);
 
       const buildConfigFile = new FilePath(extractedFolder, new FileName("APIMATIC-BUILD.json"));
       const buildConfigFileContent = JSON.parse(await this.fileService.getContents(buildConfigFile));
@@ -49,10 +50,7 @@ export class PortalScaffoldService {
       }, {} as { [key: string]: object });
 
       await this.fileService.writeContents(buildConfigFile, JSON.stringify(buildConfigFileContent));
-
-      await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
-
-      return Result.success("Portal scaffolded successfully.");
+      return Result.success(extractedFolder);
     } catch {
       return Result.failure(
         "There was an error setting up your portal. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io "

@@ -11,6 +11,7 @@ import { UrlPath } from "../../types/file/urlPath.js";
 import { PortalScaffoldService } from "../../infrastructure/services/portal-scaffold-service.js";
 import { LoginAction } from "../auth/login.js";
 import { Result } from "../../types/common/result.js";
+import { err, ok, Result as ResultEx } from "neverthrow";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { ActionResult } from "../action-result.js";
 import { GenerateAction } from "./generate.js";
@@ -19,7 +20,7 @@ import { PortalServeAction } from "./serve.js";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
-import { SpecPathFactory } from "../../types/file/spec-path.js";
+import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
 
@@ -53,29 +54,34 @@ export class PortalQuickstartAction {
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
       // Step 1/4
-      const specFilePathResult = await this.setupSpecFile(tempDirectory);
-      if (specFilePathResult.isFailed()) {
-        return ActionResult.error(specFilePathResult.error!);
+      const specDirectory = await this.importSpec(tempDirectory);
+      if (specDirectory.isErr()) {
+        return ActionResult.error(specDirectory.error);
       }
 
       // Step 2/4
-      const validateSpecResult = await this.validateSpecFile(tempDirectory, specFilePathResult.value!);
-      if (validateSpecResult.isFailed()) {
-        return ActionResult.error(validateSpecResult.error!);
+      const validatedSpecDirectory = await this.validateSpec(tempDirectory, specDirectory.value);
+      if (validatedSpecDirectory.isFailed()) {
+        return ActionResult.error(validatedSpecDirectory.error!);
+      }
+      if (validatedSpecDirectory.isCancelled()) {
+        return ActionResult.cancelled(
+          "Good luck fixing your API definition! Feel free to run this command again once you're done."
+        );
       }
 
       // Step 3/4
-      const selectedLanguages = await this.selectLanguages();
+      const selectedLanguages = await this.promptForLanguagesSelection();
 
       // Step 4/4
-      const buildDirectoryPath = await this.promptForBuildDirectory();
-      const sourceDirectory = buildDirectoryPath.join("src");
-      const portalDirectory = buildDirectoryPath.join("portal");
+      const buildDirectory = await this.promptForBuildDirectory();
+      const sourceDirectory = buildDirectory.join("src");
+      const portalDirectory = buildDirectory.join("portal");
 
       const buildDirectoryResult = await this.setupBuildDirectory(
         tempDirectory,
-        specFilePathResult.value!,
         sourceDirectory,
+        validatedSpecDirectory.value!,
         selectedLanguages
       );
       if (buildDirectoryResult.isFailed()) {
@@ -114,58 +120,32 @@ export class PortalQuickstartAction {
   }
 
   // TODO: create TempSpecContext and then refactor this.
-  private async setupSpecFile(tempDirectory: DirectoryPath): Promise<Result<DirectoryPath, string>> {
+  private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, string>> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
-    const specFilePath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
-    const specPath = SpecPathFactory.create(specFilePath);
-    const userSpecDirectory = tempDirectory.join("user-spec");
+    const inputPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
 
-    try {
-      if (specPath instanceof UrlPath) {
-        const downloadFileResult = await this.fileDownloadService.downloadFile(specPath);
-
-        if (downloadFileResult.isFailed()) {
-          return Result.failure(
-            "Unable to download the API Definition. Please verify that the provided URL is correct and publicly accessible. "
-          );
-        }
-
-        const downloadedSpecFilePath = new FilePath(tempDirectory, specPath.fileName());
-        await this.fileService.writeFile(downloadedSpecFilePath, downloadFileResult.value!);
-
-        if (await this.fileService.isZipFile(downloadedSpecFilePath)) {
-          await this.zipService.unArchive(downloadedSpecFilePath, userSpecDirectory);
-          await this.fileService.deleteFile(downloadedSpecFilePath);
-        } else {
-          await this.fileService.copyToDirectory(downloadedSpecFilePath, userSpecDirectory);
-        }
-        return Result.success(userSpecDirectory);
-      }
-
-      if (await this.fileService.isZipFile(specPath)) {
-        await this.zipService.unArchive(specPath, userSpecDirectory);
-      } else {
-        await this.fileService.copyToDirectory(specPath, userSpecDirectory);
-      }
-
-      return Result.success(userSpecDirectory);
-    } catch {
-      return Result.failure(
-        "Something went wrong while setting up the API Definition. Please try again later. If the issue persists, contact our team at support@apimatic.io"
-      );
+    const resourceContext = new ResourceContext(tempDirectory);
+    const destinationFilePath = await resourceContext.resolve(inputPath);
+    if (destinationFilePath.isErr()) {
+      return err(destinationFilePath.error);
     }
+
+    const specDirectory = await resourceContext.prepare(destinationFilePath.value, "spec");
+    return ok(specDirectory);
   }
 
-  private async validateSpecFile(
+  private async validateSpec(
     tempDirectory: DirectoryPath,
     specDirectory: DirectoryPath
-  ): Promise<Result<string, string>> {
+  ): Promise<Result<DirectoryPath, string>> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
     this.prompts.startProgressIndicator(
       getMessageInMagentaColor(
         `Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules 🔍 `
       )
     );
+
+    //TODO: Replace with validate action.
     const specZipFilePath = new FilePath(tempDirectory, new FileName("spec.zip"));
     await this.zipService.archive(specDirectory, specZipFilePath);
 
@@ -186,19 +166,25 @@ export class PortalQuickstartAction {
     const validationPassed = result.value!.success;
     if (validationPassed) {
       this.prompts.stopProgressIndicator(getMessageInCyanColor(`Validation Successful.`));
-    } else {
-      this.prompts.stopProgressIndicator(`❗ Oops, it looks like there are some errors in your API Definition.`, 1);
-      if (!(await this.prompts.useDefaultSpecPrompt())) {
-        return Result.cancelled(
-          "Good luck fixing your API definition! Feel free to run this command again once you're done."
-        );
-      }
+      return Result.success(specDirectory);
     }
 
-    return Result.success("API Validation successful.");
+    this.prompts.stopProgressIndicator(`❗ Oops, it looks like there are some errors in your API Definition.`, 1);
+    if (!(await this.prompts.useDefaultSpecPrompt())) {
+      return Result.cancelled(specDirectory);
+    }
+
+    // Use default spec...
+    const resourceContext = new ResourceContext(tempDirectory);
+    const destinationFilePath = await resourceContext.resolve(this.defaultSpecUrl.toString());
+    if (destinationFilePath.isErr()) {
+      return Result.failure(destinationFilePath.error);
+    }
+
+    return Result.success(await resourceContext.prepare(destinationFilePath.value, "default-spec"));
   }
 
-  private async selectLanguages(): Promise<string[]> {
+  private async promptForLanguagesSelection(): Promise<string[]> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
 
     return await this.prompts.selectLanguagesPrompt();
@@ -210,25 +196,29 @@ export class PortalQuickstartAction {
     return new DirectoryPath(await this.prompts.buildDirectoryPathPrompt());
   }
 
+  //TODO: Remove tempDirectory as param.
   private async setupBuildDirectory(
     tempDirectory: DirectoryPath,
-    specFileDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath,
+    specDirectory: DirectoryPath,
     selectedLanguages: string[]
   ): Promise<Result<DirectoryPath, string>> {
     this.prompts.startProgressIndicator(getMessageInMagentaColor("Generating build directory ⚙️"));
 
+    //TODO: Create a separate temp directory for scaffolding, don't pass the existing temp directory.
+    // static-portal-workflow-master
     const createBuildDirectoryResult = await this.portalScaffoldService.createBuildDirectory(
       tempDirectory,
-      sourceDirectory,
-      specFileDirectory,
+      specDirectory,
       selectedLanguages
     );
-
     if (createBuildDirectoryResult.isFailed()) {
       this.prompts.stopProgressIndicator(`Something went wrong while setting up your build directory.`, 1);
       return Result.failure(createBuildDirectoryResult.error!);
     }
+
+    // user-defined-path/static-portal-workflow-master
+    await this.fileService.copyDirectory(createBuildDirectoryResult.value!, sourceDirectory);
 
     this.prompts.stopProgressIndicator(getMessageInCyanColor(`📁 Directory created at ${sourceDirectory.toString()}`));
 

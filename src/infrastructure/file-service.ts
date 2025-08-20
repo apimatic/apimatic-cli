@@ -94,10 +94,6 @@ export class FileService {
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
-
-  public async copyToDirectory(source: FilePath, destination: DirectoryPath) {
-    await fsExtra.copy(source.toString(), path.join(destination.toString(), path.basename(source.toString())));
-  }
 }
 
 const streamPipeline = promisify(pipeline);
