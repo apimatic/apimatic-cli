@@ -12,7 +12,6 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { Result } from "../../types/common/result.js";
-import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 
 export interface ValidateViaFileParams {
   file: string;
@@ -27,8 +26,6 @@ export interface ValidateViaUrlParams {
 }
 
 export class ValidationService {
-  private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
-
   async validateViaFile({ file, configDir, authKey }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
