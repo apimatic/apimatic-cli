@@ -143,6 +143,7 @@
                 "description": "Generate a Table of Contents (TOC) file for your API documentation portal."
             }
         },
+        "topicSeparator": " ",
         "state": "Alpha"
     },
     "lint-staged": {
