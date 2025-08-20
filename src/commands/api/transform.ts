@@ -12,7 +12,7 @@ export default class Transform extends Command {
 Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.`;
 
   static examples = [
-    `apimatic api:transform --format="OpenApi3Json" --file="./specs/sample.json" --destination="./output"`,
+    `apimatic api:transform --format="OPENAPI3YAML" --file="./specs/sample.json" --destination="./output"`,
     `apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json" --destination="./output"`
   ];
 

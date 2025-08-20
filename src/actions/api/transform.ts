@@ -9,6 +9,8 @@ import { getFileNameFromPath } from "../../utils/utils.js";
 
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { TransformationService } from "../../infrastructure/services/transform-service.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { FileName } from "../../types/file/fileName.js";
 
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
@@ -28,61 +30,66 @@ export class TransformAction {
     file?: string,
     url?: string
   ): Promise<ActionResult> => {
-    const fileName = file ? getFileNameFromPath(file) : getFileNameFromPath(url || "");
+    if (!file && !url) {
+      return ActionResult.error("Please provide either a specification file or URL");
+    }
+
+    if (file && url) {
+      return ActionResult.error("Please provide either a file or URL, not both");
+    }
+
+    const destinationFileName = file ? getFileNameFromPath(file) : getFileNameFromPath(url || "");
     const destinationFormat: string = DestinationFormats[format as keyof typeof DestinationFormats];
-    const destinationFilePath: string = path.join(
-      destination.toString(),
-      `${fileName}_${format}.${destinationFormat}`.toLowerCase()
+    const destinationFilePath: FilePath = new FilePath(
+      new DirectoryPath(path.dirname(path.join(destination.toString(), `${destinationFileName}_${format}.${destinationFormat}`.toLowerCase()))),
+      new FileName(destinationFileName)
     );
 
-    if (fsExtra.existsSync(destinationFilePath) && !force) {
+    if ((await fsExtra.pathExists(destinationFilePath.toString())) && !force) {
       return ActionResult.error(
-        `Can't download transformed file to path ${destinationFilePath}, because it already exists`
+        `Can't download transformed file to path ${destinationFilePath.toString()}, because it already exists`
       );
     }
 
     if (file && !(await fsExtra.pathExists(file))) {
       return ActionResult.error(`Spec file: ${file} does not exist`);
     }
+
     if (!(await fsExtra.pathExists(destination.toString()))) {
-      return ActionResult.error(`Destination path: ${destination} does not exist`);
+      await fsExtra.ensureDir(destination.toString());
     }
 
     return await withDirPath(async (tempDirectory) => {
       this.prompts.displayApiTransformationMessage();
 
-      const fileName = file ? getFileNameFromPath(file) : getFileNameFromPath(url || "");
-      const destinationFormat: string = DestinationFormats[format as keyof typeof DestinationFormats];
-      const destinationFilePath = path.join(
-        destination.toString(),
-        `${fileName}_${format}.${destinationFormat}`.toLowerCase()
-      );
+      let result;
 
-      // Step 3: Ensure destination is valid
-      if (fsExtra.existsSync(destinationFilePath) && !force) {
-        return ActionResult.error(
-          `Can't download transformed file to path ${destinationFilePath}, because it already exists`
-        );
+      if (file) {
+        result = await this.transformationService.transformViaFileAndDownload({
+          file,
+          format,
+          tempDirectory,
+          destinationFilePath,
+          configDir: this.configDir,
+          authKey: this.authKey
+        });
+      } else {
+        result = await this.transformationService.transformViaUrlAndDownload({
+          url: url!,
+          format,
+          tempDirectory,
+          destinationFilePath,
+          configDir: this.configDir,
+          authKey: this.authKey
+        });
       }
-
-      // Step 4: Call TransformationService (it handles client + controller)
-
-      const result = await this.transformationService.transformAndDownload({
-        file,
-        url,
-        format,
-        tempDirectory,
-        destinationFilePath,
-        configDir: this.configDir,
-        authKey: this.authKey
-      });
 
       if (!result.isSuccess()) {
         this.prompts.displayApiTransformationFailureMessage();
-        return ActionResult.error(result.error || "An unknown error occurred"); //To test
+        return ActionResult.error(result.error || "An unknown error occurred");
       }
 
-      this.prompts.displayApiTransformationSuccessMessage(destinationFilePath);
+      this.prompts.displayApiTransformationSuccessMessage(destinationFilePath.toString());
       return ActionResult.success();
     });
   };

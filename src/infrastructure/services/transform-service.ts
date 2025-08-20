@@ -17,13 +17,22 @@ import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
+import { FilePath } from "../../types/file/filePath.js";
 
-export interface TransformationParams {
-  file?: string;
-  url?: string;
+export interface TransformViaUrlParams {
+  url: string;
   format: string;
   tempDirectory: DirectoryPath;
-  destinationFilePath: string;
+  destinationFilePath: FilePath;
+  configDir: DirectoryPath;
+  authKey?: string | null;
+}
+
+export interface TransformViaFileParams {
+  file: string;
+  format: string;
+  tempDirectory: DirectoryPath;
+  destinationFilePath: FilePath;
   configDir: DirectoryPath;
   authKey?: string | null;
 }
@@ -32,60 +41,93 @@ export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
 
-  async transformAndDownload({
-    file,
+  async transformViaUrlAndDownload({
     url,
     format,
     tempDirectory,
     destinationFilePath,
     configDir,
     authKey
-  }: TransformationParams): Promise<Result<string, string>> {
+  }: TransformViaUrlParams): Promise<Result<string, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader);
     const transformationController = new TransformationController(client);
 
     try {
-      let generation: ApiResponse<Transformation>;
-      if (file) {
-        const fileStream = fsExtra.createReadStream(file);
-        const fileWrapper = new FileWrapper(fileStream);
-        generation = await transformationController.transformViaFile(
-          this.CONTENT_TYPE,
-          fileWrapper,
-          format as ExportFormats
-        );
-      } else if (url) {
-        generation = await transformationController.transformViaUrl({
-          url: url,
-          exportFormat: format as ExportFormats
-        });
-      } else {
-        return Result.failure("Please provide a specification file or URL");
-      }
+      const generation: ApiResponse<Transformation> = await transformationController.transformViaUrl({
+        url: url,
+        exportFormat: format as ExportFormats
+      });
 
-      const { id, apiValidationSummary } = generation.result;
-      this.prompts.displayValidationMessages(apiValidationSummary);
-
-      const tempTransformedFilePath = path.join(
-        tempDirectory.toString(),
-        `transformed${path.extname(destinationFilePath)}`
+      return await this.processTransformationAndDownload(
+        generation,
+        transformationController,
+        tempDirectory,
+        destinationFilePath
       );
-      const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
-
-      if ((result as NodeJS.ReadableStream).readable) {
-        await writeFileUsingReadableStream(result as NodeJS.ReadableStream, tempTransformedFilePath);
-      } else {
-        return Result.failure("Couldn't save transformation file");
-      }
-
-      await fsExtra.copy(tempTransformedFilePath, destinationFilePath);
-
-      return Result.success(destinationFilePath);
     } catch (error) {
       return Result.failure(await this.handleTransformationErrors(error));
     }
+  }
+
+  async transformViaFileAndDownload({
+    file,
+    format,
+    tempDirectory,
+    destinationFilePath,
+    configDir,
+    authKey
+  }: TransformViaFileParams): Promise<Result<string, string>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
+    const client = apiClientFactory.createApiClient(authorizationHeader);
+    const transformationController = new TransformationController(client);
+
+    try {
+      const fileStream = fsExtra.createReadStream(file);
+      const fileWrapper = new FileWrapper(fileStream);
+      const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
+        this.CONTENT_TYPE,
+        fileWrapper,
+        format as ExportFormats
+      );
+
+      return await this.processTransformationAndDownload(
+        generation,
+        transformationController,
+        tempDirectory,
+        destinationFilePath
+      );
+    } catch (error) {
+      return Result.failure(await this.handleTransformationErrors(error));
+    }
+  }
+
+  private async processTransformationAndDownload(
+    generation: ApiResponse<Transformation>,
+    transformationController: TransformationController,
+    tempDirectory: DirectoryPath,
+    destinationFilePath: FilePath
+  ): Promise<Result<string, string>> {
+    const { id, apiValidationSummary } = generation.result;
+    this.prompts.displayValidationMessages(apiValidationSummary);
+
+    const tempTransformedFilePath = path.join(
+      tempDirectory.toString(),
+      `transformed${path.extname(destinationFilePath.toString())}`
+    );
+
+    const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
+
+    if ((result as NodeJS.ReadableStream).readable) {
+      await writeFileUsingReadableStream(result as NodeJS.ReadableStream, tempTransformedFilePath);
+    } else {
+      return Result.failure("Couldn't save transformation file");
+    }
+
+    await fsExtra.copy(tempTransformedFilePath, destinationFilePath.toString());
+    return Result.success(destinationFilePath.toString());
   }
 
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {
@@ -100,7 +142,7 @@ export class TransformationService {
         return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
       } else if (apiError.statusCode === 401) {
         const message = JSON.parse(apiError.body as string).message;
-        return `${message} You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";`;
+        return `${message} You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.`;
       }
       return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
     } else {
