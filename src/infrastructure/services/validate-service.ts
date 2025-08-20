@@ -12,9 +12,10 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { Result } from "../../types/common/result.js";
+import { FilePath } from "../../types/file/filePath.js";
 
 export interface ValidateViaFileParams {
-  file: string;
+  file: FilePath;
   configDir: DirectoryPath;
   authKey?: string | null;
 }
@@ -33,12 +34,12 @@ export class ValidationService {
     const controller = new ApiValidationExternalApisController(client);
 
     try {
-      const fileStatus = fsExtra.statSync(file);
+      const fileStatus = fsExtra.statSync(file.toString());
       if (fileStatus.isDirectory()) {
         return Result.failure("The provided path is a directory. Please provide a valid specification file.");
       }
 
-      const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file));
+      const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
       const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaFile(
         ContentType.EnumMultipartformdata, 
         fileDescriptor

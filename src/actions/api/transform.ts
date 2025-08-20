@@ -27,7 +27,7 @@ export class TransformAction {
     format: string,
     destination: DirectoryPath,
     force: boolean,
-    file?: string,
+    file?: FilePath,
     url?: string
   ): Promise<ActionResult> => {
     if (!file && !url) {
@@ -38,7 +38,7 @@ export class TransformAction {
       return ActionResult.error("Please provide either a file or URL, not both");
     }
 
-    const destinationFileName = file ? getFileNameFromPath(file) : getFileNameFromPath(url || "");
+    const destinationFileName = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
     const destinationFormat: string = DestinationFormats[format as keyof typeof DestinationFormats];
     const destinationFilePath: FilePath = new FilePath(
       new DirectoryPath(path.dirname(path.join(destination.toString(), `${destinationFileName}_${format}.${destinationFormat}`.toLowerCase()))),
@@ -51,7 +51,7 @@ export class TransformAction {
       );
     }
 
-    if (file && !(await fsExtra.pathExists(file))) {
+    if (file && !(await fsExtra.pathExists(file.toString()))) {
       return ActionResult.error(`Spec file: ${file} does not exist`);
     }
 

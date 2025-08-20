@@ -29,7 +29,7 @@ export interface TransformViaUrlParams {
 }
 
 export interface TransformViaFileParams {
-  file: string;
+  file: FilePath;
   format: string;
   tempDirectory: DirectoryPath;
   destinationFilePath: FilePath;
@@ -85,7 +85,7 @@ export class TransformationService {
     const transformationController = new TransformationController(client);
 
     try {
-      const fileStream = fsExtra.createReadStream(file);
+      const fileStream = fsExtra.createReadStream(file.toString());
       const fileWrapper = new FileWrapper(fileStream);
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         this.CONTENT_TYPE,

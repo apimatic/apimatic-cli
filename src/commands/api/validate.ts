@@ -3,6 +3,9 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { ValidateAction } from "../../actions/api/validate.js";
+import { FilePath } from "../../types/file/filePath.js";
+import path from "path";
+import { FileName } from "../../types/file/fileName.js";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
@@ -26,8 +29,12 @@ export default class Validate extends Command {
     } = await this.parse(Validate);
 
     const action = new ValidateAction(this.getConfigDir(), authKey);
+    let filePath: FilePath | undefined = undefined;
+    if (file) {
+      filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
+    }
 
-    const result = await action.execute(file, url);
+    const result = await action.execute(filePath, url);
 
     result.mapAll(
       () => this.prompts.displayOutroMessage(),

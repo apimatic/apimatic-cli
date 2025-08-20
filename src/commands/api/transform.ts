@@ -4,6 +4,9 @@ import { FlagsProvider } from "../../types/flags-provider.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
 import { TransformAction } from "../../actions/api/transform.js";
 import { TransformationFormats } from "../../types/api/transform.js";
+import { FilePath } from "../../types/file/filePath.js";
+import path from "path/win32";
+import { FileName } from "../../types/file/fileName.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -46,9 +49,14 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     const destinationDir = new DirectoryPath(destination);
 
+    let filePath: FilePath | undefined = undefined;
+    if (file) {
+      filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
+    }
+    
     const action = new TransformAction(this.getConfigDir(), authKey);
 
-    const result = await action.execute(format, destinationDir, force, file, url);
+    const result = await action.execute(format, destinationDir, force, filePath, url);
 
     result.mapAll(
       () => this.prompts.displayOutroMessage(destinationDir),

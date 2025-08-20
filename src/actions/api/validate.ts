@@ -3,6 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { ValidationService } from "../../infrastructure/services/validate-service.js";
+import { FilePath } from "../../types/file/filePath.js";
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -15,7 +16,7 @@ export class ValidateAction {
     this.authKey = authKey;
   }
 
-  public readonly execute = async (file?: string, url?: string): Promise<ActionResult> => {
+  public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => {
     if (!file && !url) {
       return ActionResult.error("Please provide either a specification file or URL");
     }
@@ -24,7 +25,7 @@ export class ValidateAction {
       return ActionResult.error("Please provide either a file or URL, not both");
     }
 
-    if (file && !(await fsExtra.pathExists(file))) {
+    if (file && !(await fsExtra.pathExists(file.toString()))) {
       return ActionResult.error(`Validation file: ${file} does not exist`);
     }
 
@@ -50,14 +51,17 @@ export class ValidateAction {
       return ActionResult.error(validationSummaryResult.error! || "Validation failed with an unknown error");
     }
 
-    if (!validationSummaryResult.value!.success) {
+    const validationSummary = validationSummaryResult.value;
+    if (!validationSummary?.success) {
       this.prompts.displayValidationFailureMessage();
-      this.prompts.displayValidationMessages(validationSummaryResult.value!);
+      if (validationSummary) {
+        this.prompts.displayValidationMessages(validationSummary);
+      }
       return ActionResult.error("Specification file provided is invalid");
     }
 
     this.prompts.displayValidationSuccessMessage();
-    this.prompts.displayValidationMessages(validationSummaryResult.value!);  
+    this.prompts.displayValidationMessages(validationSummary);  
     return ActionResult.success();
   };
 }
