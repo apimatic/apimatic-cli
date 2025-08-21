@@ -120,12 +120,13 @@ export class PortalQuickstartAction {
     const inputPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
 
     const resourceContext = new ResourceContext(tempDirectory);
-    const destinationFilePath = await resourceContext.resolve(inputPath);
-    if (destinationFilePath.isErr()) {
-      return err(destinationFilePath.error);
+    const result = await resourceContext.resolve(inputPath);
+    if (result.isErr()) {
+      return err(result.error);
     }
 
-    const specDirectory = await resourceContext.prepare(destinationFilePath.value, "spec");
+    const { destinationFilePath, fileName } = result.value;
+    const specDirectory = await resourceContext.prepare(destinationFilePath, fileName, "spec");
     return ok(specDirectory);
   }
 
@@ -144,14 +145,14 @@ export class PortalQuickstartAction {
     const specZipFilePath = new FilePath(tempDirectory, new FileName("spec.zip"));
     await this.zipService.archive(specDirectory, specZipFilePath);
 
-    const result = await this.validationService.validateViaFile({ file: specZipFilePath });
+    const validationResult = await this.validationService.validateViaFile({ file: specZipFilePath });
     // TODO: Add spinner when refactoring
-    if (result.isFailed()) {
+    if (validationResult.isFailed()) {
       this.prompts.stopProgressIndicator(`Something went wrong while validating your API Definition.`, 1);
-      return Result.failure(result.error!);
+      return Result.failure(validationResult.error!);
     }
 
-    const validationPassed = result.value!.success;
+    const validationPassed = validationResult.value!.success;
     if (validationPassed) {
       this.prompts.stopProgressIndicator(getMessageInCyanColor(`Validation Successful.`));
       return Result.success(specDirectory);
@@ -164,12 +165,13 @@ export class PortalQuickstartAction {
 
     // Use default spec...
     const resourceContext = new ResourceContext(tempDirectory);
-    const destinationFilePath = await resourceContext.resolve(this.defaultSpecUrl.toString());
-    if (destinationFilePath.isErr()) {
-      return Result.failure(destinationFilePath.error);
+    const result = await resourceContext.resolve(this.defaultSpecUrl.toString());
+    if (result.isErr()) {
+      return Result.failure(result.error);
     }
 
-    return Result.success(await resourceContext.prepare(destinationFilePath.value, "default-spec"));
+    const { destinationFilePath, fileName } = result.value;
+    return Result.success(await resourceContext.prepare(destinationFilePath, fileName, "spec"));
   }
 
   private async selectLanguages(): Promise<string[]> {

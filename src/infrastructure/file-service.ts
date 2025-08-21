@@ -1,6 +1,5 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
-import filetype from "file-type";
 import * as path from "path";
 import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
@@ -8,11 +7,6 @@ import { pipeline } from "stream";
 import { promisify } from "util";
 
 export class FileService {
-  public async isZipFile(file: FilePath): Promise<boolean> {
-    const fileType = await filetype.fromFile(file.toString());
-    return fileType?.ext === "zip";
-  }
-
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(file.toString());
@@ -20,10 +14,6 @@ export class FileService {
     } catch {
       return false;
     }
-  }
-
-  public async ensureDirectoryExists(dir: DirectoryPath): Promise<void> {
-    await fsExtra.ensureDir(dir.toString());
   }
 
   public async directoryExists(dir: DirectoryPath): Promise<boolean> {
@@ -68,13 +58,6 @@ export class FileService {
     const exists = await this.fileExists(filePath);
     if (exists) {
       await fsExtra.remove(filePath.toString());
-    }
-  }
-
-  public async deleteDirectory(dirPath: DirectoryPath): Promise<void> {
-    const exists = await this.directoryExists(dirPath);
-    if (exists) {
-      await fsExtra.remove(dirPath.toString());
     }
   }
 

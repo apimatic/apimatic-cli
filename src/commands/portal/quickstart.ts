@@ -12,7 +12,7 @@ export default class PortalQuickstart extends Command {
   static examples = ["apimatic portal quickstart"];
 
   async run() {
-    const telemetryService = new TelemetryService(this.getConfigDir.toString());
+    const telemetryService = new TelemetryService(this.getConfigDir());
     const prompts = new PortalQuickstartPrompts();
     const action = new PortalQuickstartAction(this.getConfigDir(), PortalQuickstart.id);
 

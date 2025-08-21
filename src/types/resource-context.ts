@@ -15,7 +15,9 @@ export class ResourceContext {
 
   constructor(private readonly tempDirectory: DirectoryPath) {}
 
-  public async resolve(resourcePath: string): Promise<Result<FilePath, string>> {
+  public async resolve(
+    resourcePath: string
+  ): Promise<Result<{ destinationFilePath: FilePath; fileName: FileName }, string>> {
     const urlPath = UrlPath.create(resourcePath);
     if (urlPath) {
       const downloadFileResult = await this.fileDownloadService.downloadFile(urlPath);
@@ -27,24 +29,24 @@ export class ResourceContext {
 
       const destinationFilePath = new FilePath(this.tempDirectory, urlPath.fileName());
       await this.fileService.writeFile(destinationFilePath, downloadFileResult.value);
-      return ok(destinationFilePath);
+      return ok({ destinationFilePath, fileName: urlPath.fileName() });
     }
 
-    //TODO: Create factory method for preparing FilePath from a string.
+    // TODO: Create factory method for preparing FilePath from a string.
     const normalizedResourcePath = path.normalize(resourcePath);
     const directory = new DirectoryPath(path.dirname(normalizedResourcePath));
     const fileName = new FileName(path.basename(normalizedResourcePath));
     const sourceFilePath = new FilePath(directory, fileName);
     const destinationFilePath = new FilePath(this.tempDirectory, fileName);
     await this.fileService.copy(sourceFilePath, destinationFilePath);
-    return ok(destinationFilePath);
+    return ok({ destinationFilePath, fileName });
   }
 
-  public async prepare(destinationFilePath: FilePath, subPath: string): Promise<DirectoryPath> {
+  public async prepare(destinationFilePath: FilePath, fileName: FileName, subPath: string): Promise<DirectoryPath> {
     const specDirectory = this.tempDirectory.join(subPath);
-    await this.fileService.ensureDirectoryExists(specDirectory);
+    await this.fileService.cleanDirectory(specDirectory);
 
-    if (await this.fileService.isZipFile(destinationFilePath)) {
+    if (await fileName.isZipFile()) {
       await this.zipService.unArchive(destinationFilePath, specDirectory);
     } else {
       await this.fileService.copy(destinationFilePath, destinationFilePath.replaceDirectory(specDirectory));

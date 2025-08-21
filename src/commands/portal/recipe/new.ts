@@ -26,22 +26,33 @@ export default class PortalRecipeNew extends Command {
 
   public async run(): Promise<void> {
     const { flags } = await this.parse(PortalRecipeNew);
-    const telemetryService = new TelemetryService(this.config.configDir);
+    const telemetryService = new TelemetryService(this.getConfigDir());
     const portalRecipeAction = new PortalRecipeAction();
     const portalRecipePrompts = new PortalRecipePrompts();
 
     const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
 
-    const createRecipeResult = await portalRecipeAction.createRecipe(buildDirectory, this.config.configDir, PortalRecipeNew.id, flags.name);
+    const createRecipeResult = await portalRecipeAction.createRecipe(
+      buildDirectory,
+      this.config.configDir,
+      PortalRecipeNew.id,
+      flags.name
+    );
 
     //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (createRecipeResult.isFailed()) {
-      await telemetryService.trackEvent(new RecipeCreationFailedEvent(createRecipeResult.error!, PortalRecipeNew.id, flags));
+      await telemetryService.trackEvent(
+        new RecipeCreationFailedEvent(createRecipeResult.error!, PortalRecipeNew.id, flags)
+      );
       portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.error!));
     }
     if (createRecipeResult.isCancelled()) {
       portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.value!));
     }
+  }
+
+  private getConfigDir(): DirectoryPath {
+    return new DirectoryPath(this.config.configDir);
   }
 }

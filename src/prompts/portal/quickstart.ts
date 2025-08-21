@@ -3,7 +3,7 @@ import fs from "fs";
 import axios from "axios";
 import treeify from "treeify";
 import { intro, outro, text, select, multiselect, log, isCancel, cancel } from "@clack/prompts";
-import { getMessageInCyanColor, getMessageInGreenColor, getMessageInRedColor, isValidUrl } from "../../utils/utils.js";
+import { getMessageInCyanColor, getMessageInGreenColor, getMessageInRedColor } from "../../utils/utils.js";
 import { BasePrompts } from "./common/base-prompts.js";
 import { DirectoryNode } from "../../types/portal/quickstart.js";
 import { UrlPath } from "../../types/file/urlPath.js";
@@ -47,7 +47,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
 
           const cleanedPath = this.removeQuotes(input.trim() ?? "");
 
-          if (!isValidUrl(cleanedPath)) {
+          if (!UrlPath.create(cleanedPath)) {
             const dirPath = path.resolve(cleanedPath);
 
             if (!fs.existsSync(dirPath)) {
@@ -71,7 +71,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
       const cleanedPath = this.removeQuotes(String(spec).trim());
 
       // Async validation for URLs
-      if (isValidUrl(cleanedPath)) {
+      if (UrlPath.create(cleanedPath)) {
         try {
           const response = await axios.head(cleanedPath);
           const contentType = response.headers["content-type"];

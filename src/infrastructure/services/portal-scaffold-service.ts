@@ -34,7 +34,7 @@ export class PortalScaffoldService {
       await this.fileService.writeFile(tempZipPath, downloadZipResult.value);
       await this.zipService.unArchive(tempZipPath, tempDirectory);
       const extractedFolder = new DirectoryPath(tempDirectory.toString(), this.repositoryFolderName);
-      await this.fileService.deleteDirectory(new DirectoryPath(extractedFolder.toString(), ".github"));
+      await this.fileService.cleanDirectory(new DirectoryPath(extractedFolder.toString(), ".github"));
 
       // Setup spec.
       const buildSpecDirectory = new DirectoryPath(extractedFolder.toString(), "spec");

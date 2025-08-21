@@ -2,7 +2,6 @@ import * as path from "path";
 import fs from "fs";
 import fsExtra from "fs-extra";
 import os from "os";
-import { URL } from "url";
 import { Buffer } from "buffer";
 import archiver from "archiver";
 import stripTags from "striptags";
@@ -12,32 +11,6 @@ import { loggers, ValidationMessages } from "../types/utils.js";
 
 export const createTempDirectory = async () => {
   return fs.mkdtempSync(path.join(os.tmpdir(), "apimatic-cli-"));
-};
-
-export const isValidUrl = (input: string): boolean => {
-  if (!input) {
-    return false;
-  }
-
-  try {
-    const url = new URL(input);
-
-    if (!["http:", "https:"].includes(url.protocol)) {
-      return false;
-    }
-
-    if (url.protocol === "file:" || fs.existsSync(input)) {
-      return false;
-    }
-
-    if (!url.host) {
-      return false;
-    }
-
-    return true;
-  } catch {
-    return false;
-  }
 };
 
 export const deleteFile = async (filePath: string) => {
