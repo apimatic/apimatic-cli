@@ -61,6 +61,13 @@ export class FileService {
     }
   }
 
+  public async deleteDirectory(dirPath: DirectoryPath): Promise<void> {
+    const exists = await this.directoryExists(dirPath);
+    if (exists) {
+      await fsExtra.remove(dirPath.toString());
+    }
+  }
+
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }

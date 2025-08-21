@@ -60,11 +60,7 @@ export default class PortalServe extends Command {
       shell: this.config.shell
     };
 
-    const generatePortalAction = new GenerateAction(
-      new DirectoryPath(this.config.configDir),
-      commandMetadata,
-      flags["auth-key"]
-    );
+    const generatePortalAction = new GenerateAction(this.getConfigDir(), commandMetadata, flags["auth-key"]);
 
     const serveFlags: ServeFlags = {
       input: buildDirectory.toString(),
@@ -80,11 +76,7 @@ export default class PortalServe extends Command {
       destinationDirectoryPath: portalDirectory.toString()
     };
 
-    const servePortalResult = await portalServeAction.servePortal(
-      serveFlags,
-      servePaths,
-      generatePortalAction.execute
-    );
+    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, generatePortalAction.execute);
     //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
@@ -95,7 +87,16 @@ export default class PortalServe extends Command {
     }
 
     if (servePortalResult.isSuccess()) {
-      this.prompts.displayOutroMessage(buildDirectory.toString(), portalDirectory.toString(), servePortalResult.value!, flags["no-reload"]);
+      this.prompts.displayOutroMessage(
+        buildDirectory.toString(),
+        portalDirectory.toString(),
+        servePortalResult.value!,
+        flags["no-reload"]
+      );
     }
+  }
+
+  private getConfigDir(): DirectoryPath {
+    return new DirectoryPath(this.config.configDir);
   }
 }
