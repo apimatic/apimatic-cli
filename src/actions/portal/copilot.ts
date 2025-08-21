@@ -51,7 +51,7 @@ export class CopilotAction {
     );
 
     if (response.isErr()) {
-      this.prompts.networkError(response.error);
+      this.prompts.serviceError(response.error);
       return ActionResult.failed();
     }
 

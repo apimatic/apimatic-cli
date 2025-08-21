@@ -8,7 +8,7 @@ export default class PortalCopilot extends Command {
   static summary = "Configure API Copilot for your API Documentation portal";
 
   static description =
-    "Displays available API Copilots associated with your account and allows you to select which one to integrate with your portal. Each APIMatic account includes one Copilot by default. The selected Copilot will be added to your APIMATIC-BUILD.json file";
+    `Displays available API Copilots associated with your account and allows you to select which one to integrate with your portal. Each APIMatic account includes one Copilot by default. The selected Copilot will be added to your ${format.var("APIMATIC-BUILD.json")} file`;
 
   static flags = {
     ...FlagsProvider.input,

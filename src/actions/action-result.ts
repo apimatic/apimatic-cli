@@ -1,6 +1,5 @@
 enum ResultType {
   Success= 0,
-  Warning = 2,
   Cancel = 130,
   Failure= 1
 }
@@ -26,10 +25,6 @@ export class ActionResult {
     return new ActionResult(ResultType.Cancel, " Cancelled ");
   }
 
-  static warning() {
-    return new ActionResult(ResultType.Warning, " Warning ");
-  }
-
   public getMessage() {
     return this.message;
   }
@@ -38,7 +33,7 @@ export class ActionResult {
     return this.resultType.valueOf();
   }
 
-  public mapAll<T>(onSuccess: () => T, onFailure: () => T, onCancel: () => T, onWarning: () => T): T {
+  public mapAll<T>(onSuccess: () => T, onFailure: () => T, onCancel: () => T): T {
     switch (this.resultType) {
       case ResultType.Success:
         return onSuccess();
@@ -46,8 +41,6 @@ export class ActionResult {
         return onFailure();
       case ResultType.Cancel:
         return onCancel();
-      case ResultType.Warning:
-        return onWarning();
     }
   }
 }

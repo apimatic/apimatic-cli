@@ -94,7 +94,7 @@ select any programming language in the Portal and look for the chat icon in the 
     log.warning("Exiting without making any change.");
   }
 
-  public networkError(serviceError: ServiceError) {
+  public serviceError(serviceError: ServiceError) {
     log.error(getErrorMessage(serviceError));
   }
 

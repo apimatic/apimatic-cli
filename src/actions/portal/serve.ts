@@ -1,7 +1,6 @@
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
-import { Result } from "../../types/common/result.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
@@ -51,7 +50,6 @@ export class PortalServeAction {
         return ActionResult.success();
         // return Result.success(`Portal was successfully served.`);
       },
-      async () => result,
       async () => result,
       async () => result);
 
