@@ -3,6 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { PortalCopilotPrompts } from "../../prompts/portal/copilot.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { CopilotAction } from "../../actions/portal/copilot.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -22,10 +23,7 @@ export default class PortalCopilotEnable extends Command {
     ...FlagsProvider.authKey
   };
 
-  static examples = [
-    `apimatic portal copilot --input="./"`,
-    `apimatic portal copilot --input="./" --disable`,
-  ];
+  static examples = [`apimatic portal copilot --input="./"`, `apimatic portal copilot --input="./" --disable`];
 
   private readonly prompts = new PortalCopilotPrompts();
 
@@ -36,8 +34,14 @@ export default class PortalCopilotEnable extends Command {
 
     const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), authKey);
-    const result = await copilotConfigAction.execute(buildDirectory, this.config.shell, force, !disable);
+
+    const commandMetadata: CommandMetadata = {
+      commandName: PortalCopilotEnable.id,
+      shell: this.config.shell
+    };
+
+    const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), commandMetadata, authKey);
+    const result = await copilotConfigAction.execute(buildDirectory, force, !disable);
     result.map((message) => this.prompts.logError(message));
   }
 }

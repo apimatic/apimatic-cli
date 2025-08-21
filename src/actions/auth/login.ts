@@ -7,24 +7,25 @@ import open from "open";
 import { setAuthInfo } from "../../client-utils/auth-manager.js";
 import { LoginPrompts } from "../../prompts/auth/login.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class LoginAction {
   private readonly authService = new AuthService();
   private readonly apiService = new ApiService();
   private readonly prompts = new LoginPrompts();
 
-  constructor(private readonly configDir: DirectoryPath) {}
+  constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
-  public async execute(shell: string, apiKey: string | undefined = undefined): Promise<Result<string, string>> {
+  public async execute(apiKey: string | undefined = undefined): Promise<Result<string, string>> {
     if (!apiKey) {
-      const result = await this.poolDeviceToken(shell);
+      const result = await this.poolDeviceToken(this.commandMetadata.shell);
       return (
         await result.asyncMap(async (token) => {
-          return await this.verifyKeyAndSave(token, shell);
+          return await this.verifyKeyAndSave(token, this.commandMetadata.shell);
         })
       ).andThen((r) => r);
     } else {
-      return await this.verifyKeyAndSave(apiKey, shell);
+      return await this.verifyKeyAndSave(apiKey, this.commandMetadata.shell);
     }
   }
 
@@ -58,16 +59,18 @@ export class LoginAction {
 
   private async verifyKeyAndSave(apiKey: string, shell: string): Promise<Result<string, string>> {
     const result = await this.apiService.getAccountInfo(this.configDir, shell, apiKey);
-    return result.asyncMap(async (info) => {
-      await setAuthInfo(info.Email, apiKey, false, this.configDir);
-      return info.Email;
-    }).mapErr(e => {
+    return result
+      .asyncMap(async (info) => {
+        await setAuthInfo(info.Email, apiKey, false, this.configDir);
+        return info.Email;
+      })
+      .mapErr((e) => {
         switch (e) {
           case ServiceError.UnAuthorized:
-            return "The provided auth key is invalid"
+            return "The provided auth key is invalid";
           default:
             return getErrorMessage(e);
         }
-    });
+      });
   }
 }

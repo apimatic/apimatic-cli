@@ -2,6 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { LoginPrompts } from "../../prompts/auth/login.js";
 import { LoginAction } from "../../actions/auth/login.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export default class Login extends Command {
   static description = "Login using your APIMatic credentials or an API Key";
@@ -26,8 +27,12 @@ export default class Login extends Command {
       this.error("Flag --auth-key must not be empty when provided.");
     }
 
-    const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
-    const result = await loginAction.execute(this.config.shell, authKey);
+    const commandMetadata: CommandMetadata = {
+      commandName: Login.id,
+      shell: this.config.shell
+    };
+    const loginAction = new LoginAction(new DirectoryPath(this.config.configDir), commandMetadata);
+    const result = await loginAction.execute(authKey);
     result.match(
       (email) => this.prompts.loginSuccessful(email),
       (error) => this.prompts.logError(error)

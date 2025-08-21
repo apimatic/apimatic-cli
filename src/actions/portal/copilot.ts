@@ -9,6 +9,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class CopilotAction {
   private readonly apiService = new ApiService();
@@ -16,18 +17,22 @@ export class CopilotAction {
   private readonly launcherService = new LauncherService();
   private readonly prompts = new PortalCopilotPrompts();
   private readonly configDir: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, authKey: string | null = null) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
+    this.commandMetadata = commandMetadata;
     this.authKey = authKey;
   }
 
-  public async execute(buildDirectory: DirectoryPath, shell: string, force: boolean, enable: boolean): Promise<ActionResult> {
+  public async execute(buildDirectory: DirectoryPath, force: boolean, enable: boolean): Promise<ActionResult> {
     const buildContext = new BuildContext(buildDirectory);
 
     if (!(await buildContext.validate())) {
-      return ActionResult.error(`Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running \`apimatic portal quickstart\`.`);
+      return ActionResult.error(
+        `Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running \`apimatic portal quickstart\`.`
+      );
     }
 
     const buildJson = await buildContext.getBuildFileContents();
@@ -35,8 +40,9 @@ export class CopilotAction {
     if (!force && buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite()))
       return ActionResult.error("Exiting without making any change.");
 
-    const response = await this.prompts.spinnerAccountInfo(
-      () => this.apiService.getAccountInfo(this.configDir, shell, this.authKey));
+    const response = await this.prompts.spinnerAccountInfo(() =>
+      this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, this.authKey)
+    );
 
     if (response.isErr()) {
       return ActionResult.error(response._unsafeUnwrapErr());
@@ -59,7 +65,6 @@ export class CopilotAction {
 
     this.prompts.copilotConfigured(enable, apiCopilotKey);
 
-
     return ActionResult.success();
   }
 
@@ -69,7 +74,9 @@ export class CopilotAction {
       subscription.ApiCopilotKeys === undefined ||
       subscription.ApiCopilotKeys.length === 0
     ) {
-      return new Error("No copilot key found for the current subscription. Please contact support at support@apimatic.io.");
+      return new Error(
+        "No copilot key found for the current subscription. Please contact support at support@apimatic.io."
+      );
     }
 
     if (subscription.ApiCopilotKeys.length === 1) {
@@ -88,14 +95,15 @@ export class CopilotAction {
   private async getWelcomeMessage(): Promise<string> {
     return await withDirPath(async (tempDir) => {
       const tempFile = new FilePath(tempDir, new FileName("welcome-message.md"));
-      const defaultContent = "Hi there! I'm your API Integration Assistant, here to help you learn and integrate with this API.\n" +
+      const defaultContent =
+        "Hi there! I'm your API Integration Assistant, here to help you learn and integrate with this API.\n" +
         "\n" +
         "Ask me anything about this API or try one of these example prompts:\n" +
         "\n" +
         "`- What authentication methods does this API support?`\n" +
         "`- [Enter another prompt here]`";
       await this.fileService.writeContents(tempFile, defaultContent);
-      this.prompts.openWelcomeMessageEditor();  
+      this.prompts.openWelcomeMessageEditor();
       await this.launcherService.openInEditor(tempFile);
       const welcomeMessage = await this.fileService.getContents(tempFile);
       return welcomeMessage.replace(/\r\n|\r/g, "\n");

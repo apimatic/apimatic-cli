@@ -39,13 +39,9 @@ export class ServeHandler {
   public async startServer(
     paths: ServePaths,
     flags: ServeFlags,
-    commandName: string,
-    shell: string,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
-      commandName: string,
-      shell: string,
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>,
@@ -59,7 +55,7 @@ export class ServeHandler {
           }
 
           if (!flags["no-reload"]) {
-            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, commandName, shell, generatePortal);
+            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, generatePortal);
           }
 
           if (process.platform !== "darwin") {

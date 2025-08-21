@@ -6,18 +6,19 @@ import { FilePath } from "../../types/file/filePath.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { Result } from "../../types/common/result.js";
 import { validateFileInputParams } from "../../infrastructure/api-utils.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
   private readonly validationService: ValidationService = new ValidationService();
   private readonly configDir: DirectoryPath;
-  private readonly shell: string;
+  private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, shell: string, authKey: string | null = null) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
-    this.shell = shell;
     this.authKey = authKey;
+    this.commandMetadata = commandMetadata;
   }
 
   public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => {
@@ -35,14 +36,14 @@ export class ValidateAction {
       validationSummaryResult = await this.validationService.validateViaFile({
         file,
         configDir: this.configDir,
-        shell: this.shell,
+        commandMetadata: this.commandMetadata,
         authKey: this.authKey
       });
     } else {
       validationSummaryResult = await this.validationService.validateViaUrl({
         url: url!,
         configDir: this.configDir,
-        shell: this.shell,
+        commandMetadata: this.commandMetadata,
         authKey: this.authKey
       });
     }

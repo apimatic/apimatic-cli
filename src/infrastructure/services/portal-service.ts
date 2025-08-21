@@ -25,32 +25,31 @@ import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { apiClientFactory } from "./api-client-factory.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
-  private readonly TIMEOUT = 0;
   private readonly fileService = new FileService();
 
   //TODO: Pass stream as parameter instead of file path.
   public async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
-    commandName: string,
-    shell: string,
+    eventMetadata: CommandMetadata,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = apiClientFactory.createApiClient(authorizationHeader, shell);
+    const client = apiClientFactory.createApiClient(authorizationHeader, eventMetadata.shell);
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
       const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(
         this.CONTENT_TYPE,
         file,
-        this.createOriginQueryParameter(commandName)
+        this.createOriginQueryParameter(eventMetadata.commandName)
       );
       return Result.success(response.result as NodeJS.ReadableStream);
     } catch (error) {
@@ -65,15 +64,14 @@ export class PortalService {
     specPath: FilePath,
     sdkPlatform: Platforms,
     configDir: DirectoryPath,
-    commandName: string,
-    shell: string,
+    commandMetadata: CommandMetadata,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = apiClientFactory.createApiClient(authorizationHeader, shell);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
@@ -81,7 +79,7 @@ export class PortalService {
         Accept.EnumApplicationjson,
         file,
         sdkPlatform,
-        this.createOriginQueryParameter(commandName)
+        this.createOriginQueryParameter(commandMetadata.commandName)
       );
       const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
       return Result.success(sdkResponse.result as NodeJS.ReadableStream);
@@ -94,14 +92,13 @@ export class PortalService {
 
   public async generateSdl(
     specFileStream: ReadStream,
-    configDir: string,
-    commandName: string,
-    shell: string
+    configDir: DirectoryPath,
+    commandMetadata: CommandMetadata
   ): Promise<Result<Sdl, string>> {
     const file = new FileWrapper(specFileStream);
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, shell);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const transformationController = new TransformationController(client);
 
     try {
@@ -109,7 +106,7 @@ export class PortalService {
         ContentType.EnumMultipartformdata,
         file,
         ExportFormats.Apimatic,
-        this.createOriginQueryParameter(commandName)
+        this.createOriginQueryParameter(commandMetadata.commandName)
       );
 
       if (!generation.result.success) {

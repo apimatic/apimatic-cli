@@ -6,6 +6,7 @@ import { ValidateAction } from "../../actions/api/validate.js";
 import { FilePath } from "../../types/file/filePath.js";
 import path from "path";
 import { FileName } from "../../types/file/fileName.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export default class Validate extends Command {
   static description = "Validate the syntactic and semantic correctness of an API specification";
@@ -28,7 +29,16 @@ export default class Validate extends Command {
       flags: { file, url, "auth-key": authKey }
     } = await this.parse(Validate);
 
-    const action = new ValidateAction(this.getConfigDir(), this.config.shell, authKey);
+    const commandMetadata: CommandMetadata = {
+      commandName: Validate.id,
+      shell: this.config.shell
+    };
+
+    const action = new ValidateAction(
+      this.getConfigDir(),
+      commandMetadata,
+      authKey
+    );
     let filePath: FilePath | undefined = undefined;
     if (file) {
       filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
