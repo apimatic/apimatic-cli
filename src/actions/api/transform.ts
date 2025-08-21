@@ -48,7 +48,7 @@ export class TransformAction {
 
     this.prompts.displayApiTransformationMessage();
 
-    const parseFormat = async (format: string) => getValidFormat(format);
+    const parsedFormat = getValidFormat(format);
 
     const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
@@ -72,14 +72,14 @@ export class TransformAction {
       if (file) {
         result = await this.transformationService.transformViaFile({
           file,
-          format: await parseFormat(format),
+          format: parsedFormat,
           configDir: this.configDir,
           authKey: this.authKey
         });
       } else {
         result = await this.transformationService.transformViaUrl({
           url: url!,
-          format: await parseFormat(format),
+          format: parsedFormat,
           configDir: this.configDir,
           authKey: this.authKey
         });
