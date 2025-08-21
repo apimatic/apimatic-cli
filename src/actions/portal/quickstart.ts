@@ -68,12 +68,10 @@ export class PortalQuickstartAction {
       }
 
       // Step 3/4
-      const selectedLanguages = await this.promptForLanguagesSelection();
+      const selectedLanguages = await this.selectLanguages();
 
       // Step 4/4
-      const buildDirectory = await this.promptForBuildDirectory();
-      const sourceDirectory = buildDirectory.join("src");
-      const portalDirectory = buildDirectory.join("portal");
+      const { sourceDirectory, portalDirectory } = await this.selectInputDirectory();
 
       const buildDirectoryResult = await this.setupBuildDirectory(
         tempDirectory,
@@ -174,16 +172,18 @@ export class PortalQuickstartAction {
     return Result.success(await resourceContext.prepare(destinationFilePath.value, "default-spec"));
   }
 
-  private async promptForLanguagesSelection(): Promise<string[]> {
+  private async selectLanguages(): Promise<string[]> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
 
     return await this.prompts.selectLanguagesPrompt();
   }
 
-  private async promptForBuildDirectory(): Promise<DirectoryPath> {
+  private async selectInputDirectory(): Promise<{ sourceDirectory: DirectoryPath; portalDirectory: DirectoryPath }> {
     this.prompts.displayInfo(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
 
-    return new DirectoryPath(await this.prompts.buildDirectoryPathPrompt());
+    const workingDirectory = new DirectoryPath(await this.prompts.inputDirectoryPathPrompt());
+
+    return { sourceDirectory: workingDirectory.join("src"), portalDirectory: workingDirectory.join("portal") };
   }
 
   //TODO: Remove tempDirectory as param.
@@ -207,9 +207,7 @@ export class PortalQuickstartAction {
     }
 
     await this.fileService.copyDirectoryContents(createBuildDirectoryResult.value!, sourceDirectory);
-
     this.prompts.stopProgressIndicator(getMessageInCyanColor(`📁 Directory created at ${sourceDirectory.toString()}`));
-
     this.prompts.displayBuildDirectoryAsTree(sourceDirectory.toString());
 
     return Result.success(sourceDirectory);

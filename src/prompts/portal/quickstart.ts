@@ -134,7 +134,7 @@ export class PortalQuickstartPrompts extends BasePrompts {
     return ["http", ...languages];
   }
 
-  async buildDirectoryPathPrompt(): Promise<string> {
+  async inputDirectoryPathPrompt(): Promise<string> {
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
