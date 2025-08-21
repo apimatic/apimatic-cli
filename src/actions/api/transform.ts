@@ -14,6 +14,7 @@ import { Result } from "../../types/common/result.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { getValidFormat } from "../../controllers/api/transform.js";
 
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
@@ -50,6 +51,8 @@ export class TransformAction {
 
     this.prompts.displayApiTransformationMessage();
 
+    const parsedFormat = getValidFormat(format);
+
     const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
 
@@ -72,7 +75,7 @@ export class TransformAction {
       if (file) {
         result = await this.transformationService.transformViaFile({
           file,
-          format,
+          format: parsedFormat,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey
@@ -80,7 +83,7 @@ export class TransformAction {
       } else {
         result = await this.transformationService.transformViaUrl({
           url: url!,
-          format,
+          format: parsedFormat,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey
