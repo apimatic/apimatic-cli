@@ -21,6 +21,7 @@ import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
 import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -33,18 +34,18 @@ export class PortalQuickstartAction {
   );
   private readonly defaultPort: number = 3000 as const;
   private readonly configDir: DirectoryPath;
-  private readonly commandName: string;
+  private readonly commandMetadata: CommandMetadata;
 
-  constructor(configDir: DirectoryPath, commandName: string) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
-    this.commandName = commandName;
-    this.validationService = new ValidationService(configDir);
+    this.commandMetadata = commandMetadata;
+    this.validationService = new ValidationService(configDir, commandMetadata);
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
     this.prompts.displayWelcomeMessage();
 
-    const authenticateUserResult = await this.authenticateUser(this.configDir);
+    const authenticateUserResult = await this.authenticateUser();
     if (authenticateUserResult.isFailed()) {
       return ActionResult.error(authenticateUserResult.error!);
     }
@@ -97,14 +98,14 @@ export class PortalQuickstartAction {
     });
   };
 
-  private async authenticateUser(configDir: DirectoryPath): Promise<Result<string, string>> {
-    const storedAuth = await getAuthInfo(configDir.toString());
+  private async authenticateUser(): Promise<Result<string, string>> {
+    const storedAuth = await getAuthInfo(this.configDir.toString());
     if (storedAuth?.authKey) {
       return Result.success("User is already authenticated.");
     }
 
     this.prompts.displayInfo("You need to be logged in to continue.");
-    const loginResult = await new LoginAction(configDir).execute();
+    const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
 
     if (loginResult.isErr()) {
       this.prompts.logError(loginResult.error);
@@ -219,7 +220,7 @@ export class PortalQuickstartAction {
     sourceDirectory: DirectoryPath,
     portalDirectory: DirectoryPath
   ): Promise<Result<string, string>> {
-    const generatePortalAction = new GenerateAction(this.configDir, null);
+    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata);
     const portalServeAction = new PortalServeAction(new PortalServePrompts(), new ServeHandler(), new PortalService());
 
     const serveFlags: ServeFlags = {
@@ -236,12 +237,7 @@ export class PortalQuickstartAction {
       destinationDirectoryPath: portalDirectory.toString()
     };
 
-    const servePortalResult = await portalServeAction.servePortal(
-      serveFlags,
-      servePaths,
-      this.commandName,
-      generatePortalAction.execute
-    );
+    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, generatePortalAction.execute);
 
     if (servePortalResult.isFailed()) {
       return Result.failure(servePortalResult.error!);

@@ -19,7 +19,7 @@ export default class PortalQuickstart extends Command {
       commandName: PortalQuickstart.id,
       shell: this.config.shell
     };
-    const action = new PortalQuickstartAction(this.getConfigDir(), commandMetadata.commandName);
+    const action = new PortalQuickstartAction(this.getConfigDir(), commandMetadata);
 
     await telemetryService.trackEvent(new QuickstartInitiatedEvent(), commandMetadata.shell);
 
