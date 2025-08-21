@@ -1,20 +1,20 @@
 import {
+  Accept,
+  ApiError,
+  ApiResponse,
+  BadRequestResponseSdkError,
+  Client,
+  CodeGenerationExternalApisController,
   ContentType,
   DocsPortalManagementController,
-  Client,
-  UnauthorizedResponseError,
-  ProblemDetailsError,
-  FileWrapper,
-  ApiResponse,
-  ApiError,
-  TransformationController,
-  Transformation,
   ExportFormats,
+  FileWrapper,
   InternalServerErrorResponseError,
-  CodeGenerationExternalApisController,
   Platforms,
-  BadRequestResponseSdkError,
-  Accept
+  ProblemDetailsError,
+  Transformation,
+  TransformationController,
+  UnauthorizedResponseError
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { Result } from "../../types/common/result.js";
@@ -50,7 +50,7 @@ export class PortalService {
       const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
       return ok(response.result as NodeJS.ReadableStream);
     } catch (error) {
-      return err(await this.handlePortalGenerationErrors(error));
+      return err(await PortalService.handlePortalGenerationErrors(error));
     } finally {
       buildFileStream.close();
     }
@@ -130,23 +130,20 @@ export class PortalService {
     });
   };
 
-  private handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
+  private static handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
     if (error instanceof UnauthorizedResponseError) {
       //401
-      const unAuthError = error as UnauthorizedResponseError;
-      return unAuthError.result?.message ?? "Authorization has been denied for this request.";
+      return error.result?.message ?? "Authorization has been denied for this request.";
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
-      const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
-      return probDetailsError.result!.title + "\n- " + message;
+      const message = (error.result!.errors as Record<string, string[]>)?.[""]?.[0];
+      return error.result!.title + "\n- " + message;
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422
       return error.body as NodeJS.ReadableStream;
     } else if (error instanceof InternalServerErrorResponseError) {
       //500
-      const internalServerError = error as InternalServerErrorResponseError;
-      const message = internalServerError.result?.message;
+      const message = error.result?.message;
       return `${
           message ?? "An unknown error occurred."
         } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`;
@@ -168,8 +165,7 @@ export class PortalService {
       // Get the first error and clean it up
       const firstError = parsedResult.Errors[0];
       // Split on <br/> and take first part, then strip remaining HTML tags
-      const cleanError = firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
-      return cleanError;
+      return firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
     } else if (parsedResult.Success === false) {
       return "API definition file validation failed.";
     }

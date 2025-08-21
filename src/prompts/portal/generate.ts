@@ -48,6 +48,4 @@ export class PortalGeneratePrompts {
 An error report has been written at the destination path: ${f.path(reportPath.toString())}`;
     log.error(message);
   }
-
-
 }
