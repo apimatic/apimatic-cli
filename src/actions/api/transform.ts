@@ -13,6 +13,8 @@ import { FileName } from "../../types/file/fileName.js";
 import { Result } from "../../types/common/result.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { getValidFormat } from "../../controllers/api/transform.js";
 
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
@@ -25,10 +27,12 @@ export class TransformAction {
   private readonly transformationService: TransformationService = new TransformationService();
   private readonly fileService: FileService = new FileService();
   private readonly configDir: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, authKey: string | null = null) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
+    this.commandMetadata = commandMetadata;
     this.authKey = authKey;
   }
 
@@ -46,6 +50,8 @@ export class TransformAction {
     }
 
     this.prompts.displayApiTransformationMessage();
+
+    const parsedFormat = getValidFormat(format);
 
     const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
@@ -69,15 +75,17 @@ export class TransformAction {
       if (file) {
         result = await this.transformationService.transformViaFile({
           file,
-          format,
+          format: parsedFormat,
           configDir: this.configDir,
+          commandMetadata: this.commandMetadata,
           authKey: this.authKey
         });
       } else {
         result = await this.transformationService.transformViaUrl({
           url: url!,
-          format,
+          format: parsedFormat,
           configDir: this.configDir,
+          commandMetadata: this.commandMetadata,
           authKey: this.authKey
         });
       }
@@ -94,9 +102,7 @@ export class TransformAction {
       }
 
       this.prompts.displayApiTransformationSuccessMessage();
-      this.validatePrompts.displayValidationMessages(
-        result.value!.apiValidationSummary
-      );
+      this.validatePrompts.displayValidationMessages(result.value!.apiValidationSummary);
 
       return ActionResult.success();
     });

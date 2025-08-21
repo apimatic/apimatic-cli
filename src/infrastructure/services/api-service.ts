@@ -11,6 +11,7 @@ export class ApiService {
 
   public async getAccountInfo(
     configDir: DirectoryPath,
+    shell: string,
     authKey: string | null
   ): Promise<Result<SubscriptionInfo, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
@@ -20,7 +21,7 @@ export class ApiService {
 
     try {
       const token = authKey || authInfo?.authKey;
-      const response = await this.axiosInstance(token).get("/account/profile");
+      const response = await this.axiosInstance(shell, token).get("/account/profile");
 
       if (response.status === 200) {
         return ok(response.data as SubscriptionInfo);
@@ -31,9 +32,9 @@ export class ApiService {
     }
   }
 
-  public async sendTelemetry(payload: string, authKey: string): Promise<Result<string, string>> {
+  public async sendTelemetry(payload: string, authKey: string, shell: string): Promise<Result<string, string>> {
     try {
-      const response = await this.axiosInstance(authKey).post("/telemetry/track", payload, {
+      const response = await this.axiosInstance(shell, authKey).post("/telemetry/track", payload, {
         headers: { "Content-Type": "application/json" }
       });
 
@@ -46,9 +47,9 @@ export class ApiService {
     }
   }
 
-  private axiosInstance(apiKey: string | undefined) {
+  private axiosInstance(shell: string, apiKey: string | undefined) {
     const headers: Record<string, string> = {
-      "User-Agent": envInfo.getUserAgent()
+      "User-Agent": envInfo.getUserAgent(shell)
     };
 
     if (apiKey) {

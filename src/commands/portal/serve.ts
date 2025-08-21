@@ -8,6 +8,7 @@ import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -54,7 +55,16 @@ export default class PortalServe extends Command {
     const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
     const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
 
-    const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), flags["auth-key"]);
+    const commandMetadata: CommandMetadata = {
+      commandName: PortalServe.id,
+      shell: this.config.shell
+    };
+
+    const generatePortalAction = new GenerateAction(
+      new DirectoryPath(this.config.configDir),
+      commandMetadata,
+      flags["auth-key"]
+    );
 
     const serveFlags: ServeFlags = {
       input: buildDirectory.toString(),
@@ -70,7 +80,11 @@ export default class PortalServe extends Command {
       destinationDirectoryPath: portalDirectory.toString()
     };
 
-    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, PortalServe.id, generatePortalAction.execute);
+    const servePortalResult = await portalServeAction.servePortal(
+      serveFlags,
+      servePaths,
+      generatePortalAction.execute
+    );
     //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
     if (servePortalResult.isFailed()) {
       portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));

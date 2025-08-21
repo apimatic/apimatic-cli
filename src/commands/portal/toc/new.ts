@@ -4,6 +4,7 @@ import { TelemetryService } from "../../../infrastructure/services/telemetry-ser
 import { TocCreationFailedEvent } from "../../../types/events/toc-creation-failed.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../../types/flags-provider.js";
+import { CommandMetadata } from "../../../types/common/command-metadata.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -46,8 +47,13 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
 
   async run(): Promise<void> {
     const { flags } = await this.parse(PortalTocNew);
+    const commandMetadata: CommandMetadata = {
+      commandName: PortalTocNew.id,
+      shell: this.config.shell
+    };
+
     const telemetryService = new TelemetryService(this.getConfigDir());
-    const portalNewTocAction = new PortalNewTocAction();
+    const portalNewTocAction = new PortalNewTocAction(this.getConfigDir(), commandMetadata);
 
     const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
@@ -60,8 +66,6 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
 
     const result = await portalNewTocAction.createToc(
       buildDirectory,
-      this.config.configDir,
-      PortalTocNew.id,
       tocDirectory,
       flags.force,
       flags["expand-endpoints"],
@@ -70,7 +74,10 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
 
     //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (result.isFailed()) {
-      await telemetryService.trackEvent(new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags));
+      await telemetryService.trackEvent(
+        new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags),
+        commandMetadata.shell
+      );
       this.error(result.error!);
     }
   }

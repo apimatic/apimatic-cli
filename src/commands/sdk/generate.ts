@@ -4,6 +4,7 @@ import { FlagsProvider } from "../../types/flags-provider.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
 import { Language } from "../../types/sdk/generate.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -11,7 +12,7 @@ export default class SdkGenerate extends Command {
   static description = "Generate an SDK for your API";
   static flags = {
     language: Flags.string({
-      char: 'l',
+      char: "l",
       required: true,
       options: Object.values(Language).map((p) => p.toString()),
       description: `language for which the sdk will be generated.`
@@ -49,8 +50,13 @@ export default class SdkGenerate extends Command {
 
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(language);
 
-    var action = new GenerateAction(this.getConfigDir(), authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, language as Language, SdkGenerate.id, force, zipSdk);
+    const commandMetadata: CommandMetadata = {
+      commandName: SdkGenerate.id,
+      shell: this.config.shell
+    };
+
+    var action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
+    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk);
     result.mapAll(
       () => this.prompts.displayOutroMessage(sdkDirectory),
       (message) => this.prompts.logError(message),

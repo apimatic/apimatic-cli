@@ -22,7 +22,7 @@ export class TelemetryService {
 
   constructor(private readonly configDirectory: DirectoryPath) {}
 
-  public async trackEvent<T extends DomainEvent>(event: T): Promise<void> {
+  public async trackEvent<T extends DomainEvent>(event: T, shell: string): Promise<void> {
     const authInfo = await this.getAuthInfo(this.configDirectory.toString());
     const telemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
     const authKey = authInfo?.authKey;
@@ -40,7 +40,7 @@ export class TelemetryService {
       nodeVersion: process.version
     };
 
-    await this.apiService.sendTelemetry(JSON.stringify(payload), authKey);
+    await this.apiService.sendTelemetry(JSON.stringify(payload), authKey, shell);
   }
 
   private async getAuthInfo(configDirectory: string): Promise<AuthInfo | null> {
