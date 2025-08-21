@@ -1,3 +1,10 @@
+# [1.1.0-alpha.21](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.20...v1.1.0-alpha.21) (2025-08-18)
+
+
+### Features
+
+* add tracking events and improve messaging ([#171](https://github.com/apimatic/apimatic-cli/issues/171)) ([20c45de](https://github.com/apimatic/apimatic-cli/commit/20c45deed7a10cceb5d587290e4e31905e69c552))
+
 # [1.1.0-alpha.20](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.19...v1.1.0-alpha.20) (2025-08-11)
 
 

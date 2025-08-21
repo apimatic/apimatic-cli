@@ -9,7 +9,7 @@ import { baseURL, staticPortalRepoUrl } from "../../../src/config/env";
 import { EventEmitter } from "events";
 EventEmitter.defaultMaxListeners = 50;
 
-const COMMAND = "portal:generate";
+const COMMAND = "portal generate";
 const GENERATION_SUCCESS_MESSAGE = "The generated portal can be found at";
 const GENERATION_FAILURE_MESSAGE = "Portal Generation failed";
 const AUTHENTICATION_FAILURE_MESSAGE = "Authorization has been denied for this request";
@@ -35,7 +35,7 @@ async function setupValidBuildDirectory(targetFolder: string): Promise<void> {
   await fsExtra.remove(path.join(targetFolder, ".github"));
 }
 
-describe("apimatic portal:generate", function () {
+describe("apimatic portal generate", function () {
   const portalArtifactsDir = path.join(process.cwd(), "test-portal");
   const sourceBuildInputDir = path.join(process.cwd(), "test-source");
 
@@ -61,7 +61,7 @@ describe("apimatic portal:generate", function () {
   });
 
   // Basic command execution
-  it("runs portal:generate with default flags and valid build input", async () => {
+  it("runs portal generate with default flags and valid build input", async () => {
     await setupValidBuildDirectory(sourceBuildInputDir);
     const { stdout, stderr } = await runCommand([
       COMMAND,

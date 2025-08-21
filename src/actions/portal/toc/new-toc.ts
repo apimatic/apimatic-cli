@@ -12,6 +12,7 @@ import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { FileName } from "../../../types/file/fileName.js";
 import { BuildContext } from "../../../types/build-context.js";
+import { CommandMetadata } from "../../../types/common/command-metadata.js";
 
 export class PortalNewTocAction {
   private readonly prompts: PortalNewTocPrompts;
@@ -21,16 +22,15 @@ export class PortalNewTocAction {
   private readonly DEFAULT_TOC_FILENAME: string = "toc.yml" as const;
   private readonly APIMATIC_BUILD_FILENAME: string = "APIMATIC-BUILD.json" as const;
 
-  constructor() {
+  constructor(configDirectory: DirectoryPath, commandMetadata: CommandMetadata) {
     this.prompts = new PortalNewTocPrompts();
-    this.sdlParser = new SdlParser(new PortalService());
+    this.sdlParser = new SdlParser(new PortalService(), configDirectory, commandMetadata);
     this.tocGenerator = new TocStructureGenerator();
     this.contentParser = new TocContentParser();
   }
 
   public async createToc(
     buildDirectory: DirectoryPath,
-    configDir: string,
     tocDirectory?: DirectoryPath,
     force: boolean = false,
     expandEndpoints: boolean = false,
@@ -38,18 +38,13 @@ export class PortalNewTocAction {
   ): Promise<Result<string, string>> {
     try {
       const tocDir = await this.getDestinationPath(buildDirectory, tocDirectory);
-      const tocPath = new FilePath(tocDir, new FileName(this.DEFAULT_TOC_FILENAME))
+      const tocPath = new FilePath(tocDir, new FileName(this.DEFAULT_TOC_FILENAME));
       const tocCheckResult = await this.handleExistingToc(tocPath, force);
       if (!tocCheckResult.isSuccess()) {
         return Result.cancelled(tocCheckResult.value!);
       }
 
-      const { endpointGroups, models } = await this.extractSdlComponents(
-        buildDirectory,
-        configDir,
-        expandEndpoints,
-        expandModels
-      );
+      const { endpointGroups, models } = await this.extractSdlComponents(buildDirectory, expandEndpoints, expandModels);
 
       const contentGroups = await this.extractContentGroups(buildDirectory);
 
@@ -86,7 +81,6 @@ export class PortalNewTocAction {
 
   private async extractSdlComponents(
     buildDirectory: DirectoryPath,
-    configDir: string,
     expandEndpoints: boolean,
     expandModels: boolean
   ): Promise<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }> {
@@ -103,7 +97,7 @@ export class PortalNewTocAction {
       return { endpointGroups: new Map(), models: [] };
     }
 
-    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath, configDir);
+    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath);
 
     if (!sdlResult.isSuccess()) {
       this.prompts.stopProgressIndicatorWithMessage(`⚠️ ${sdlResult.error!}`);
@@ -129,7 +123,10 @@ export class PortalNewTocAction {
     return await this.contentParser.parseContentFolder(contentFolderPath.toString(), contentFolderPath.toString());
   }
 
-  private async getDestinationPath(buildDirectory: DirectoryPath, providedTocDirectory?: DirectoryPath): Promise<DirectoryPath> {
+  private async getDestinationPath(
+    buildDirectory: DirectoryPath,
+    providedTocDirectory?: DirectoryPath
+  ): Promise<DirectoryPath> {
     if (providedTocDirectory === undefined) {
       const inferredDestination = await this.getContentFolderPath(buildDirectory);
       return inferredDestination;

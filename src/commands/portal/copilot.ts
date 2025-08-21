@@ -2,6 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { CopilotAction } from "../../actions/portal/copilot.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 
 export default class PortalCopilot extends Command {
@@ -17,6 +18,7 @@ export default class PortalCopilot extends Command {
       description: "marks the API Copilot as disabled in the configuration"
     }),
     ...FlagsProvider.force,
+    ...FlagsProvider.force,
     ...FlagsProvider.authKey
   };
 
@@ -31,9 +33,14 @@ export default class PortalCopilot extends Command {
       flags: { input, "auth-key": authKey, disable, force }
     } = await this.parse(PortalCopilot);
 
+    const commandMetadata: CommandMetadata = {
+      commandName: PortalCopilot.id,
+      shell: this.config.shell
+    };
+
     intro("Configure API Copilot");
     const buildDirectory = new DirectoryPath(input ?? "./", "src");
-    const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), authKey);
+    const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), commandMetadata, authKey);
     const result = await copilotConfigAction.execute(buildDirectory, force, !disable);
     outro(result);
   }

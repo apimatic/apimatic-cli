@@ -11,6 +11,11 @@ export class PortalCopilotPrompts {
       "API Copilot can only be active on one Portal at a time. Configuring it on this Portal will disable it on any previously configured Portal."
     );
   }
+
+  public openWelcomeMessageEditor() {
+    log.step("Opening markdown editor for you to enter welcome message in...");
+  }
+
   public async selectCopilotKey(keys: string[]): Promise<string | null> {
     const selectedKey = await select({
       message: "Select the ID for the API Copilot you would like to add to this API Portal:",
@@ -22,6 +27,7 @@ export class PortalCopilotPrompts {
     });
 
     if (isCancel(selectedKey)) {
+      return null;
       return null;
     }
 

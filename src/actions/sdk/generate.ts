@@ -10,7 +10,8 @@ import { SdkContext } from "../../types/sdk-context.js";
 import { Platforms } from "@apimatic/sdk";
 import { SpecContext } from "../../types/spec-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
-import { LanguagePlatform } from "../../types/sdk/generate.js";
+import { Language } from "../../types/sdk/generate.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -18,17 +19,19 @@ export class GenerateAction {
   private readonly fileService: FileService = new FileService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, authKey: string | null = null) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
+    this.commandMetadata = commandMetadata;
     this.authKey = authKey;
   }
 
   public readonly execute = async (
     specDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
-    platform: LanguagePlatform,
+    language: Language,
     force: boolean,
     zipSdk: boolean
   ): Promise<ActionResult> => {
@@ -43,7 +46,7 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, platform);
+    const sdkContext = new SdkContext(sdkDirectory, language);
     if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
       // return ActionResult.error(
       //   "Please enter a different destination folder or remove the existing files and try again."
@@ -57,8 +60,14 @@ export class GenerateAction {
       const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
       await this.zipArchiver.archive(specDirectory, specZipPath);
 
-      const sdkPlatform = this.convertSimplePlatformToPlatform(platform as LanguagePlatform);
-      const response = await this.portalService.generateSdk(specZipPath, sdkPlatform, this.configDir, this.authKey);
+      const platform = this.convertLanguageToPlatform(language);
+      const response = await this.portalService.generateSdk(
+        specZipPath,
+        platform,
+        this.configDir,
+        this.commandMetadata,
+        this.authKey
+      );
 
       if (!response.isSuccess()) {
         this.prompts.displaySdkGenerationErrorMessage();
@@ -76,24 +85,24 @@ export class GenerateAction {
     });
   };
 
-  private convertSimplePlatformToPlatform(languagePlatform: LanguagePlatform): Platforms {
-    switch (languagePlatform) {
-      case LanguagePlatform.CSHARP:
+  private convertLanguageToPlatform(language: Language): Platforms {
+    switch (language) {
+      case Language.CSHARP:
         return Platforms.CsNetStandardLib;
-      case LanguagePlatform.JAVA:
+      case Language.JAVA:
         return Platforms.JavaEclipseJreLib;
-      case LanguagePlatform.PHP:
+      case Language.PHP:
         return Platforms.PhpGenericLibV2;
-      case LanguagePlatform.PYTHON:
+      case Language.PYTHON:
         return Platforms.PythonGenericLib;
-      case LanguagePlatform.RUBY:
+      case Language.RUBY:
         return Platforms.RubyGenericLib;
-      case LanguagePlatform.TYPESCRIPT:
+      case Language.TYPESCRIPT:
         return Platforms.TsGenericLib;
-      case LanguagePlatform.GO:
+      case Language.GO:
         return Platforms.GoGenericLib;
       default:
-        throw new Error(`Unknown LanguagePlatform: ${languagePlatform}`);
+        throw new Error(`Unknown LanguagePlatform: ${language}`);
     }
   }
 }

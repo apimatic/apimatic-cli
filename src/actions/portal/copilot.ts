@@ -9,6 +9,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result } from "neverthrow";
 
 type SelectKeyFailure = "failed" | "cancelled";
@@ -20,10 +21,12 @@ export class CopilotAction {
   private readonly launcherService = new LauncherService();
   private readonly prompts = new PortalCopilotPrompts();
   private readonly configDir: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, authKey: string | null = null) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
+    this.commandMetadata = commandMetadata;
     this.authKey = authKey;
   }
 
@@ -47,7 +50,7 @@ export class CopilotAction {
     }
 
     const response = await this.prompts.spinnerAccountInfo(
-      this.apiService.getAccountInfo(this.configDir, this.authKey)
+      this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, this.authKey)
     );
 
     if (response.isErr()) {
@@ -109,6 +112,7 @@ export class CopilotAction {
         "`- What authentication methods does this API support?`\n" +
         "`- [Enter another prompt here]`";
       await this.fileService.writeContents(tempFile, defaultContent);
+      this.prompts.openWelcomeMessageEditor();
       await this.launcherService.openInEditor(tempFile);
       const welcomeMessage = await this.fileService.getContents(tempFile);
       return welcomeMessage.replace(/\r\n|\r/g, "\n");

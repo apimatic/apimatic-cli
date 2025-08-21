@@ -1,20 +1,20 @@
+import { ReadStream } from "fs";
 import {
   Accept,
   ApiError,
   ApiResponse,
   BadRequestResponseSdkError,
-  Client,
   CodeGenerationExternalApisController,
   ContentType,
   DocsPortalManagementController,
-  ExportFormats,
+  UnauthorizedResponseError,
+  ProblemDetailsError,
   FileWrapper,
+  TransformationController,
+  Transformation,
+  ExportFormats,
   InternalServerErrorResponseError,
   Platforms,
-  ProblemDetailsError,
-  Transformation,
-  TransformationController,
-  UnauthorizedResponseError
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { Result } from "../../types/common/result.js";
@@ -24,30 +24,30 @@ import { Sdl } from "../../types/sdl/sdl.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
-import { envInfo } from "../env-info.js";
-import { ReadStream } from "fs";
+import { apiClientFactory } from "./api-client-factory.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result as ResultEx } from "neverthrow";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
-  private readonly TIMEOUT = 0;
   private readonly fileService = new FileService();
 
   // TODO: Pass stream as parameter instead of file path.
   public async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
+    eventMetadata: CommandMetadata,
     authKey: string | null
   ): Promise<ResultEx<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = this.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader, eventMetadata.shell);
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
-      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file);
+      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file, this.createOriginQueryParameter(eventMetadata.commandName));
       return ok(response.result as NodeJS.ReadableStream);
     } catch (error) {
       return err(await PortalService.handlePortalGenerationErrors(error));
@@ -57,21 +57,27 @@ export class PortalService {
   }
 
   // TODO: Pass stream as parameter instead of file path.
-  async generateSdk(
+  public async generateSdk(
     specPath: FilePath,
     sdkPlatform: Platforms,
     configDir: DirectoryPath,
+    commandMetadata: CommandMetadata,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = this.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
     try {
-      const response = await sdkGenerationController.generateSdkViaFile(Accept.EnumApplicationjson, file, sdkPlatform);
+      const response = await sdkGenerationController.generateSdkViaFile(
+        Accept.EnumApplicationjson,
+        file,
+        sdkPlatform,
+        this.createOriginQueryParameter(commandMetadata.commandName)
+      );
       const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
       return Result.success(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
@@ -81,18 +87,23 @@ export class PortalService {
     }
   }
 
-  public async generateSdl(specFileStream: ReadStream, configDir: string): Promise<Result<Sdl, string>> {
+  public async generateSdl(
+    specFileStream: ReadStream,
+    configDir: DirectoryPath,
+    commandMetadata: CommandMetadata
+  ): Promise<Result<Sdl, string>> {
     const file = new FileWrapper(specFileStream);
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir);
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
-    const client = this.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const transformationController = new TransformationController(client);
 
     try {
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         ContentType.EnumMultipartformdata,
         file,
-        ExportFormats.Apimatic
+        ExportFormats.Apimatic,
+        this.createOriginQueryParameter(commandMetadata.commandName)
       );
 
       if (!generation.result.success) {
@@ -120,14 +131,10 @@ export class PortalService {
     return `X-Auth-Key ${key ?? ""}`;
   };
 
-  private createApiClient = (authorizationHeader: string): Client => {
-    return new Client({
-      customHeaderAuthenticationCredentials: {
-        Authorization: authorizationHeader
-      },
-      userAgent: envInfo.getUserAgent(),
-      timeout: this.TIMEOUT
-    });
+  private createOriginQueryParameter = (commandName: string): Record<string, string> => {
+    return {
+      origin: `APIMATIC CLI ${commandName}`
+    };
   };
 
   private static handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
@@ -136,7 +143,8 @@ export class PortalService {
       return error.result?.message ?? "Authorization has been denied for this request.";
     } else if (error instanceof ProblemDetailsError) {
       //400 & 403
-      const message = (error.result!.errors as Record<string, string[]>)?.[""]?.[0];
+      const probDetailsError = error as ProblemDetailsError;
+      const message = Object.values(probDetailsError.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
       return error.result!.title + "\n- " + message;
     } else if (error instanceof ApiError && error.statusCode === 422) {
       //422

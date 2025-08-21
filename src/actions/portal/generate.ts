@@ -7,16 +7,19 @@ import { PortalContext } from "../../types/portal-context.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { TempContext } from "../../types/temp-context.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, authKey: string | null = null) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
+    this.commandMetadata = commandMetadata;
     this.authKey = authKey;
   }
 
@@ -49,7 +52,12 @@ export class GenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generatePortal(
-        this.portalService.generatePortal(buildZipPath, this.configDir, this.authKey)
+        this.portalService.generatePortal(
+        buildZipPath,
+        this.configDir,
+        this.commandMetadata,
+        this.authKey
+      )
       );
 
       if (response.isErr()) {

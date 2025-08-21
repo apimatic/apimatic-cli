@@ -14,22 +14,18 @@ import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { CommandMetadata } from "../../../types/common/command-metadata.js";
 
 export class PortalRecipeAction {
-  private readonly prompts: PortalRecipePrompts;
+  private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
   private readonly sdlParser: SdlParser;
-  private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
+  private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json" as const;
 
-  constructor() {
-    this.prompts = new PortalRecipePrompts();
-    this.sdlParser = new SdlParser(new PortalService());
+  constructor(configDirectory: DirectoryPath, commandMetadata: CommandMetadata) {
+    this.sdlParser = new SdlParser(new PortalService(), configDirectory, commandMetadata);
   }
 
-  public async createRecipe(
-    buildDirectoryPath: DirectoryPath,
-    configDir: string,
-    name?: string
-  ): Promise<Result<string, string>> {
+  public async createRecipe(buildDirectoryPath: DirectoryPath, name?: string): Promise<Result<string, string>> {
     this.prompts.displayWelcomeMessage();
 
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
@@ -37,7 +33,9 @@ export class PortalRecipeAction {
 
     const validateBuildDirectoryPathResult = await this.validateBuildDirectoryPath(buildDirectoryPath);
     if (validateBuildDirectoryPathResult.isFailed()) {
-      return Result.failure(`Unable to generate API Recipe: ${validateBuildDirectoryPathResult.error!}`);
+      return Result.failure(
+        `Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running \`apimatic portal quickstart\`.`
+      );
     }
 
     //TODO: Create a type for the build config and use that here instead of any.
@@ -60,12 +58,7 @@ export class PortalRecipeAction {
       return Result.cancelled("Operation was cancelled by the user.");
     }
 
-    const recipeResult = await this.promptUserAndBuildNewRecipe(
-      buildConfigResult.value,
-      contentFolderPath,
-      recipeName,
-      configDir
-    );
+    const recipeResult = await this.promptUserAndBuildNewRecipe(buildConfigResult.value, contentFolderPath, recipeName);
     if (recipeResult.isFailed()) {
       return Result.failure(`Unable to generate API Recipe: ${recipeResult.error!}`);
     }
@@ -112,8 +105,7 @@ export class PortalRecipeAction {
   private async promptUserAndBuildNewRecipe(
     buildConfig: any,
     contentFolderPath: string,
-    recipeName: string,
-    configDir: string
+    recipeName: string
   ): Promise<Result<SerializableRecipe, string>> {
     const recipe = new PortalRecipe(recipeName);
     let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
@@ -135,8 +127,7 @@ export class PortalRecipeAction {
           if (!endpointGroups) {
             const extractEndpointGroupsFromSdlResult = await this.extractEndpointGroupsFromSdl(
               buildConfig,
-              contentFolderPath,
-              configDir
+              contentFolderPath
             );
             if (extractEndpointGroupsFromSdlResult.isFailed()) {
               return Result.failure(`${extractEndpointGroupsFromSdlResult.error!}`);
@@ -190,7 +181,7 @@ export class PortalRecipeAction {
 
       this.prompts.displayStepAddedSuccessfullyMessage();
       return Result.success("Added content step successfully.");
-    } catch (error) {
+    } catch {
       return Result.failure(`Unable to add content step. Please try again later.`);
     } finally {
       await fsExtra.unlink(tempFilePath);
@@ -287,10 +278,10 @@ export class PortalRecipeAction {
     };
   }
 
+  //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
   private async extractEndpointGroupsFromSdl(
     buildConfig: any,
-    contentFolderPath: string,
-    configDir: string
+    contentFolderPath: string
   ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     const specFolderPath = this.getSpecFolderPath(buildConfig, contentFolderPath);
     if (!(await fsExtra.pathExists(specFolderPath))) {
@@ -301,7 +292,7 @@ export class PortalRecipeAction {
       "Extracting endpoint groups and endpoints from the API specification."
     );
 
-    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(specFolderPath, configDir);
+    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(specFolderPath);
 
     if (endpointGroupsResult.isFailed()) {
       this.prompts.stopProgressIndicatorWithMessage("Unable to extract endpoints from your API specification.");

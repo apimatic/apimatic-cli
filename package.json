@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.19",
+    "version": "1.1.0-alpha.21",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -47,21 +47,20 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.2.0-alpha.3",
+        "@apimatic/sdk": "^0.2.0-alpha.4",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",
-        "@oclif/plugin-not-found": "^3.2.44",
         "archiver": "^7.0.1",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
-        "base-64": "^1.0.0",
         "chokidar": "^3.6.0",
         "connect-livereload": "^0.6.1",
         "execa": "^9.6.0",
         "express": "^4.17.1",
         "extract-zip": "^2.0.1",
+        "fast-levenshtein": "^3.0.0",
         "file-type": "^15.0.0",
         "form-data": "^4.0.2",
         "fs-extra": "^11.3.0",
@@ -86,6 +85,7 @@
         "@types/chai": "^4.3.20",
         "@types/connect-livereload": "^0.5.32",
         "@types/express": "^4.17.23",
+        "@types/fast-levenshtein": "^0.0.4",
         "@types/fs-extra": "^9.0.13",
         "@types/livereload": "^0.9.5",
         "@types/mocha": "^5.2.7",
@@ -110,7 +110,6 @@
         "oclif": "^4.17.34",
         "rimraf": "^6.0.1",
         "sinon": "^21.0.0",
-        "tmp-promise": "^3.0.3",
         "ts-node": "^10.9.2",
         "tsx": "^4.20.3",
         "typescript": "^5.2.2"
@@ -120,10 +119,12 @@
         "dirname": "apimatic",
         "bin": "apimatic",
         "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
+        "hooks": {
+            "command_not_found": "./lib/hooks/not-found"
+        },
         "plugins": [
             "@oclif/plugin-autocomplete",
-            "@oclif/plugin-help",
-            "@oclif/plugin-not-found"
+            "@oclif/plugin-help"
         ],
         "topics": {
             "api": {
@@ -142,6 +143,7 @@
                 "description": "Generate a Table of Contents (TOC) file for your API documentation portal."
             }
         },
+        "topicSeparator": " ",
         "state": "Alpha"
     },
     "lint-staged": {

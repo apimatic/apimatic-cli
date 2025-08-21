@@ -1,7 +1,6 @@
 import getPort from "get-port";
 import { Command } from "@oclif/core";
 import { ApiValidationExternalApisController, ApiValidationSummary, Client } from "@apimatic/sdk";
-import { SDKClient } from "../../client-utils/sdk-client.js";
 import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { PortalQuickstartController } from "../../controllers/portal/quickstart.js";
 import { SpecFile } from "../../types/portal/quickstart.js";
@@ -14,11 +13,17 @@ import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { LoginAction } from "../../actions/auth/login.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiated.js";
+import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
+import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
+import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
-  static examples = ["apimatic portal:quickstart"];
+  static examples = ["apimatic portal quickstart"];
 
   private async getSpecFile(
     prompts: PortalQuickstartPrompts,
@@ -76,26 +81,33 @@ export default class PortalQuickstart extends Command {
   async run() {
     const prompts = new PortalQuickstartPrompts();
     const controller = new PortalQuickstartController();
+    const telemetryService = new TelemetryService(this.config.configDir);
+    const commandMetadata: CommandMetadata = {
+      commandName: PortalQuickstart.id,
+      shell: this.config.shell
+    };
 
+    await telemetryService.trackEvent(new QuickstartInitiatedEvent(), commandMetadata.shell);
     prompts.displayWelcomeMessage();
 
     let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
 
     if (!loggedIn) {
       prompts.getLoggedInFirst();
-      const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
-      const loginResult = await loginAction.execute();
+      const loginAction = new LoginAction(new DirectoryPath(this.config.configDir), commandMetadata);
+      const loginResult = await loginAction.execute(this.config.shell);
 
       loginResult.match(
-        e => prompts.displayLoggedInMessage(e),
-          error => prompts.logError(error)
+        (e) => prompts.displayLoggedInMessage(e),
+        (error) => prompts.logError(error)
       );
 
-      if (loginResult.isErr())
-        return;
+      if (loginResult.isErr()) return;
     }
 
-    const client: Client = await SDKClient.getInstance().getClient(null, this.config.configDir);
+    const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
+    const authorizationHeader = createAuthorizationHeader(authInfo, null);
+    const client: Client = createApiClient(authorizationHeader, this.config.shell, 0);
     const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
       client
     );
@@ -129,7 +141,7 @@ export default class PortalQuickstart extends Command {
       const buildDirectory = new DirectoryPath(workingDirectory, "src");
       const portalDirectory = new DirectoryPath(workingDirectory, "portal");
 
-      const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), null);
+      const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), commandMetadata);
 
       const serveFlags: ServeFlags = {
         folder: buildDirectory.toString(),
@@ -165,6 +177,7 @@ export default class PortalQuickstart extends Command {
       // }
 
       prompts.displayOutroMessage(buildDirectory.toString());
+      await telemetryService.trackEvent(new QuickstartCompletedEvent(), commandMetadata.shell);
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

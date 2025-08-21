@@ -32,7 +32,7 @@ interface DirectoryNode {
   [key: string]: DirectoryNode | string | null | undefined;
 }
 
-// TODO: Move to portal:quickstart command.
+// TODO: Move to portal quickstart command.
 const descriptions: { [key: string]: string } = Object.entries({
   "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
   spec: "# Contains all API definition files",
@@ -44,7 +44,7 @@ const descriptions: { [key: string]: string } = Object.entries({
   return acc;
 }, {} as { [key: string]: string });
 
-// TODO: Move to portal:quickstart command.
+// TODO: Move to portal quickstart command.
 export const directoryToJson = (dirPath: string, parentPath = ""): DirectoryNode => {
   const directoryStructure: DirectoryNode = {};
 
@@ -166,7 +166,7 @@ export const printValidationMessages = (
   const singleError: string = errors.join("\n") || "";
 
   messages.forEach((message) => {
-    log(`Info: ${replaceHTML(message)}`);
+    log(`\nInfo: ${replaceHTML(message)}`);
   });
   warnings.forEach((warning) => {
     warn(replaceHTML(warning));

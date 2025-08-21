@@ -8,18 +8,27 @@ import { FileName } from "../../../types/file/fileName.js";
 import { ZipService } from "../../../infrastructure/zip-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { FileService } from "../../../infrastructure/file-service.js";
+import { CommandMetadata } from "../../../types/common/command-metadata.js";
 
 export class SdlParser {
   private readonly zipArchiver: ZipService = new ZipService();
   private readonly fileService = new FileService();
+  private readonly configDirectory: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
 
-  constructor(private readonly portalService: PortalService) {}
+  constructor(
+    private readonly portalService: PortalService,
+    configDirectory: DirectoryPath,
+    commandMetadata: CommandMetadata
+  ) {
+    this.configDirectory = configDirectory;
+    this.commandMetadata = commandMetadata;
+  }
 
   public async getTocComponentsFromSdl(
-    specFolderPath: string,
-    configDir: string
+    specFolderPath: string
   ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
-    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir);
+    const sdlResult = await this.generateSdlFromSpec(specFolderPath);
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(
@@ -34,11 +43,8 @@ export class SdlParser {
     return Result.success({ endpointGroups, models });
   }
 
-  public async getEndpointGroupsFromSdl(
-    specFolderPath: string,
-    configDir: string
-  ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    const sdlResult = await this.generateSdlFromSpec(specFolderPath, configDir);
+  public async getEndpointGroupsFromSdl(specFolderPath: string): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
+    const sdlResult = await this.generateSdlFromSpec(specFolderPath);
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(
@@ -52,7 +58,7 @@ export class SdlParser {
     return Result.success(endpointGroups);
   }
 
-  private async generateSdlFromSpec(specFolderPath: string, configDir: string): Promise<Result<Sdl, string>> {
+  private async generateSdlFromSpec(specFolderPath: string): Promise<Result<Sdl, string>> {
     return await withDirPath(async (tempDirectory) => {
       const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
       await this.zipArchiver.archive(new DirectoryPath(specFolderPath), specZipPath);
@@ -61,11 +67,11 @@ export class SdlParser {
       let result: Result<Sdl, string>;
 
       try {
-        result = await this.portalService.generateSdl(specFileStream, configDir);
+        result = await this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata);
       } finally {
         specFileStream.close();
       }
-      
+
       if (!result.isSuccess()) {
         return Result.failure(
           "Failed to generate SDL from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension."
