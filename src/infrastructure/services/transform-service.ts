@@ -16,11 +16,13 @@ import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export interface TransformViaUrlParams {
   url: string;
   format: string;
   configDir: DirectoryPath;
+  commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
@@ -28,6 +30,7 @@ export interface TransformViaFileParams {
   file: FilePath;
   format: string;
   configDir: DirectoryPath;
+  commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
@@ -44,14 +47,16 @@ export class TransformationService {
     url,
     format,
     configDir,
+    commandMetadata,
     authKey
   }: TransformViaUrlParams): Promise<Result<TransformationResultData, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const transformationController = new TransformationController(client);
 
     try {
+      //TODO: Update spec to include origin query parameter.
       const generation: ApiResponse<Transformation> = await transformationController.transformViaUrl({
         url: url,
         exportFormat: format as ExportFormats
@@ -73,11 +78,12 @@ export class TransformationService {
     file,
     format,
     configDir,
+    commandMetadata,
     authKey
   }: TransformViaFileParams): Promise<Result<TransformationResultData, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const transformationController = new TransformationController(client);
 
     try {
@@ -86,7 +92,8 @@ export class TransformationService {
       const generation: ApiResponse<Transformation> = await transformationController.transformViaFile(
         this.CONTENT_TYPE,
         fileWrapper,
-        format as ExportFormats
+        format as ExportFormats,
+        this.createOriginQueryParameter(commandMetadata.commandName)
       );
 
       const { id, apiValidationSummary } = generation.result;
@@ -105,6 +112,12 @@ export class TransformationService {
     const key = overrideAuthKey || authInfo?.authKey;
     return `X-Auth-Key ${key ?? ""}`;
   }
+
+  private createOriginQueryParameter = (commandName: string): Record<string, string> => {
+    return {
+      origin: `APIMATIC CLI ${commandName}`
+    };
+  };
 
   private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof ApiError) {

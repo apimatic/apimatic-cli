@@ -18,6 +18,7 @@ import { QuickstartInitiatedEvent } from "../../types/events/quickstart-initiate
 import { QuickstartCompletedEvent } from "../../types/events/quickstart-completed.js";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
@@ -81,16 +82,20 @@ export default class PortalQuickstart extends Command {
     const prompts = new PortalQuickstartPrompts();
     const controller = new PortalQuickstartController();
     const telemetryService = new TelemetryService(this.config.configDir);
+    const commandMetadata: CommandMetadata = {
+      commandName: PortalQuickstart.id,
+      shell: this.config.shell
+    };
 
-    await telemetryService.trackEvent(new QuickstartInitiatedEvent());
+    await telemetryService.trackEvent(new QuickstartInitiatedEvent(), commandMetadata.shell);
     prompts.displayWelcomeMessage();
 
     let loggedIn = await controller.isUserAuthenticated(this.config.configDir);
 
     if (!loggedIn) {
       prompts.getLoggedInFirst();
-      const loginAction = new LoginAction(new DirectoryPath(this.config.configDir));
-      const loginResult = await loginAction.execute();
+      const loginAction = new LoginAction(new DirectoryPath(this.config.configDir), commandMetadata);
+      const loginResult = await loginAction.execute(this.config.shell);
 
       loginResult.match(
         (e) => prompts.displayLoggedInMessage(e),
@@ -102,7 +107,7 @@ export default class PortalQuickstart extends Command {
 
     const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
     const authorizationHeader = createAuthorizationHeader(authInfo, null);
-    const client: Client = createApiClient(authorizationHeader, 0);
+    const client: Client = createApiClient(authorizationHeader, this.config.shell, 0);
     const apiValidationController: ApiValidationExternalApisController = new ApiValidationExternalApisController(
       client
     );
@@ -136,7 +141,7 @@ export default class PortalQuickstart extends Command {
       const buildDirectory = new DirectoryPath(workingDirectory, "src");
       const portalDirectory = new DirectoryPath(workingDirectory, "portal");
 
-      const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), null);
+      const generatePortalAction = new GenerateAction(new DirectoryPath(this.config.configDir), commandMetadata);
 
       const serveFlags: ServeFlags = {
         folder: buildDirectory.toString(),
@@ -155,7 +160,6 @@ export default class PortalQuickstart extends Command {
       const servePortalResult = await portalServeAction.servePortal(
         serveFlags,
         serverPaths,
-        PortalQuickstart.id,
         generatePortalAction.execute
       );
 
@@ -170,7 +174,7 @@ export default class PortalQuickstart extends Command {
       }
 
       prompts.displayOutroMessage(buildDirectory.toString());
-      await telemetryService.trackEvent(new QuickstartCompletedEvent());
+      await telemetryService.trackEvent(new QuickstartCompletedEvent(), commandMetadata.shell);
     } catch (error) {
       this.error(getMessageInRedColor(error instanceof Error ? error.message : String(error)));
     }

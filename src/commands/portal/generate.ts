@@ -3,6 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { GenerateAction } from "../../actions/portal/generate.js";
 import { PortalGeneratePrompts } from "../../prompts/portal/generate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -38,9 +39,13 @@ export class PortalGenerate extends Command {
     const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
+    const commandMetadata: CommandMetadata = {
+      commandName: PortalGenerate.id,
+      shell: this.config.shell
+    };
 
-    const action = new GenerateAction(this.getConfigDir(), authKey);
-    const result = await action.execute(buildDirectory, portalDirectory, PortalGenerate.id, force, zipPortal);
+    const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
+    const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
     result.mapAll(
       () => this.prompts.displayOutroMessage(portalDirectory.toString()),
       (message) => this.prompts.logError(message)

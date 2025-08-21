@@ -13,30 +13,39 @@ import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { Result } from "../../types/common/result.js";
 import { FilePath } from "../../types/file/filePath.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export interface ValidateViaFileParams {
   file: FilePath;
   configDir: DirectoryPath;
+  commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
 export interface ValidateViaUrlParams {
   url: string;
   configDir: DirectoryPath;
+  commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
 export class ValidationService {
-  async validateViaFile({ file, configDir, authKey }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
+  async validateViaFile({
+    file,
+    configDir,
+    commandMetadata,
+    authKey
+  }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const controller = new ApiValidationExternalApisController(client);
 
     try {
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
+      //TODO: Update spec to include origin query parameter.
       const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaFile(
-        ContentType.EnumMultipartformdata, 
+        ContentType.EnumMultipartformdata,
         fileDescriptor
       );
 
@@ -46,13 +55,19 @@ export class ValidationService {
     }
   }
 
-  async validateViaUrl({ url, configDir, authKey }: ValidateViaUrlParams): Promise<Result<ApiValidationSummary, string>> {
+  async validateViaUrl({
+    url,
+    configDir,
+    commandMetadata,
+    authKey
+  }: ValidateViaUrlParams): Promise<Result<ApiValidationSummary, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const controller = new ApiValidationExternalApisController(client);
 
     try {
+      //TODO: Update spec to include origin query parameter.
       const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaUrl(url);
       return Result.success(validation.result as ApiValidationSummary);
     } catch (error) {

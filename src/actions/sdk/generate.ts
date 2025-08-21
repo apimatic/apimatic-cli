@@ -11,6 +11,7 @@ import { Platforms } from "@apimatic/sdk";
 import { SpecContext } from "../../types/spec-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { Language } from "../../types/sdk/generate.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -18,10 +19,12 @@ export class GenerateAction {
   private readonly fileService: FileService = new FileService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
-  constructor(configDir: DirectoryPath, authKey: string | null = null) {
+  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
+    this.commandMetadata = commandMetadata;
     this.authKey = authKey;
   }
 
@@ -29,7 +32,6 @@ export class GenerateAction {
     specDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     language: Language,
-    commandName: string,
     force: boolean,
     zipSdk: boolean
   ): Promise<ActionResult> => {
@@ -39,7 +41,9 @@ export class GenerateAction {
 
     const specContext = new SpecContext(specDirectory);
     if (!(await specContext.validate())) {
-      return ActionResult.error(`Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running \`apimatic portal quickstart\`.`);
+      return ActionResult.error(
+        `Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running \`apimatic portal quickstart\`.`
+      );
     }
 
     const sdkContext = new SdkContext(sdkDirectory, language);
@@ -56,7 +60,13 @@ export class GenerateAction {
       await this.zipArchiver.archive(specDirectory, specZipPath);
 
       const platform = this.convertLanguageToPlatform(language);
-      const response = await this.portalService.generateSdk(specZipPath, platform, this.configDir, commandName, this.authKey);
+      const response = await this.portalService.generateSdk(
+        specZipPath,
+        platform,
+        this.configDir,
+        this.commandMetadata,
+        this.authKey
+      );
 
       if (!response.isSuccess()) {
         this.prompts.displaySdkGenerationErrorMessage();

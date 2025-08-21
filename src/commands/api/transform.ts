@@ -6,6 +6,7 @@ import { TransformAction } from "../../actions/api/transform.js";
 import { FilePath } from "../../types/file/filePath.js";
 import path from "path/win32";
 import { FileName } from "../../types/file/fileName.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -51,8 +52,12 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
     if (file) {
       filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
     }
-    
-    const action = new TransformAction(this.getConfigDir(), authKey);
+    const commandMetadata: CommandMetadata = {
+      commandName: Transform.id,
+      shell: this.config.shell
+    }
+
+    const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
 
     const result = await action.execute(format, destinationDir, force, filePath, url);
 
