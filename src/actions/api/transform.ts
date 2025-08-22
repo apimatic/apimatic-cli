@@ -17,6 +17,8 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { getValidFormat } from "../../controllers/api/transform.js";
 import { TransformContext } from "../../types/transform-context.js";
 
+const DEFAULT_WORKING_DIRECTORY = "./";
+
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
   apiValidationSummary: ApiValidationSummary;
@@ -55,11 +57,17 @@ export class TransformAction {
 
     const parsedFormat = getValidFormat(format);
 
+    const workingDirectory = new DirectoryPath(destination?.toString() ?? DEFAULT_WORKING_DIRECTORY);
+    const transformedApiDirectory = destination
+      ? new DirectoryPath(destination.toString(), "TransformedApi")
+      : workingDirectory.join("TransformedApi");
+
+    // Use transformedApiDirectory for saving the transformed API file
     const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
 
     const destinationFileName = new FileName(`${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`);
-    const destinationFilePath = new FilePath(destination, destinationFileName);
+    const destinationFilePath = new FilePath(transformedApiDirectory, destinationFileName);
 
     if ((await fsExtra.pathExists(destinationFilePath.toString())) && !force) {
       // TODO: Render the error message here
@@ -69,11 +77,7 @@ export class TransformAction {
       // return ActionResult.failed();
     }
 
-    if (!(await fsExtra.pathExists(destination.toString()))) {
-      await fsExtra.ensureDir(destination.toString());
-    }
-
-    const transformContext = new TransformContext(destination, destinationFileName);
+    const transformContext = new TransformContext(transformedApiDirectory, destinationFileName);
 
     return await withDirPath(async (tempDirectory) => {
       let result: Result<TransformationResultData, string>;
