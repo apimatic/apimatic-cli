@@ -121,14 +121,11 @@ export class PortalQuickstartAction {
     const inputPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
 
     const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolve(inputPath);
+    const result = await resourceContext.resolveTo(inputPath, "spec");
     if (result.isErr()) {
       return err(result.error);
     }
-
-    const { destinationFilePath, fileName } = result.value;
-    const specDirectory = await resourceContext.prepare(destinationFilePath, fileName, "spec");
-    return ok(specDirectory);
+    return ok(result.value);
   }
 
   private async validateSpec(
@@ -166,13 +163,11 @@ export class PortalQuickstartAction {
 
     // Use default spec...
     const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolve(this.defaultSpecUrl.toString());
+    const result = await resourceContext.resolveTo(this.defaultSpecUrl.toString(), "spec");
     if (result.isErr()) {
       return Result.failure(result.error);
     }
-
-    const { destinationFilePath, fileName } = result.value;
-    return Result.success(await resourceContext.prepare(destinationFilePath, fileName, "spec"));
+    return Result.success(result.value);
   }
 
   private async selectLanguages(): Promise<string[]> {

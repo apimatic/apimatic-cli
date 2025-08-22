@@ -6,14 +6,15 @@ import { ZipService } from "../zip-service.js";
 import { FileDownloadService } from "./file-download-service.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { err, ok, Result } from "neverthrow";
+import { ResourceContext } from "../../types/resource-context.js";
+import { BuildContext } from "../../types/build-context.js";
 
 export class PortalScaffoldService {
   private readonly fileService: FileService = new FileService();
   private readonly zipService: ZipService = new ZipService();
   private readonly fileDownloadService: FileDownloadService = new FileDownloadService();
-  private readonly zipUrl = new UrlPath(
-    `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`
-  );
+  private readonly zipUrl =
+    `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`;
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
   private readonly defaultSpecFileName = new FileName("openapi.json");
 
@@ -23,32 +24,26 @@ export class PortalScaffoldService {
     selectedLanguages: string[]
   ): Promise<Result<DirectoryPath, string>> {
     try {
-      const downloadZipResult = await this.fileDownloadService.downloadFile(this.zipUrl);
-
-      if (downloadZipResult.isErr()) {
+      const resourceContext = new ResourceContext(tempDirectory);
+      const result = await resourceContext.resolveTo(this.zipUrl, this.repositoryFolderName);
+      if (result.isErr()) {
         return err("Unable to setup the portal, please try again later.");
       }
-
-      // Setup directory.
-      const tempZipPath = new FilePath(tempDirectory, new FileName("static-portal.zip"));
-      await this.fileService.writeFile(tempZipPath, downloadZipResult.value);
-      await this.zipService.unArchive(tempZipPath, tempDirectory);
-      const extractedFolder = new DirectoryPath(tempDirectory.toString(), this.repositoryFolderName);
-      await this.fileService.deleteDirectory(new DirectoryPath(extractedFolder.toString(), ".github"));
+      const extractedFolder = result.value;
+      await this.fileService.deleteDirectory(extractedFolder.join(".github"));
 
       // Setup spec.
-      const buildSpecDirectory = new DirectoryPath(extractedFolder.toString(), "spec");
-      await this.fileService.deleteFile(new FilePath(buildSpecDirectory, this.defaultSpecFileName));
-      await this.fileService.copyDirectory(specDirectory, buildSpecDirectory);
+      const tempSpecDirectory = extractedFolder.join("spec");
+      await this.fileService.cleanDirectory(specDirectory);
+      await this.fileService.copyDirectory(specDirectory, tempSpecDirectory);
 
-      // Setup languages.
-      const buildConfigFile = new FilePath(extractedFolder, new FileName("APIMATIC-BUILD.json"));
-      const buildConfigFileContent = JSON.parse(await this.fileService.getContents(buildConfigFile));
-      buildConfigFileContent.generatePortal.languageConfig = selectedLanguages.reduce((config, lang) => {
+      const buildContext = new BuildContext(extractedFolder);
+      const buildFile = await buildContext.getBuildFileContents();
+      buildFile.generatePortal!.languageConfig =  selectedLanguages.reduce((config, lang) => {
         config[lang] = {};
         return config;
-      }, {} as { [key: string]: object });
-      await this.fileService.writeContents(buildConfigFile, JSON.stringify(buildConfigFileContent));
+      }, {} as { [key: string]: object })
+      await buildContext.updateBuildFileContents(buildFile);
 
       return ok(extractedFolder);
     } catch {

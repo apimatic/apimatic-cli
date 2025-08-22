@@ -24,8 +24,4 @@ export class UrlPath {
   public toString(): string {
     return this.url;
   }
-
-  public fileName(): FileName {
-    return new FileName(path.basename(this.url));
-  }
 }

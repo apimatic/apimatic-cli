@@ -24,7 +24,7 @@ export default class PortalQuickstart extends Command {
     await telemetryService.trackEvent(new QuickstartInitiatedEvent(), commandMetadata.shell);
 
     const result = await action.execute();
-    result.mapAll(
+    await result.mapAll(
       async (buildDirectoryPath) => {
         await telemetryService.trackEvent(new QuickstartCompletedEvent(), commandMetadata.shell);
         prompts.displayOutroMessage(buildDirectoryPath!);

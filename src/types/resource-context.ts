@@ -15,43 +15,31 @@ export class ResourceContext {
 
   constructor(private readonly tempDirectory: DirectoryPath) {}
 
-  public async resolve(
-    resourcePath: string
-  ): Promise<Result<{ destinationFilePath: FilePath; fileName: FileName }, string>> {
+  public async resolveTo(resourcePath: string, destinationSubPath: string){
     const urlPath = UrlPath.create(resourcePath);
+    const fileName =  new FileName(path.basename(resourcePath))
+    const destinationFilePath = new FilePath(this.tempDirectory, fileName);
+
     if (urlPath) {
       const downloadFileResult = await this.fileDownloadService.downloadFile(urlPath);
       if (downloadFileResult.isErr()) {
-        return err(
-          "Unable to download the API Definition. Please verify that the provided URL is correct and publicly accessible. "
-        );
+        // TODO: Update message here
+        return err("Unable to download the file. Please verify that the provided URL is correct and publicly accessible. ");
       }
-
-      const destinationFilePath = new FilePath(this.tempDirectory, urlPath.fileName());
       await this.fileService.writeFile(destinationFilePath, downloadFileResult.value);
-      return ok({ destinationFilePath, fileName: urlPath.fileName() });
+    } else {
+      const directory = new DirectoryPath(path.dirname(resourcePath));
+      const sourceFilePath = new FilePath(directory, fileName);
+      await this.fileService.copy(sourceFilePath, destinationFilePath);
     }
-
-    // TODO: Create factory method for preparing FilePath from a string.
-    const normalizedResourcePath = path.normalize(resourcePath);
-    const directory = new DirectoryPath(path.dirname(normalizedResourcePath));
-    const fileName = new FileName(path.basename(normalizedResourcePath));
-    const sourceFilePath = new FilePath(directory, fileName);
-    const destinationFilePath = new FilePath(this.tempDirectory, fileName);
-    await this.fileService.copy(sourceFilePath, destinationFilePath);
-    return ok({ destinationFilePath, fileName });
-  }
-
-  public async prepare(destinationFilePath: FilePath, fileName: FileName, subPath: string): Promise<DirectoryPath> {
-    const specDirectory = this.tempDirectory.join(subPath);
+    const specDirectory = this.tempDirectory.join(destinationSubPath);
     await this.fileService.cleanDirectory(specDirectory);
 
-    if (await fileName.isZipFile()) {
+    if (fileName.isZipFile()) {
       await this.zipService.unArchive(destinationFilePath, specDirectory);
     } else {
       await this.fileService.copy(destinationFilePath, destinationFilePath.replaceDirectory(specDirectory));
     }
-
-    return specDirectory;
+    return ok(specDirectory);
   }
 }

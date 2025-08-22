@@ -7,7 +7,7 @@ export class FileName {
     this.name = name;
   }
 
-  public async isZipFile(): Promise<boolean> {
+  public isZipFile() {
     return path.extname(this.name).toLowerCase() === ".zip";
   }
 
