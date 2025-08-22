@@ -61,6 +61,13 @@ export class FileService {
     }
   }
 
+  public async deleteDirectory(dirPath: DirectoryPath): Promise<void> {
+    const exists = await this.directoryExists(dirPath);
+    if (exists) {
+      await fsExtra.remove(dirPath.toString());
+    }
+  }
+
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }
@@ -78,14 +85,9 @@ export class FileService {
     await fsExtra.writeFile(filePath.toString(), contents, "utf-8");
   }
 
-  public async writeBuffer(filePath: FilePath, buffer: Buffer) {
-    await fsExtra.writeFile(filePath.toString(), buffer);
-  }
-
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
-
 }
 
 const streamPipeline = promisify(pipeline);

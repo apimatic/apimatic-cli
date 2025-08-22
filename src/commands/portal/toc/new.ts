@@ -52,7 +52,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
       shell: this.config.shell
     };
 
-    const telemetryService = new TelemetryService(this.config.configDir);
+    const telemetryService = new TelemetryService(this.getConfigDir());
     const portalNewTocAction = new PortalNewTocAction(this.getConfigDir(), commandMetadata);
 
     const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
@@ -82,7 +82,7 @@ https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-porta
     }
   }
 
-  private getConfigDir = () => {
+  private getConfigDir(): DirectoryPath {
     return new DirectoryPath(this.config.configDir);
-  };
+  }
 }

@@ -17,28 +17,27 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export interface ValidateViaFileParams {
   file: FilePath;
-  configDir: DirectoryPath;
-  commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
 export interface ValidateViaUrlParams {
   url: string;
-  configDir: DirectoryPath;
-  commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
 export class ValidationService {
-  async validateViaFile({
-    file,
-    configDir,
-    commandMetadata,
-    authKey
-  }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+  private readonly configDirectory: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
+
+  constructor(configDirectory: DirectoryPath, commandMetadata: CommandMetadata) {
+    this.configDirectory = configDirectory;
+    this.commandMetadata = commandMetadata;
+  }
+
+  async validateViaFile({ file, authKey }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDirectory.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
+    const client = apiClientFactory.createApiClient(authorizationHeader, this.commandMetadata.shell);
     const controller = new ApiValidationExternalApisController(client);
 
     try {
@@ -55,15 +54,10 @@ export class ValidationService {
     }
   }
 
-  async validateViaUrl({
-    url,
-    configDir,
-    commandMetadata,
-    authKey
-  }: ValidateViaUrlParams): Promise<Result<ApiValidationSummary, string>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+  async validateViaUrl({ url, authKey }: ValidateViaUrlParams): Promise<Result<ApiValidationSummary, string>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDirectory.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
+    const client = apiClientFactory.createApiClient(authorizationHeader, this.commandMetadata.shell);
     const controller = new ApiValidationExternalApisController(client);
 
     try {

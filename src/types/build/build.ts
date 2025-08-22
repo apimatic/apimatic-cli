@@ -1,27 +1,17 @@
 export interface BuildConfig {
   generatePortal?: PortalConfig;
-  apiCopilotConfig?: CopilotConfig;  
+  apiCopilotConfig?: CopilotConfig;
   [key: string]: unknown;
 }
 
 export interface PortalConfig {
   contentFolder?: string;
+  languageConfig: { [key: string]: object };
+  [key: string]: unknown;
 }
 
 export interface CopilotConfig {
   isEnabled: boolean;
   key: string;
   welcomeMessage: string;
-}
-
-export function updateCopilotConfig(
-  buildConfig: BuildConfig,
-  copilotConfig: CopilotConfig
-): BuildConfig {
-  return {
-    ...buildConfig,
-    apiCopilotConfig: {
-      ...copilotConfig,
-    },
-  };
 }
