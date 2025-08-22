@@ -54,10 +54,10 @@ export class TransformAction {
 
     const parsedFormat = getValidFormat(format);
 
-    const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
+    const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
 
-    const destinationFileName = `${destinationFilePrefix}_${format}.${destinationFileExt}`;
+    const destinationFileName = `${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`;
     const destinationFilePath = new FilePath(destination, new FileName(destinationFileName));
 
     if ((await fsExtra.pathExists(destinationFilePath.toString())) && !force) {
@@ -66,7 +66,7 @@ export class TransformAction {
       //   `Can't download transformed file to path ${destinationFilePath.toString()}, because it already exists`
       // );
 
-      return ActionResult.failed();
+      // return ActionResult.failed();
     }
 
     if (!(await fsExtra.pathExists(destination.toString()))) {
