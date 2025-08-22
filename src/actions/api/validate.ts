@@ -58,12 +58,11 @@ export class ValidateAction {
         this.prompts.displayValidationMessages(validationSummary);
         return ActionResult.success();
       } else {
-        this.prompts.displayValidationFailureMessage();
         this.prompts.displayValidationMessages(validationSummary);
         return ActionResult.failed();
       }
     } else {
-      this.prompts.displayValidationFailureMessage();
+      this.prompts.logError(validationSummaryResult.error);
       return ActionResult.failed();
     }
   };

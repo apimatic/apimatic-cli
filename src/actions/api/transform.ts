@@ -100,7 +100,7 @@ export class TransformAction {
         this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
         return ActionResult.success();
       } else {
-        this.prompts.displayApiTransformationFailureMessage();
+        this.prompts.logError(result.error);
         return ActionResult.failed();
       }
     });
