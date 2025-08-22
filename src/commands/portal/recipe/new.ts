@@ -31,7 +31,7 @@ export default class PortalRecipeNew extends Command {
       commandName: PortalRecipeNew.id,
       shell: this.config.shell
     };
-    const telemetryService = new TelemetryService(this.config.configDir);
+    const telemetryService = new TelemetryService(this.getConfigDir());
     const portalRecipeAction = new PortalRecipeAction(this.getConfigDir(), commandMetadata);
     const portalRecipePrompts = new PortalRecipePrompts();
 
@@ -43,7 +43,7 @@ export default class PortalRecipeNew extends Command {
     //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
     if (createRecipeResult.isFailed()) {
       await telemetryService.trackEvent(
-        new RecipeCreationFailedEvent(createRecipeResult.error!, PortalRecipeNew.id, flags),
+        new RecipeCreationFailedEvent(createRecipeResult.error!, commandMetadata.commandName, flags),
         commandMetadata.shell
       );
       portalRecipePrompts.logError(getMessageInRedColor(createRecipeResult.error!));
@@ -53,7 +53,7 @@ export default class PortalRecipeNew extends Command {
     }
   }
 
-  private getConfigDir = () => {
+  private getConfigDir(): DirectoryPath {
     return new DirectoryPath(this.config.configDir);
-  };
+  }
 }

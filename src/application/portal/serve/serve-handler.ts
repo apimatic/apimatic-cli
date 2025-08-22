@@ -45,13 +45,14 @@ export class ServeHandler {
       force: boolean,
       zipPortal: boolean
     ) => Promise<ActionResult>,
+    serverPort: number,
     displayShutdownMessages = true
   ): Promise<Result<boolean, string>> {
     return new Promise<Result<boolean, string>>((resolve, reject) => {
       this.server = this.app
-        .listen(flags.port, async () => {
+        .listen(serverPort, async () => {
           if (flags.open) {
-            await open(`http://localhost:${flags.port}`);
+            await open(`http://localhost:${serverPort}`);
           }
 
           if (!flags["no-reload"]) {
