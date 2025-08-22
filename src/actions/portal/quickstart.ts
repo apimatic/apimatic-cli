@@ -47,25 +47,27 @@ export class PortalQuickstartAction {
 
     const authenticateUserResult = await this.authenticateUser();
     if (authenticateUserResult.isFailed()) {
-      return ActionResult.error(authenticateUserResult.error!);
+      // TODO: authenticateUserResult.error!
+      return ActionResult.failed();
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
       // Step 1/4
       const specDirectory = await this.importSpec(tempDirectory);
       if (specDirectory.isErr()) {
-        return ActionResult.error(specDirectory.error);
+        // TODO: specDirectory.error
+        return ActionResult.failed();
       }
 
       // Step 2/4
       const validatedSpecDirectory = await this.validateSpec(tempDirectory, specDirectory.value);
       if (validatedSpecDirectory.isFailed()) {
-        return ActionResult.error(validatedSpecDirectory.error!);
+        // TODO: validatedSpecDirectory.error
+        return ActionResult.failed();
       }
       if (validatedSpecDirectory.isCancelled()) {
-        return ActionResult.cancelled(
-          "Good luck fixing your API definition! Feel free to run this command again once you're done."
-        );
+        // TODO:  "Good luck fixing your API definition! Feel free to run this command again once you're done."
+        return ActionResult.cancelled();
       }
 
       // Step 3/4
@@ -81,20 +83,24 @@ export class PortalQuickstartAction {
         selectedLanguages
       );
       if (buildDirectoryResult.isFailed()) {
-        return ActionResult.error(buildDirectoryResult.error!);
+        // TODO: buildDirectoryResult.error
+        return ActionResult.failed();
       }
 
       const generateAndServePortalResult = await this.generateAndServePortal(sourceDirectory, portalDirectory);
 
       if (generateAndServePortalResult.isFailed()) {
-        return ActionResult.error(generateAndServePortalResult.error!);
+        // TODO: generateAndServePortalResult.error!
+        return ActionResult.failed();
       }
 
       if (generateAndServePortalResult.isCancelled()) {
-        return ActionResult.cancelled(generateAndServePortalResult.value!);
+        // TODO: generateAndServePortalResult.value!
+        return ActionResult.cancelled();
       }
 
-      return ActionResult.success(buildDirectoryResult.value!.toString());
+      // TODO: buildDirectoryResult.value!.toString()
+      return ActionResult.success();
     });
   };
 

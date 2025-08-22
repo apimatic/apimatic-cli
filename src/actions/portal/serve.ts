@@ -52,8 +52,9 @@ export class PortalServeAction {
         //TODO: Figure out a better way for this.
         return Result.success(serverPort.toString());
       },
-      async (message) => Result.failure(message),
-      async (message) => Result.cancelled(message)
+      // TODO: return action result
+      async () => Result.failure('failure'),
+      async () => Result.cancelled('cancelled')
     );
   }
 
