@@ -2,6 +2,7 @@ import axios from "axios";
 import fsExtra from "fs-extra";
 import { Result } from "../types/common/result.js";
 import { FilePath } from "../types/file/filePath.js";
+import { UrlPath } from "../types/file/urlPath.js";
 
 export const enum ServiceError {
   NotFound = "NOT_FOUND",
@@ -45,7 +46,7 @@ export function handleServiceError(error: unknown): ServiceError {
 
 export async function validateFileInputParams(
   file: FilePath | undefined,
-  url: string | undefined
+  url: UrlPath | undefined
 ): Promise<Result<string, string>> {
   if (!file && !url) {
     return Result.failure("Please provide either a specification file or URL");

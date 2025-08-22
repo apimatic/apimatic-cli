@@ -17,10 +17,11 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result} from "neverthrow";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 
 export interface TransformViaUrlParams {
-  url: string;
+  url: UrlPath;
   format: string;
   configDir: DirectoryPath;
   commandMetadata: CommandMetadata;
@@ -59,7 +60,7 @@ export class TransformationService {
     try {
       //TODO: Update spec to include origin query parameter.
       const generation: ApiResponse<Transformation> = await transformationController.transformViaUrl({
-        url: url,
+        url: url.toString(),
         exportFormat: format as ExportFormats
       });
 

@@ -7,6 +7,7 @@ import { ApiValidationSummary } from "@apimatic/sdk";
 import { Result } from "neverthrow";
 import { validateFileInputParams } from "../../infrastructure/api-utils.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -21,7 +22,7 @@ export class ValidateAction {
     this.commandMetadata = commandMetadata;
   }
 
-  public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => {
+  public readonly execute = async (file?: FilePath, url?: UrlPath): Promise<ActionResult> => {
     // SPECPATH, useQuickstartPrompts = false
     const validationResult = await validateFileInputParams(file, url);
 

@@ -7,6 +7,7 @@ import path from "path/win32";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -54,14 +55,11 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
       flags: { format, file, url, destination, force, "auth-key": authKey }
     } = await this.parse(Transform);
 
-    let filePath: FilePath | undefined = undefined;
-    if (file) {
-      filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
-    }
+    const { filePath, urlPath } = this.getPaths(file, url);
 
     const workingDirectory = new DirectoryPath(destination ?? DEFAULT_WORKING_DIRECTORY);
     const transformedApiDirectory = workingDirectory.join("transformations");
-    
+
     const commandMetadata: CommandMetadata = {
       commandName: Transform.id,
       shell: this.config.shell
@@ -69,11 +67,27 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     intro("Transform API");
     const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(format, transformedApiDirectory, force, filePath, url);
+    const result = await action.execute(format, transformedApiDirectory, force, filePath, urlPath);
     outro(result);
   }
 
   private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
   };
+
+  private getPaths(file?: string, url?: string): { filePath?: FilePath; urlPath?: UrlPath } {
+    if (file) {
+      return {
+        filePath: new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file))),
+        urlPath: undefined
+      };
+    }
+    if (url) {
+      return {
+        filePath: undefined,
+        urlPath: UrlPath.create(url)
+      };
+    }
+    return { filePath: undefined, urlPath: undefined };
+  }
 }

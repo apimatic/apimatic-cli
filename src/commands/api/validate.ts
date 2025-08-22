@@ -7,6 +7,7 @@ import path from "path";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 export default class Validate extends Command {
   static summary = "Validate API specification for syntactic and semantic correctness";
@@ -16,7 +17,7 @@ export default class Validate extends Command {
   static examples = [
     `${Validate.cmdTxt} ${format.flag("file", "./specs/sample.json")}`,
     `${Validate.cmdTxt} ${format.flag("url", '"https://petstore.swagger.io/v2/swagger.json"')}`
-  ];  
+  ];
 
   static flags = {
     file: Flags.string({ description: "Path to the API specification file to validate" }),
@@ -35,16 +36,30 @@ export default class Validate extends Command {
     };
 
     const action = new ValidateAction(this.getConfigDir(), commandMetadata, authKey);
-    let filePath: FilePath | undefined = undefined;
-    if (file) {
-      filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
-    }
+    const { filePath, urlPath } = this.getPaths(file, url);
+
     intro("Validate API");
-    const result = await action.execute(filePath, url);
+    const result = await action.execute(filePath, urlPath);
     outro(result);
   }
 
   private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
   };
+
+  private getPaths(file?: string, url?: string): { filePath?: FilePath; urlPath?: UrlPath } {
+    if (file) {
+      return {
+        filePath: new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file))),
+        urlPath: undefined
+      };
+    }
+    if (url) {
+      return {
+        filePath: undefined,
+        urlPath: UrlPath.create(url)
+      };
+    }
+    return { filePath: undefined, urlPath: undefined };
+  }
 }

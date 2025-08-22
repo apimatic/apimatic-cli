@@ -15,6 +15,7 @@ import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { getValidFormat } from "../../controllers/api/transform.js";
 import { TransformContext } from "../../types/transform-context.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
@@ -36,10 +37,10 @@ export class TransformAction {
     this.authKey = authKey;
   }
 
-  private getDestinationFileName(format: string, file?: FilePath, url?: string): FileName {
+  private getDestinationFileName(format: string, file?: FilePath, url?: UrlPath): FileName {
     const parsedFormat = getValidFormat(format);
     const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
-    const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
+    const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url?.toString() || "");
     return new FileName(`${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`);
   }
 
@@ -48,9 +49,9 @@ export class TransformAction {
     destination: DirectoryPath,
     force: boolean,
     file?: FilePath,
-    url?: string
+    url?: UrlPath
   ): Promise<ActionResult> => {
-    const validationResult = await validateFileInputParams(file, url);
+    const validationResult = await validateFileInputParams(file, url); // remove fsextras do smth
 
     if (!validationResult.isSuccess()) {
       this.validatePrompts.displayValidationFailureMessage();
@@ -58,7 +59,7 @@ export class TransformAction {
     }
     const parsedFormat = getValidFormat(format);
 
-    const destinationFileName = this.getDestinationFileName(format, file, url);
+    const destinationFileName = this.getDestinationFileName(format, file, url); // move to contxt
 
     const transformContext = new TransformContext(destination, destinationFileName);
 
@@ -67,31 +68,31 @@ export class TransformAction {
       return ActionResult.cancelled();
     }
 
+    let result: Result<TransformationResultData, string>; //ternary
+
+    if (file) {
+      result = await this.prompts.transformApi(
+        this.transformationService.transformViaFile({
+          file,
+          format: parsedFormat,
+          configDir: this.configDir,
+          commandMetadata: this.commandMetadata,
+          authKey: this.authKey
+        })
+      );
+    } else {
+      result = await this.prompts.transformApi(
+        this.transformationService.transformViaUrl({
+          url: url!,
+          format: parsedFormat,
+          configDir: this.configDir,
+          commandMetadata: this.commandMetadata,
+          authKey: this.authKey
+        })
+      );
+    }
+
     return await withDirPath(async (tempDirectory) => {
-      let result: Result<TransformationResultData, string>;
-
-      if (file) {
-        result = await this.prompts.transformApi(
-          this.transformationService.transformViaFile({
-            file,
-            format: parsedFormat,
-            configDir: this.configDir,
-            commandMetadata: this.commandMetadata,
-            authKey: this.authKey
-          })
-        );
-      } else {
-        result = await this.prompts.transformApi(
-          this.transformationService.transformViaUrl({
-            url: url!,
-            format: parsedFormat,
-            configDir: this.configDir,
-            commandMetadata: this.commandMetadata,
-            authKey: this.authKey
-          })
-        );
-      }
-
       if (result.isOk()) {
         await this.fileService.writeFile(
           new FilePath(tempDirectory, destinationFileName),
@@ -101,6 +102,7 @@ export class TransformAction {
         this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
         return ActionResult.success();
       } else {
+        //TODO: implement service error logic
         this.prompts.logError(result.error);
         return ActionResult.failed();
       }
