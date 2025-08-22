@@ -37,7 +37,7 @@ export class PortalServeAction {
       false
     );
 
-    return result.mapAll<Promise<Result<string, string>>>(
+    return await result.mapAll<Promise<Result<string, string>>>(
       async () => {
         const setupServerResult = await this.serveHandler.setupServer(paths.destinationDirectoryPath);
         if (setupServerResult.isFailed()) {
