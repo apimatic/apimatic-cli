@@ -9,7 +9,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { TransformationService } from "../../infrastructure/services/transform-service.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { FileName } from "../../types/file/fileName.js";
-import { Result } from "../../types/common/result.js";
+import { Result } from "neverthrow";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
@@ -73,39 +73,38 @@ export class TransformAction {
       let result: Result<TransformationResultData, string>;
 
       if (file) {
-        result = await this.transformationService.transformViaFile({
-          file,
-          format: parsedFormat,
-          configDir: this.configDir,
-          commandMetadata: this.commandMetadata,
-          authKey: this.authKey
-        });
+        result = await this.prompts.transformApi(
+             this.transformationService.transformViaFile({
+              file,
+              format: parsedFormat,
+              configDir: this.configDir,
+              commandMetadata: this.commandMetadata,
+              authKey: this.authKey
+            })
+        );
       } else {
-        result = await this.transformationService.transformViaUrl({
-          url: url!,
-          format: parsedFormat,
-          configDir: this.configDir,
-          commandMetadata: this.commandMetadata,
-          authKey: this.authKey
-        });
+        result = await this.prompts.transformApi(
+          this.transformationService.transformViaUrl({
+            url: url!,
+            format: parsedFormat,
+            configDir: this.configDir,
+            commandMetadata: this.commandMetadata,
+            authKey: this.authKey
+          })
+        );
       }
 
       const tempTransformedFilePath = new FilePath(tempDirectory, new FileName(`transformed_${destinationFileName}`));
-      await this.fileService.writeFile(tempTransformedFilePath, result.value?.stream as NodeJS.ReadableStream);
 
-      if (!result.isSuccess()) {
-        this.validatePrompts.displayValidationMessages(
-          result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
-        );
+      if (result.isOk()) {
+        await this.fileService.writeFile(tempTransformedFilePath, result.value.stream as NodeJS.ReadableStream);
+        await transformContext.save(tempTransformedFilePath);
+        this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
+        return ActionResult.success();
+      } else {
         this.prompts.displayApiTransformationFailureMessage();
         return ActionResult.failed();
       }
-
-      await transformContext.save(tempTransformedFilePath);
-      this.prompts.displayApiTransformationSuccessMessage();
-      this.validatePrompts.displayValidationMessages(result.value!.apiValidationSummary);
-
-      return ActionResult.success();
     });
   };
 }

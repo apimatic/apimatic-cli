@@ -2,7 +2,8 @@ import { outro, spinner, log, isCancel, confirm } from "@clack/prompts";
 import { getMessageInMagentaColor, getMessageInCyanColor, getMessageInRedColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, withSpinner } from "../format.js";
-import { Result } from "../../types/common/result.js";
+import { Result } from "neverthrow";
+import { TransformationResultData } from "../../infrastructure/services/transform-service.js";
 
 export class ApiTransformPrompts {
   private readonly spin = spinner();
@@ -25,9 +26,14 @@ export class ApiTransformPrompts {
     log.error(message);
   }
 
-  // public async transformApi(fn: Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>>) {
-  //   return withSpinner("Transforming API", "API transformed successfully.", "API transformation failed.", fn);
-  // }
+  public async transformApi(fn: Promise<Result<TransformationResultData, string>>) {
+  return withSpinner(
+    "Transforming API",
+    "API transformed successfully.",
+    "API transformation failed.",
+    fn
+  );
+}
 
   displayApiTransformationMessage(): void {
     this.spin.start(getMessageInMagentaColor("Transforming API"));

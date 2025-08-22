@@ -12,11 +12,12 @@ import {
 
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { TransformationData } from "../../types/api/transform.js";
-import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { err, ok, Result} from "neverthrow";
+
 
 export interface TransformViaUrlParams {
   url: string;
@@ -65,12 +66,12 @@ export class TransformationService {
       const { id, apiValidationSummary } = generation.result;
       const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
 
-      return Result.success({
+      return ok({
         stream: result as NodeJS.ReadableStream,
         apiValidationSummary
       });
     } catch (error) {
-      return Result.failure(await this.handleTransformationErrors(error));
+      return err(await this.handleTransformationErrors(error));
     }
   }
 
@@ -99,12 +100,12 @@ export class TransformationService {
       const { id, apiValidationSummary } = generation.result;
       const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
 
-      return Result.success({
+      return ok({
         stream: result as NodeJS.ReadableStream,
         apiValidationSummary
       });
     } catch (error) {
-      return Result.failure(await this.handleTransformationErrors(error));
+      return err(await this.handleTransformationErrors(error));
     }
   }
 

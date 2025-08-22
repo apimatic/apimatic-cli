@@ -1,7 +1,6 @@
 import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
-import { ApiTransformPrompts } from "../../prompts/api/transform.js";
 import { TransformAction } from "../../actions/api/transform.js";
 import { FilePath } from "../../types/file/filePath.js";
 import path from "path/win32";
@@ -40,8 +39,6 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
     ...FlagsProvider.authKey
   };
 
-  private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
-
   async run() {
     const {
       flags: { format, file, url, destination, force, "auth-key": authKey }
@@ -57,7 +54,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
       commandName: Transform.id,
       shell: this.config.shell
     }
-    
+
     intro("Transform API");
     const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(format, destinationDir, force, filePath, url);
