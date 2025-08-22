@@ -7,7 +7,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import path from "path/win32";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { outro } from "../../prompts/format.js";
+import { intro, outro } from "../../prompts/format.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -57,11 +57,10 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
       commandName: Transform.id,
       shell: this.config.shell
     }
-
+    
+    intro("Transform API");
     const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
-
     const result = await action.execute(format, destinationDir, force, filePath, url);
-
     outro(result);
   }
 

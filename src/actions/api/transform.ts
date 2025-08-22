@@ -1,4 +1,3 @@
-import fsExtra from "fs-extra";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
@@ -49,12 +48,9 @@ export class TransformAction {
     const validationResult = await validateFileInputParams(file, url);
 
     if (!validationResult.isSuccess()) {
-      // TODO: Render the message here: validationResult.error!
+      this.validatePrompts.displayValidationFailureMessage();
       return ActionResult.failed();
     }
-
-    this.prompts.displayApiTransformationMessage();
-
     const parsedFormat = getValidFormat(format);
 
     const workingDirectory = new DirectoryPath(destination?.toString() ?? DEFAULT_WORKING_DIRECTORY);
@@ -62,22 +58,16 @@ export class TransformAction {
       ? new DirectoryPath(destination.toString(), "TransformedApi")
       : workingDirectory.join("TransformedApi");
 
-    // Use transformedApiDirectory for saving the transformed API file
     const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
-
     const destinationFileName = new FileName(`${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`);
-    const destinationFilePath = new FilePath(transformedApiDirectory, destinationFileName);
-
-    if ((await fsExtra.pathExists(destinationFilePath.toString())) && !force) {
-      // TODO: Render the error message here
-      // return ActionResult.error(
-      //   `Can't download transformed file to path ${destinationFilePath.toString()}, because it already exists`
-      // );
-      // return ActionResult.failed();
-    }
 
     const transformContext = new TransformContext(transformedApiDirectory, destinationFileName);
+
+    if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(transformedApiDirectory))) {
+      this.prompts.transformedApiDirectoryNotEmpty();
+      return ActionResult.cancelled();
+    }
 
     return await withDirPath(async (tempDirectory) => {
       let result: Result<TransformationResultData, string>;
@@ -108,9 +98,6 @@ export class TransformAction {
           result.value?.apiValidationSummary || { warnings: [], errors: [], messages: [] }
         );
         this.prompts.displayApiTransformationFailureMessage();
-
-        // TODO: Render the error message here
-        //return ActionResult.error(result.error || "An unknown error occurred");
         return ActionResult.failed();
       }
 

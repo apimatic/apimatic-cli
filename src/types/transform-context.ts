@@ -17,6 +17,10 @@ export class TransformContext {
     return new FilePath(this.specDirectory, new FileName(this.transformedApi.toString()));
   }
 
+  public async exists() {
+    return !await this.fileService.directoryEmpty(this.specDirectory);
+  }
+
   public async save(tempApiFilePath: FilePath) {
     await this.fileService.cleanDirectory(this.specDirectory);
     await this.fileService.copy(tempApiFilePath, this.specPath);
