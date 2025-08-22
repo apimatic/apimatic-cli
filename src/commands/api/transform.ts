@@ -6,18 +6,22 @@ import { FilePath } from "../../types/file/filePath.js";
 import path from "path/win32";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { intro, outro } from "../../prompts/format.js";
+import { format, intro, outro } from "../../prompts/format.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class Transform extends Command {
+  static summary = "Transform API specifications between different formats";
+
   static readonly description = `Transform API specifications from one format to another.
 Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.`;
 
+  static cmdTxt = format.cmd("apimatic", "api", "transform");
+
   static examples = [
-    `apimatic api transform --format=OPENAPI3YAML --file="./specs/sample.json" --destination="D:/"`,
-    `apimatic api transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"`
-  ];
+  `${Transform.cmdTxt} ${format.flag("format", "OPENAPI3YAML")} ${format.flag("file", "./specs/sample.json")} ${format.flag("destination", "D:/")}`,
+  `${Transform.cmdTxt} ${format.flag("format", "RAML")} ${format.flag("url", '"https://petstore.swagger.io/v2/swagger.json"')} ${format.flag("destination", "D:/")}`
+];
 
   static flags = {
     format: Flags.string({
@@ -53,7 +57,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
     const commandMetadata: CommandMetadata = {
       commandName: Transform.id,
       shell: this.config.shell
-    }
+    };
 
     intro("Transform API");
     const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
