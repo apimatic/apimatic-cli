@@ -4,7 +4,7 @@ import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { ValidationService } from "../../infrastructure/services/validate-service.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
-import { Result } from "../../types/common/result.js";
+import { Result } from "neverthrow";
 import { validateFileInputParams } from "../../infrastructure/api-utils.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 
@@ -21,54 +21,50 @@ export class ValidateAction {
     this.commandMetadata = commandMetadata;
   }
 
-  public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => { // SPECPATH, useQuickstartPrompts = false
+  public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => {
+    // SPECPATH, useQuickstartPrompts = false
     const validationResult = await validateFileInputParams(file, url);
 
     if (!validationResult.isSuccess()) {
-      // TODO: Render the error message here
-      //return ActionResult.error(validationResult.error!);
+      this.prompts.displayValidationFailureMessage();
       return ActionResult.failed();
     }
-
-    this.prompts.displayValidationStartMessage();
 
     let validationSummaryResult: Result<ApiValidationSummary, string>;
 
     if (file) {
-      validationSummaryResult = await this.validationService.validateViaFile({
-        file,
-        configDir: this.configDir,
-        commandMetadata: this.commandMetadata,
-        authKey: this.authKey
-      });
+      validationSummaryResult = await this.prompts.ValidateApi(
+        this.validationService.validateViaFile({
+          file,
+          configDir: this.configDir,
+          commandMetadata: this.commandMetadata,
+          authKey: this.authKey
+        })
+      );
     } else {
-      validationSummaryResult = await this.validationService.validateViaUrl({
-        url: url!,
-        configDir: this.configDir,
-        commandMetadata: this.commandMetadata,
-        authKey: this.authKey
-      });
+      validationSummaryResult = await this.prompts.ValidateApi(
+        this.validationService.validateViaUrl({
+          url: url!,
+          configDir: this.configDir,
+          commandMetadata: this.commandMetadata,
+          authKey: this.authKey
+        })
+      );
     }
 
-    if (!validationSummaryResult.isSuccess()) {
-      // TODO: Render the error message here
-      //return ActionResult.error(validationSummaryResult.error! || "Validation failed with an unknown error");
-      return ActionResult.failed();
-    }
-
-    const validationSummary = validationSummaryResult.value;
-    if (!validationSummary?.success) {
-      this.prompts.displayValidationFailureMessage();
-      if (validationSummary) {
+    if (validationSummaryResult.isOk()) {
+      const validationSummary = validationSummaryResult.value;
+      if (validationSummary?.success) {
         this.prompts.displayValidationMessages(validationSummary);
+        return ActionResult.success();
+      } else {
+        this.prompts.displayValidationFailureMessage();
+        this.prompts.displayValidationMessages(validationSummary);
+        return ActionResult.failed();
       }
-      // TODO: Render the error message here
-      //return ActionResult.error("Specification file provided is invalid");
+    } else {
+      this.prompts.displayValidationFailureMessage();
       return ActionResult.failed();
     }
-
-    this.prompts.displayValidationSuccessMessage();
-    this.prompts.displayValidationMessages(validationSummary);
-    return ActionResult.success();
   };
 }

@@ -27,13 +27,8 @@ export class ApiTransformPrompts {
   }
 
   public async transformApi(fn: Promise<Result<TransformationResultData, string>>) {
-  return withSpinner(
-    "Transforming API",
-    "API transformed successfully.",
-    "API transformation failed.",
-    fn
-  );
-}
+    return withSpinner("Transforming API", "API transformed successfully.", "API transformation failed.", fn);
+  }
 
   displayApiTransformationMessage(): void {
     this.spin.start(getMessageInMagentaColor("Transforming API"));

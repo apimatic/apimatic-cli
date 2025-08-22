@@ -11,7 +11,7 @@ import {
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
-import { Result } from "../../types/common/result.js";
+import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 
@@ -49,9 +49,9 @@ export class ValidationService {
         fileDescriptor
       );
 
-      return Result.success(validation.result as ApiValidationSummary);
+      return ok(validation.result as ApiValidationSummary);
     } catch (error) {
-      return Result.failure(await this.handleValidationErrors(error));
+      return err(await this.handleValidationErrors(error));
     }
   }
 
@@ -69,9 +69,9 @@ export class ValidationService {
     try {
       //TODO: Update spec to include origin query parameter.
       const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaUrl(url);
-      return Result.success(validation.result as ApiValidationSummary);
+      return ok(validation.result as ApiValidationSummary);
     } catch (error) {
-      return Result.failure(await this.handleValidationErrors(error));
+      return err(await this.handleValidationErrors(error));
     }
   }
 

@@ -1,6 +1,9 @@
 import { outro, spinner, log } from "@clack/prompts";
 import { getMessageInCyanColor, getMessageInGreenColor, getMessageInRedColor, replaceHTML } from "../../utils/utils.js";
 import { ValidationMessages } from "../../types/utils.js";
+import { Result } from "neverthrow";
+import { withSpinner } from "../format.js";
+import { ApiValidationSummary } from "@apimatic/sdk";
 
 export class ApiValidatePrompts {
   private readonly spin = spinner();
@@ -15,6 +18,10 @@ export class ApiValidatePrompts {
 
   displayValidationFailureMessage(): void {
     this.spin.stop(getMessageInRedColor("Specification validation failed"));
+  }
+
+  public async ValidateApi(fn: Promise<Result<ApiValidationSummary, string>>) {
+    return withSpinner("Validating API", "API validated successfully.", "API validation failed.", fn);
   }
 
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
