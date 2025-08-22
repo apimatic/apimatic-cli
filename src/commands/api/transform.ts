@@ -19,9 +19,15 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
   static cmdTxt = format.cmd("apimatic", "api", "transform");
 
   static examples = [
-  `${Transform.cmdTxt} ${format.flag("format", "OPENAPI3YAML")} ${format.flag("file", "./specs/sample.json")} ${format.flag("destination", "D:/")}`,
-  `${Transform.cmdTxt} ${format.flag("format", "RAML")} ${format.flag("url", '"https://petstore.swagger.io/v2/swagger.json"')} ${format.flag("destination", "D:/")}`
-];
+    `${Transform.cmdTxt} ${format.flag("format", "OPENAPI3YAML")} ${format.flag(
+      "file",
+      "./specs/sample.json"
+    )} ${format.flag("destination", "D:/")}`,
+    `${Transform.cmdTxt} ${format.flag("format", "RAML")} ${format.flag(
+      "url",
+      '"https://petstore.swagger.io/v2/swagger.json"'
+    )} ${format.flag("destination", "D:/")}`
+  ];
 
   static flags = {
     format: Flags.string({
@@ -48,12 +54,14 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
       flags: { format, file, url, destination, force, "auth-key": authKey }
     } = await this.parse(Transform);
 
-    const destinationDir = new DirectoryPath(destination);
-
     let filePath: FilePath | undefined = undefined;
     if (file) {
       filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
     }
+
+    const workingDirectory = new DirectoryPath(destination ?? DEFAULT_WORKING_DIRECTORY);
+    const transformedApiDirectory = workingDirectory.join("transformations");
+    
     const commandMetadata: CommandMetadata = {
       commandName: Transform.id,
       shell: this.config.shell
@@ -61,7 +69,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     intro("Transform API");
     const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(format, destinationDir, force, filePath, url);
+    const result = await action.execute(format, transformedApiDirectory, force, filePath, url);
     outro(result);
   }
 

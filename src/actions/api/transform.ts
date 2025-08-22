@@ -16,8 +16,6 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { getValidFormat } from "../../controllers/api/transform.js";
 import { TransformContext } from "../../types/transform-context.js";
 
-const DEFAULT_WORKING_DIRECTORY = "./";
-
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
   apiValidationSummary: ApiValidationSummary;
@@ -38,6 +36,13 @@ export class TransformAction {
     this.authKey = authKey;
   }
 
+  private getDestinationFileName(format: string, file?: FilePath, url?: string): FileName {
+    const parsedFormat = getValidFormat(format);
+    const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
+    const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
+    return new FileName(`${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`);
+  }
+
   public readonly execute = async (
     format: string,
     destination: DirectoryPath,
@@ -53,18 +58,11 @@ export class TransformAction {
     }
     const parsedFormat = getValidFormat(format);
 
-    const workingDirectory = new DirectoryPath(destination?.toString() ?? DEFAULT_WORKING_DIRECTORY);
-    const transformedApiDirectory = destination
-      ? new DirectoryPath(destination.toString(), "TransformedApi")
-      : workingDirectory.join("TransformedApi");
+    const destinationFileName = this.getDestinationFileName(format, file, url);
 
-    const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
-    const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
-    const destinationFileName = new FileName(`${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`);
+    const transformContext = new TransformContext(destination, destinationFileName);
 
-    const transformContext = new TransformContext(transformedApiDirectory, destinationFileName);
-
-    if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(transformedApiDirectory))) {
+    if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
       this.prompts.transformedApiDirectoryNotEmpty();
       return ActionResult.cancelled();
     }
@@ -74,13 +72,13 @@ export class TransformAction {
 
       if (file) {
         result = await this.prompts.transformApi(
-             this.transformationService.transformViaFile({
-              file,
-              format: parsedFormat,
-              configDir: this.configDir,
-              commandMetadata: this.commandMetadata,
-              authKey: this.authKey
-            })
+          this.transformationService.transformViaFile({
+            file,
+            format: parsedFormat,
+            configDir: this.configDir,
+            commandMetadata: this.commandMetadata,
+            authKey: this.authKey
+          })
         );
       } else {
         result = await this.prompts.transformApi(
@@ -95,7 +93,10 @@ export class TransformAction {
       }
 
       if (result.isOk()) {
-        await this.fileService.writeFile(new FilePath(tempDirectory, destinationFileName), result.value.stream as NodeJS.ReadableStream);
+        await this.fileService.writeFile(
+          new FilePath(tempDirectory, destinationFileName),
+          result.value.stream as NodeJS.ReadableStream
+        );
         await transformContext.save(new FilePath(tempDirectory, destinationFileName));
         this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
         return ActionResult.success();
