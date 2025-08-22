@@ -21,7 +21,7 @@ export class ValidateAction {
     this.commandMetadata = commandMetadata;
   }
 
-  public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => {
+  public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => { // SPECPATH, useQuickstartPrompts = false
     const validationResult = await validateFileInputParams(file, url);
 
     if (!validationResult.isSuccess()) {

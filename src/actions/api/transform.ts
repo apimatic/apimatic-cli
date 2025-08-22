@@ -15,6 +15,7 @@ import { ApiValidationSummary } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { getValidFormat } from "../../controllers/api/transform.js";
+import { TransformContext } from "../../types/transform-context.js";
 
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
@@ -57,21 +58,22 @@ export class TransformAction {
     const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
     const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url || "");
 
-    const destinationFileName = `${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`;
-    const destinationFilePath = new FilePath(destination, new FileName(destinationFileName));
+    const destinationFileName = new FileName(`${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`);
+    const destinationFilePath = new FilePath(destination, destinationFileName);
 
     if ((await fsExtra.pathExists(destinationFilePath.toString())) && !force) {
       // TODO: Render the error message here
       // return ActionResult.error(
       //   `Can't download transformed file to path ${destinationFilePath.toString()}, because it already exists`
       // );
-
       // return ActionResult.failed();
     }
 
     if (!(await fsExtra.pathExists(destination.toString()))) {
       await fsExtra.ensureDir(destination.toString());
     }
+
+    const transformContext = new TransformContext(destination, destinationFileName);
 
     return await withDirPath(async (tempDirectory) => {
       let result: Result<TransformationResultData, string>;
@@ -108,6 +110,7 @@ export class TransformAction {
         return ActionResult.failed();
       }
 
+      await transformContext.save(tempTransformedFilePath);
       this.prompts.displayApiTransformationSuccessMessage();
       this.validatePrompts.displayValidationMessages(result.value!.apiValidationSummary);
 
