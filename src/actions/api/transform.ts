@@ -94,11 +94,9 @@ export class TransformAction {
         );
       }
 
-      const tempTransformedFilePath = new FilePath(tempDirectory, new FileName(`transformed_${destinationFileName}`));
-
       if (result.isOk()) {
-        await this.fileService.writeFile(tempTransformedFilePath, result.value.stream as NodeJS.ReadableStream);
-        await transformContext.save(tempTransformedFilePath);
+        await this.fileService.writeFile(new FilePath(tempDirectory, destinationFileName), result.value.stream as NodeJS.ReadableStream);
+        await transformContext.save(new FilePath(tempDirectory, destinationFileName));
         this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
         return ActionResult.success();
       } else {
