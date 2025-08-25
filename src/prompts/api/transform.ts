@@ -3,6 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { Result } from "neverthrow";
 import { TransformationResultData } from "../../infrastructure/services/transformation-service.js";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 export class ApiTransformPrompts {
   public async overwriteApi(directory: DirectoryPath): Promise<boolean> {
@@ -38,5 +39,10 @@ export class ApiTransformPrompts {
 
   logTransformationError(error: string): void {
     log.error(error);
+  }
+
+  public networkError(serviceError: ServiceError): void {
+    const message = getErrorMessage(serviceError);
+    log.error(message);
   }
 }

@@ -8,20 +8,21 @@ import { FilePath } from "./file/filePath.js";
 
 export class TransformContext {
   private readonly fileService = new FileService();
-  private readonly specDirectory: DirectoryPath;
+
   private readonly transformedApi: FileName;
 
-  constructor(specDirectory: DirectoryPath, format: ExportFormats, file: FilePath) {
-    this.specDirectory = specDirectory;
-    this.transformedApi = this.parseFileName(format, file);
+  constructor(private readonly specFilePath: FilePath,
+              private readonly format: ExportFormats,
+              private readonly destinationDirectory: DirectoryPath ) {
+    this.transformedApi = this.parseFileName(format, specFilePath);
   }
 
   private get specPath(): FilePath {
-    return new FilePath(this.specDirectory, this.transformedApi);
+    return new FilePath(this.destinationDirectory, this.transformedApi);
   }
 
   public async exists(): Promise<boolean> {
-    const transformedApiPath = new FilePath(this.specDirectory, this.transformedApi);
+    const transformedApiPath = new FilePath(this.destinationDirectory, this.transformedApi);
     const fileExists = await this.fileService.fileExists(transformedApiPath);
     if (fileExists) {
       return true;
@@ -29,7 +30,7 @@ export class TransformContext {
     return false;
   }
 
-  public async saveStream(stream: NodeJS.ReadableStream): Promise<void> {
+  public async save(stream: NodeJS.ReadableStream): Promise<void> {
     await this.fileService.writeFile(this.specPath, stream);
   }
 

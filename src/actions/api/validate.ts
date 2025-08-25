@@ -5,8 +5,9 @@ import { ValidationService } from "../../infrastructure/services/validation-serv
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { Result } from "neverthrow";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { ResourceInput, resolveSpecFilePath } from "../../types/file/resource-input.js";
+import { ResourceInput } from "../../types/file/resource-input.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { ResourceContext } from "../../types/resource-context.js";
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -23,14 +24,17 @@ export class ValidateAction {
 
   public readonly execute = async (resourcePath: ResourceInput): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-      const specFileResult = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
-      if (specFileResult.isErr()) {
-        this.prompts.invalidFilePathProvided();
+
+
+      const resourceContext = new ResourceContext(tempDirectory);
+      const specFileDirResult = await resourceContext.resolveTo(resourcePath);
+      if (specFileDirResult.isErr()){
+        this.prompts.networkError(specFileDirResult.error);
         return ActionResult.failed();
       }
       const validationSummaryResult: Result<ApiValidationSummary, string>= await this.prompts.validateApi(
         this.validationService.validateViaFile({
-          file: specFileResult.value,
+          file: specFileDirResult.value,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey

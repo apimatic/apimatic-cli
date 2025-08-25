@@ -1,5 +1,5 @@
 import * as path from "path";
-import { err, ok } from "neverthrow";
+import { err, ok, Result } from "neverthrow";
 import { UrlPath } from "./file/urlPath.js";
 import { FilePath } from "./file/filePath.js";
 import { DirectoryPath } from "./file/directoryPath.js";
@@ -7,6 +7,8 @@ import { FileName } from "./file/fileName.js";
 import { FileDownloadService } from "../infrastructure/services/file-download-service.js";
 import { FileService } from "../infrastructure/file-service.js";
 import { ZipService } from "../infrastructure/zip-service.js";
+import { ResourceInput } from "./file/resource-input.js";
+import { ServiceError } from "../infrastructure/api-utils.js";
 
 export class ResourceContext {
   private readonly fileDownloadService = new FileDownloadService();
@@ -15,30 +17,28 @@ export class ResourceContext {
 
   constructor(private readonly tempDirectory: DirectoryPath) {}
 
-  public async resolveTo(resourcePath: string, destinationSubPath: string){
-    const urlPath = UrlPath.create(resourcePath);
-    const fileName =  new FileName(path.basename(resourcePath))
+  public async resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError>> {
+    const fileName = this.resolveFileName(resourcePath);
     const destinationFilePath = new FilePath(this.tempDirectory, fileName);
 
-    if (urlPath) {
-      const downloadFileResult = await this.fileDownloadService.downloadFile(urlPath);
+    if (resourcePath instanceof UrlPath) {
+      const downloadFileResult = await this.fileDownloadService.downloadFile(resourcePath);
       if (downloadFileResult.isErr()) {
-        return err("Unable to download the file. Please verify that the provided URL is correct and publicly accessible. ");
+        return err(downloadFileResult.error);
       }
       await this.fileService.writeFile(destinationFilePath, downloadFileResult.value);
-    } else {
-      const directory = new DirectoryPath(path.dirname(resourcePath));
-      const sourceFilePath = new FilePath(directory, fileName);
-      await this.fileService.copy(sourceFilePath, destinationFilePath);
     }
-    const specDirectory = this.tempDirectory.join(destinationSubPath);
-    await this.fileService.cleanDirectory(specDirectory);
+    if (resourcePath instanceof FilePath) {
+      await this.fileService.copy(resourcePath, destinationFilePath);
+    }
+    return ok(destinationFilePath);
+  }
 
-    if (fileName.isZipFile()) {
-      await this.zipService.unArchive(destinationFilePath, specDirectory);
+  private resolveFileName(resourcePath: ResourceInput): FileName {
+    if (resourcePath instanceof UrlPath) {
+      return new FileName(path.basename(resourcePath.toString()));
     } else {
-      await this.fileService.copy(destinationFilePath, destinationFilePath.replaceDirectory(specDirectory));
+      return new FileName(path.basename(resourcePath.toString()));
     }
-    return ok(specDirectory);
   }
 }

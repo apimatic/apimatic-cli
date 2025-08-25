@@ -1,9 +1,10 @@
 import { outro, spinner, log } from "@clack/prompts";
-import { getMessageInCyanColor, getMessageInRedColor, replaceHTML } from "../../utils/utils.js";
+import { replaceHTML } from "../../utils/utils.js";
 import { ValidationMessages } from "../../types/utils.js";
 import { Result } from "neverthrow";
 import { withSpinner } from "../format.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 export class ApiValidatePrompts {
   private readonly spin = spinner();
@@ -18,24 +19,32 @@ export class ApiValidatePrompts {
   }
 
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
-    const singleError: string = errors.join("\n") || "";
-
-    messages.forEach((message) => {
-      log.message(getMessageInCyanColor(`${replaceHTML(message)}`));
-    });
-    warnings.forEach((warning) => {
-      log.warn(`${replaceHTML(warning)}`);
-    });
-    if (errors.length > 0) {
-      log.error(getMessageInRedColor(`${replaceHTML(singleError)}`));
+    if (warnings.length > 0) {
+      log.warning("warnings");
+      messages.forEach((message) => {
+        log.message(`${replaceHTML(message)}`);
+      });
     }
-  }
-
-  displayOutroMessage(): void {
-    outro("Validation complete");
+    if (messages.length > 0) {
+      log.info("messages");
+      warnings.forEach((war) => {
+        log.message(`${replaceHTML(war)}`);
+      });
+    }
+    if (errors.length > 0) {
+      log.error("errors");
+      errors.forEach((err) => {
+        log.message(`${replaceHTML(err)}`);
+      });
+    }
   }
 
   logValidationError(error: string): void {
     log.error(error);
+  }
+
+  public networkError(serviceError: ServiceError): void {
+    const message = getErrorMessage(serviceError);
+    log.error(message);
   }
 }

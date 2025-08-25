@@ -7,7 +7,8 @@ import { ExportFormats } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TransformContext } from "../../types/transform-context.js";
-import { resolveSpecFilePath, ResourceInput } from "../../types/file/resource-input.js";
+import { ResourceInput } from "../../types/file/resource-input.js";
+import { ResourceContext } from "../../types/resource-context.js";
 
 
 export class TransformAction {
@@ -31,13 +32,14 @@ export class TransformAction {
     force: boolean
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-      const specFileResult = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
-      if (specFileResult.isErr()) {
-        this.prompts.InvalidFilePathProvided();
+
+      const resourceContext = new ResourceContext(tempDirectory);
+      const specFileDirResult = await resourceContext.resolveTo(resourcePath);
+      if (specFileDirResult.isErr()){
+        this.prompts.networkError(specFileDirResult.error);
         return ActionResult.failed();
       }
-      const transformContext = new TransformContext(destination, format, specFileResult.value);
-
+      const transformContext = new TransformContext(specFileDirResult.value, format, destination);
       if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
         this.prompts.transformedApiAlreadyExists();
         return ActionResult.cancelled();
@@ -45,7 +47,7 @@ export class TransformAction {
 
       const result = await this.prompts.transformApi(
         this.transformationService.transformViaFile({
-          file: specFileResult.value,
+          file: specFileDirResult.value,
           format: format,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
@@ -58,7 +60,7 @@ export class TransformAction {
         return ActionResult.failed();
       }
 
-      await transformContext.saveStream(result.value.stream as NodeJS.ReadableStream);
+      await transformContext.save(result.value.stream);
       this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
       return ActionResult.success();
     });
