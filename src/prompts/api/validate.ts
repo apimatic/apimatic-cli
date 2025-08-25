@@ -1,4 +1,4 @@
-import { outro, spinner, log } from "@clack/prompts";
+import { spinner, log } from "@clack/prompts";
 import { replaceHTML } from "../../utils/utils.js";
 import { ValidationMessages } from "../../types/utils.js";
 import { Result } from "neverthrow";
@@ -19,20 +19,20 @@ export class ApiValidatePrompts {
   }
 
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
-    if (warnings.length > 0) {
-      log.warning("warnings");
-      messages.forEach((message) => {
-        log.message(`${replaceHTML(message)}`);
-      });
-    }
     if (messages.length > 0) {
-      log.info("messages");
+      log.info("Messages");
       warnings.forEach((war) => {
         log.message(`${replaceHTML(war)}`);
       });
     }
+    if (warnings.length > 0) {
+      log.warning("Warnings");
+      messages.forEach((message) => {
+        log.message(`${replaceHTML(message)}`);
+      });
+    }
     if (errors.length > 0) {
-      log.error("errors");
+      log.error("Errors");
       errors.forEach((err) => {
         log.message(`${replaceHTML(err)}`);
       });
