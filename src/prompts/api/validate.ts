@@ -28,13 +28,13 @@ export class ApiValidatePrompts {
     const singleError: string = errors.join("\n") || "";
 
     messages.forEach((message) => {
-      log.message(getMessageInCyanColor(`ℹ️ ${replaceHTML(message)}`));
+      log.message(getMessageInCyanColor(`${replaceHTML(message)}`));
     });
     warnings.forEach((warning) => {
-      log.warn(`⚠️ ${replaceHTML(warning)}`);
+      log.warn(`${replaceHTML(warning)}`);
     });
     if (errors.length > 0) {
-      log.error(getMessageInRedColor(`❌ ${replaceHTML(singleError)}`));
+      log.error(getMessageInRedColor(`${replaceHTML(singleError)}`));
     }
   }
 

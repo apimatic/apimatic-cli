@@ -1,21 +1,18 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
-import { DestinationFormats } from "../../types/api/transform.js";
-import { getFileNameFromPath } from "../../utils/utils.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { validateFileInputParams } from "../../infrastructure/api-utils.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { TransformationService } from "../../infrastructure/services/transform-service.js";
 import { FilePath } from "../../types/file/filePath.js";
-import { FileName } from "../../types/file/fileName.js";
 import { Result } from "neverthrow";
-import { ApiValidationSummary } from "@apimatic/sdk";
+import { ApiValidationSummary, ExportFormats } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { getValidFormat } from "../../controllers/api/transform.js";
 import { TransformContext } from "../../types/transform-context.js";
 import { UrlPath } from "../../types/file/urlPath.js";
+import { TransformationFormats } from "../../types/api/transform.js";
 
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
@@ -37,12 +34,18 @@ export class TransformAction {
     this.authKey = authKey;
   }
 
-  private getDestinationFileName(format: string, file?: FilePath, url?: UrlPath): FileName {
-    const parsedFormat = getValidFormat(format);
-    const destinationFileExt: string = DestinationFormats[parsedFormat as keyof typeof DestinationFormats];
-    const destinationFilePrefix = file ? getFileNameFromPath(file.toString()) : getFileNameFromPath(url?.toString() || "");
-    return new FileName(`${destinationFilePrefix}_${parsedFormat}.${destinationFileExt}`);
-  }
+  private getValidFormat = (format: string) => {
+    const key = Object.keys(TransformationFormats).find((value) => value === format) as
+      | keyof typeof TransformationFormats
+      | undefined;
+    if (key) {
+      const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;
+      return ExportFormats[transformationFormat];
+    } else {
+      const formats = Object.keys(TransformationFormats).join("|");
+      throw new Error(`Please provide a valid platform, e.g. ${formats}`);
+    }
+  };
 
   public readonly execute = async (
     format: string,
@@ -57,11 +60,10 @@ export class TransformAction {
       this.validatePrompts.displayValidationFailureMessage();
       return ActionResult.failed();
     }
-    const parsedFormat = getValidFormat(format);
 
-    const destinationFileName = this.getDestinationFileName(format, file, url); // move to contxt
-
-    const transformContext = new TransformContext(destination, destinationFileName);
+    //const destinationFileName = this.getDestinationFileName(format, file, url); // move to contxt
+    const parsedFormat = this.getValidFormat(format);
+    const transformContext = new TransformContext(destination, parsedFormat, file, url);
 
     if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
       this.prompts.transformedApiDirectoryNotEmpty();
@@ -93,19 +95,15 @@ export class TransformAction {
     }
 
     return await withDirPath(async (tempDirectory) => {
-      if (result.isOk()) {
-        await this.fileService.writeFile(
-          new FilePath(tempDirectory, destinationFileName),
-          result.value.stream as NodeJS.ReadableStream
-        );
-        await transformContext.save(new FilePath(tempDirectory, destinationFileName));
-        this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
-        return ActionResult.success();
-      } else {
+      if (result.isErr()) {
         //TODO: implement service error logic
         this.prompts.logError(result.error);
         return ActionResult.failed();
       }
+      await transformContext.writeToTempDirectory(tempDirectory, result.value.stream as NodeJS.ReadableStream);
+      await transformContext.save(tempDirectory);
+      this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
+      return ActionResult.success();
     });
   };
 }

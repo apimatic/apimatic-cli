@@ -53,17 +53,16 @@ export class ValidateAction {
       );
     }
 
-    if (validationSummaryResult.isOk()) {
-      const validationSummary = validationSummaryResult.value;
-      if (validationSummary?.success) {
-        this.prompts.displayValidationMessages(validationSummary);
-        return ActionResult.success();
-      } else {
-        this.prompts.displayValidationMessages(validationSummary);
-        return ActionResult.failed();
-      }
-    } else {
+    if (validationSummaryResult.isErr()) {
       this.prompts.logError(validationSummaryResult.error);
+      return ActionResult.failed();
+    }
+    const validationSummary = validationSummaryResult.value;
+    if (validationSummary?.success) {
+      this.prompts.displayValidationMessages(validationSummary);
+      return ActionResult.success();
+    } else {
+      this.prompts.displayValidationMessages(validationSummary);
       return ActionResult.failed();
     }
   };

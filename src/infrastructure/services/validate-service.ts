@@ -14,6 +14,7 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 
 export interface ValidateViaFileParams {
   file: FilePath;
@@ -23,7 +24,7 @@ export interface ValidateViaFileParams {
 }
 
 export interface ValidateViaUrlParams {
-  url: string;
+  url: UrlPath;
   configDir: DirectoryPath;
   commandMetadata: CommandMetadata;
   authKey?: string | null;
@@ -68,7 +69,7 @@ export class ValidationService {
 
     try {
       //TODO: Update spec to include origin query parameter.
-      const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaUrl(url);
+      const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaUrl(url.toString());
       return ok(validation.result as ApiValidationSummary);
     } catch (error) {
       return err(await this.handleValidationErrors(error));
