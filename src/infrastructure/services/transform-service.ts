@@ -17,16 +17,6 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result} from "neverthrow";
-import { UrlPath } from "../../types/file/urlPath.js";
-
-
-export interface TransformViaUrlParams {
-  url: UrlPath;
-  format: string;
-  configDir: DirectoryPath;
-  commandMetadata: CommandMetadata;
-  authKey?: string | null;
-}
 
 export interface TransformViaFileParams {
   file: FilePath;
@@ -43,38 +33,6 @@ export interface TransformationResultData {
 
 export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
-
-  //TODO: we can remove this endpoint and use the transformViaFile in case url is given. We can download the file within the CLI from the url and pass it to the transformViaFile endpoint
-  async transformViaUrl({
-    url,
-    format,
-    configDir,
-    commandMetadata,
-    authKey
-  }: TransformViaUrlParams): Promise<Result<TransformationResultData, string>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
-    const transformationController = new TransformationController(client);
-
-    try {
-      //TODO: Update spec to include origin query parameter.
-      const generation: ApiResponse<Transformation> = await transformationController.transformViaUrl({
-        url: url.toString(),
-        exportFormat: format as ExportFormats
-      });
-
-      const { id, apiValidationSummary } = generation.result;
-      const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
-
-      return ok({
-        stream: result as NodeJS.ReadableStream,
-        apiValidationSummary
-      });
-    } catch (error) {
-      return err(await this.handleTransformationErrors(error));
-    }
-  }
 
   async transformViaFile({
     file,

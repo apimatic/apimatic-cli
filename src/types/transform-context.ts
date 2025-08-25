@@ -4,16 +4,15 @@ import { DestinationFormats } from "./api/transform.js";
 import { DirectoryPath } from "./file/directoryPath.js";
 import { FileName } from "./file/fileName.js";
 import { FilePath } from "./file/filePath.js";
-import { UrlPath } from "./file/urlPath.js";
 
 export class TransformContext {
   private readonly fileService = new FileService();
   private readonly specDirectory: DirectoryPath;
   private readonly transformedApi: FileName;
 
-  constructor(specDirectory: DirectoryPath, format: string, file?: FilePath, url?: UrlPath) {
+  constructor(specDirectory: DirectoryPath, format: string, file: FilePath) {
     this.specDirectory = specDirectory;
-    this.transformedApi = this.parseFileName(format, file, url);
+    this.transformedApi = this.parseFileName(format, file);
   }
 
   private get specPath(): FilePath {
@@ -34,11 +33,9 @@ export class TransformContext {
     await this.fileService.writeFile(tempFilePath, stream);
   }
 
-  private parseFileName(format: string, file?: FilePath, url?: UrlPath): FileName {
+  private parseFileName(format: string, file: FilePath): FileName {
     const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
-    const destinationFilePrefix = file
-      ? getFileNameFromPath(file.toString())
-      : getFileNameFromPath(url?.toString() || "");
+    const destinationFilePrefix = getFileNameFromPath(file.toString());
     return new FileName(`${destinationFilePrefix}_${format}.${destinationFileExt}`);
   }
 }

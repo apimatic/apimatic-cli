@@ -2,12 +2,9 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { TransformAction } from "../../actions/api/transform.js";
-import { FilePath } from "../../types/file/filePath.js";
-import path from "path/win32";
-import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
-import { UrlPath } from "../../types/file/urlPath.js";
+import { createResourceInput } from "../../types/file/resource-input.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -55,10 +52,9 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
       flags: { format, file, url, destination, force, "auth-key": authKey }
     } = await this.parse(Transform);
 
-    const { filePath, urlPath } = this.getPaths(file, url);
-
     const workingDirectory = new DirectoryPath(destination ?? DEFAULT_WORKING_DIRECTORY);
     const transformedApiDirectory = workingDirectory.join("transformations");
+    const resourceInput = createResourceInput(file, url);
 
     const commandMetadata: CommandMetadata = {
       commandName: Transform.id,
@@ -67,7 +63,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     intro("Transform API");
     const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(format, transformedApiDirectory, force, filePath, urlPath);
+    const result = await action.execute(format, transformedApiDirectory, force, resourceInput);
     outro(result);
   }
 
@@ -75,19 +71,4 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
     return new DirectoryPath(this.config.configDir);
   };
 
-  private getPaths(file?: string, url?: string): { filePath?: FilePath; urlPath?: UrlPath } {
-    if (file) {
-      return {
-        filePath: new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file))),
-        urlPath: undefined
-      };
-    }
-    if (url) {
-      return {
-        filePath: undefined,
-        urlPath: UrlPath.create(url)
-      };
-    }
-    return { filePath: undefined, urlPath: undefined };
-  }
 }
