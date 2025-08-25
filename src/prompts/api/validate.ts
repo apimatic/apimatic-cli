@@ -21,14 +21,14 @@ export class ApiValidatePrompts {
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
     if (messages.length > 0) {
       log.info("Messages");
-      warnings.forEach((war) => {
-        log.message(`${replaceHTML(war)}`);
+      messages.forEach((msg) => {
+        log.message(`${replaceHTML(msg)}`);
       });
     }
     if (warnings.length > 0) {
       log.warning("Warnings");
-      messages.forEach((message) => {
-        log.message(`${replaceHTML(message)}`);
+      warnings.forEach((war) => {
+        log.message(`${replaceHTML(war)}`);
       });
     }
     if (errors.length > 0) {
