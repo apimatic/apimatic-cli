@@ -23,7 +23,6 @@ export class ResourceContext {
     if (urlPath) {
       const downloadFileResult = await this.fileDownloadService.downloadFile(urlPath);
       if (downloadFileResult.isErr()) {
-        // TODO: Update message here
         return err("Unable to download the file. Please verify that the provided URL is correct and publicly accessible. ");
       }
       await this.fileService.writeFile(destinationFilePath, downloadFileResult.value);
