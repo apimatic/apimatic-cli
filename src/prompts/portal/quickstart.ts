@@ -2,13 +2,15 @@ import * as path from "path";
 import fs from "fs";
 import axios from "axios";
 import treeify from "treeify";
-import { intro, outro, text, select, multiselect, log, isCancel, cancel } from "@clack/prompts";
-import { getMessageInCyanColor, getMessageInGreenColor, getMessageInRedColor } from "../../utils/utils.js";
-import { BasePrompts } from "./common/base-prompts.js";
+import { text, select, multiselect, log, isCancel, cancel, spinner } from "@clack/prompts";
+import { getMessageInGreenColor, getMessageInRedColor } from "../../utils/utils.js";
 import { DirectoryNode } from "../../types/portal/quickstart.js";
 import { UrlPath } from "../../types/file/urlPath.js";
+import { withSpinner } from "../format.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { Result } from "neverthrow";
 
-export class PortalQuickstartPrompts extends BasePrompts {
+export class PortalQuickstartPrompts {
   private readonly vscodeExtensionUrl =
     "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
   private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
@@ -27,12 +29,35 @@ export class PortalQuickstartPrompts extends BasePrompts {
     return acc;
   }, {} as { [key: string]: string });
 
-  public displayWelcomeMessage(): void {
-    intro(`Hello there 👋`);
+  // TODO: Remove after refactoring validate action.
+  private readonly spin = spinner();
+
+  public welcomeMessage() {
+    log.message(`Hello there.`);
     log.message(
       `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.`
     );
-    log.message(`Let's get started! 🚀`);
+    log.message(`Let's get started!`);
+  }
+
+  public loginRequired() {
+    const message = `You need to be logged in to continue.`;
+    log.step(message);
+  }
+
+  public loginFailed() {
+    const message = `Unable to login, please check your credentials and try again later.`;
+    log.error(message);
+  }
+
+  public loginSuccessful(email: string) {
+    const message = `Logged in as: ${email}`;
+    log.step(message);
+  }
+
+  public importSpecStep() {
+    const message = `Step 1 of 4: Import your OpenAPI Definition`;
+    log.step(message);
   }
 
   //TODO: Very complex validation, needs to be improved.
@@ -77,17 +102,25 @@ export class PortalQuickstartPrompts extends BasePrompts {
           const contentType = response.headers["content-type"];
 
           if (contentType?.includes("text/html")) {
-            this.logError(`Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`);
+            log.error(`Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`);
             continue; // re-prompt
           }
         } catch {
-          this.logError(`Failed to reach the URL. Please check your internet connection or the URL.`);
+          log.error(`Failed to reach the URL. Please check your internet connection or the URL.`);
           continue; // re-prompt
         }
       }
 
       return cleanedPath; // valid local file or valid URL
     }
+  }
+
+  public specImportError(error: string) {
+    log.error(error);
+  }
+
+  public specValidationError(error: string) {
+    log.error(error);
   }
 
   public async useDefaultSpecPrompt(): Promise<boolean> {
@@ -110,10 +143,45 @@ export class PortalQuickstartPrompts extends BasePrompts {
     return useDefaultSpec === "yes";
   }
 
-  async selectLanguagesPrompt(): Promise<string[]> {
+  public fixYourSpec() {
+    const message = `Good luck fixing your API definition! Feel free to run this command again once you're done.`;
+    log.step(message);
+  }
+
+  public validateSpecStep() {
+    const message = `Step 2 of 4: Validate and Lint your OpenAPI file`;
+    log.step(message);
+  }
+
+  // TODO: Add once you have refactored the validate action.
+  public validateSpec(fn: Promise<Result<DirectoryPath, string>>) {
+    return withSpinner(
+      "Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules",
+      "Validation Successful.",
+      "Something went wrong while validating your API Definition.",
+      fn
+    );
+  }
+
+  // TODO: Remove after refactoring validate action.
+  public startProgressIndicator(message: string) {
+    this.spin.start(message);
+  }
+
+  // TODO: Remove after refactoring validate action.
+  public stopProgressIndicator(message: string, statusCode?: number) {
+    this.spin.stop(message, statusCode);
+  }
+
+  public selectLanguagesStep() {
+    const message = `Step 3 of 4: Select programming languages`;
+    log.step(message);
+  }
+
+  public async selectLanguagesPrompt(): Promise<string[]> {
     const languages = (await multiselect({
       message:
-        "💻 Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
+        "Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
       options: [
         { label: "Typescript", value: "typescript" },
         { label: "Ruby", value: "ruby" },
@@ -134,7 +202,12 @@ export class PortalQuickstartPrompts extends BasePrompts {
     return ["http", ...languages];
   }
 
-  async inputDirectoryPathPrompt(): Promise<string> {
+  public selectInputDirectoryStep() {
+    const message = `Step 4 of 4: Generate source files for Docs as Code`;
+    log.step(message);
+  }
+
+  public async inputDirectoryPathPrompt(): Promise<string> {
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
@@ -178,6 +251,19 @@ export class PortalQuickstartPrompts extends BasePrompts {
     }
   }
 
+  public createBuildDirectory(sourceDirectory: string, fn: Promise<Result<DirectoryPath, string>>) {
+    return withSpinner(
+      "Generating build directory",
+      `Directory created at ${sourceDirectory}`,
+      "Something went wrong while setting up your build directory.",
+      fn
+    );
+  }
+
+  public buildSetupError(message: string) {
+    log.error(message);
+  }
+
   public displayBuildDirectoryAsTree(buildDirectory: string): void {
     const structuredBuildDirectory = this.convertDirectoryStructureToJson(buildDirectory) as treeify.TreeObject;
 
@@ -191,20 +277,20 @@ export class PortalQuickstartPrompts extends BasePrompts {
     log.step(coloredLogString);
   }
 
-  public displayOutroMessage(buildDirectory: string): void {
+  public portalGenerationError(error: string) {
+    log.error(error);
+  }
+
+  public nextSteps(buildDirectory: string): void {
     log.step(
-      getMessageInCyanColor(`📢  Your API Portal is live at: ${this.serverUrl}\n`) +
-        getMessageInCyanColor(
-          `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
-        ) +
-        getMessageInCyanColor(`Press CTRL+C to stop the server.`)
+      `Your API Portal is live at: ${this.serverUrl}\n` +
+        `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n` +
+        `Press CTRL+C to stop the server.`
     );
-    outro(
-      getMessageInCyanColor(`What's next?\n`) +
-        getMessageInCyanColor(`- Use the API Playground or an SDK to call your API.\n`) +
-        getMessageInCyanColor(
-          `- Customize the Portal theme, add API recipes and enable AI features: ${this.referenceDocumentationUrl}`
-        )
+    log.step(
+      `What's next?\n` +
+        `- Use the API Playground or an SDK to call your API.\n` +
+        `- Customize the Portal theme, add API recipes and enable AI features: ${this.referenceDocumentationUrl}`
     );
   }
 

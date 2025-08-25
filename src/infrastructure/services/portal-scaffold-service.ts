@@ -21,7 +21,7 @@ export class PortalScaffoldService {
       const resourceContext = new ResourceContext(tempDirectory);
       const result = await resourceContext.resolveTo(this.zipUrl, this.repositoryFolderName);
       if (result.isErr()) {
-        return err("Unable to setup the portal, please try again later.");
+        return err("Unable to setup the build directory, please try again later.");
       }
       const extractedFolder = result.value.join(this.repositoryFolderName);
       await this.fileService.deleteDirectory(extractedFolder.join(".github"));
@@ -43,7 +43,7 @@ export class PortalScaffoldService {
       return ok(extractedFolder);
     } catch {
       return err(
-        "There was an error setting up your portal. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io "
+        "There was an error setting up your build directory. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io "
       );
     }
   }

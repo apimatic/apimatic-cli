@@ -6,8 +6,7 @@ import process from "process";
 import getPort from "get-port";
 import console from "console";
 import { Server } from "http";
-import { Result } from "../../../types/common/result.js";
-import { ServeFlags, ServePaths } from "../../../types/portal/serve.js";
+import { ok, err, Result } from "neverthrow";
 import { PortalWatcher } from "./portal-watcher.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ActionResult } from "../../../actions/action-result.js";
@@ -16,29 +15,28 @@ export class ServeHandler {
   private server!: Server;
   private liveReloadServer!: livereload.LiveReloadServer;
   private readonly app: express.Application;
-  private readonly portalWatcher: PortalWatcher;
+  private readonly portalWatcher: PortalWatcher = new PortalWatcher();
 
   constructor() {
     this.app = express();
-    this.portalWatcher = new PortalWatcher();
   }
 
   //TODO: Needs to be refactored after refactoring quickstart.
-  public async setupServer(generatedPortalArtifactsDirectoryPath: string): Promise<Result<string, string>> {
-    const createLiveReloadServerResult = await this.createLiveReloadServer(generatedPortalArtifactsDirectoryPath);
-    if (createLiveReloadServerResult.isFailed()) {
-      return Result.failure(createLiveReloadServerResult.error!);
+  public async setupServer(portalDirectory: DirectoryPath): Promise<Result<string, string>> {
+    const createLiveReloadServerResult = await this.createLiveReloadServer(portalDirectory);
+    if (createLiveReloadServerResult.isErr()) {
+      return err(createLiveReloadServerResult.error);
     }
 
-    this.app.use(express.static(generatedPortalArtifactsDirectoryPath, { extensions: ["html"] }));
+    this.app.use(express.static(portalDirectory.toString(), { extensions: ["html"] }));
 
-    return Result.success(`Server is set up and serving files from ${generatedPortalArtifactsDirectoryPath}`);
+    return ok(`Server is set up and serving files from ${portalDirectory.toString()}`);
   }
 
   //TODO: Needs to be refactored after refactoring quickstart.
   public async startServer(
-    paths: ServePaths,
-    flags: ServeFlags,
+    buildDirectory: DirectoryPath,
+    portalDirectory: DirectoryPath,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
@@ -46,17 +44,18 @@ export class ServeHandler {
       zipPortal: boolean
     ) => Promise<ActionResult>,
     serverPort: number,
-    displayShutdownMessages = true
+    openInBrowser: boolean,
+    noReload: boolean
   ): Promise<Result<boolean, string>> {
     return new Promise<Result<boolean, string>>((resolve, reject) => {
       this.server = this.app
         .listen(serverPort, async () => {
-          if (flags.open) {
+          if (openInBrowser) {
             await open(`http://localhost:${serverPort}`);
           }
 
-          if (!flags["no-reload"]) {
-            await this.portalWatcher.watchAndRegeneratePortalOnChange(paths, generatePortal);
+          if (!noReload) {
+            await this.portalWatcher.watchAndRegeneratePortalOnChange(buildDirectory, portalDirectory, generatePortal);
           }
 
           if (process.platform !== "darwin") {
@@ -65,7 +64,7 @@ export class ServeHandler {
               process.stdin.setRawMode(false);
             }
           }
-          resolve(Result.success(true));
+          resolve(ok(true));
         })
         .on("error", () => {
           reject(
@@ -76,14 +75,10 @@ export class ServeHandler {
         });
 
       const shutdown = async () => {
-        if (displayShutdownMessages) {
-          console.log("Shutting down server...");
-        }
+        console.log("Shutting down server...");
         await this.stopServer();
-        if (displayShutdownMessages) {
-          console.log("Server shut down successfully.");
-        }
-        resolve(Result.success(true));
+        console.log("Server shut down successfully.");
+        resolve(ok(true));
         process.exit(0);
       };
 
@@ -105,19 +100,19 @@ export class ServeHandler {
     }
   }
 
-  private async createLiveReloadServer(generatedPortalPath: string): Promise<Result<string, string>> {
+  private async createLiveReloadServer(portalDirectory: DirectoryPath): Promise<Result<string, string>> {
     try {
       const availablePort = await this.getPortForReloadServer();
       this.liveReloadServer = livereload.createServer({
         port: availablePort
       });
 
-      this.liveReloadServer.watch(generatedPortalPath);
+      this.liveReloadServer.watch(portalDirectory.toString());
       this.app.use(connectLivereload());
 
-      return Result.success("Live Reload Server setup successfully.");
+      return ok("Live Reload Server setup successfully.");
     } catch {
-      return Result.failure(
+      return err(
         "An unexpected error occurred while serving your portal, please try again later. If the issue persists, contact our team at support@apimatic.io for assistance."
       );
     }

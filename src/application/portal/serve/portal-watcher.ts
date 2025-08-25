@@ -2,7 +2,6 @@ import chokidar from "chokidar";
 import crypto from "crypto";
 import console from "console";
 import { Mutex } from "async-mutex";
-import { ServePaths } from "../../../types/portal/serve.js";
 import { WatcherHandler } from "./watcher-handler.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ActionResult } from "../../../actions/action-result.js";
@@ -15,7 +14,8 @@ export class PortalWatcher {
   }
 
   public async watchAndRegeneratePortalOnChange(
-    paths: ServePaths,
+    buildDirectory: DirectoryPath,
+    portalDirectory: DirectoryPath,
     generatePortal: (
       buildDirectory: DirectoryPath,
       portalDirectory: DirectoryPath,
@@ -24,7 +24,7 @@ export class PortalWatcher {
     ) => Promise<ActionResult>
   ) {
     //Regex matches any hidden files and folders.
-    const watcher = chokidar.watch(paths.sourceDirectoryPath, {
+    const watcher = chokidar.watch(buildDirectory.toString(), {
       ignored: [/(^|[/\\])\..+/],
       ignoreInitial: true,
       persistent: true,
@@ -58,7 +58,7 @@ export class PortalWatcher {
         });
 
         await this.watcherHandler.execute(async () => {
-          await this.handleFileChange(paths, eventQueue, eventId, generatePortal);
+          await this.handleFileChange(buildDirectory, portalDirectory, eventQueue, eventId, generatePortal);
         });
       })
       .on("error", () => {
@@ -79,7 +79,8 @@ export class PortalWatcher {
   }
 
   protected async handleFileChange(
-    paths: ServePaths,
+    buildDirectory: DirectoryPath,
+    portalDirectory: DirectoryPath,
     eventQueue: Map<string, string>,
     eventId: string,
     generatePortal: (
@@ -92,13 +93,6 @@ export class PortalWatcher {
     if (!eventQueue.has(eventId)) {
       return;
     }
-    const result = await generatePortal(
-      new DirectoryPath(paths.sourceDirectoryPath),
-      new DirectoryPath(paths.destinationDirectoryPath),
-      true,
-      false
-    );
-
-    //result.map((error) => console.log(error));
+    await generatePortal(buildDirectory, portalDirectory, true, false);
   }
 }

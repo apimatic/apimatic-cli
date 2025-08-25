@@ -1,60 +1,80 @@
+import getPort from "get-port";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
 import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
-import { Result } from "../../types/common/result.js";
-import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
-import getPort from "get-port";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { GenerateAction } from "./generate.js";
 
 export class PortalServeAction {
-  protected readonly prompts: PortalServePrompts;
-  protected readonly serveHandler: ServeHandler;
-  protected readonly docsPortalService: PortalService;
+  private readonly prompts: PortalServePrompts = new PortalServePrompts();
+  private readonly serveHandler: ServeHandler = new ServeHandler();
+  private readonly configDir: DirectoryPath;
+  private readonly commandMetadata: CommandMetadata;
+  private readonly authKey: string | null;
+  private readonly port: number | undefined;
 
-  public constructor(prompts: PortalServePrompts, serveHandler: ServeHandler, docsPortalService: PortalService) {
-    this.prompts = prompts;
-    this.serveHandler = serveHandler;
-    this.docsPortalService = docsPortalService;
+  public constructor(
+    configDir: DirectoryPath,
+    commandMetadata: CommandMetadata,
+    authKey: string | null = null,
+    port: number | undefined = undefined
+  ) {
+    this.configDir = configDir;
+    this.commandMetadata = commandMetadata;
+    this.authKey = authKey;
+    this.port = port;
   }
 
   public async servePortal(
-    flags: ServeFlags,
-    paths: ServePaths,
-    generatePortal: (
-      buildDirectory: DirectoryPath,
-      portalDirectory: DirectoryPath,
-      force: boolean,
-      zipPortal: boolean
-    ) => Promise<ActionResult>
-  ): Promise<Result<string, string>> {
-    const serverPort: number = await this.getServerPort(flags.port);
+    buildDirectory: DirectoryPath,
+    portalDirectory: DirectoryPath,
+    openInBrowser: boolean,
+    noReload: boolean,
+    displayServeCommandMessages: boolean = true
+  ): Promise<ActionResult> {
+    const serverPort: number = await this.getServerPort(this.port);
+    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
 
-    const result = await generatePortal(
-      new DirectoryPath(paths.sourceDirectoryPath),
-      new DirectoryPath(paths.destinationDirectoryPath),
-      false,
-      false
-    );
-
-    return await result.mapAll<Promise<Result<string, string>>>(
+    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
+    return result.mapAll<Promise<ActionResult>>(
       async () => {
-        const setupServerResult = await this.serveHandler.setupServer(paths.destinationDirectoryPath);
-        if (setupServerResult.isFailed()) {
-          return Result.failure(setupServerResult.error!);
+        const setupServerResult = await this.serveHandler.setupServer(portalDirectory);
+        if (setupServerResult.isErr()) {
+          this.prompts.setupServerError(setupServerResult.error);
+          return ActionResult.failed();
         }
 
-        const startServerResult = await this.serveHandler.startServer(paths, flags, generatePortal, serverPort);
-        if (startServerResult.isFailed()) {
-          return Result.failure(startServerResult.error!);
+        const startServerResult = await this.serveHandler.startServer(
+          buildDirectory,
+          portalDirectory,
+          generatePortalAction.execute,
+          serverPort,
+          openInBrowser,
+          noReload
+        );
+        if (startServerResult.isErr()) {
+          this.prompts.startServerError(startServerResult.error);
+          return ActionResult.failed();
         }
 
-        //TODO: Figure out a better way for this.
-        return Result.success(serverPort.toString());
+        if (displayServeCommandMessages) {
+          this.prompts.nextSteps(
+            buildDirectory.toString(),
+            portalDirectory.toString(),
+            serverPort.toString(),
+            noReload
+          );
+        }
+
+        return ActionResult.success();
       },
-      // TODO: return action result
-      async () => Result.failure('failure'),
-      async () => Result.cancelled('cancelled')
+      async () => {
+        return ActionResult.failed();
+      },
+      async () => {
+        return ActionResult.cancelled();
+      }
     );
   }
 
@@ -67,7 +87,7 @@ export class PortalServeAction {
 
     // Show warning only if user provided --port and it is not available
     if (typeof port === "number" && availablePort !== port) {
-      this.prompts.displayInfo(`⚠️ Port ${port} is already in use. Available port ${availablePort} will be used.`);
+      this.prompts.portAlreadyInUse(port, availablePort);
     }
 
     return availablePort;
