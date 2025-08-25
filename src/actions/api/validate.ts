@@ -1,7 +1,7 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
-import { ValidationService } from "../../infrastructure/services/validate-service.js";
+import { ValidationService } from "../../infrastructure/services/validation-service.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { Result } from "neverthrow";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
@@ -25,11 +25,10 @@ export class ValidateAction {
     return await withDirPath(async (tempDirectory) => {
       const specFileResult = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
       if (specFileResult.isErr()) {
-        this.prompts.InvalidFilePathProvided();
+        this.prompts.invalidFilePathProvided();
         return ActionResult.failed();
       }
-      let validationSummaryResult: Result<ApiValidationSummary, string>;
-      validationSummaryResult = await this.prompts.ValidateApi(
+      const validationSummaryResult: Result<ApiValidationSummary, string>= await this.prompts.validateApi(
         this.validationService.validateViaFile({
           file: specFileResult.value,
           configDir: this.configDir,

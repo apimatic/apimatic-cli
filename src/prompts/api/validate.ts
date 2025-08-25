@@ -8,11 +8,11 @@ import { ApiValidationSummary } from "@apimatic/sdk";
 export class ApiValidatePrompts {
   private readonly spin = spinner();
 
-  public async ValidateApi(fn: Promise<Result<ApiValidationSummary, string>>) {
+  public async validateApi(fn: Promise<Result<ApiValidationSummary, string>>) {
     return withSpinner("Validating API", "API validated successfully.", "API validation failed.", fn);
   }
 
-  public async InvalidFilePathProvided() {
+  public async invalidFilePathProvided() {
     const message = `Invalid file path or URL provided.`;
     log.error(message);
   }

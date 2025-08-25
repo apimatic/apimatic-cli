@@ -20,7 +20,7 @@ import { err, ok, Result} from "neverthrow";
 
 export interface TransformViaFileParams {
   file: FilePath;
-  format: string;
+  format: ExportFormats;
   configDir: DirectoryPath;
   commandMetadata: CommandMetadata;
   authKey?: string | null;
@@ -34,7 +34,7 @@ export interface TransformationResultData {
 export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
 
-  async transformViaFile({
+  public async transformViaFile({
     file,
     format,
     configDir,

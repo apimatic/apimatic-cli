@@ -2,17 +2,13 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { TransformationService } from "../../infrastructure/services/transform-service.js";
-import { ApiValidationSummary, ExportFormats } from "@apimatic/sdk";
+import { TransformationService } from "../../infrastructure/services/transformation-service.js";
+import { ExportFormats } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TransformContext } from "../../types/transform-context.js";
 import { resolveSpecFilePath, ResourceInput } from "../../types/file/resource-input.js";
 
-export interface TransformationResultData {
-  stream: NodeJS.ReadableStream;
-  apiValidationSummary: ApiValidationSummary;
-}
 
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
