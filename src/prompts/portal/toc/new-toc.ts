@@ -2,16 +2,14 @@ import { cancel, outro, confirm, spinner, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
 import { Result } from "neverthrow";
 import { SdlTocComponents } from "../../../types/spec-context.js";
-import { withSpinner } from "../../format.js";
+import { format, withSpinner } from "../../format.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 export class PortalNewTocPrompts {
   public sdlComponentsExtractionFailed() {
     log.error("Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again.");
   }
 
-  public sdlComponentsExtractionSuccess() {
-
-  }
   specNotFound() {
     throw new Error("Method not implemented.");
   }
@@ -40,27 +38,12 @@ export class PortalNewTocPrompts {
     log.error(message);
   }
 
-  startProgressIndicatorWithMessage(message: string): void {
-    this.spin.start(message);
-  }
-
-  stopProgressIndicatorWithMessage(message: string): void {
-    this.spin.stop(message);
-  }
-
   displayOutroMessage(tocPath: FilePath): void {
-    outro(`toc.yml file successfully created at: ${tocPath}`);
+    log.info(`${format.var('toc.yml')} file successfully created at: ${format.path(tocPath.toString())}`);
   }
 
-  logError(error: string): void {
-    outro(error);
-  }
-
-  displayWarning(message: string): void {
-    log.warning(message);
-  }
-
-  displayInfo(message: string): void {
-    log.step(message);
+  public contentDirectoryNotFound(contentFolderPath: DirectoryPath) {
+    const message = `Content folder not found at: ${contentFolderPath}`
+    log.error(message);
   }
 }

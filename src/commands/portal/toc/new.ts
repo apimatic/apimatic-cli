@@ -60,45 +60,42 @@ ${format.link(
 
     const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
+    const tocDirectory = destination? new DirectoryPath(destination): undefined;
 
     const commandMetadata: CommandMetadata = {
       commandName: PortalTocNew.id,
       shell: this.config.shell
     };
 
-
-    let tocDirectory: DirectoryPath | undefined;
-
-    if (destination) {
-      tocDirectory = new DirectoryPath(destination);
-    }
-
-    const action = new PortalNewTocAction(new DirectoryPath(this.config.configDir), commandMetadata);
-
     intro("New TOC");
-    const result = await action.createToc(
+    const action = new PortalNewTocAction(new DirectoryPath(this.config.configDir), commandMetadata);
+    const result = await action.execute(
       buildDirectory,
       tocDirectory,
       force,
       expandEndpoints,
       expandModels
     );
+    outro(result);
 
-    //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
-    if (result.isFailed()) {
-      const telemetryService = new TelemetryService(this.config.configDir);
-      await telemetryService.trackEvent(
-        new TocCreationFailedEvent(result.error!, PortalTocNew.id, {
-          input,
-          destination,
-          force,
-          "expand-endpoints": expandEndpoints,
-          "expand-models": expandModels
-        }),
-        commandMetadata.shell
-      );
-      this.error(result.error!);
-    }
+    result.mapAll(
+      () => {},
+      async () => {
+        const telemetryService = new TelemetryService(this.config.configDir);
+        await telemetryService.trackEvent(
+          // TODO: fix Toc error message
+          new TocCreationFailedEvent('error', PortalTocNew.id, {
+            input,
+            destination,
+            force,
+            "expand-endpoints": expandEndpoints,
+            "expand-models": expandModels
+          }),
+          commandMetadata.shell
+        );
+      },
+      () => {}
+    );
   }
 
 }

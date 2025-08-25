@@ -6,6 +6,7 @@ import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
 import { FileName } from "../types/file/fileName.js";
+import { Directory } from "../types/file/directory.js";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -42,6 +43,20 @@ export class FileService {
 
   public async copyDirectory(source: DirectoryPath, destination: DirectoryPath) {
     await fsExtra.copy(source.toString(), destination.toString());
+  }
+
+  public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
+      const entries = await fsExtra.readdir(directoryPath.toString());
+      const results =  await Promise.all(
+        entries.map(async (entry) => {
+          const fullPath = path.join(directoryPath.toString(), entry);
+          const stat = await fsExtra.stat(fullPath);
+          return stat.isDirectory()
+            ? await this.getDirectory(new DirectoryPath(fullPath))
+            : new FileName(entry);
+        })
+      );
+      return new Directory(directoryPath, results);
   }
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {

@@ -1,38 +1,52 @@
 import { DirectoryPath } from './directoryPath.js';
 import { FileName } from './fileName.js';
-import { FilePath } from './filePath.js';
-import { File } from './file.js';
-import fsExtra from "fs-extra";
-import * as path from "path";
+import { TocCustomPage, TocGroup } from "../toc/toc.js";
+import { FilePath } from "./filePath.js";
+
+
+export type DirectoryItem = FileName | Directory;
 
 export class Directory {
   public readonly directoryPath: DirectoryPath;
-  public readonly items: (FileName | Directory)[];
+  public readonly items: DirectoryItem[];
 
 
-  private constructor(directoryPath: DirectoryPath, filePaths: (File | Directory)[]) {
+  public constructor(directoryPath: DirectoryPath, filePaths: DirectoryItem[]) {
     this.directoryPath = directoryPath;
     this.items = filePaths;
   }
 
-  public static async parseFromDirectoryPath(directoryPath: DirectoryPath): Promise<Directory> {
-    const contents = await this.readDirectoryContents(directoryPath);
-    return new Directory(directoryPath, contents);
-  }
+  public async parseContentFolder(baseContentPath: DirectoryPath): Promise<TocGroup[]> {
+    const contentItems: (TocGroup | TocCustomPage)[] = [];
 
-  private static async readDirectoryContents(dir: DirectoryPath): Promise<(Directory | File)[]> {
-    try {
-      const entries = await fsExtra.readdir(dir.toString());
-      const results = await Promise.all(
-        entries.map(async (entry) => {
-          const fullPath = path.join(dir.toString(), entry);
-          const stat = await fsExtra.stat(fullPath);
-          return stat.isDirectory() ? await this.parseFromDirectoryPath(new DirectoryPath(fullPath)) : new File(new FilePath(dir, new FileName(entry)));
-        })
-      );
-      return results;
-    } catch {
+    for (const item of this.items) {
+      if (item instanceof Directory) {
+        contentItems.push({
+          group: item.toString(),
+          items: await item.parseContentFolder(baseContentPath)
+        });
+      } else {
+        if (item.isMarkDown()) {
+          const filePath = new FilePath(this.directoryPath, item);
+          contentItems.push({
+            page: filePath.toString(),
+            file: new FilePath(baseContentPath, item.normalize()).toString(),
+          });
+        }
+      }
+    }
+
+    // Return empty if no mark-down files were found
+    if (contentItems.length === 0) {
       return [];
     }
+
+    // Wrap everything under a "Custom Content" group
+    return [
+      {
+        group: "Custom Content",
+        items: contentItems
+      }
+    ];
   }
 }

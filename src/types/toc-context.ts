@@ -23,5 +23,6 @@ export class TocContext {
   public async save(contents: string) {
     await this.fileService.ensurePathExists(this.tocFilePath);
     await this.fileService.writeContents(this.tocFilePath, contents);
+    return this.tocPath;
   }
 }
