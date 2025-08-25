@@ -78,6 +78,7 @@
     "devDependencies": {
         "@commitlint/cli": "^15.0.0",
         "@commitlint/config-conventional": "^15.0.0",
+        "@eslint/js": "^9.34.0",
         "@oclif/test": "^4.1.13",
         "@types/archiver": "^5.3.4",
         "@types/base-64": "^1.0.0",

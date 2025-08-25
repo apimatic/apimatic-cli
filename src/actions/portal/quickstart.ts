@@ -112,13 +112,11 @@ export class PortalQuickstartAction {
 
     this.prompts.displayInfo("You need to be logged in to continue.");
     const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
-
-    if (loginResult.isErr()) {
-      this.prompts.logError(loginResult.error);
-      return Result.failure("Unable to login, please check your credentials and try again later.");
-    }
-    this.prompts.displaySuccess(`Logged in as: ${loginResult.value}`);
-    return Result.success("Authentication was successful.");
+    // TODO: fix error messages after refactoring
+    return loginResult.mapAll(() =>
+        Result.success("Authentication was successful."),
+      () => Result.failure("Unable to login, please check your credentials and try again later."),
+      () => Result.failure("Unable to login, please check your credentials and try again later."));
   }
 
   // TODO: create TempSpecContext and then refactor this.
