@@ -1,5 +1,4 @@
 import { outro, spinner, log, isCancel, confirm } from "@clack/prompts";
-import { getMessageInMagentaColor, getMessageInCyanColor, getMessageInRedColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { Result } from "neverthrow";
@@ -30,20 +29,6 @@ export class ApiTransformPrompts {
     return withSpinner("Transforming API", "API transformed successfully.", "API transformation failed.", fn);
   }
 
-  displayApiTransformationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Transforming API"));
-  }
-
-  displayApiTransformationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor(`API transformed successfully`));
-    this.cleanUpStandardInput();
-  }
-
-  displayApiTransformationFailureMessage(): void {
-    this.spin.stop(getMessageInRedColor("API transformation failed"));
-    this.cleanUpStandardInput();
-  }
-
   displayOutroMessage(transformedApiPath: DirectoryPath): void {
     outro(`The transformed API specification can be found at ${transformedApiPath}`);
   }
@@ -52,10 +37,4 @@ export class ApiTransformPrompts {
     log.error(error);
   }
 
-  private cleanUpStandardInput(): void {
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(false);
-      process.stdin.pause();
-    }
-  }
 }

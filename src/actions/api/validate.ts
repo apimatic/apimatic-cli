@@ -37,7 +37,7 @@ export class ValidateAction {
       );
 
       if (validationSummaryResult.isErr()) {
-        this.prompts.logError(validationSummaryResult.error);
+        this.prompts.logValidationError(validationSummaryResult.error);
         return ActionResult.failed();
       }
       const validationSummary = validationSummaryResult.value;
