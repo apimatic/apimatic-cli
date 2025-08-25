@@ -7,7 +7,6 @@ import { ApiValidationSummary, ExportFormats } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TransformContext } from "../../types/transform-context.js";
-import { TransformationFormats } from "../../types/api/transform.js";
 import { resolveSpecFilePath, ResourceInput } from "../../types/file/resource-input.js";
 
 export interface TransformationResultData {
@@ -29,30 +28,18 @@ export class TransformAction {
     this.authKey = authKey;
   }
 
-  private readonly getValidFormat = (format: string) => {
-    const key = Object.keys(TransformationFormats).find((value) => value === format) as
-      | keyof typeof TransformationFormats
-      | undefined;
-    if (key) {
-      const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;
-      return ExportFormats[transformationFormat];
-    } else {
-      const formats = Object.keys(TransformationFormats).join("|");
-      throw new Error(`Please provide a valid platform, e.g. ${formats}`);
-    }
-  };
-
   public readonly execute = async (
-    format: string,
+    resourcePath: ResourceInput,
+    format: ExportFormats,
     destination: DirectoryPath,
-    force: boolean,
-    resourcePath: ResourceInput
+    force: boolean
   ): Promise<ActionResult> => {
-    const parsedFormat = this.getValidFormat(format);
-
     return await withDirPath(async (tempDirectory) => {
-      const specFile = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
-      const transformContext = new TransformContext(destination, parsedFormat, specFile.filePath!);
+      const specFileResult = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
+      if (!specFileResult.filePath) {
+        return ActionResult.failed();
+      }
+      const transformContext = new TransformContext(destination, format, specFileResult.filePath);
 
       if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
         this.prompts.transformedApiDirectoryNotEmpty();
@@ -61,8 +48,8 @@ export class TransformAction {
 
       const result = await this.prompts.transformApi(
         this.transformationService.transformViaFile({
-          file: specFile.filePath!,
-          format: parsedFormat,
+          file: specFileResult.filePath,
+          format: format,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey

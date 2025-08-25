@@ -35,10 +35,10 @@ export default class Validate extends Command {
     };
 
     const action = new ValidateAction(this.getConfigDir(), commandMetadata, authKey);
-    const specFile = createResourceInput(file, url);
+    const resourceInput = createResourceInput(file, url);
 
     intro("Validate API");
-    const result = await action.execute(specFile);
+    const result = await action.execute(resourceInput);
     outro(result);
   }
 

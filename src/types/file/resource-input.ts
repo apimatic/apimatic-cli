@@ -6,17 +6,15 @@ import { UrlPath } from "./urlPath.js";
 import { ActionResult } from "../../actions/action-result.js";
 import { ResourceContext } from "../resource-context.js";
 
-export type ResourceInput = 
-  | { type: 'file'; path: FilePath }
-  | { type: 'url'; path: UrlPath };
+export type ResourceInput = { type: "file"; path: FilePath } | { type: "url"; path: UrlPath };
 
 // Type guard functions
-export const isFileResource = (resource: ResourceInput): resource is { type: 'file'; path: FilePath } => {
-  return resource.type === 'file';
+export const isFileResource = (resource: ResourceInput): resource is { type: "file"; path: FilePath } => {
+  return resource.type === "file";
 };
 
-export const isUrlResource = (resource: ResourceInput): resource is { type: 'url'; path: UrlPath } => {
-  return resource.type === 'url';
+export const isUrlResource = (resource: ResourceInput): resource is { type: "url"; path: UrlPath } => {
+  return resource.type === "url";
 };
 
 // Factory function to create the discriminated union
@@ -29,13 +27,16 @@ export const createResourceInput = (file?: string, url?: string): ResourceInput 
   }
 
   if (file) {
-    const filePath = new FilePath(
-      new DirectoryPath(path.dirname(file)), 
-      new FileName(path.basename(file))
-    );
-    return { type: 'file', path: filePath };
+    if (typeof file !== "string" || !file.trim()) {
+      throw new Error("Invalid file path provided.");
+    }
+    const filePath = new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file)));
+    return { type: "file", path: filePath };
   } else {
-    return { type: 'url', path: new UrlPath(url!) };
+    if (typeof url !== "string" || !url.trim()) {
+      throw new Error("Invalid URL provided.");
+    }
+    return { type: "url", path: new UrlPath(url) };
   }
 };
 export const resolveSpecFilePath = async (
