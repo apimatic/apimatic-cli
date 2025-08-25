@@ -61,7 +61,6 @@ export class TransformAction {
       return ActionResult.failed();
     }
 
-    //const destinationFileName = this.getDestinationFileName(format, file, url); // move to contxt
     const parsedFormat = this.getValidFormat(format);
     const transformContext = new TransformContext(destination, parsedFormat, file, url);
 
