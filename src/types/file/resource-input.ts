@@ -48,7 +48,7 @@ export const resolveSpecFilePath = async (
     const specFileDirResult = await resourceContext.resolveTo(resourcePath, "spec");
 
     if (specFileDirResult.isErr()) {
-      return specFileDirResult; // Pass through the error
+      return specFileDirResult; 
     }
 
     const resolvedFileName = new FileName(path.basename(resourcePath));

@@ -1,3 +1,4 @@
+import { ExportFormats } from "@apimatic/sdk";
 import { FileService } from "../infrastructure/file-service.js";
 import { getFileNameFromPath } from "../utils/utils.js";
 import { DestinationFormats } from "./api/transform.js";
@@ -10,7 +11,7 @@ export class TransformContext {
   private readonly specDirectory: DirectoryPath;
   private readonly transformedApi: FileName;
 
-  constructor(specDirectory: DirectoryPath, format: string, file: FilePath) {
+  constructor(specDirectory: DirectoryPath, format: ExportFormats, file: FilePath) {
     this.specDirectory = specDirectory;
     this.transformedApi = this.parseFileName(format, file);
   }
