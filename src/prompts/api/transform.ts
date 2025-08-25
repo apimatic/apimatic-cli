@@ -7,7 +7,7 @@ import { TransformationResultData } from "../../infrastructure/services/transfor
 export class ApiTransformPrompts {
   public async overwriteApi(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `The destination ${f.path(directory.toString())} is not empty, do you want to overwrite?`,
+      message: `A specification file already exists at ${f.path(directory.toString())}. Do you want to overwrite the existing file?`,
       initialValue: false
     });
 
@@ -18,8 +18,8 @@ export class ApiTransformPrompts {
     return overwrite;
   }
 
-  public transformedApiDirectoryNotEmpty() {
-    const message = `Please enter a different destination folder or remove the existing files and try again.`;
+  public transformedApiAlreadyExists() {
+    const message = `Specification already exists.`;
     log.error(message);
   }
 

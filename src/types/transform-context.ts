@@ -20,11 +20,15 @@ export class TransformContext {
   }
 
   public async exists(): Promise<boolean> {
-    return !(await this.fileService.directoryEmpty(this.specDirectory));
+    const transformedApiPath = new FilePath(this.specDirectory, this.transformedApi);
+    const fileExists = await this.fileService.fileExists(transformedApiPath);
+    if (fileExists) {
+      return true;
+    }
+    return false;
   }
 
   public async saveStream(stream: NodeJS.ReadableStream): Promise<void> {
-    await this.fileService.cleanDirectory(this.specDirectory);
     await this.fileService.writeFile(this.specPath, stream);
   }
 

@@ -43,7 +43,7 @@ export class TransformAction {
       const transformContext = new TransformContext(destination, format, specFileResult.value);
 
       if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
-        this.prompts.transformedApiDirectoryNotEmpty();
+        this.prompts.transformedApiAlreadyExists();
         return ActionResult.cancelled();
       }
 
