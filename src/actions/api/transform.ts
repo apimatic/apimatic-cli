@@ -3,16 +3,12 @@ import { ActionResult } from "../action-result.js";
 import { ApiTransformPrompts } from "../../prompts/api/transform.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { TransformationService } from "../../infrastructure/services/transform-service.js";
-import { FilePath } from "../../types/file/filePath.js";
 import { ApiValidationSummary, ExportFormats } from "@apimatic/sdk";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TransformContext } from "../../types/transform-context.js";
 import { TransformationFormats } from "../../types/api/transform.js";
 import { resolveSpecFilePath, ResourceInput } from "../../types/file/resource-input.js";
-import { ResourceContext } from "../../types/resource-context.js";
-import { FileName } from "../../types/file/fileName.js";
-import path from "path";
 
 export interface TransformationResultData {
   stream: NodeJS.ReadableStream;
@@ -45,21 +41,6 @@ export class TransformAction {
       throw new Error(`Please provide a valid platform, e.g. ${formats}`);
     }
   };
-  private async resolveSpecFilePath(
-    tempDir: DirectoryPath,
-    resourcePath: string
-  ): Promise<{ actionResult: ActionResult; filePath?: FilePath }> {
-    const resourceContext = new ResourceContext(tempDir);
-    const specFileDirResult = await resourceContext.resolveTo(resourcePath, "spec");
-
-    if (specFileDirResult.isErr()) {
-      this.prompts.logError(specFileDirResult.error);
-      return { actionResult: ActionResult.failed() };
-    }
-    const resolvedFileName = new FileName(path.basename(resourcePath));
-    const filePath = new FilePath(specFileDirResult.value, resolvedFileName);
-    return { actionResult: ActionResult.success(), filePath };
-  }
 
   public readonly execute = async (
     format: string,
