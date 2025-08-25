@@ -37,6 +37,7 @@ export class TransformAction {
     return await withDirPath(async (tempDirectory) => {
       const specFileResult = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
       if (!specFileResult.filePath) {
+        this.prompts.InvalidFilePathProvided();
         return ActionResult.failed();
       }
       const transformContext = new TransformContext(destination, format, specFileResult.filePath);
@@ -61,8 +62,7 @@ export class TransformAction {
         return ActionResult.failed();
       }
 
-      await transformContext.writeToTempDirectory(tempDirectory, result.value.stream as NodeJS.ReadableStream);
-      await transformContext.save(tempDirectory);
+      await transformContext.saveStream(result.value.stream as NodeJS.ReadableStream);
       this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
       return ActionResult.success();
     });

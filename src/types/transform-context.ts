@@ -16,21 +16,16 @@ export class TransformContext {
   }
 
   private get specPath(): FilePath {
-    return new FilePath(this.specDirectory, new FileName(this.transformedApi.toString()));
+    return new FilePath(this.specDirectory, this.transformedApi);
   }
 
-  public async exists() {
+  public async exists(): Promise<boolean> {
     return !(await this.fileService.directoryEmpty(this.specDirectory));
   }
 
-  public async save(tempApiFilePath: DirectoryPath) {
+  public async saveStream(stream: NodeJS.ReadableStream): Promise<void> {
     await this.fileService.cleanDirectory(this.specDirectory);
-    await this.fileService.copy(new FilePath(tempApiFilePath, this.transformedApi), this.specPath);
-  }
-
-  public async writeToTempDirectory(tempDirectory: DirectoryPath, stream: NodeJS.ReadableStream) {
-    const tempFilePath = new FilePath(tempDirectory, this.transformedApi);
-    await this.fileService.writeFile(tempFilePath, stream);
+    await this.fileService.writeFile(this.specPath, stream);
   }
 
   private parseFileName(format: string, file: FilePath): FileName {

@@ -23,6 +23,11 @@ export class ApiTransformPrompts {
     log.error(message);
   }
 
+  public async InvalidFilePathProvided(){
+    const message = `Invalid file path or URL provided.`;
+    log.error(message);
+  }
+
   public async transformApi(fn: Promise<Result<TransformationResultData, string>>) {
     return withSpinner("Transforming API", "API transformed successfully.", "API transformation failed.", fn);
   }
