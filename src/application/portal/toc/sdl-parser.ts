@@ -4,11 +4,10 @@ import { Result } from "../../../types/common/result.js";
 import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
-import { FileName } from "../../../types/file/fileName.js";
 import { ZipService } from "../../../infrastructure/zip-service.js";
-import { FilePath } from "../../../types/file/filePath.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
+import { TempContext } from "../../../types/temp-context.js";
 
 export class SdlParser {
   private readonly zipArchiver: ZipService = new ZipService();
@@ -26,9 +25,9 @@ export class SdlParser {
   }
 
   public async getTocComponentsFromSdl(
-    specFolderPath: string
+    specDirectoryPath: DirectoryPath
   ): Promise<Result<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }, string>> {
-    const sdlResult = await this.generateSdlFromSpec(specFolderPath);
+    const sdlResult = await this.generateSdlFromSpec(specDirectoryPath);
 
     if (!sdlResult.isSuccess()) {
       return Result.failure(
@@ -58,10 +57,10 @@ export class SdlParser {
     return Result.success(endpointGroups);
   }
 
-  private async generateSdlFromSpec(specFolderPath: string): Promise<Result<Sdl, string>> {
+  private async generateSdlFromSpec(specDirectory: DirectoryPath): Promise<Result<Sdl, string>> {
     return await withDirPath(async (tempDirectory) => {
-      const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
-      await this.zipArchiver.archive(new DirectoryPath(specFolderPath), specZipPath);
+      const tempContext = new TempContext(tempDirectory);
+      const specZipPath = await tempContext.zip(specDirectory);
 
       const specFileStream = await this.fileService.getStream(specZipPath);
       let result: Result<Sdl, string>;

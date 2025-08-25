@@ -5,6 +5,7 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
+import { FileName } from "../types/file/fileName.js";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -74,6 +75,10 @@ export class FileService {
     await streamPipeline(stream, writeStream);
   }
 
+  public async ensurePathExists(filePath: FilePath) {
+    await fsExtra.ensureFile(filePath.toString());
+  }
+
   public async writeContents(filePath: FilePath, contents: string) {
     await fsExtra.writeFile(filePath.toString(), contents, "utf-8");
   }
@@ -84,6 +89,10 @@ export class FileService {
 
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
+  }
+
+  public async getRelativePath(from: DirectoryPath, to: FilePath): Promise<string> {
+    return path.relative(from.toString(), to.toString());
   }
 }
 

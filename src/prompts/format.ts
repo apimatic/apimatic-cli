@@ -8,7 +8,8 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: string) => pc.cyan(`'${text}'`),
-  cmd: (cmd: string, topic: string, action: string) => `${pc.blue(cmd)} ${pc.dim(topic)} ${pc.dim(action)}`,
+  cmd: (cmd: string, ...args: string[]) => `${pc.blue(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
+  link: (text: string) => pc.underline(pc.blue(text)),
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
       return `${pc.green(`--${name}`)}=${pc.dim(value)}`;

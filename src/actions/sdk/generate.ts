@@ -42,7 +42,7 @@ export class GenerateAction {
 
     const specContext = new SpecContext(specDirectory);
     if (!(await specContext.validate())) {
-      // return ActionResult.error(`The spec directory is either empty or invalid: "${specDirectory}"`);
+      // return ActionResult.error(`The spec directory either does not exist or is empty: "${specDirectory}"`);
       return ActionResult.failed();
     }
 

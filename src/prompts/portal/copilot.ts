@@ -28,7 +28,6 @@ export class PortalCopilotPrompts {
 
     if (isCancel(selectedKey)) {
       return null;
-      return null;
     }
 
     return selectedKey;

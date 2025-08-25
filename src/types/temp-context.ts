@@ -3,29 +3,28 @@ import { ZipService } from "../infrastructure/zip-service.js";
 import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
+import { randomUUID } from "crypto";
 
 export class TempContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
 
-  constructor(private readonly tempDirectory: DirectoryPath) {
+  constructor(private readonly tempDirectory: DirectoryPath) {}
+
+  private get getTempFileName(): FilePath {
+    const uuid = randomUUID();
+    return new FilePath(this.tempDirectory, new FileName(`${uuid}.zip`));
   }
 
-  private get buildZipPath(): FilePath {
-    return new FilePath(this.tempDirectory, new FileName(`build.zip`));
+  async zip(buildDirectory: DirectoryPath): Promise<FilePath> {
+    const tempFile = this.getTempFileName;
+    await this.zipService.archive(buildDirectory, tempFile);
+    return tempFile;
   }
 
-  private get portalZipPath(): FilePath {
-    return new FilePath(this.tempDirectory, new FileName(`portal.zip`));
-  }
-
-  async zip(buildDirectory: DirectoryPath) {
-    await this.zipService.archive(buildDirectory, this.buildZipPath);
-    return this.buildZipPath;
-  }
-
-  async save(portalStream: NodeJS.ReadableStream) {
-    await this.fileService.writeFile(this.portalZipPath, <NodeJS.ReadableStream>portalStream);
-    return this.portalZipPath;
+  async save(portalStream: NodeJS.ReadableStream): Promise<FilePath> {
+    const tempFile = this.getTempFileName;
+    await this.fileService.writeFile(tempFile, portalStream);
+    return tempFile;
   }
 }

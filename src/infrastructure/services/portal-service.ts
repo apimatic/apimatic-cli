@@ -91,7 +91,7 @@ export class PortalService {
     specFileStream: ReadStream,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata
-  ): Promise<Result<Sdl, string>> {
+  ): Promise<ResultEx<Sdl, string>> {
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
@@ -107,23 +107,19 @@ export class PortalService {
       );
 
       if (!generation.result.success) {
-        return this.createGenericErrorResult();
+        return err("An unexpected error occurred");
       }
 
       const transformationId = generation.result.id;
       const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
       if ((result as NodeJS.ReadableStream).readable) {
-        return Result.success((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
+        return ok((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
       } else {
-        return this.createGenericErrorResult();
+        return err("An unexpected error occurred");
       }
     } catch {
-      return this.createGenericErrorResult();
+      return err("An unexpected error occurred");
     }
-  }
-
-  private createGenericErrorResult() {
-    return Result.failure<Sdl, string>("An unexpected error occurred");
   }
 
   private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
