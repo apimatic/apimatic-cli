@@ -9,7 +9,7 @@ import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TransformContext } from "../../types/transform-context.js";
 import { TransformationFormats } from "../../types/api/transform.js";
-import { ResourceInput } from "../../types/file/resource-input.js";
+import { resolveSpecFilePath, ResourceInput } from "../../types/file/resource-input.js";
 import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
 import path from "path";
@@ -70,7 +70,7 @@ export class TransformAction {
     const parsedFormat = this.getValidFormat(format);
 
     return await withDirPath(async (tempDirectory) => {
-      const specFile = await this.resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
+      const specFile = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
       const transformContext = new TransformContext(destination, parsedFormat, specFile.filePath!);
 
       if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {

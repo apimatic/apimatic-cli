@@ -2,12 +2,12 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { ValidationService } from "../../infrastructure/services/validate-service.js";
-import { FilePath } from "../../types/file/filePath.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { Result } from "neverthrow";
-import { validateFileInputParams } from "../../infrastructure/api-utils.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { UrlPath } from "../../types/file/urlPath.js";
+import { ResourceInput, resolveSpecFilePath } from "../../types/file/resource-input.js";
+import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -22,48 +22,32 @@ export class ValidateAction {
     this.commandMetadata = commandMetadata;
   }
 
-  public readonly execute = async (file?: FilePath, url?: UrlPath): Promise<ActionResult> => {
-    // SPECPATH, useQuickstartPrompts = false
-    const validationResult = await validateFileInputParams(file, url);
+  public readonly execute = async (resourcePath: ResourceInput): Promise<ActionResult> => {
+    return await withDirPath(async (tempDirectory) => {
+      const specFile = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
 
-    if (!validationResult.isSuccess()) {
-      this.prompts.displayValidationFailureMessage();
-      return ActionResult.failed();
-    }
-
-    let validationSummaryResult: Result<ApiValidationSummary, string>;
-
-    if (file) {
+      let validationSummaryResult: Result<ApiValidationSummary, string>;
       validationSummaryResult = await this.prompts.ValidateApi(
         this.validationService.validateViaFile({
-          file,
+          file: specFile.filePath!,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey
         })
       );
-    } else {
-      validationSummaryResult = await this.prompts.ValidateApi(
-        this.validationService.validateViaUrl({
-          url: url!,
-          configDir: this.configDir,
-          commandMetadata: this.commandMetadata,
-          authKey: this.authKey
-        })
-      );
-    }
 
-    if (validationSummaryResult.isErr()) {
-      this.prompts.logError(validationSummaryResult.error);
-      return ActionResult.failed();
-    }
-    const validationSummary = validationSummaryResult.value;
-    if (validationSummary?.success) {
-      this.prompts.displayValidationMessages(validationSummary);
-      return ActionResult.success();
-    } else {
-      this.prompts.displayValidationMessages(validationSummary);
-      return ActionResult.failed();
-    }
+      if (validationSummaryResult.isErr()) {
+        this.prompts.logError(validationSummaryResult.error);
+        return ActionResult.failed();
+      }
+      const validationSummary = validationSummaryResult.value;
+      if (validationSummary?.success) {
+        this.prompts.displayValidationMessages(validationSummary);
+        return ActionResult.success();
+      } else {
+        this.prompts.displayValidationMessages(validationSummary);
+        return ActionResult.failed();
+      }
+    });
   };
 }

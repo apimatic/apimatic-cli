@@ -2,12 +2,9 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { ValidateAction } from "../../actions/api/validate.js";
-import { FilePath } from "../../types/file/filePath.js";
-import path from "path";
-import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
-import { UrlPath } from "../../types/file/urlPath.js";
+import { createResourceInput } from "../../types/file/resource-input.js";
 
 export default class Validate extends Command {
   static summary = "Validate API specification for syntactic and semantic correctness";
@@ -36,30 +33,14 @@ export default class Validate extends Command {
     };
 
     const action = new ValidateAction(this.getConfigDir(), commandMetadata, authKey);
-    const { filePath, urlPath } = this.getPaths(file, url);
+    const specFile = createResourceInput(file, url);
 
     intro("Validate API");
-    const result = await action.execute(filePath, urlPath);
+    const result = await action.execute(specFile);
     outro(result);
   }
 
   private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
   };
-
-  private getPaths(file?: string, url?: string): { filePath?: FilePath; urlPath?: UrlPath } {
-    if (file) {
-      return {
-        filePath: new FilePath(new DirectoryPath(path.dirname(file)), new FileName(path.basename(file))),
-        urlPath: undefined
-      };
-    }
-    if (url) {
-      return {
-        filePath: undefined,
-        urlPath: UrlPath.create(url)
-      };
-    }
-    return { filePath: undefined, urlPath: undefined };
-  }
 }

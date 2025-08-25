@@ -54,7 +54,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     const workingDirectory = new DirectoryPath(destination ?? DEFAULT_WORKING_DIRECTORY);
     const transformedApiDirectory = workingDirectory.join("transformations");
-    const resourceInput = createResourceInput(file, url);
+    const specFile = createResourceInput(file, url);
 
     const commandMetadata: CommandMetadata = {
       commandName: Transform.id,
@@ -63,7 +63,7 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
     intro("Transform API");
     const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(format, transformedApiDirectory, force, resourceInput);
+    const result = await action.execute(format, transformedApiDirectory, force, specFile);
     outro(result);
   }
 
