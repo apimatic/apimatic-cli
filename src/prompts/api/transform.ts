@@ -33,8 +33,7 @@ export class ApiTransformPrompts {
     outro(`The transformed API specification can be found at ${transformedApiPath}`);
   }
 
-  logError(error: string): void {
+  logTransformationError(error: string): void {
     log.error(error);
   }
-
 }

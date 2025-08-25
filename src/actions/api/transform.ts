@@ -70,7 +70,7 @@ export class TransformAction {
       );
 
       if (result.isErr()) {
-        this.prompts.logError(result.error);
+        this.prompts.logTransformationError(result.error);
         return ActionResult.failed();
       }
 
