@@ -7,9 +7,11 @@ import { format, intro, outro } from "../../prompts/format.js";
 import { createResourceInput } from "../../types/file/resource-input.js";
 
 export default class Validate extends Command {
-  static summary = "Validate API specification for syntactic and semantic correctness";
+  static readonly summary = "Validate API specification for syntactic and semantic correctness";
 
-  static cmdTxt = format.cmd("apimatic", "api", "validate");
+  static readonly description = `Validate your API specification to ensure it adheres to syntactic and semantic standards.`;
+
+  static readonly cmdTxt = format.cmd("apimatic", "api", "validate");
 
   static examples = [
     `${Validate.cmdTxt} ${format.flag("file", "./specs/sample.json")}`,

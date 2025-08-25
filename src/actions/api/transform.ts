@@ -33,7 +33,7 @@ export class TransformAction {
     this.authKey = authKey;
   }
 
-  private getValidFormat = (format: string) => {
+  private readonly getValidFormat = (format: string) => {
     const key = Object.keys(TransformationFormats).find((value) => value === format) as
       | keyof typeof TransformationFormats
       | undefined;

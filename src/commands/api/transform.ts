@@ -9,12 +9,12 @@ import { createResourceInput } from "../../types/file/resource-input.js";
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class Transform extends Command {
-  static summary = "Transform API specifications between different formats";
+  static readonly summary = "Transform API specifications between different formats";
 
   static readonly description = `Transform API specifications from one format to another.
 Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.`;
 
-  static cmdTxt = format.cmd("apimatic", "api", "transform");
+  static readonly cmdTxt = format.cmd("apimatic", "api", "transform");
 
   static examples = [
     `${Transform.cmdTxt} ${format.flag("format", "OPENAPI3YAML")} ${format.flag(
