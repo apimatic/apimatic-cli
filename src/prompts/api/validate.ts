@@ -12,6 +12,11 @@ export class ApiValidatePrompts {
     return withSpinner("Validating API", "API validated successfully.", "API validation failed.", fn);
   }
 
+  public async InvalidFilePathProvided() {
+    const message = `Invalid file path or URL provided.`;
+    log.error(message);
+  }
+
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {
     const singleError: string = errors.join("\n") || "";
 

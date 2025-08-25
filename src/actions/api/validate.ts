@@ -8,7 +8,6 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { ResourceInput, resolveSpecFilePath } from "../../types/file/resource-input.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 
-
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
   private readonly validationService: ValidationService = new ValidationService();
@@ -24,12 +23,15 @@ export class ValidateAction {
 
   public readonly execute = async (resourcePath: ResourceInput): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-      const specFile = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
-
+      const specFileResult = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
+      if (specFileResult.isErr()) {
+        this.prompts.InvalidFilePathProvided();
+        return ActionResult.failed();
+      }
       let validationSummaryResult: Result<ApiValidationSummary, string>;
       validationSummaryResult = await this.prompts.ValidateApi(
         this.validationService.validateViaFile({
-          file: specFile.filePath!,
+          file: specFileResult.value,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey
