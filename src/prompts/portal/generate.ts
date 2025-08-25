@@ -36,7 +36,7 @@ export class PortalGeneratePrompts {
   }
 
   public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>>) {
-    var result = withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
+    const result = withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
     this.cleanUpStandardInput();
     return result;
   }
