@@ -36,11 +36,11 @@ export class TransformAction {
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
       const specFileResult = await resolveSpecFilePath(tempDirectory, resourcePath.path.toString());
-      if (!specFileResult.filePath) {
+      if (specFileResult.isErr()) {
         this.prompts.InvalidFilePathProvided();
         return ActionResult.failed();
       }
-      const transformContext = new TransformContext(destination, format, specFileResult.filePath);
+      const transformContext = new TransformContext(destination, format, specFileResult.value);
 
       if (!force && (await transformContext.exists()) && !(await this.prompts.overwriteApi(destination))) {
         this.prompts.transformedApiDirectoryNotEmpty();
@@ -49,7 +49,7 @@ export class TransformAction {
 
       const result = await this.prompts.transformApi(
         this.transformationService.transformViaFile({
-          file: specFileResult.filePath,
+          file: specFileResult.value,
           format: format,
           configDir: this.configDir,
           commandMetadata: this.commandMetadata,
