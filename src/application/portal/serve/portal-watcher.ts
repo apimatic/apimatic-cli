@@ -7,11 +7,7 @@ import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ActionResult } from "../../../actions/action-result.js";
 
 export class PortalWatcher {
-  private watcherHandler: WatcherHandler;
-
-  constructor() {
-    this.watcherHandler = new WatcherHandler();
-  }
+  private readonly watcherHandler: WatcherHandler =  new WatcherHandler();
 
   public async watchAndRegeneratePortalOnChange(
     buildDirectory: DirectoryPath,
@@ -24,51 +20,7 @@ export class PortalWatcher {
     ) => Promise<ActionResult>
   ) {
     //Regex matches any hidden files and folders.
-    const watcher = chokidar.watch(buildDirectory.toString(), {
-      ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: true,
-      persistent: true,
-      awaitWriteFinish: true,
-      atomic: true
-    });
 
-    const deletedDirectories = new Set<string>();
-    const eventQueue = new Map();
-    const mutex = new Mutex();
-
-    watcher
-      .on("all", async (event, path) => {
-        if (event == "unlinkDir") {
-          deletedDirectories.add(path);
-        }
-
-        if (event == "unlink") {
-          for (const dir of deletedDirectories) {
-            if (path.startsWith(dir)) {
-              return;
-            }
-          }
-        }
-
-        const eventId: string = `${Date.now()}-${crypto.randomUUID()}`;
-
-        await mutex.runExclusive(async () => {
-          eventQueue.clear();
-          eventQueue.set(eventId, path);
-        });
-
-        await this.watcherHandler.execute(async () => {
-          await this.handleFileChange(buildDirectory, portalDirectory, eventQueue, eventId, generatePortal);
-        });
-      })
-      .on("error", () => {
-        console.error(
-          "An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at support@apimatic.io"
-        );
-        watcher.close();
-      });
-
-    return watcher;
   }
 
   // TODO: Remove this method. Figure out a better way to do this.

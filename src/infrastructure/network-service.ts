@@ -1,6 +1,5 @@
 import getPort from "get-port";
 import net from "net";
-import open from "open";
 
 export class NetworkService {
 
@@ -21,9 +20,5 @@ export class NetworkService {
 
   public async getServerPort(preferredPorts: number[]): Promise<number> {
     return await getPort({ port: preferredPorts });
-  }
-
-  public openUrlInBrowser(url: string) {
-    return open(url);
   }
 }
