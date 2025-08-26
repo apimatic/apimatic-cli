@@ -35,41 +35,33 @@ export class GenerateAction {
     zipSdk: boolean
   ): Promise<ActionResult> => {
     if (specDirectory.isEqual(sdkDirectory)) {
-      // return ActionResult.error(`The spec directory and sdk directory cannot be the same: "${specDirectory}"`);
+      this.prompts.sameSpecAndSdkDir(specDirectory);
       return ActionResult.failed();
     }
 
     const specContext = new SpecContext(specDirectory);
     if (!(await specContext.validate())) {
-      // return ActionResult.error(`The spec directory is either empty or invalid: "${specDirectory}"`);
+      this.prompts.invalidSpecDirectory(specDirectory);
       return ActionResult.failed();
     }
 
     const sdkContext = new SdkContext(sdkDirectory, platform);
     if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
-      // return ActionResult.error(
-      //   "Please enter a different destination folder or remove the existing files and try again."
-      // );
+      this.prompts.destinationDirNotEmpty();
       return ActionResult.failed();
     }
 
     return await withDirPath(async (tempDirectory) => {
-      this.prompts.displaySdkGenerationMessage();
-
       const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
       await this.zipArchiver.archive(specDirectory, specZipPath);
 
-      const response = await this.portalService.generateSdk(
-        specZipPath,
-        platform,
-        this.configDir,
-        this.commandMetadata,
-        this.authKey
+      const response = await this.prompts.generateSDK(
+        this.portalService.generateSdk(specZipPath, platform, this.configDir, this.commandMetadata, this.authKey)
       );
 
       if (response.isErr()) {
-        this.prompts.displaySdkGenerationErrorMessage();
-       // return ActionResult.error(response.error!);
+        this.prompts.logGenerationError(response.error);
+        // return ActionResult.error(response.error!);
         return ActionResult.failed();
       }
 
@@ -77,8 +69,6 @@ export class GenerateAction {
       await this.fileService.writeFile(tempSdkFilePath, response.value);
 
       await sdkContext.save(tempSdkFilePath, zipSdk);
-      this.prompts.displaySdkGenerationSuccessMessage();
-
       return ActionResult.success();
     });
   };

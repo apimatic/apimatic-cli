@@ -1,8 +1,8 @@
 import { spinner, isCancel, confirm, log } from "@clack/prompts";
-import { getMessageInRedColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { withSpinner } from "../format.js";
 import { Result } from "neverthrow";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 export class SdkGeneratePrompts {
   private readonly spin = spinner();
@@ -20,22 +20,32 @@ export class SdkGeneratePrompts {
     return overwrite;
   }
 
-  public async transformApi(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
+  public sameSpecAndSdkDir(directory: DirectoryPath) {
+    const message = `Specification and SDK directories cannot be the same: ${directory}.`;
+    log.error(message);
+  }
+
+  public invalidSpecDirectory(directory: DirectoryPath) {
+    const message = `Invalid specification directory: ${directory}.`;
+    log.error(message);
+  }
+
+  public destinationDirNotEmpty() {
+    const message = `Destination directory is not empty. Please enter a different destination folder or remove the existing files and try again.`;
+    log.error(message);
+  }
+
+  public async generateSDK(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
-  displaySdkGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Generating SDK"));
+  public networkError(serviceError: ServiceError): void {
+    const message = getErrorMessage(serviceError);
+    this.logError(message);
   }
 
-  displaySdkGenerationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor("SDK generated successfully."));
-    this.cleanUpStandardInput();
-  }
-
-  displaySdkGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`SDK Generation failed.`), 1);
-    this.cleanUpStandardInput();
+   logGenerationError(error: string): void {
+    log.error(error);
   }
 
   logError(error: string): void {

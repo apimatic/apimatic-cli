@@ -57,12 +57,10 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     const specDirectory = new DirectoryPath(spec);
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(language);
 
-    // Single method call for validation and platform conversion
     const platformResult = this.getValidPlatform(language);
     if (platformResult.isErr()) {
       this.error(platformResult.error);
     }
-
     const platform = platformResult.value;
 
     const commandMetadata: CommandMetadata = {
@@ -72,8 +70,6 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-
-    // Pass the platform directly to action
     const result = await action.execute(specDirectory, sdkDirectory, platform, force, zipSdk);
     outro(result);
   }
