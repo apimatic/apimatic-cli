@@ -57,7 +57,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     const specDirectory = new DirectoryPath(spec);
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(language);
 
-    const platformResult = this.getValidPlatform(language);
+    const platformResult = this.getValidLanguage(language);
     if (platformResult.isErr()) {
       this.error(platformResult.error);
     }
@@ -77,7 +77,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     return new DirectoryPath(this.config.configDir);
   };
 
-  private readonly getValidPlatform = (language: string): Result<Platforms, string> => {
+  private readonly getValidLanguage = (language: string): Result<Platforms, string> => {
     if (!(language in LANGUAGE_PLATFORM_MAP)) {
       const supportedLanguages = Object.keys(LANGUAGE_PLATFORM_MAP).join(" | ");
       return err(`Invalid language '${language}'. Supported languages: ${supportedLanguages}`);
