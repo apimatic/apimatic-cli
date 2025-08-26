@@ -2,8 +2,6 @@ import { ZipService } from "../../infrastructure/zip-service.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { FileName } from "../../types/file/fileName.js";
 import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { SdkContext } from "../../types/sdk-context.js";
