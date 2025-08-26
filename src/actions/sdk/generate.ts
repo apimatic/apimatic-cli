@@ -48,7 +48,7 @@ export class GenerateAction {
     const sdkContext = new SdkContext(sdkDirectory, platform);
     if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
       this.prompts.destinationDirNotEmpty();
-      return ActionResult.failed();
+      return ActionResult.cancelled();
     }
 
     return await withDirPath(async (tempDirectory) => {
@@ -61,7 +61,6 @@ export class GenerateAction {
 
       if (response.isErr()) {
         this.prompts.logGenerationError(response.error);
-        // return ActionResult.error(response.error!);
         return ActionResult.failed();
       }
 
