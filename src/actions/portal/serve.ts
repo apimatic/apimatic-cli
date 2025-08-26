@@ -4,10 +4,12 @@ import { ActionResult } from "../action-result.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { GenerateAction } from "./generate.js";
 import { PortalServeService } from "../../infrastructure/services/portal-serve-service.js";
+import { NetworkService } from "../../infrastructure/network-service.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly portalServeService: PortalServeService = new PortalServeService();
+  private readonly networkService: NetworkService = new NetworkService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -26,30 +28,30 @@ export class PortalServeAction {
     noReload: boolean,
     displayServeCommandMessages: boolean = true
   ): Promise<ActionResult> {
-    const portAvailable = await this.portalServeService.isPortAvailable(port);
-    const serverPort = portAvailable ? port : await this.portalServeService.getServerPort();
-    if (!portAvailable) {
-      this.prompts.portAlreadyInUse(port, serverPort);
+
+    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
+    if (servePort != port) {
+      this.prompts.portAlreadyInUse(port, servePort);
     }
 
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
     const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
     return result.mapAll<Promise<ActionResult>>(
       async () => {
-        this.portalServeService.servePortal(
+        await this.portalServeService.servePortal(
           buildDirectory,
           portalDirectory,
           generatePortalAction.execute,
-          serverPort,
+          servePort,
           openInBrowser,
           noReload
         );
 
         if (displayServeCommandMessages) {
           this.prompts.nextSteps(
-            buildDirectory.toString(),
-            portalDirectory.toString(),
-            serverPort.toString(),
+            buildDirectory,
+            portalDirectory,
+            servePort,
             noReload
           );
         }

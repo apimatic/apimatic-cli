@@ -37,7 +37,8 @@ export default class PortalServe extends Command {
   static cmdTxt = format.cmd("apimatic", "portal", "serve");
   static examples = [
     this.cmdTxt,
-    `${this.cmdTxt} ${format.flag("input", '"./"')} ` +
+    `${this.cmdTxt}` +
+      `${format.flag("input", '"./"')} ` +
       `${format.flag("destination", '"./portal"')} ` +
       `${format.flag("port", "3000")} ` +
       `${format.flag("open")} ` +

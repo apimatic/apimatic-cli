@@ -39,7 +39,7 @@ export class PortalServeService {
     const server = this.application
       .listen(serverPort, async () => {
         if (openInBrowser) {
-          this.networkService.openUrlInBrowser(`http://localhost:${serverPort}`);
+          await this.networkService.openUrlInBrowser(`http://localhost:${serverPort}`);
         }
 
         if (!noReload) {

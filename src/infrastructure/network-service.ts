@@ -3,6 +3,7 @@ import net from "net";
 import open from "open";
 
 export class NetworkService {
+
   public async isPortAvailable(port: number): Promise<boolean> {
     return new Promise((resolve) => {
       const server = net
@@ -22,7 +23,7 @@ export class NetworkService {
     return await getPort({ port: preferredPorts });
   }
 
-  public openUrlInBrowser(url: string): void {
-    open(url);
+  public openUrlInBrowser(url: string) {
+    return open(url);
   }
 }
