@@ -2,11 +2,9 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
-import { Language, LANGUAGE_PLATFORM_MAP } from "../../types/sdk/generate.js";
+import { Language, languagePlatform } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
-import { err, ok, Result } from "neverthrow";
-import { Platforms } from "@apimatic/sdk";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -22,7 +20,8 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     language: Flags.string({
       char: "l",
       required: true,
-      description: "Programming language for SDK generation"
+      description: "Programming language for SDK generation",
+      options: Object.values(Language).map((p) => p.valueOf()),
     }),
     spec: Flags.string({
       description: "Path to the folder containing the API specification file",
@@ -57,11 +56,6 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     const specDirectory = new DirectoryPath(spec);
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(language);
 
-    const platformResult = this.getValidLanguage(language);
-    if (platformResult.isErr()) {
-      this.error(platformResult.error);
-    }
-
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
       shell: this.config.shell
@@ -69,20 +63,11 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, platformResult.value, force, zipSdk);
+    const result = await action.execute(specDirectory, sdkDirectory, languagePlatform[language as Language], force, zipSdk);
     outro(result);
   }
 
   private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
-  };
-
-  private readonly getValidLanguage = (language: string): Result<Platforms, string> => {
-    if (!(language in LANGUAGE_PLATFORM_MAP)) {
-      const supportedLanguages = Object.keys(LANGUAGE_PLATFORM_MAP).join(" | ");
-      return err(`Invalid language '${language}'. Supported languages: ${supportedLanguages}`);
-    }
-
-    return ok(LANGUAGE_PLATFORM_MAP[language as Language]);
   };
 }
