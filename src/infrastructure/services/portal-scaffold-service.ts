@@ -5,9 +5,13 @@ import { err, ok, Result } from "neverthrow";
 import { ResourceContext } from "../../types/resource-context.js";
 import { BuildContext } from "../../types/build-context.js";
 import { FilePath } from "../../types/file/filePath.js";
+import { UrlPath } from "../../types/file/urlPath.js";
+import { ZipService } from "../zip-service.js";
 
 export class PortalScaffoldService {
   private readonly fileService: FileService = new FileService();
+  private readonly zipService: ZipService = new ZipService();
+
   private readonly zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`;
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
   private readonly defaultSpecFileName = new FileName("openapi.json");
@@ -19,11 +23,13 @@ export class PortalScaffoldService {
   ): Promise<Result<DirectoryPath, string>> {
     try {
       const resourceContext = new ResourceContext(tempDirectory);
-      const result = await resourceContext.resolveTo(this.zipUrl, this.repositoryFolderName);
+      // TODO: repositoryFolderName should be handled
+      const result = await resourceContext.resolveTo(new UrlPath(this.zipUrl));
       if (result.isErr()) {
         return err("Unable to setup the portal, please try again later.");
       }
-      const extractedFolder = result.value.join(this.repositoryFolderName);
+      await this.zipService.unArchive(result.value, tempDirectory);
+      const extractedFolder = tempDirectory.join(this.repositoryFolderName);
       await this.fileService.deleteDirectory(extractedFolder.join(".github"));
 
       // Setup spec.
@@ -31,7 +37,6 @@ export class PortalScaffoldService {
       // TODO: Replace this with SpecContext
       await this.fileService.deleteFile(new FilePath(tempSpecDirectory, this.defaultSpecFileName));
       await this.fileService.copyDirectory(specDirectory, tempSpecDirectory);
-
       const buildContext = new BuildContext(extractedFolder);
       const buildFile = await buildContext.getBuildFileContents();
       buildFile.generatePortal!.languageConfig = selectedLanguages.reduce((config, lang) => {
