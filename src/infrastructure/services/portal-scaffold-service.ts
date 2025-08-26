@@ -6,11 +6,10 @@ import { ResourceContext } from "../../types/resource-context.js";
 import { BuildContext } from "../../types/build-context.js";
 import { FilePath } from "../../types/file/filePath.js";
 
-const zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip` as const;
-const repositoryFolderName = "static-portal-workflow-master" as const;
-
 export class PortalScaffoldService {
   private readonly fileService: FileService = new FileService();
+  private readonly zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip` as const;
+  private readonly repositoryFolderName = "static-portal-workflow-master" as const;
   private readonly defaultSpecFileName = new FileName("openapi.json");
 
   public async createBuildDirectory(
@@ -19,11 +18,11 @@ export class PortalScaffoldService {
     selectedLanguages: string[]
   ): Promise<Result<DirectoryPath, string>> {
     const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolveTo(zipUrl, repositoryFolderName);
+    const result = await resourceContext.resolveTo(this.zipUrl, this.repositoryFolderName);
     if (result.isErr()) {
       return err(result.error);
     }
-    const extractedFolder = result.value.join(repositoryFolderName);
+    const extractedFolder = result.value.join(this.repositoryFolderName);
     await this.fileService.deleteDirectory(extractedFolder.join(".github"));
 
     // Setup spec.
