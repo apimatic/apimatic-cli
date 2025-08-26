@@ -18,7 +18,7 @@ export class ResourceContext {
   constructor(private readonly tempDirectory: DirectoryPath) {}
 
   public async resolveTo(resourcePath: ResourceInput): Promise<Result<FilePath, ServiceError>> {
-    const fileName = this.resolveFileName(resourcePath);
+    const fileName = new FileName(path.basename(resourcePath.toString()));
     const destinationFilePath = new FilePath(this.tempDirectory, fileName);
 
     if (resourcePath instanceof UrlPath) {
@@ -32,13 +32,5 @@ export class ResourceContext {
       await this.fileService.copy(resourcePath, destinationFilePath);
     }
     return ok(destinationFilePath);
-  }
-
-  private resolveFileName(resourcePath: ResourceInput): FileName {
-    if (resourcePath instanceof UrlPath) {
-      return new FileName(path.basename(resourcePath.toString()));
-    } else {
-      return new FileName(path.basename(resourcePath.toString()));
-    }
   }
 }
