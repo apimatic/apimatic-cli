@@ -61,7 +61,6 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     if (platformResult.isErr()) {
       this.error(platformResult.error);
     }
-    const platform = platformResult.value;
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
@@ -70,7 +69,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, platform, force, zipSdk);
+    const result = await action.execute(specDirectory, sdkDirectory, platformResult.value, force, zipSdk);
     outro(result);
   }
 
@@ -79,14 +78,11 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
   };
 
   private readonly getValidPlatform = (language: string): Result<Platforms, string> => {
-    const validLanguages = Object.values(Language);
-    const foundLanguage = validLanguages.find((lang) => lang === language);
-
-    if (!foundLanguage) {
-      const availableLanguages = validLanguages.join(" | ");
-      return err(`Invalid language '${language}'. Supported languages: ${availableLanguages}`);
+    if (!(language in LANGUAGE_PLATFORM_MAP)) {
+      const supportedLanguages = Object.keys(LANGUAGE_PLATFORM_MAP).join(" | ");
+      return err(`Invalid language '${language}'. Supported languages: ${supportedLanguages}`);
     }
 
-    return ok(LANGUAGE_PLATFORM_MAP[foundLanguage]);
+    return ok(LANGUAGE_PLATFORM_MAP[language as Language]);
   };
 }
