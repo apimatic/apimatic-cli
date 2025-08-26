@@ -4,7 +4,7 @@ export interface SubscriptionInfo {
   FullName: string;
   SecurityStamp: string;
   tenantId: string;
-  allowedLanguages: string; // might be a comma-separated string or code — clarify if needed
+  allowedLanguages: number; // might be a comma-separated string or code — clarify if needed
   isPackagePublishingAllowed: boolean;
   ApiCopilotKeys: string[];
 }

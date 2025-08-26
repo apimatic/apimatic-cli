@@ -23,11 +23,6 @@ export class SDKClient {
     return SDKClient.instance;
   }
 
-  public async logout(configDir: string): Promise<string> {
-    await removeAuthInfo(configDir);
-    return "Logged out";
-  }
-
   public async status(configDir: string): Promise<string> {
     try {
       let storedAuthInfo: AuthInfo | null = await getAuthInfo(configDir);
