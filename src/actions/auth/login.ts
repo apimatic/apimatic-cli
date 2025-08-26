@@ -8,6 +8,7 @@ import { LoginPrompts } from "../../prompts/auth/login.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { ActionResult } from "../action-result.js";
 import { err, ok, Result } from "neverthrow";
+import { StatusAction } from "./status.js";
 
 type LoginTimout = "TIMEOUT";
 
@@ -25,6 +26,8 @@ export class LoginAction {
       return ActionResult.failed();
     }
 
+    // TODO: Use status endpoint here
+    // Problem, we don't have email info here, just the key and required for setAuthInfo
     const accountInfoResult =
       await this.prompts.accountInfoSpinner(
         this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, apiKeyResult.value)

@@ -20,7 +20,8 @@ export default class Status extends Command {
     };
 
     intro('Status')
-    const actionResult = await new StatusAction(new DirectoryPath(this.config.configDir), commandMetadata).execute();
+    const statusAction = new StatusAction(new DirectoryPath(this.config.configDir), commandMetadata);
+    const actionResult = await statusAction.execute(null);
     outro(actionResult)
   }
 }

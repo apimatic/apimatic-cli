@@ -11,13 +11,13 @@ export class StatusAction {
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
-  public async execute(): Promise<ActionResult> {
+  public async execute(authKey: string | null): Promise<ActionResult> {
     const accountInfo = await getAuthInfo(this.configDir.toString());
     if (accountInfo === null) {
       return ActionResult.failed();
     }
     const result = await this.prompts.accountInfoSpinner(
-      this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, accountInfo.authKey)
+      this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, authKey)
     );
     if (result.isErr()) {
       this.prompts.invalidKeyProvided(result.error);
