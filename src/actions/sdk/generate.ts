@@ -1,5 +1,3 @@
-import { ZipService } from "../../infrastructure/zip-service.js";
-import { FileService } from "../../infrastructure/file-service.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
@@ -13,8 +11,6 @@ import { TempContext } from "../../types/temp-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
-  private readonly zipArchiver: ZipService = new ZipService();
-  private readonly fileService: FileService = new FileService();
   private readonly portalService: PortalService = new PortalService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
