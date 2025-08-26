@@ -18,6 +18,7 @@ export class TransformContext {
   }
 
   private get specPath(): FilePath {
+    this.fileService.createDirectoryIfNotExists(this.destinationDirectory);
     return new FilePath(this.destinationDirectory, this.transformedApi);
   }
 

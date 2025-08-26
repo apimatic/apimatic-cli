@@ -32,7 +32,6 @@ export class TransformAction {
     force: boolean
   ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
-
       const resourceContext = new ResourceContext(tempDirectory);
       const specFileDirResult = await resourceContext.resolveTo(resourcePath);
       if (specFileDirResult.isErr()){
