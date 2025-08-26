@@ -73,7 +73,7 @@ export class TransformationService {
     return `X-Auth-Key ${key ?? ""}`;
   }
 
-  private createOriginQueryParameter = (commandName: string): Record<string, string> => {
+  private readonly createOriginQueryParameter = (commandName: string): Record<string, string> => {
     return {
       origin: `APIMATIC CLI ${commandName}`
     };
