@@ -34,7 +34,7 @@ export class PortalQuickstartAction {
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
-    this.validationService = new ValidationService(configDir, commandMetadata);
+    this.validationService = new ValidationService(configDir);
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
@@ -127,11 +127,11 @@ export class PortalQuickstartAction {
     }
 
     const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolveTo(inputPath, "spec");
+    const result = await resourceContext.resolveTo(new UrlPath(inputPath));
     if (result.isErr()) {
       return err(result.error);
     }
-    return ok(result.value);
+    return ok(new DirectoryPath(result.value.toString(), "spec"));
   }
 
   // TODO: Needs to be refactored after refactoring validate action.
@@ -148,9 +148,12 @@ export class PortalQuickstartAction {
     const specZipFilePath = new FilePath(tempDirectory, new FileName("spec.zip"));
     await this.zipService.archive(specDirectory, specZipFilePath);
 
-    const validationResult = await this.validationService.validateViaFile({ file: specZipFilePath });
+    const validationResult = await this.validationService.validateViaFile({
+      file: specZipFilePath,
+      commandMetadata: this.commandMetadata
+    });
     // TODO: Add spinner when refactoring
-    if (validationResult.isFailed()) {
+    if (validationResult.isErr()) {
       this.prompts.stopProgressIndicator(`Something went wrong while validating your API Definition.`, 1);
       return Result.failure(validationResult.error!);
     }
@@ -168,11 +171,11 @@ export class PortalQuickstartAction {
 
     // Use default spec...
     const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolveTo(defaultSpecUrl.toString(), "spec");
+    const result = await resourceContext.resolveTo(defaultSpecUrl);
     if (result.isErr()) {
       return Result.failure(result.error);
     }
-    return Result.success(result.value);
+    return Result.success(new DirectoryPath(result.value.toString(), "spec"));
   }
 
   private async selectLanguages(): Promise<ResultEx<string[], string>> {

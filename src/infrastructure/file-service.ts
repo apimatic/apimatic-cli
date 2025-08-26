@@ -40,6 +40,10 @@ export class FileService {
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
+  public async createDirectoryIfNotExists(dir: DirectoryPath): Promise<void> {
+    await fsExtra.ensureDir(dir.toString());
+  }
+
   public async copyDirectory(source: DirectoryPath, destination: DirectoryPath) {
     await fsExtra.copy(source.toString(), destination.toString());
   }
