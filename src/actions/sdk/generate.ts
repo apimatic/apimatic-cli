@@ -11,6 +11,7 @@ import { Platforms } from "@apimatic/sdk";
 import { SpecContext } from "../../types/spec-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { TempContext } from "../../types/temp-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -52,8 +53,8 @@ export class GenerateAction {
     }
 
     return await withDirPath(async (tempDirectory) => {
-      const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
-      await this.zipArchiver.archive(specDirectory, specZipPath);
+      const tempContext = new TempContext(tempDirectory);
+      const specZipPath = await tempContext.zip(specDirectory);
 
       const response = await this.prompts.generateSDK(
         this.portalService.generateSdk(specZipPath, platform, this.configDir, this.commandMetadata, this.authKey)
@@ -64,9 +65,7 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const tempSdkFilePath = new FilePath(tempDirectory, new FileName("sdk.zip"));
-      await this.fileService.writeFile(tempSdkFilePath, response.value);
-
+      const tempSdkFilePath = await tempContext.save(response.value);
       await sdkContext.save(tempSdkFilePath, zipSdk);
       return ActionResult.success();
     });
