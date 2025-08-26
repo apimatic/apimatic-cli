@@ -16,6 +16,6 @@ export class FilePath {
   }
 
   public toString(): string {
-    return path.join(this.directoryPath.toString() , this.fileName.toString());
+    return path.join(this.directoryPath.toString(), this.fileName.toString());
   }
 }

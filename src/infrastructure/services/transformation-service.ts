@@ -12,23 +12,15 @@ import {
 
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { TransformationData } from "../../types/api/transform.js";
-import { Result } from "../../types/common/result.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-
-export interface TransformViaUrlParams {
-  url: string;
-  format: string;
-  configDir: DirectoryPath;
-  commandMetadata: CommandMetadata;
-  authKey?: string | null;
-}
+import { err, ok, Result} from "neverthrow";
 
 export interface TransformViaFileParams {
   file: FilePath;
-  format: string;
+  format: ExportFormats;
   configDir: DirectoryPath;
   commandMetadata: CommandMetadata;
   authKey?: string | null;
@@ -42,39 +34,7 @@ export interface TransformationResultData {
 export class TransformationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
 
-  //TODO: we can remove this endpoint and use the transformViaFile in case url is given. We can download the file within the CLI from the url and pass it to the transformViaFile endpoint
-  async transformViaUrl({
-    url,
-    format,
-    configDir,
-    commandMetadata,
-    authKey
-  }: TransformViaUrlParams): Promise<Result<TransformationResultData, string>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
-    const transformationController = new TransformationController(client);
-
-    try {
-      //TODO: Update spec to include origin query parameter.
-      const generation: ApiResponse<Transformation> = await transformationController.transformViaUrl({
-        url: url,
-        exportFormat: format as ExportFormats
-      });
-
-      const { id, apiValidationSummary } = generation.result;
-      const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
-
-      return Result.success({
-        stream: result as NodeJS.ReadableStream,
-        apiValidationSummary
-      });
-    } catch (error) {
-      return Result.failure(await this.handleTransformationErrors(error));
-    }
-  }
-
-  async transformViaFile({
+  public async transformViaFile({
     file,
     format,
     configDir,
@@ -99,12 +59,12 @@ export class TransformationService {
       const { id, apiValidationSummary } = generation.result;
       const { result }: TransformationData = await transformationController.downloadTransformedFile(id);
 
-      return Result.success({
+      return ok({
         stream: result as NodeJS.ReadableStream,
         apiValidationSummary
       });
     } catch (error) {
-      return Result.failure(await this.handleTransformationErrors(error));
+      return err(await this.handleTransformationErrors(error));
     }
   }
 
@@ -113,7 +73,7 @@ export class TransformationService {
     return `X-Auth-Key ${key ?? ""}`;
   }
 
-  private createOriginQueryParameter = (commandName: string): Record<string, string> => {
+  private readonly createOriginQueryParameter = (commandName: string): Record<string, string> => {
     return {
       origin: `APIMATIC CLI ${commandName}`
     };
