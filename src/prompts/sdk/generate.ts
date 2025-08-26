@@ -1,4 +1,4 @@
-import { outro, spinner, isCancel, confirm, log } from "@clack/prompts";
+import { spinner, isCancel, confirm, log } from "@clack/prompts";
 import { getMessageInRedColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
@@ -30,10 +30,6 @@ export class SdkGeneratePrompts {
   displaySdkGenerationErrorMessage(): void {
     this.spin.stop(getMessageInRedColor(`SDK Generation failed.`), 1);
     this.cleanUpStandardInput();
-  }
-
-  displayOutroMessage(generatedSdkPath: DirectoryPath): void {
-    outro(`The generated SDK can be found at ${generatedSdkPath}`);
   }
 
   logError(error: string): void {
