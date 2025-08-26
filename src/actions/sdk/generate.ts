@@ -10,7 +10,6 @@ import { SdkContext } from "../../types/sdk-context.js";
 import { Platforms } from "@apimatic/sdk";
 import { SpecContext } from "../../types/spec-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
-import { Language } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class GenerateAction {
@@ -31,7 +30,7 @@ export class GenerateAction {
   public readonly execute = async (
     specDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
-    language: Language,
+    platform: Platforms,
     force: boolean,
     zipSdk: boolean
   ): Promise<ActionResult> => {
@@ -46,7 +45,7 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, language);
+    const sdkContext = new SdkContext(sdkDirectory, platform);
     if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
       // return ActionResult.error(
       //   "Please enter a different destination folder or remove the existing files and try again."
@@ -60,7 +59,6 @@ export class GenerateAction {
       const specZipPath = new FilePath(tempDirectory, new FileName("spec.zip"));
       await this.zipArchiver.archive(specDirectory, specZipPath);
 
-      const platform = this.convertLanguageToPlatform(language);
       const response = await this.portalService.generateSdk(
         specZipPath,
         platform,
@@ -84,25 +82,4 @@ export class GenerateAction {
       return ActionResult.success();
     });
   };
-
-  private convertLanguageToPlatform(language: Language): Platforms {
-    switch (language) {
-      case Language.CSHARP:
-        return Platforms.CsNetStandardLib;
-      case Language.JAVA:
-        return Platforms.JavaEclipseJreLib;
-      case Language.PHP:
-        return Platforms.PhpGenericLibV2;
-      case Language.PYTHON:
-        return Platforms.PythonGenericLib;
-      case Language.RUBY:
-        return Platforms.RubyGenericLib;
-      case Language.TYPESCRIPT:
-        return Platforms.TsGenericLib;
-      case Language.GO:
-        return Platforms.GoGenericLib;
-      default:
-        throw new Error(`Unknown LanguagePlatform: ${language}`);
-    }
-  }
 }
