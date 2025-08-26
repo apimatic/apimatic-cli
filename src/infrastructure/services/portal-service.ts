@@ -63,7 +63,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, string>> {
+  ): Promise<ResultEx<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
@@ -79,9 +79,9 @@ export class PortalService {
         this.createOriginQueryParameter(commandMetadata.commandName)
       );
       const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
-      return Result.success(sdkResponse.result as NodeJS.ReadableStream);
+      return ok(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
-      return Result.failure(await this.handleSdkGenerationErrors(error));
+      return err(await this.handleSdkGenerationErrors(error));
     } finally {
       specFileStream.close();
     }

@@ -1,6 +1,8 @@
 import { outro, spinner, isCancel, confirm, log } from "@clack/prompts";
 import { getMessageInRedColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { withSpinner } from "../format.js";
+import { Result } from "neverthrow";
 
 export class SdkGeneratePrompts {
   private readonly spin = spinner();
@@ -16,6 +18,10 @@ export class SdkGeneratePrompts {
     }
 
     return overwrite;
+  }
+
+  public async transformApi(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
+    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
   displaySdkGenerationMessage(): void {

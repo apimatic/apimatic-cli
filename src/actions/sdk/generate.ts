@@ -67,14 +67,14 @@ export class GenerateAction {
         this.authKey
       );
 
-      if (!response.isSuccess()) {
+      if (response.isErr()) {
         this.prompts.displaySdkGenerationErrorMessage();
        // return ActionResult.error(response.error!);
         return ActionResult.failed();
       }
 
       const tempSdkFilePath = new FilePath(tempDirectory, new FileName("sdk.zip"));
-      await this.fileService.writeFile(tempSdkFilePath, <NodeJS.ReadableStream>response.value);
+      await this.fileService.writeFile(tempSdkFilePath, response.value);
 
       await sdkContext.save(tempSdkFilePath, zipSdk);
       this.prompts.displaySdkGenerationSuccessMessage();
