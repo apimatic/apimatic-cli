@@ -10,6 +10,8 @@ import { format, intro, outro } from "../../prompts/format.js";
 export default class PortalQuickstart extends Command {
   static description = "Create your first API Portal using APIMatic's Docs as Code offering.";
 
+  static summary = "Get started with your first API Portal in four easy steps.";
+
   static cmdTxt = format.cmd("apimatic", "portal", "quickstart");
 
   static examples = [this.cmdTxt];

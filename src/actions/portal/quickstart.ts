@@ -51,6 +51,7 @@ export class PortalQuickstartAction {
       const specDirectory = await this.importSpec(tempDirectory);
       if (specDirectory.isErr()) {
         this.prompts.specImportError(specDirectory.error);
+        if (specDirectory.error === "cancelled") return ActionResult.cancelled();
         return ActionResult.failed();
       }
 
@@ -66,16 +67,23 @@ export class PortalQuickstartAction {
       }
 
       // Step 3/4
-      const selectedLanguages = await this.selectLanguages();
+      const selectedLanguagesResult = await this.selectLanguages();
+      if (selectedLanguagesResult.isErr()) {
+        return ActionResult.cancelled();
+      }
 
       // Step 4/4
-      const { sourceDirectory, portalDirectory } = await this.selectInputDirectory();
+      const selectInputDirectoryResult = await this.selectInputDirectory();
+      if (selectInputDirectoryResult.isErr()) {
+        return ActionResult.cancelled();
+      }
 
+      const { sourceDirectory, portalDirectory } = selectInputDirectoryResult.value;
       const buildDirectoryResult = await this.setupBuildDirectory(
         tempDirectory,
         sourceDirectory,
         validatedSpecDirectory.value!,
-        selectedLanguages
+        selectedLanguagesResult.value
       );
       if (buildDirectoryResult.isErr()) {
         this.prompts.buildSetupError(buildDirectoryResult.error);
@@ -114,6 +122,9 @@ export class PortalQuickstartAction {
   private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, string>> {
     this.prompts.importSpecStep();
     const inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
+    if (inputPath === null) {
+      return err("Operation cancelled. No API Definition was provided.");
+    }
 
     const resourceContext = new ResourceContext(tempDirectory);
     const result = await resourceContext.resolveTo(inputPath, "spec");
@@ -164,18 +175,31 @@ export class PortalQuickstartAction {
     return Result.success(result.value);
   }
 
-  private async selectLanguages(): Promise<string[]> {
+  private async selectLanguages(): Promise<ResultEx<string[], string>> {
     this.prompts.selectLanguagesStep();
 
-    return await this.prompts.selectLanguagesPrompt();
+    const languages = await this.prompts.selectLanguagesPrompt();
+    if (languages === null) {
+      this.prompts.noLanguagesSelected();
+      return err("cancelled");
+    }
+
+    return ok(languages);
   }
 
-  private async selectInputDirectory(): Promise<{ sourceDirectory: DirectoryPath; portalDirectory: DirectoryPath }> {
+  private async selectInputDirectory(): Promise<
+    ResultEx<{ sourceDirectory: DirectoryPath; portalDirectory: DirectoryPath }, string>
+  > {
     this.prompts.selectInputDirectoryStep();
 
-    const workingDirectory = new DirectoryPath(await this.prompts.inputDirectoryPathPrompt());
+    const inputDirectoryPath = await this.prompts.inputDirectoryPathPrompt();
+    if (inputDirectoryPath === null) {
+      this.prompts.noInputDirectoryProvided();
+      return err("cancelled");
+    }
 
-    return { sourceDirectory: workingDirectory.join("src"), portalDirectory: workingDirectory.join("portal") };
+    const workingDirectory = new DirectoryPath(inputDirectoryPath);
+    return ok({ sourceDirectory: workingDirectory.join("src"), portalDirectory: workingDirectory.join("portal") });
   }
 
   //TODO: Remove tempDirectory as param.
@@ -189,13 +213,12 @@ export class PortalQuickstartAction {
       sourceDirectory.toString(),
       this.portalScaffoldService.createBuildDirectory(tempDirectory, specDirectory, selectedLanguages)
     );
-
     if (result.isErr()) {
       return err(result.error);
     }
 
     await this.fileService.copyDirectoryContents(result.value, sourceDirectory);
-    this.prompts.displayBuildDirectoryAsTree(sourceDirectory.toString());
+    this.prompts.displayBuildDirectoryAsTree(sourceDirectory);
 
     return ok(result.value);
   }

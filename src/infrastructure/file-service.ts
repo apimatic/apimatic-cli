@@ -5,6 +5,7 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
+import { DirectoryNode } from "../types/file/directoryNode.js";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -87,6 +88,50 @@ export class FileService {
 
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
+  }
+
+  public removeQuotes(path: string): string {
+    const quotes = ['"', "'"];
+
+    for (const quote of quotes) {
+      if (path.startsWith(quote) && path.endsWith(quote) && path.length > 1) {
+        return this.removeQuotes(path.slice(1, -1)); // Recursive call
+      }
+    }
+    return path;
+  }
+
+  public convertDirectoryStructureToJson(
+    directoryPath: string,
+    descriptions: { [key: string]: string },
+    parentPath = ""
+  ): { [key: string]: DirectoryNode | string | null | undefined } {
+    const directoryStructure: { [key: string]: DirectoryNode | string | null | undefined } = {};
+
+    const items = fs.readdirSync(directoryPath);
+    items.forEach((item) => {
+      if (item === ".git") return; // Skip .git directory
+
+      const itemPath = path.join(directoryPath, item);
+      const relativePath = path.join(parentPath, item);
+      const stats = fs.statSync(itemPath);
+
+      if (stats.isDirectory()) {
+        const subdirectoryStructure = this.convertDirectoryStructureToJson(itemPath, descriptions, relativePath);
+
+        const folderName = descriptions[path.normalize(relativePath)]
+          ? `${item} : ${descriptions[path.normalize(relativePath)]}`
+          : item;
+
+        directoryStructure[folderName] = subdirectoryStructure;
+      } else {
+        directoryStructure[
+          descriptions[path.normalize(relativePath)] ? `${item} : ${descriptions[path.normalize(relativePath)]}` : item
+        ] = null;
+      }
+    });
+
+    return directoryStructure;
   }
 }
 

@@ -2,33 +2,32 @@ import * as path from "path";
 import fs from "fs";
 import axios from "axios";
 import treeify from "treeify";
-import { text, select, multiselect, log, isCancel, cancel, spinner } from "@clack/prompts";
+import { text, select, multiselect, log, isCancel, spinner } from "@clack/prompts";
 import { getMessageInGreenColor, getMessageInRedColor } from "../../utils/utils.js";
-import { DirectoryNode } from "../../types/portal/quickstart.js";
 import { UrlPath } from "../../types/file/urlPath.js";
-import { withSpinner } from "../format.js";
+import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { Result } from "neverthrow";
+import { FileService } from "../../infrastructure/file-service.js";
+
+const vscodeExtensionUrl =
+  "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
+const serverUrl = "http://localhost:3000";
+const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/advanced-portal-setup";
+const descriptions: { [key: string]: string } = Object.entries({
+  "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
+  spec: "# Contains all API definition files",
+  content: "# Includes custom documentation pages in Markdown",
+  "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal",
+  static: "# Includes all static files, such as images, GIFs, and PDFs"
+}).reduce((acc, [key, value]) => {
+  acc[path.normalize(key)] = value;
+  return acc;
+}, {} as { [key: string]: string });
+const defaultPortalDirectoryPath = process.cwd();
 
 export class PortalQuickstartPrompts {
-  private readonly vscodeExtensionUrl =
-    "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
-  private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
-  private readonly referenceDocumentationUrl =
-    "\u001b[4mhttps://docs.apimatic.io/cli-getting-started/advanced-portal-setup\u001b[0m";
-  private readonly defaultPortalDirectoryPath = process.cwd();
-  private readonly descriptions: { [key: string]: string } = Object.entries({
-    "APIMATIC-BUILD.json":
-      "# Defines all configurations for the API portal, including programming languages and themes",
-    spec: "# Contains all API definition files",
-    content: "# Includes custom documentation pages in Markdown",
-    "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal",
-    static: "# Includes all static files, such as images, GIFs, and PDFs"
-  }).reduce((acc, [key, value]) => {
-    acc[path.normalize(key)] = value;
-    return acc;
-  }, {} as { [key: string]: string });
-
+  private readonly fileService = new FileService();
   // TODO: Remove after refactoring validate action.
   private readonly spin = spinner();
 
@@ -61,7 +60,7 @@ export class PortalQuickstartPrompts {
   }
 
   //TODO: Very complex validation, needs to be improved.
-  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string> {
+  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string | null> {
     while (true) {
       const spec = await text({
         message: `Provide a local path or a public URL for your OpenAPI definition file:`,
@@ -70,7 +69,7 @@ export class PortalQuickstartPrompts {
         validate: (input) => {
           if (!input) return;
 
-          const cleanedPath = this.removeQuotes(input.trim() ?? "");
+          const cleanedPath = this.fileService.removeQuotes(input.trim() ?? "");
 
           if (!UrlPath.create(cleanedPath)) {
             const dirPath = path.resolve(cleanedPath);
@@ -89,11 +88,10 @@ export class PortalQuickstartPrompts {
       });
 
       if (isCancel(spec)) {
-        cancel("Operation cancelled.");
-        process.exit(1);
+        return null;
       }
 
-      const cleanedPath = this.removeQuotes(String(spec).trim());
+      const cleanedPath = this.fileService.removeQuotes(String(spec).trim());
 
       // Async validation for URLs
       if (UrlPath.create(cleanedPath)) {
@@ -115,6 +113,10 @@ export class PortalQuickstartPrompts {
     }
   }
 
+  public noSpecProvided() {
+    log.error("Operation cancelled. No API Definition was provided.");
+  }
+
   public specImportError(error: string) {
     log.error(error);
   }
@@ -129,15 +131,14 @@ export class PortalQuickstartPrompts {
       options: [
         {
           value: "no",
-          label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${this.vscodeExtensionUrl}`
+          label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${vscodeExtensionUrl}`
         },
         { value: "yes", label: `2. Use an example API spec instead (recommended)` }
       ]
     });
 
     if (isCancel(useDefaultSpec)) {
-      cancel("Operation cancelled.");
-      return process.exit(1);
+      return false;
     }
 
     return useDefaultSpec === "yes";
@@ -178,7 +179,7 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  public async selectLanguagesPrompt(): Promise<string[]> {
+  public async selectLanguagesPrompt(): Promise<string[] | null> {
     const languages = (await multiselect({
       message:
         "Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
@@ -195,11 +196,14 @@ export class PortalQuickstartPrompts {
     })) as string[];
 
     if (isCancel(languages)) {
-      cancel("Operation cancelled.");
-      return process.exit(1);
+      return null;
     }
 
     return ["http", ...languages];
+  }
+
+  public noLanguagesSelected() {
+    log.error("Operation cancelled. No programming languages were selected.");
   }
 
   public selectInputDirectoryStep() {
@@ -207,29 +211,29 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  public async inputDirectoryPathPrompt(): Promise<string> {
+  public async inputDirectoryPathPrompt(): Promise<string | null> {
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const cleanedPath = this.removeQuotes(input?.trim() ?? "");
-        const dirPath = path.resolve(cleanedPath);
+        const cleanedPath = this.fileService.removeQuotes(input?.trim() ?? "");
+        const inputDirectory = new DirectoryPath(cleanedPath);
 
-        if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
+        if (!fs.existsSync(inputDirectory.toString()) && inputDirectory.toString() != defaultPortalDirectoryPath) {
           return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
         }
 
-        if (dirPath !== this.defaultPortalDirectoryPath) {
-          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
+        if (inputDirectory.toString() !== defaultPortalDirectoryPath) {
+          const files = fs.readdirSync(inputDirectory.toString()).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
             return getMessageInRedColor(
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
             );
           }
-        } else if (fs.existsSync(dirPath)) {
+        } else if (fs.existsSync(inputDirectory.toString())) {
           // For ignoring hidden files and folders in the current directory in MacOS.
-          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
+          const files = fs.readdirSync(inputDirectory.toString()).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
             return getMessageInRedColor(
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
@@ -240,15 +244,18 @@ export class PortalQuickstartPrompts {
     });
 
     if (isCancel(directory)) {
-      cancel("Operation cancelled.");
-      return process.exit(1);
+      return null;
     }
 
     if (directory === "./") {
-      return this.defaultPortalDirectoryPath;
+      return defaultPortalDirectoryPath;
     } else {
-      return this.removeQuotes(String(directory).trim());
+      return this.fileService.removeQuotes(String(directory).trim());
     }
+  }
+
+  public noInputDirectoryProvided() {
+    log.error("Operation cancelled. No build directory was provided.");
   }
 
   public createBuildDirectory(sourceDirectory: string, fn: Promise<Result<DirectoryPath, string>>) {
@@ -264,8 +271,11 @@ export class PortalQuickstartPrompts {
     log.error(message);
   }
 
-  public displayBuildDirectoryAsTree(buildDirectory: string): void {
-    const structuredBuildDirectory = this.convertDirectoryStructureToJson(buildDirectory) as treeify.TreeObject;
+  public displayBuildDirectoryAsTree(buildDirectory: DirectoryPath): void {
+    const structuredBuildDirectory = this.fileService.convertDirectoryStructureToJson(
+      buildDirectory.toString(),
+      descriptions
+    ) as treeify.TreeObject;
 
     const tree = treeify.asTree(structuredBuildDirectory, true, true);
 
@@ -282,57 +292,16 @@ export class PortalQuickstartPrompts {
   }
 
   public nextSteps(buildDirectory: string): void {
-    log.step(
-      `Your API Portal is live at: ${this.serverUrl}\n` +
-        `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n` +
-        `Press CTRL+C to stop the server.`
-    );
-    log.step(
+    const firstMessage =
+      `Your API Portal is live at: ${f.path(serverUrl)}\n` +
+      `Hot reload enabled! Edit files in ${f.path(buildDirectory)} to see changes instantly reflected in your API Portal.\n` +
+      `Press CTRL+C to stop the server.`;
+    const secondMessage =
       `What's next?\n` +
-        `- Use the API Playground or an SDK to call your API.\n` +
-        `- Customize the Portal theme, add API recipes and enable AI features: ${this.referenceDocumentationUrl}`
-    );
-  }
+      `- Use the API Playground or an SDK to call your API.\n` +
+      `- Customize the Portal theme, add API recipes and enable AI features: ${f.path(referenceDocumentationUrl)}`;
 
-  private removeQuotes(str: string): string {
-    const quotes = ['"', "'"];
-
-    for (const quote of quotes) {
-      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-        return this.removeQuotes(str.slice(1, -1)); // Recursive call
-      }
-    }
-    return str;
-  }
-
-  private convertDirectoryStructureToJson(dirPath: string, parentPath = ""): DirectoryNode {
-    const directoryStructure: DirectoryNode = {};
-
-    const items = fs.readdirSync(dirPath);
-    items.forEach((item) => {
-      if (item === ".git") return; // Skip .git directory
-
-      const itemPath = path.join(dirPath, item);
-      const relativePath = path.join(parentPath, item);
-      const stats = fs.statSync(itemPath);
-
-      if (stats.isDirectory()) {
-        const subdirectoryStructure = this.convertDirectoryStructureToJson(itemPath, relativePath);
-
-        const folderName = this.descriptions[path.normalize(relativePath)]
-          ? `${item} : ${this.descriptions[path.normalize(relativePath)]}`
-          : item;
-
-        directoryStructure[folderName] = subdirectoryStructure;
-      } else {
-        directoryStructure[
-          this.descriptions[path.normalize(relativePath)]
-            ? `${item} : ${this.descriptions[path.normalize(relativePath)]}`
-            : item
-        ] = null;
-      }
-    });
-
-    return directoryStructure;
+    log.step(firstMessage);
+    log.step(secondMessage);
   }
 }

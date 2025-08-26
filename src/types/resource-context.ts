@@ -1,5 +1,5 @@
 import * as path from "path";
-import { err, ok, Result } from "neverthrow";
+import { err, ok } from "neverthrow";
 import { UrlPath } from "./file/urlPath.js";
 import { FilePath } from "./file/filePath.js";
 import { DirectoryPath } from "./file/directoryPath.js";
@@ -15,16 +15,15 @@ export class ResourceContext {
 
   constructor(private readonly tempDirectory: DirectoryPath) {}
 
-  public async resolveTo(resourcePath: string, destinationSubPath: string){
+  public async resolveTo(resourcePath: string, destinationSubPath: string) {
     const urlPath = UrlPath.create(resourcePath);
-    const fileName =  new FileName(path.basename(resourcePath))
+    const fileName = new FileName(path.basename(resourcePath));
     const destinationFilePath = new FilePath(this.tempDirectory, fileName);
 
     if (urlPath) {
       const downloadFileResult = await this.fileDownloadService.downloadFile(urlPath);
       if (downloadFileResult.isErr()) {
-        // TODO: Update message here
-        return err("Unable to download the file. Please verify that the provided URL is correct and publicly accessible. ");
+        return err(downloadFileResult.error);
       }
       await this.fileService.writeFile(destinationFilePath, downloadFileResult.value);
     } else {
