@@ -6,6 +6,7 @@ import { AuthInfo } from "../../client-utils/auth-manager.js";
 import { envInfo } from "../env-info.js";
 import path from "path";
 import { ApiService } from "./api-service.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 type TelemetryPayload = {
   payload: DomainEvent;
@@ -19,10 +20,10 @@ type TelemetryPayload = {
 export class TelemetryService {
   private readonly apiService = new ApiService();
 
-  constructor(private readonly configDirectory: string) {}
+  constructor(private readonly configDirectory: DirectoryPath) {}
 
   public async trackEvent<T extends DomainEvent>(event: T, shell: string): Promise<void> {
-    const authInfo = await this.getAuthInfo(this.configDirectory);
+    const authInfo = await this.getAuthInfo(this.configDirectory.toString());
     const telemetryOptedOut = process.env.APIMATIC_CLI_TELEMETRY_OPTOUT === "1";
     const authKey = authInfo?.authKey;
 
@@ -39,9 +40,7 @@ export class TelemetryService {
       nodeVersion: process.version
     };
 
-    const result = await this.apiService.sendTelemetry(JSON.stringify(payload), authKey, shell);
-    // eslint-disable-next-line no-undef
-    result.mapErr((err) => console.log(err));
+    await this.apiService.sendTelemetry(JSON.stringify(payload), authKey, shell);
   }
 
   private async getAuthInfo(configDirectory: string): Promise<AuthInfo | null> {

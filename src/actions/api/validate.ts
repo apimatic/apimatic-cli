@@ -11,14 +11,13 @@ import { ResourceContext } from "../../types/resource-context.js";
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
-  private readonly validationService: ValidationService = new ValidationService();
-  private readonly configDir: DirectoryPath;
-  private readonly commandMetadata: CommandMetadata;
+  private readonly validationService: ValidationService;
   private readonly authKey: string | null;
+  private readonly commandMetadata: CommandMetadata;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
-    this.configDir = configDir;
     this.authKey = authKey;
+    this.validationService = new ValidationService(configDir);
     this.commandMetadata = commandMetadata;
   }
 
@@ -35,7 +34,6 @@ export class ValidateAction {
       const validationSummaryResult: Result<ApiValidationSummary, string>= await this.prompts.validateApi(
         this.validationService.validateViaFile({
           file: specFileDirResult.value,
-          configDir: this.configDir,
           commandMetadata: this.commandMetadata,
           authKey: this.authKey
         })

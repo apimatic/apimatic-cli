@@ -17,19 +17,19 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export interface ValidateViaFileParams {
   file: FilePath;
-  configDir: DirectoryPath;
   commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
 export class ValidationService {
+  constructor(private readonly configDir: DirectoryPath) {}
+
   async validateViaFile({
     file,
-    configDir,
     commandMetadata,
     authKey
   }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const controller = new ApiValidationExternalApisController(client);
