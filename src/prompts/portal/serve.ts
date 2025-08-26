@@ -10,7 +10,7 @@ export class PortalServePrompts {
     log.error(message);
   }
 
-  public setupServerError(message: string) {
+  public createLiveReloadServerError(message: string) {
     log.error(message);
   }
 
@@ -20,10 +20,10 @@ export class PortalServePrompts {
   }
 
   public nextSteps(buildDirectory: string, portalDirectory: string, port: string, hotReloadDisabled: boolean): void {
-    log.message(`The generated portal can be found at ${portalDirectory}`);
-    log.message(`Server started at http://localhost:${port}`);
+    log.message(`Portal successfully generated at: ${portalDirectory}`);
+    log.message(`Server running at: http://localhost:${port}`);
     if (!hotReloadDisabled) {
-      log.message(`Hot reload enabled. Watching the following build folder for any changes:`);
+      log.message(`Hot reload is enabled. Watching the following build folder for any changes:`);
       log.message(`${buildDirectory}`);
     }
     log.message(`Press CTRL+C to stop the server.`);

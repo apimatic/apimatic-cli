@@ -1,3 +1,5 @@
+import { clearTimeout, setTimeout } from "timers";
+
 export class WatcherHandler {
   private isProcessing = false;
   private latestHandler: (() => Promise<void>) | null = null;

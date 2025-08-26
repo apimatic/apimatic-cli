@@ -17,16 +17,17 @@ import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 
+const defaultSpecUrl: UrlPath = new UrlPath(
+  "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
+);
+const defaultPort: number = 3000 as const;
+
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
   private readonly zipService: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
   private readonly portalScaffoldService: PortalScaffoldService = new PortalScaffoldService();
   private readonly validationService: ValidationService;
-  private readonly defaultSpecUrl: UrlPath = new UrlPath(
-    "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
-  );
-  private readonly defaultPort: number = 3000 as const;
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
 
@@ -112,7 +113,7 @@ export class PortalQuickstartAction {
   // TODO: create TempSpecContext and then refactor this.
   private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, string>> {
     this.prompts.importSpecStep();
-    const inputPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
+    const inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
 
     const resourceContext = new ResourceContext(tempDirectory);
     const result = await resourceContext.resolveTo(inputPath, "spec");
@@ -156,7 +157,7 @@ export class PortalQuickstartAction {
 
     // Use default spec...
     const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolveTo(this.defaultSpecUrl.toString(), "spec");
+    const result = await resourceContext.resolveTo(defaultSpecUrl.toString(), "spec");
     if (result.isErr()) {
       return Result.failure(result.error);
     }
@@ -203,8 +204,8 @@ export class PortalQuickstartAction {
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath
   ): Promise<ResultEx<string, string>> {
-    const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null, this.defaultPort);
-    const result = await portalServeAction.servePortal(buildDirectory, portalDirectory, true, false, false);
+    const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
+    const result = await portalServeAction.execute(buildDirectory, portalDirectory, defaultPort, true, false, false);
 
     return result.mapAll<ResultEx<string, string>>(
       () => {
