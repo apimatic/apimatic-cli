@@ -6,14 +6,12 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FileName } from "./file/fileName.js";
 import { FileDownloadService } from "../infrastructure/services/file-download-service.js";
 import { FileService } from "../infrastructure/file-service.js";
-import { ZipService } from "../infrastructure/zip-service.js";
 import { ResourceInput } from "./file/resource-input.js";
 import { ServiceError } from "../infrastructure/api-utils.js";
 
 export class ResourceContext {
   private readonly fileDownloadService = new FileDownloadService();
   private readonly fileService = new FileService();
-  private readonly zipService = new ZipService();
 
   constructor(private readonly tempDirectory: DirectoryPath) {}
 
