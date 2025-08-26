@@ -1,12 +1,10 @@
-import { spinner, isCancel, confirm, log } from "@clack/prompts";
+import { isCancel, confirm, log } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { withSpinner } from "../format.js";
 import { Result } from "neverthrow";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 export class SdkGeneratePrompts {
-  private readonly spin = spinner();
-
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
       message: `The destination '${directory}' is not empty, do you want to overwrite?`,
