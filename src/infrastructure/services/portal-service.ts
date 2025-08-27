@@ -207,7 +207,7 @@ export class PortalService {
     }
   };
 
-  private languagePlatform: Record<Language, Platforms> = {
+  private readonly languagePlatform: Record<Language, Platforms> = {
     [Language.CSHARP]: Platforms.CsNetStandardLib,
     [Language.JAVA]: Platforms.JavaEclipseJreLib,
     [Language.PHP]: Platforms.PhpGenericLibV2,
