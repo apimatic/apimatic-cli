@@ -42,7 +42,7 @@ export class SdlParser {
     return Result.success({ endpointGroups, models });
   }
 
-  public async getEndpointGroupsFromSdl(specFolderPath: string): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
+  public async getEndpointGroupsFromSdl(specFolderPath: DirectoryPath): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     const sdlResult = await this.generateSdlFromSpec(specFolderPath);
 
     if (!sdlResult.isSuccess()) {
@@ -63,13 +63,18 @@ export class SdlParser {
       const specZipPath = await tempContext.zip(specDirectory);
 
       const specFileStream = await this.fileService.getStream(specZipPath);
-      let result: Result<Sdl, string>;
+      let sdlResult;
 
       try {
-        result = await this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata);
+        sdlResult = await this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata);
       } finally {
         specFileStream.close();
       }
+
+      // Convert neverthrow Result to our custom Result
+      const result: Result<Sdl, string> = sdlResult.isOk()
+        ? Result.success(sdlResult.value)
+        : Result.failure(sdlResult.error);
 
       if (!result.isSuccess()) {
         return Result.failure(

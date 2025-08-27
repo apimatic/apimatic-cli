@@ -284,7 +284,7 @@ export class PortalRecipeAction {
     contentFolderPath: string
   ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     const specFolderPath = this.getSpecFolderPath(buildConfig, contentFolderPath);
-    if (!(await fsExtra.pathExists(specFolderPath))) {
+    if (!(await fsExtra.pathExists(specFolderPath.toString()))) {
       return Result.failure(`API specification file not found at ${specFolderPath}.`);
     }
 
@@ -306,13 +306,13 @@ export class PortalRecipeAction {
   }
 
   //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
-  private getSpecFolderPath(buildConfig: any, contentFolderPath: string): string {
+  private getSpecFolderPath(buildConfig: any, contentFolderPath: string): DirectoryPath {
     const apiSpecPath = buildConfig.generatePortal?.apiSpecPath;
     if (apiSpecPath) {
-      return path.join(contentFolderPath, apiSpecPath);
+      return new DirectoryPath(path.join(contentFolderPath, apiSpecPath));
     }
 
-    return path.join(contentFolderPath, "spec");
+    return new DirectoryPath(path.join(contentFolderPath, "spec"));
   }
 
   //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.

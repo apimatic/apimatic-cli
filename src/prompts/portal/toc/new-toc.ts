@@ -1,4 +1,4 @@
-import { cancel, outro, confirm, spinner, isCancel, log } from "@clack/prompts";
+import { cancel, confirm, spinner, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
 import { Result } from "neverthrow";
 import { SdlTocComponents } from "../../../types/spec-context.js";
@@ -17,7 +17,9 @@ export class PortalNewTocPrompts {
     return withSpinner("Extracting endpoints and/or models from the API specification", "Extraction successful.", "Extraction failed.", fn);
   }
 
-  private readonly spin = spinner();
+  public generateTOC(fn: Promise<Result<FilePath, string>>) {
+    return withSpinner("Generating TOC", "TOC generated successfully.", "TOC generation failed.", fn);
+  }
 
   public async overwriteToc(tocPath: FilePath): Promise<boolean> {
     const overwrite = await confirm({
@@ -33,8 +35,20 @@ export class PortalNewTocPrompts {
     return overwrite;
   }
 
+  public contentGroupsExtractionFailed() {
+    log.error(`Failed to extract content groups.`);
+  }
+
+  public fallingBackToDefault() {
+    log.warn(`Falling back to default TOC structure.`);
+  }
+
   public tocFileAlreadyExists() {
     const message = `Please enter a different destination path or delete the existing toc.yml file and try again.`;
+    log.error(message);
+  }
+
+  public logError(message: string) {
     log.error(message);
   }
 
