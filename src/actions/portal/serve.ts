@@ -63,12 +63,10 @@ export class PortalServeAction {
     }
 
     const liveReloadServer = createServer();
-    this.application
+    const server = this.application
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
-
-
 
     // end live reload code
 
@@ -94,12 +92,9 @@ export class PortalServeAction {
           eventQueue.set(eventId, path);
         });
 
-
-
         await this.watcherHandler.execute(async () => {
-
           if (this.isPortalServed) {
-              this.prompts.changesDetected();
+            this.prompts.changesDetected();
           }
 
           const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
@@ -107,8 +102,11 @@ export class PortalServeAction {
 
           const portalUrl = new UrlPath(`http://localhost:${servePort}`);
           if (!this.isPortalServed) {
-            this.prompts.portalServed(portalUrl)
-            if (openInBrowser){
+            if (displayServeCommandMessages) {
+              this.prompts.portalServed(portalUrl);
+            }
+
+            if (openInBrowser) {
               await this.launcherService.openUrlInBrowser(portalUrl);
             }
             this.isPortalServed = true;
@@ -125,20 +123,21 @@ export class PortalServeAction {
       });
 
     // Wait for SIGINT or SIGTERM
-    await this.prompts.blockPrompt();
+    if (!noReload) {
+      await this.prompts.blockPrompt();
+    }
 
     // TODO: find a better way to stop server
-     await watcher.close();
-     this.watcherHandler.close();
+    await watcher.close();
+    this.watcherHandler.close();
     liveReloadServer.close();
+    server.close();
 
     // TODO: return stopped
     return ActionResult.success();
 
     // TODO: check if i can show prompt
     //watcher.close();
-
-
 
     //const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
     //const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);

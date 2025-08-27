@@ -16,6 +16,7 @@ import { ValidationService } from "../../infrastructure/services/validation-serv
 import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { createResourceInput } from "../../types/file/resource-input.js";
 
 const defaultSpecUrl: UrlPath = new UrlPath(
   "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
@@ -126,12 +127,20 @@ export class PortalQuickstartAction {
       return err("Operation cancelled. No API Definition was provided.");
     }
 
+    const urlPath = UrlPath.create(inputPath);
     const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolveTo(new UrlPath(inputPath));
+    const result =
+      urlPath === undefined
+        ? await resourceContext.resolveTo(createResourceInput(inputPath))
+        : await resourceContext.resolveTo(urlPath);
     if (result.isErr()) {
       return err(result.error);
     }
-    return ok(new DirectoryPath(result.value.toString(), "spec"));
+
+    const specDirectory = tempDirectory.join("spec");
+    await this.fileService.createDirectoryIfNotExists(specDirectory);
+    await this.fileService.copy(result.value, result.value.replaceDirectory(specDirectory));
+    return ok(specDirectory);
   }
 
   // TODO: Needs to be refactored after refactoring validate action.
