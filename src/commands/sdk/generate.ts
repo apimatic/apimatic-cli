@@ -2,7 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
-import { Language, languagePlatform } from "../../types/sdk/generate.js";
+import { Language } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 
@@ -54,7 +54,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     const workingDirectory = new DirectoryPath(DEFAULT_WORKING_DIRECTORY);
     const specDirectory = new DirectoryPath(spec);
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(language);
+    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
@@ -63,7 +63,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, languagePlatform[language as Language], force, zipSdk);
+    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk);
     outro(result);
   }
 

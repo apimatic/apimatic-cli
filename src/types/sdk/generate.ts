@@ -1,5 +1,3 @@
-import { Platforms } from "@apimatic/sdk";
-
 export enum Language {
   CSHARP = "csharp",
   JAVA = "java",
@@ -10,12 +8,3 @@ export enum Language {
   GO = "go"
 }
 
-export const languagePlatform: Record<Language, Platforms> = {
-  [Language.CSHARP]: Platforms.CsNetStandardLib,
-  [Language.JAVA]: Platforms.JavaEclipseJreLib,
-  [Language.PHP]: Platforms.PhpGenericLibV2,
-  [Language.PYTHON]: Platforms.PythonGenericLib,
-  [Language.RUBY]: Platforms.RubyGenericLib,
-  [Language.TYPESCRIPT]: Platforms.TsGenericLib,
-  [Language.GO]: Platforms.GoGenericLib
-};

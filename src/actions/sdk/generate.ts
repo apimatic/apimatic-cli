@@ -3,11 +3,11 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { SdkContext } from "../../types/sdk-context.js";
-import { Platforms } from "@apimatic/sdk";
 import { SpecContext } from "../../types/spec-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
+import { Language } from "../../types/sdk/generate.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -25,7 +25,7 @@ export class GenerateAction {
   public readonly execute = async (
     specDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
-    platform: Platforms,
+    language: Language,
     force: boolean,
     zipSdk: boolean
   ): Promise<ActionResult> => {
@@ -40,8 +40,8 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, platform);
-    if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
+    const sdkContext = new SdkContext(sdkDirectory, language);
+    if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkContext.sdkLanguageDirectory))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
     }
@@ -51,7 +51,7 @@ export class GenerateAction {
       const specZipPath = await tempContext.zip(specDirectory);
 
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(specZipPath, platform, this.configDir, this.commandMetadata, this.authKey)
+        this.portalService.generateSdk(specZipPath, language, this.configDir, this.commandMetadata, this.authKey)
       );
 
       if (response.isErr()) {
