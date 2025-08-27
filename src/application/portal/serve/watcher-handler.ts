@@ -51,7 +51,7 @@ export class WatcherHandler {
   }
 
   // Method to clear any pending execution.
-  public cancel(): void {
+  public close(): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;

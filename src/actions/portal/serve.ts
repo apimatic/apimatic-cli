@@ -9,7 +9,6 @@ import connectLiveReload from "connect-livereload";
 import express, { Express } from "express";
 import { UrlPath } from "../../types/file/urlPath.js";
 import console from "console";
-import { PortalWatcher } from "../../application/portal/serve/portal-watcher.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { WatcherHandler } from "../../application/portal/serve/watcher-handler.js";
 import chokidar from "chokidar";
@@ -19,14 +18,14 @@ import { Mutex } from "async-mutex";
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
-  private readonly portalWatcher: PortalWatcher = new PortalWatcher();
   private readonly launcherService: LauncherService = new LauncherService();
-  private readonly watcherHandler: WatcherHandler =  new WatcherHandler();
+  private readonly watcherHandler: WatcherHandler = new WatcherHandler();
 
   private readonly application: Express = express();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
+  private isPortalServed = false;
 
   public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
@@ -42,13 +41,11 @@ export class PortalServeAction {
     noReload: boolean,
     displayServeCommandMessages: boolean = true
   ): Promise<ActionResult> {
-
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-
 
     const watcher = chokidar.watch(buildDirectory.toString(), {
       ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: true,
+      ignoreInitial: false, // TODO: check this flag with Saeed
       persistent: true,
       awaitWriteFinish: true,
       atomic: true
@@ -58,20 +55,22 @@ export class PortalServeAction {
     const eventQueue = new Map();
     const mutex = new Mutex();
 
-
     // live reload code
 
-    const liveReloadServer = createServer();
-    this.application.use(connectLiveReload())
-      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
-      .listen(5034);
+    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
+    if (servePort != port) {
+      this.prompts.portAlreadyInUse(port, servePort);
+    }
 
-    if (openInBrowser) {
-            await this.launcherService.openUrlInBrowser(new UrlPath(`http://localhost:${5034}`));
-          }
+    const liveReloadServer = createServer();
+    this.application
+      .use(connectLiveReload())
+      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
+      .listen(servePort);
+
+
 
     // end live reload code
-
 
     watcher
       .on("all", async (event, path) => {
@@ -95,10 +94,26 @@ export class PortalServeAction {
           eventQueue.set(eventId, path);
         });
 
+
+
         await this.watcherHandler.execute(async () => {
+
+          if (this.isPortalServed) {
+              this.prompts.changesDetected();
+          }
+
           const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
           // TODO: check for result
 
+          const portalUrl = new UrlPath(`http://localhost:${servePort}`);
+          if (!this.isPortalServed) {
+            this.prompts.portalServed(portalUrl)
+            if (openInBrowser){
+              await this.launcherService.openUrlInBrowser(portalUrl);
+            }
+            this.isPortalServed = true;
+          }
+          this.prompts.waitingForChanges();
           liveReloadServer.refresh(portalDirectory.toString());
         });
       })
@@ -109,6 +124,15 @@ export class PortalServeAction {
         watcher.close();
       });
 
+    // Wait for SIGINT or SIGTERM
+    await this.prompts.blockPrompt();
+
+    // TODO: find a better way to stop server
+     await watcher.close();
+     this.watcherHandler.close();
+    liveReloadServer.close();
+
+    // TODO: return stopped
     return ActionResult.success();
 
     // TODO: check if i can show prompt
@@ -116,39 +140,13 @@ export class PortalServeAction {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-    // if (servePort != port) {
-    //   this.prompts.portAlreadyInUse(port, servePort);
-    // }
-
-
-
     //const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
     //const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
-
-
-
 
     // watcher (src) -> generate() -> -> reload()
     // liveReload (des) -> watcher (automated) -> generate() ->
 
     // assuming result is success
-
 
     //
 
@@ -191,7 +189,6 @@ export class PortalServeAction {
     //
     // process.on("SIGINT", shutdown);
     // process.on("SIGTERM", shutdown);
-
 
     // return result.mapAll<Promise<ActionResult>>(
     //   async () => {
