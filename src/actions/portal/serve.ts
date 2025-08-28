@@ -1,31 +1,28 @@
+import { createServer } from "livereload";
+import connectLiveReload from "connect-livereload";
+import express, { Express } from "express";
+import chokidar from "chokidar";
+import crypto from "crypto";
+import { Mutex } from "async-mutex";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { GenerateAction } from "./generate.js";
 import { NetworkService } from "../../infrastructure/network-service.js";
-import { createServer } from "livereload";
-import connectLiveReload from "connect-livereload";
-import express, { Express } from "express";
 import { UrlPath } from "../../types/file/urlPath.js";
-import console from "console";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { WatcherHandler } from "../../application/portal/serve/watcher-handler.js";
-import chokidar from "chokidar";
-import crypto from "crypto";
-import { Mutex } from "async-mutex";
+import { DebounceService } from "../../infrastructure/debounce-service.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
-  private readonly watcherHandler: WatcherHandler = new WatcherHandler();
-
+  private readonly debounceService: DebounceService = new DebounceService();
   private readonly application: Express = express();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
-  private isPortalServed = false;
 
   public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
@@ -41,11 +38,41 @@ export class PortalServeAction {
     noReload: boolean,
     displayServeCommandMessages: boolean = true
   ): Promise<ActionResult> {
+    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
+    if (servePort != port) {
+      this.prompts.portAlreadyInUse(port, servePort);
+    }
+
+    // Generate once, return early if there was a problem.
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
+    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
+    const isFailedOrCancelledResult = result.mapAll(
+      () => null,
+      () => ActionResult.failed(),
+      () => ActionResult.cancelled()
+    );
+    if (isFailedOrCancelledResult) {
+      return isFailedOrCancelledResult;
+    }
+
+    const portalUrl = new UrlPath(`http://localhost:${servePort}`);
+    if (displayServeCommandMessages) {
+      this.prompts.portalServed(portalUrl);
+      this.prompts.waitingForChanges();
+    }
+    if (openInBrowser) {
+      await this.launcherService.openUrlInBrowser(portalUrl);
+    }
+
+    const liveReloadServer = createServer();
+    const server = this.application
+      .use(connectLiveReload())
+      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
+      .listen(servePort);
 
     const watcher = chokidar.watch(buildDirectory.toString(), {
       ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: false, // TODO: check this flag with Saeed
+      ignoreInitial: true, // TODO: check this flag with Saeed
       persistent: true,
       awaitWriteFinish: true,
       atomic: true
@@ -55,20 +82,13 @@ export class PortalServeAction {
     const eventQueue = new Map();
     const mutex = new Mutex();
 
-    // live reload code
-
-    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-    if (servePort != port) {
-      this.prompts.portAlreadyInUse(port, servePort);
-    }
-
-    const liveReloadServer = createServer();
-    const server = this.application
-      .use(connectLiveReload())
-      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
-      .listen(servePort);
-
-    // end live reload code
+    const shutdown = async () => {
+      await watcher.close();
+      this.debounceService.close();
+      liveReloadServer.close();
+      server.close();
+      this.prompts.serverClosed();
+    };
 
     watcher
       .on("all", async (event, path) => {
@@ -92,123 +112,41 @@ export class PortalServeAction {
           eventQueue.set(eventId, path);
         });
 
-        await this.watcherHandler.execute(async () => {
-          if (this.isPortalServed) {
-            this.prompts.changesDetected();
-          }
-
-          const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-          // TODO: check for result
-
-          const portalUrl = new UrlPath(`http://localhost:${servePort}`);
-          if (!this.isPortalServed) {
-            if (displayServeCommandMessages) {
-              this.prompts.portalServed(portalUrl);
-            }
-
-            if (openInBrowser) {
-              await this.launcherService.openUrlInBrowser(portalUrl);
-            }
-            this.isPortalServed = true;
-          }
+        await this.debounceService.execute(async () => {
+          this.prompts.changesDetected();
+          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
           this.prompts.waitingForChanges();
+
           liveReloadServer.refresh(portalDirectory.toString());
+          this.clearStandardInput();
         });
       })
-      .on("error", () => {
-        console.error(
-          "An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at support@apimatic.io"
-        );
-        watcher.close();
+      .on("error", async () => {
+        this.prompts.watcherError();
+        await watcher.close();
+        this.debounceService.close();
+        liveReloadServer.close();
+        server.close();
+        return ActionResult.failed();
       });
 
     // Wait for SIGINT or SIGTERM
     if (!noReload) {
-      await this.prompts.blockPrompt();
+      this.clearStandardInput();
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
+    } else {
+      await shutdown();
     }
 
-    // TODO: find a better way to stop server
-    await watcher.close();
-    this.watcherHandler.close();
-    liveReloadServer.close();
-    server.close();
-
-    // TODO: return stopped
     return ActionResult.success();
+  }
 
-    // TODO: check if i can show prompt
-    //watcher.close();
-
-    //const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    //const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
-
-    // watcher (src) -> generate() -> -> reload()
-    // liveReload (des) -> watcher (automated) -> generate() ->
-
-    // assuming result is success
-
-    //
-
-    // const liveReloadServer = createServer();
-    // liveReloadServer.watch(portalDirectory.toString());
-    // this.application.use(connectLiveReload());
-    // this.application.use(express.static(portalDirectory.toString(), { extensions: ["html"] }));
-    //
-    // const server = this.application
-    //   .listen(servePort, async () => {
-    //     if (openInBrowser) {
-    //       await this.launcherService.openUrlInBrowser(new UrlPath(`http://localhost:${servePort}`));
-    //     }
-    //
-    //     if (!noReload) {
-    //       await this.portalWatcher.watchAndRegeneratePortalOnChange(buildDirectory, portalDirectory, generatePortalAction.execute);
-    //     }
-    //
-    //     if (process.platform !== "darwin") {
-    //       //For non-macOS users.
-    //       if (process.stdin.setRawMode) {
-    //         process.stdin.setRawMode(false);
-    //       }
-    //     }
-    //   })
-    //   .on("error", () => {});
-    //
-    // const shutdown = async () => {
-    //   console.log("Shutting down server...");
-    //   if (liveReloadServer) {
-    //     liveReloadServer.close();
-    //   }
-    //   if (server) {
-    //     server.close();
-    //   }
-    //   console.log("Server shut down successfully.");
-    //   // TODO: Find a better way.
-    //   process.exit(0);
-    // };
-    //
-    // process.on("SIGINT", shutdown);
-    // process.on("SIGTERM", shutdown);
-
-    // return result.mapAll<Promise<ActionResult>>(
-    //   async () => {
-    //
-    //     if (displayServeCommandMessages) {
-    //       this.prompts.nextSteps(
-    //         buildDirectory,
-    //         portalDirectory,
-    //         servePort,
-    //         noReload
-    //       );
-    //     }
-    //
-    //     return ActionResult.success();
-    //   },
-    //   async () => {
-    //     return ActionResult.failed();
-    //   },
-    //   async () => {
-    //     return ActionResult.cancelled();
-    //   }
-    // );
+  // This clears the standard input to allow interrupts like CTRL+C to work properly.
+  private clearStandardInput() {
+    if (process.platform !== "darwin" && process.stdin.isTTY) {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+    }
   }
 }

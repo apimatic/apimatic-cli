@@ -1,6 +1,6 @@
 import { clearTimeout, setTimeout } from "timers";
 
-export class WatcherHandler {
+export class DebounceService {
   private isProcessing = false;
   private latestHandler: (() => Promise<void>) | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
