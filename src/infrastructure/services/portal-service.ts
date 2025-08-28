@@ -14,7 +14,7 @@ import {
   Transformation,
   ExportFormats,
   InternalServerErrorResponseError,
-  Platforms,
+  Platforms
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { Result } from "../../types/common/result.js";
@@ -27,6 +27,7 @@ import { FileService } from "../file-service.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result as ResultEx } from "neverthrow";
+import { Language } from "../../types/sdk/generate.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -47,7 +48,11 @@ export class PortalService {
     const docsPortalManagementController = new DocsPortalManagementController(client);
 
     try {
-      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(this.CONTENT_TYPE, file, this.createOriginQueryParameter(eventMetadata.commandName));
+      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(
+        this.CONTENT_TYPE,
+        file,
+        this.createOriginQueryParameter(eventMetadata.commandName)
+      );
       return ok(response.result as NodeJS.ReadableStream);
     } catch (error) {
       return err(await PortalService.handlePortalGenerationErrors(error));
@@ -59,11 +64,11 @@ export class PortalService {
   // TODO: Pass stream as parameter instead of file path.
   public async generateSdk(
     specPath: FilePath,
-    sdkPlatform: Platforms,
+    language: Language,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, string>> {
+  ): Promise<ResultEx<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
@@ -75,13 +80,13 @@ export class PortalService {
       const response = await sdkGenerationController.generateSdkViaFile(
         Accept.EnumApplicationjson,
         file,
-        sdkPlatform,
+        this.languagePlatform[language],
         this.createOriginQueryParameter(commandMetadata.commandName)
       );
       const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
-      return Result.success(sdkResponse.result as NodeJS.ReadableStream);
+      return ok(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
-      return Result.failure(await this.handleSdkGenerationErrors(error));
+      return err(await this.handleSdkGenerationErrors(error));
     } finally {
       specFileStream.close();
     }
@@ -153,8 +158,8 @@ export class PortalService {
       //500
       const message = error.result?.message;
       return `${
-          message ?? "An unknown error occurred."
-        } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`;
+        message ?? "An unknown error occurred."
+      } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`;
     } else {
       return "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
     }
@@ -200,5 +205,15 @@ export class PortalService {
         "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
       );
     }
+  };
+
+  private readonly languagePlatform: Record<Language, Platforms> = {
+    [Language.CSHARP]: Platforms.CsNetStandardLib,
+    [Language.JAVA]: Platforms.JavaEclipseJreLib,
+    [Language.PHP]: Platforms.PhpGenericLibV2,
+    [Language.PYTHON]: Platforms.PythonGenericLib,
+    [Language.RUBY]: Platforms.RubyGenericLib,
+    [Language.TYPESCRIPT]: Platforms.TsGenericLib,
+    [Language.GO]: Platforms.GoGenericLib
   };
 }
