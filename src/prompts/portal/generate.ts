@@ -37,7 +37,6 @@ export class PortalGeneratePrompts {
 
   public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>>) {
     const result = withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
-    this.cleanUpStandardInput();
     return result;
   }
 
@@ -49,13 +48,5 @@ export class PortalGeneratePrompts {
     const message = `An error occurred during portal generation due to an issue with the input.
 An error report has been written at the destination path: ${f.path(reportPath.toString())}`;
     log.error(message);
-  }
-
-  // This clears the standard input to allow interrupts like CTRL+C to work properly.
-  private cleanUpStandardInput(): void {
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(false);
-      process.stdin.pause();
-    }
   }
 }
