@@ -46,17 +46,15 @@ export class FileService {
   }
 
   public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
-      const entries = await fsExtra.readdir(directoryPath.toString());
-      const results =  await Promise.all(
-        entries.map(async (entry) => {
-          const fullPath = path.join(directoryPath.toString(), entry);
-          const stat = await fsExtra.stat(fullPath);
-          return stat.isDirectory()
-            ? await this.getDirectory(new DirectoryPath(fullPath))
-            : new FileName(entry);
-        })
-      );
-      return new Directory(directoryPath, results);
+    const entries = await fsExtra.readdir(directoryPath.toString());
+    const results = await Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = path.join(directoryPath.toString(), entry);
+        const stat = await fsExtra.stat(fullPath);
+        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : new FileName(entry);
+      })
+    );
+    return new Directory(directoryPath, results);
   }
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {

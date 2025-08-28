@@ -1,3 +1,5 @@
+import { FilePath } from "../file/filePath.js";
+
 export interface BuildConfig {
   generatePortal?: PortalConfig;
   apiCopilotConfig?: CopilotConfig;  
@@ -6,6 +8,7 @@ export interface BuildConfig {
 
 export interface PortalConfig {
   contentFolder?: string;
+  apiSpecPath?: FilePath;
 }
 
 export interface CopilotConfig {

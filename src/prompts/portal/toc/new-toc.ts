@@ -1,4 +1,4 @@
-import { cancel, confirm, spinner, isCancel, log } from "@clack/prompts";
+import { cancel, confirm, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
 import { Result } from "neverthrow";
 import { SdlTocComponents } from "../../../types/spec-context.js";
