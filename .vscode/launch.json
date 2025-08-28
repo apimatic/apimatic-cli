@@ -21,7 +21,6 @@
             // "portal:quickstart",
             // "portal:generate",
             // "portal:toc:new",
-            "portal:generate",
             //"--expand-endpoints",
             //"--expand-models",
             // "--force",
@@ -32,7 +31,6 @@
             // "portal:serve",
             // "api:transform",
             // "--help",
-            "--input=C:\\Users\\Ali\\Desktop\\test-cli\\test-prompts-framework-integration"
             //   "--folder=C:/Users/User/Desktop/demo/portal",
             //   "--destination=C:\\Users\\User\\Desktop\\demo\\portal\\api-portal"
             // "--source=C:/Users/User/Desktop/demo/portal/",
