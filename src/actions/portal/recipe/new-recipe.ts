@@ -13,6 +13,12 @@ import { TocContext } from "../../../types/toc-context.js";
 import { FileName } from "../../../types/file/fileName.js";
 import fs from "fs";
 import path from "path";
+import { Toc } from "../../../types/toc/toc.js";
+import { tmpdir } from "os";
+import { execa } from "execa";
+import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
+import { StepType } from "../../../types/recipe/recipe.js";
+
 
 class BuildConfigContext {
   private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
@@ -55,10 +61,12 @@ class BuildConfigContext {
     return new DirectoryPath(this.buildDirectory.toString());
   }
 
-  async  getSpecFolderPath(buildConfig: BuildConfig): Promise<DirectoryPath> {
+  async getSpecFolderPath(buildConfig: BuildConfig): Promise<DirectoryPath> {
     const apiSpecPath = buildConfig.generatePortal?.apiSpecPath;
     if (apiSpecPath) {
-      return new DirectoryPath(path.join((await this.getContentFolderPath(buildConfig)).toString(), apiSpecPath.toString()));
+      return new DirectoryPath(
+        path.join((await this.getContentFolderPath(buildConfig)).toString(), apiSpecPath.toString())
+      );
     }
 
     return new DirectoryPath(path.join((await this.getContentFolderPath(buildConfig)).toString(), "spec"));
@@ -79,34 +87,91 @@ class RecipeContext {
       .join("");
   }
 
-  async generateRecipe(recipe: SerializableRecipe, buildConfig: BuildConfig): Promise<Result<string, string>> {
-    throw new Error("Method not implemented");
-  }
-
   async save(): Promise<Result<string, string>> {
     throw new Error("Method not implemented");
   }
 }
 
 class EndpointContext {
-  constructor(private specPath: DirectoryPath, private sdlParser: SdlParser) {}
+  private readonly sdlParser: SdlParser;
+
+  constructor(
+    private specPath: DirectoryPath,
+    private configDirectory: DirectoryPath,
+    private commandMetadata: CommandMetadata
+  ) {
+    const portalService = new PortalService();
+    this.sdlParser = new SdlParser(portalService, this.configDirectory, this.commandMetadata);
+  }
 
   async exists(): Promise<boolean> {
-    throw new Error("Method not implemented");
+    return fsExtra.pathExists(this.specPath.toString());
   }
 
   async extractEndpointGroups(): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    throw new Error("Method not implemented");
+    const result = await this.sdlParser.getEndpointGroupsFromSdl(this.specPath);
+
+    if (!result.value) {
+      return err("No endpoint groups found");
+    }
+
+    return ok(result.value);
   }
 }
 
 class ContentStepContext {
   async promptForContent(): Promise<Result<string, string>> {
-    throw new Error("Method not implemented");
+    const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.txt`);
+    const template =
+      `# The Heading Goes Here\n\n` +
+      `This is placeholder text for your API Recipe content step. ` +
+      `Feel free to edit this. Save your changes and then close the file once you're done.`;
+
+    await fsExtra.writeFile(tempFilePath, template, "utf-8");
+
+    try {
+      const editorResult = await this.openEditor(tempFilePath);
+      if (editorResult.isErr()) {
+        return err(editorResult.error);
+      }
+
+      const fileContent = await fsExtra.readFile(tempFilePath, "utf-8");
+      return ok(fileContent);
+    } catch {
+      return err("Unable to add content step. Please try again later.");
+    } finally {
+      await fsExtra.unlink(tempFilePath);
+    }
   }
 
-  private async openEditor(): Promise<Result<string, string>> {
-    throw new Error("Method not implemented");
+  private async openEditor(tempFilePath: string): Promise<Result<null, string>> {
+    let editor = process.env.EDITOR;
+    let editorArgs: string[] = [];
+
+    try {
+      if (!editor) {
+        if (process.platform === "win32") {
+          await execa("cmd", ["/c", "start", "/wait", "notepad", tempFilePath], { stdio: "ignore" });
+        } else if (process.platform === "darwin" || process.platform === "linux") {
+          editor = "vim";
+          try {
+            await execa(editor, [tempFilePath], { stdio: "inherit" });
+          } catch {
+            // ignore vim exit non-zero codes
+          }
+        }
+      } else {
+        if (editor === "code" || editor.endsWith("code.cmd") || editor.endsWith("code.exe")) {
+          editorArgs.push("--wait");
+        }
+        editorArgs.push(tempFilePath);
+        await execa(editor, editorArgs, { stdio: "ignore" });
+      }
+
+      return ok(null);
+    } catch {
+      return err("Failed to open editor for content step.");
+    }
   }
 }
 
@@ -115,7 +180,7 @@ type RecipeSetup = {
   recipeFileName: FileName;
   buildConfig: BuildConfig;
   contentFolderPath: DirectoryPath;
-  tocData: any;
+  tocData: Toc;
   buildConfigContext: BuildConfigContext;
   endpointContext: EndpointContext;
   recipeContext: RecipeContext;
@@ -137,12 +202,91 @@ export class PortalRecipeAction {
     if (setupResult.isErr()) {
       this.prompts.logError(setupResult.error);
       return ActionResult.failed();
-
-      //check for existing recipe   --- can be moved above (check)
-      //build recipe steps
-      //generate and save
     }
+    const recipeAlreadyExists = this.checkRecipeAlreadyExists(
+      setupResult.value.tocData,
+      setupResult.value.recipeName,
+      setupResult.value.recipeFileName
+    );
+    if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt())) {
+      return ActionResult.cancelled();
+    }
+
+    const recipeResult = await this.promptUserAndBuildNewRecipe(
+      setupResult.value.recipeName,
+      setupResult.value.buildConfig,
+      setupResult.value.contentFolderPath,
+      setupResult.value.endpointContext
+    );
+
+    if (recipeResult.isErr()) {
+      this.prompts.logError(recipeResult.error);
+      return ActionResult.failed();
+    }
+
+    this.prompts.logError("Recipe built successfully (not yet saved).");
+
     return ActionResult.success();
+  }
+
+  private async promptUserAndBuildNewRecipe(
+    recipeName: string,
+    buildConfig: BuildConfig,
+    contentFolderPath: DirectoryPath,
+    endpointContext: EndpointContext
+  ): Promise<Result<SerializableRecipe, string>> {
+    const recipe = new PortalRecipe(recipeName);
+    let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
+    let idx: number = 1;
+    let addAnotherStep = true;
+
+    this.prompts.displayStepsInformation();
+
+    while (addAnotherStep) {
+      const stepType = await this.prompts.stepTypeSelectionPrompt();
+      const stepName = await this.prompts.stepNamePrompt("Step " + idx);
+
+      switch (stepType) {
+        case StepType.Content: {
+          const contentStepContext = new ContentStepContext();
+          const contentResult = await contentStepContext.promptForContent();
+          if (contentResult.isErr()) {
+            return err(contentResult.error);
+          }
+          recipe.addContentStep(stepName, stepName, contentResult.value);
+          this.prompts.displayStepAddedSuccessfullyMessage();
+          break;
+        }
+
+        case StepType.Endpoint: {
+          if (!endpointGroups) {
+            const extractResult = await endpointContext.extractEndpointGroups();
+            if (extractResult.isErr()) {
+              return err(extractResult.error);
+            }
+            endpointGroups = extractResult.value;
+          }
+
+          const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
+          const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
+          const description = await this.prompts.endpointDescriptionPrompt(
+            endpointGroups,
+            endpointGroupName,
+            endpointName
+          );
+          const endpointPermalink = `$e/${[endpointGroupName, endpointName].map(encodeURIComponent).join("/")}`;
+
+          recipe.addEndpointStep(stepName, stepName, description, endpointPermalink);
+          this.prompts.displayStepAddedSuccessfullyMessage();
+          break;
+        }
+      }
+
+      addAnotherStep = await this.prompts.addAnotherStepSelectionPrompt();
+      idx++;
+    }
+
+    return ok(recipe.toSerializableRecipe());
   }
 
   private async validateBuildDirectory(buildDirectoryPath: DirectoryPath): Promise<Result<string, string>> {
@@ -177,8 +321,7 @@ export class PortalRecipeAction {
     }
 
     const specFolderPath = await buildConfigContext.getSpecFolderPath(buildConfigResult.value);
-    const sdlParser = new SdlParser(new PortalService(), this.configDirectory, this.commandMetadata);
-    const endpointContext = new EndpointContext(specFolderPath, sdlParser);
+    const endpointContext = new EndpointContext(specFolderPath, this.configDirectory, this.commandMetadata);
 
     const recipeContext = new RecipeContext(recipeName, contentFolderPath);
     const recipeFileName = recipeContext.createRecipeFileName();
@@ -198,11 +341,21 @@ export class PortalRecipeAction {
     return ok(recipeSetup);
   }
 
-  // private async buildRecipeSteps(endpointContext: EndpointContext): Promise<Result<SerializableRecipe, string>> {
-  //   // Implementation for building the recipe steps
-  // }
+  private checkRecipeAlreadyExists(tocData: Toc, recipeName: string, recipeFileName: FileName): boolean {
+    let apiRecipesGroup = tocData.toc?.find((item) => "group" in item && item.group === "API Recipes");
+    if (!apiRecipesGroup || !("items" in apiRecipesGroup)) {
+      return false;
+    }
 
-  // private async generateAndSaveRecipe(recipe: SerializableRecipe, contexts: RecipeContexts): Promise<Result<string, string>> {
-  //   // Implementation for generating and saving the recipe
-  // }
+    // Check if recipe name or file name already exists
+    const existingRecipe = apiRecipesGroup.items.find(
+      (item) =>
+        "page" in item && "file" in item && (item.page === recipeName || item.file === `recipes/${recipeFileName}.md`)
+    );
+    if (existingRecipe) {
+      return true;
+    }
+
+    return false;
+  }
 }
