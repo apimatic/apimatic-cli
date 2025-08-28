@@ -30,7 +30,7 @@
             // "test-portal",
             // "portal:serve",
             // "api:transform",
-            // "--help",
+            // "--help"
             //   "--folder=C:/Users/User/Desktop/demo/portal",
             //   "--destination=C:\\Users\\User\\Desktop\\demo\\portal\\api-portal"
             // "--source=C:/Users/User/Desktop/demo/portal/",
