@@ -1,6 +1,6 @@
 import fsExtra from "fs-extra";
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
-import { SerializableRecipe } from "../../../types/recipe/recipe.js";
+import { DirectoryNode, SerializableRecipe } from "../../../types/recipe/recipe.js";
 import { err, ok, Result } from "neverthrow";
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
@@ -18,7 +18,8 @@ import { tmpdir } from "os";
 import { execa } from "execa";
 import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
 import { StepType } from "../../../types/recipe/recipe.js";
-
+import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
+import { TreeObject } from "treeify";
 
 class BuildConfigContext {
   private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
@@ -224,9 +225,41 @@ export class PortalRecipeAction {
       return ActionResult.failed();
     }
 
-    this.prompts.logError("Recipe built successfully (not yet saved).");
+    const buildConfigPathResult = await setupResult.value.buildConfigContext.findBuildConfigPath();
+    if (buildConfigPathResult.isErr()) {
+      this.prompts.logError(buildConfigPathResult.error);
+      return ActionResult.failed();
+    }
 
+    const recipeGenerator = new PortalRecipeGenerator();
+    await recipeGenerator.createRecipe(
+      recipeResult.value,
+      setupResult.value.buildConfig,
+      setupResult.value.tocData,
+      setupResult.value.tocContext.tocPath.toString(),
+      setupResult.value.recipeName,
+      setupResult.value.recipeFileName.toString(),
+      buildConfigPathResult.value,
+      setupResult.value.contentFolderPath.toString()
+    );
+    const buildDirectoryStructure = await this.getBuildDirectoryStructure(setupResult.value.recipeFileName.toString());
+    this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
     return ActionResult.success();
+  }
+
+  private async getBuildDirectoryStructure(recipeFileName: string): Promise<DirectoryNode> {
+    return {
+      content: {
+        "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
+      },
+      static: {
+        scripts: {
+          recipes: {
+            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
+          }
+        }
+      }
+    };
   }
 
   private async promptUserAndBuildNewRecipe(
