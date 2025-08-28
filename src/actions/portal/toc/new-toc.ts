@@ -56,27 +56,50 @@ export class PortalNewTocAction {
       return ActionResult.cancelled();
     }
 
-    const sdlResult = await this.extractSdlComponents(buildDirectory, expandEndpoints, expandModels);
-    if (sdlResult.isErr()) {
-      this.prompts.logError(sdlResult.error);
-      return ActionResult.failed();
+    let sdlComponents: SdlComponents = { endpointGroups: new Map(), models: [] };
+    if (expandEndpoints || expandModels) {
+      const specDirectory = buildDirectory.join("spec");
+      const specContext = new SpecContext(specDirectory);
+
+      const isValid = await specContext.validate();
+      if (!isValid) {
+        this.prompts.specNotFound();
+        this.prompts.fallingBackToDefault();
+      } else {
+        const sdlResult = await this.extractSdlComponents(specContext);
+        if (sdlResult.isErr()) {
+          this.prompts.logError(sdlResult.error);
+          return ActionResult.failed();
+        }
+        sdlComponents = sdlResult.value;
+      }
     }
 
-    const contentResult = await this.extractContentGroups(buildDirectory);
-    if (contentResult.isErr()) {
-      this.prompts.logError(contentResult.error);
-      return ActionResult.failed();
+    const contentDirectory = buildDirectory.join("content");
+    const contentContext = new ContentContext(contentDirectory);
+    const contentExists = await contentContext.exists();
+    
+    let contentGroups: TocGroup[] = [];
+    if (!contentExists) {
+      this.prompts.contentDirectoryNotFound(contentDirectory);
+    } else {
+      const contentResult = await contentContext.extractContentGroups();
+      if (contentResult.isErr()) {
+        this.prompts.logError(contentResult.error);
+        return ActionResult.failed();
+      }
+      contentGroups = contentResult.value;
     }
 
-    const tocResult = await 
-    this.prompts.generateTOC(
+
+    const tocResult = await this.prompts.generateTOC(
       this.generateToc(
         tocContext,
-        sdlResult.value.endpointGroups,
-        sdlResult.value.models,
+        sdlComponents.endpointGroups,
+        sdlComponents.models,
         expandEndpoints,
         expandModels,
-        contentResult.value
+        contentGroups
       )
     );
 
@@ -88,27 +111,10 @@ export class PortalNewTocAction {
   }
 
   private async extractSdlComponents(
-    buildDirectory: DirectoryPath,
-    expandEndpoints: boolean,
-    expandModels: boolean
+    specContext: SpecContext,
   ): Promise<Result<SdlComponents, string>> {
-    if (!expandEndpoints && !expandModels) {
-      return ok({ endpointGroups: new Map(), models: [] });
-    }
-
-    const specDirectory = buildDirectory.join("spec");
-    const specContext = new SpecContext(specDirectory);
-
-    const isValid = await specContext.validate();
-    if (!isValid) {
-      this.prompts.specNotFound();
-      this.prompts.fallingBackToDefault();
-      return ok({ endpointGroups: new Map(), models: [] });
-    }
-
     try {
       const extractionPromise = specContext.extractSdlComponents(this.configDirectory, this.commandMetadata);
-
       const response = await this.prompts.extractSdlComponents(extractionPromise);
 
       if (response.isErr()) {
@@ -129,18 +135,11 @@ export class PortalNewTocAction {
     const contentDirectory = buildDirectory.join("content");
     const contentContext = new ContentContext(contentDirectory);
 
-    const exists = await contentContext.exists();
-    if (!exists) {
-      this.prompts.contentDirectoryNotFound(contentDirectory);
-      return ok([]);
-    }
-
     const contentGroupsResult = await contentContext.extractContentGroups();
     if (contentGroupsResult.isErr()) {
       this.prompts.contentGroupsExtractionFailed();
       return ok([]);
     }
-
     return contentGroupsResult;
   }
 
