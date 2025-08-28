@@ -36,15 +36,14 @@ export class PortalGeneratePrompts {
   }
 
   public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>>) {
-    const result = withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
-    return result;
+    return withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
   }
 
   public portalGenerationError(error: string) {
     log.error(error);
   }
 
-  public portalGenerationErrorWithReport(reportPath: FilePath) {
+  portalGenerationErrorWithReport(reportPath: FilePath) {
     const message = `An error occurred during portal generation due to an issue with the input.
 An error report has been written at the destination path: ${f.path(reportPath.toString())}`;
     log.error(message);
