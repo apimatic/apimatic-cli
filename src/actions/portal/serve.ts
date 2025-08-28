@@ -1,6 +1,3 @@
-import { createServer } from "livereload";
-import connectLiveReload from "connect-livereload";
-import express, { Express } from "express";
 import chokidar from "chokidar";
 import crypto from "crypto";
 import { Mutex } from "async-mutex";
@@ -13,13 +10,16 @@ import { NetworkService } from "../../infrastructure/network-service.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { DebounceService } from "../../infrastructure/debounce-service.js";
+import { ServerService } from "../../infrastructure/server-service.js";
+import { LiveReloadService } from "../../infrastructure/live-reload-service.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
+  private readonly serverService: ServerService = new ServerService();
+  private readonly liveReloadService: LiveReloadService = new LiveReloadService();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly debounceService: DebounceService = new DebounceService();
-  private readonly application: Express = express();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -64,15 +64,14 @@ export class PortalServeAction {
       await this.launcherService.openUrlInBrowser(portalUrl);
     }
 
-    const liveReloadServer = createServer();
-    const server = this.application
-      .use(connectLiveReload())
-      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
-      .listen(servePort);
+    this.liveReloadService.start();
+    this.serverService.use(this.liveReloadService.getMiddleware());
+    this.serverService.serveStatic(portalDirectory, { extensions: ["html"] });
+    this.serverService.start(servePort);
 
     const watcher = chokidar.watch(buildDirectory.toString(), {
       ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: true, // TODO: check this flag with Saeed
+      ignoreInitial: true,
       persistent: true,
       awaitWriteFinish: true,
       atomic: true
@@ -85,8 +84,8 @@ export class PortalServeAction {
     const shutdown = async () => {
       await watcher.close();
       this.debounceService.close();
-      liveReloadServer.close();
-      server.close();
+      this.liveReloadService.stop();
+      this.serverService.stop();
       this.prompts.serverClosed();
     };
 
@@ -117,7 +116,7 @@ export class PortalServeAction {
           await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
           this.prompts.waitingForChanges();
 
-          liveReloadServer.refresh(portalDirectory.toString());
+          this.liveReloadService.refresh(portalDirectory);
           this.clearStandardInput();
         });
       })
@@ -125,8 +124,8 @@ export class PortalServeAction {
         this.prompts.watcherError();
         await watcher.close();
         this.debounceService.close();
-        liveReloadServer.close();
-        server.close();
+        this.liveReloadService.stop();
+        this.serverService.stop();
         return ActionResult.failed();
       });
 
