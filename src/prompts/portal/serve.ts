@@ -14,13 +14,13 @@ export class PortalServePrompts {
   }
 
   public portalServed(urlPath: UrlPath) {
-    const message = `Server running at: ${f.link(urlPath.toString())}`;
+    const message = `Portal hosted at ${f.link(urlPath.toString())}`;
     log.message(message);
   }
 
-  public waitingForChanges() {
-    const message = "Watching for changes... Press CTRL+C to stop.";
-    log.message(message);
+  public promptForExit() {
+    const message = "Press CTRL+C to exit.";
+    log.info(message);
   }
 
   public changesDetected() {

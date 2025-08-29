@@ -19,12 +19,11 @@ export class PortalServeAction {
   private readonly prompts: PortalServePrompts;
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
-  private readonly debounceService: DebounceService = new DebounceService();
   private readonly application: Express = express();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
-  private watcher: chokidar.FSWatcher | undefined;
+
   private isPortalServed: boolean = false;
 
   public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null, displayMessages: boolean = true) {
@@ -54,7 +53,21 @@ export class PortalServeAction {
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
 
-    this.watcher = chokidar.watch(buildDirectory.toString(), {
+    if(!hotReload) {
+      await generatePortalAction.execute(buildDirectory, portalDirectory, true, false)
+      const portalUrl = new UrlPath(`http://localhost:${servePort}`);
+      this.prompts.portalServed(portalUrl);
+      if (openInBrowser) {
+        await this.launcherService.openUrlInBrowser(portalUrl);
+      }
+      this.prompts.promptForExit();
+      await this.blockExecution();
+      liveReloadServer.close();
+      server.close();
+      return ActionResult.success();
+    }
+
+    const watcher = chokidar.watch(buildDirectory.toString(), {
       ignored: [/(^|[/\\])\..+/],
       ignoreInitial: false, // TODO: check this flag with Saeed
       persistent: true,
@@ -66,7 +79,9 @@ export class PortalServeAction {
     const eventQueue = new Map();
     const mutex = new Mutex();
 
-    this.watcher
+   const debounceService: DebounceService = new DebounceService();
+
+    watcher
       .on("all", async (event, path) => {
         // triggers folder deletion as a single event
         if (event == "unlinkDir") {
@@ -85,7 +100,7 @@ export class PortalServeAction {
           eventQueue.set(eventId, path);
         });
 
-        await this.debounceService.batchSingleRequest(async () => {
+        await debounceService.batchSingleRequest(async () => {
           if (this.isPortalServed) {
             this.prompts.changesDetected();
           }
@@ -102,41 +117,33 @@ export class PortalServeAction {
             }
             this.isPortalServed = true;
           }
-          this.prompts.waitingForChanges();
+          this.prompts.promptForExit();
 
           liveReloadServer.refresh(portalDirectory.toString());
-          this.clearStandardInput();
         });
       })
       .on("error", async () => {
         this.prompts.watcherError();
-        await shutdown();
       });
 
     // Wait for SIGINT or SIGTERM
-    await this.blockExecution();
+    // await this.blockExecution();
 
-    // Clean up.
-    // end live reload code
-    const shutdown = async () => {
-      await this.watcher?.close();
-      this.debounceService.close();
-      liveReloadServer.close();
-      server.close();
-    };
 
+    // await watcher.close();
+    // liveReloadServer.close();
+    // server.close();
+    // debounceService.close();
     return ActionResult.success();
   }
 
-  // This clears the standard input to allow interrupts like CTRL+C to work properly.
-  private clearStandardInput() {
+  private async blockExecution() {
+    // This clears the standard input to allow interrupts like CTRL+C to work properly.
+
     if (process.platform !== "darwin" && process.stdin.isTTY) {
       process.stdin.setRawMode(false);
       process.stdin.pause();
     }
-  }
-
-  private async blockExecution() {
     await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
   }
 }

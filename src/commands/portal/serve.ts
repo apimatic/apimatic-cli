@@ -60,7 +60,7 @@ export default class PortalServe extends Command {
 
     intro("Portal Serve");
     const portalServeAction = new PortalServeAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await portalServeAction.execute(buildDirectory, portalDirectory, port, open, noReload);
+    const result = await portalServeAction.execute(buildDirectory, portalDirectory, port, open, !noReload);
     outro(result);
   }
 
