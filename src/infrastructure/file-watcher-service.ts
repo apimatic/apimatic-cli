@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { Mutex } from "async-mutex";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 
-export interface FileWatcherOptions {
+interface FileWatcherOptions {
   ignored?: RegExp[];
   ignoreInitial?: boolean;
   persistent?: boolean;
@@ -11,14 +11,14 @@ export interface FileWatcherOptions {
   atomic?: boolean;
 }
 
-export interface FileChangeEvent {
+interface FileChangeEvent {
   event: string;
   path: string;
   eventId: string;
 }
 
-export type FileChangeHandler = (event: FileChangeEvent) => Promise<void>;
-export type ErrorHandler = () => Promise<void>;
+type FileChangeHandler = (event: FileChangeEvent) => Promise<void>;
+type ErrorHandler = () => Promise<void>;
 
 export class FileWatcherService {
   private watcher: chokidar.FSWatcher | null = null;
@@ -98,9 +98,5 @@ export class FileWatcherService {
 
   public isWatching(): boolean {
     return this.watcher !== null;
-  }
-
-  public getWatcher(): chokidar.FSWatcher | null {
-    return this.watcher;
   }
 }

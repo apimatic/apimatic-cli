@@ -1,6 +1,3 @@
-import chokidar from "chokidar";
-import crypto from "crypto";
-import { Mutex } from "async-mutex";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
@@ -12,17 +9,20 @@ import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { DebounceService } from "../../infrastructure/debounce-service.js";
 import { ServerService } from "../../infrastructure/server-service.js";
 import { LiveReloadService } from "../../infrastructure/live-reload-service.js";
+import { FileWatcherService } from "../../infrastructure/file-watcher-service.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly serverService: ServerService = new ServerService();
   private readonly liveReloadService: LiveReloadService = new LiveReloadService();
+  private readonly fileWatcherService: FileWatcherService = new FileWatcherService();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly debounceService: DebounceService = new DebounceService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
+  private watcherFailedToRun: boolean = false;
 
   public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
@@ -69,65 +69,32 @@ export class PortalServeAction {
     this.serverService.serveStatic(portalDirectory, { extensions: ["html"] });
     this.serverService.start(servePort);
 
-    const watcher = chokidar.watch(buildDirectory.toString(), {
-      ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: true,
-      persistent: true,
-      awaitWriteFinish: true,
-      atomic: true
-    });
-
-    const deletedDirectories = new Set<string>();
-    const eventQueue = new Map();
-    const mutex = new Mutex();
+    this.fileWatcherService.startWatching(buildDirectory);
 
     const shutdown = async () => {
-      await watcher.close();
+      this.fileWatcherService.stopWatching();
       this.debounceService.close();
       this.liveReloadService.stop();
       this.serverService.stop();
       this.prompts.serverClosed();
     };
 
-    watcher
-      .on("all", async (event, path) => {
-        // triggers folder deletion as a single event
-        if (event == "unlinkDir") {
-          deletedDirectories.add(path);
-        }
+    this.fileWatcherService.onFileChange(async () => {
+      await this.debounceService.execute(async () => {
+        this.prompts.changesDetected();
+        await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+        this.prompts.waitingForChanges();
 
-        if (event == "unlink") {
-          for (const dir of deletedDirectories) {
-            if (path.startsWith(dir)) {
-              return;
-            }
-          }
-        }
-
-        const eventId: string = `${Date.now()}-${crypto.randomUUID()}`;
-
-        await mutex.runExclusive(async () => {
-          eventQueue.clear();
-          eventQueue.set(eventId, path);
-        });
-
-        await this.debounceService.execute(async () => {
-          this.prompts.changesDetected();
-          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-          this.prompts.waitingForChanges();
-
-          this.liveReloadService.refresh(portalDirectory);
-          this.clearStandardInput();
-        });
-      })
-      .on("error", async () => {
-        this.prompts.watcherError();
-        await watcher.close();
-        this.debounceService.close();
-        this.liveReloadService.stop();
-        this.serverService.stop();
-        return ActionResult.failed();
+        this.liveReloadService.refresh(portalDirectory);
+        this.clearStandardInput();
       });
+    });
+
+    this.fileWatcherService.onError(async () => {
+      this.prompts.watcherError();
+      shutdown();
+      this.watcherFailedToRun = true;
+    });
 
     // Wait for SIGINT or SIGTERM
     if (!noReload) {
@@ -136,6 +103,11 @@ export class PortalServeAction {
       process.on("SIGTERM", shutdown);
     } else {
       await shutdown();
+    }
+
+    // TODO: Figure out a better way to achieve this.
+    if (this.watcherFailedToRun) {
+      return ActionResult.failed();
     }
 
     return ActionResult.success();
