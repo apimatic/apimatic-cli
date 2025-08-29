@@ -1,29 +1,37 @@
+import { createServer } from "livereload";
+import connectLiveReload from "connect-livereload";
+import express, { Express } from "express";
+import chokidar from "chokidar";
+import crypto from "crypto";
+import { Mutex } from "async-mutex";
 import { once } from "events";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-// import { GenerateAction } from "./generate.js";
+import { GenerateAction } from "./generate.js";
 import { NetworkService } from "../../infrastructure/network-service.js";
+import { UrlPath } from "../../types/file/urlPath.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { DebounceService } from "../../infrastructure/debounce-service.js";
-import { LiveServer } from "../../infrastructure/entities/live-server.js";
-import { FileWatcher } from "../../infrastructure/entities/file-watcher.js";
 
 export class PortalServeAction {
-  private readonly prompts: PortalServePrompts = new PortalServePrompts();
+  private readonly prompts: PortalServePrompts;
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly debounceService: DebounceService = new DebounceService();
+  private readonly application: Express = express();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
-  private watcherFailedToRun: boolean = false;
+  private watcher: chokidar.FSWatcher | undefined;
+  private isPortalServed: boolean = false;
 
-  public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
+  public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null, displayMessages: boolean = true) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
     this.authKey = authKey;
+    this.prompts = new PortalServePrompts(displayMessages);
   }
 
   public async execute(
@@ -31,81 +39,92 @@ export class PortalServeAction {
     portalDirectory: DirectoryPath,
     port: number,
     openInBrowser: boolean,
-    noReload: boolean,
-    displayServeCommandMessages: boolean = true
+    hotReload: boolean,
   ): Promise<ActionResult> {
+    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
+
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort != port) {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    // Generate once, return early if there was a problem.
-    // const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    // const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
-    // const isFailedOrCancelledResult = result.mapAll(
-    //   () => null,
-    //   () => ActionResult.failed(),
-    //   () => ActionResult.cancelled()
-    // );
-    // if (isFailedOrCancelledResult) {
-    //   return isFailedOrCancelledResult;
-    // }
+    const liveReloadServer = createServer();
+    const server = this.application
+      .use(connectLiveReload())
+      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
+      .listen(servePort);
 
-    
-    const liveServer = new LiveServer();
-    const portalUrl = liveServer.start(portalDirectory, servePort, openInBrowser, !noReload);
+    this.watcher = chokidar.watch(buildDirectory.toString(), {
+      ignored: [/(^|[/\\])\..+/],
+      ignoreInitial: false, // TODO: check this flag with Saeed
+      persistent: true,
+      awaitWriteFinish: true,
+      atomic: true
+    });
 
-    if (displayServeCommandMessages) {
-      this.prompts.portalServed(portalUrl);
-    }
+    const deletedDirectories = new Set<string>();
+    const eventQueue = new Map();
+    const mutex = new Mutex();
 
-    // Hot-reload enabled.
-    if (!noReload) {
-      const fileWatcher = new FileWatcher({
-        ignored: [/(^|[/\\])\..+/],
-        ignoreInitial: true,
-        persistent: true,
-        awaitWriteFinish: true,
-        atomic: true
-      });
-      fileWatcher.watch(buildDirectory);
-      fileWatcher.onFileChange(async () => {
-        await this.debounceService.execute(async () => {
-          this.prompts.changesDetected();
+    this.watcher
+      .on("all", async (event, path) => {
+        // triggers folder deletion as a single event
+        if (event == "unlinkDir") {
+          deletedDirectories.add(path);
+        }
+        if (event == "unlink") {
+          for (const dir of deletedDirectories) {
+            if (path.startsWith(dir)) {
+              return;
+            }
+          }
+        }
+        const eventId: string = `${Date.now()}-${crypto.randomUUID()}`;
+        await mutex.runExclusive(async () => {
+          eventQueue.clear();
+          eventQueue.set(eventId, path);
+        });
+
+        await this.debounceService.batchSingleRequest(async () => {
+          if (this.isPortalServed) {
+            this.prompts.changesDetected();
+          }
+
           await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+          // toDO: check for success
+
+          const portalUrl = new UrlPath(`http://localhost:${servePort}`);
+          if (!this.isPortalServed) {
+            this.prompts.portalServed(portalUrl);
+
+            if (openInBrowser) {
+              await this.launcherService.openUrlInBrowser(portalUrl);
+            }
+            this.isPortalServed = true;
+          }
           this.prompts.waitingForChanges();
 
-          liveServer.refresh(portalDirectory);
+          liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();
         });
-      });
-
-      fileWatcher.onError(async () => {
+      })
+      .on("error", async () => {
         this.prompts.watcherError();
-        shutdown();
-        this.watcherFailedToRun = true;
+        await shutdown();
       });
 
-      const shutdown = async () => {
-        await fileWatcher.stopWatching();
-        this.debounceService.close();
-      };
-      process.on("SIGINT", shutdown);
-      process.on("SIGTERM", shutdown);
+    // Wait for SIGINT or SIGTERM
+    await this.blockExecution();
 
-      this.prompts.waitingForChanges();
-    } else {
-      await this.blockExecution();
-    }
+    // Clean up.
+    // end live reload code
+    const shutdown = async () => {
+      await this.watcher?.close();
+      this.debounceService.close();
+      liveReloadServer.close();
+      server.close();
+    };
 
-    liveServer.stop();
-
-    // TODO: Figure out a better way to achieve this.
-    if (this.watcherFailedToRun) {
-      return ActionResult.failed();
-    }
-
-    this.prompts.serverClosed();
     return ActionResult.success();
   }
 

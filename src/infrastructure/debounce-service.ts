@@ -10,7 +10,7 @@ export class DebounceService {
     this.debounceMs = debounceMs;
   }
 
-  async execute(handler: () => Promise<void>): Promise<void> {
+  async batchSingleRequest(handler: () => Promise<void>): Promise<void> {
     // Always store the latest handler
     this.latestHandler = handler;
 

@@ -4,6 +4,8 @@ import { format as f } from "../format.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 
 export class PortalServePrompts {
+  constructor(private readonly displayMessages: boolean) {}
+
   public usingFallbackPort(currentPort: number, availablePort: number) {
     const message = `Port ${f.var(currentPort.toString())} is already in use. Available port ${f.var(
       availablePort.toString()
