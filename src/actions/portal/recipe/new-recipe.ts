@@ -23,7 +23,6 @@ import { TreeObject } from "treeify";
 
 class BuildConfigContext {
   private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
-  private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
 
   constructor(private buildDirectory: DirectoryPath) {}
 
@@ -31,7 +30,8 @@ class BuildConfigContext {
     const files = await fs.promises.readdir(this.buildDirectory.toString());
     const buildFileExists = files.find((file) => file === this.BUILD_FILE_NAME);
     if (!buildFileExists) {
-      const promptResult = await this.prompts.buildConfigFilePathPrompt(this.buildDirectory.toString());
+      const prompts = new PortalRecipePrompts();
+      const promptResult = await prompts.buildConfigFilePathPrompt(this.buildDirectory.toString());
       return ok(promptResult);
     }
 
@@ -89,7 +89,21 @@ class RecipeContext {
   }
 
   async save(): Promise<Result<string, string>> {
-    throw new Error("Method not implemented");
+    try {
+      const recipeFileName = this.createRecipeFileName();
+      const recipePath = path.join(this.contentFolderPath.toString(), "recipes", `${recipeFileName}.md`);
+      
+      // Ensure the recipes directory exists
+      await fsExtra.ensureDir(path.dirname(recipePath));
+      
+      // Create a basic markdown file for the recipe
+      const recipeContent = `# ${this.recipeName}\n\nThis is a generated API recipe.`;
+      await fsExtra.writeFile(recipePath, recipeContent, "utf-8");
+      
+      return ok(recipePath);
+    } catch (error) {
+      return err(`Failed to save recipe: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 
@@ -176,98 +190,62 @@ class ContentStepContext {
   }
 }
 
-type RecipeSetup = {
-  recipeName: string;
-  recipeFileName: FileName;
-  buildConfig: BuildConfig;
-  contentFolderPath: DirectoryPath;
-  tocData: Toc;
-  buildConfigContext: BuildConfigContext;
-  endpointContext: EndpointContext;
-  recipeContext: RecipeContext;
-  tocContext: TocContext;
-};
-
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
 
   constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public async execute(buildDirectory: DirectoryPath, name?: string): Promise<ActionResult> {
-    const validationResult = await this.validateBuildDirectory(buildDirectory);
-    if (validationResult.isErr()) {
-      this.prompts.logError(validationResult.error);
-      return ActionResult.failed();
-    }
-    const setupResult = await this.setupRecipe(buildDirectory, name);
-    if (setupResult.isErr()) {
-      this.prompts.logError(setupResult.error);
-      return ActionResult.failed();
-    }
-    const recipeAlreadyExists = this.checkRecipeAlreadyExists(
-      setupResult.value.tocData,
-      setupResult.value.recipeName,
-      setupResult.value.recipeFileName
-    );
-    if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt())) {
-      return ActionResult.cancelled();
-    }
-
-    const recipeResult = await this.promptUserAndBuildNewRecipe(
-      setupResult.value.recipeName,
-      setupResult.value.buildConfig,
-      setupResult.value.contentFolderPath,
-      setupResult.value.endpointContext
-    );
-
-    if (recipeResult.isErr()) {
-      this.prompts.logError(recipeResult.error);
+    // Validate build directory
+    if (!(await fsExtra.pathExists(buildDirectory.toString()))) {
+      this.prompts.logError(`Portal build input folder ${buildDirectory.toString()} does not exist.`);
       return ActionResult.failed();
     }
 
-    const buildConfigPathResult = await setupResult.value.buildConfigContext.findBuildConfigPath();
+    // Get recipe name
+    const recipeName = name ?? (await this.prompts.recipeNamePrompt());
+    
+    // Setup build config context
+    const buildConfigContext = new BuildConfigContext(buildDirectory);
+    const buildConfigPathResult = await buildConfigContext.findBuildConfigPath();
     if (buildConfigPathResult.isErr()) {
       this.prompts.logError(buildConfigPathResult.error);
       return ActionResult.failed();
     }
 
-    const recipeGenerator = new PortalRecipeGenerator();
-    await recipeGenerator.createRecipe(
-      recipeResult.value,
-      setupResult.value.buildConfig,
-      setupResult.value.tocData,
-      setupResult.value.tocContext.tocPath.toString(),
-      setupResult.value.recipeName,
-      setupResult.value.recipeFileName.toString(),
-      buildConfigPathResult.value,
-      setupResult.value.contentFolderPath.toString()
-    );
-    const buildDirectoryStructure = await this.getBuildDirectoryStructure(setupResult.value.recipeFileName.toString());
-    this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
-    return ActionResult.success();
-  }
+    const buildConfigResult = await buildConfigContext.parseBuildConfig();
+    if (buildConfigResult.isErr()) {
+      this.prompts.logError(`Unable to generate API Recipe: ${buildConfigResult.error}`);
+      return ActionResult.failed();
+    }
 
-  private async getBuildDirectoryStructure(recipeFileName: string): Promise<DirectoryNode> {
-    return {
-      content: {
-        "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
-      },
-      static: {
-        scripts: {
-          recipes: {
-            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
-          }
-        }
-      }
-    };
-  }
+    const buildConfig = buildConfigResult.value;
+    const contentFolderPath = await buildConfigContext.getContentFolderPath(buildConfig);
 
-  private async promptUserAndBuildNewRecipe(
-    recipeName: string,
-    buildConfig: BuildConfig,
-    contentFolderPath: DirectoryPath,
-    endpointContext: EndpointContext
-  ): Promise<Result<SerializableRecipe, string>> {
+    // Setup TOC context
+    const tocContext = new TocContext(contentFolderPath.join("content"));
+    const tocDataResult = await tocContext.parseTocData();
+    if (tocDataResult.isErr()) {
+      this.prompts.logError(`Unable to generate API Recipe: ${tocDataResult.error}`);
+      return ActionResult.failed();
+    }
+    const tocData = tocDataResult.value;
+
+    // Setup recipe context
+    const recipeContext = new RecipeContext(recipeName, contentFolderPath);
+    const recipeFileName = recipeContext.createRecipeFileName();
+
+    // Check if recipe already exists
+    const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocData, recipeName, recipeFileName);
+    if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt())) {
+      return ActionResult.cancelled();
+    }
+
+    // Setup endpoint context
+    const specFolderPath = await buildConfigContext.getSpecFolderPath(buildConfig);
+    const endpointContext = new EndpointContext(specFolderPath, this.configDirectory, this.commandMetadata);
+
+    // Build the recipe
     const recipe = new PortalRecipe(recipeName);
     let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
     let idx: number = 1;
@@ -284,7 +262,8 @@ export class PortalRecipeAction {
           const contentStepContext = new ContentStepContext();
           const contentResult = await contentStepContext.promptForContent();
           if (contentResult.isErr()) {
-            return err(contentResult.error);
+            this.prompts.logError(contentResult.error);
+            return ActionResult.failed();
           }
           recipe.addContentStep(stepName, stepName, contentResult.value);
           this.prompts.displayStepAddedSuccessfullyMessage();
@@ -295,7 +274,8 @@ export class PortalRecipeAction {
           if (!endpointGroups) {
             const extractResult = await endpointContext.extractEndpointGroups();
             if (extractResult.isErr()) {
-              return err(extractResult.error);
+              this.prompts.logError(extractResult.error);
+              return ActionResult.failed();
             }
             endpointGroups = extractResult.value;
           }
@@ -319,59 +299,41 @@ export class PortalRecipeAction {
       idx++;
     }
 
-    return ok(recipe.toSerializableRecipe());
-  }
+    const serializableRecipe = recipe.toSerializableRecipe();
 
-  private async validateBuildDirectory(buildDirectoryPath: DirectoryPath): Promise<Result<string, string>> {
-    if (!(await fsExtra.pathExists(buildDirectoryPath.toString()))) {
-      return err(`Portal build input folder ${buildDirectoryPath.toString()} does not exist.`);
-    }
-
-    return ok("Portal build input folder path validated successfully.");
-  }
-
-  private async setupRecipe(buildDirectory: DirectoryPath, name?: string): Promise<Result<RecipeSetup, string>> {
-    const recipeName = name ?? (await this.prompts.recipeNamePrompt());
-    const buildConfigContext = new BuildConfigContext(buildDirectory);
-
-    const buildConfigPathResult = await buildConfigContext.findBuildConfigPath();
-    if (buildConfigPathResult.isErr()) {
-      return err(buildConfigPathResult.error);
-    }
-
-    const buildConfigResult = await buildConfigContext.parseBuildConfig();
-    if (buildConfigResult.isErr()) {
-      return err(`Unable to generate API Recipe: ${buildConfigResult.error}`);
-    }
-
-    const contentFolderPath = await buildConfigContext.getContentFolderPath(buildConfigResult.value);
-
-    const tocContext = new TocContext(contentFolderPath.join("content"));
-
-    const tocDataResult = await tocContext.parseTocData();
-    if (tocDataResult.isErr()) {
-      return err(`Unable to generate API Recipe: ${tocDataResult.error}`);
-    }
-
-    const specFolderPath = await buildConfigContext.getSpecFolderPath(buildConfigResult.value);
-    const endpointContext = new EndpointContext(specFolderPath, this.configDirectory, this.commandMetadata);
-
-    const recipeContext = new RecipeContext(recipeName, contentFolderPath);
-    const recipeFileName = recipeContext.createRecipeFileName();
-
-    const recipeSetup: RecipeSetup = {
+    // Generate the recipe
+    const recipeGenerator = new PortalRecipeGenerator();
+    await recipeGenerator.createRecipe(
+      serializableRecipe,
+      buildConfig,
+      tocData,
+      tocContext.tocPath.toString(),
       recipeName,
-      recipeFileName,
-      buildConfig: buildConfigResult.value,
-      contentFolderPath,
-      tocData: tocDataResult.value,
-      buildConfigContext,
-      endpointContext,
-      recipeContext,
-      tocContext
-    };
+      recipeFileName.toString(),
+      buildConfigPathResult.value,
+      contentFolderPath.toString()
+    );
 
-    return ok(recipeSetup);
+    // Display build directory structure
+    const buildDirectoryStructure = this.getBuildDirectoryStructure(recipeFileName.toString());
+    this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
+    
+    return ActionResult.success();
+  }
+
+  private getBuildDirectoryStructure(recipeFileName: string): DirectoryNode {
+    return {
+      content: {
+        "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
+      },
+      static: {
+        scripts: {
+          recipes: {
+            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
+          }
+        }
+      }
+    };
   }
 
   private checkRecipeAlreadyExists(tocData: Toc, recipeName: string, recipeFileName: FileName): boolean {
