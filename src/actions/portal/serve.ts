@@ -61,6 +61,7 @@ export class PortalServeAction {
         await this.launcherService.openUrlInBrowser(portalUrl);
       }
       this.prompts.promptForExit();
+      this.clearStandardInput();
       await this.blockExecution();
       liveReloadServer.close();
       server.close();
@@ -120,6 +121,7 @@ export class PortalServeAction {
           this.prompts.promptForExit();
 
           liveReloadServer.refresh(portalDirectory.toString());
+          this.clearStandardInput();
         });
       })
       .on("error", async () => {
@@ -127,23 +129,25 @@ export class PortalServeAction {
       });
 
     // Wait for SIGINT or SIGTERM
-    // await this.blockExecution();
+    await this.blockExecution();
 
 
-    // await watcher.close();
-    // liveReloadServer.close();
-    // server.close();
-    // debounceService.close();
+    await watcher.close();
+    liveReloadServer.close();
+    server.close();
+    debounceService.close();
     return ActionResult.success();
   }
 
-  private async blockExecution() {
-    // This clears the standard input to allow interrupts like CTRL+C to work properly.
-
+  // This clears the standard input to allow interrupts like CTRL+C to work properly.
+  private clearStandardInput() {
     if (process.platform !== "darwin" && process.stdin.isTTY) {
       process.stdin.setRawMode(false);
       process.stdin.pause();
     }
+  }
+
+  private async blockExecution() {
     await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
   }
 }
