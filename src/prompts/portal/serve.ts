@@ -1,24 +1,10 @@
 import console from "console";
 import { log } from "@clack/prompts";
 import { format as f } from "../format.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 
 export class PortalServePrompts {
-  // TODO: Remove this method.
-  public logError(message: string) {
-    log.error(message);
-  }
-
-  public startServerError(message: string) {
-    log.error(message);
-  }
-
-  public createLiveReloadServerError(message: string) {
-    log.error(message);
-  }
-
-  public portAlreadyInUse(currentPort: number, availablePort: number) {
+  public usingFallbackPort(currentPort: number, availablePort: number) {
     const message = `Port ${f.var(currentPort.toString())} is already in use. Available port ${f.var(
       availablePort.toString()
     )} will be used.`;

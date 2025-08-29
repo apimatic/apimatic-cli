@@ -58,7 +58,7 @@ export class ValidationService {
       const apiError = error as ApiError;
 
       if (apiError.statusCode === 400) {
-        return "Your API Definition is invalid. Please check the errors and try again.";
+        return "Your API Definition is invalid. Please fix the issues and try again.";
       } else if (apiError.statusCode === 401) {
         return "You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";
       } else if (apiError.statusCode === 403) {

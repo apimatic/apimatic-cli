@@ -1,21 +1,17 @@
+import { once } from "events";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { GenerateAction } from "./generate.js";
+// import { GenerateAction } from "./generate.js";
 import { NetworkService } from "../../infrastructure/network-service.js";
-import { UrlPath } from "../../types/file/urlPath.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { DebounceService } from "../../infrastructure/debounce-service.js";
-import { ServerService } from "../../infrastructure/server-service.js";
-import { LiveReloadService } from "../../infrastructure/live-reload-service.js";
-import { FileWatcherService } from "../../infrastructure/file-watcher-service.js";
+import { LiveServer } from "../../infrastructure/entities/live-server.js";
+import { FileWatcher } from "../../infrastructure/entities/file-watcher.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
-  private readonly serverService: ServerService = new ServerService();
-  private readonly liveReloadService: LiveReloadService = new LiveReloadService();
-  private readonly fileWatcherService: FileWatcherService = new FileWatcherService();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly debounceService: DebounceService = new DebounceService();
@@ -40,76 +36,76 @@ export class PortalServeAction {
   ): Promise<ActionResult> {
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort != port) {
-      this.prompts.portAlreadyInUse(port, servePort);
+      this.prompts.usingFallbackPort(port, servePort);
     }
 
     // Generate once, return early if there was a problem.
-    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
-    const isFailedOrCancelledResult = result.mapAll(
-      () => null,
-      () => ActionResult.failed(),
-      () => ActionResult.cancelled()
-    );
-    if (isFailedOrCancelledResult) {
-      return isFailedOrCancelledResult;
-    }
+    // const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
+    // const result = await generatePortalAction.execute(buildDirectory, portalDirectory, false, false);
+    // const isFailedOrCancelledResult = result.mapAll(
+    //   () => null,
+    //   () => ActionResult.failed(),
+    //   () => ActionResult.cancelled()
+    // );
+    // if (isFailedOrCancelledResult) {
+    //   return isFailedOrCancelledResult;
+    // }
 
-    const portalUrl = new UrlPath(`http://localhost:${servePort}`);
+    
+    const liveServer = new LiveServer();
+    const portalUrl = liveServer.start(portalDirectory, servePort, openInBrowser, !noReload);
+
     if (displayServeCommandMessages) {
       this.prompts.portalServed(portalUrl);
-      this.prompts.waitingForChanges();
-    }
-    if (openInBrowser) {
-      await this.launcherService.openUrlInBrowser(portalUrl);
     }
 
-    this.liveReloadService.start();
-    this.serverService.use(this.liveReloadService.getMiddleware());
-    this.serverService.serveStatic(portalDirectory, { extensions: ["html"] });
-    this.serverService.start(servePort);
-
-    this.fileWatcherService.startWatching(buildDirectory);
-
-    const shutdown = async () => {
-      this.fileWatcherService.stopWatching();
-      this.debounceService.close();
-      this.liveReloadService.stop();
-      this.serverService.stop();
-      this.prompts.serverClosed();
-    };
-
-    this.fileWatcherService.onFileChange(async () => {
-      await this.debounceService.execute(async () => {
-        this.prompts.changesDetected();
-        await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-        this.prompts.waitingForChanges();
-
-        this.liveReloadService.refresh(portalDirectory);
-        this.clearStandardInput();
-      });
-    });
-
-    this.fileWatcherService.onError(async () => {
-      this.prompts.watcherError();
-      shutdown();
-      this.watcherFailedToRun = true;
-    });
-
-    // Wait for SIGINT or SIGTERM
+    // Hot-reload enabled.
     if (!noReload) {
-      this.clearStandardInput();
+      const fileWatcher = new FileWatcher({
+        ignored: [/(^|[/\\])\..+/],
+        ignoreInitial: true,
+        persistent: true,
+        awaitWriteFinish: true,
+        atomic: true
+      });
+      fileWatcher.watch(buildDirectory);
+      fileWatcher.onFileChange(async () => {
+        await this.debounceService.execute(async () => {
+          this.prompts.changesDetected();
+          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+          this.prompts.waitingForChanges();
+
+          liveServer.refresh(portalDirectory);
+          this.clearStandardInput();
+        });
+      });
+
+      fileWatcher.onError(async () => {
+        this.prompts.watcherError();
+        shutdown();
+        this.watcherFailedToRun = true;
+      });
+
+      const shutdown = async () => {
+        await fileWatcher.stopWatching();
+        this.debounceService.close();
+      };
       process.on("SIGINT", shutdown);
       process.on("SIGTERM", shutdown);
+
+      this.prompts.waitingForChanges();
     } else {
-      await shutdown();
+      await this.blockExecution();
     }
+
+    liveServer.stop();
 
     // TODO: Figure out a better way to achieve this.
     if (this.watcherFailedToRun) {
       return ActionResult.failed();
     }
 
+    this.prompts.serverClosed();
     return ActionResult.success();
   }
 
@@ -119,5 +115,9 @@ export class PortalServeAction {
       process.stdin.setRawMode(false);
       process.stdin.pause();
     }
+  }
+
+  private async blockExecution() {
+    await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
   }
 }

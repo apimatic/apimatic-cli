@@ -17,6 +17,7 @@ import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { createResourceInput } from "../../types/file/resource-input.js";
+import { ValidateAction } from "../api/validate.js";
 
 const defaultSpecUrl: UrlPath = new UrlPath(
   "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
@@ -149,42 +150,27 @@ export class PortalQuickstartAction {
     specDirectory: DirectoryPath
   ): Promise<Result<DirectoryPath, string>> {
     this.prompts.validateSpecStep();
-    this.prompts.startProgressIndicator(
-      `Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules`
-    );
-
-    //TODO: Replace with validate action.
     const specZipFilePath = new FilePath(tempDirectory, new FileName("spec.zip"));
     await this.zipService.archive(specDirectory, specZipFilePath);
 
-    const validationResult = await this.validationService.validateViaFile({
-      file: specZipFilePath,
-      commandMetadata: this.commandMetadata
-    });
-    // TODO: Add spinner when refactoring
-    if (validationResult.isErr()) {
-      this.prompts.stopProgressIndicator(`Something went wrong while validating your API Definition.`, 1);
-      return Result.failure(validationResult.error!);
+    const validateAction = new ValidateAction(this.configDir, this.commandMetadata);
+    const validationResult = await validateAction.execute(specZipFilePath, false);
+
+    if (validationResult.isFailed()) {
+      if (!(await this.prompts.useDefaultSpecPrompt())) {
+        return Result.cancelled(specDirectory);
+      }
+
+      const resourceContext = new ResourceContext(tempDirectory);
+      const result = await resourceContext.resolveTo(defaultSpecUrl);
+      if (result.isErr()) {
+        return Result.failure(result.error);
+      }
+      await this.fileService.cleanDirectory(specDirectory);
+      await this.fileService.copy(result.value, result.value.replaceDirectory(specDirectory));
     }
 
-    const validationPassed = validationResult.value!.success;
-    if (validationPassed) {
-      this.prompts.stopProgressIndicator(`Validation Successful.`);
-      return Result.success(specDirectory);
-    }
-
-    this.prompts.stopProgressIndicator(`Oops, it looks like there are some errors in your API Definition.`, 1);
-    if (!(await this.prompts.useDefaultSpecPrompt())) {
-      return Result.cancelled(specDirectory);
-    }
-
-    // Use default spec...
-    const resourceContext = new ResourceContext(tempDirectory);
-    const result = await resourceContext.resolveTo(defaultSpecUrl);
-    if (result.isErr()) {
-      return Result.failure(result.error);
-    }
-    return Result.success(new DirectoryPath(result.value.toString(), "spec"));
+    return Result.success(specDirectory);
   }
 
   private async selectLanguages(): Promise<ResultEx<string[], string>> {

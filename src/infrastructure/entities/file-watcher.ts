@@ -1,7 +1,7 @@
 import chokidar from "chokidar";
 import crypto from "crypto";
 import { Mutex } from "async-mutex";
-import { DirectoryPath } from "../types/file/directoryPath.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 interface FileWatcherOptions {
   ignored?: RegExp[];
@@ -20,37 +20,24 @@ interface FileChangeEvent {
 type FileChangeHandler = (event: FileChangeEvent) => Promise<void>;
 type ErrorHandler = () => Promise<void>;
 
-export class FileWatcherService {
-  private watcher: chokidar.FSWatcher | null = null;
-  private readonly options: FileWatcherOptions;
+export class FileWatcher {
+  private readonly watcher: chokidar.FSWatcher;
   private readonly deletedDirectories = new Set<string>();
   private readonly eventQueue = new Map<string, string>();
   private readonly mutex = new Mutex();
 
-  public constructor(options: FileWatcherOptions = {}) {
-    this.options = {
-      ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: true,
-      persistent: true,
-      awaitWriteFinish: true,
-      atomic: true,
+  constructor(options: FileWatcherOptions = {}) {
+    this.watcher = new chokidar.FSWatcher({
       ...options
-    };
+    });
   }
 
-  public startWatching(directory: DirectoryPath): void {
-    if (this.watcher) {
-      return;
-    }
-
-    this.watcher = chokidar.watch(directory.toString(), this.options);
+  public watch(directory: DirectoryPath): void {
+    this.watcher.add(directory.toString());
   }
 
   public async stopWatching(): Promise<void> {
-    if (this.watcher) {
-      await this.watcher.close();
-      this.watcher = null;
-    }
+    this.watcher.close();
     this.deletedDirectories.clear();
     this.eventQueue.clear();
   }

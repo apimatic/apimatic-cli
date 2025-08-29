@@ -33,6 +33,10 @@ export class ActionResult {
     return this.resultType.valueOf();
   }
 
+  public isFailed() {
+    return this.resultType === ResultType.Failure;
+  }
+
   public mapAll<T>(onSuccess: () => T, onFailure: () => T, onCancel: () => T): T {
     switch (this.resultType) {
       case ResultType.Success:
