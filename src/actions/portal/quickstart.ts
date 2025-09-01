@@ -134,7 +134,7 @@ export class PortalQuickstartAction {
   private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, string>> {
     this.prompts.importSpecStep();
     const inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
-    if (inputPath === null) {
+    if (!inputPath) {
       return err("Operation cancelled. No API Definition was provided.");
     }
 
@@ -182,13 +182,13 @@ export class PortalQuickstartAction {
     return Result.success(specDirectory);
   }
 
-  private async selectLanguages(): Promise<ResultEx<string[], string>> {
+  private async selectLanguages(): Promise<ResultEx<string[], void>> {
     this.prompts.selectLanguagesStep();
 
     const languages = await this.prompts.selectLanguagesPrompt();
-    if (languages === null) {
+    if (!languages) {
       this.prompts.noLanguagesSelected();
-      return err("cancelled");
+      return err();
     }
 
     return ok(languages);
@@ -215,7 +215,7 @@ export class PortalQuickstartAction {
       defaultPort,
       true,
       false,
-      async () => {
+      () => {
         this.prompts.nextSteps();
       }
     );

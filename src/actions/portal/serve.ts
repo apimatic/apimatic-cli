@@ -43,7 +43,7 @@ export class PortalServeAction {
     port: number,
     openInBrowser: boolean,
     hotReload: boolean,
-    onInterrupt?: () => Promise<void>
+    onInterrupt?: () => void
   ): Promise<ActionResult> {
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
 
@@ -69,12 +69,7 @@ export class PortalServeAction {
       this.clearStandardInput();
 
       if (onInterrupt) {
-        await onInterrupt();
-        process.once("SIGINT", async () => {
-          liveReloadServer.close();
-          server.close();
-        });
-        return ActionResult.success();
+        onInterrupt();
       }
 
       await this.prompts.blockExecution();

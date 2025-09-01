@@ -47,7 +47,7 @@ export class PortalQuickstartPrompts {
   }
 
   // TODO: Very complex validation, needs to be improved.
-  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string | null> {
+  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string | undefined> {
     while (true) {
       const spec = await text({
         message: `Provide a local path or a public URL for your OpenAPI definition file:`,
@@ -75,7 +75,7 @@ export class PortalQuickstartPrompts {
       });
 
       if (isCancel(spec)) {
-        return null;
+        return undefined;
       }
 
       const cleanedPath = removeQuotes(String(spec).trim());
@@ -142,7 +142,7 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  public async selectLanguagesPrompt(): Promise<string[] | null> {
+  public async selectLanguagesPrompt(): Promise<string[] | undefined> {
     const languages = (await multiselect({
       message:
         "Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
@@ -155,12 +155,11 @@ export class PortalQuickstartPrompts {
         { label: "PHP", value: "php" },
         { label: "Go", value: "go" }
       ],
-      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"],
-      required: false,
+      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"]
     })) as string[];
 
     if (isCancel(languages)) {
-      return null;
+      return undefined;
     }
 
     return ["http", ...languages];
@@ -235,18 +234,13 @@ export class PortalQuickstartPrompts {
   }
 
   public displayBuildDirectoryAsTree(buildDirectory: DirectoryPath): void {
-    const structuredBuildDirectory = this.fileService.getDirectoryStructure(
-      buildDirectory.toString(),
-      descriptions
-    ) as treeify.TreeObject;
-
-    const tree = treeify.asTree(structuredBuildDirectory, true, true);
-
+    const buildDirectoryStructure = this.fileService.getDirectoryStructure(buildDirectory) as treeify.TreeObject;
+    const buildDirectoryTreeStructure = this.createTreeStructure(buildDirectoryStructure);
+    const tree = treeify.asTree(buildDirectoryTreeStructure, true, true);
     const coloredLogString = tree
       .split("\n")
       .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
       .join("\n");
-
     log.step(coloredLogString);
   }
 
@@ -258,7 +252,22 @@ ${f.link(referenceDocumentationUrl)}`;
     note(message, "Next steps");
   }
 
-  serviceError(error: ServiceError) {
+  public serviceError(error: ServiceError) {
     log.error(getErrorMessage(error));
+  }
+
+  private createTreeStructure(directoryTreeStructure: treeify.TreeObject, parentPath = ""): treeify.TreeObject {
+    const result: treeify.TreeObject = {};
+    for (const key in directoryTreeStructure) {
+      const relPath = path.join(parentPath, key);
+      const desc = descriptions[path.normalize(relPath)];
+      const displayKey = desc ? `${key} : ${desc}` : key;
+      if (directoryTreeStructure[key] && typeof directoryTreeStructure[key] === "object") {
+        result[displayKey] = this.createTreeStructure(directoryTreeStructure[key] as treeify.TreeObject, relPath);
+      } else {
+        result[displayKey] = "";
+      }
+    }
+    return result;
   }
 }

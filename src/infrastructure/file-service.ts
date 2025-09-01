@@ -95,32 +95,24 @@ export class FileService {
   }
 
   public getDirectoryStructure(
-    directoryPath: string,
-    descriptions: { [key: string]: string },
+    directoryPath: DirectoryPath,
     parentPath = ""
   ): { [key: string]: DirectoryNode | string | null | undefined } {
     const directoryStructure: { [key: string]: DirectoryNode | string | null | undefined } = {};
 
-    const items = fs.readdirSync(directoryPath);
+    const items = fs.readdirSync(directoryPath.toString());
     items.forEach((item) => {
       if (item === ".git") return; // Skip .git directory
 
-      const itemPath = path.join(directoryPath, item);
+      const itemPath = path.join(directoryPath.toString(), item);
       const relativePath = path.join(parentPath, item);
       const stats = fs.statSync(itemPath);
 
       if (stats.isDirectory()) {
-        const subdirectoryStructure = this.getDirectoryStructure(itemPath, descriptions, relativePath);
-
-        const folderName = descriptions[path.normalize(relativePath)]
-          ? `${item} : ${descriptions[path.normalize(relativePath)]}`
-          : item;
-
-        directoryStructure[folderName] = subdirectoryStructure;
+        const subdirectoryStructure = this.getDirectoryStructure(new DirectoryPath(itemPath), relativePath);
+        directoryStructure[item] = subdirectoryStructure;
       } else {
-        directoryStructure[
-          descriptions[path.normalize(relativePath)] ? `${item} : ${descriptions[path.normalize(relativePath)]}` : item
-        ] = null;
+        directoryStructure[item] = null;
       }
     });
 

@@ -20,7 +20,7 @@ export class PortalServePrompts {
 
   public promptForExit() {
     const message = "Press CTRL+C to exit.";
-    log.info(message);
+    log.message(message);
   }
 
   public changesDetected() {
@@ -36,6 +36,6 @@ export class PortalServePrompts {
   }
 
   public async blockExecution() {
-    if (this.displayMessages) await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
+    await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
   }
 }
