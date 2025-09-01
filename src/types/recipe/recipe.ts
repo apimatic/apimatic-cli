@@ -30,7 +30,7 @@ export interface SerializableRecipe {
 export interface SerializableStep {
   key: string;
   name: string;
-  type: "content" | "endpoint";
+  type: StepType;
   config: ContentStepConfig | EndpointStepConfig;
 }
 

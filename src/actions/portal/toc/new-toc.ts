@@ -1,4 +1,4 @@
-import { Result, ok, err } from "neverthrow";
+import { err, ok, Result } from "neverthrow";
 import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc.js";
 import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator.js";
 import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc.js";
@@ -30,6 +30,7 @@ export class ContentContext {
     return this.contentDirectory;
   }
 
+  // TODO: check Sohail if this method is wrong
   public getTocDirectory(): DirectoryPath {
     return this.contentDirectory.join("content");
   }
@@ -38,14 +39,9 @@ export class ContentContext {
     return this.fileService.directoryExists(this.contentDirectory);
   }
 
-  public async extractContentGroups(): Promise<Result<TocGroup[], string>> {
-    try {
-      const directory = await this.fileService.getDirectory(this.contentDirectory);
-      const groups = await directory.parseContentFolder(this.contentDirectory);
-      return ok(groups);
-    } catch (error) {
-      return err(`Failed to extract content groups: ${(error as Error).message}`);
-    }
+  public async extractContentGroups(): Promise<TocGroup[]> {
+    const directory = await this.fileService.getDirectory(this.contentDirectory);
+    return await directory.parseContentFolder(this.contentDirectory);
   }
 }
 
@@ -98,16 +94,12 @@ export class PortalNewTocAction {
     const contentContext = new ContentContext(contentDirectory);
     const contentExists = await contentContext.exists();
 
-    let contentGroups: TocGroup[] = [];
+    let contentGroups: TocGroup[];
     if (!contentExists) {
       this.prompts.contentDirectoryNotFound(contentDirectory);
+      contentGroups = [];
     } else {
-      const contentResult = await contentContext.extractContentGroups();
-      if (contentResult.isErr()) {
-        this.prompts.logError(contentResult.error);
-        return ActionResult.failed();
-      }
-      contentGroups = contentResult.value;
+      contentGroups = await contentContext.extractContentGroups();
     }
 
     const tocResult = await this.prompts.generateTOC(
@@ -145,18 +137,6 @@ export class PortalNewTocAction {
       this.prompts.fallingBackToDefault();
       return ok({ endpointGroups: new Map(), models: [] });
     }
-  }
-
-  private async extractContentGroups(buildDirectory: DirectoryPath): Promise<Result<TocGroup[], string>> {
-    const contentDirectory = buildDirectory.join("content");
-    const contentContext = new ContentContext(contentDirectory);
-
-    const contentGroupsResult = await contentContext.extractContentGroups();
-    if (contentGroupsResult.isErr()) {
-      this.prompts.contentGroupsExtractionFailed();
-      return ok([]);
-    }
-    return contentGroupsResult;
   }
 
   private async generateToc(

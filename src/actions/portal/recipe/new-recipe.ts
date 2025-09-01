@@ -7,11 +7,9 @@ import { PortalService } from "../../../infrastructure/services/portal-service.j
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
-import { BuildConfig } from "../../../types/build/build.js";
 import { ActionResult } from "../../action-result.js";
 import { TocContext } from "../../../types/toc-context.js";
 import { FileName } from "../../../types/file/fileName.js";
-import fs from "fs";
 import path from "path";
 import { Toc } from "../../../types/toc/toc.js";
 import { tmpdir } from "os";
@@ -23,59 +21,6 @@ import { TreeObject } from "treeify";
 import { BuildContext } from "../../../types/build-context.js";
 import { ContentContext } from "../toc/new-toc.js";
 import { SpecContext } from "../../../types/spec-context.js";
-
-class BuildConfigContext {
-  private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
-
-  constructor(private buildDirectory: DirectoryPath) {}
-
-  async findBuildConfigPath(): Promise<Result<string, string>> {
-    const files = await fs.promises.readdir(this.buildDirectory.toString());
-    const buildFileExists = files.find((file) => file === this.BUILD_FILE_NAME);
-    if (!buildFileExists) {
-      const prompts = new PortalRecipePrompts();
-      const promptResult = await prompts.buildConfigFilePathPrompt(this.buildDirectory.toString());
-      return ok(promptResult);
-    }
-
-    return ok(path.join(this.buildDirectory.toString(), this.BUILD_FILE_NAME));
-  }
-
-  async parseBuildConfig(): Promise<Result<BuildConfig, string>> {
-    try {
-      const buildConfigPathResult = await this.findBuildConfigPath();
-      if (buildConfigPathResult.isErr()) {
-        return err(buildConfigPathResult.error);
-      }
-      const fileData = await fs.promises.readFile(buildConfigPathResult.value, "utf-8");
-      return ok(JSON.parse(fileData));
-    } catch {
-      return err(
-        `There was an error parsing the build config file. Please check your build config file and try again later.`
-      );
-    }
-  }
-
-  async getContentFolderPath(buildConfig: BuildConfig): Promise<DirectoryPath> {
-    const contentFolder = buildConfig.generatePortal?.contentFolder;
-    if (contentFolder) {
-      return new DirectoryPath(path.join(this.buildDirectory.toString(), contentFolder));
-    }
-
-    return new DirectoryPath(this.buildDirectory.toString());
-  }
-
-  async getSpecFolderPath(buildConfig: BuildConfig): Promise<DirectoryPath> {
-    const apiSpecPath = buildConfig.generatePortal?.apiSpecPath;
-    if (apiSpecPath) {
-      return new DirectoryPath(
-        path.join((await this.getContentFolderPath(buildConfig)).toString(), apiSpecPath.toString())
-      );
-    }
-
-    return new DirectoryPath(path.join((await this.getContentFolderPath(buildConfig)).toString(), "spec"));
-  }
-}
 
 class RecipeContext {
   constructor(private recipeName: string, private contentFolderPath: DirectoryPath) {}
@@ -202,35 +147,24 @@ export class PortalRecipeAction {
     // Validate build directory
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
-      this.prompts.logError(`Portal build input folder ${buildDirectory.toString()} does not exist.`);
+      this.prompts.invalidBuildDirectory(buildDirectory);
       return ActionResult.failed();
     }
 
-    // Get recipe name
+    // Get the recipe name
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
     if (!recipeName) {
       this.prompts.recipeNameEmpty();
       return ActionResult.cancelled();
     }
-    //build config logic exists
-    const buildConfigResult = await buildContext.getBuildFileContents();
-    if (buildConfigResult instanceof Error) {
-      //discussion
-      this.prompts.buildFileError();
-      return ActionResult.failed();
-    }
 
-    const buildConfig = buildConfigResult.value as BuildConfig;
+    //build config logic exists
+    const buildConfig = await buildContext.getBuildFileContents();
+
     const contentContext = ContentContext.fromBuildConfig(buildConfig, buildDirectory);
 
     if (!(await contentContext.exists())) {
       this.prompts.contentFolderNotFound();
-      return ActionResult.failed();
-    }
-
-    const groupsResult = await contentContext.extractContentGroups();
-    if (groupsResult.isErr()) {
-      this.prompts.logError(groupsResult.error);
       return ActionResult.failed();
     }
 
@@ -277,11 +211,16 @@ export class PortalRecipeAction {
 
     do {
       const stepType = await this.prompts.stepTypeSelectionPrompt();
+      if (!stepType) return ActionResult.cancelled();
+
       const stepName = await this.prompts.stepNamePrompt("Step " + idx);
+      if (!stepName) return ActionResult.cancelled();
+
 
       switch (stepType) {
         case StepType.Content: {
           const contentStepContext = new ContentStepContext();
+          // TODO: Sohail -> remove context and copy code from copilot
           const contentResult = await contentStepContext.promptForContent();
           if (contentResult.isErr()) {
             this.prompts.logError(contentResult.error);

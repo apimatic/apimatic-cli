@@ -4,6 +4,9 @@ import treeify from "treeify";
 import { intro, spinner, select, text, cancel, isCancel, outro, log, autocomplete } from "@clack/prompts";
 import { getMessageInGreenColor } from "../../../utils/utils.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { format as f } from "../../format.js";
+import { StepType } from "../../../types/recipe/recipe.js";
 
 export class PortalRecipePrompts {
   private readonly spin = spinner();
@@ -20,29 +23,24 @@ export class PortalRecipePrompts {
     log.message(`Let's get started!`);
   }
 
-  public async recipeNameEmpty(){
+  public recipeNameEmpty() {
     const message = "No recipe name provided";
     this.logError(message);
   }
 
-  public async buildFileError() {
-    const message = "Error getting build file content.";
-    this.logError(message);
-  }
-
-  public async contentFolderNotFound(){
+  public contentFolderNotFound() {
     const message = "Content folder not found.";
     this.logError(message);
   }
 
-  public async apiRecipeGenerationFailed() {
+  public apiRecipeGenerationFailed() {
     const message = "API Recipe generation failed.";
     this.logError(message);
   }
 
   public async recipeNamePrompt(): Promise<string> {
     const recipeName = await text({
-      message: `📘 Enter a name for your API Recipe:`,
+      message: `Enter a name for your API Recipe:`,
       placeholder: "This name will be displayed in your API Documentation portal sidebar.",
       validate: (name) => {
         if (!name) {
@@ -78,12 +76,11 @@ export class PortalRecipePrompts {
         }
         const cleanedPath = this.removeQuotes(filePath.trim());
         const resolvedPath = path.resolve(buildDirectoryPath, cleanedPath);
-        
+
         if (!resolvedPath.endsWith(".json")) {
           return "The content file must be a JSON (.json) file. Please provide a valid file path.";
         }
 
-      
         if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
           return;
         }
@@ -100,7 +97,7 @@ export class PortalRecipePrompts {
     return path.resolve(buildDirectoryPath, this.removeQuotes((buildConfigFilePath as string).trim()));
   }
 
-  public async stepNamePrompt(defaultStepName: string): Promise<string> {
+  public async stepNamePrompt(defaultStepName: string): Promise<string | undefined> {
     const stepName = await text({
       message: `Enter a name for the step:`,
       defaultValue: defaultStepName,
@@ -117,16 +114,14 @@ export class PortalRecipePrompts {
 
   public displayStepsInformation(): void {
     log.step(`🔧 Add Steps to your API Recipe:`);
-    log.message(`You can add:`)
-    log.message(
-      `1. Content Step: Display custom content, such as instructions or information related to your API.`
-    );
+    log.message(`You can add:`);
+    log.message(`1. Content Step: Display custom content, such as instructions or information related to your API.`);
     log.message(`2. Endpoint Step: Display an API endpoint, its playground and other relevant details.`);
     log.message(`Steps appear in the order you add them.`);
     log.message(`Let's proceed to adding steps to your API Recipe.`);
   }
 
-  public async stepTypeSelectionPrompt(): Promise<string> {
+  public async stepTypeSelectionPrompt(): Promise<StepType | undefined> {
     const stepType = await select({
       message: `Select the type of step you want to add:`,
       options: [
@@ -138,9 +133,9 @@ export class PortalRecipePrompts {
     if (isCancel(stepType)) {
       cancel("Operation cancelled.");
       return process.exit(0);
+      // TODO: Sohail
     }
-
-    return stepType as string;
+    return stepType as StepType;
   }
 
   public displayContentStepInfo(): void {
@@ -166,7 +161,10 @@ export class PortalRecipePrompts {
     return (endpointGroupName as string).trim();
   }
 
-  public async endpointNamePrompt(endpointGroups: Map<string, SdlEndpoint[]>, endpointGroupName: string): Promise<string> {
+  public async endpointNamePrompt(
+    endpointGroups: Map<string, SdlEndpoint[]>,
+    endpointGroupName: string
+  ): Promise<string> {
     const endpoints = endpointGroups.get(endpointGroupName);
     const endpointName = await autocomplete({
       message: `Select the name of the endpoint:`,
@@ -185,7 +183,11 @@ export class PortalRecipePrompts {
     return (endpointName as string).trim();
   }
 
-  public async endpointDescriptionPrompt(endpointGroups: Map<string, SdlEndpoint[]>, endpointGroupName: string, endpointName: string): Promise<string> {
+  public async endpointDescriptionPrompt(
+    endpointGroups: Map<string, SdlEndpoint[]>,
+    endpointGroupName: string,
+    endpointName: string
+  ): Promise<string> {
     const defaultDescription = endpointGroups.get(endpointGroupName)!.find((e) => e.Name === endpointName)!.Description;
     const endpointDescription = await text({
       message: `Enter a description for the endpoint:`,
@@ -242,9 +244,7 @@ export class PortalRecipePrompts {
 
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
     log.message(`Your new API Recipe has been added to the source directory at: ${buildDirectoryPath}`);
-    outro(
-      `Run the command \`apimatic portal serve\` to preview your documentation portal.`
-    );
+    outro(`Run the command \`apimatic portal serve\` to preview your documentation portal.`);
   }
 
   public startProgressIndicatorWithMessage(message: string): void {
@@ -264,6 +264,11 @@ export class PortalRecipePrompts {
       .join("\n");
 
     log.step(`You can edit the following files to customize your API Recipe:\n\n` + coloredLogString);
+  }
+
+  public invalidBuildDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    log.error(message);
   }
 
   public logError(error: string): void {
