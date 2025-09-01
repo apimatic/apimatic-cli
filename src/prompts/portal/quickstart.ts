@@ -2,7 +2,7 @@ import * as path from "path";
 import fs from "fs";
 import axios from "axios";
 import treeify from "treeify";
-import { text, select, multiselect, log, isCancel, spinner } from "@clack/prompts";
+import { text, select, multiselect, log, isCancel, spinner, note } from "@clack/prompts";
 import { getMessageInGreenColor, getMessageInRedColor } from "../../utils/utils.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, withSpinner } from "../format.js";
@@ -12,7 +12,6 @@ import { FileService } from "../../infrastructure/file-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
-const serverUrl = "http://localhost:3000";
 const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/advanced-portal-setup";
 const descriptions: { [key: string]: string } = Object.entries({
   "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
@@ -47,11 +46,6 @@ export class PortalQuickstartPrompts {
   public loginFailed() {
     const message = `Unable to login, please check your credentials and try again later.`;
     log.error(message);
-  }
-
-  public loginSuccessful(email: string) {
-    const message = `Logged in as: ${email}`;
-    log.step(message);
   }
 
   public importSpecStep() {
@@ -113,10 +107,6 @@ export class PortalQuickstartPrompts {
     }
   }
 
-  public noSpecProvided() {
-    log.error("Operation cancelled. No API Definition was provided.");
-  }
-
   public specImportError(error: string) {
     log.error(error);
   }
@@ -152,26 +142,6 @@ export class PortalQuickstartPrompts {
   public validateSpecStep() {
     const message = `Step 2 of 4: Validate and Lint your OpenAPI file`;
     log.step(message);
-  }
-
-  // TODO: Add once you have refactored the validate action.
-  public validateSpec(fn: Promise<Result<DirectoryPath, string>>) {
-    return withSpinner(
-      "Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules",
-      "Validation Successful.",
-      "Something went wrong while validating your API Definition.",
-      fn
-    );
-  }
-
-  // TODO: Remove after refactoring validate action.
-  public startProgressIndicator(message: string) {
-    this.spin.start(message);
-  }
-
-  // TODO: Remove after refactoring validate action.
-  public stopProgressIndicator(message: string, statusCode?: number) {
-    this.spin.stop(message, statusCode);
   }
 
   public selectLanguagesStep() {
@@ -250,6 +220,8 @@ export class PortalQuickstartPrompts {
     if (directory === "./") {
       return defaultPortalDirectoryPath;
     } else {
+      // TODO: MOVe this method to string urils
+      // TODO: return domain class
       return this.fileService.removeQuotes(String(directory).trim());
     }
   }
@@ -258,15 +230,16 @@ export class PortalQuickstartPrompts {
     log.error("Operation cancelled. No build directory was provided.");
   }
 
-  public createBuildDirectory(sourceDirectory: string, fn: Promise<Result<DirectoryPath, string>>) {
+  public createBuildDirectory(sourceDirectory: DirectoryPath, fn: Promise<Result<DirectoryPath, string>>) {
     return withSpinner(
       "Generating build directory",
-      `Directory created at ${sourceDirectory}`,
+      `Directory created at ${f.path(sourceDirectory.toString())}`,
       "Something went wrong while setting up your build directory.",
       fn
     );
   }
 
+  // TODO: remove this message param
   public buildSetupError(message: string) {
     log.error(message);
   }
@@ -287,21 +260,12 @@ export class PortalQuickstartPrompts {
     log.step(coloredLogString);
   }
 
-  public portalGenerationError(error: string) {
-    log.error(error);
-  }
+  public nextSteps(): void {
+    const message =
+      `Use the API Playground or an SDK to call your API.
+Customize the Portal theme, add API recipes and enable AI features
+${f.link(referenceDocumentationUrl)}`;
 
-  public nextSteps(buildDirectory: string): void {
-    const firstMessage =
-      `Your API Portal is live at: ${f.path(serverUrl)}\n` +
-      `Hot reload enabled! Edit files in ${f.path(buildDirectory)} to see changes instantly reflected in your API Portal.\n` +
-      `Press CTRL+C to stop the server.`;
-    const secondMessage =
-      `What's next?\n` +
-      `- Use the API Playground or an SDK to call your API.\n` +
-      `- Customize the Portal theme, add API recipes and enable AI features: ${f.path(referenceDocumentationUrl)}`;
-
-    log.step(firstMessage);
-    log.step(secondMessage);
+    note(message, "Next steps");
   }
 }

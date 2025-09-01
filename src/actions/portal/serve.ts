@@ -4,7 +4,6 @@ import express, { Express } from "express";
 import chokidar from "chokidar";
 import crypto from "crypto";
 import { Mutex } from "async-mutex";
-import { once } from "events";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
@@ -62,7 +61,7 @@ export class PortalServeAction {
       }
       this.prompts.promptForExit();
       this.clearStandardInput();
-      await this.blockExecution();
+      await this.prompts.blockExecution();
       liveReloadServer.close();
       server.close();
       return ActionResult.success();
@@ -129,7 +128,7 @@ export class PortalServeAction {
       });
 
     // Wait for SIGINT or SIGTERM
-    await this.blockExecution();
+    await this.prompts.blockExecution();
 
 
     await watcher.close();
@@ -145,9 +144,5 @@ export class PortalServeAction {
       process.stdin.setRawMode(false);
       process.stdin.pause();
     }
-  }
-
-  private async blockExecution() {
-    await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
   }
 }

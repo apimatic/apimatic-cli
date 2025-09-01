@@ -2,6 +2,7 @@ import console from "console";
 import { log } from "@clack/prompts";
 import { format as f } from "../format.js";
 import { UrlPath } from "../../types/file/urlPath.js";
+import { once } from "events";
 
 export class PortalServePrompts {
   constructor(private readonly displayMessages: boolean) {}
@@ -35,8 +36,8 @@ export class PortalServePrompts {
     log.error(message);
   }
 
-  public serverClosed() {
-    const message = "Server shutdown successfully.";
-    console.log(message);
+
+  public async blockExecution() {
+    if (this.displayMessages) await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
   }
 }

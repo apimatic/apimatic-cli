@@ -22,11 +22,11 @@ export default class PortalQuickstart extends Command {
       commandName: PortalQuickstart.id,
       shell: this.config.shell
     };
-    const action = new PortalQuickstartAction(this.getConfigDir(), commandMetadata);
 
     await telemetryService.trackEvent(new QuickstartInitiatedEvent(), commandMetadata.shell);
 
     intro("Portal Quickstart");
+    const action = new PortalQuickstartAction(this.getConfigDir(), commandMetadata);
     const result = await action.execute();
     outro(result);
 

@@ -12,7 +12,6 @@ import { Result } from "../../types/common/result.js";
 import { err, ok, Result as ResultEx } from "neverthrow";
 import { ActionResult } from "../action-result.js";
 import { PortalServeAction } from "./serve.js";
-import { ValidationService } from "../../infrastructure/services/validation-service.js";
 import { ResourceContext } from "../../types/resource-context.js";
 import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
@@ -29,14 +28,12 @@ export class PortalQuickstartAction {
   private readonly zipService: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
   private readonly portalScaffoldService: PortalScaffoldService = new PortalScaffoldService();
-  private readonly validationService: ValidationService;
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
-    this.validationService = new ValidationService(configDir);
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
@@ -92,13 +89,12 @@ export class PortalQuickstartAction {
         return ActionResult.failed();
       }
 
-      const generateAndServePortalResult = await this.servePortal(sourceDirectory, portalDirectory);
-      if (generateAndServePortalResult.isErr()) {
-        this.prompts.portalGenerationError(generateAndServePortalResult.error);
+      const servePortalResult = await this.servePortal(sourceDirectory, portalDirectory);
+      if (servePortalResult.isErr()) {
         return ActionResult.failed();
       }
 
-      this.prompts.nextSteps(sourceDirectory.toString());
+      this.prompts.nextSteps();
       return ActionResult.success();
     });
   };
@@ -145,7 +141,6 @@ export class PortalQuickstartAction {
     return ok(specDirectory);
   }
 
-  // TODO: Needs to be refactored after refactoring validate action.
   private async validateSpec(
     tempDirectory: DirectoryPath,
     specDirectory: DirectoryPath
@@ -209,7 +204,7 @@ export class PortalQuickstartAction {
     selectedLanguages: string[]
   ): Promise<ResultEx<DirectoryPath, string>> {
     const result = await this.prompts.createBuildDirectory(
-      sourceDirectory.toString(),
+      sourceDirectory,
       this.portalScaffoldService.createBuildDirectory(tempDirectory, specDirectory, selectedLanguages)
     );
     if (result.isErr()) {
