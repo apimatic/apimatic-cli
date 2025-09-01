@@ -9,26 +9,12 @@ import { TocContext } from "../../../types/toc-context.js";
 import { SpecContext } from "../../../types/spec-context.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
-import { BuildConfig } from "../../../types/build/build.js";
-import path from "path";
+import { BuildContext } from "../../../types/build-context.js";
 
 export class ContentContext {
   private readonly fileService = new FileService();
 
   constructor(private readonly contentDirectory: DirectoryPath) {}
-
-  public static fromBuildConfig(buildConfig: BuildConfig, buildDirectory: DirectoryPath): ContentContext {
-    const contentFolder = buildConfig.generatePortal?.contentFolder;
-    const directoryPath = contentFolder
-      ? new DirectoryPath(path.join(buildDirectory.toString(), contentFolder))
-      : buildDirectory;
-
-    return new ContentContext(directoryPath);
-  }
-
-  public get contentDirectoryPath(): DirectoryPath {
-    return this.contentDirectory;
-  }
 
   public async exists(): Promise<boolean> {
     return this.fileService.directoryExists(this.contentDirectory);
@@ -58,6 +44,14 @@ export class PortalNewTocAction {
     expandEndpoints: boolean = false,
     expandModels: boolean = false
   ): Promise<ActionResult> {
+
+    // Validate build directory
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.validate())) {
+      this.prompts.invalidBuildDirectory(buildDirectory);
+      return ActionResult.failed();
+    }
+
     const tocDir = tocDirectory ?? buildDirectory.join("content");
     const tocContext = new TocContext(tocDir);
 
@@ -85,7 +79,11 @@ export class PortalNewTocAction {
       }
     }
 
-    const contentDirectory = buildDirectory.join("content");
+    const buildConfig = await buildContext.getBuildFileContents();
+    const contentDirectory = buildConfig.generatePortal?.contentFolder
+      ? buildDirectory.join(buildConfig.generatePortal?.contentFolder)
+      : buildDirectory;
+
     const contentContext = new ContentContext(contentDirectory);
     const contentExists = await contentContext.exists();
 

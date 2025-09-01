@@ -104,9 +104,6 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
-  public async getRelativePath(from: DirectoryPath, to: FilePath): Promise<string> {
-    return path.relative(from.toString(), to.toString());
-  }
 }
 
 const streamPipeline = promisify(pipeline);

@@ -2,7 +2,7 @@ import { cancel, confirm, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
 import { Result } from "neverthrow";
 import { SdlTocComponents } from "../../../types/spec-context.js";
-import { format, withSpinner } from "../../format.js";
+import { format as f, format, withSpinner } from "../../format.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 
 export class PortalNewTocPrompts {
@@ -58,6 +58,11 @@ export class PortalNewTocPrompts {
 
   public contentDirectoryNotFound(contentFolderPath: DirectoryPath) {
     const message = `Content folder not found at: ${contentFolderPath}`
+    log.error(message);
+  }
+
+  public invalidBuildDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
     log.error(message);
   }
 }

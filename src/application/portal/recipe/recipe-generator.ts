@@ -3,9 +3,13 @@ import fs from "fs";
 import prettier from "prettier";
 import { stringify } from "yaml";
 import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../../types/recipe/recipe.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { FileService } from "../../../infrastructure/file-service.js";
 
 export class PortalRecipeGenerator {
   //TODO: Replace tocFileContent any type with concrete type.
+  private fileService: FileService = new FileService();
+
   public async createRecipe(
     recipe: SerializableRecipe,
     buildConfig: any,
@@ -14,14 +18,14 @@ export class PortalRecipeGenerator {
     recipeName: string,
     recipeFileName: string,
     buildConfigFilePath: string,
-    contentFolderPath: string
+    contentFolderPath: DirectoryPath
   ) {
     await this.addRecipeToToc(tocFileContent, tocFilePath, recipeName, recipeFileName);
     await this.registerRecipeInBuildConfigFile(buildConfig, recipeName, recipeFileName, buildConfigFilePath);
     await this.createMarkdownFile(recipeFileName, contentFolderPath);
 
     const generatedRecipeScript = await this.createScriptFromRecipe(recipe);
-    const generatedRecipeScriptsDirectoryPath = path.join(contentFolderPath, "static", "scripts", "recipes");
+    const generatedRecipeScriptsDirectoryPath = path.join(contentFolderPath.toString(), "static", "scripts", "recipes");
     await this.saveGeneratedRecipeScriptToBuildDirectory(
       generatedRecipeScript,
       generatedRecipeScriptsDirectoryPath,
@@ -110,11 +114,11 @@ export class PortalRecipeGenerator {
     await fs.promises.writeFile(buildConfigFilePath, JSON.stringify(buildConfig, null, 2));
   }
 
-  private async createMarkdownFile(recipeFileName: string, contentFolder: string): Promise<void> {
-    const directory = path.join(contentFolder, "content", "recipes");
+  private async createMarkdownFile(recipeFileName: string, contentFolder: DirectoryPath): Promise<void> {
+    const directory = contentFolder.join("recipes");
     const markdownFileContent = this.getMarkdownFileContent();
 
-    fs.mkdirSync(directory, { recursive: true });
+    this.fileService.ensurePathExists(directory);
     fs.writeFileSync(`${directory}/${recipeFileName}.md`, markdownFileContent);
   }
 

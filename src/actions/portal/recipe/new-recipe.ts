@@ -1,5 +1,5 @@
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
-import { DirectoryNode } from "../../../types/recipe/recipe.js";
+import { DirectoryNode, StepType } from "../../../types/recipe/recipe.js";
 import { err, ok, Result } from "neverthrow";
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
@@ -12,7 +12,6 @@ import { FileName } from "../../../types/file/fileName.js";
 import { Toc } from "../../../types/toc/toc.js";
 import { tmpdir } from "os";
 import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
-import { StepType } from "../../../types/recipe/recipe.js";
 import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
 import { TreeObject } from "treeify";
 import { BuildContext } from "../../../types/build-context.js";
@@ -89,8 +88,10 @@ export class PortalRecipeAction {
 
     //build config logic exists
     const buildConfig = await buildContext.getBuildFileContents();
-
-    const contentContext = ContentContext.fromBuildConfig(buildConfig, buildDirectory);
+    const contentDirectory = buildConfig.generatePortal?.contentFolder
+      ? buildDirectory.join(buildConfig.generatePortal?.contentFolder)
+      : buildDirectory;
+    const contentContext = new ContentContext(contentDirectory);
 
     if (!(await contentContext.exists())) {
       this.prompts.contentFolderNotFound();
@@ -98,7 +99,7 @@ export class PortalRecipeAction {
     }
 
     // Setup TOC context
-    const tocContext = new TocContext(contentContext.contentDirectoryPath);
+    const tocContext = new TocContext(contentDirectory);
     const tocDataResult = await tocContext.parseTocData();
     if (tocDataResult.isErr()) {
       this.prompts.apiRecipeGenerationFailed();
@@ -196,7 +197,7 @@ export class PortalRecipeAction {
       recipeName,
       recipeFileName.toString(),
       buildContext.BuildFile.toString(),
-      contentContext.contentDirectoryPath.toString()
+      contentDirectory
     );
 
     // Display build directory structure
