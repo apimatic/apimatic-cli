@@ -9,11 +9,30 @@ import { TocContext } from "../../../types/toc-context.js";
 import { SpecContext } from "../../../types/spec-context.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
+import { BuildConfig } from "../../../types/build/build.js";
+import path from "path";
 
-class ContentContext {
+export class ContentContext {
   private readonly fileService = new FileService();
 
   constructor(private readonly contentDirectory: DirectoryPath) {}
+
+  public static fromBuildConfig(buildConfig: BuildConfig, buildDirectory: DirectoryPath): ContentContext {
+    const contentFolder = buildConfig.generatePortal?.contentFolder;
+    const directoryPath = contentFolder
+      ? new DirectoryPath(path.join(buildDirectory.toString(), contentFolder))
+      : buildDirectory;
+
+    return new ContentContext(directoryPath);
+  }
+
+  public get contentDirectoryPath(): DirectoryPath {
+    return this.contentDirectory;
+  }
+
+  public getTocDirectory(): DirectoryPath {
+    return this.contentDirectory.join("content");
+  }
 
   public async exists(): Promise<boolean> {
     return this.fileService.directoryExists(this.contentDirectory);
@@ -78,7 +97,7 @@ export class PortalNewTocAction {
     const contentDirectory = buildDirectory.join("content");
     const contentContext = new ContentContext(contentDirectory);
     const contentExists = await contentContext.exists();
-    
+
     let contentGroups: TocGroup[] = [];
     if (!contentExists) {
       this.prompts.contentDirectoryNotFound(contentDirectory);
@@ -90,7 +109,6 @@ export class PortalNewTocAction {
       }
       contentGroups = contentResult.value;
     }
-
 
     const tocResult = await this.prompts.generateTOC(
       this.generateToc(
@@ -110,9 +128,7 @@ export class PortalNewTocAction {
     return ActionResult.success();
   }
 
-  private async extractSdlComponents(
-    specContext: SpecContext,
-  ): Promise<Result<SdlComponents, string>> {
+  private async extractSdlComponents(specContext: SpecContext): Promise<Result<SdlComponents, string>> {
     try {
       const extractionPromise = specContext.extractSdlComponents(this.configDirectory, this.commandMetadata);
       const response = await this.prompts.extractSdlComponents(extractionPromise);

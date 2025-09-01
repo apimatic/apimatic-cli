@@ -20,9 +20,11 @@ import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.j
 import { StepType } from "../../../types/recipe/recipe.js";
 import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
 import { TreeObject } from "treeify";
+import { BuildContext } from "../../../types/build-context.js";
+import { ContentContext } from "../toc/new-toc.js";
+import { SpecContext } from "../../../types/spec-context.js";
 
 class BuildConfigContext {
-  
   private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json";
 
   constructor(private buildDirectory: DirectoryPath) {}
@@ -93,17 +95,17 @@ class RecipeContext {
     try {
       const recipeFileName = this.createRecipeFileName();
       const recipePath = path.join(this.contentFolderPath.toString(), "recipes", `${recipeFileName}.md`);
-      
+
       // Ensure the recipes directory exists
       await fsExtra.ensureDir(path.dirname(recipePath));
-      
+
       // Create a basic markdown file for the recipe
       const recipeContent = `# ${this.recipeName}\n\nThis is a generated API recipe.`;
       await fsExtra.writeFile(recipePath, recipeContent, "utf-8");
-      
+
       return ok(recipePath);
     } catch (error) {
-      return err(`Failed to save recipe: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return err(`Failed to save recipe: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
 }
@@ -198,42 +200,52 @@ export class PortalRecipeAction {
 
   public async execute(buildDirectory: DirectoryPath, name?: string): Promise<ActionResult> {
     // Validate build directory
-    if (!(await fsExtra.pathExists(buildDirectory.toString()))) {
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.validate())) {
       this.prompts.logError(`Portal build input folder ${buildDirectory.toString()} does not exist.`);
       return ActionResult.failed();
     }
 
     // Get recipe name
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
-    
-    // Setup build config context
-    const buildConfigContext = new BuildConfigContext(buildDirectory);
-    const buildConfigPathResult = await buildConfigContext.findBuildConfigPath();
-    if (buildConfigPathResult.isErr()) {
-      this.prompts.logError(buildConfigPathResult.error);
+    if (!recipeName) {
+      this.prompts.recipeNameEmpty();
+      return ActionResult.cancelled();
+    }
+    //build config logic exists
+    const buildConfigResult = await buildContext.getBuildFileContents();
+    if (buildConfigResult instanceof Error) {
+      //discussion
+      this.prompts.buildFileError();
       return ActionResult.failed();
     }
 
-    const buildConfigResult = await buildConfigContext.parseBuildConfig();
-    if (buildConfigResult.isErr()) {
-      this.prompts.logError(`Unable to generate API Recipe: ${buildConfigResult.error}`);
+    const buildConfig = buildConfigResult.value as BuildConfig;
+    const contentContext = ContentContext.fromBuildConfig(buildConfig, buildDirectory);
+
+    if (!(await contentContext.exists())) {
+      this.prompts.contentFolderNotFound();
       return ActionResult.failed();
     }
 
-    const buildConfig = buildConfigResult.value;
-    const contentFolderPath = await buildConfigContext.getContentFolderPath(buildConfig);
+    const groupsResult = await contentContext.extractContentGroups();
+    if (groupsResult.isErr()) {
+      this.prompts.logError(groupsResult.error);
+      return ActionResult.failed();
+    }
 
     // Setup TOC context
-    const tocContext = new TocContext(contentFolderPath.join("content"));
+    const tocContext = new TocContext(contentContext.getTocDirectory());
     const tocDataResult = await tocContext.parseTocData();
     if (tocDataResult.isErr()) {
-      this.prompts.logError(`Unable to generate API Recipe: ${tocDataResult.error}`);
+      this.prompts.apiRecipeGenerationFailed();
       return ActionResult.failed();
     }
     const tocData = tocDataResult.value;
 
     // Setup recipe context
-    const recipeContext = new RecipeContext(recipeName, contentFolderPath);
+    //model the recipe in a better way
+    const recipeContext = new RecipeContext(recipeName, contentContext.contentDirectoryPath);
     const recipeFileName = recipeContext.createRecipeFileName();
 
     // Check if recipe already exists
@@ -243,18 +255,27 @@ export class PortalRecipeAction {
     }
 
     // Setup endpoint context
-    const specFolderPath = await buildConfigContext.getSpecFolderPath(buildConfig);
-    const endpointContext = new EndpointContext(specFolderPath, this.configDirectory, this.commandMetadata);
+    const specContext = SpecContext.fromBuildConfig(buildConfig, buildDirectory);
+
+    if (!(await specContext.validate())) {
+      this.prompts.logError("Spec folder is empty or invalid.");
+      return ActionResult.failed();
+    }
+    const endpointContext = new EndpointContext(
+      specContext.specDirectoryPath,
+      this.configDirectory,
+      this.commandMetadata
+    );
 
     // Build the recipe
     const recipe = new PortalRecipe(recipeName);
     let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
     let idx: number = 1;
-    let addAnotherStep = true;
+    let addAnotherStep: boolean;
 
     this.prompts.displayStepsInformation();
 
-    while (addAnotherStep) {
+    do {
       const stepType = await this.prompts.stepTypeSelectionPrompt();
       const stepName = await this.prompts.stepNamePrompt("Step " + idx);
 
@@ -298,7 +319,7 @@ export class PortalRecipeAction {
 
       addAnotherStep = await this.prompts.addAnotherStepSelectionPrompt();
       idx++;
-    }
+    } while (addAnotherStep);
 
     const serializableRecipe = recipe.toSerializableRecipe();
 
@@ -311,14 +332,14 @@ export class PortalRecipeAction {
       tocContext.tocPath.toString(),
       recipeName,
       recipeFileName.toString(),
-      buildConfigPathResult.value,
-      contentFolderPath.toString()
+      buildContext.BuildFile.toString(),
+      contentContext.contentDirectoryPath.toString()
     );
 
     // Display build directory structure
     const buildDirectoryStructure = this.getBuildDirectoryStructure(recipeFileName.toString());
     this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
-    
+
     return ActionResult.success();
   }
 

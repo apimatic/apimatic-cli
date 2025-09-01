@@ -15,9 +15,29 @@ export class PortalRecipePrompts {
       `An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.`
     );
     log.message(
-      `ℹ️  Learn more: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes`
+      `Learn more: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes`
     );
-    log.message(`Let's get started! 🚀`);
+    log.message(`Let's get started!`);
+  }
+
+  public async recipeNameEmpty(){
+    const message = "No recipe name provided";
+    this.logError(message);
+  }
+
+  public async buildFileError() {
+    const message = "Error getting build file content.";
+    this.logError(message);
+  }
+
+  public async contentFolderNotFound(){
+    const message = "Content folder not found.";
+    this.logError(message);
+  }
+
+  public async apiRecipeGenerationFailed() {
+    const message = "API Recipe generation failed.";
+    this.logError(message);
   }
 
   public async recipeNamePrompt(): Promise<string> {
@@ -99,16 +119,16 @@ export class PortalRecipePrompts {
     log.step(`🔧 Add Steps to your API Recipe:`);
     log.message(`You can add:`)
     log.message(
-      `1. 📄 Content Step: Display custom content, such as instructions or information related to your API.`
+      `1. Content Step: Display custom content, such as instructions or information related to your API.`
     );
-    log.message(`2. 🔗 Endpoint Step: Display an API endpoint, its playground and other relevant details.`);
-    log.message(`💡 Steps appear in the order you add them.`);
-    log.message(`📝 Let's proceed to adding steps to your API Recipe. `);
+    log.message(`2. Endpoint Step: Display an API endpoint, its playground and other relevant details.`);
+    log.message(`Steps appear in the order you add them.`);
+    log.message(`Let's proceed to adding steps to your API Recipe.`);
   }
 
   public async stepTypeSelectionPrompt(): Promise<string> {
     const stepType = await select({
-      message: `➕ Select the type of step you want to add:`,
+      message: `Select the type of step you want to add:`,
       options: [
         { value: "content", label: "Content Step", hint: "For displaying custom content" },
         { value: "endpoint", label: "Endpoint Step", hint: "For displaying an API endpoint with its details" }
@@ -124,7 +144,7 @@ export class PortalRecipePrompts {
   }
 
   public displayContentStepInfo(): void {
-    log.step("📝 Opening markdown editor for you to add content in...");
+    log.step("Opening markdown editor for you to add content in...");
   }
 
   public async endpointGroupNamePrompt(endpointGroups: Map<string, SdlEndpoint[]>): Promise<string> {
@@ -221,9 +241,9 @@ export class PortalRecipePrompts {
   }
 
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
-    log.message(`🎉 Your new API Recipe has been added to the source directory at: ${buildDirectoryPath}`);
+    log.message(`Your new API Recipe has been added to the source directory at: ${buildDirectoryPath}`);
     outro(
-      `▶ Run the command \`apimatic portal serve\` to preview your documentation portal.`
+      `Run the command \`apimatic portal serve\` to preview your documentation portal.`
     );
   }
 
@@ -243,7 +263,7 @@ export class PortalRecipePrompts {
       .map((line: string) => line.replace(/#.*/, (match: string) => getMessageInGreenColor(match)))
       .join("\n");
 
-    log.step(`🛠️  You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
+    log.step(`You can edit the following files to customize your API Recipe:\n\n` + coloredLogString);
   }
 
   public logError(error: string): void {

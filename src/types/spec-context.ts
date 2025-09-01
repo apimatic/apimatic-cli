@@ -7,6 +7,7 @@ import { withDirPath } from "../infrastructure/tmp-extensions.js";
 import { TempContext } from "./temp-context.js";
 import { PortalService } from "../infrastructure/services/portal-service.js";
 import { CommandMetadata } from "./common/command-metadata.js";
+import { BuildConfig } from "./build/build.js";
 
 export type EndpointGroup = Map<string, TocEndpoint[]>;
 export type SdlTocComponents = { endpointGroups: EndpointGroup; models: TocModel[] };
@@ -18,6 +19,18 @@ export class SpecContext {
 
   constructor(specDirectory: DirectoryPath) {
     this.specDirectory = specDirectory;
+  }
+
+   public static fromBuildConfig(
+    buildConfig: BuildConfig,
+    buildDirectory: DirectoryPath
+  ): SpecContext {
+    const specFolder = buildConfig.generatePortal?.apiSpecPath;
+    const directoryPath = specFolder
+      ? new DirectoryPath(buildDirectory.toString(), specFolder.toString())
+      : buildDirectory;
+
+    return new SpecContext(directoryPath);
   }
 
   public get specDirectoryPath(): DirectoryPath {
