@@ -12,6 +12,7 @@ export default [
       sourceType: "module",
       globals: {
         process: "readonly",
+        setTimeout: "readonly",
         NodeJS: true,
       },
     },

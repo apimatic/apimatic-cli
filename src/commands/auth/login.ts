@@ -1,13 +1,18 @@
 import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { LoginPrompts } from "../../prompts/auth/login.js";
 import { LoginAction } from "../../actions/auth/login.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { format, intro, outro } from "../../prompts/format.js";
 
 export default class Login extends Command {
+  static summary = "Login to your APIMatic account";
+
   static description = "Login using your APIMatic credentials or an API Key";
 
-  static examples = [`apimatic auth login`, `apimatic auth login --auth-key={api-key}`];
+  private static cmdTxt = format.cmd('apimatic',  'auth' ,'login');
+  static examples = [
+    Login.cmdTxt,
+    `${Login.cmdTxt} ${format.flag('auth-key', '{api-key}')}`];
 
   static flags = {
     "auth-key": Flags.string({
@@ -16,7 +21,6 @@ export default class Login extends Command {
     })
   };
 
-  private readonly prompts = new LoginPrompts();
 
   async run() {
     const {
@@ -31,11 +35,10 @@ export default class Login extends Command {
       commandName: Login.id,
       shell: this.config.shell
     };
+
+    intro("Login");
     const loginAction = new LoginAction(new DirectoryPath(this.config.configDir), commandMetadata);
     const result = await loginAction.execute(authKey);
-    result.match(
-      (email) => this.prompts.loginSuccessful(email),
-      (error) => this.prompts.logError(error)
-    );
+    outro(result);
   }
 }

@@ -1,4 +1,4 @@
-import { outro, log, isCancel, confirm } from "@clack/prompts";
+import { log, isCancel, confirm } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { Result } from "neverthrow";
@@ -31,10 +31,6 @@ export class ApiTransformPrompts {
 
   public async transformApi(fn: Promise<Result<TransformationResultData, string>>) {
     return withSpinner("Transforming API", "API transformed successfully.", "API transformation failed.", fn);
-  }
-
-  displayOutroMessage(transformedApiPath: DirectoryPath): void {
-    outro(`The transformed API specification can be found at ${transformedApiPath}`);
   }
 
   logTransformationError(error: string): void {

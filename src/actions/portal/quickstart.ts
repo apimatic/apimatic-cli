@@ -43,7 +43,7 @@ export class PortalQuickstartAction {
     this.prompts.welcomeMessage();
 
     const authenticateUserResult = await this.authenticateUser();
-    if (authenticateUserResult.isErr()) {
+    if (authenticateUserResult.isFailed()) {
       this.prompts.loginFailed();
       return ActionResult.failed();
     }
@@ -104,20 +104,21 @@ export class PortalQuickstartAction {
   };
 
   // TODO: LoginAction needs to be fixed to use prompts framework, then we can fix this.
-  private async authenticateUser(): Promise<ResultEx<void, void>> {
+  private async authenticateUser(): Promise<Result<string, string>> {
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (storedAuth?.authKey) {
-      return ok();
+      return Result.success("User is already authenticated.");
     }
 
     this.prompts.loginRequired();
     const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
 
-    if (loginResult.isErr()) {
-      return err();
-    }
-    this.prompts.loginSuccessful(loginResult.value);
-    return ok();
+    // TODO: fix error messages after refactoring
+    return loginResult.mapAll(
+      () => Result.success("Authentication was successful."),
+      () => Result.failure("Unable to login, please check your credentials and try again later."),
+      () => Result.failure("Unable to login, please check your credentials and try again later.")
+    );
   }
 
   // TODO: create TempSpecContext and then refactor this.
