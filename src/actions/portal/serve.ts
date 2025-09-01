@@ -1,4 +1,4 @@
-import { createServer } from "livereload";
+import { createServer as createLiveReloadServer } from "livereload";
 import connectLiveReload from "connect-livereload";
 import express, { Express } from "express";
 import chokidar from "chokidar";
@@ -25,7 +25,12 @@ export class PortalServeAction {
 
   private isPortalServed: boolean = false;
 
-  public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null, displayMessages: boolean = true) {
+  public constructor(
+    configDir: DirectoryPath,
+    commandMetadata: CommandMetadata,
+    authKey: string | null = null,
+    displayMessages: boolean = true
+  ) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
     this.authKey = authKey;
@@ -38,6 +43,7 @@ export class PortalServeAction {
     port: number,
     openInBrowser: boolean,
     hotReload: boolean,
+    onInterrupt?: () => Promise<void>
   ): Promise<ActionResult> {
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
 
@@ -46,14 +52,14 @@ export class PortalServeAction {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    const liveReloadServer = createServer();
+    const liveReloadServer = createLiveReloadServer();
     const server = this.application
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
 
-    if(!hotReload) {
-      await generatePortalAction.execute(buildDirectory, portalDirectory, true, false)
+    if (!hotReload) {
+      await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
       const portalUrl = new UrlPath(`http://localhost:${servePort}`);
       this.prompts.portalServed(portalUrl);
       if (openInBrowser) {
@@ -61,6 +67,16 @@ export class PortalServeAction {
       }
       this.prompts.promptForExit();
       this.clearStandardInput();
+
+      if (onInterrupt) {
+        await onInterrupt();
+        process.once("SIGINT", async () => {
+          liveReloadServer.close();
+          server.close();
+        });
+        return ActionResult.success();
+      }
+
       await this.prompts.blockExecution();
       liveReloadServer.close();
       server.close();
@@ -79,7 +95,7 @@ export class PortalServeAction {
     const eventQueue = new Map();
     const mutex = new Mutex();
 
-   const debounceService: DebounceService = new DebounceService();
+    const debounceService: DebounceService = new DebounceService();
 
     watcher
       .on("all", async (event, path) => {
@@ -129,7 +145,6 @@ export class PortalServeAction {
 
     // Wait for SIGINT or SIGTERM
     await this.prompts.blockExecution();
-
 
     await watcher.close();
     liveReloadServer.close();

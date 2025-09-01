@@ -2,17 +2,21 @@ import * as path from "path";
 import fs from "fs";
 import axios from "axios";
 import treeify from "treeify";
+import { Result } from "neverthrow";
 import { text, select, multiselect, log, isCancel, spinner, note } from "@clack/prompts";
 import { getMessageInGreenColor, getMessageInRedColor } from "../../utils/utils.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { Result } from "neverthrow";
 import { FileService } from "../../infrastructure/file-service.js";
+import { removeQuotes } from "../../utils/string-utils.js";
+import { ServiceError } from "../../infrastructure/api-utils.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
 const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/advanced-portal-setup";
+const defaultPortalDirectoryPath = process.cwd();
+
 const descriptions: { [key: string]: string } = Object.entries({
   "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
   spec: "# Contains all API definition files",
@@ -23,7 +27,6 @@ const descriptions: { [key: string]: string } = Object.entries({
   acc[path.normalize(key)] = value;
   return acc;
 }, {} as { [key: string]: string });
-const defaultPortalDirectoryPath = process.cwd();
 
 export class PortalQuickstartPrompts {
   private readonly fileService = new FileService();
@@ -63,7 +66,7 @@ export class PortalQuickstartPrompts {
         validate: (input) => {
           if (!input) return;
 
-          const cleanedPath = this.fileService.removeQuotes(input.trim() ?? "");
+          const cleanedPath = removeQuotes(input.trim() ?? "");
 
           if (!UrlPath.create(cleanedPath)) {
             const dirPath = path.resolve(cleanedPath);
@@ -85,7 +88,7 @@ export class PortalQuickstartPrompts {
         return null;
       }
 
-      const cleanedPath = this.fileService.removeQuotes(String(spec).trim());
+      const cleanedPath = removeQuotes(String(spec).trim());
 
       // Async validation for URLs
       if (UrlPath.create(cleanedPath)) {
@@ -181,29 +184,28 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  public async inputDirectoryPathPrompt(): Promise<string | null> {
+  public async inputDirectoryPathPrompt(): Promise<DirectoryPath | null> {
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
       defaultValue: "./",
       validate: (input) => {
-        const cleanedPath = this.fileService.removeQuotes(input?.trim() ?? "");
-        const inputDirectory = new DirectoryPath(cleanedPath);
+        const cleanedPath = removeQuotes(input?.trim() ?? "");
 
-        if (!fs.existsSync(inputDirectory.toString()) && inputDirectory.toString() != defaultPortalDirectoryPath) {
+        if (!fs.existsSync(cleanedPath.toString()) && cleanedPath.toString() != defaultPortalDirectoryPath) {
           return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
         }
 
-        if (inputDirectory.toString() !== defaultPortalDirectoryPath) {
-          const files = fs.readdirSync(inputDirectory.toString()).filter((item) => !item.startsWith("."));
+        if (cleanedPath.toString() !== defaultPortalDirectoryPath) {
+          const files = fs.readdirSync(cleanedPath.toString()).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
             return getMessageInRedColor(
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
             );
           }
-        } else if (fs.existsSync(inputDirectory.toString())) {
+        } else if (fs.existsSync(cleanedPath.toString())) {
           // For ignoring hidden files and folders in the current directory in MacOS.
-          const files = fs.readdirSync(inputDirectory.toString()).filter((item) => !item.startsWith("."));
+          const files = fs.readdirSync(cleanedPath.toString()).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
             return getMessageInRedColor(
               "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
@@ -218,11 +220,10 @@ export class PortalQuickstartPrompts {
     }
 
     if (directory === "./") {
-      return defaultPortalDirectoryPath;
+      return new DirectoryPath(defaultPortalDirectoryPath);
     } else {
-      // TODO: MOVe this method to string urils
       // TODO: return domain class
-      return this.fileService.removeQuotes(String(directory).trim());
+      return new DirectoryPath(removeQuotes(directory as string).trim());
     }
   }
 
@@ -230,7 +231,7 @@ export class PortalQuickstartPrompts {
     log.error("Operation cancelled. No build directory was provided.");
   }
 
-  public createBuildDirectory(sourceDirectory: DirectoryPath, fn: Promise<Result<DirectoryPath, string>>) {
+  public createBuildDirectory(sourceDirectory: DirectoryPath, fn: Promise<Result<DirectoryPath, ServiceError>>) {
     return withSpinner(
       "Generating build directory",
       `Directory created at ${f.path(sourceDirectory.toString())}`,
@@ -261,8 +262,7 @@ export class PortalQuickstartPrompts {
   }
 
   public nextSteps(): void {
-    const message =
-      `Use the API Playground or an SDK to call your API.
+    const message = `Use the API Playground or an SDK to call your API.
 Customize the Portal theme, add API recipes and enable AI features
 ${f.link(referenceDocumentationUrl)}`;
 

@@ -7,6 +7,7 @@ import { BuildContext } from "../../types/build-context.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { ZipService } from "../zip-service.js";
+import { ServiceError } from "../api-utils.js";
 
 export class PortalScaffoldService {
   private readonly fileService: FileService = new FileService();
@@ -19,36 +20,30 @@ export class PortalScaffoldService {
     tempDirectory: DirectoryPath,
     specDirectory: DirectoryPath,
     selectedLanguages: string[]
-  ): Promise<Result<DirectoryPath, string>> {
-    try {
-      const resourceContext = new ResourceContext(tempDirectory);
-      // TODO: repositoryFolderName should be handled
-      const result = await resourceContext.resolveTo(new UrlPath(this.zipUrl));
-      if (result.isErr()) {
-        return err("Unable to setup the portal, please try again later.");
-      }
-      await this.zipService.unArchive(result.value, tempDirectory);
-      const extractedFolder = tempDirectory.join(this.repositoryFolderName);
-      await this.fileService.deleteDirectory(extractedFolder.join(".github"));
-
-      // Setup spec.
-      const tempSpecDirectory = extractedFolder.join("spec");
-      // TODO: Replace this with SpecContext
-      await this.fileService.deleteFile(new FilePath(tempSpecDirectory, this.defaultSpecFileName));
-      await this.fileService.copyDirectory(specDirectory, tempSpecDirectory);
-      const buildContext = new BuildContext(extractedFolder);
-      const buildFile = await buildContext.getBuildFileContents();
-      buildFile.generatePortal!.languageConfig = selectedLanguages.reduce((config, lang) => {
-        config[lang] = {};
-        return config;
-      }, {} as { [key: string]: object });
-      await buildContext.updateBuildFileContents(buildFile);
-
-      return ok(extractedFolder);
-    } catch {
-      return err(
-        "There was an error setting up your portal. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io "
-      );
+  ): Promise<Result<DirectoryPath, ServiceError>> {
+    const resourceContext = new ResourceContext(tempDirectory);
+    // TODO: repositoryFolderName should be handled
+    const result = await resourceContext.resolveTo(new UrlPath(this.zipUrl));
+    if (result.isErr()) {
+      return err(result.error);
     }
+    await this.zipService.unArchive(result.value, tempDirectory);
+    const extractedFolder = tempDirectory.join(this.repositoryFolderName);
+    await this.fileService.deleteDirectory(extractedFolder.join(".github"));
+
+    // Setup spec.
+    const tempSpecDirectory = extractedFolder.join("spec");
+    // TODO: Replace this with SpecContext
+    await this.fileService.deleteFile(new FilePath(tempSpecDirectory, this.defaultSpecFileName));
+    await this.fileService.copyDirectory(specDirectory, tempSpecDirectory);
+    const buildContext = new BuildContext(extractedFolder);
+    const buildFile = await buildContext.getBuildFileContents();
+    buildFile.generatePortal!.languageConfig = selectedLanguages.reduce((config, lang) => {
+      config[lang] = {};
+      return config;
+    }, {} as { [key: string]: object });
+    await buildContext.updateBuildFileContents(buildFile);
+
+    return ok(extractedFolder);
   }
 }

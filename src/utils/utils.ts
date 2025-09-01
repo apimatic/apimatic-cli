@@ -3,9 +3,6 @@ import { Buffer } from "buffer";
 import stripTags from "striptags";
 import colors from "picocolors";
 
-import { loggers, ValidationMessages } from "../types/utils.js";
-
-
 export const replaceHTML = (string: string) => {
   return stripTags(string);
 };
@@ -13,7 +10,6 @@ export const replaceHTML = (string: string) => {
 export const getFileNameFromPath = (filePath: string) => {
   return path.basename(filePath).split(".")[0];
 };
-
 
 export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promise<any> {
   const chunks: Buffer[] = [];

@@ -94,17 +94,6 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
-  public removeQuotes(path: string): string {
-    const quotes = ['"', "'"];
-
-    for (const quote of quotes) {
-      if (path.startsWith(quote) && path.endsWith(quote) && path.length > 1) {
-        return this.removeQuotes(path.slice(1, -1)); // Recursive call
-      }
-    }
-    return path;
-  }
-
   public convertDirectoryStructureToJson(
     directoryPath: string,
     descriptions: { [key: string]: string },

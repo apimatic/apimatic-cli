@@ -1,4 +1,3 @@
-import console from "console";
 import { log } from "@clack/prompts";
 import { format as f } from "../format.js";
 import { UrlPath } from "../../types/file/urlPath.js";
@@ -35,7 +34,6 @@ export class PortalServePrompts {
 
     log.error(message);
   }
-
 
   public async blockExecution() {
     if (this.displayMessages) await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);

@@ -17,6 +17,7 @@ import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { createResourceInput } from "../../types/file/resource-input.js";
 import { ValidateAction } from "../api/validate.js";
+import { ServiceError } from "../../infrastructure/api-utils.js";
 
 const defaultSpecUrl: UrlPath = new UrlPath(
   "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
@@ -85,7 +86,6 @@ export class PortalQuickstartAction {
         selectedLanguagesResult.value
       );
       if (buildDirectoryResult.isErr()) {
-        this.prompts.buildSetupError(buildDirectoryResult.error);
         return ActionResult.failed();
       }
 
@@ -94,12 +94,10 @@ export class PortalQuickstartAction {
         return ActionResult.failed();
       }
 
-      this.prompts.nextSteps();
       return ActionResult.success();
     });
   };
 
-  // TODO: LoginAction needs to be fixed to use prompts framework, then we can fix this.
   private async authenticateUser(): Promise<Result<string, string>> {
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (storedAuth?.authKey) {
@@ -117,7 +115,6 @@ export class PortalQuickstartAction {
     );
   }
 
-  // TODO: create TempSpecContext and then refactor this.
   private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, string>> {
     this.prompts.importSpecStep();
     const inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
@@ -144,7 +141,7 @@ export class PortalQuickstartAction {
   private async validateSpec(
     tempDirectory: DirectoryPath,
     specDirectory: DirectoryPath
-  ): Promise<Result<DirectoryPath, string>> {
+  ): Promise<Result<DirectoryPath, ServiceError>> {
     this.prompts.validateSpecStep();
     const specZipFilePath = new FilePath(tempDirectory, new FileName("spec.zip"));
     await this.zipService.archive(specDirectory, specZipFilePath);
@@ -186,14 +183,13 @@ export class PortalQuickstartAction {
   > {
     this.prompts.selectInputDirectoryStep();
 
-    const inputDirectoryPath = await this.prompts.inputDirectoryPathPrompt();
-    if (inputDirectoryPath === null) {
+    const inputDirectory = await this.prompts.inputDirectoryPathPrompt();
+    if (inputDirectory === null) {
       this.prompts.noInputDirectoryProvided();
       return err("cancelled");
     }
 
-    const workingDirectory = new DirectoryPath(inputDirectoryPath);
-    return ok({ sourceDirectory: workingDirectory.join("src"), portalDirectory: workingDirectory.join("portal") });
+    return ok({ sourceDirectory: inputDirectory.join("src"), portalDirectory: inputDirectory.join("portal") });
   }
 
   //TODO: Remove tempDirectory as param.
@@ -202,12 +198,13 @@ export class PortalQuickstartAction {
     sourceDirectory: DirectoryPath,
     specDirectory: DirectoryPath,
     selectedLanguages: string[]
-  ): Promise<ResultEx<DirectoryPath, string>> {
+  ): Promise<ResultEx<DirectoryPath, ServiceError>> {
     const result = await this.prompts.createBuildDirectory(
       sourceDirectory,
       this.portalScaffoldService.createBuildDirectory(tempDirectory, specDirectory, selectedLanguages)
     );
     if (result.isErr()) {
+      this.prompts.buildSetupError(result.error);
       return err(result.error);
     }
 
@@ -222,8 +219,18 @@ export class PortalQuickstartAction {
     portalDirectory: DirectoryPath
   ): Promise<ResultEx<string, string>> {
     const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null, false);
-    const result = await portalServeAction.execute(buildDirectory, portalDirectory, defaultPort, true, false);
+    const result = await portalServeAction.execute(
+      buildDirectory,
+      portalDirectory,
+      defaultPort,
+      true,
+      false,
+      async () => {
+        this.prompts.nextSteps();
+      }
+    );
 
+    // TODO: Figure out a better way for this.
     return result.mapAll<ResultEx<string, string>>(
       () => {
         return ok("Generated portal and served it successfully.");
