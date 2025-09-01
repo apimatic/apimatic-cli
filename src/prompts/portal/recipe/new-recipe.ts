@@ -25,17 +25,22 @@ export class PortalRecipePrompts {
 
   public recipeNameEmpty() {
     const message = "No recipe name provided";
-    this.logError(message);
+    log.error(message);
   }
 
   public contentFolderNotFound() {
     const message = "Content folder not found.";
-    this.logError(message);
+    log.error(message);
   }
 
   public apiRecipeGenerationFailed() {
     const message = "API Recipe generation failed.";
-    this.logError(message);
+    log.error(message);
+  }
+
+  public specFileEmptyInvalid() {
+    const message = "Spec file is empty or invalid.";
+    log.error(message);
   }
 
   public async recipeNamePrompt(): Promise<string> {

@@ -119,7 +119,7 @@ export class PortalRecipeAction {
     const specContext = SpecContext.fromBuildConfig(buildConfig, buildDirectory);
 
     if (!(await specContext.validate())) {
-      this.prompts.logError("Spec folder is empty or invalid.");
+      this.prompts.specFileEmptyInvalid();
       return ActionResult.failed();
     }
     const endpointContext = new EndpointContext(
@@ -150,7 +150,7 @@ export class PortalRecipeAction {
             this.prompts.logError(contentResult.error);
             return ActionResult.failed();
           }
-          recipe.addContentStep(stepName, stepName, contentResult.value);
+          recipe.addContentStep(stepName, contentResult.value);
           this.prompts.displayStepAddedSuccessfullyMessage();
           break;
         }
@@ -174,7 +174,7 @@ export class PortalRecipeAction {
           );
           const endpointPermalink = `$e/${[endpointGroupName, endpointName].map(encodeURIComponent).join("/")}`;
 
-          recipe.addEndpointStep(stepName, stepName, description, endpointPermalink);
+          recipe.addEndpointStep(stepName, description, endpointPermalink);
           this.prompts.displayStepAddedSuccessfullyMessage();
           break;
         }

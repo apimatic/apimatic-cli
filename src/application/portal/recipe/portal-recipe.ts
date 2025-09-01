@@ -10,19 +10,19 @@ export class PortalRecipe {
     };
   }
 
-  addContentStep(key: string, name: string, content: string) {
+  addContentStep(key: string,  content: string) {
     this.recipe.steps.push({
       key,
-      name,
+      name: key, //TODO: Check if key is required
       type: StepType.Content,
       config: { content }
     });
   }
 
-  addEndpointStep(key: string, name: string, description: string, endpointPermalink: string) {
+  addEndpointStep(key: string , description: string, endpointPermalink: string) {
     this.recipe.steps.push({
       key,
-      name,
+      name: key,  //TODO: Check if key is required
       type: StepType.Endpoint,
       config: {
         description,
