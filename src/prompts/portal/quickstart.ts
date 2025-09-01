@@ -10,7 +10,7 @@ import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { removeQuotes } from "../../utils/string-utils.js";
-import { ServiceError } from "../../infrastructure/api-utils.js";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -34,21 +34,11 @@ export class PortalQuickstartPrompts {
   private readonly spin = spinner();
 
   public welcomeMessage() {
-    log.message(`Hello there.`);
+    log.info(`Hello there.`);
     log.message(
       `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.`
     );
     log.message(`Let's get started!`);
-  }
-
-  public loginRequired() {
-    const message = `You need to be logged in to continue.`;
-    log.step(message);
-  }
-
-  public loginFailed() {
-    const message = `Unable to login, please check your credentials and try again later.`;
-    log.error(message);
   }
 
   public importSpecStep() {
@@ -56,7 +46,7 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  //TODO: Very complex validation, needs to be improved.
+  // TODO: Very complex validation, needs to be improved.
   public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string | null> {
     while (true) {
       const spec = await text({
@@ -165,7 +155,8 @@ export class PortalQuickstartPrompts {
         { label: "PHP", value: "php" },
         { label: "Go", value: "go" }
       ],
-      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"]
+      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"],
+      required: false,
     })) as string[];
 
     if (isCancel(languages)) {
@@ -184,7 +175,7 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  public async inputDirectoryPathPrompt(): Promise<DirectoryPath | null> {
+  public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
     const directory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
@@ -216,37 +207,35 @@ export class PortalQuickstartPrompts {
     });
 
     if (isCancel(directory)) {
-      return null;
+      return undefined;
     }
 
     if (directory === "./") {
       return new DirectoryPath(defaultPortalDirectoryPath);
     } else {
-      // TODO: return domain class
       return new DirectoryPath(removeQuotes(directory as string).trim());
     }
   }
 
   public noInputDirectoryProvided() {
-    log.error("Operation cancelled. No build directory was provided.");
+    log.error("No build directory was provided.");
   }
 
-  public createBuildDirectory(sourceDirectory: DirectoryPath, fn: Promise<Result<DirectoryPath, ServiceError>>) {
+  public downloadBuildDirectory(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner(
-      "Generating build directory",
-      `Directory created at ${f.path(sourceDirectory.toString())}`,
-      "Something went wrong while setting up your build directory.",
+      "Downloading Build directory",
+      `Build directory downloaded successfully`,
+      "Unable to download Build directory",
       fn
     );
   }
 
-  // TODO: remove this message param
-  public buildSetupError(message: string) {
-    log.error(message);
+  public buildSetupError(serviceError: ServiceError) {
+    log.error(getErrorMessage(serviceError));
   }
 
   public displayBuildDirectoryAsTree(buildDirectory: DirectoryPath): void {
-    const structuredBuildDirectory = this.fileService.convertDirectoryStructureToJson(
+    const structuredBuildDirectory = this.fileService.getDirectoryStructure(
       buildDirectory.toString(),
       descriptions
     ) as treeify.TreeObject;
@@ -267,5 +256,9 @@ Customize the Portal theme, add API recipes and enable AI features
 ${f.link(referenceDocumentationUrl)}`;
 
     note(message, "Next steps");
+  }
+
+  serviceError(error: ServiceError) {
+    log.error(getErrorMessage(error));
   }
 }

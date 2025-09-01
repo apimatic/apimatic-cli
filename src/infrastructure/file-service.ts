@@ -94,7 +94,7 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
-  public convertDirectoryStructureToJson(
+  public getDirectoryStructure(
     directoryPath: string,
     descriptions: { [key: string]: string },
     parentPath = ""
@@ -110,7 +110,7 @@ export class FileService {
       const stats = fs.statSync(itemPath);
 
       if (stats.isDirectory()) {
-        const subdirectoryStructure = this.convertDirectoryStructureToJson(itemPath, descriptions, relativePath);
+        const subdirectoryStructure = this.getDirectoryStructure(itemPath, descriptions, relativePath);
 
         const folderName = descriptions[path.normalize(relativePath)]
           ? `${item} : ${descriptions[path.normalize(relativePath)]}`

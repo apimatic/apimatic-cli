@@ -8,9 +8,8 @@ import { LoginPrompts } from "../../prompts/auth/login.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { ActionResult } from "../action-result.js";
 import { err, ok, Result } from "neverthrow";
-import { StatusAction } from "./status.js";
 
-type LoginTimout = "TIMEOUT";
+type LoginTimeout = "TIMEOUT";
 
 export class LoginAction {
   private readonly authService = new AuthService();
@@ -41,7 +40,7 @@ export class LoginAction {
     return ActionResult.success();
   }
 
-  private async pollDeviceToken(apiKey: string | undefined, shell: string): Promise<Result<string, LoginTimout>> {
+  private async pollDeviceToken(apiKey: string | undefined, shell: string): Promise<Result<string, LoginTimeout>> {
     if (apiKey) return ok(apiKey);
     const state = uuid();
     this.prompts.openBrowser();

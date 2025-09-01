@@ -6,7 +6,6 @@ import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { UrlPath } from "../../types/file/urlPath.js";
-import { PortalScaffoldService } from "../../infrastructure/services/portal-scaffold-service.js";
 import { LoginAction } from "../auth/login.js";
 import { Result } from "../../types/common/result.js";
 import { err, ok, Result as ResultEx } from "neverthrow";
@@ -18,19 +17,28 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { createResourceInput } from "../../types/file/resource-input.js";
 import { ValidateAction } from "../api/validate.js";
 import { ServiceError } from "../../infrastructure/api-utils.js";
+import { BuildContext } from "../../types/build-context.js";
+import { TempContext } from "../../types/temp-context.js";
+import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
+import { getLanguageConfig } from "../../types/build/build.js";
 
 const defaultSpecUrl: UrlPath = new UrlPath(
   "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
 );
 const defaultPort: number = 3000 as const;
 
+
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
   private readonly zipService: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
-  private readonly portalScaffoldService: PortalScaffoldService = new PortalScaffoldService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
+  private readonly fileDownloadService = new FileDownloadService();
+
+
+  private readonly zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip` as const;
+  private readonly repositoryFolderName = "static-portal-workflow-master" as const;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
@@ -41,8 +49,7 @@ export class PortalQuickstartAction {
     this.prompts.welcomeMessage();
 
     const authenticateUserResult = await this.authenticateUser();
-    if (authenticateUserResult.isFailed()) {
-      this.prompts.loginFailed();
+    if (authenticateUserResult.isErr()) {
       return ActionResult.failed();
     }
 
@@ -67,52 +74,61 @@ export class PortalQuickstartAction {
       }
 
       // Step 3/4
-      const selectedLanguagesResult = await this.selectLanguages();
-      if (selectedLanguagesResult.isErr()) {
+      const selectedLanguages = await this.selectLanguages();
+      if (selectedLanguages.isErr()) {
         return ActionResult.cancelled();
       }
 
       // Step 4/4
-      const selectInputDirectoryResult = await this.selectInputDirectory();
-      if (selectInputDirectoryResult.isErr()) {
+      const inputDirectory = await this.selectInputDirectory();
+      if (!inputDirectory) {
         return ActionResult.cancelled();
       }
 
-      const { sourceDirectory, portalDirectory } = selectInputDirectoryResult.value;
-      const buildDirectoryResult = await this.setupBuildDirectory(
-        tempDirectory,
-        sourceDirectory,
-        validatedSpecDirectory.value!,
-        selectedLanguagesResult.value
+      const masterBuildFile = await this.prompts.downloadBuildDirectory(
+        this.fileDownloadService.downloadFile(new UrlPath(this.zipUrl))
       );
-      if (buildDirectoryResult.isErr()) {
+
+      if (masterBuildFile.isErr()) {
+        this.prompts.serviceError(masterBuildFile.error);
         return ActionResult.failed();
       }
+      const tempContext = new TempContext(tempDirectory);
+      const masterBuildFilePath = await tempContext.save(masterBuildFile.value);
+      await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
+      const extractedFolder = tempDirectory.join(this.repositoryFolderName);
 
+      const tempBuildContext = new BuildContext(extractedFolder);
+      await tempBuildContext.replaceDefaultSpec(specDirectory.value);
+      await tempBuildContext.deleteWorkflowDir();
+
+      const buildFile = await tempBuildContext.getBuildFileContents();
+      buildFile.generatePortal!.languageConfig = getLanguageConfig(selectedLanguages);
+      await tempBuildContext.updateBuildFileContents(buildFile);
+
+      const sourceDirectory = inputDirectory.join("src");
+      await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
+      this.prompts.displayBuildDirectoryAsTree(sourceDirectory);
+
+      const portalDirectory = inputDirectory.join("portal");
       const servePortalResult = await this.servePortal(sourceDirectory, portalDirectory);
       if (servePortalResult.isErr()) {
         return ActionResult.failed();
       }
-
       return ActionResult.success();
     });
   };
 
-  private async authenticateUser(): Promise<Result<string, string>> {
+  private async authenticateUser(): Promise<ResultEx<void, void>> {
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (storedAuth?.authKey) {
-      return Result.success("User is already authenticated.");
+      return ok();
     }
-
-    this.prompts.loginRequired();
     const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
-
-    // TODO: fix error messages after refactoring
-    return loginResult.mapAll(
-      () => Result.success("Authentication was successful."),
-      () => Result.failure("Unable to login, please check your credentials and try again later."),
-      () => Result.failure("Unable to login, please check your credentials and try again later.")
-    );
+    if (loginResult.isFailed()) {
+      return err();
+    }
+    return ok();
   }
 
   private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, string>> {
@@ -178,40 +194,14 @@ export class PortalQuickstartAction {
     return ok(languages);
   }
 
-  private async selectInputDirectory(): Promise<
-    ResultEx<{ sourceDirectory: DirectoryPath; portalDirectory: DirectoryPath }, string>
-  > {
+  private async selectInputDirectory(): Promise< DirectoryPath | undefined> {
     this.prompts.selectInputDirectoryStep();
-
     const inputDirectory = await this.prompts.inputDirectoryPathPrompt();
-    if (inputDirectory === null) {
+    if (inputDirectory) {
+      return inputDirectory;
+    } else {
       this.prompts.noInputDirectoryProvided();
-      return err("cancelled");
     }
-
-    return ok({ sourceDirectory: inputDirectory.join("src"), portalDirectory: inputDirectory.join("portal") });
-  }
-
-  //TODO: Remove tempDirectory as param.
-  private async setupBuildDirectory(
-    tempDirectory: DirectoryPath,
-    sourceDirectory: DirectoryPath,
-    specDirectory: DirectoryPath,
-    selectedLanguages: string[]
-  ): Promise<ResultEx<DirectoryPath, ServiceError>> {
-    const result = await this.prompts.createBuildDirectory(
-      sourceDirectory,
-      this.portalScaffoldService.createBuildDirectory(tempDirectory, specDirectory, selectedLanguages)
-    );
-    if (result.isErr()) {
-      this.prompts.buildSetupError(result.error);
-      return err(result.error);
-    }
-
-    await this.fileService.copyDirectoryContents(result.value, sourceDirectory);
-    this.prompts.displayBuildDirectoryAsTree(sourceDirectory);
-
-    return ok(result.value);
   }
 
   private async servePortal(
