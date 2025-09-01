@@ -30,11 +30,6 @@ export class ContentContext {
     return this.contentDirectory;
   }
 
-  // TODO: check Sohail if this method is wrong
-  public getTocDirectory(): DirectoryPath {
-    return this.contentDirectory.join("content");
-  }
-
   public async exists(): Promise<boolean> {
     return this.fileService.directoryExists(this.contentDirectory);
   }

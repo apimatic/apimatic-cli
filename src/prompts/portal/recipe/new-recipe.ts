@@ -133,7 +133,6 @@ export class PortalRecipePrompts {
     if (isCancel(stepType)) {
       cancel("Operation cancelled.");
       return process.exit(0);
-      // TODO: Sohail
     }
     return stepType as StepType;
   }
