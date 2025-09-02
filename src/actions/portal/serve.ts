@@ -43,7 +43,7 @@ export class PortalServeAction {
     port: number,
     openInBrowser: boolean,
     hotReload: boolean,
-    onInterrupt?: () => void
+    onAfterServe?: () => void
   ): Promise<ActionResult> {
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
 
@@ -67,8 +67,8 @@ export class PortalServeAction {
       }
       this.prompts.promptForExit();
 
-      if (onInterrupt) {
-        onInterrupt();
+      if (onAfterServe) {
+        onAfterServe();
       }
 
       this.clearStandardInput();
