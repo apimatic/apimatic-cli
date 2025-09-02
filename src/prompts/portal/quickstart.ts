@@ -47,7 +47,6 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  // TODO: Very complex validation, needs to be improved.
   public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string | undefined> {
     while (true) {
       const spec = await text({
@@ -89,7 +88,7 @@ export class PortalQuickstartPrompts {
         continue; // re-prompt
       }
 
-      return cleanedPath; // valid local file or valid URL
+      return cleanedPath;
     }
   }
 
