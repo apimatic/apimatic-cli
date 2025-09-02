@@ -118,7 +118,7 @@ export class PortalRecipeGenerator {
     const directory = contentFolder.join("recipes");
     const markdownFileContent = this.getMarkdownFileContent();
 
-    this.fileService.directoryExists(directory);
+    await this.fileService.directoryExists(directory);
     fs.writeFileSync(`${directory}/${recipeFileName}.md`, markdownFileContent);
   }
 

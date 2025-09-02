@@ -10,7 +10,7 @@ export class PortalRecipe {
     };
   }
 
-  addContentStep(key: string,  content: string) {
+  addContentStep(key: string, content: string) {
     this.recipe.steps.push({
       key,
       name: key, //TODO: Check if key is required
@@ -19,16 +19,17 @@ export class PortalRecipe {
     });
   }
 
-  addEndpointStep(key: string , description: string, endpointPermalink: string) {
+  addEndpointStep(key: string, description: string, endpointGroupName: string, endpointName: string) {
+    const endpointPermalink = `$e/${[endpointGroupName, endpointName].map(encodeURIComponent).join("/")}`;
     this.recipe.steps.push({
       key,
-      name: key,  //TODO: Check if key is required
+      name: key, //TODO: Check if key is required
       type: StepType.Endpoint,
       config: {
         description,
         endpointPermalink
       }
-    })
+    });
   }
 
   toSerializableRecipe(): SerializableRecipe {

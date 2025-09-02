@@ -158,15 +158,19 @@ export class PortalRecipeAction {
           }
 
           const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
+          if (!endpointGroupName) return ActionResult.cancelled();
+
           const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
+          if (!endpointName ) return ActionResult.cancelled()
+
           const description = await this.prompts.endpointDescriptionPrompt(
             endpointGroups,
             endpointGroupName,
             endpointName
           );
-          const endpointPermalink = `$e/${[endpointGroupName, endpointName].map(encodeURIComponent).join("/")}`;
+          if (!description) return ActionResult.cancelled();
 
-          recipe.addEndpointStep(stepName, description, endpointPermalink);
+          recipe.addEndpointStep(stepName, description, endpointGroupName, endpointName);
           this.prompts.displayStepAddedSuccessfullyMessage();
           break;
         }
@@ -223,7 +227,7 @@ export class PortalRecipeAction {
 
       await this.fileService.writeContents(tempFile, defaultContent);
       await this.launcherService.openInEditor(tempFile);
-
+      this.prompts.openRecipteMarkdownEditor();
       const fileContent = await this.fileService.getContents(tempFile);
       return fileContent.replace(/\r\n|\r/g, "\n");
     });
