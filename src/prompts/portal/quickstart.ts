@@ -3,8 +3,8 @@ import fs from "fs";
 import axios from "axios";
 import treeify from "treeify";
 import { Result } from "neverthrow";
-import { text, select, multiselect, log, isCancel, spinner, note } from "@clack/prompts";
-import { getMessageInGreenColor, getMessageInRedColor } from "../../utils/utils.js";
+import { text, select, multiselect, log, isCancel, note } from "@clack/prompts";
+import { getMessageInGreenColor } from "../../utils/utils.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -30,8 +30,6 @@ const descriptions: { [key: string]: string } = Object.entries({
 
 export class PortalQuickstartPrompts {
   private readonly fileService = new FileService();
-  // TODO: Remove after refactoring validate action.
-  private readonly spin = spinner();
 
   public welcomeMessage() {
     log.info(`Hello there.`);
@@ -100,12 +98,8 @@ export class PortalQuickstartPrompts {
     }
   }
 
-  public specImportError(error: string) {
-    log.error(error);
-  }
-
-  public specValidationError(error: string) {
-    log.error(error);
+  public noSpecSpecified() {
+    log.error("No API definition was provided.");
   }
 
   public async useDefaultSpecPrompt(): Promise<boolean> {
@@ -166,7 +160,7 @@ export class PortalQuickstartPrompts {
   }
 
   public noLanguagesSelected() {
-    log.error("Operation cancelled. No programming languages were selected.");
+    log.error("No programming languages were selected.");
   }
 
   public selectInputDirectoryStep() {
@@ -183,23 +177,19 @@ export class PortalQuickstartPrompts {
         const cleanedPath = removeQuotes(input?.trim() ?? "");
 
         if (!fs.existsSync(cleanedPath.toString()) && cleanedPath.toString() != defaultPortalDirectoryPath) {
-          return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
+          return "Error: The specified directory path does not exist. Please try again.";
         }
 
         if (cleanedPath.toString() !== defaultPortalDirectoryPath) {
           const files = fs.readdirSync(cleanedPath.toString()).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
-            return getMessageInRedColor(
-              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-            );
+            return "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.";
           }
         } else if (fs.existsSync(cleanedPath.toString())) {
           // For ignoring hidden files and folders in the current directory in MacOS.
           const files = fs.readdirSync(cleanedPath.toString()).filter((item) => !item.startsWith("."));
           if (files.length > 0) {
-            return getMessageInRedColor(
-              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-            );
+            return "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.";
           }
         }
       }
@@ -222,15 +212,11 @@ export class PortalQuickstartPrompts {
 
   public downloadBuildDirectory(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner(
-      "Downloading Build directory",
-      `Build directory downloaded successfully`,
-      "Unable to download Build directory",
+      "Downloading build directory",
+      `Build directory downloaded successfully.`,
+      "Unable to download build directory.",
       fn
     );
-  }
-
-  public buildSetupError(serviceError: ServiceError) {
-    log.error(getErrorMessage(serviceError));
   }
 
   public displayBuildDirectoryAsTree(buildDirectory: DirectoryPath): void {
@@ -262,10 +248,11 @@ ${f.link(referenceDocumentationUrl)}`;
       const relPath = path.join(parentPath, key);
       const desc = descriptions[path.normalize(relPath)];
       const displayKey = desc ? `${key} : ${desc}` : key;
+
       if (directoryTreeStructure[key] && typeof directoryTreeStructure[key] === "object") {
         result[displayKey] = this.createTreeStructure(directoryTreeStructure[key] as treeify.TreeObject, relPath);
       } else {
-        result[displayKey] = "";
+        result[displayKey] = null as unknown as string; // keep null, not ""
       }
     }
     return result;

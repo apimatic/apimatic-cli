@@ -46,11 +46,11 @@ export class ValidateAction {
       if (displayValidationSummary) {
         this.prompts.displayValidationMessages(validationSummary);
       }
-      if (validationSummary?.success) {
-        return ActionResult.success();
+      if (!validationSummary.success) {
+        return ActionResult.failed();
       }
 
-      return ActionResult.failed();
+      return ActionResult.success();
     });
   };
 }

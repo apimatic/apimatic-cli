@@ -20,13 +20,12 @@ import { ServiceError } from "../../infrastructure/api-utils.js";
 import { BuildContext } from "../../types/build-context.js";
 import { TempContext } from "../../types/temp-context.js";
 import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
-import { getLanguageConfig } from "../../types/build/build.js";
+import { getLanguagesConfig } from "../../types/build/build.js";
 
 const defaultSpecUrl: UrlPath = new UrlPath(
   "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
 );
 const defaultPort: number = 3000 as const;
-
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -35,8 +34,6 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
-
-
   private readonly zipUrl = `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip` as const;
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
 
@@ -57,15 +54,12 @@ export class PortalQuickstartAction {
       // Step 1/4
       const specDirectory = await this.importSpec(tempDirectory);
       if (specDirectory.isErr()) {
-        this.prompts.specImportError(specDirectory.error);
-        if (specDirectory.error === "cancelled") return ActionResult.cancelled();
         return ActionResult.failed();
       }
 
       // Step 2/4
       const validatedSpecDirectory = await this.validateSpec(tempDirectory, specDirectory.value);
       if (validatedSpecDirectory.isFailed()) {
-        this.prompts.specValidationError(validatedSpecDirectory.error!);
         return ActionResult.failed();
       }
       if (validatedSpecDirectory.isCancelled()) {
@@ -103,7 +97,7 @@ export class PortalQuickstartAction {
       await tempBuildContext.deleteWorkflowDir();
 
       const buildFile = await tempBuildContext.getBuildFileContents();
-      buildFile.generatePortal!.languageConfig = getLanguageConfig(selectedLanguages);
+      buildFile.generatePortal!.languageConfig = getLanguagesConfig(selectedLanguages);
       await tempBuildContext.updateBuildFileContents(buildFile);
 
       const sourceDirectory = inputDirectory.join("src");
@@ -131,11 +125,12 @@ export class PortalQuickstartAction {
     return ok();
   }
 
-  private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, string>> {
+  private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, void>> {
     this.prompts.importSpecStep();
     const inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
     if (!inputPath) {
-      return err("Operation cancelled. No API Definition was provided.");
+      this.prompts.noSpecSpecified();
+      return err();
     }
 
     const urlPath = UrlPath.create(inputPath);
@@ -145,7 +140,8 @@ export class PortalQuickstartAction {
         ? await resourceContext.resolveTo(createResourceInput(inputPath))
         : await resourceContext.resolveTo(urlPath);
     if (result.isErr()) {
-      return err(result.error);
+      this.prompts.serviceError(result.error);
+      return err();
     }
 
     const specDirectory = tempDirectory.join("spec");
@@ -173,6 +169,7 @@ export class PortalQuickstartAction {
       const resourceContext = new ResourceContext(tempDirectory);
       const result = await resourceContext.resolveTo(defaultSpecUrl);
       if (result.isErr()) {
+        this.prompts.serviceError(result.error);
         return Result.failure(result.error);
       }
       await this.fileService.cleanDirectory(specDirectory);
@@ -194,7 +191,7 @@ export class PortalQuickstartAction {
     return ok(languages);
   }
 
-  private async selectInputDirectory(): Promise< DirectoryPath | undefined> {
+  private async selectInputDirectory(): Promise<DirectoryPath | undefined> {
     this.prompts.selectInputDirectoryStep();
     const inputDirectory = await this.prompts.inputDirectoryPathPrompt();
     if (inputDirectory) {
@@ -209,16 +206,9 @@ export class PortalQuickstartAction {
     portalDirectory: DirectoryPath
   ): Promise<ResultEx<string, string>> {
     const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null, false);
-    const result = await portalServeAction.execute(
-      buildDirectory,
-      portalDirectory,
-      defaultPort,
-      true,
-      false,
-      () => {
-        this.prompts.nextSteps();
-      }
-    );
+    const result = await portalServeAction.execute(buildDirectory, portalDirectory, defaultPort, true, false, () => {
+      this.prompts.nextSteps();
+    });
 
     // TODO: Figure out a better way for this.
     return result.mapAll<ResultEx<string, string>>(

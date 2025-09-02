@@ -94,11 +94,8 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
-  public getDirectoryStructure(
-    directoryPath: DirectoryPath,
-    parentPath = ""
-  ): { [key: string]: DirectoryNode | string | null | undefined } {
-    const directoryStructure: { [key: string]: DirectoryNode | string | null | undefined } = {};
+  public getDirectoryStructure(directoryPath: DirectoryPath, parentPath = ""): DirectoryNode {
+    const directoryStructure: DirectoryNode = {};
 
     const items = fs.readdirSync(directoryPath.toString());
     items.forEach((item) => {

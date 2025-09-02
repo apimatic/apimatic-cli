@@ -66,12 +66,12 @@ export class PortalServeAction {
         await this.launcherService.openUrlInBrowser(portalUrl);
       }
       this.prompts.promptForExit();
-      this.clearStandardInput();
 
       if (onInterrupt) {
         onInterrupt();
       }
 
+      this.clearStandardInput();
       await this.prompts.blockExecution();
       liveReloadServer.close();
       server.close();
@@ -87,6 +87,7 @@ export class PortalServeAction {
     });
 
     const deletedDirectories = new Set<string>();
+    // TODO: Verify if we need mutex and eventQueue after refactoring.
     const eventQueue = new Map();
     const mutex = new Mutex();
 
@@ -116,8 +117,12 @@ export class PortalServeAction {
             this.prompts.changesDetected();
           }
 
+          // TODO: Verify if this is needed.
+          if (!eventQueue.has(eventId)) {
+            return;
+          }
+
           await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-          // toDO: check for success
 
           const portalUrl = new UrlPath(`http://localhost:${servePort}`);
           if (!this.isPortalServed) {

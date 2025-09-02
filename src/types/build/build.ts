@@ -16,7 +16,7 @@ export interface CopilotConfig {
   welcomeMessage: string;
 }
 
-export function getLanguageConfig(selectedLanguages: { value: string[] }) {
+export function getLanguagesConfig(selectedLanguages: { value: string[] }) {
   return selectedLanguages.value.reduce((config, lang) => {
     config[lang] = {};
     return config;
