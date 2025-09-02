@@ -10,6 +10,7 @@ import { SpecContext } from "../../../types/spec-context.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { BuildContext } from "../../../types/build-context.js";
+import { spec } from "node:test/reporters";
 
 export class ContentContext {
   private readonly fileService = new FileService();
@@ -70,7 +71,7 @@ export class PortalNewTocAction {
         this.prompts.specNotFound();
         this.prompts.fallingBackToDefault();
       } else {
-        const sdlResult = await this.extractSdlComponents(specContext);
+        const sdlResult = await specContext.extractSdlComponents(this.configDirectory, this.commandMetadata);
         if (sdlResult.isErr()) {
           this.prompts.logError(sdlResult.error);
           return ActionResult.failed();
@@ -111,25 +112,6 @@ export class PortalNewTocAction {
       return ActionResult.failed();
     }
     return ActionResult.success();
-  }
-
-  private async extractSdlComponents(specContext: SpecContext): Promise<Result<SdlComponents, string>> {
-    try {
-      const extractionPromise = specContext.extractSdlComponents(this.configDirectory, this.commandMetadata);
-      const response = await this.prompts.extractSdlComponents(extractionPromise);
-
-      if (response.isErr()) {
-        this.prompts.sdlComponentsExtractionFailed();
-        this.prompts.fallingBackToDefault();
-        return ok({ endpointGroups: new Map(), models: [] });
-      }
-
-      return ok(response.value);
-    } catch {
-      this.prompts.sdlComponentsExtractionFailed();
-      this.prompts.fallingBackToDefault();
-      return ok({ endpointGroups: new Map(), models: [] });
-    }
   }
 
   private async generateToc(

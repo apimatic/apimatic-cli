@@ -25,7 +25,7 @@ import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 class RecipeContext {
   constructor(private recipeName: string) {}
 
-  createRecipeFileName(): FileName {
+  getRecipeName(): FileName {
     return new FileName(toPascalCase(this.recipeName.trim()));
   }
 
@@ -77,7 +77,6 @@ export class PortalRecipeAction {
 
   constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
-
   public async execute(buildDirectory: DirectoryPath, name?: string): Promise<ActionResult> {
     this.prompts.displayWelcomeMessage();
 
@@ -86,6 +85,7 @@ export class PortalRecipeAction {
       this.prompts.invalidBuildDirectory(buildDirectory);
       return ActionResult.failed();
     }
+    const buildConfig = await buildContext.getBuildFileContents();
 
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
     if (!recipeName) {
@@ -93,7 +93,6 @@ export class PortalRecipeAction {
       return ActionResult.cancelled();
     }
 
-    const buildConfig = await buildContext.getBuildFileContents();
     const contentDirectory = buildDirectory.join("content");
     const contentContext = new ContentContext(contentDirectory);
 
@@ -116,7 +115,7 @@ export class PortalRecipeAction {
 
     // Setup recipe context
     const recipeContext = new RecipeContext(recipeName);
-    const recipeFileName = recipeContext.createRecipeFileName();
+    const recipeFileName = recipeContext.getRecipeName();
 
     // Check if the recipe already exists
     const recipeAlreadyExists = recipeContext.exists(tocData, recipeName, recipeFileName);

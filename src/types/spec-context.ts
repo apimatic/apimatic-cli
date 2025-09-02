@@ -7,7 +7,6 @@ import { withDirPath } from "../infrastructure/tmp-extensions.js";
 import { TempContext } from "./temp-context.js";
 import { PortalService } from "../infrastructure/services/portal-service.js";
 import { CommandMetadata } from "./common/command-metadata.js";
-import { BuildConfig } from "./build/build.js";
 
 export type EndpointGroup = Map<string, TocEndpoint[]>;
 export type SdlTocComponents = { endpointGroups: EndpointGroup; models: TocModel[] };
@@ -56,7 +55,7 @@ export class SpecContext {
     });
   }
 
-  private extractEndpointGroupsForToc(sdl: Sdl): Map<string, TocEndpoint[]> {
+  public extractEndpointGroupsForToc(sdl: Sdl): Map<string, TocEndpoint[]> {
     const endpointGroups = new Map<string, TocEndpoint[]>();
 
     const endpoints = sdl.Endpoints.map(

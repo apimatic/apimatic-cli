@@ -9,6 +9,7 @@ import { ZipService } from "../../../infrastructure/zip-service.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { TempContext } from "../../../types/temp-context.js";
+import { SpecContext } from "../../../types/spec-context.js";
 
 export class SdlParser {
   private readonly zipArchiver: ZipService = new ZipService();
@@ -35,9 +36,10 @@ export class SdlParser {
         "Failed to extract endpoints/models from the specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
       );
     }
+    const specContext = new SpecContext(specDirectoryPath);
 
     const sdl: Sdl = sdlResult.value!;
-    const endpointGroups = this.extractEndpointGroupsForToc(sdl);
+    const endpointGroups = specContext.extractEndpointGroupsForToc(sdl);
     const models = this.extractModelsForToc(sdl);
 
     return Result.success({ endpointGroups, models });
@@ -100,29 +102,6 @@ export class SdlParser {
         Group: endpoint.Group
       });
     }
-
-    return endpointGroups;
-  }
-
-  private extractEndpointGroupsForToc(sdl: Sdl): Map<string, TocEndpoint[]> {
-    const endpointGroups = new Map<string, TocEndpoint[]>();
-
-    const endpoints = sdl.Endpoints.map(
-      (e: SdlEndpoint): TocEndpoint => ({
-        generate: null,
-        from: "endpoint",
-        endpointName: e.Name,
-        endpointGroup: e.Group
-      })
-    );
-
-    endpoints.forEach((endpoint: TocEndpoint) => {
-      const group = endpoint.endpointGroup;
-      if (!endpointGroups.has(group)) {
-        endpointGroups.set(group, []);
-      }
-      endpointGroups.get(group)!.push(endpoint);
-    });
 
     return endpointGroups;
   }
