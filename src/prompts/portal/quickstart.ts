@@ -11,8 +11,8 @@ import { FileService } from "../../infrastructure/file-service.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { Directory } from "../../types/file/directory.js";
-import { FileName } from "../../types/file/fileName.js";
 import { FileMetadataService } from "../../infrastructure/services/file-metadata-service.js";
+import { createResourceInput } from "../../types/file/resource-input.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -63,18 +63,18 @@ export class PortalQuickstartPrompts {
       const cleanedPath = removeQuotes((spec as string).trim() ?? "");
 
       if (!UrlPath.create(cleanedPath)) {
-        const dirName = path.dirname(cleanedPath);
-        const baseName = path.basename(cleanedPath);
-        const directoryPath = new DirectoryPath(dirName);
-        const fileName = new FileName(baseName);
-        const filePath = new FilePath(directoryPath, fileName);
+        try {
+          const resourcePath = createResourceInput(cleanedPath);
 
-        if (!(await this.fileService.fileExists(filePath))) {
-          log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");
-          continue; // re-prompt
+          if (!(await this.fileService.fileExists(resourcePath as FilePath))) {
+            log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");
+            continue; // re-prompt
+          }
+
+          return cleanedPath;
+        } catch {
+          log.error("Invalid file path provided. Please enter a valid file path.");
         }
-
-        return cleanedPath;
       }
 
       try {
@@ -234,7 +234,7 @@ ${f.link(referenceDocumentationUrl)}`;
     note(message, "Next steps", {
       format(line) {
         return f.success(line);
-      },
+      }
     });
   }
 
