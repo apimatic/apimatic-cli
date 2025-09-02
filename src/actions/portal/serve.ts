@@ -22,7 +22,6 @@ export class PortalServeAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
-
   private isPortalServed: boolean = false;
 
   public constructor(
