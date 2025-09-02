@@ -1,6 +1,6 @@
+import path from "path";
 import { FileName } from "./fileName.js";
 import { DirectoryPath } from "./directoryPath.js";
-import path from "path";
 
 export class FilePath {
   private readonly fileName: FileName;
@@ -11,7 +11,11 @@ export class FilePath {
     this.directoryPath = path;
   }
 
+  public replaceDirectory(newDirectory: DirectoryPath): FilePath {
+    return new FilePath(newDirectory, this.fileName);
+  }
+
   public toString(): string {
-    return path.join(this.directoryPath.toString() , this.fileName.toString());
+    return path.join(this.directoryPath.toString(), this.fileName.toString());
   }
 }

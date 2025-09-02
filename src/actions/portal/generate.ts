@@ -46,7 +46,6 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
 
-
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildDirectory);

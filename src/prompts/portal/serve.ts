@@ -5,7 +5,7 @@ export class PortalServePrompts extends BasePrompts {
   public displayOutroMessage(
     buildDirectory: string,
     portalDirectory: string,
-    port: number,
+    port: string,
     hotReloadDisabled: boolean
   ): void {
     log.message(`The generated portal can be found at ${portalDirectory}`);

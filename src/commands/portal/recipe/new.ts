@@ -52,7 +52,7 @@ ${format.link(
     result.mapAll(
       () => {},
       async () => {
-        const telemetryService = new TelemetryService(this.config.configDir);
+        const telemetryService = new TelemetryService(new DirectoryPath(this.config.configDir));
         await telemetryService.trackEvent(
           new RecipeCreationFailedEvent("error", PortalRecipeNew.id, {
             name,

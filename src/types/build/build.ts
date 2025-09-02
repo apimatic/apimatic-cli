@@ -8,6 +8,8 @@ export interface BuildConfig {
 
 export interface PortalConfig {
   contentFolder?: string;
+  languageConfig: { [key: string]: object };
+  [key: string]: unknown;
   apiSpecPath?: DirectoryPath;
 }
 
@@ -15,16 +17,4 @@ export interface CopilotConfig {
   isEnabled: boolean;
   key: string;
   welcomeMessage: string;
-}
-
-export function updateCopilotConfig(
-  buildConfig: BuildConfig,
-  copilotConfig: CopilotConfig
-): BuildConfig {
-  return {
-    ...buildConfig,
-    apiCopilotConfig: {
-      ...copilotConfig,
-    },
-  };
 }

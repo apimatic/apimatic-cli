@@ -1,27 +1,44 @@
-import { outro, spinner, log } from "@clack/prompts";
-import { getMessageInMagentaColor, getMessageInCyanColor, getMessageInRedColor } from "../../utils/utils.js";
+import { log, isCancel, confirm } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { format as f, withSpinner } from "../format.js";
+import { Result } from "neverthrow";
+import { TransformationResultData } from "../../infrastructure/services/transformation-service.js";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 export class ApiTransformPrompts {
-  private readonly spin = spinner();
+  public async overwriteApi(directory: DirectoryPath): Promise<boolean> {
+    const overwrite = await confirm({
+      message: `A specification file already exists at ${f.path(directory.toString())}. Do you want to overwrite the existing file?`,
+      initialValue: false
+    });
 
-  displayApiTransformationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Transforming API"));
+    if (isCancel(overwrite)) {
+      return false;
+    }
+
+    return overwrite;
   }
 
-  displayApiTransformationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor(`API transformed successfully`));
+  public transformedApiAlreadyExists() {
+    const message = `Specification already exists.`;
+    log.error(message);
   }
 
-  displayApiTransformationFailureMessage(): void {
-    this.spin.stop(getMessageInRedColor("API transformation failed"));
+  public async InvalidFilePathProvided(){
+    const message = `Invalid file path or URL provided.`;
+    log.error(message);
   }
 
-  displayOutroMessage(transformedApiPath: DirectoryPath): void {
-    outro(`The transformed API specification can be found at ${transformedApiPath}`);
+  public async transformApi(fn: Promise<Result<TransformationResultData, string>>) {
+    return withSpinner("Transforming API", "API transformed successfully.", "API transformation failed.", fn);
   }
 
-   logError(error: string): void {
+  logTransformationError(error: string): void {
     log.error(error);
+  }
+
+  public networkError(serviceError: ServiceError): void {
+    const message = getErrorMessage(serviceError);
+    log.error(message);
   }
 }
