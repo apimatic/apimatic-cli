@@ -15,9 +15,8 @@ export class FileName {
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, "-")
       .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
+      .replace(/(^-|-$)/g, "");
     return new FileName(normalized);
-    //       return path.replace(/\\/g, "/");
   }
 
   public toString(): string {
