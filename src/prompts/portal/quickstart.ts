@@ -129,25 +129,23 @@ export class PortalQuickstartPrompts {
   }
 
   public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
-    while (true) {
-      const inputDirectory = await text({
-        message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
-        placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
-        defaultValue: "./"
-      });
+    const inputDirectory = await text({
+      message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
+      placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
+      defaultValue: "./"
+    });
 
-      if (isCancel(inputDirectory)) {
-        return undefined;
-      }
+    if (isCancel(inputDirectory)) {
+      return undefined;
+    }
 
-      const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
-      const directoryPath = new DirectoryPath(cleanedPath);
+    const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
+    const directoryPath = new DirectoryPath(cleanedPath);
 
-      if ((inputDirectory as string) === "./") {
-        return new DirectoryPath(defaultPortalDirectoryPath);
-      } else {
-        return directoryPath;
-      }
+    if ((inputDirectory as string) === "./") {
+      return new DirectoryPath(defaultPortalDirectoryPath);
+    } else {
+      return directoryPath;
     }
   }
 
