@@ -15,7 +15,7 @@ import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { DebounceService } from "../../infrastructure/debounce-service.js";
 
 export class PortalServeAction {
-  private readonly prompts: PortalServePrompts;
+  private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly application: Express = express();
@@ -24,16 +24,10 @@ export class PortalServeAction {
   private readonly authKey: string | null;
   private isPortalServed: boolean = false;
 
-  public constructor(
-    configDir: DirectoryPath,
-    commandMetadata: CommandMetadata,
-    authKey: string | null = null,
-    displayMessages: boolean = true
-  ) {
+  public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
     this.authKey = authKey;
-    this.prompts = new PortalServePrompts(displayMessages);
   }
 
   public async execute(
@@ -146,9 +140,10 @@ export class PortalServeAction {
     await this.prompts.blockExecution();
 
     await watcher.close();
+    debounceService.close();
+
     liveReloadServer.close();
     server.close();
-    debounceService.close();
     return ActionResult.success();
   }
 

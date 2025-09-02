@@ -4,8 +4,6 @@ import { UrlPath } from "../../types/file/urlPath.js";
 import { once } from "events";
 
 export class PortalServePrompts {
-  constructor(private readonly displayMessages: boolean) {}
-
   public usingFallbackPort(currentPort: number, availablePort: number) {
     const message = `Port ${f.var(currentPort.toString())} is already in use. Available port ${f.var(
       availablePort.toString()
@@ -31,7 +29,6 @@ export class PortalServePrompts {
   public watcherError() {
     const message =
       "An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at support@apimatic.io";
-
     log.error(message);
   }
 

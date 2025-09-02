@@ -205,7 +205,7 @@ export class PortalQuickstartAction {
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath
   ): Promise<ResultEx<string, string>> {
-    const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null, false);
+    const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
     const result = await portalServeAction.execute(buildDirectory, portalDirectory, defaultPort, true, false, () => {
       this.prompts.nextSteps();
     });
