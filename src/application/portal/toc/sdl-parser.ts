@@ -1,6 +1,7 @@
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { TocEndpoint, TocModel } from "../../../types/toc/toc.js";
 import { Result } from "../../../types/common/result.js";
+import { err, ok, Result as ResultEx } from "neverthrow";
 import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
@@ -42,11 +43,11 @@ export class SdlParser {
     return Result.success({ endpointGroups, models });
   }
 
-  public async getEndpointGroupsFromSdl(specFolderPath: DirectoryPath): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
+  public async getEndpointGroupsFromSdl(specFolderPath: DirectoryPath): Promise<ResultEx<Map<string, SdlEndpoint[]>, string>> {
     const sdlResult = await this.generateSdlFromSpec(specFolderPath);
 
     if (!sdlResult.isSuccess()) {
-      return Result.failure(
+      return err(
         "Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
       );
     }
@@ -54,7 +55,7 @@ export class SdlParser {
     const sdl: Sdl = sdlResult.value!;
     const endpointGroups = this.extractEndpointGroupsForRecipe(sdl);
 
-    return Result.success(endpointGroups);
+    return ok(endpointGroups);
   }
 
   private async generateSdlFromSpec(specDirectory: DirectoryPath): Promise<Result<Sdl, string>> {

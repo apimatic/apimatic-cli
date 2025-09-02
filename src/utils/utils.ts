@@ -74,6 +74,13 @@ export const directoryToJson = (dirPath: string, parentPath = ""): DirectoryNode
   return directoryStructure;
 };
 
+export const toPascalCase = (str: string): string => {
+    return str
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join("");
+  }
+
 export const isValidUrl = (input: string): boolean => {
   if (!input) {
     return false;

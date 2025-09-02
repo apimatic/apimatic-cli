@@ -1,6 +1,6 @@
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
 import { DirectoryNode, StepType } from "../../../types/recipe/recipe.js";
-import { err, ok, Result } from "neverthrow";
+import { Result } from "neverthrow";
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
@@ -10,7 +10,6 @@ import { ActionResult } from "../../action-result.js";
 import { TocContext } from "../../../types/toc-context.js";
 import { FileName } from "../../../types/file/fileName.js";
 import { Toc } from "../../../types/toc/toc.js";
-import { tmpdir } from "os";
 import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
 import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
 import { TreeObject } from "treeify";
@@ -20,20 +19,32 @@ import { SpecContext } from "../../../types/spec-context.js";
 import { LauncherService } from "../../../infrastructure/launcher-service.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
+import { toPascalCase } from "../../../utils/utils.js";
+import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 
 class RecipeContext {
   constructor(private recipeName: string) {}
 
   createRecipeFileName(): FileName {
-    return new FileName(this.toPascalCase(this.recipeName.trim()));
+    return new FileName(toPascalCase(this.recipeName.trim()));
   }
 
-  // TODO: Sohail move to utils or string utils
-  private toPascalCase(str: string): string {
-    return str
-      .split(" ")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join("");
+  exists(tocData: Toc, recipeName: string, recipeFileName: FileName): boolean {
+    let apiRecipesGroup = tocData.toc?.find((item) => "group" in item && item.group === "API Recipes");
+    if (!apiRecipesGroup || !("items" in apiRecipesGroup)) {
+      return false;
+    }
+
+    // Check if recipe name or file name already exists
+    const existingRecipe = apiRecipesGroup.items.find(
+      (item) =>
+        "page" in item && "file" in item && (item.page === recipeName || item.file === `recipes/${recipeFileName}.md`)
+    );
+    if (existingRecipe) {
+      return true;
+    }
+
+    return false;
   }
 }
 
@@ -55,13 +66,7 @@ class EndpointContext {
   }
 
   async extractEndpointGroups(): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    const result = await this.sdlParser.getEndpointGroupsFromSdl(this.specDirPath);
-
-    if (!result.value) {
-      return err("No endpoint groups found");
-    }
-
-    return ok(result.value);
+    return await this.sdlParser.getEndpointGroupsFromSdl(this.specDirPath);
   }
 }
 
@@ -86,9 +91,7 @@ export class PortalRecipeAction {
     }
 
     const buildConfig = await buildContext.getBuildFileContents();
-    const contentDirectory = buildConfig.generatePortal?.contentFolder
-      ? buildDirectory.join(buildConfig.generatePortal?.contentFolder)
-      : buildDirectory;
+    const contentDirectory = buildDirectory.join("content");
     const contentContext = new ContentContext(contentDirectory);
 
     if (!(await contentContext.exists())) {
@@ -97,11 +100,9 @@ export class PortalRecipeAction {
     }
 
     // TODO: if we need this or no
-    const specDirectory = buildConfig.generatePortal?.apiSpecPath
-      ? buildDirectory.joinWith(buildConfig.generatePortal?.apiSpecPath)
-      : buildDirectory;
+    const specDirectory = buildDirectory.join("spec");
 
-    const specContext =  new SpecContext(specDirectory);
+    const specContext = new SpecContext(specDirectory);
 
     if (!(await specContext.validate())) {
       this.prompts.specFileEmptyInvalid();
@@ -110,20 +111,14 @@ export class PortalRecipeAction {
 
     // Setup TOC context
     const tocContext = new TocContext(contentDirectory);
-    const tocDataResult = await tocContext.parseTocData();
-    if (tocDataResult.isErr()) {
-      this.prompts.apiRecipeGenerationFailed();
-      return ActionResult.failed();
-    }
-    const tocData = tocDataResult.value;
+    const tocData = await tocContext.parseTocData();
 
     // Setup recipe context
     const recipeContext = new RecipeContext(recipeName);
     const recipeFileName = recipeContext.createRecipeFileName();
 
     // Check if the recipe already exists
-    // TODO: Sohail, encapsulate this to recipte context
-    const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocData, recipeName, recipeFileName);
+    const recipeAlreadyExists = recipeContext.exists(tocData, recipeName, recipeFileName);
     if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt(recipeName))) {
       return ActionResult.cancelled();
     }
@@ -146,22 +141,14 @@ export class PortalRecipeAction {
       switch (stepType) {
         case StepType.Content: {
           const contentResult = await this.promptForContent();
-          if (contentResult.isErr()) {
-            this.prompts.logError(contentResult.error);
-            return ActionResult.failed();
-          }
-          recipe.addContentStep(stepName, contentResult.value);
+          recipe.addContentStep(stepName, contentResult);
           this.prompts.displayStepAddedSuccessfullyMessage();
           break;
         }
 
         case StepType.Endpoint: {
           if (!endpointGroups) {
-            const endpointContext = new EndpointContext(
-              specDirectory,
-              this.configDirectory,
-              this.commandMetadata
-            );
+            const endpointContext = new EndpointContext(specDirectory, this.configDirectory, this.commandMetadata);
             const extractResult = await endpointContext.extractEndpointGroups();
             if (extractResult.isErr()) {
               this.prompts.logError(extractResult.error);
@@ -226,45 +213,19 @@ export class PortalRecipeAction {
     };
   }
 
-  // TODO: sohail move this method to recipe contxt
-  private checkRecipeAlreadyExists(tocData: Toc, recipeName: string, recipeFileName: FileName): boolean {
-    let apiRecipesGroup = tocData.toc?.find((item) => "group" in item && item.group === "API Recipes");
-    if (!apiRecipesGroup || !("items" in apiRecipesGroup)) {
-      return false;
-    }
+  private async promptForContent(): Promise<string> {
+    return await withDirPath(async (tempDir) => {
+      const tempFile = new FilePath(tempDir, new FileName(`recipe-markdown-content-${Date.now()}.md`));
+      const defaultContent =
+        "# The Heading Goes Here\n\n" +
+        "This is placeholder text for your API Recipe content step. " +
+        "Feel free to edit this. Save your changes and then close the file once you're done.";
 
-    // Check if recipe name or file name already exists
-    const existingRecipe = apiRecipesGroup.items.find(
-      (item) =>
-        "page" in item && "file" in item && (item.page === recipeName || item.file === `recipes/${recipeFileName}.md`)
-    );
-    if (existingRecipe) {
-      return true;
-    }
+      await this.fileService.writeContents(tempFile, defaultContent);
+      await this.launcherService.openInEditor(tempFile);
 
-    return false;
-  }
-
-
-  // TODO: SOhail refactor this class like copilot
-  private async promptForContent(): Promise<Result<string, string>> {
-    const tempDir = new DirectoryPath(tmpdir());
-    const tempFilePath = new FilePath(tempDir, new FileName(`recipe-markdown-content-${Date.now()}.txt`));
-    const template =
-      `# The Heading Goes Here\n\n` +
-      `This is placeholder text for your API Recipe content step. ` +
-      `Feel free to edit this. Save your changes and then close the file once you're done.`;
-
-    await this.fileService.writeContents(tempFilePath, template);
-
-    try {
-      await this.launcherService.openInEditor(tempFilePath);
-      const fileContent = await this.fileService.getContents(tempFilePath);
-      return ok(fileContent);
-    } catch {
-      return err("Unable to add content step. Please try again later.");
-    } finally {
-      await this.fileService.deleteFile(tempFilePath);
-    }
+      const fileContent = await this.fileService.getContents(tempFile);
+      return fileContent.replace(/\r\n|\r/g, "\n");
+    });
   }
 }
