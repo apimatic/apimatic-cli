@@ -3,13 +3,9 @@ import { text, select, multiselect, log, isCancel, note } from "@clack/prompts";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { FileService } from "../../infrastructure/file-service.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { Directory } from "../../types/file/directory.js";
-import { FileMetadataService } from "../../infrastructure/services/file-metadata-service.js";
-import { createResourceInput } from "../../types/file/resource-input.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -17,9 +13,6 @@ const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/
 const defaultPortalDirectoryPath = process.cwd();
 
 export class PortalQuickstartPrompts {
-  private readonly fileService = new FileService();
-  private readonly fileMetadataService = new FileMetadataService();
-
   public welcomeMessage() {
     log.info(`Hello there.`);
     log.message(
@@ -34,48 +27,35 @@ export class PortalQuickstartPrompts {
   }
 
   public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string | undefined> {
-    while (true) {
-      const spec = await text({
-        message: `Provide a local path or a public URL for your OpenAPI definition file:`,
-        placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
-        defaultValue: defaultSpecUrl.toString()
-      });
+    const spec = await text({
+      message: `Provide a local path or a public URL for your OpenAPI definition file:`,
+      placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
+      defaultValue: defaultSpecUrl.toString()
+    });
 
-      if (isCancel(spec)) {
-        return undefined;
-      }
-
-      const cleanedPath = removeQuotes((spec as string).trim() ?? "");
-
-      if (!UrlPath.create(cleanedPath)) {
-        try {
-          const resourcePath = createResourceInput(cleanedPath);
-
-          if (!(await this.fileService.fileExists(resourcePath as FilePath))) {
-            log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");
-            continue; // re-prompt
-          }
-
-          return cleanedPath;
-        } catch {
-          log.error("Invalid file path provided. Please enter a valid file path.");
-        }
-      }
-
-      try {
-        const contentType = await this.fileMetadataService.contentType(cleanedPath);
-
-        if (contentType?.includes("text/html")) {
-          log.error(`Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`);
-          continue; // re-prompt
-        }
-      } catch {
-        log.error(`Failed to reach the URL. Please check your internet connection or the URL.`);
-        continue; // re-prompt
-      }
-
-      return cleanedPath;
+    if (isCancel(spec)) {
+      return undefined;
     }
+
+    const cleanedPath = removeQuotes(spec.trim() ?? "");
+
+    return cleanedPath;
+  }
+
+  public specFileDoesNotExist() {
+    log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");
+  }
+
+  public invalidSpecFilePath() {
+    log.error("Invalid file path provided. Please enter a valid file path.");
+  }
+
+  public invalidSpecUrl() {
+    log.error(`Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`);
+  }
+
+  public unreachableUrl() {
+    log.error(`Failed to reach the URL. Please check your internet connection or the URL.`);
   }
 
   public noSpecSpecified() {
@@ -163,28 +143,22 @@ export class PortalQuickstartPrompts {
       const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
       const directoryPath = new DirectoryPath(cleanedPath);
 
-      if (
-        !(await this.fileService.directoryExists(directoryPath)) &&
-        directoryPath.toString() !== defaultPortalDirectoryPath
-      ) {
-        log.error("Error: The specified directory path does not exist. Please try again.");
-        continue;
-      }
-
-      const directory = await this.fileService.getDirectory(directoryPath);
-      if (directory.items.length > 0) {
-        log.error(
-          "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-        );
-        continue;
-      }
-
-      if (directory.toString() === "./") {
+      if ((inputDirectory as string) === "./") {
         return new DirectoryPath(defaultPortalDirectoryPath);
       } else {
         return directoryPath;
       }
     }
+  }
+
+  public inputDirectoryPathDoesNotExist() {
+    log.error("Error: The specified directory path does not exist. Please try again.");
+  }
+
+  public inputDirectoryNotEmpty() {
+    log.error(
+      "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
+    );
   }
 
   public noInputDirectoryProvided() {
@@ -205,7 +179,7 @@ export class PortalQuickstartPrompts {
 Customize the Portal theme, add API recipes and enable AI features
 ${f.link(referenceDocumentationUrl)}`;
 
-    note(message, 'Next steps');
+    note(message, "Next steps");
   }
 
   public serviceError(error: ServiceError) {
@@ -219,25 +193,24 @@ ${f.link(referenceDocumentationUrl)}`;
 
   private getDirectoryTree(dir: Directory, prefix: string = "", isLast: boolean = true): string {
     const folderDescription: Record<string, string> = {
-      "src/APIMATIC-BUILD.json":
-        "# Defines all configurations for the API portal, including programming languages and themes",
-      "src/spec": "# Contains all API definition files",
+      spec: "# Contains all API definition files",
       content: "# Includes custom documentation pages in Markdown",
       static: "# Includes all static files, such as images, GIFs, and PDFs"
     };
 
     const fileDescriptions: Record<string, string> = {
-      "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal"
+      "toc.yml": "# Controls the structure of the side navigation bar in the API portal",
+      "APIMATIC-BUILD.json":
+        "# Defines all configurations for the API portal, including programming languages and themes"
     };
 
-    // Root line
-    const pointer = f.bullet(isLast ? "└─ " : "├─ ");
-
-    const description = f.description(folderDescription[dir.directoryPath.leafName()]) ?? "";
-    let output = `${prefix}${pointer}${dir.directoryPath.leafName()} ${description}\n`;
+    const pointer = isLast ? "└─ " : "├─ ";
+    const folderName = dir.directoryPath.leafName();
+    const description = folderDescription[folderName] ? f.description(folderDescription[folderName]) : "";
+    let output = `${prefix}${pointer}${folderName}${description ? " " + description : ""}\n`;
 
     const items = dir.items;
-    const newPrefix = prefix + (isLast ? "   " : f.bullet("|  "));
+    const newPrefix = prefix + (isLast ? "   " : "|  ");
 
     items.forEach((item, index) => {
       const last = index === items.length - 1;
@@ -245,10 +218,10 @@ ${f.link(referenceDocumentationUrl)}`;
       if (item instanceof Directory) {
         output += this.getDirectoryTree(item, newPrefix, last);
       } else {
-        const filePointer = f.bullet(last ? "└─ " : "├─ ");
-        const fileDescription =
-          (fileDescriptions[item.toString()] ? f.description(fileDescriptions[item.toString()]) : undefined) ?? "";
-        output += `${newPrefix}${filePointer}${item.toString()} ${fileDescription}\n`;
+        const filePointer = last ? "└─ " : "├─ ";
+        const fileName = item.toString();
+        const fileDescription = fileDescriptions[fileName] ? f.description(fileDescriptions[fileName]) : "";
+        output += `${newPrefix}${filePointer}${fileName}${fileDescription ? " " + fileDescription : ""}\n`;
       }
     });
 

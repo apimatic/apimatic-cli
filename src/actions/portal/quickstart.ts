@@ -21,6 +21,7 @@ import { BuildContext } from "../../types/build-context.js";
 import { TempContext } from "../../types/temp-context.js";
 import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
 import { getLanguagesConfig } from "../../types/build/build.js";
+import { FileMetadataService } from "../../infrastructure/services/file-metadata-service.js";
 
 const defaultSpecUrl: UrlPath = new UrlPath(
   "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json"
@@ -31,6 +32,7 @@ export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
   private readonly zipService: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
+  private readonly fileMetadataService: FileMetadataService = new FileMetadataService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
@@ -75,7 +77,7 @@ export class PortalQuickstartAction {
 
       // Step 4/4
       const inputDirectory = await this.selectInputDirectory();
-      if (!inputDirectory) {
+      if (inputDirectory.isErr()) {
         return ActionResult.cancelled();
       }
 
@@ -100,13 +102,13 @@ export class PortalQuickstartAction {
       buildFile.generatePortal!.languageConfig = getLanguagesConfig(selectedLanguages);
       await tempBuildContext.updateBuildFileContents(buildFile);
 
-      const sourceDirectory = inputDirectory.join("src");
+      const sourceDirectory = inputDirectory.value.join("src");
       await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
 
       const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(buildDirectoryStructure);
 
-      const portalDirectory = inputDirectory.join("portal");
+      const portalDirectory = inputDirectory.value.join("portal");
       const servePortalResult = await this.servePortal(sourceDirectory, portalDirectory);
       if (servePortalResult.isErr()) {
         return ActionResult.failed();
@@ -129,10 +131,42 @@ export class PortalQuickstartAction {
 
   private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, void>> {
     this.prompts.importSpecStep();
-    const inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
-    if (!inputPath) {
-      this.prompts.noSpecSpecified();
-      return err();
+    let inputPath: string | undefined;
+    while (true) {
+      inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
+      if (!inputPath) {
+        this.prompts.noSpecSpecified();
+        return err();
+      }
+
+      if (!UrlPath.create(inputPath)) {
+        try {
+          const resourcePath = createResourceInput(inputPath);
+          if (!(await this.fileService.fileExists(resourcePath as FilePath))) {
+            this.prompts.specFileDoesNotExist();
+            continue; // re-prompt
+          }
+
+          break; // valid file path.
+        } catch {
+          this.prompts.invalidSpecFilePath();
+          continue; // re-prompt
+        }
+      }
+
+      try {
+        const contentType = await this.fileMetadataService.contentType(inputPath);
+
+        if (contentType?.includes("text/html")) {
+          this.prompts.invalidSpecUrl();
+          continue; // re-prompt
+        }
+      } catch {
+        this.prompts.unreachableUrl();
+        continue; // re-prompt
+      }
+
+      break; // valid URL.
     }
 
     const urlPath = UrlPath.create(inputPath);
@@ -193,14 +227,31 @@ export class PortalQuickstartAction {
     return ok(languages);
   }
 
-  private async selectInputDirectory(): Promise<DirectoryPath | undefined> {
+  private async selectInputDirectory(): Promise<ResultEx<DirectoryPath, void>> {
     this.prompts.selectInputDirectoryStep();
-    const inputDirectory = await this.prompts.inputDirectoryPathPrompt();
-    if (inputDirectory) {
-      return inputDirectory;
-    } else {
-      this.prompts.noInputDirectoryProvided();
+    let inputDirectory: DirectoryPath | undefined;
+    while (true) {
+      inputDirectory = await this.prompts.inputDirectoryPathPrompt();
+      if (!inputDirectory) {
+        this.prompts.noInputDirectoryProvided();
+        return err();
+      }
+
+      if (!(await this.fileService.directoryExists(inputDirectory)) && inputDirectory.toString() !== "./") {
+        this.prompts.inputDirectoryPathDoesNotExist();
+        continue;
+      }
+
+      const directory = await this.fileService.getDirectory(inputDirectory);
+      if (directory.items.length > 0) {
+        this.prompts.inputDirectoryNotEmpty();
+        continue;
+      }
+
+      break;
     }
+
+    return ok(inputDirectory);
   }
 
   private async servePortal(
