@@ -72,21 +72,18 @@ export class PortalRecipeAction {
   constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public async execute(buildDirectory: DirectoryPath, name?: string): Promise<ActionResult> {
-    // Validate build directory
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
       this.prompts.invalidBuildDirectory(buildDirectory);
       return ActionResult.failed();
     }
 
-    // Get the recipe name
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
     if (!recipeName) {
       this.prompts.recipeNameEmpty();
       return ActionResult.cancelled();
     }
 
-    //build config logic exists
     const buildConfig = await buildContext.getBuildFileContents();
     const contentDirectory = buildConfig.generatePortal?.contentFolder
       ? buildDirectory.join(buildConfig.generatePortal?.contentFolder)
