@@ -102,7 +102,9 @@ export class PortalQuickstartAction {
 
       const sourceDirectory = inputDirectory.join("src");
       await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
-      this.prompts.displayBuildDirectoryAsTree(sourceDirectory);
+
+      const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
+      this.prompts.printDirectoryStructure(buildDirectoryStructure);
 
       const portalDirectory = inputDirectory.join("portal");
       const servePortalResult = await this.servePortal(sourceDirectory, portalDirectory);

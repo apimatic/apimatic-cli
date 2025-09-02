@@ -1,8 +1,5 @@
-import * as path from "path";
-import treeify from "treeify";
 import { Result } from "neverthrow";
 import { text, select, multiselect, log, isCancel, note } from "@clack/prompts";
-import { getMessageInGreenColor } from "../../utils/utils.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -18,17 +15,6 @@ const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
 const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/advanced-portal-setup";
 const defaultPortalDirectoryPath = process.cwd();
-
-const descriptions: { [key: string]: string } = Object.entries({
-  "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
-  spec: "# Contains all API definition files",
-  content: "# Includes custom documentation pages in Markdown",
-  "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal",
-  static: "# Includes all static files, such as images, GIFs, and PDFs"
-}).reduce((acc, [key, value]) => {
-  acc[path.normalize(key)] = value;
-  return acc;
-}, {} as { [key: string]: string });
 
 export class PortalQuickstartPrompts {
   private readonly fileService = new FileService();
@@ -214,53 +200,58 @@ export class PortalQuickstartPrompts {
     );
   }
 
-  public async displayBuildDirectoryAsTree(buildDirectory: DirectoryPath): Promise<void> {
-    const buildDirectoryStructure = await this.fileService.getDirectory(buildDirectory);
-    const buildDirectoryTreeStructure = this.createTreeStructure(buildDirectoryStructure);
-    const tree = treeify.asTree(buildDirectoryTreeStructure, true, true);
-    const coloredLogString = tree
-      .split("\n")
-      .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
-      .join("\n");
-    log.step(coloredLogString);
-  }
-
   public nextSteps(): void {
     const message = `Use the API Playground or an SDK to call your API.
 Customize the Portal theme, add API recipes and enable AI features
 ${f.link(referenceDocumentationUrl)}`;
 
-    note(message, "Next steps", {
-      format(line) {
-        return f.success(line);
-      }
-    });
+    note(message, 'Next steps');
   }
 
   public serviceError(error: ServiceError) {
     log.error(getErrorMessage(error));
   }
 
-  private createTreeStructure(directoryTreeStructure: Directory, parentPath = ""): treeify.TreeObject {
-    const result: treeify.TreeObject = {};
-    for (const item of directoryTreeStructure.items) {
-      let name: string;
-      let relPath: string;
+  public printDirectoryStructure(directory: Directory) {
+    const tree = this.getDirectoryTree(directory);
+    log.info(tree);
+  }
+
+  private getDirectoryTree(dir: Directory, prefix: string = "", isLast: boolean = true): string {
+    const folderDescription: Record<string, string> = {
+      "src/APIMATIC-BUILD.json":
+        "# Defines all configurations for the API portal, including programming languages and themes",
+      "src/spec": "# Contains all API definition files",
+      content: "# Includes custom documentation pages in Markdown",
+      static: "# Includes all static files, such as images, GIFs, and PDFs"
+    };
+
+    const fileDescriptions: Record<string, string> = {
+      "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal"
+    };
+
+    // Root line
+    const pointer = f.bullet(isLast ? "└─ " : "├─ ");
+
+    const description = f.description(folderDescription[dir.directoryPath.leafName()]) ?? "";
+    let output = `${prefix}${pointer}${dir.directoryPath.leafName()} ${description}\n`;
+
+    const items = dir.items;
+    const newPrefix = prefix + (isLast ? "   " : f.bullet("|  "));
+
+    items.forEach((item, index) => {
+      const last = index === items.length - 1;
+
       if (item instanceof Directory) {
-        name = path.basename(item.directoryPath.toString());
-        relPath = path.join(parentPath, name);
+        output += this.getDirectoryTree(item, newPrefix, last);
       } else {
-        name = item.toString();
-        relPath = path.join(parentPath, name);
+        const filePointer = f.bullet(last ? "└─ " : "├─ ");
+        const fileDescription =
+          (fileDescriptions[item.toString()] ? f.description(fileDescriptions[item.toString()]) : undefined) ?? "";
+        output += `${newPrefix}${filePointer}${item.toString()} ${fileDescription}\n`;
       }
-      const desc = descriptions[path.normalize(relPath)];
-      const displayKey = desc ? `${name} : ${desc}` : name;
-      if (item instanceof Directory) {
-        result[displayKey] = this.createTreeStructure(item, relPath);
-      } else {
-        result[displayKey] = null as unknown as string;
-      }
-    }
-    return result;
+    });
+
+    return output;
   }
 }

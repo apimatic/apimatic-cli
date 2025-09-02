@@ -1,8 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import treeify from "treeify";
 import { intro, spinner, select, text, cancel, isCancel, outro, log, autocomplete } from "@clack/prompts";
-import { getMessageInGreenColor } from "../../../utils/utils.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 
 export class PortalRecipePrompts {
@@ -58,12 +56,12 @@ export class PortalRecipePrompts {
         }
         const cleanedPath = this.removeQuotes(filePath.trim());
         const resolvedPath = path.resolve(buildDirectoryPath, cleanedPath);
-        
+
         if (!resolvedPath.endsWith(".json")) {
           return "The content file must be a JSON (.json) file. Please provide a valid file path.";
         }
 
-      
+
         if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
           return;
         }
@@ -233,17 +231,6 @@ export class PortalRecipePrompts {
 
   public stopProgressIndicatorWithMessage(message: string): void {
     this.spin.stop(message);
-  }
-
-  public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: treeify.TreeObject) {
-    const tree = treeify.asTree(buildDirectoryTreeObject, true, true);
-
-    const coloredLogString = tree
-      .split("\n")
-      .map((line: string) => line.replace(/#.*/, (match: string) => getMessageInGreenColor(match)))
-      .join("\n");
-
-    log.step(`🛠️  You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
   }
 
   public logError(error: string): void {

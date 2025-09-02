@@ -8,7 +8,9 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: string) => pc.cyan(`'${text}'`),
-  link: (text: string) => pc.cyan(`'${text}'`), // TODO: merge with Saeed's implementation
+  bullet: (text: string) => pc.dim(text),
+  link: (text: string) => pc.blue(`${text}`), // TODO: merge with Saeed's implementation
+  description: (text: string) => pc.greenBright(`${text}`), // TODO: merge with Saeed's implementation
   cmd: (cmd: string, topic: string, action: string) => `${pc.blue(cmd)} ${pc.dim(topic)} ${pc.dim(action)}`,
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {

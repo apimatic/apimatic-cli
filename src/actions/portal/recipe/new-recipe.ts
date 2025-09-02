@@ -75,9 +75,7 @@ export class PortalRecipeAction {
       contentFolderPath
     );
 
-    const buildDirectoryStructure = await this.getBuildDirectoryStructure(recipeFileName);
 
-    this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
     this.prompts.displayRecipeGenerationSuccessMessage(contentFolderPath);
     return Result.success("Generated recipe successfully.");
   }

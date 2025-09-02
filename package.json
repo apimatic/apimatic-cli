@@ -70,7 +70,6 @@
         "prettier": "^2.8.8",
         "striptags": "^3.2.0",
         "tmp-promise": "^3.0.3",
-        "treeify": "^1.1.0",
         "tslib": "^2.8.1",
         "uuid": "^11.1.0",
         "yaml": "^2.8.0"
