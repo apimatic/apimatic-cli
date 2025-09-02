@@ -1,6 +1,4 @@
 import * as path from "path";
-import fs from "fs";
-import axios from "axios";
 import treeify from "treeify";
 import { Result } from "neverthrow";
 import { text, select, multiselect, log, isCancel, note } from "@clack/prompts";
@@ -8,10 +6,13 @@ import { getMessageInGreenColor } from "../../utils/utils.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FilePath } from "../../types/file/filePath.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { Directory } from "../../types/file/directory.js";
+import { FileName } from "../../types/file/fileName.js";
+import { FileMetadataService } from "../../infrastructure/services/file-metadata-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -31,6 +32,7 @@ const descriptions: { [key: string]: string } = Object.entries({
 
 export class PortalQuickstartPrompts {
   private readonly fileService = new FileService();
+  private readonly fileMetadataService = new FileMetadataService();
 
   public welcomeMessage() {
     log.info(`Hello there.`);
@@ -51,48 +53,40 @@ export class PortalQuickstartPrompts {
       const spec = await text({
         message: `Provide a local path or a public URL for your OpenAPI definition file:`,
         placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
-        defaultValue: defaultSpecUrl.toString(),
-        validate: (input) => {
-          if (!input) return;
-
-          const cleanedPath = removeQuotes(input.trim() ?? "");
-
-          if (!UrlPath.create(cleanedPath)) {
-            const dirPath = path.resolve(cleanedPath);
-
-            if (!fs.existsSync(dirPath)) {
-              return "The specified file does not exist. Please enter a valid file path.";
-            }
-
-            if (!fs.statSync(dirPath).isFile()) {
-              return "The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again.";
-            }
-          }
-
-          return; // pass sync validation
-        }
+        defaultValue: defaultSpecUrl.toString()
       });
 
       if (isCancel(spec)) {
         return undefined;
       }
 
-      const cleanedPath = removeQuotes(String(spec).trim());
+      const cleanedPath = removeQuotes((spec as string).trim() ?? "");
 
-      // Async validation for URLs
-      if (UrlPath.create(cleanedPath)) {
-        try {
-          const response = await axios.head(cleanedPath);
-          const contentType = response.headers["content-type"];
+      if (!UrlPath.create(cleanedPath)) {
+        const dirName = path.dirname(cleanedPath);
+        const baseName = path.basename(cleanedPath);
+        const directoryPath = new DirectoryPath(dirName);
+        const fileName = new FileName(baseName);
+        const filePath = new FilePath(directoryPath, fileName);
 
-          if (contentType?.includes("text/html")) {
-            log.error(`Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`);
-            continue; // re-prompt
-          }
-        } catch {
-          log.error(`Failed to reach the URL. Please check your internet connection or the URL.`);
+        if (!(await this.fileService.fileExists(filePath))) {
+          log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");
           continue; // re-prompt
         }
+
+        return cleanedPath;
+      }
+
+      try {
+        const contentType = await this.fileMetadataService.contentType(cleanedPath);
+
+        if (contentType?.includes("text/html")) {
+          log.error(`Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`);
+          continue; // re-prompt
+        }
+      } catch {
+        log.error(`Failed to reach the URL. Please check your internet connection or the URL.`);
+        continue; // re-prompt
       }
 
       return cleanedPath; // valid local file or valid URL
@@ -170,40 +164,41 @@ export class PortalQuickstartPrompts {
   }
 
   public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
-    const directory = await text({
-      message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
-      placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
-      defaultValue: "./",
-      validate: (input) => {
-        const cleanedPath = removeQuotes(input?.trim() ?? "");
+    while (true) {
+      const inputDirectory = await text({
+        message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
+        placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
+        defaultValue: "./"
+      });
 
-        if (!fs.existsSync(cleanedPath.toString()) && cleanedPath.toString() != defaultPortalDirectoryPath) {
-          return "Error: The specified directory path does not exist. Please try again.";
-        }
-
-        if (cleanedPath.toString() !== defaultPortalDirectoryPath) {
-          const files = fs.readdirSync(cleanedPath.toString()).filter((item) => !item.startsWith("."));
-          if (files.length > 0) {
-            return "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.";
-          }
-        } else if (fs.existsSync(cleanedPath.toString())) {
-          // For ignoring hidden files and folders in the current directory in MacOS.
-          const files = fs.readdirSync(cleanedPath.toString()).filter((item) => !item.startsWith("."));
-          if (files.length > 0) {
-            return "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents.";
-          }
-        }
+      if (isCancel(inputDirectory)) {
+        return undefined;
       }
-    });
 
-    if (isCancel(directory)) {
-      return undefined;
-    }
+      const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
+      const directoryPath = new DirectoryPath(cleanedPath);
 
-    if (directory === "./") {
-      return new DirectoryPath(defaultPortalDirectoryPath);
-    } else {
-      return new DirectoryPath(removeQuotes(directory as string).trim());
+      if (
+        !(await this.fileService.directoryExists(directoryPath)) &&
+        directoryPath.toString() !== defaultPortalDirectoryPath
+      ) {
+        log.error("Error: The specified directory path does not exist. Please try again.");
+        continue;
+      }
+
+      const directory = await this.fileService.getDirectory(directoryPath);
+      if (directory.items.length > 0) {
+        log.error(
+          "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
+        );
+        continue;
+      }
+
+      if (directory.toString() === "./") {
+        return new DirectoryPath(defaultPortalDirectoryPath);
+      } else {
+        return directoryPath;
+      }
     }
   }
 
@@ -236,7 +231,11 @@ export class PortalQuickstartPrompts {
 Customize the Portal theme, add API recipes and enable AI features
 ${f.link(referenceDocumentationUrl)}`;
 
-    note(message, "Next steps");
+    note(message, "Next steps", {
+      format(line) {
+        return f.success(line);
+      },
+    });
   }
 
   public serviceError(error: ServiceError) {
