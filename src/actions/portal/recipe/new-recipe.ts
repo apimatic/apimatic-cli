@@ -28,6 +28,7 @@ class RecipeContext {
     return new FileName(this.toPascalCase(this.recipeName.trim()));
   }
 
+  // TODO: Sohail move to utils or string utils
   private toPascalCase(str: string): string {
     return str
       .split(" ")
@@ -95,6 +96,18 @@ export class PortalRecipeAction {
       return ActionResult.failed();
     }
 
+    // TODO: if we need this or no
+    const specDirectory = buildConfig.generatePortal?.apiSpecPath
+      ? buildDirectory.joinWith(buildConfig.generatePortal?.apiSpecPath)
+      : buildDirectory;
+
+    const specContext =  new SpecContext(specDirectory);
+
+    if (!(await specContext.validate())) {
+      this.prompts.specFileEmptyInvalid();
+      return ActionResult.failed();
+    }
+
     // Setup TOC context
     const tocContext = new TocContext(contentDirectory);
     const tocDataResult = await tocContext.parseTocData();
@@ -108,23 +121,12 @@ export class PortalRecipeAction {
     const recipeContext = new RecipeContext(recipeName);
     const recipeFileName = recipeContext.createRecipeFileName();
 
-    // Check if recipe already exists
+    // Check if the recipe already exists
+    // TODO: Sohail, encapsulate this to recipte context
     const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocData, recipeName, recipeFileName);
-    if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt())) {
+    if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt(recipeName))) {
       return ActionResult.cancelled();
     }
-
-    const specContext = SpecContext.fromBuildConfig(buildConfig, buildDirectory);
-
-    if (!(await specContext.validate())) {
-      this.prompts.specFileEmptyInvalid();
-      return ActionResult.failed();
-    }
-    const endpointContext = new EndpointContext(
-      specContext.specDirectoryPath,
-      this.configDirectory,
-      this.commandMetadata
-    );
 
     // Build the recipe
     const recipe = new PortalRecipe(recipeName);
@@ -155,6 +157,11 @@ export class PortalRecipeAction {
 
         case StepType.Endpoint: {
           if (!endpointGroups) {
+            const endpointContext = new EndpointContext(
+              specDirectory,
+              this.configDirectory,
+              this.commandMetadata
+            );
             const extractResult = await endpointContext.extractEndpointGroups();
             if (extractResult.isErr()) {
               this.prompts.logError(extractResult.error);
@@ -219,6 +226,7 @@ export class PortalRecipeAction {
     };
   }
 
+  // TODO: sohail move this method to recipe contxt
   private checkRecipeAlreadyExists(tocData: Toc, recipeName: string, recipeFileName: FileName): boolean {
     let apiRecipesGroup = tocData.toc?.find((item) => "group" in item && item.group === "API Recipes");
     if (!apiRecipesGroup || !("items" in apiRecipesGroup)) {
@@ -237,7 +245,9 @@ export class PortalRecipeAction {
     return false;
   }
 
-  async promptForContent(): Promise<Result<string, string>> {
+
+  // TODO: SOhail refactor this class like copilot
+  private async promptForContent(): Promise<Result<string, string>> {
     const tempDir = new DirectoryPath(tmpdir());
     const tempFilePath = new FilePath(tempDir, new FileName(`recipe-markdown-content-${Date.now()}.txt`));
     const template =

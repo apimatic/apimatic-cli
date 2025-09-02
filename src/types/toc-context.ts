@@ -3,7 +3,6 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { err, ok, Result } from "neverthrow";
-import fs from "fs";
 import { Toc } from "./toc/toc.js";
 import { parse } from "yaml";
 
@@ -22,6 +21,8 @@ export class TocContext {
   public async exists() {
     return !(await this.fileService.fileExists(this.tocFilePath));
   }
+
+  // TODO: Sohail create validate method and read directly
 
   public async parseTocData(): Promise<Result<Toc, string>> {
     // Check if the file exists

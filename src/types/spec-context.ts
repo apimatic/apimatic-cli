@@ -21,21 +21,6 @@ export class SpecContext {
     this.specDirectory = specDirectory;
   }
 
-   public static fromBuildConfig(
-    buildConfig: BuildConfig,
-    buildDirectory: DirectoryPath
-  ): SpecContext {
-    const specFolder = buildConfig.generatePortal?.apiSpecPath;
-    const directoryPath = specFolder
-      ? new DirectoryPath(buildDirectory.toString(), specFolder.toString())
-      : buildDirectory;
-
-    return new SpecContext(directoryPath);
-  }
-
-  public get specDirectoryPath(): DirectoryPath {
-    return this.specDirectory;
-  }
 
   public async validate(): Promise<boolean> {
     return !(await this.fileService.directoryEmpty(this.specDirectory));

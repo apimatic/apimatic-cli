@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import treeify from "treeify";
-import { intro, spinner, select, text, cancel, isCancel, outro, log, autocomplete } from "@clack/prompts";
+import { intro, spinner, select, text, cancel, isCancel, outro, log, autocomplete, confirm } from "@clack/prompts";
 import { getMessageInGreenColor } from "../../../utils/utils.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
@@ -208,38 +208,27 @@ export class PortalRecipePrompts {
   }
 
   public async addAnotherStepSelectionPrompt(): Promise<boolean> {
-    const addAnotherStep = await select({
+    const addAnotherStep = await confirm({
       message: `Do you want to add another step?`,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" }
-      ],
-      initialValue: "yes"
+      initialValue: true
     });
 
     if (isCancel(addAnotherStep)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return false;
     }
-
-    return addAnotherStep === "yes";
+    return addAnotherStep;
   }
 
-  public async overwriteApiRecipeInTocPrompt(): Promise<boolean> {
-    const overwriteApiRecipeInToc = await select({
-      message: `⚠️  An API Recipe with this name already exists. Do you want to overwrite it?`,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" }
-      ]
+  public async overwriteApiRecipeInTocPrompt(name: string): Promise<boolean> {
+    const overwrite = await confirm({
+      message: `An API Recipe with name ${f.var(name)} already exists. Do you want to overwrite it?`,
+      initialValue: false
     });
 
-    if (isCancel(overwriteApiRecipeInToc)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+    if (isCancel(overwrite)) {
+      return false;
     }
-
-    return overwriteApiRecipeInToc === "yes";
+    return overwrite;
   }
 
   public displayStepAddedSuccessfullyMessage() {
