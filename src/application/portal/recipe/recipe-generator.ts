@@ -8,7 +8,7 @@ import { FileService } from "../../../infrastructure/file-service.js";
 
 export class PortalRecipeGenerator {
   //TODO: Replace tocFileContent any type with concrete type.
-  private fileService: FileService = new FileService();
+  private readonly fileService: FileService = new FileService();
 
   public async createRecipe(
     recipe: SerializableRecipe,

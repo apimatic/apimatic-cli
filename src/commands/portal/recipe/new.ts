@@ -25,8 +25,8 @@ ${format.link(
     ...FlagsProvider.force
   };
 
-  static cmdTxt = format.cmd("apimatic", "portal", "recipe", "new");
-  static examples = [
+  static readonly cmdTxt = format.cmd("apimatic", "portal", "recipe", "new");
+  static readonly examples = [
     `${this.cmdTxt}`,
     `${this.cmdTxt} ${format.flag("name", '"My API Recipe"')} ${format.flag("input", '"./"')}`
   ];

@@ -23,7 +23,7 @@ import { toPascalCase } from "../../../utils/utils.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 
 class RecipeContext {
-  constructor(private recipeName: string) {}
+  constructor(private readonly recipeName: string) {}
 
   getRecipeName(): FileName {
     return new FileName(toPascalCase(this.recipeName.trim()));
@@ -53,9 +53,9 @@ class EndpointContext {
   private readonly fileService = new FileService();
 
   constructor(
-    private specDirPath: DirectoryPath,
-    private configDirectory: DirectoryPath,
-    private commandMetadata: CommandMetadata
+    private readonly specDirPath: DirectoryPath,
+    private readonly configDirectory: DirectoryPath,
+    private readonly commandMetadata: CommandMetadata
   ) {
     const portalService = new PortalService();
     this.sdlParser = new SdlParser(portalService, this.configDirectory, this.commandMetadata);

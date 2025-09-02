@@ -10,7 +10,6 @@ import { SpecContext } from "../../../types/spec-context.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { BuildContext } from "../../../types/build-context.js";
-import { spec } from "node:test/reporters";
 
 export class ContentContext {
   private readonly fileService = new FileService();

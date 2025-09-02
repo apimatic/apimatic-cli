@@ -3,8 +3,6 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { BuildConfig } from "./build/build.js";
-import { TocGroup } from "./toc/toc.js";
-import { err, ok, Result } from "neverthrow";
 
 export class BuildContext {
   private readonly fileService = new FileService();
