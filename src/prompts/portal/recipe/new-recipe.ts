@@ -1,7 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
 import treeify from "treeify";
-import { intro, spinner, select, text, cancel, isCancel, outro, log, autocomplete, confirm } from "@clack/prompts";
+import { intro, select, text, cancel, isCancel, outro, log, autocomplete, confirm } from "@clack/prompts";
 import { getMessageInGreenColor } from "../../../utils/utils.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
@@ -9,7 +7,6 @@ import { format as f } from "../../format.js";
 import { StepType } from "../../../types/recipe/recipe.js";
 
 export class PortalRecipePrompts {
-  private readonly spin = spinner();
 
   public displayWelcomeMessage(): void {
     intro(`Welcome to the API Recipe Generation Wizard. 🪄`);
@@ -71,35 +68,6 @@ export class PortalRecipePrompts {
       }
     }
     return str;
-  }
-  public async buildConfigFilePathPrompt(buildDirectoryPath: string): Promise<string> {
-    const buildConfigFilePath = await text({
-      message: `⚠️  APIMATIC-BUILD.json is required and was not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
-      validate: (filePath) => {
-        if (!filePath) {
-          return "Build config file path cannot be empty. Please provide a valid file path.";
-        }
-        const cleanedPath = this.removeQuotes(filePath.trim());
-        const resolvedPath = path.resolve(buildDirectoryPath, cleanedPath);
-
-        if (!resolvedPath.endsWith(".json")) {
-          return "The content file must be a JSON (.json) file. Please provide a valid file path.";
-        }
-
-        if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
-          return;
-        }
-
-        return "The specified path is either not a valid relative file path or it doesn't exist. Please provide a valid relative file path.";
-      }
-    });
-
-    if (isCancel(buildConfigFilePath)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
-    }
-
-    return path.resolve(buildDirectoryPath, this.removeQuotes((buildConfigFilePath as string).trim()));
   }
 
   public async stepNamePrompt(defaultStepName: string): Promise<string | undefined> {
@@ -238,14 +206,6 @@ export class PortalRecipePrompts {
   public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
     log.message(`Your new API Recipe has been added to the source directory at: ${buildDirectoryPath}`);
     outro(`Run the command \`apimatic portal serve\` to preview your documentation portal.`);
-  }
-
-  public startProgressIndicatorWithMessage(message: string): void {
-    this.spin.start(message);
-  }
-
-  public stopProgressIndicatorWithMessage(message: string): void {
-    this.spin.stop(message);
   }
 
   public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: treeify.TreeObject) {

@@ -77,7 +77,12 @@ export class PortalRecipeAction {
 
   constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
+
   public async execute(buildDirectory: DirectoryPath, name?: string): Promise<ActionResult> {
+
+    this.prompts.displayWelcomeMessage();
+
+
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
       this.prompts.invalidBuildDirectory(buildDirectory);
