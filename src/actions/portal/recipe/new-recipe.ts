@@ -79,9 +79,7 @@ export class PortalRecipeAction {
 
 
   public async execute(buildDirectory: DirectoryPath, name?: string): Promise<ActionResult> {
-
     this.prompts.displayWelcomeMessage();
-
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
@@ -104,9 +102,7 @@ export class PortalRecipeAction {
       return ActionResult.failed();
     }
 
-    // TODO: if we need this or no
     const specDirectory = buildDirectory.join("spec");
-
     const specContext = new SpecContext(specDirectory);
 
     if (!(await specContext.validate())) {
