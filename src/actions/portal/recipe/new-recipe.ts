@@ -249,7 +249,6 @@ export class PortalRecipeAction {
 
     try {
       await this.launcherService.openInEditor(tempFilePath);
-
       const fileContent = await this.fileService.getContents(tempFilePath);
       return ok(fileContent);
     } catch {
