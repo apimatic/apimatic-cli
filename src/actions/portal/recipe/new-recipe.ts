@@ -40,6 +40,7 @@ class RecipeContext {
       (item) =>
         "page" in item && "file" in item && (item.page === recipeName || item.file === `recipes/${recipeFileName}.md`)
     );
+
     if (existingRecipe) {
       return true;
     }
@@ -50,7 +51,6 @@ class RecipeContext {
 
 class EndpointContext {
   private readonly sdlParser: SdlParser;
-  private readonly fileService = new FileService();
 
   constructor(
     private readonly specDirPath: DirectoryPath,
@@ -61,9 +61,6 @@ class EndpointContext {
     this.sdlParser = new SdlParser(portalService, this.configDirectory, this.commandMetadata);
   }
 
-  async exists(): Promise<boolean> {
-    return this.fileService.directoryExists(this.specDirPath);
-  }
 
   async extractEndpointGroups(): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
     return await this.sdlParser.getEndpointGroupsFromSdl(this.specDirPath);
@@ -85,7 +82,6 @@ export class PortalRecipeAction {
       this.prompts.invalidBuildDirectory(buildDirectory);
       return ActionResult.failed();
     }
-    const buildConfig = await buildContext.getBuildFileContents();
 
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
     if (!recipeName) {
@@ -125,17 +121,19 @@ export class PortalRecipeAction {
 
     // Build the recipe
     const recipe = new PortalRecipe(recipeName);
-    let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
-    let idx: number = 1;
-    let addAnotherStep: boolean;
+
+    let stepIndex: number = 0;
 
     this.prompts.displayStepsInformation();
+
+    let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
+
 
     do {
       const stepType = await this.prompts.stepTypeSelectionPrompt();
       if (!stepType) return ActionResult.cancelled();
 
-      const stepName = await this.prompts.stepNamePrompt("Step " + idx);
+      const stepName = await this.prompts.stepNamePrompt(`Step ${++stepIndex}`);
       if (!stepName) return ActionResult.cancelled();
 
       switch (stepType) {
@@ -148,6 +146,7 @@ export class PortalRecipeAction {
 
         case StepType.Endpoint: {
           if (!endpointGroups) {
+            // TODO: Sohail remove EndpointContext class
             const endpointContext = new EndpointContext(specDirectory, this.configDirectory, this.commandMetadata);
             const extractResult = await endpointContext.extractEndpointGroups();
             if (extractResult.isErr()) {
@@ -159,10 +158,8 @@ export class PortalRecipeAction {
 
           const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
           if (!endpointGroupName) return ActionResult.cancelled();
-
           const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
           if (!endpointName ) return ActionResult.cancelled()
-
           const description = await this.prompts.endpointDescriptionPrompt(
             endpointGroups,
             endpointGroupName,
@@ -175,12 +172,10 @@ export class PortalRecipeAction {
           break;
         }
       }
-
-      addAnotherStep = await this.prompts.addAnotherStepSelectionPrompt();
-      idx++;
-    } while (addAnotherStep);
+    } while (await this.prompts.addAnotherStepSelectionPrompt());
 
     const serializableRecipe = recipe.toSerializableRecipe();
+    const buildConfig = await buildContext.getBuildFileContents();
 
     // Generate the recipe
     const recipeGenerator = new PortalRecipeGenerator();
@@ -202,6 +197,7 @@ export class PortalRecipeAction {
     return ActionResult.success();
   }
 
+  // TODO: Refactor this after quick start merge
   private getBuildDirectoryStructure(recipeFileName: string): DirectoryNode {
     return {
       content: {

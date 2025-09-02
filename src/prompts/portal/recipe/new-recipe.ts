@@ -131,6 +131,7 @@ Let's get started!`;
     endpointGroupName: string,
     endpointName: string
   ): Promise<string | undefined> {
+    // TODO: Sohail, pass default description as pamater
     const defaultDescription = endpointGroups.get(endpointGroupName)!.find((e) => e.Name === endpointName)!.Description;
     const endpointDescription = await text({
       message: `Enter a description for the endpoint:`,
