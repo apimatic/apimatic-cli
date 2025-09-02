@@ -1,6 +1,5 @@
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
 import { DirectoryNode, StepType } from "../../../types/recipe/recipe.js";
-import { Result } from "neverthrow";
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
@@ -49,28 +48,13 @@ class RecipeContext {
   }
 }
 
-class EndpointContext {
-  private readonly sdlParser: SdlParser;
-
-  constructor(
-    private readonly specDirPath: DirectoryPath,
-    private readonly configDirectory: DirectoryPath,
-    private readonly commandMetadata: CommandMetadata
-  ) {
-    const portalService = new PortalService();
-    this.sdlParser = new SdlParser(portalService, this.configDirectory, this.commandMetadata);
-  }
-
-
-  async extractEndpointGroups(): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    return await this.sdlParser.getEndpointGroupsFromSdl(this.specDirPath);
-  }
-}
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
   private readonly launcherService = new LauncherService();
   private readonly fileService = new FileService();
+  private readonly portalService = new PortalService();
+  private readonly sdlParser = new SdlParser(this.portalService, this.configDirectory, this.commandMetadata);
 
   constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -128,7 +112,6 @@ export class PortalRecipeAction {
 
     let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
 
-
     do {
       const stepType = await this.prompts.stepTypeSelectionPrompt();
       if (!stepType) return ActionResult.cancelled();
@@ -146,9 +129,7 @@ export class PortalRecipeAction {
 
         case StepType.Endpoint: {
           if (!endpointGroups) {
-            // TODO: Sohail remove EndpointContext class
-            const endpointContext = new EndpointContext(specDirectory, this.configDirectory, this.commandMetadata);
-            const extractResult = await endpointContext.extractEndpointGroups();
+            const extractResult = await this.sdlParser.getEndpointGroupsFromSdl(specDirectory);
             if (extractResult.isErr()) {
               this.prompts.logError(extractResult.error);
               return ActionResult.failed();
@@ -159,12 +140,13 @@ export class PortalRecipeAction {
           const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
           if (!endpointGroupName) return ActionResult.cancelled();
           const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
-          if (!endpointName ) return ActionResult.cancelled()
-          const description = await this.prompts.endpointDescriptionPrompt(
-            endpointGroups,
-            endpointGroupName,
-            endpointName
-          );
+          if (!endpointName) return ActionResult.cancelled();
+
+          const defaultDescription = endpointGroups
+            .get(endpointGroupName)!
+            .find((e) => e.Name === endpointName)!.Description;
+
+          const description = await this.prompts.endpointDescriptionPrompt(defaultDescription);
           if (!description) return ActionResult.cancelled();
 
           recipe.addEndpointStep(stepName, description, endpointGroupName, endpointName);

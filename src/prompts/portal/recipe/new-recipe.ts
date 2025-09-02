@@ -1,5 +1,5 @@
 import treeify from "treeify";
-import { select, text, cancel, isCancel, outro, log, autocomplete, confirm } from "@clack/prompts";
+import { select, text, isCancel, outro, log, autocomplete, confirm } from "@clack/prompts";
 import { getMessageInGreenColor } from "../../../utils/utils.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
@@ -127,12 +127,8 @@ Let's get started!`;
   }
 
   public async endpointDescriptionPrompt(
-    endpointGroups: Map<string, SdlEndpoint[]>,
-    endpointGroupName: string,
-    endpointName: string
+    defaultDescription: string,
   ): Promise<string | undefined> {
-    // TODO: Sohail, pass default description as pamater
-    const defaultDescription = endpointGroups.get(endpointGroupName)!.find((e) => e.Name === endpointName)!.Description;
     const endpointDescription = await text({
       message: `Enter a description for the endpoint:`,
       placeholder: `Optional. Leave this empty to use the endpoint description defined in the API Specification`,
