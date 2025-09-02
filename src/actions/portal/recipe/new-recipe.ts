@@ -2,7 +2,7 @@ import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.j
 import { DirectoryNode, StepType } from "../../../types/recipe/recipe.js";
 import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
-import { SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { Sdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { ActionResult } from "../../action-result.js";
@@ -20,6 +20,9 @@ import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { toPascalCase } from "../../../utils/utils.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
+import { Result } from "neverthrow";
+import { TempContext } from "../../../types/temp-context.js";
+import { ok } from "assert";
 
 class RecipeContext {
   constructor(private readonly recipeName: string) {}
@@ -47,7 +50,6 @@ class RecipeContext {
     return false;
   }
 }
-
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
@@ -129,12 +131,30 @@ export class PortalRecipeAction {
 
         case StepType.Endpoint: {
           if (!endpointGroups) {
-            const extractResult = await this.sdlParser.getEndpointGroupsFromSdl(specDirectory);
-            if (extractResult.isErr()) {
-              this.prompts.logError(extractResult.error);
+            const sdlResult = await withDirPath(async (tempDirectory) => {
+              const tempContext = new TempContext(tempDirectory);
+              const specZipPath = await tempContext.zip(specDirectory);
+
+              const specFileStream = await this.fileService.getStream(specZipPath);
+
+              try {
+                const sdlResult = await this.portalService.generateSdl(
+                  specFileStream,
+                  this.configDirectory,
+                  this.commandMetadata
+                );
+
+                return sdlResult;
+              } finally {
+                specFileStream.close();
+              }
+            });
+
+            if (sdlResult.isErr()) {
+              this.prompts.logError(sdlResult.error);
               return ActionResult.failed();
             }
-            endpointGroups = extractResult.value;
+            endpointGroups = await this.sdlParser.getEndpointGroupsFromSdl(sdlResult.value);
           }
 
           const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);

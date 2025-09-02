@@ -5,14 +5,12 @@ import { err, ok, Result as ResultEx } from "neverthrow";
 import { Sdl, SdlEndpoint, SdlModel } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
-import { ZipService } from "../../../infrastructure/zip-service.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { TempContext } from "../../../types/temp-context.js";
 import { SpecContext } from "../../../types/spec-context.js";
 
 export class SdlParser {
-  private readonly zipArchiver: ZipService = new ZipService();
   private readonly fileService = new FileService();
   private readonly configDirectory: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -45,19 +43,21 @@ export class SdlParser {
     return Result.success({ endpointGroups, models });
   }
 
-  public async getEndpointGroupsFromSdl(specFolderPath: DirectoryPath): Promise<ResultEx<Map<string, SdlEndpoint[]>, string>> {
-    const sdlResult = await this.generateSdlFromSpec(specFolderPath);
+  public async getEndpointGroupsFromSdl(sdl: Sdl): Promise<Map<string, SdlEndpoint[]>> {
+    const endpointGroups = new Map<string, SdlEndpoint[]>();
+    for (const endpoint of sdl.Endpoints) {
+      if (!endpointGroups.has(endpoint.Group)) {
+        endpointGroups.set(endpoint.Group, []);
+      }
 
-    if (!sdlResult.isSuccess()) {
-      return err(
-        "Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
-      );
+      endpointGroups.get(endpoint.Group)!.push({
+        Name: endpoint.Name,
+        Description: endpoint.Description,
+        Group: endpoint.Group
+      });
     }
 
-    const sdl: Sdl = sdlResult.value!;
-    const endpointGroups = this.extractEndpointGroupsForRecipe(sdl);
-
-    return ok(endpointGroups);
+    return endpointGroups;
   }
 
   private async generateSdlFromSpec(specDirectory: DirectoryPath): Promise<Result<Sdl, string>> {
@@ -89,22 +89,6 @@ export class SdlParser {
     });
   }
 
-  private extractEndpointGroupsForRecipe(sdl: Sdl): Map<string, SdlEndpoint[]> {
-    const endpointGroups = new Map<string, SdlEndpoint[]>();
-    for (const endpoint of sdl.Endpoints) {
-      if (!endpointGroups.has(endpoint.Group)) {
-        endpointGroups.set(endpoint.Group, []);
-      }
-
-      endpointGroups.get(endpoint.Group)!.push({
-        Name: endpoint.Name,
-        Description: endpoint.Description,
-        Group: endpoint.Group
-      });
-    }
-
-    return endpointGroups;
-  }
 
   private extractModelsForToc(sdl: Sdl): TocModel[] {
     return sdl.CustomTypes.map(
