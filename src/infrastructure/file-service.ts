@@ -1,11 +1,12 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
 import * as path from "path";
-import { FilePath } from "../types/file/filePath.js";
-import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
-import { DirectoryNode } from "../types/file/directoryNode.js";
+import { FilePath } from "../types/file/filePath.js";
+import { DirectoryPath } from "../types/file/directoryPath.js";
+import { Directory } from "../types/file/directory.js";
+import { FileName } from "../types/file/fileName.js";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -46,6 +47,18 @@ export class FileService {
 
   public async copyDirectory(source: DirectoryPath, destination: DirectoryPath) {
     await fsExtra.copy(source.toString(), destination.toString());
+  }
+
+  public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
+    const entries = (await fsExtra.readdir(directoryPath.toString())).filter((entry) => entry !== ".git");
+    const results = await Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = path.join(directoryPath.toString(), entry);
+        const stat = await fsExtra.stat(fullPath);
+        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : new FileName(entry);
+      })
+    );
+    return new Directory(directoryPath, results);
   }
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
@@ -92,28 +105,6 @@ export class FileService {
 
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
-  }
-
-  public getDirectoryStructure(directoryPath: DirectoryPath, parentPath = ""): DirectoryNode {
-    const directoryStructure: DirectoryNode = {};
-
-    const items = fs.readdirSync(directoryPath.toString());
-    items.forEach((item) => {
-      if (item === ".git") return; // Skip .git directory
-
-      const itemPath = path.join(directoryPath.toString(), item);
-      const relativePath = path.join(parentPath, item);
-      const stats = fs.statSync(itemPath);
-
-      if (stats.isDirectory()) {
-        const subdirectoryStructure = this.getDirectoryStructure(new DirectoryPath(itemPath), relativePath);
-        directoryStructure[item] = subdirectoryStructure;
-      } else {
-        directoryStructure[item] = null;
-      }
-    });
-
-    return directoryStructure;
   }
 }
 

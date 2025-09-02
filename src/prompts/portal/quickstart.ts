@@ -11,6 +11,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { Directory } from "../../types/file/directory.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -219,8 +220,8 @@ export class PortalQuickstartPrompts {
     );
   }
 
-  public displayBuildDirectoryAsTree(buildDirectory: DirectoryPath): void {
-    const buildDirectoryStructure = this.fileService.getDirectoryStructure(buildDirectory) as treeify.TreeObject;
+  public async displayBuildDirectoryAsTree(buildDirectory: DirectoryPath): Promise<void> {
+    const buildDirectoryStructure = await this.fileService.getDirectory(buildDirectory);
     const buildDirectoryTreeStructure = this.createTreeStructure(buildDirectoryStructure);
     const tree = treeify.asTree(buildDirectoryTreeStructure, true, true);
     const coloredLogString = tree
@@ -242,17 +243,24 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error(getErrorMessage(error));
   }
 
-  private createTreeStructure(directoryTreeStructure: treeify.TreeObject, parentPath = ""): treeify.TreeObject {
+  private createTreeStructure(directoryTreeStructure: Directory, parentPath = ""): treeify.TreeObject {
     const result: treeify.TreeObject = {};
-    for (const key in directoryTreeStructure) {
-      const relPath = path.join(parentPath, key);
-      const desc = descriptions[path.normalize(relPath)];
-      const displayKey = desc ? `${key} : ${desc}` : key;
-
-      if (directoryTreeStructure[key] && typeof directoryTreeStructure[key] === "object") {
-        result[displayKey] = this.createTreeStructure(directoryTreeStructure[key] as treeify.TreeObject, relPath);
+    for (const item of directoryTreeStructure.items) {
+      let name: string;
+      let relPath: string;
+      if (item instanceof Directory) {
+        name = path.basename(item.directoryPath.toString());
+        relPath = path.join(parentPath, name);
       } else {
-        result[displayKey] = null as unknown as string; // keep null, not ""
+        name = item.toString();
+        relPath = path.join(parentPath, name);
+      }
+      const desc = descriptions[path.normalize(relPath)];
+      const displayKey = desc ? `${name} : ${desc}` : name;
+      if (item instanceof Directory) {
+        result[displayKey] = this.createTreeStructure(item, relPath);
+      } else {
+        result[displayKey] = null as unknown as string;
       }
     }
     return result;
