@@ -17,12 +17,15 @@ export interface SerializableStep {
   key: string;
   name: string;
   type: StepType;
-  config: ContentStepConfig | EndpointConfig;
+  config: ContentStepConfig | EndpointStepConfig;
 }
 
 export interface ContentStepConfig {
   content: string;
 }
+
+export type EndpointStepConfig = EndpointConfig
+
 
 export interface DirectoryNode {
   [key: string]: DirectoryNode | string | null | undefined;
