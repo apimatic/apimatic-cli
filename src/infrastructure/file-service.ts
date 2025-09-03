@@ -50,7 +50,7 @@ export class FileService {
   }
 
   public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
-    const entries = (await fsExtra.readdir(directoryPath.toString())).filter((entry) => entry !== ".git");
+    const entries = await fsExtra.readdir(directoryPath.toString());
     const results = await Promise.all(
       entries.map(async (entry) => {
         const fullPath = path.join(directoryPath.toString(), entry);
@@ -97,6 +97,10 @@ export class FileService {
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
     const writeStream = fs.createWriteStream(filePath.toString());
     await streamPipeline(stream, writeStream);
+  }
+
+  public async ensurePathExists(filePath: FilePath) {
+    await fsExtra.ensureFile(filePath.toString());
   }
 
   public async writeContents(filePath: FilePath, contents: string) {

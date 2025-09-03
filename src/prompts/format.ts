@@ -1,6 +1,6 @@
 import pc from "picocolors";
 import { Result } from "neverthrow";
-import { intro as i, outro as o, spinner } from "@clack/prompts";
+import { intro as i, outro as o, spinner } from '@clack/prompts';
 import { ActionResult } from "../actions/action-result.js";
 import { Directory } from "../types/file/directory.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
@@ -10,9 +10,9 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
-  link: (text: string) => pc.blue(`${text}`), // TODO: merge with Saeed's implementation
+  cmd: (cmd: string, ...args: string[]) => `${pc.blue(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
+  link: (text: string) => pc.underline(pc.blue(text)),
   description: (text: string) => pc.greenBright(`${text}`), // TODO: merge with Saeed's implementation
-  cmd: (cmd: string, topic: string, action: string) => `${pc.blue(cmd)} ${pc.dim(topic)} ${pc.dim(action)}`,
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
       return `${pc.green(`--${name}`)}=${pc.dim(value)}`;
@@ -52,7 +52,7 @@ export async function withSpinner<T, E>(intro: string, success: string, failure:
   const s = spinner({
     cancelMessage: "cancelled",
     errorMessage: "failed",
-    frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    frames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
   });
   s.start(intro);
   const result = await fn;
