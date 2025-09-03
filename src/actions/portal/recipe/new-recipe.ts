@@ -154,10 +154,10 @@ export class PortalRecipeAction {
       serializableRecipe,
       buildConfig,
       tocData,
-      tocContext.tocPath.toString(),
+      tocContext.tocPath,
       recipeName,
-      recipeFileName.toString(),
-      buildContext.BuildFile.toString(),
+      recipeFileName,
+      buildContext.BuildFile,
       contentDirectory
     );
 

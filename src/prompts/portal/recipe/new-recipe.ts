@@ -67,11 +67,12 @@ Let's get started!`;
 
   public displayStepsInformation(): void {
     log.step(`Add Steps to your API Recipe:`);
-    log.message(`You can add:`);
-    log.message(`1. Content Step: Display custom content, such as instructions or information related to your API.`);
-    log.message(`2. Endpoint Step: Display an API endpoint, its playground and other relevant details.`);
-    log.message(`Steps appear in the order you add them.`);
-    log.message(`Let's proceed to adding steps to your API Recipe.`);
+    const message = `You can add:
+1. Content Step: Display custom content, such as instructions or information related to your API.
+2. Endpoint Step: Display an API endpoint, its playground and other relevant details.
+Steps appear in the order you add them.
+Let's proceed to adding steps to your API Recipe.`;
+    log.message(message);
   }
 
   public async stepTypeSelectionPrompt(): Promise<StepType | undefined> {
