@@ -1,4 +1,4 @@
-import { SerializableRecipe } from "../../../types/recipe/recipe.js";
+import { SerializableRecipe, StepType } from "../../../types/recipe/recipe.js";
 
 export class PortalRecipe {
   private readonly recipe: SerializableRecipe;
@@ -10,32 +10,26 @@ export class PortalRecipe {
     };
   }
 
-  addContentStep(key: string, name: string, content: string): this {
+  addContentStep(key: string, content: string) {
     this.recipe.steps.push({
       key,
-      name,
-      type: 'content',
+      name: key, //TODO: Check if key is required
+      type: StepType.Content,
       config: { content }
     });
-    return this;
   }
 
-  addEndpointStep(
-    key: string, 
-    name: string, 
-    description: string,
-    endpointPermalink: string
-  ): this {
+  addEndpointStep(key: string, description: string, endpointGroupName: string, endpointName: string) {
+    const endpointPermalink = `$e/${[endpointGroupName, endpointName].map(encodeURIComponent).join("/")}`;
     this.recipe.steps.push({
       key,
-      name,
-      type: 'endpoint',
+      name: key, //TODO: Check if key is required
+      type: StepType.Endpoint,
       config: {
         description,
-        endpointPermalink,
+        endpointPermalink
       }
     });
-    return this;
   }
 
   toSerializableRecipe(): SerializableRecipe {

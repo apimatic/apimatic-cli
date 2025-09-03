@@ -1,3 +1,5 @@
+import { DirectoryPath } from "../file/directoryPath.js";
+
 export interface BuildConfig {
   generatePortal?: PortalConfig;
   apiCopilotConfig?: CopilotConfig;
@@ -8,6 +10,7 @@ export interface PortalConfig {
   contentFolder?: string;
   languageConfig: { [key: string]: object };
   [key: string]: unknown;
+  apiSpecPath?: DirectoryPath;
 }
 
 export interface CopilotConfig {

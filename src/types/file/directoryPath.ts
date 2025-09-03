@@ -12,8 +12,12 @@ export class DirectoryPath {
     return this.directoryPath;
   }
 
-  public join(subPath: string) {
-    return new DirectoryPath(path.join(this.directoryPath, subPath));
+  public join(...subPath: string[]) {
+    return new DirectoryPath(path.join(this.directoryPath, ...subPath));
+  }
+
+  public joinWith(other: DirectoryPath) {
+    return new DirectoryPath(path.join(this.directoryPath, other.toString()));
   }
 
   public isEqual(other: DirectoryPath) {

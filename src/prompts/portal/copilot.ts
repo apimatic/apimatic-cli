@@ -1,4 +1,4 @@
-import { confirm, isCancel, log, note, outro, select } from "@clack/prompts";
+import { confirm, isCancel, log, note, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";

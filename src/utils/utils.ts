@@ -13,6 +13,101 @@ export const createTempDirectory = async () => {
   return fs.mkdtempSync(path.join(os.tmpdir(), "apimatic-cli-"));
 };
 
+export const clearDirectory = async (folderPath: string) => {
+  if (!fs.existsSync(folderPath)) {
+    throw new Error(`Directory ${folderPath} does not exist`);
+  }
+
+  const files = await fsExtra.readdir(folderPath);
+
+  for (const file of files) {
+    const filePath = path.join(folderPath, file);
+    await deleteFile(filePath);
+  }
+
+  await deleteFile(folderPath);
+};
+
+// TODO: Move to types folder.
+interface DirectoryNode {
+  [key: string]: DirectoryNode | string | null | undefined;
+}
+
+// TODO: Move to portal quickstart command.
+const descriptions: { [key: string]: string } = Object.entries({
+  "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes",
+  spec: "# Contains all API definition files",
+  content: "# Includes custom documentation pages in Markdown",
+  "content/toc.yml": "# Controls the structure of the side navigation bar in the API portal",
+  static: "# Includes all static files, such as images, GIFs, and PDFs"
+}).reduce((acc, [key, value]) => {
+  acc[path.normalize(key)] = value;
+  return acc;
+}, {} as { [key: string]: string });
+
+// TODO: Move to portal quickstart command.
+export const directoryToJson = (dirPath: string, parentPath = ""): DirectoryNode => {
+  const directoryStructure: DirectoryNode = {};
+
+  const items = fs.readdirSync(dirPath);
+  items.forEach((item) => {
+    if (item === ".git") return; // Skip .git directory
+
+    const itemPath = path.join(dirPath, item);
+    const relativePath = path.join(parentPath, item);
+    const stats = fs.statSync(itemPath);
+
+    if (stats.isDirectory()) {
+      const subdirectoryStructure = directoryToJson(itemPath, relativePath);
+
+      const folderName = descriptions[path.normalize(relativePath)]
+        ? `${item} : ${descriptions[path.normalize(relativePath)]}`
+        : item;
+
+      directoryStructure[folderName] = subdirectoryStructure;
+    } else {
+      directoryStructure[
+        descriptions[path.normalize(relativePath)] ? `${item} : ${descriptions[path.normalize(relativePath)]}` : item
+      ] = null;
+    }
+  });
+
+  return directoryStructure;
+};
+
+export const toPascalCase = (str: string): string => {
+    return str
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join("");
+  }
+
+export const isValidUrl = (input: string): boolean => {
+  if (!input) {
+    return false;
+  }
+
+  try {
+    const url = new URL(input);
+
+    if (!["http:", "https:"].includes(url.protocol)) {
+      return false;
+    }
+
+    if (url.protocol === "file:" || fs.existsSync(input)) {
+      return false;
+    }
+
+    if (!url.host) {
+      return false;
+    }
+
+    return true;
+  } catch (_) {
+    return false;
+  }
+};
+
 export const deleteFile = async (filePath: string) => {
   return await fsExtra.remove(filePath);
 };

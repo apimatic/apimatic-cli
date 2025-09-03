@@ -1,12 +1,35 @@
-import { cancel, outro, confirm, spinner, isCancel, log } from "@clack/prompts";
+import { cancel, confirm, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
+import { Result } from "neverthrow";
+import { SdlTocComponents } from "../../../types/spec-context.js";
+import { format as f, format, withSpinner } from "../../format.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { ServiceError } from "../../../infrastructure/api-utils.js";
+import { Sdl } from "../../../types/sdl/sdl.js";
 
 export class PortalNewTocPrompts {
-  private readonly spin = spinner();
+  public sdlComponentsExtractionFailed() {
+    log.error(
+      "Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
+    );
+  }
 
-  async overwriteExistingTocPrompt(tocPath: FilePath): Promise<boolean> {
+  public extractSdlComponents(fn: Promise<Result<SdlTocComponents, string>>) {
+    return withSpinner(
+      "Extracting endpoints and/or models from the API specification",
+      "Extraction successful.",
+      "Extraction failed.",
+      fn
+    );
+  }
+
+  public generateTOC(fn: Promise<Result<FilePath, string>>) {
+    return withSpinner("Generating TOC", "TOC generated successfully.", "TOC generation failed.", fn);
+  }
+
+  public async overwriteToc(tocPath: FilePath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `⚠️ The destination file '${tocPath}' already exists, do you want to overwrite it?`,
+      message: `The destination file '${tocPath}' already exists, do you want to overwrite it?`,
       initialValue: false
     });
 
@@ -15,34 +38,46 @@ export class PortalNewTocPrompts {
       return false;
     }
 
-    if (!overwrite) {
-      log.error("Please enter a different destination path or delete the existing toc.yml file and try again.");
-    }
-
     return overwrite;
   }
 
-  startProgressIndicatorWithMessage(message: string): void {
-    this.spin.start(message);
+  public contentGroupsExtractionFailed() {
+    log.error(`Failed to extract content groups.`);
   }
 
-  stopProgressIndicatorWithMessage(message: string): void {
-    this.spin.stop(message);
+  public fallingBackToDefault() {
+    log.warn(`Falling back to default TOC structure.`);
+  }
+
+  public tocFileAlreadyExists() {
+    const message = `Please enter a different destination path or delete the existing toc.yml file and try again.`;
+    log.error(message);
+  }
+
+  public logError(message: string) {
+    log.error(message);
   }
 
   displayOutroMessage(tocPath: FilePath): void {
-    outro(`toc.yml file successfully created at: ${tocPath}`);
+    log.info(`${format.var("toc.yml")} file successfully created at: ${format.path(tocPath.toString())}`);
   }
 
-  logError(error: string): void {
-    outro(error);
+  public contentDirectoryNotFound(contentFolderPath: DirectoryPath) {
+    const message = `Content folder not found at: ${contentFolderPath}`;
+    log.error(message);
   }
 
-  displayWarning(message: string): void {
-    log.warning(message);
+  public invalidBuildDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    log.error(message);
   }
 
-  displayInfo(message: string): void {
-    log.step(message);
+  public extractModels(fn: Promise<Result<Sdl, ServiceError>>) {
+    return withSpinner(
+      "Extracting endpoint groups and models",
+      "Endpoint groups and models extracted.",
+      "Endpoint groups and models extraction failed.",
+      fn
+    );
   }
 }

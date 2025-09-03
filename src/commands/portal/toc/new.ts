@@ -1,10 +1,11 @@
-import { Command, Config, Flags } from "@oclif/core";
+import { Command, Flags } from "@oclif/core";
 import { PortalNewTocAction } from "../../../actions/portal/toc/new-toc.js";
 import { TelemetryService } from "../../../infrastructure/services/telemetry-service.js";
 import { TocCreationFailedEvent } from "../../../types/events/toc-creation-failed.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../../types/flags-provider.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
+import { format, intro, outro } from "../../../prompts/format.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -17,72 +18,84 @@ generation of your API documentation portal.
 The output is a YAML file with the .yml extension.
 
 To learn more about the TOC file and APIMatic build directory structure, visit:
-https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal`;
+${format.link(
+  "https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal"
+)}`;
 
   static flags = {
-    ...FlagsProvider.destination("src/content", `'toc.yml'`),
+    ...FlagsProvider.destination("src/content", `toc.yml`),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
     "expand-endpoints": Flags.boolean({
       default: false,
-      description:
-        "include individual entries for each endpoint in the generated 'toc.yml'. Requires a valid API specification in the working directory."
+      description: `include individual entries for each endpoint in the generated ${format.path(
+        "toc.yml"
+      )}. Requires a valid API specification in the working directory.`
     }),
     "expand-models": Flags.boolean({
       default: false,
-      description:
-        "include individual entries for each model in the generated 'toc.yml'. Requires a valid API specification in the working directory."
+      description: `include individual entries for each model in the generated ${format.path(
+        "toc.yml"
+      )}. Requires a valid API specification in the working directory.`
     })
   };
 
+  static cmdTxt = format.cmd("apimatic", "portal", "toc", "new");
   static examples = [
-    `apimatic portal toc new --destination="./src/content/"`,
-    `apimatic portal toc new --input="./"`,
-    `apimatic portal toc new --input="./" --destination="./src/content/"`
+    `${this.cmdTxt} ${format.flag("destination", '"./src/content/"')}`,
+    `${this.cmdTxt} ${format.flag("input", '"./"')}`,
+    `${this.cmdTxt} ${format.flag("input", '"./"')} ${format.flag("destination", '"./src/content/"')}`
   ];
 
-  constructor(argv: string[], config: Config) {
-    super(argv, config);
-  }
-
   async run(): Promise<void> {
-    const { flags } = await this.parse(PortalTocNew);
+    const {
+      flags: {
+        input,
+        destination,
+        force,
+        "expand-endpoints": expandEndpoints,
+        "expand-models": expandModels
+      }
+    } = await this.parse(PortalTocNew);
+
+    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
+    const tocDirectory = destination? new DirectoryPath(destination): undefined;
+
     const commandMetadata: CommandMetadata = {
       commandName: PortalTocNew.id,
       shell: this.config.shell
     };
 
-    const telemetryService = new TelemetryService(this.getConfigDir());
-    const portalNewTocAction = new PortalNewTocAction(this.getConfigDir(), commandMetadata);
-
-    const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
-    const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
-
-    let tocDirectory: DirectoryPath | undefined;
-
-    if (flags.destination) {
-      tocDirectory = new DirectoryPath(flags.destination);
-    }
-
-    const result = await portalNewTocAction.createToc(
+    intro("New TOC");
+    const action = new PortalNewTocAction(new DirectoryPath(this.config.configDir), commandMetadata);
+    const result = await action.execute(
       buildDirectory,
       tocDirectory,
-      flags.force,
-      flags["expand-endpoints"],
-      flags["expand-models"]
+      force,
+      expandEndpoints,
+      expandModels
     );
+    outro(result);
 
-    //TODO: Add a mapper for automatically mapping events to logger and telemetry service.
-    if (result.isFailed()) {
-      await telemetryService.trackEvent(
-        new TocCreationFailedEvent(result.error!, PortalTocNew.id, flags),
-        commandMetadata.shell
-      );
-      this.error(result.error!);
-    }
+    result.mapAll(
+      () => {},
+      async () => {
+        const telemetryService = new TelemetryService(new DirectoryPath(this.config.configDir));
+        await telemetryService.trackEvent(
+          // TODO: fix Toc error message
+          new TocCreationFailedEvent('error', PortalTocNew.id, {
+            input,
+            destination,
+            force,
+            "expand-endpoints": expandEndpoints,
+            "expand-models": expandModels
+          }),
+          commandMetadata.shell
+        );
+      },
+      () => {}
+    );
   }
 
-  private getConfigDir(): DirectoryPath {
-    return new DirectoryPath(this.config.configDir);
-  }
 }
