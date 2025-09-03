@@ -1,7 +1,7 @@
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
-import { DirectoryNode, StepType } from "../../../types/recipe/recipe.js";
+import { StepType } from "../../../types/recipe/recipe.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
-import { Sdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { getEndpointDescription, getEndpointGroupsFromSdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { ActionResult } from "../../action-result.js";
@@ -9,7 +9,6 @@ import { TocContext } from "../../../types/toc-context.js";
 import { FileName } from "../../../types/file/fileName.js";
 import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
 import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
-import { TreeObject } from "treeify";
 import { BuildContext } from "../../../types/build-context.js";
 import { ContentContext } from "../toc/new-toc.js";
 import { SpecContext } from "../../../types/spec-context.js";
@@ -122,7 +121,7 @@ export class PortalRecipeAction {
               this.prompts.serviceError(sdlResult.error);
               return ActionResult.failed();
             }
-            endpointGroups = PortalRecipeAction.getEndpointGroupsFromSdl(sdlResult.value);
+            endpointGroups = getEndpointGroupsFromSdl(sdlResult.value);
           }
 
           const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
@@ -130,11 +129,7 @@ export class PortalRecipeAction {
           const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
           if (!endpointName) return ActionResult.cancelled();
 
-          const defaultDescription = PortalRecipeAction.getEndpointDescription(
-            endpointGroups,
-            endpointGroupName,
-            endpointName
-          );
+          const defaultDescription = getEndpointDescription(endpointGroups, endpointGroupName, endpointName);
           const description = await this.prompts.endpointDescriptionPrompt(defaultDescription);
           if (!description) return ActionResult.cancelled();
 
@@ -146,67 +141,44 @@ export class PortalRecipeAction {
     } while (await this.prompts.addAnotherStepSelectionPrompt());
 
     const serializableRecipe = recipe.toSerializableRecipe();
-    const buildConfig = await buildContext.getBuildFileContents();
 
     // Generate the recipe
     const recipeGenerator = new PortalRecipeGenerator();
     await recipeGenerator.createRecipe(
       serializableRecipe,
-      buildConfig,
       tocData,
       tocContext.tocPath,
       recipeName,
       recipeFileName,
-      buildContext.BuildFile,
+      buildContext,
       contentDirectory
     );
 
+    // TODO: Sheild fix this toc final
     // Display build directory structure
-    const buildDirectoryStructure = this.getBuildDirectoryStructure(recipeFileName.toString());
-    this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
+    // const buildDirectoryStructure = this.getBuildDirectoryStructure(recipeFileName.toString());
+    // this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
 
     return ActionResult.success();
   }
 
   // TODO: Refactor this after quick start merge
-  private getBuildDirectoryStructure(recipeFileName: string): DirectoryNode {
-    return {
-      content: {
-        "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
-      },
-      static: {
-        scripts: {
-          recipes: {
-            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
-          }
-        }
-      }
-    };
-  }
-
-  private static getEndpointGroupsFromSdl(sdl: Sdl): Map<string, SdlEndpoint[]> {
-    const endpointGroups = new Map<string, SdlEndpoint[]>();
-    for (const endpoint of sdl.Endpoints) {
-      if (!endpointGroups.has(endpoint.Group)) {
-        endpointGroups.set(endpoint.Group, []);
-      }
-
-      endpointGroups.get(endpoint.Group)!.push({
-        Name: endpoint.Name,
-        Description: endpoint.Description,
-        Group: endpoint.Group
-      });
-    }
-    return endpointGroups;
-  }
-
-  private static getEndpointDescription(
-    endpointGroups: Map<string, SdlEndpoint[]>,
-    endpointGroupName: string,
-    endpointName: string
-  ): string {
-    return endpointGroups.get(endpointGroupName)!.find((e) => e.Name === endpointName)!.Description;
-  }
+  // private getBuildDirectoryStructure(recipeFileName: string): Directory {
+  //
+  //   const content = new Directory(new )
+  //   return {
+  //     content: {
+  //       "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
+  //     },
+  //     static: {
+  //       scripts: {
+  //         recipes: {
+  //           [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
+  //         }
+  //       }
+  //     }
+  //   };
+  // }
 
   private async promptForContent(): Promise<string> {
     return await withDirPath(async (tempDir) => {

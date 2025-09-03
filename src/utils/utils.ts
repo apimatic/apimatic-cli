@@ -1,7 +1,6 @@
 import * as path from "path";
 import { Buffer } from "buffer";
 import stripTags from "striptags";
-import colors from "picocolors";
 
 export const replaceHTML = (string: string) => {
   return stripTags(string);
@@ -20,10 +19,9 @@ export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promis
   return JSON.parse(text);
 }
 
-export const getMessageInGreenColor = (message: string) => {
-  return colors.greenBright(message);
-};
-
-export const getMessageInRedColor = (message: string) => {
-  return colors.redBright(message);
+export const toPascalCase = (str: string): string => {
+  return str
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join("");
 };

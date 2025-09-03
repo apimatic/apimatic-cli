@@ -28,13 +28,13 @@ ${format.link(
     ...FlagsProvider.force,
     "expand-endpoints": Flags.boolean({
       default: false,
-      description: `include individual entries for each endpoint in the generated ${format.path(
+      description: `include individual entries for each endpoint in the generated ${format.var(
         "toc.yml"
       )}. Requires a valid API specification in the working directory.`
     }),
     "expand-models": Flags.boolean({
       default: false,
-      description: `include individual entries for each model in the generated ${format.path(
+      description: `include individual entries for each model in the generated ${format.var(
         "toc.yml"
       )}. Requires a valid API specification in the working directory.`
     })
@@ -49,18 +49,12 @@ ${format.link(
 
   async run(): Promise<void> {
     const {
-      flags: {
-        input,
-        destination,
-        force,
-        "expand-endpoints": expandEndpoints,
-        "expand-models": expandModels
-      }
+      flags: { input, destination, force, "expand-endpoints": expandEndpoints, "expand-models": expandModels }
     } = await this.parse(PortalTocNew);
 
     const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const tocDirectory = destination? new DirectoryPath(destination): undefined;
+    const tocDirectory = destination ? new DirectoryPath(destination) : undefined;
 
     const commandMetadata: CommandMetadata = {
       commandName: PortalTocNew.id,
@@ -69,13 +63,7 @@ ${format.link(
 
     intro("New TOC");
     const action = new PortalNewTocAction(new DirectoryPath(this.config.configDir), commandMetadata);
-    const result = await action.execute(
-      buildDirectory,
-      tocDirectory,
-      force,
-      expandEndpoints,
-      expandModels
-    );
+    const result = await action.execute(buildDirectory, tocDirectory, force, expandEndpoints, expandModels);
     outro(result);
 
     result.mapAll(
@@ -84,7 +72,7 @@ ${format.link(
         const telemetryService = new TelemetryService(new DirectoryPath(this.config.configDir));
         await telemetryService.trackEvent(
           // TODO: fix Toc error message
-          new TocCreationFailedEvent('error', PortalTocNew.id, {
+          new TocCreationFailedEvent("error", PortalTocNew.id, {
             input,
             destination,
             force,
@@ -97,5 +85,4 @@ ${format.link(
       () => {}
     );
   }
-
 }

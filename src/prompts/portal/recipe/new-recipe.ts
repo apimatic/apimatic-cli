@@ -1,6 +1,4 @@
-import treeify from "treeify";
 import { select, text, isCancel, log, autocomplete, confirm } from "@clack/prompts";
-import { getMessageInGreenColor } from "../../../utils/utils.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { format as f } from "../../format.js";
@@ -170,19 +168,8 @@ Let's proceed to adding steps to your API Recipe.`;
     log.step(`Step has been added successfully.`);
   }
 
-  public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: treeify.TreeObject) {
-    const tree = treeify.asTree(buildDirectoryTreeObject, true, true);
-
-    const coloredLogString = tree
-      .split("\n")
-      .map((line: string) => line.replace(/#.*/, (match: string) => getMessageInGreenColor(match)))
-      .join("\n");
-
-    log.step(`You can edit the following files to customize your API Recipe:\n\n` + coloredLogString);
-  }
-
   public invalidBuildDirectory(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }
 

@@ -25,8 +25,3 @@ export interface ContentStepConfig {
 }
 
 export type EndpointStepConfig = EndpointConfig
-
-
-export interface DirectoryNode {
-  [key: string]: DirectoryNode | string | null | undefined;
-}

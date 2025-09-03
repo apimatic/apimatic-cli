@@ -15,16 +15,11 @@ export class RecipeContext {
       return false;
     }
 
-    // Check if recipe name or file name already exists
+    // Check if the recipe name or file name already exists
     const existingRecipe = apiRecipesGroup.items.find(
       (item) =>
         "page" in item && "file" in item && (item.page === recipeName || item.file === `recipes/${recipeFileName}.md`)
     );
-
-    if (existingRecipe) {
-      return true;
-    }
-
-    return false;
+    return !!existingRecipe;
   }
 }

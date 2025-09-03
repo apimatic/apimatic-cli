@@ -17,7 +17,7 @@ import {
   Platforms
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils.js";
+import { parseStreamBodyToJson } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Sdl } from "../../types/sdl/sdl.js";
 import { FilePath } from "../../types/file/filePath.js";
@@ -25,7 +25,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { err, ok, Result} from "neverthrow";
+import { err, ok, Result } from "neverthrow";
 import { Language } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../api-utils.js";
 
@@ -122,7 +122,7 @@ export class PortalService {
       } else {
         return err(ServiceError.InvalidResponse);
       }
-    } catch(error) {
+    } catch (error) {
       return err(handleServiceError(error));
     }
   }
@@ -140,25 +140,44 @@ export class PortalService {
 
   private static handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
     if (error instanceof UnauthorizedResponseError) {
-      //401
+      // 401
       return error.result?.message ?? "Authorization has been denied for this request.";
-    } else if (error instanceof ProblemDetailsError) {
-      //400 & 403
+    }
+    if (error instanceof ProblemDetailsError) {
+      // 400 & 403
       const probDetailsError = error as ProblemDetailsError;
       const message = Object.values(probDetailsError.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
       return error.result!.title + "\n- " + message;
-    } else if (error instanceof ApiError && error.statusCode === 422) {
-      //422
+    }
+    if (error instanceof ApiError && error.statusCode === 422) {
+      // 422
       return error.body as NodeJS.ReadableStream;
-    } else if (error instanceof InternalServerErrorResponseError) {
-      //500
+    }
+    if (error instanceof InternalServerErrorResponseError) {
+      // 422
       const message = error.result?.message;
       return `${
         message ?? "An unknown error occurred."
       } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`;
-    } else {
-      return "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
     }
+    return "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+  };
+
+  private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
+    if (error instanceof BadRequestResponseSdkError) {
+      //400
+      return this.parseBadRequestResponse(error.result?.message);
+    }
+    if (error instanceof UnauthorizedResponseError) {
+      //401
+      return error.result?.message ?? "Authorization has been denied for this request.";
+    }
+    if (error instanceof ProblemDetailsError) {
+      // 403
+      const message = (error.result!.errors as Record<string, string[]>)?.[""]?.[0];
+      return error.result!.title + "\n- " + message;
+    }
+    return "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
   };
 
   private parseBadRequestResponse(errorMessage: string | undefined): string {
@@ -169,39 +188,17 @@ export class PortalService {
     // Parse the JSON string
     const parsedResult = JSON.parse(errorMessage);
 
-    // Check if it has the expected structure with Errors array
+    // Check if it has the expected structure with Errors
     if (parsedResult.Errors && Array.isArray(parsedResult.Errors) && parsedResult.Errors.length > 0) {
       // Get the first error and clean it up
       const firstError = parsedResult.Errors[0];
-      // Split on <br/> and take first part, then strip remaining HTML tags
+      // Split on <br/> and take the first part, then strip remaining HTML tags
       return firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
     } else if (parsedResult.Success === false) {
       return "API definition file validation failed.";
     }
     return errorMessage;
   }
-
-  private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
-    if (error instanceof BadRequestResponseSdkError) {
-      //400
-      const badRequestError = error as BadRequestResponseSdkError;
-      const errorMessage = this.parseBadRequestResponse(badRequestError.result?.message);
-      return getMessageInRedColor(errorMessage);
-    } else if (error instanceof UnauthorizedResponseError) {
-      //401
-      const unAuthError = error as UnauthorizedResponseError;
-      return getMessageInRedColor(unAuthError.result?.message ?? "Authorization has been denied for this request.");
-    } else if (error instanceof ProblemDetailsError) {
-      // 403
-      const probDetailsError = error as ProblemDetailsError;
-      const message = (probDetailsError.result!.errors as Record<string, string[]>)?.[""]?.[0];
-      return getMessageInRedColor(probDetailsError.result!.title + "\n- " + message);
-    } else {
-      return getMessageInRedColor(
-        "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io"
-      );
-    }
-  };
 
   private readonly languagePlatform: Record<Language, Platforms> = {
     [Language.CSHARP]: Platforms.CsNetStandardLib,

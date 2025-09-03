@@ -3,10 +3,10 @@ import { stringify } from "yaml";
 import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../../types/recipe/recipe.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { FileService } from "../../../infrastructure/file-service.js";
-import { BuildConfig } from "../../../types/build/build.js";
 import { Toc } from "../../../types/toc/toc.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { FileName } from "../../../types/file/fileName.js";
+import { BuildContext } from "../../../types/build-context.js";
 
 export class PortalRecipeGenerator {
   //TODO: Replace tocFileContent any type with concrete type.
@@ -14,16 +14,15 @@ export class PortalRecipeGenerator {
 
   public async createRecipe(
     recipe: SerializableRecipe,
-    buildConfig: BuildConfig,
     tocFileContent: Toc,
     tocFilePath: FilePath,
     recipeName: string,
     recipeFileName: FileName,
-    buildConfigFilePath: FilePath,
+    buildContext: BuildContext,
     contentFolderPath: DirectoryPath
   ) {
     await this.addRecipeToToc(tocFileContent, tocFilePath, recipeName, recipeFileName);
-    await this.registerRecipeInBuildConfigFile(buildConfig, recipeName, recipeFileName, buildConfigFilePath);
+    await this.registerRecipeInBuildConfigFile(buildContext, recipeName, recipeFileName);
     await this.createMarkdownFile(recipeFileName, contentFolderPath);
 
     const generatedRecipeScript = await this.createScriptFromRecipe(recipe);
@@ -72,11 +71,12 @@ export class PortalRecipeGenerator {
   }
 
   private async registerRecipeInBuildConfigFile(
-    buildConfig: BuildConfig,
+    buildContext: BuildContext,
     recipeName: string,
     recipeFileName: FileName,
-    buildConfigFilePath: FilePath
   ): Promise<void> {
+
+    const buildConfig = await buildContext.getBuildFileContents();
     if (!buildConfig.recipes) {
       buildConfig.recipes = {};
     }
@@ -104,16 +104,7 @@ export class PortalRecipeGenerator {
       recipesConfig.workflows.push(newWorkflow);
     }
 
-    await this.writeRecipesConfigToBuildConfigFile(recipesConfig, buildConfigFilePath);
-  }
-
-  private async writeRecipesConfigToBuildConfigFile(recipesConfig: string, buildConfigFilePath: FilePath): Promise<void> {
-    const fileData = await this.fileService.getContents(buildConfigFilePath);
-    const buildConfig = JSON.parse(fileData);
-
-    buildConfig.recipes = recipesConfig;
-
-    await this.fileService.writeContents(buildConfigFilePath, JSON.stringify(buildConfig, null, 2));
+    await buildContext.updateBuildFileContents(buildConfig)
   }
 
   private async createMarkdownFile(recipeFileName: FileName, contentFolder: DirectoryPath): Promise<void> {
@@ -121,8 +112,7 @@ export class PortalRecipeGenerator {
     const markdownFileContent = this.getMarkdownFileContent();
 
     await this.fileService.directoryExists(directory);
-    this.fileService.writeContents(new FilePath(directory, new FileName(`${recipeFileName}.md`)), markdownFileContent);
-
+    await this.fileService.writeContents(new FilePath(directory, new FileName(`${recipeFileName}.md`)), markdownFileContent);
   }
 
   private async createScriptFromRecipe(recipe: SerializableRecipe): Promise<string> {

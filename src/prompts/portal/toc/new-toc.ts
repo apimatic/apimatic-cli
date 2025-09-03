@@ -1,27 +1,12 @@
 import { cancel, confirm, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
 import { Result } from "neverthrow";
-import { SdlTocComponents } from "../../../types/spec-context.js";
-import { format as f, format, withSpinner } from "../../format.js";
+import { format as f, withSpinner } from "../../format.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ServiceError } from "../../../infrastructure/api-utils.js";
 import { Sdl } from "../../../types/sdl/sdl.js";
 
 export class PortalNewTocPrompts {
-  public sdlComponentsExtractionFailed() {
-    log.error(
-      "Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
-    );
-  }
-
-  public extractSdlComponents(fn: Promise<Result<SdlTocComponents, string>>) {
-    return withSpinner(
-      "Extracting endpoints and/or models from the API specification",
-      "Extraction successful.",
-      "Extraction failed.",
-      fn
-    );
-  }
 
   public generateTOC(fn: Promise<Result<FilePath, string>>) {
     return withSpinner("Generating TOC", "TOC generated successfully.", "TOC generation failed.", fn);
@@ -41,10 +26,6 @@ export class PortalNewTocPrompts {
     return overwrite;
   }
 
-  public contentGroupsExtractionFailed() {
-    log.error(`Failed to extract content groups.`);
-  }
-
   public fallingBackToDefault() {
     log.warn(`Falling back to default TOC structure.`);
   }
@@ -58,17 +39,13 @@ export class PortalNewTocPrompts {
     log.error(message);
   }
 
-  displayOutroMessage(tocPath: FilePath): void {
-    log.info(`${format.var("toc.yml")} file successfully created at: ${format.path(tocPath.toString())}`);
-  }
-
   public contentDirectoryNotFound(contentFolderPath: DirectoryPath) {
     const message = `Content folder not found at: ${contentFolderPath}`;
     log.error(message);
   }
 
   public invalidBuildDirectory(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }
 
