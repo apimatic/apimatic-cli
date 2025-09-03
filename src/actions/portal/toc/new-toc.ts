@@ -6,10 +6,13 @@ import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { ActionResult } from "../../action-result.js";
 import { TocContext } from "../../../types/toc-context.js";
-import { SpecContext } from "../../../types/spec-context.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { BuildContext } from "../../../types/build-context.js";
+import { getEndpointGroupsAndModels } from "../../../types/sdl/sdl.js";
+import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
+import { TempContext } from "../../../types/temp-context.js";
+import { PortalService } from "../../../infrastructure/services/portal-service.js";
 
 export class ContentContext {
   private readonly fileService = new FileService();
@@ -34,6 +37,8 @@ type SdlComponents = {
 export class PortalNewTocAction {
   private readonly prompts: PortalNewTocPrompts = new PortalNewTocPrompts();
   private readonly tocGenerator: TocStructureGenerator = new TocStructureGenerator();
+  private readonly fileService = new FileService();
+  private readonly portalService = new PortalService();
 
   constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -44,15 +49,16 @@ export class PortalNewTocAction {
     expandEndpoints: boolean = false,
     expandModels: boolean = false
   ): Promise<ActionResult> {
-
     // Validate build directory
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
       this.prompts.invalidBuildDirectory(buildDirectory);
       return ActionResult.failed();
     }
+    const buildConfig = await buildContext.getBuildFileContents();
+    const contentDirectory = buildDirectory.join(buildConfig.generatePortal?.contentFolder ?? "content");
 
-    const tocDir = tocDirectory ?? buildDirectory.join("content");
+    const tocDir = tocDirectory ?? contentDirectory;
     const tocContext = new TocContext(tocDir);
 
     if (!force && (await tocContext.exists()) && !(await this.prompts.overwriteToc(tocContext.tocPath))) {
@@ -63,14 +69,27 @@ export class PortalNewTocAction {
     let sdlComponents: SdlComponents = { endpointGroups: new Map(), models: [] };
     if (expandEndpoints || expandModels) {
       const specDirectory = buildDirectory.join("spec");
-      const specContext = new SpecContext(specDirectory);
 
-      const isValid = await specContext.validate();
-      if (!isValid) {
-        this.prompts.specNotFound();
+      if (!(await this.fileService.directoryExists(specDirectory))) {
         this.prompts.fallingBackToDefault();
       } else {
-        const sdlResult = await specContext.extractSdlComponents(this.configDirectory, this.commandMetadata);
+        const sdlResult = await withDirPath(async (tempDirectory) => {
+          const tempContext = new TempContext(tempDirectory);
+          const specZipPath = await tempContext.zip(specDirectory);
+          const specFileStream = await this.fileService.getStream(specZipPath);
+          try {
+            const result = await this.prompts.extractModels(
+              this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata)
+            );
+            if (result.isErr()) {
+              return err(result.error);
+            }
+            return ok(getEndpointGroupsAndModels(result.value));
+          } finally {
+            specFileStream.close();
+          }
+        });
+
         if (sdlResult.isErr()) {
           this.prompts.logError(sdlResult.error);
           return ActionResult.failed();
@@ -78,12 +97,6 @@ export class PortalNewTocAction {
         sdlComponents = sdlResult.value;
       }
     }
-
-    const buildConfig = await buildContext.getBuildFileContents();
-    const contentDirectory = buildConfig.generatePortal?.contentFolder
-      ? buildDirectory.join(buildConfig.generatePortal?.contentFolder)
-      : buildDirectory;
-
     const contentContext = new ContentContext(contentDirectory);
     const contentExists = await contentContext.exists();
 

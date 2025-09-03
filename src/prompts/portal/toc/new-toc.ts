@@ -4,17 +4,23 @@ import { Result } from "neverthrow";
 import { SdlTocComponents } from "../../../types/spec-context.js";
 import { format as f, format, withSpinner } from "../../format.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { ServiceError } from "../../../infrastructure/api-utils.js";
+import { Sdl } from "../../../types/sdl/sdl.js";
 
 export class PortalNewTocPrompts {
   public sdlComponentsExtractionFailed() {
-    log.error("Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again.");
+    log.error(
+      "Failed to extract endpoints from the API specification. Please validate your spec using APIMatic's interactive VS Code Extension and then try again."
+    );
   }
 
-  specNotFound() {
-    throw new Error("Method not implemented.");
-  }
   public extractSdlComponents(fn: Promise<Result<SdlTocComponents, string>>) {
-    return withSpinner("Extracting endpoints and/or models from the API specification", "Extraction successful.", "Extraction failed.", fn);
+    return withSpinner(
+      "Extracting endpoints and/or models from the API specification",
+      "Extraction successful.",
+      "Extraction failed.",
+      fn
+    );
   }
 
   public generateTOC(fn: Promise<Result<FilePath, string>>) {
@@ -53,16 +59,25 @@ export class PortalNewTocPrompts {
   }
 
   displayOutroMessage(tocPath: FilePath): void {
-    log.info(`${format.var('toc.yml')} file successfully created at: ${format.path(tocPath.toString())}`);
+    log.info(`${format.var("toc.yml")} file successfully created at: ${format.path(tocPath.toString())}`);
   }
 
   public contentDirectoryNotFound(contentFolderPath: DirectoryPath) {
-    const message = `Content folder not found at: ${contentFolderPath}`
+    const message = `Content folder not found at: ${contentFolderPath}`;
     log.error(message);
   }
 
   public invalidBuildDirectory(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
     log.error(message);
+  }
+
+  public extractModels(fn: Promise<Result<Sdl, ServiceError>>) {
+    return withSpinner(
+      "Extracting endpoint groups and models",
+      "Endpoint groups and models extracted.",
+      "Endpoint groups and models extraction failed.",
+      fn
+    );
   }
 }
