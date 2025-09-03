@@ -3,10 +3,12 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { BuildConfig } from "./build/build.js";
+import { ZipService } from "../infrastructure/zip-service.js";
 
 export class BuildContext {
   private readonly fileService = new FileService();
   private readonly buildDirectory: DirectoryPath;
+  private readonly zipService = new ZipService();
 
   constructor(buildDirectory: DirectoryPath) {
     this.buildDirectory = buildDirectory;
@@ -18,7 +20,7 @@ export class BuildContext {
   }
 
   private get specDirectory(): DirectoryPath {
-    return this.buildDirectory.join("spec")
+    return this.buildDirectory.join("spec");
   }
 
   public async validate(): Promise<boolean> {
@@ -41,9 +43,13 @@ export class BuildContext {
     await this.fileService.writeContents(this.buildFile, JSON.stringify(buildJson, null, 2));
   }
 
-  public async replaceDefaultSpec(newSpecDirectory: DirectoryPath) {
-    await this.fileService.deleteFile(new FilePath(this.specDirectory, new FileName('openapi.json')));
-    await this.fileService.copyDirectory(newSpecDirectory, this.specDirectory);
+  public async replaceDefaultSpec(specPath: FilePath) {
+    await this.fileService.deleteFile(new FilePath(this.specDirectory, new FileName("openapi.json")));
+    if (await this.fileService.isZipFile(specPath)) {
+      await this.zipService.unArchive(specPath, this.specDirectory);
+    } else {
+      await this.fileService.copy(specPath, specPath.replaceDirectory(this.specDirectory));
+    }
   }
 
   public async deleteWorkflowDir() {

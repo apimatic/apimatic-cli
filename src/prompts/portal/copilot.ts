@@ -1,4 +1,4 @@
-import { confirm, isCancel, log, note, outro, select } from "@clack/prompts";
+import { confirm, isCancel, log, note, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
@@ -40,13 +40,22 @@ export class PortalCopilotPrompts {
     Copilot ID: ${f.var(copilotId)}
     Status: ${f.var(status ? "Enabled" : "Disabled")}
 
-  Configuration saved to: ${f.path('APIMATIC-BUILD.json')}`);
+  Configuration saved to: ${f.var("APIMATIC-BUILD.json")}`
+    );
 
     note(
-      `API Copilot will index your content the next time you run ${f.cmd('apimatic', 'portal', 'generate')} or ${f.cmd('apimatic', 'portal', 'serve')}.
+      `API Copilot will index your content the next time you run ${f.cmd("apimatic", "portal", "generate")} or ${f.cmd(
+        "apimatic",
+        "portal",
+        "serve"
+      )}.
 This process can take up to 10 minutes, depending on your API’s size.
 
-To see your copilot: If your portal is already running, refresh the page. Otherwise, run ${f.cmd('apimatic', 'portal', 'serve')},
+To see your copilot: If your portal is already running, refresh the page. Otherwise, run ${f.cmd(
+        "apimatic",
+        "portal",
+        "serve"
+      )},
 select any programming language in the Portal and look for the chat icon in the bottom-right corner.`,
 
       `Next steps`
@@ -91,7 +100,7 @@ select any programming language in the Portal and look for the chat icon in the 
   }
 
   public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }
 

@@ -8,7 +8,7 @@ import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js
 export class ApiTransformPrompts {
   public async overwriteApi(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `A specification file already exists at ${f.path(directory.toString())}. Do you want to overwrite the existing file?`,
+      message: `A specification file already exists at ${f.path(directory)}. Do you want to overwrite the existing file?`,
       initialValue: false
     });
 

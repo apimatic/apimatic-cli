@@ -106,6 +106,21 @@ export class FileService {
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
+
+  public async isZipFile(filePath: FilePath): Promise<boolean> {
+    try {
+      const buffer = await fsExtra.readFile(filePath.toString());
+      return (
+        buffer.length >= 4 &&
+        buffer[0] === 0x50 && // P
+        buffer[1] === 0x4b && // K
+        buffer[2] === 0x03 && // \x03
+        buffer[3] === 0x04
+      ); // \x04
+    } catch {
+      return false;
+    }
+  }
 }
 
 const streamPipeline = promisify(pipeline);

@@ -20,12 +20,12 @@ export class SdkGeneratePrompts {
 
   public sameSpecAndSdkDir(directory: DirectoryPath) {
    const message = `The ${f.var("src")} and ${f.var("portal")} directories must be different. Current value: ${f.path(
-      directory.toString()
+      directory
     )}`;    this.logGenerationError(message);
   }
 
   public invalidSpecDirectory(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
 

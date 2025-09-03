@@ -7,7 +7,7 @@ import { FilePath } from "../../types/file/filePath.js";
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `The destination ${f.path(directory.toString())} is not empty, do you want to overwrite?`,
+      message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,
       initialValue: false
     });
 
@@ -20,13 +20,13 @@ export class PortalGeneratePrompts {
 
   public directoryCannotBeSame(directory: DirectoryPath) {
     const message = `The ${f.var("src")} and ${f.var("portal")} directories must be different. Current value: ${f.path(
-      directory.toString()
+      directory
     )}`;
     log.error(message);
   }
 
   public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory.toString())}`;
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }
 
@@ -45,7 +45,7 @@ export class PortalGeneratePrompts {
 
   portalGenerationErrorWithReport(reportPath: FilePath) {
     const message = `An error occurred during portal generation due to an issue with the input.
-An error report has been written at the destination path: ${f.path(reportPath.toString())}`;
+An error report has been written at the destination path: ${f.path(reportPath)}`;
     log.error(message);
   }
 }
