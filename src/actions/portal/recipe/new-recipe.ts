@@ -7,7 +7,6 @@ import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { ActionResult } from "../../action-result.js";
 import { TocContext } from "../../../types/toc-context.js";
 import { FileName } from "../../../types/file/fileName.js";
-import { Toc } from "../../../types/toc/toc.js";
 import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
 import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
 import { TreeObject } from "treeify";
@@ -17,36 +16,10 @@ import { SpecContext } from "../../../types/spec-context.js";
 import { LauncherService } from "../../../infrastructure/launcher-service.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
-import { toPascalCase } from "../../../utils/utils.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 import { TempContext } from "../../../types/temp-context.js";
+import { RecipeContext } from "../../../types/recipe-context.js";
 
-class RecipeContext {
-  constructor(private readonly recipeName: string) {}
-
-  getRecipeName(): FileName {
-    return new FileName(toPascalCase(this.recipeName.trim()));
-  }
-
-  exists(tocData: Toc, recipeName: string, recipeFileName: FileName): boolean {
-    let apiRecipesGroup = tocData.toc?.find((item) => "group" in item && item.group === "API Recipes");
-    if (!apiRecipesGroup || !("items" in apiRecipesGroup)) {
-      return false;
-    }
-
-    // Check if recipe name or file name already exists
-    const existingRecipe = apiRecipesGroup.items.find(
-      (item) =>
-        "page" in item && "file" in item && (item.page === recipeName || item.file === `recipes/${recipeFileName}.md`)
-    );
-
-    if (existingRecipe) {
-      return true;
-    }
-
-    return false;
-  }
-}
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
