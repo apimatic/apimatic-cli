@@ -12,7 +12,7 @@ export const format = {
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
   cmd: (cmd: string, ...args: string[]) => `${pc.blue(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
   link: (text: string) => pc.underline(pc.blue(text)),
-  description: (text: string) => pc.greenBright(`${text}`), // TODO: merge with Saeed's implementation
+  description: (text: string) => pc.greenBright(`${text}`),
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
       return `${pc.green(`--${name}`)}=${pc.dim(value)}`;

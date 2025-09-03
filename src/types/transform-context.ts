@@ -11,27 +11,24 @@ export class TransformContext {
 
   private readonly transformedApi: FileName;
 
-  constructor(private readonly specFilePath: FilePath,
-              private readonly format: ExportFormats,
+  constructor(specFilePath: FilePath,
+              format: ExportFormats,
               private readonly destinationDirectory: DirectoryPath ) {
     this.transformedApi = this.parseFileName(format, specFilePath);
   }
 
   private get specPath(): FilePath {
-    this.fileService.createDirectoryIfNotExists(this.destinationDirectory);
     return new FilePath(this.destinationDirectory, this.transformedApi);
   }
 
   public async exists(): Promise<boolean> {
     const transformedApiPath = new FilePath(this.destinationDirectory, this.transformedApi);
-    const fileExists = await this.fileService.fileExists(transformedApiPath);
-    if (fileExists) {
-      return true;
-    }
-    return false;
+    return await this.fileService.fileExists(transformedApiPath);
+
   }
 
   public async save(stream: NodeJS.ReadableStream): Promise<void> {
+    await this.fileService.createDirectoryIfNotExists(this.destinationDirectory);
     await this.fileService.writeFile(this.specPath, stream);
   }
 

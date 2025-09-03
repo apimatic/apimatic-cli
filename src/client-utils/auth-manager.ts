@@ -14,8 +14,7 @@ export type AuthInfo = {
  */
 export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
   try {
-    const data: AuthInfo | null = JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
-    return data;
+    return JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
   } catch {
     return null;
   }

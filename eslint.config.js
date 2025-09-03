@@ -13,6 +13,7 @@ export default [
       globals: {
         process: "readonly",
         setTimeout: "readonly",
+        clearTimeout: "readonly",
         NodeJS: true,
       },
     },
