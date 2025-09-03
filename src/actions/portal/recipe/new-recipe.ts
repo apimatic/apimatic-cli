@@ -1,6 +1,5 @@
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
 import { DirectoryNode, StepType } from "../../../types/recipe/recipe.js";
-import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { Sdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
@@ -20,9 +19,7 @@ import { FileService } from "../../../infrastructure/file-service.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { toPascalCase } from "../../../utils/utils.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
-import { Result } from "neverthrow";
 import { TempContext } from "../../../types/temp-context.js";
-import { ok } from "assert";
 
 class RecipeContext {
   constructor(private readonly recipeName: string) {}
@@ -56,7 +53,6 @@ export class PortalRecipeAction {
   private readonly launcherService = new LauncherService();
   private readonly fileService = new FileService();
   private readonly portalService = new PortalService();
-  private readonly sdlParser = new SdlParser(this.portalService, this.configDirectory, this.commandMetadata);
 
   constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -154,7 +150,7 @@ export class PortalRecipeAction {
               this.prompts.logError(sdlResult.error);
               return ActionResult.failed();
             }
-            endpointGroups = await this.sdlParser.getEndpointGroupsFromSdl(sdlResult.value);
+            endpointGroups = await this.getEndpointGroupsFromSdl(sdlResult.value);
           }
 
           const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
@@ -213,6 +209,23 @@ export class PortalRecipeAction {
         }
       }
     };
+  }
+
+  private async getEndpointGroupsFromSdl(sdl: Sdl): Promise<Map<string, SdlEndpoint[]>> {
+    const endpointGroups = new Map<string, SdlEndpoint[]>();
+    for (const endpoint of sdl.Endpoints) {
+      if (!endpointGroups.has(endpoint.Group)) {
+        endpointGroups.set(endpoint.Group, []);
+      }
+
+      endpointGroups.get(endpoint.Group)!.push({
+        Name: endpoint.Name,
+        Description: endpoint.Description,
+        Group: endpoint.Group
+      });
+    }
+
+    return endpointGroups;
   }
 
   private async promptForContent(): Promise<string> {
