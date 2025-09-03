@@ -52,8 +52,65 @@ export class PortalQuickstartAction {
       return ActionResult.failed();
     }
 
-    return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath) => {
+    return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
       // Step 1/4
+
+      this.prompts.importSpecStep();
+      let inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
+      if (!inputPath) {
+        this.prompts.noSpecSpecified();
+        return ActionResult.cancelled();
+      }
+      const resourceContext = new ResourceContext(tempDirectory);
+      const specPath = await resourceContext.resolveTo(inputPath);
+      if (specPath.isErr()) {
+        this.prompts.serviceError(specPath.error);
+      }
+
+
+
+      while (true) {
+
+
+
+        if (!UrlPath.create(inputPath)) {
+          try {
+            const resourcePath = createResourceInput(inputPath);
+            if (!(await this.fileService.fileExists(resourcePath as FilePath))) {
+              this.prompts.specFileDoesNotExist();
+              continue; // re-prompt
+            }
+
+            break; // valid file path.
+          } catch {
+            this.prompts.invalidSpecFilePath();
+            continue; // re-prompt
+          }
+        }
+
+        try {
+          const contentType = await this.fileMetadataService.contentType(inputPath);
+
+          if (contentType?.includes("text/html")) {
+            this.prompts.invalidSpecUrl();
+            continue; // re-prompt
+          }
+        } catch {
+          this.prompts.unreachableUrl();
+          continue; // re-prompt
+        }
+
+        break; // valid URL.
+      }
+
+
+
+      const specDirectory = tempDirectory.join("spec");
+      await this.fileService.createDirectoryIfNotExists(specDirectory);
+      await this.fileService.copy(result.value, result.value.replaceDirectory(specDirectory));
+      return ok(specDirectory);
+
+
       const specDirectory = await this.importSpec(tempDirectory);
       if (specDirectory.isErr()) {
         return ActionResult.failed();
@@ -127,63 +184,6 @@ export class PortalQuickstartAction {
       return err();
     }
     return ok();
-  }
-
-  private async importSpec(tempDirectory: DirectoryPath): Promise<ResultEx<DirectoryPath, void>> {
-    this.prompts.importSpecStep();
-    let inputPath: string | undefined;
-    while (true) {
-      inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
-      if (!inputPath) {
-        this.prompts.noSpecSpecified();
-        return err();
-      }
-
-      if (!UrlPath.create(inputPath)) {
-        try {
-          const resourcePath = createResourceInput(inputPath);
-          if (!(await this.fileService.fileExists(resourcePath as FilePath))) {
-            this.prompts.specFileDoesNotExist();
-            continue; // re-prompt
-          }
-
-          break; // valid file path.
-        } catch {
-          this.prompts.invalidSpecFilePath();
-          continue; // re-prompt
-        }
-      }
-
-      try {
-        const contentType = await this.fileMetadataService.contentType(inputPath);
-
-        if (contentType?.includes("text/html")) {
-          this.prompts.invalidSpecUrl();
-          continue; // re-prompt
-        }
-      } catch {
-        this.prompts.unreachableUrl();
-        continue; // re-prompt
-      }
-
-      break; // valid URL.
-    }
-
-    const urlPath = UrlPath.create(inputPath);
-    const resourceContext = new ResourceContext(tempDirectory);
-    const result =
-      urlPath === undefined
-        ? await resourceContext.resolveTo(createResourceInput(inputPath))
-        : await resourceContext.resolveTo(urlPath);
-    if (result.isErr()) {
-      this.prompts.serviceError(result.error);
-      return err();
-    }
-
-    const specDirectory = tempDirectory.join("spec");
-    await this.fileService.createDirectoryIfNotExists(specDirectory);
-    await this.fileService.copy(result.value, result.value.replaceDirectory(specDirectory));
-    return ok(specDirectory);
   }
 
   private async validateSpec(

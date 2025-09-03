@@ -1,11 +1,12 @@
 import { Result } from "neverthrow";
-import { text, select, multiselect, log, isCancel, note } from "@clack/prompts";
+import { isCancel, log, multiselect, note, select, text } from "@clack/prompts";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { Directory } from "../../types/file/directory.js";
+import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -26,20 +27,23 @@ export class PortalQuickstartPrompts {
     log.step(message);
   }
 
-  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<string | undefined> {
+  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<ResourceInput | undefined> {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI definition file:`,
       placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
-      defaultValue: defaultSpecUrl.toString()
+      defaultValue: defaultSpecUrl.toString(),
+      validate: value => {
+        if (!value || !createResourceInputFromInput(value)) {
+          return "Please enter a valid file path or URL.";
+        }
+      }
     });
 
     if (isCancel(spec)) {
       return undefined;
     }
 
-    const cleanedPath = removeQuotes(spec.trim() ?? "");
-
-    return cleanedPath;
+    return createResourceInputFromInput(spec);
   }
 
   public specFileDoesNotExist() {

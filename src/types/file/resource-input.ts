@@ -3,6 +3,7 @@ import { DirectoryPath } from "./directoryPath.js";
 import { FileName } from "./fileName.js";
 import { FilePath } from "./filePath.js";
 import { UrlPath } from "./urlPath.js";
+import { removeQuotes } from "../../utils/string-utils.js";
 
 export type ResourceInput = FilePath | UrlPath;
 
@@ -29,3 +30,16 @@ export const createResourceInput = (file?: string, url?: string): ResourceInput 
   }
   throw new Error("Must specify either file or url.");
 };
+
+export function createResourceInputFromInput(path: string): ResourceInput | undefined {
+  const sanitizedPath = removeQuotes(path.trim() ?? "")
+  const urlPath = UrlPath.create(sanitizedPath);
+  if (urlPath) {
+    return urlPath;
+  }
+  const filePath = FilePath.create(sanitizedPath);
+  if (filePath) {
+    return filePath;
+  }
+  return undefined;
+}

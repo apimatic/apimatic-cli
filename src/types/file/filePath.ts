@@ -18,4 +18,21 @@ export class FilePath {
   public toString(): string {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
   }
+
+  public static create(filePath: string): FilePath | undefined {
+    if (!filePath) {
+      return undefined;
+    }
+
+    try {
+      const normalizedPath = path.normalize(filePath);
+      const directory = path.dirname(normalizedPath);
+      const filename = path.basename(normalizedPath);
+      const directoryPath = new DirectoryPath(directory);
+      const fileName = new FileName(filename);
+      return new FilePath(directoryPath, fileName);
+    } catch {
+      return undefined;
+    }
+  }
 }
