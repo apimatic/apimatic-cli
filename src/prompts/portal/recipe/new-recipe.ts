@@ -1,10 +1,11 @@
 import treeify from "treeify";
-import { select, text, isCancel, outro, log, autocomplete, confirm } from "@clack/prompts";
+import { select, text, isCancel, log, autocomplete, confirm } from "@clack/prompts";
 import { getMessageInGreenColor } from "../../../utils/utils.js";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { format as f } from "../../format.js";
 import { StepType } from "../../../types/recipe/recipe.js";
+import { getErrorMessage, ServiceError } from "../../../infrastructure/api-utils.js";
 
 export class PortalRecipePrompts {
   public displayWelcomeMessage(): void {
@@ -126,9 +127,7 @@ Let's get started!`;
     return (endpointName as string).trim();
   }
 
-  public async endpointDescriptionPrompt(
-    defaultDescription: string,
-  ): Promise<string | undefined> {
+  public async endpointDescriptionPrompt(defaultDescription: string): Promise<string | undefined> {
     const endpointDescription = await text({
       message: `Enter a description for the endpoint:`,
       placeholder: `Optional. Leave this empty to use the endpoint description defined in the API Specification`,
@@ -186,11 +185,11 @@ Let's get started!`;
     log.error(message);
   }
 
-  public logError(error: string): void {
-    outro(error);
+  public serviceError(serviceError: ServiceError) {
+    log.error(getErrorMessage(serviceError));
   }
 
-  public openRecipteMarkdownEditor() {
+  public openRecipeMarkdownEditor() {
     log.step("Opening markdown editor for you to enter recipe content...");
   }
 }

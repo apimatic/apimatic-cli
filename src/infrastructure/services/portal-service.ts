@@ -17,7 +17,6 @@ import {
   Platforms
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { Result } from "../../types/common/result.js";
 import { getMessageInRedColor, parseStreamBodyToJson } from "../../utils/utils.js";
 import { TransformationData } from "../../types/api/transform.js";
 import { Sdl } from "../../types/sdl/sdl.js";
@@ -26,8 +25,9 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { err, ok, Result as ResultEx } from "neverthrow";
+import { err, ok, Result} from "neverthrow";
 import { Language } from "../../types/sdk/generate.js";
+import { handleServiceError, ServiceError } from "../api-utils.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -39,7 +39,7 @@ export class PortalService {
     configDir: DirectoryPath,
     eventMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<ResultEx<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
+  ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
@@ -68,7 +68,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<ResultEx<NodeJS.ReadableStream, string>> {
+  ): Promise<Result<NodeJS.ReadableStream, string>> {
     const specFileStream = await this.fileService.getStream(specPath);
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
@@ -96,7 +96,7 @@ export class PortalService {
     specFileStream: ReadStream,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata
-  ): Promise<ResultEx<Sdl, string>> {
+  ): Promise<Result<Sdl, ServiceError>> {
     const file = new FileWrapper(specFileStream);
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
@@ -112,7 +112,7 @@ export class PortalService {
       );
 
       if (!generation.result.success) {
-        return err("An unexpected error occurred");
+        return err(ServiceError.InvalidResponse);
       }
 
       const transformationId = generation.result.id;
@@ -120,10 +120,10 @@ export class PortalService {
       if ((result as NodeJS.ReadableStream).readable) {
         return ok((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
       } else {
-        return err("An unexpected error occurred");
+        return err(ServiceError.InvalidResponse);
       }
-    } catch {
-      return err("An unexpected error occurred");
+    } catch(error) {
+      return err(handleServiceError(error));
     }
   }
 

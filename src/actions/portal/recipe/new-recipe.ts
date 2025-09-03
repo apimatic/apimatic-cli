@@ -20,7 +20,6 @@ import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 import { TempContext } from "../../../types/temp-context.js";
 import { RecipeContext } from "../../../types/recipe-context.js";
 
-
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
   private readonly launcherService = new LauncherService();
@@ -120,10 +119,10 @@ export class PortalRecipeAction {
             });
 
             if (sdlResult.isErr()) {
-              this.prompts.logError(sdlResult.error);
+              this.prompts.serviceError(sdlResult.error);
               return ActionResult.failed();
             }
-            endpointGroups = await this.getEndpointGroupsFromSdl(sdlResult.value);
+            endpointGroups = PortalRecipeAction.getEndpointGroupsFromSdl(sdlResult.value);
           }
 
           const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
@@ -131,10 +130,11 @@ export class PortalRecipeAction {
           const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
           if (!endpointName) return ActionResult.cancelled();
 
-          const defaultDescription = endpointGroups
-            .get(endpointGroupName)!
-            .find((e) => e.Name === endpointName)!.Description;
-
+          const defaultDescription = PortalRecipeAction.getEndpointDescription(
+            endpointGroups,
+            endpointGroupName,
+            endpointName
+          );
           const description = await this.prompts.endpointDescriptionPrompt(defaultDescription);
           if (!description) return ActionResult.cancelled();
 
@@ -184,7 +184,7 @@ export class PortalRecipeAction {
     };
   }
 
-  private async getEndpointGroupsFromSdl(sdl: Sdl): Promise<Map<string, SdlEndpoint[]>> {
+  private static getEndpointGroupsFromSdl(sdl: Sdl): Map<string, SdlEndpoint[]> {
     const endpointGroups = new Map<string, SdlEndpoint[]>();
     for (const endpoint of sdl.Endpoints) {
       if (!endpointGroups.has(endpoint.Group)) {
@@ -197,13 +197,20 @@ export class PortalRecipeAction {
         Group: endpoint.Group
       });
     }
-
     return endpointGroups;
+  }
+
+  private static getEndpointDescription(
+    endpointGroups: Map<string, SdlEndpoint[]>,
+    endpointGroupName: string,
+    endpointName: string
+  ): string {
+    return endpointGroups.get(endpointGroupName)!.find((e) => e.Name === endpointName)!.Description;
   }
 
   private async promptForContent(): Promise<string> {
     return await withDirPath(async (tempDir) => {
-      const tempFile = new FilePath(tempDir, new FileName(`recipe-markdown-content-${Date.now()}.md`));
+      const tempFile = new FilePath(tempDir, new FileName(`recipe-markdown-content.md`));
       const defaultContent =
         "# The Heading Goes Here\n\n" +
         "This is placeholder text for your API Recipe content step. " +
@@ -211,7 +218,7 @@ export class PortalRecipeAction {
 
       await this.fileService.writeContents(tempFile, defaultContent);
       await this.launcherService.openInEditor(tempFile);
-      this.prompts.openRecipteMarkdownEditor();
+      this.prompts.openRecipeMarkdownEditor();
       const fileContent = await this.fileService.getContents(tempFile);
       return fileContent.replace(/\r\n|\r/g, "\n");
     });
