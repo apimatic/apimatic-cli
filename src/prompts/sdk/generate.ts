@@ -2,7 +2,6 @@ import { isCancel, confirm, log } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { Result } from "neverthrow";
-import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 export class SdkGeneratePrompts {
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -34,7 +33,7 @@ export class SdkGeneratePrompts {
     this.logGenerationError(message);
   }
 
-  public async generateSDK(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
+  public generateSDK(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
@@ -42,4 +41,7 @@ export class SdkGeneratePrompts {
     log.error(error);
   }
 
+  public sdkGenerated(sdk: DirectoryPath) {
+    log.info(`Generated SDK at ${f.path(sdk)}.`);
+  }
 }

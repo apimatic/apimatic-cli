@@ -16,7 +16,7 @@ export default class PortalServe extends Command {
   static flags = {
     port: Flags.integer({
       char: "p",
-      description: "Port to serve the portal.",
+      description: "port to serve the portal.",
       default: 3000,
       helpValue: "3000"
     }),
@@ -24,11 +24,11 @@ export default class PortalServe extends Command {
     ...FlagsProvider.destination("portal", "portal"),
     open: Flags.boolean({
       char: "o",
-      description: "Open the portal in the default browser.",
+      description: "open the portal in the default browser.",
       default: false
     }),
     "no-reload": Flags.boolean({
-      description: "Disable hot reload.",
+      description: "disable hot reload.",
       default: false
     }),
     ...FlagsProvider.authKey
@@ -37,9 +37,9 @@ export default class PortalServe extends Command {
   static cmdTxt = format.cmd("apimatic", "portal", "serve");
   static examples = [
     this.cmdTxt,
-    `${this.cmdTxt}` +
-      `${format.flag("input", '"./"')} ` +
-      `${format.flag("destination", '"./portal"')} ` +
+    `${this.cmdTxt} ` +
+      `${format.flag("input", './')} ` +
+      `${format.flag("destination", './portal')} ` +
       `${format.flag("port", "3000")} ` +
       `${format.flag("open")} ` +
       `${format.flag("no-reload")}`

@@ -1,9 +1,10 @@
-import { select, text, isCancel, log, autocomplete, confirm } from "@clack/prompts";
+import { select, text, isCancel, log, autocomplete, confirm, note } from "@clack/prompts";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { format as f, getTree, TreeNode } from "../../format.js";
 import { StepType } from "../../../types/recipe/recipe.js";
 import { getErrorMessage, ServiceError } from "../../../infrastructure/api-utils.js";
+import { Dir } from "node:fs";
 
 export class PortalRecipePrompts {
   public displayWelcomeMessage(): void {
@@ -181,8 +182,15 @@ Let's proceed to adding steps to your API Recipe.`;
     log.step("Opening markdown editor for you to enter recipe content...");
   }
 
-  displayTocStructure(tocStructure: TreeNode) {
+  public displayRecipeStructure(tocStructure: TreeNode) {
+    const heading = `You can edit the following files to customize your API Recipe:\n`;
     const message  = getTree(tocStructure);
-    log.info(message)
+    log.info(heading + message);
+  }
+
+  public nextSteps(buildDirectory: DirectoryPath) {
+    const message = `Your new API Recipe has been added to the source directory at: ${f.path(buildDirectory)}
+Run the command '${f.cmdAlt(`apimatic`, 'portal', 'serve')}' to preview your documentation portal`;
+    note(message, "Next Steps");
   }
 }

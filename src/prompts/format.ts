@@ -10,8 +10,9 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
-  cmd: (cmd: string, ...args: string[]) => `${pc.blue(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
-  link: (text: string) => pc.underline(pc.blue(text)),
+  cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
+  cmdAlt: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map(arg => pc.blueBright(arg)).join(" ")}`,
+  link: (text: string) => pc.underline(pc.blueBright(text)),
   description: (text: string) => pc.greenBright(`${text}`),
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
@@ -28,7 +29,7 @@ export const format = {
   intro: (text: string) => pc.bgCyan(text),
   outroSuccess: (text: string) => pc.bgGreen(text),
   outroFailure: (text: string) => pc.bgRed(text),
-  outroCancelled: (text: string) => pc.bgWhite(text),
+  outroCancelled: (text: string) => pc.bgWhite(pc.blackBright(text)),
 };
 
 export function intro(text: string) {

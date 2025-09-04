@@ -44,21 +44,16 @@ export class PortalCopilotPrompts {
     );
 
     note(
-      `API Copilot will index your content the next time you run ${f.cmd("apimatic", "portal", "generate")} or ${f.cmd(
-        "apimatic",
-        "portal",
-        "serve"
-      )}.
+      `API Copilot will index your content the next time you run
+'${f.cmdAlt("apimatic", "portal", "generate")}' or '${f.cmdAlt("apimatic", "portal", "serve")}'.
 This process can take up to 10 minutes, depending on your API’s size.
 
-To see your copilot: If your portal is already running, refresh the page. Otherwise, run ${f.cmd(
-        "apimatic",
-        "portal",
-        "serve"
-      )},
-select any programming language in the Portal and look for the chat icon in the bottom-right corner.`,
+To see your copilot: If your portal is already running, refresh the page.
+Otherwise, run '${f.cmdAlt("apimatic", "portal", "serve")}',
+select any programming language in the Portal and
+look for the chat icon in the bottom-right corner.`,
 
-      `Next steps`
+      `Next Steps`
     );
   }
 
@@ -114,9 +109,7 @@ select any programming language in the Portal and look for the chat icon in the 
 
   public noCopilotKeyFound() {
     log.error(
-      `No copilot key found for the current subscription. Please contact support at ${f.var(
-        "support@apimatic.io"
-      )}.`
+      `No copilot key found for the current subscription. Please contact support at ${f.var("support@apimatic.io")}.`
     );
   }
 

@@ -24,8 +24,8 @@ export default class PortalCopilot extends Command {
 
   static cmdTxt = format.cmd("apimatic", "portal", "copilot");
   static examples = [
-    `${this.cmdTxt} ${format.flag("input", '"./"')}`,
-    `${this.cmdTxt} ${format.flag("input", '"./"')} ${format.flag("disable")}`
+    `${this.cmdTxt} ${format.flag("input", './')}`,
+    `${this.cmdTxt} ${format.flag("input", './')} ${format.flag("disable")}`
   ];
 
   async run(): Promise<void> {

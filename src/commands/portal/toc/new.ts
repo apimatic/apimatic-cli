@@ -42,9 +42,9 @@ ${format.link(
 
   static cmdTxt = format.cmd("apimatic", "portal", "toc", "new");
   static examples = [
-    `${this.cmdTxt} ${format.flag("destination", '"./src/content/"')}`,
-    `${this.cmdTxt} ${format.flag("input", '"./"')}`,
-    `${this.cmdTxt} ${format.flag("input", '"./"')} ${format.flag("destination", '"./src/content/"')}`
+    `${this.cmdTxt} ${format.flag("destination", './src/content/')}`,
+    `${this.cmdTxt} ${format.flag("input", './')}`,
+    `${this.cmdTxt} ${format.flag("input", './')} ${format.flag("destination", './src/content/')}`
   ];
 
   async run(): Promise<void> {
