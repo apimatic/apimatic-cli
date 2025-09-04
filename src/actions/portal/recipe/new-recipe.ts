@@ -106,7 +106,7 @@ export class PortalRecipeAction {
               const specFileStream = await this.fileService.getStream(specZipPath);
 
               try {
-                return await this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata);
+                return await this.prompts.generateSdl(this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata))
               } finally {
                 specFileStream.close();
               }
@@ -150,8 +150,9 @@ export class PortalRecipeAction {
     );
 
     const tocStructure = this.getTocStructure(recipeFileName);
+    this.prompts.recipeCreated();
     this.prompts.displayRecipeStructure(tocStructure);
-    this.prompts.nextSteps(buildDirectory);
+    this.prompts.nextSteps();
     return ActionResult.success();
   }
 

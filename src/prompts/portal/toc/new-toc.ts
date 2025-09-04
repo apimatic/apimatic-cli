@@ -21,12 +21,11 @@ export class PortalNewTocPrompts {
   }
 
   public fallingBackToDefault() {
-    log.warn(`Falling back to default TOC structure.`);
+    log.warn(`Falling back to the default TOC structure.`);
   }
 
   public tocFileAlreadyExists() {
-    const message = `Please enter a different destination path or delete the existing toc.yml file and try again.`;
-    log.error(message);
+    log.error(`Please enter a different destination path or delete the existing toc.yml file and try again.`);
   }
 
   public logError(message: string) {
@@ -34,8 +33,7 @@ export class PortalNewTocPrompts {
   }
 
   public contentDirectoryNotFound(contentFolderPath: DirectoryPath) {
-    const message = `Content folder not found at: ${contentFolderPath}`;
-    log.error(message);
+    log.error(`Content folder not found at: ${contentFolderPath}`);
   }
 
   public invalidBuildDirectory(directory: DirectoryPath) {
@@ -46,13 +44,13 @@ export class PortalNewTocPrompts {
   public extractEndpointGroupsAndModels(fn: Promise<Result<Sdl, ServiceError>>) {
     return withSpinner(
       "Extracting endpoint groups and models",
-      "Endpoint groups and models extracted.",
-      "Endpoint groups and models extraction failed.",
+      "Endpoint groups and models extracted",
+      "Endpoint groups and models extraction failed",
       fn
     );
   }
 
   public tocCreated(tocPath: FilePath) {
-    log.info(`The TOC file successfully created at: ${f.path(tocPath)}`)
+    log.info(`The TOC file successfully created at: ${f.path(tocPath)}`);
   }
 }

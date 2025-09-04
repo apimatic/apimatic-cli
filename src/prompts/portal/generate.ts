@@ -44,8 +44,8 @@ export class PortalGeneratePrompts {
   }
 
   portalGenerationErrorWithReport(reportPath: FilePath) {
-    const message = `An error occurred during portal generation due to an issue with the input.
-An error report has been written at the destination path: ${f.path(reportPath)}`;
+    const message = `An error occurred during portal generation.
+A report has been written at the destination path ${f.path(reportPath)}`;
     log.error(message);
   }
 
