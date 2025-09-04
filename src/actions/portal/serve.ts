@@ -124,9 +124,11 @@ export class PortalServeAction {
             if (openInBrowser) {
               await this.launcherService.openUrlInBrowser(portalUrl);
             }
+
+            this.prompts.promptForExit();
+
             this.isPortalServed = true;
           }
-          this.prompts.promptForExit();
 
           liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();

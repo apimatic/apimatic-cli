@@ -71,7 +71,7 @@ Let's get started!`;
 
   public fixYourSpec() {
     const message = `Good luck fixing your API definition! Feel free to run this command again once you're done.`;
-    log.step(message);
+    log.info(message);
   }
 
   public validateSpecStep() {
@@ -97,7 +97,6 @@ Let's get started!`;
         { label: "PHP", value: "php" },
         { label: "Go", value: "go" }
       ],
-      required: false,
       initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"]
     })) as string[];
 
@@ -139,7 +138,7 @@ Let's get started!`;
   }
 
   public inputDirectoryPathDoesNotExist(inputDirectory: DirectoryPath) {
-    log.error(`The specified directory path ${f.path(inputDirectory)} does not exists.`);
+    log.error(`The specified directory path ${f.path(inputDirectory)} does not exist.`);
   }
 
   public inputDirectoryNotEmpty(inputDirectory: DirectoryPath) {
@@ -181,5 +180,9 @@ ${f.link(referenceDocumentationUrl)}`;
   public printDirectoryStructure(directory: Directory) {
     const message = getTree(directory.toTreeNode());
     log.info(message);
+  }
+
+  public specValidationFailed() {
+    log.error(`Oops, it looks like there are some errors in your API Definition`);
   }
 }

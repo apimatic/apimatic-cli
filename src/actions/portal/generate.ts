@@ -74,6 +74,9 @@ export class GenerateAction {
 
       const tempPortalZipPath = await tempContext.save(response.value);
       await portalContext.save(tempPortalZipPath, zipPortal);
+
+      this.prompts.portalGenerated(portalDirectory);
+
       return ActionResult.success();
     });
   };

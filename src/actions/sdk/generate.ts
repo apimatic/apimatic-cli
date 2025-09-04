@@ -62,6 +62,9 @@ export class GenerateAction {
 
       const tempSdkFilePath = await tempContext.save(response.value);
       await sdkContext.save(tempSdkFilePath, zipSdk);
+
+      this.prompts.sdkGenerated(sdkContext.sdkLanguageDirectory);
+
       return ActionResult.success();
     });
   };

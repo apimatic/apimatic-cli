@@ -150,8 +150,8 @@ export class PortalRecipeAction {
     );
 
     const tocStructure = this.getTocStructure(recipeFileName);
-    this.prompts.displayTocStructure(tocStructure);
-
+    this.prompts.displayRecipeStructure(tocStructure);
+    this.prompts.nextSteps(buildDirectory);
     return ActionResult.success();
   }
 
@@ -164,8 +164,8 @@ export class PortalRecipeAction {
         "Feel free to edit this. Save your changes and then close the file once you're done.";
 
       await this.fileService.writeContents(tempFile, defaultContent);
-      await this.launcherService.openInEditor(tempFile);
       this.prompts.openRecipeMarkdownEditor();
+      await this.launcherService.openInEditor(tempFile);
       const fileContent = await this.fileService.getContents(tempFile);
       return fileContent.replace(/\r\n|\r/g, "\n");
     });

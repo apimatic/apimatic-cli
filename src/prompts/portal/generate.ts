@@ -48,4 +48,8 @@ export class PortalGeneratePrompts {
 An error report has been written at the destination path: ${f.path(reportPath)}`;
     log.error(message);
   }
+
+  public portalGenerated(portal: DirectoryPath) {
+    log.info(`Generated portal at ${f.path(portal)}.`);
+  }
 }

@@ -8,7 +8,7 @@ import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js
 
 export class ApiValidatePrompts {
   public async validateApi(fn: Promise<Result<ApiValidationSummary, string>>) {
-    return withSpinner("Validating API", "API validated successfully.", "API validation failed.", fn);
+    return withSpinner("Validating API", "API validation completed", "API validation failed", fn);
   }
 
   displayValidationMessages({ warnings, errors, messages }: ValidationMessages): void {

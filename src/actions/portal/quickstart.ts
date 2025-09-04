@@ -85,6 +85,7 @@ export class PortalQuickstartAction {
       const validationResult = await validateAction.execute(specPath, false);
 
       if (validationResult.isFailed()) {
+        this.prompts.specValidationFailed();
         if (!(await this.prompts.useDefaultSpecPrompt())) {
           this.prompts.fixYourSpec();
           return ActionResult.cancelled();
@@ -120,6 +121,7 @@ export class PortalQuickstartAction {
 
         if (!(await this.fileService.directoryExists(inputDirectory))) {
           this.prompts.inputDirectoryPathDoesNotExist(inputDirectory);
+          // TODO: Prompt user if he wants to create the directory
           continue;
         }
 
