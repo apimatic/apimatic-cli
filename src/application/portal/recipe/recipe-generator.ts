@@ -19,14 +19,14 @@ export class PortalRecipeGenerator {
     recipeName: string,
     recipeFileName: FileName,
     buildContext: BuildContext,
-    contentFolderPath: DirectoryPath
+    buildDirectory: DirectoryPath
   ) {
     await this.addRecipeToToc(tocFileContent, tocFilePath, recipeName, recipeFileName);
     await this.registerRecipeInBuildConfigFile(buildContext, recipeName, recipeFileName);
-    await this.createMarkdownFile(recipeFileName, contentFolderPath);
+    await this.createMarkdownFile(recipeFileName, buildDirectory.join("content"));
 
     const generatedRecipeScript = await this.createScriptFromRecipe(recipe);
-    const generatedRecipeScriptsDirectoryPath = contentFolderPath.join("static", "scripts", "recipes");
+    const generatedRecipeScriptsDirectoryPath = buildDirectory.join("static", "scripts", "recipes");
     await this.saveGeneratedRecipeScriptToBuildDirectory(
       generatedRecipeScript,
       generatedRecipeScriptsDirectoryPath,
@@ -111,7 +111,7 @@ export class PortalRecipeGenerator {
     const directory = contentFolder.join("recipes");
     const markdownFileContent = this.getMarkdownFileContent();
 
-    await this.fileService.directoryExists(directory);
+    await this.fileService.createDirectoryIfNotExists(directory);
     await this.fileService.writeContents(new FilePath(directory, new FileName(`${recipeFileName}.md`)), markdownFileContent);
   }
 

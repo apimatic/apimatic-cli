@@ -146,7 +146,7 @@ export class PortalRecipeAction {
       recipeName,
       recipeFileName,
       buildContext,
-      contentDirectory
+      buildDirectory
     );
 
     const tocStructure = this.getTocStructure(recipeFileName);
