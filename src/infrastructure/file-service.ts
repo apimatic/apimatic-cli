@@ -45,10 +45,6 @@ export class FileService {
     await fsExtra.ensureDir(dir.toString());
   }
 
-  public async copyDirectory(source: DirectoryPath, destination: DirectoryPath) {
-    await fsExtra.copy(source.toString(), destination.toString());
-  }
-
   public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
     const entries = await fsExtra.readdir(directoryPath.toString());
     const results = await Promise.all(

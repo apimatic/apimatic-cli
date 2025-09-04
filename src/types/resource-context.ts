@@ -24,32 +24,11 @@ export class ResourceContext {
       if (downloadFileResult.isErr()) {
         return err(downloadFileResult.error);
       }
-      await this.fileService.writeFile(destinationFilePath, downloadFileResult.value);
+      await this.fileService.writeFile(destinationFilePath, downloadFileResult.value.stream);
     }
     if (resourcePath instanceof FilePath) {
       await this.fileService.copy(resourcePath, destinationFilePath);
     }
     return ok(destinationFilePath);
-  }
-}
-
-export class ResourceInputContext {
-  private readonly fileDownloadService = new FileDownloadService();
-  private readonly fileService = new FileService();
-
-  public async validate(inputPath: ResourceInput): Promise<ResourceInput | ServiceError | undefined> {
-    if (inputPath instanceof UrlPath) {
-      const downloadFileResult = await this.fileDownloadService.downloadFile(inputPath);
-      if (downloadFileResult.isErr()) {
-        return downloadFileResult.error;
-      }
-
-    } else {
-      const fileExists = await this.fileService.fileExists(inputPath);
-      if (!fileExists) {
-        return undefined;
-      }
-    }
-    return inputPath;
   }
 }

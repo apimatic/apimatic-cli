@@ -15,6 +15,7 @@ import { TempContext } from "../../types/temp-context.js";
 import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
 import { getLanguagesConfig } from "../../types/build/build.js";
 import { FilePath } from "../../types/file/filePath.js";
+import { SpecContext } from "../../types/spec-context.js";
 
 
 const defaultPort: number = 3000 as const;
@@ -27,7 +28,7 @@ export class PortalQuickstartAction {
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
   private readonly buildFileUrl = new UrlPath(`https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`);
-  private readonly defaultSpecUrl = new UrlPath(`https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`);
+  private readonly defaultSpecUrl = new UrlPath(`https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json`);
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
@@ -65,8 +66,8 @@ export class PortalQuickstartAction {
           if (downloadFileResult.isErr()) {
             this.prompts.serviceError(downloadFileResult.error);
           } else {
-            const tempContext = new TempContext(tempDirectory);
-            specPath = await tempContext.save(downloadFileResult.value);
+            const specContext = new SpecContext(tempDirectory)
+            specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
           }
         } else {
           const fileExists = await this.fileService.fileExists(inputPath);
@@ -94,8 +95,8 @@ export class PortalQuickstartAction {
         if (downloadFileResult.isErr()) {
           this.prompts.serviceError(downloadFileResult.error);
         } else {
-          const tempContext = new TempContext(tempDirectory);
-          specPath = await tempContext.save(downloadFileResult.value);
+          const specContext = new SpecContext(tempDirectory)
+          specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
         }
       }
 
@@ -137,7 +138,7 @@ export class PortalQuickstartAction {
         return ActionResult.failed();
       }
       const tempContext = new TempContext(tempDirectory);
-      const masterBuildFilePath = await tempContext.save(masterBuildFile.value);
+      const masterBuildFilePath = await tempContext.save(masterBuildFile.value.stream);
       await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
       const extractedFolder = tempDirectory.join(this.repositoryFolderName);
 

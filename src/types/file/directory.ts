@@ -2,7 +2,7 @@ import { DirectoryPath } from "./directoryPath.js";
 import { FileName } from "./fileName.js";
 import { TocCustomPage, TocGroup } from "../toc/toc.js";
 import { FilePath } from "./filePath.js";
-
+import { TreeNode } from "../../prompts/format.js";
 
 export type DirectoryItem = FileName | Directory;
 
@@ -13,6 +13,41 @@ export class Directory {
   public constructor(directoryPath: DirectoryPath, filePaths: DirectoryItem[]) {
     this.directoryPath = directoryPath;
     this.items = filePaths;
+  }
+
+  private static readonly folderDescriptions: Record<string, string> = {
+    spec: "# Contains all API definition files",
+    content: "# Includes custom documentation pages in Markdown",
+    static: "# Includes all static files, such as images, GIFs, and PDFs"
+  };
+
+  private static readonly fileDescriptions: Record<string, string> = {
+    "toc.yml": "# Controls the structure of the side navigation bar in the API portal",
+    "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes"
+  };
+
+
+  public toTreeNode(): TreeNode {
+    const folderName = this.directoryPath.leafName();
+    const folderDescription = Directory.folderDescriptions[folderName];
+
+    return {
+      name: folderName,
+      description: folderDescription,
+      items: this.items.map((item) => {
+        if (item instanceof Directory) {
+          return item.toTreeNode();
+        }
+
+        // file case
+        const fileName = item.toString();
+        const fileDescription = Directory.fileDescriptions[fileName];
+        return {
+          name: fileName,
+          description: fileDescription
+        };
+      })
+    };
   }
 
   public async parseContentFolder(baseContentPath: DirectoryPath): Promise<TocGroup[]> {

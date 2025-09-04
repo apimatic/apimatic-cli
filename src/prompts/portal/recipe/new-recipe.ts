@@ -1,7 +1,7 @@
 import { select, text, isCancel, log, autocomplete, confirm } from "@clack/prompts";
 import { SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
-import { format as f } from "../../format.js";
+import { format as f, getTree, TreeNode } from "../../format.js";
 import { StepType } from "../../../types/recipe/recipe.js";
 import { getErrorMessage, ServiceError } from "../../../infrastructure/api-utils.js";
 
@@ -179,5 +179,10 @@ Let's proceed to adding steps to your API Recipe.`;
 
   public openRecipeMarkdownEditor() {
     log.step("Opening markdown editor for you to enter recipe content...");
+  }
+
+  displayTocStructure(tocStructure: TreeNode) {
+    const message  = getTree(tocStructure);
+    log.info(message)
   }
 }

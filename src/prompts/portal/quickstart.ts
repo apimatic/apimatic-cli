@@ -1,12 +1,13 @@
 import { Result } from "neverthrow";
 import { isCancel, log, multiselect, note, select, text } from "@clack/prompts";
 import { UrlPath } from "../../types/file/urlPath.js";
-import { format as f, withSpinner, getDirectoryTree } from "../format.js";
+import { format as f, getTree, withSpinner } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { Directory } from "../../types/file/directory.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
+import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -143,7 +144,9 @@ Let's get started!`;
 
   public inputDirectoryNotEmpty(inputDirectory: DirectoryPath) {
     log.error(
-      `The target directory ${f.path(inputDirectory)} is not empty. Please provide a path to an empty directory or clear its contents.`
+      `The target directory ${f.path(
+        inputDirectory
+      )} is not empty. Please provide a path to an empty directory or clear its contents.`
     );
   }
 
@@ -151,7 +154,7 @@ Let's get started!`;
     log.error("No build directory was provided.");
   }
 
-  public downloadBuildDirectory(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+  public downloadBuildDirectory(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner(
       "Downloading build directory",
       `Build directory downloaded successfully`,
@@ -160,7 +163,7 @@ Let's get started!`;
     );
   }
 
-  public downloadSpecFile(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+  public downloadSpecFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner("Downloading Spec file", `Spec file downloaded`, "Unable to download spec file", fn);
   }
 
@@ -176,7 +179,7 @@ ${f.link(referenceDocumentationUrl)}`;
   }
 
   public printDirectoryStructure(directory: Directory) {
-    const tree = getDirectoryTree(directory);
-    log.info(tree);
+    const message = getTree(directory.toTreeNode());
+    log.info(message);
   }
 }

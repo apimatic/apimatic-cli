@@ -98,3 +98,46 @@ export function getDirectoryTree(dir: Directory, prefix: string = "", isLast: bo
 
   return output;
 }
+
+
+export interface LeafNode {
+  name: string;
+  description?: string;
+}
+
+export interface TreeNode extends LeafNode {
+  items: Array<TreeNode | LeafNode>;
+}
+
+
+export function getTree(
+  dir: TreeNode,
+  prefix: string = "",
+  isLast: boolean = true
+): string {
+  const pointer = isLast ? "└─ " : "├─ ";
+  const folderName = dir.name;
+  const description = dir.description ? format.description(dir.description) : "";
+
+  let output = `${prefix}${pointer}${folderName}${description ? " " + description : ""}\n`;
+
+  const items = dir.items;
+  const newPrefix = prefix + (isLast ? "   " : "|  ");
+
+  items.forEach((item, index) => {
+    const last = index === items.length - 1;
+
+    if ('items' in item) {
+      output += getTree(item as TreeNode, newPrefix, last);
+    } else {
+      const filePointer = last ? "└─ " : "├─ ";
+      const fileName = item.name;
+      const fileDescription = item.description ? format.description(item.description) : "";
+      output += `${newPrefix}${filePointer}${fileName}${fileDescription ? " " + fileDescription : ""}\n`;
+    }
+  });
+
+  return output;
+}
+
+

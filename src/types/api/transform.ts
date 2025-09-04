@@ -1,16 +1,3 @@
-import { TransformationController } from "@apimatic/sdk";
-
-export type TransformationIdParams = {
-  file: string;
-  url: string;
-  format: string;
-};
-
-export type DownloadTransformationParams = {
-  id: string;
-  destinationFilePath: string;
-  transformationController: TransformationController;
-};
 
 export type TransformationData = {
   result: NodeJS.ReadableStream | Blob;

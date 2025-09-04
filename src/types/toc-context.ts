@@ -23,8 +23,7 @@ export class TocContext {
 
   public async parseTocData(): Promise<Toc> {
     const tocContent = await this.fileService.getContents(this.tocFilePath);
-    const parsedToc = parse(tocContent) as Toc;
-    return parsedToc;
+    return parse(tocContent) as Toc;
   }
 
   public async save(contents: string) {

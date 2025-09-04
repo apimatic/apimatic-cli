@@ -1,5 +1,7 @@
-import { SdlTocComponents } from "../spec-context.js";
 import { TocEndpoint, TocModel } from "../toc/toc.js";
+export type EndpointGroup = Map<string, TocEndpoint[]>;
+export type SdlTocComponents = { endpointGroups: EndpointGroup; models: TocModel[] };
+
 
 export interface Sdl {
   readonly Endpoints: SdlEndpoint[];

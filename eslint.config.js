@@ -14,6 +14,7 @@ export default [
         process: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
+        URL: "readonly",
         NodeJS: true,
       },
     },

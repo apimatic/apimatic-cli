@@ -13,7 +13,7 @@ export class TempContext {
 
   private get getTempFileName(): FilePath {
     const uuid = randomUUID();
-    return new FilePath(this.tempDirectory, new FileName(`${uuid}.zip`));
+    return new FilePath(this.tempDirectory, new FileName(`${uuid}`));
   }
 
   async zip(buildDirectory: DirectoryPath): Promise<FilePath> {

@@ -1,9 +1,8 @@
 import { FileService } from "../infrastructure/file-service.js";
 import { DirectoryPath } from "./file/directoryPath.js";
-import { TocEndpoint, TocModel } from "./toc/toc.js";
+import { FilePath } from "./file/filePath.js";
+import { FileName } from "./file/fileName.js";
 
-export type EndpointGroup = Map<string, TocEndpoint[]>;
-export type SdlTocComponents = { endpointGroups: EndpointGroup; models: TocModel[] };
 
 export class SpecContext {
   private readonly fileService = new FileService();
@@ -15,5 +14,11 @@ export class SpecContext {
 
   public async validate(): Promise<boolean> {
     return !(await this.fileService.directoryEmpty(this.specDirectory));
+  }
+
+  async save(stream: NodeJS.ReadableStream, fileName: FileName): Promise<FilePath> {
+    const filePath = new FilePath(this.specDirectory, fileName);
+    await this.fileService.writeFile(filePath, stream);
+    return filePath;
   }
 }

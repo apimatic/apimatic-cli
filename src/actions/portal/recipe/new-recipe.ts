@@ -18,6 +18,7 @@ import { FilePath } from "../../../types/file/filePath.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 import { TempContext } from "../../../types/temp-context.js";
 import { RecipeContext } from "../../../types/recipe-context.js";
+import { TreeNode } from "../../../prompts/format.js";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
@@ -105,13 +106,7 @@ export class PortalRecipeAction {
               const specFileStream = await this.fileService.getStream(specZipPath);
 
               try {
-                const sdlResult = await this.portalService.generateSdl(
-                  specFileStream,
-                  this.configDirectory,
-                  this.commandMetadata
-                );
-
-                return sdlResult;
+                return await this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata);
               } finally {
                 specFileStream.close();
               }
@@ -154,31 +149,11 @@ export class PortalRecipeAction {
       contentDirectory
     );
 
-    // TODO: Sheild fix this toc final
-    // Display build directory structure
-    // const buildDirectoryStructure = this.getBuildDirectoryStructure(recipeFileName.toString());
-    // this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
+    const tocStructure = this.getTocStructure(recipeFileName);
+    this.prompts.displayTocStructure(tocStructure);
 
     return ActionResult.success();
   }
-
-  // TODO: Refactor this after quick start merge
-  // private getBuildDirectoryStructure(recipeFileName: string): Directory {
-  //
-  //   const content = new Directory(new )
-  //   return {
-  //     content: {
-  //       "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
-  //     },
-  //     static: {
-  //       scripts: {
-  //         recipes: {
-  //           [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
-  //         }
-  //       }
-  //     }
-  //   };
-  // }
 
   private async promptForContent(): Promise<string> {
     return await withDirPath(async (tempDir) => {
@@ -194,5 +169,41 @@ export class PortalRecipeAction {
       const fileContent = await this.fileService.getContents(tempFile);
       return fileContent.replace(/\r\n|\r/g, "\n");
     });
+  }
+
+  private getTocStructure(recipeFileName: FileName): TreeNode {
+    return {
+      name: "src",
+      items: [
+        {
+          name: "content",
+          items: [
+            {
+              name: "toc.yml",
+              description: "# Contains the API Recipes group with a new page for your API recipe"
+            }
+          ]
+        },
+        {
+          name: "static",
+          items: [
+            {
+              name: "scripts",
+              items: [
+                {
+                  name: "recipes",
+                  items: [
+                    {
+                      name: `${recipeFileName}`,
+                      description: "# Generated recipe script file containing all of the steps"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
   }
 }

@@ -154,7 +154,7 @@ export class PortalRecipeGenerator {
       generatedRecipeScript = await this.formatScript(generatedRecipeScript);
     }
 
-    this.fileService.createDirectoryIfNotExists(generatedRecipeScriptsDirectoryPath);
+    await this.fileService.createDirectoryIfNotExists(generatedRecipeScriptsDirectoryPath);
     await this.fileService.writeContents(new FilePath(generatedRecipeScriptsDirectoryPath, new FileName(`${recipeFileName}.js`)), generatedRecipeScript);
   }
 
