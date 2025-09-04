@@ -6,7 +6,7 @@ export class RecipeContext {
   constructor(private readonly recipeName: string) {}
 
   getRecipeName(): FileName {
-    return new FileName(toPascalCase(this.recipeName.trim()));
+    return new FileName(toPascalCase(this.recipeName.trim()) + `.js`);
   }
 
   exists(tocData: Toc, recipeName: string, recipeFileName: FileName): boolean {
