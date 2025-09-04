@@ -22,14 +22,13 @@ export const format = {
 
   // Common message styles
   success: (text: string) => pc.green(text),
-  warning: (text: string) => pc.yellow(text),
   error: (text: string) => pc.red(text),
   info: (text: string) => pc.cyan(text),
 
   intro: (text: string) => pc.bgCyan(text),
   outroSuccess: (text: string) => pc.bgGreen(text),
   outroFailure: (text: string) => pc.bgRed(text),
-  outroCancelled: (text: string) => pc.bgWhite(text)
+  outroCancelled: (text: string) => pc.bgWhite(text),
 };
 
 export function intro(text: string) {

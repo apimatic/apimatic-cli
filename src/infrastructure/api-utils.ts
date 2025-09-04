@@ -1,4 +1,5 @@
 import axios from "axios";
+import { format as f } from "../prompts/format.js";
 
 export const enum ServiceError {
   NotFound = "NOT_FOUND",
@@ -18,7 +19,7 @@ export function getErrorMessage(error: ServiceError): string {
     case ServiceError.ServerError:
     case ServiceError.InvalidResponse:
     default:
-      return "An unexpected error occurred, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+      return `An unexpected error occurred, please try again later. If the problem persists, please reach out to our team at ${f.var('support@apimatic.io')}`;
   }
 }
 

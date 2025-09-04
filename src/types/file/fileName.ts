@@ -7,10 +7,6 @@ export class FileName {
     this.name = name;
   }
 
-  public isZipFile() {
-    return path.extname(this.name).toLowerCase() === ".zip";
-  }
-
   public isMarkDown() {
     return this.name.endsWith(".md");
   }

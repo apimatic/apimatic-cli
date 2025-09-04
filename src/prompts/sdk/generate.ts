@@ -38,11 +38,6 @@ export class SdkGeneratePrompts {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
-  public networkError(serviceError: ServiceError): void {
-    const message = getErrorMessage(serviceError);
-    this.logGenerationError(message);
-  }
-
   public logGenerationError(error: string): void {
     log.error(error);
   }

@@ -54,6 +54,7 @@ export class GenerateAction {
         this.portalService.generateSdk(specZipPath, language, this.configDir, this.commandMetadata, this.authKey)
       );
 
+      // TODO: this should be service error
       if (response.isErr()) {
         this.prompts.logGenerationError(response.error);
         return ActionResult.failed();

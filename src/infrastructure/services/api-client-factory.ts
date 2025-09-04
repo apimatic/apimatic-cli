@@ -23,5 +23,3 @@ export class ApiClientFactory {
 }
 
 export const apiClientFactory = new ApiClientFactory();
-
-export default ApiClientFactory;

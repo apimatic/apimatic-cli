@@ -87,7 +87,7 @@ Let's get started!`;
   public async selectLanguagesPrompt(): Promise<string[] | undefined> {
     const languages = (await multiselect({
       message:
-        "Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
+        "Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
       options: [
         { label: "Typescript", value: "typescript" },
         { label: "Ruby", value: "ruby" },

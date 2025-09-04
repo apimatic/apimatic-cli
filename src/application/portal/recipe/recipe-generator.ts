@@ -49,7 +49,7 @@ export class PortalRecipeGenerator {
         group: "API Recipes",
         items: []
       };
-      // Insert after the last group section, before any generate sections
+      // Insert after the last group section, before generate sections
       let lastGroupIdx = -1;
       for (let i = 0; i < toc.length; i++) {
         if (toc[i].group) lastGroupIdx = i;

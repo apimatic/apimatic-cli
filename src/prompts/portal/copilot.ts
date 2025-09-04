@@ -3,7 +3,7 @@ import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format, format as f, withSpinner } from "../format.js";
+import { format as f, withSpinner } from "../format.js";
 
 export class PortalCopilotPrompts {
   public async displayApiCopilotKeyUsageWarning() {
@@ -114,13 +114,13 @@ select any programming language in the Portal and look for the chat icon in the 
 
   public noCopilotKeyFound() {
     log.error(
-      `No copilot key found for the current subscription. Please contact support at ${format.var(
+      `No copilot key found for the current subscription. Please contact support at ${f.var(
         "support@apimatic.io"
       )}.`
     );
   }
 
   public noCopilotKeySelected() {
-    log.error("Operation cancelled. No API Copilot key was selected.");
+    log.error("No API Copilot key was selected.");
   }
 }

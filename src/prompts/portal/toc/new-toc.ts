@@ -19,7 +19,6 @@ export class PortalNewTocPrompts {
     });
 
     if (isCancel(overwrite)) {
-      cancel("Operation cancelled.");
       return false;
     }
 
