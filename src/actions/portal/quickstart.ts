@@ -156,7 +156,7 @@ export class PortalQuickstartAction {
       await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
 
       const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
-      this.prompts.printDirectoryStructure(buildDirectoryStructure);
+      this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
 
       const portalDirectory = inputDirectory.join("portal");
       const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);

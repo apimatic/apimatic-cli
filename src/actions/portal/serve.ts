@@ -49,7 +49,8 @@ export class PortalServeAction {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    const liveReloadServer = createLiveReloadServer();
+    const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
+    const liveReloadServer = createLiveReloadServer({ port: liveReloadPort});
     const server = this.application
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
@@ -74,6 +75,8 @@ export class PortalServeAction {
       server.close();
       return ActionResult.success();
     }
+
+    this.prompts.hotReloadEnabled(buildDirectory);
 
     const watcher = chokidar.watch(buildDirectory.toString(), {
       ignored: [/(^|[/\\])\..+/],

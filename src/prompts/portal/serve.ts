@@ -1,7 +1,8 @@
-import { log } from "@clack/prompts";
+import { log, note } from "@clack/prompts";
 import { format as f } from "../format.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { once } from "events";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 export class PortalServePrompts {
   public usingFallbackPort(currentPort: number, availablePort: number) {
@@ -12,12 +13,12 @@ export class PortalServePrompts {
   }
 
   public portalServed(urlPath: UrlPath) {
-    const message = `Portal hosted at ${f.link(urlPath.toString())}`;
+    const message = `The portal is running at ${f.link(urlPath.toString())}`;
     log.message(message);
   }
 
   public promptForExit() {
-    const message = "Press CTRL+C to exit.";
+    const message = "Press CTRL+C to stop the server.";
     log.message(message);
   }
 
@@ -28,11 +29,16 @@ export class PortalServePrompts {
 
   public watcherError() {
     const message =
-      "An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at support@apimatic.io";
+      `An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at ${f.var('support@apimatic.io')}`;
     log.error(message);
   }
 
   public async blockExecution() {
     await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
+  }
+
+  public hotReloadEnabled(srcDirectory: DirectoryPath) {
+    note(`Hot reload is enabled.
+Watching the directory ${f.path(srcDirectory)} for any changes`, `Note`);
   }
 }

@@ -50,6 +50,6 @@ An error report has been written at the destination path: ${f.path(reportPath)}`
   }
 
   public portalGenerated(portal: DirectoryPath) {
-    log.info(`Generated portal at ${f.path(portal)}.`);
+    log.info(`Portal artifacts can be found at ${f.path(portal)}.`);
   }
 }

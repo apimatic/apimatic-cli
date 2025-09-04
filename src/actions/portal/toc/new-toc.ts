@@ -109,47 +109,21 @@ export class PortalNewTocAction {
       contentGroups = await contentContext.extractContentGroups();
     }
 
-    const tocResult = await this.prompts.generateTOC(
-      this.generateToc(
-        tocContext,
-        sdlComponents.endpointGroups,
-        sdlComponents.models,
-        expandEndpoints,
-        expandModels,
-        contentGroups
-      )
+
+    const toc = this.tocGenerator.createTocStructure(
+      sdlComponents.endpointGroups,
+      sdlComponents.models,
+      expandEndpoints,
+      expandModels,
+      contentGroups
     );
 
-    if (tocResult.isErr()) {
-      this.prompts.logError(tocResult.error);
-      return ActionResult.failed();
-    }
+    const yamlString = this.tocGenerator.transformToYaml(toc);
+    const tocFilePath = await tocContext.save(yamlString);
+
+
+    this.prompts.tocCreated(tocFilePath)
+
     return ActionResult.success();
-  }
-
-  private async generateToc(
-    tocContext: TocContext,
-    endpointGroups: Map<string, TocEndpoint[]>,
-    models: TocModel[],
-    expandEndpoints: boolean,
-    expandModels: boolean,
-    contentGroups: TocGroup[]
-  ): Promise<Result<FilePath, string>> {
-    try {
-      const toc = this.tocGenerator.createTocStructure(
-        endpointGroups,
-        models,
-        expandEndpoints,
-        expandModels,
-        contentGroups
-      );
-
-      const yamlString = this.tocGenerator.transformToYaml(toc);
-      const tocFilePath = await tocContext.save(yamlString);
-
-      return ok(tocFilePath);
-    } catch (error) {
-      return err(`Failed to generate TOC: ${(error as Error).message}`);
-    }
   }
 }

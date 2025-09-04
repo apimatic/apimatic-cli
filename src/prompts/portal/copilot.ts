@@ -52,7 +52,6 @@ To see your copilot: If your portal is already running, refresh the page.
 Otherwise, run '${f.cmdAlt("apimatic", "portal", "serve")}',
 select any programming language in the Portal and
 look for the chat icon in the bottom-right corner.`,
-
       `Next Steps`
     );
   }
@@ -73,8 +72,8 @@ look for the chat icon in the bottom-right corner.`,
   public async spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
     return withSpinner(
       "Retrieving your subscription info",
-      "Retrieved subscription info",
-      "Error retrieving subscription info",
+      "Subscription info retrieved",
+      "Subscription info retrieval failed",
       fn
     );
   }
@@ -83,7 +82,7 @@ look for the chat icon in the bottom-right corner.`,
     const confirmKeyUsage = await confirm({
       message:
         "API Copilot can only be active on one Portal at a time. Configuring it on this Portal will disable it on any previously configured Portal.\n" +
-        `Do you want to use this key: '${f.var(apiCopilotKey)}'?`,
+        `Do you want to use this key: ${f.var(apiCopilotKey)}?`,
       initialValue: true
     });
 

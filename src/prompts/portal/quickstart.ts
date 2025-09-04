@@ -16,14 +16,13 @@ const defaultPortalDirectoryPath = process.cwd();
 
 export class PortalQuickstartPrompts {
   public welcomeMessage() {
-    log.info(`Hello there.`);
+    log.info(`Welcome to the Portal Quickstart Wizard.`);
     const message = `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.
 Let's get started!`;
     log.message(message);
   }
   public importSpecStep() {
-    const message = `Step 1 of 4: Import your OpenAPI Definition`;
-    log.step(message);
+    log.info(`Step 1 of 4: Import your OpenAPI Definition`);
   }
 
   public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<ResourceInput | undefined> {
@@ -75,13 +74,11 @@ Let's get started!`;
   }
 
   public validateSpecStep() {
-    const message = `Step 2 of 4: Validate and Lint your OpenAPI file`;
-    log.step(message);
+    log.info(`Step 2 of 4: Validate and Lint your OpenAPI file`);
   }
 
   public selectLanguagesStep() {
-    const message = `Step 3 of 4: Select programming languages`;
-    log.step(message);
+    log.info(`Step 3 of 4: Select programming languages`);
   }
 
   public async selectLanguagesPrompt(): Promise<string[] | undefined> {
@@ -112,8 +109,7 @@ Let's get started!`;
   }
 
   public selectInputDirectoryStep() {
-    const message = `Step 4 of 4: Generate source files for Docs as Code`;
-    log.step(message);
+    log.info(`Step 4 of 4: Generate source files for Docs as Code`);
   }
 
   public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
@@ -177,9 +173,10 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error(getErrorMessage(error));
   }
 
-  public printDirectoryStructure(directory: Directory) {
+  public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
+    const heading = `${f.var('src')} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());
-    log.info(message);
+    log.info(heading + message);
   }
 
   public specValidationFailed() {

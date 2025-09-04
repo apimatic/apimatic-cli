@@ -7,14 +7,9 @@ import { ServiceError } from "../../../infrastructure/api-utils.js";
 import { Sdl } from "../../../types/sdl/sdl.js";
 
 export class PortalNewTocPrompts {
-
-  public generateTOC(fn: Promise<Result<FilePath, string>>) {
-    return withSpinner("Generating TOC", "TOC generated successfully.", "TOC generation failed.", fn);
-  }
-
   public async overwriteToc(tocPath: FilePath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `The destination file '${tocPath}' already exists, do you want to overwrite it?`,
+      message: `The destination file ${f.path(tocPath)} already exists, do you want to overwrite it?`,
       initialValue: false
     });
 
@@ -55,5 +50,9 @@ export class PortalNewTocPrompts {
       "Endpoint groups and models extraction failed.",
       fn
     );
+  }
+
+  public tocCreated(tocPath: FilePath) {
+    log.info(`The TOC file successfully created at: ${f.path(tocPath)}`)
   }
 }

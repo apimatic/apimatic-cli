@@ -25,6 +25,10 @@ export class ActionResult {
     return new ActionResult(ResultType.Cancel, " Cancelled ");
   }
 
+  static stopped() {
+    return new ActionResult(ResultType.Cancel, " Stopped ");
+  }
+
   public getMessage() {
     return this.message;
   }

@@ -4,7 +4,6 @@ import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { format as f, getTree, TreeNode } from "../../format.js";
 import { StepType } from "../../../types/recipe/recipe.js";
 import { getErrorMessage, ServiceError } from "../../../infrastructure/api-utils.js";
-import { Dir } from "node:fs";
 
 export class PortalRecipePrompts {
   public displayWelcomeMessage(): void {
@@ -14,7 +13,7 @@ export class PortalRecipePrompts {
 An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.
 Learn more: ${f.link("https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes")}
 Let's get started!`;
-    log.message(message);
+    log.info(message);
   }
 
   public recipeNameEmpty() {
