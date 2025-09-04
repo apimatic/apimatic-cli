@@ -39,6 +39,10 @@ export class PortalServeAction {
     onAfterServe?: () => void
   ): Promise<ActionResult> {
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
+    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+    if (result.isFailed()) {
+      return ActionResult.failed();
+    }
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort != port) {
@@ -51,21 +55,21 @@ export class PortalServeAction {
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
 
-    if (!hotReload) {
-      await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-      const portalUrl = new UrlPath(`http://localhost:${servePort}`);
-      this.prompts.portalServed(portalUrl);
-      if (openInBrowser) {
-        await this.launcherService.openUrlInBrowser(portalUrl);
-      }
-      this.prompts.promptForExit();
+    const portalUrl = new UrlPath(`http://localhost:${servePort}`);
+    this.prompts.portalServed(portalUrl);
+    if (openInBrowser) {
+      await this.launcherService.openUrlInBrowser(portalUrl);
+    }
+    this.prompts.promptForExit();
 
+    if (!hotReload) {
       if (onAfterServe) {
         onAfterServe();
       }
 
       this.clearStandardInput();
       await this.prompts.blockExecution();
+
       liveReloadServer.close();
       server.close();
       return ActionResult.success();
@@ -73,7 +77,7 @@ export class PortalServeAction {
 
     const watcher = chokidar.watch(buildDirectory.toString(), {
       ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: false, // TODO: check this flag with Saeed
+      ignoreInitial: true,
       persistent: true,
       awaitWriteFinish: true,
       atomic: true
@@ -106,9 +110,7 @@ export class PortalServeAction {
         });
 
         await debounceService.batchSingleRequest(async () => {
-          if (this.isPortalServed) {
-            this.prompts.changesDetected();
-          }
+          this.prompts.changesDetected();
 
           // TODO: Verify if this is needed.
           if (!eventQueue.has(eventId)) {
@@ -116,19 +118,6 @@ export class PortalServeAction {
           }
 
           await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-
-          const portalUrl = new UrlPath(`http://localhost:${servePort}`);
-          if (!this.isPortalServed) {
-            this.prompts.portalServed(portalUrl);
-
-            if (openInBrowser) {
-              await this.launcherService.openUrlInBrowser(portalUrl);
-            }
-
-            this.prompts.promptForExit();
-
-            this.isPortalServed = true;
-          }
 
           liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();
@@ -139,6 +128,7 @@ export class PortalServeAction {
       });
 
     // Wait for SIGINT or SIGTERM
+    this.clearStandardInput();
     await this.prompts.blockExecution();
 
     await watcher.close();
