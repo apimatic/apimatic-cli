@@ -1,5 +1,3 @@
-import path from "path";
-
 export class FileName {
   private readonly name: string;
 

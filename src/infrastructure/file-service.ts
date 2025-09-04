@@ -82,6 +82,19 @@ export class FileService {
     }
   }
 
+  public getRelativePath(filePath: FilePath, basePath: DirectoryPath): string {
+    const filePathStr = filePath.toString();
+    const basePathStr = basePath.toString();
+
+    if (filePathStr.startsWith(basePathStr)) {
+      const relativePath = filePathStr.substring(basePathStr.length).replace(/^[/\\]/, "");
+      return relativePath.replace(/\\/g, "/");
+    }
+
+    // Normalize the full path if it doesn't start with basePath
+    return filePathStr.replace(/\\/g, "/");
+  }
+
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }

@@ -18,7 +18,7 @@ export class TocContext {
   }
 
   public async exists() {
-    return !(await this.fileService.fileExists(this.tocFilePath));
+    return await this.fileService.fileExists(this.tocFilePath);
   }
 
   public async parseTocData(): Promise<Toc> {

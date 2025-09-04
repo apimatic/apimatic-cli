@@ -1,4 +1,4 @@
-import { cancel, confirm, isCancel, log } from "@clack/prompts";
+import { confirm, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
 import { Result } from "neverthrow";
 import { format as f, withSpinner } from "../../format.js";
@@ -48,7 +48,7 @@ export class PortalNewTocPrompts {
     log.error(message);
   }
 
-  public extractModels(fn: Promise<Result<Sdl, ServiceError>>) {
+  public extractEndpointGroupsAndModels(fn: Promise<Result<Sdl, ServiceError>>) {
     return withSpinner(
       "Extracting endpoint groups and models",
       "Endpoint groups and models extracted.",

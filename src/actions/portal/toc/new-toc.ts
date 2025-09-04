@@ -78,11 +78,12 @@ export class PortalNewTocAction {
           const specZipPath = await tempContext.zip(specDirectory);
           const specFileStream = await this.fileService.getStream(specZipPath);
           try {
-            const result = await this.prompts.extractModels(
+            const result = await this.prompts.extractEndpointGroupsAndModels(
               this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata)
             );
             if (result.isErr()) {
-              return err(result.error);
+              this.prompts.fallingBackToDefault();
+              return ok({ endpointGroups: new Map(), models: [] } as SdlComponents);
             }
             return ok(getEndpointGroupsAndModels(result.value));
           } finally {
