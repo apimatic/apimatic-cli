@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.21",
+    "version": "1.1.0-alpha.22",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
