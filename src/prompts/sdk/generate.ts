@@ -6,7 +6,7 @@ import { Result } from "neverthrow";
 export class SdkGeneratePrompts {
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `The destination '${directory}' is not empty, do you want to overwrite?`,
+      message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,
       initialValue: false
     });
 

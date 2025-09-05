@@ -12,8 +12,8 @@ export const DestinationFormats = {
   Swagger10: "json",
   Swagger20: "json",
   SwaggerYaml: "yaml",
-  RAML: "yaml",
-  RAML10: "yaml",
+  RAML: "raml",
+  RAML10: "raml",
   Postman10: "json",
   Postman20: "json",
   GraphQlSchema: "json"
