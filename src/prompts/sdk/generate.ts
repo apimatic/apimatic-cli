@@ -1,13 +1,12 @@
-import { outro, spinner, isCancel, confirm, log } from "@clack/prompts";
-import { getMessageInRedColor, getMessageInMagentaColor, getMessageInCyanColor } from "../../utils/utils.js";
+import { isCancel, confirm, log } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { format as f, withSpinner } from "../format.js";
+import { Result } from "neverthrow";
 
 export class SdkGeneratePrompts {
-  private readonly spin = spinner();
-
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `The destination '${directory}' is not empty, do you want to overwrite?`,
+      message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,
       initialValue: false
     });
 
@@ -18,33 +17,31 @@ export class SdkGeneratePrompts {
     return overwrite;
   }
 
-  displaySdkGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Generating SDK"));
+  public sameSpecAndSdkDir(directory: DirectoryPath) {
+   const message = `The ${f.var("src")} and ${f.var("portal")} directories must be different. Current value: ${f.path(
+      directory
+    )}`;    this.logGenerationError(message);
   }
 
-  displaySdkGenerationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor("SDK generated successfully."));
-    this.cleanUpStandardInput();
+  public invalidSpecDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    this.logGenerationError(message);
   }
 
-  displaySdkGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`SDK Generation failed.`), 1);
-    this.cleanUpStandardInput();
+  public destinationDirNotEmpty() {
+    const message = `Please enter a different destination folder or remove the existing files and try again.`;
+    this.logGenerationError(message);
   }
 
-  displayOutroMessage(generatedSdkPath: DirectoryPath): void {
-    outro(`The generated SDK can be found at ${generatedSdkPath}`);
+  public generateSDK(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
+    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
-  logError(error: string): void {
+  public logGenerationError(error: string): void {
     log.error(error);
   }
 
-  //This clears the standard input to allow interrupts like CTRL+C to work properly.
-  private cleanUpStandardInput(): void {
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(false);
-      process.stdin.pause();
-    }
+  public sdkGenerated(sdk: DirectoryPath) {
+    log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }
 }

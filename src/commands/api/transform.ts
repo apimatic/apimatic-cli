@@ -1,122 +1,80 @@
-import * as path from "path";
-import fsExtra from "fs-extra";
-import { Flags, Command } from "@oclif/core";
-import { TransformationController, Transformation, Client, ApiError } from "@apimatic/sdk";
-import { AuthenticationError, loggers } from "../../types/utils.js";
-import { printValidationMessages } from "../../utils/utils.js";
-import { getFileNameFromPath, replaceHTML } from "../../utils/utils.js";
-import { DestinationFormats, TransformationFormats } from "../../types/api/transform.js";
-import { getValidFormat, getTransformationId, downloadTransformationFile } from "../../controllers/api/transform.js";
+import { Command, Flags } from "@oclif/core";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
-import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { createApiClient, createAuthorizationHeader } from "../../infrastructure/api-client-utils.js";
+import { TransformAction } from "../../actions/api/transform.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { format, intro, outro } from "../../prompts/format.js";
+import { createResourceInput } from "../../types/file/resource-input.js";
+import { TransformationFormats } from "../../types/api/transform.js";
+import { ExportFormats } from "@apimatic/sdk";
 
-const formats: string = Object.keys(TransformationFormats).join("|");
+const DEFAULT_WORKING_DIRECTORY = "./";
+
 export default class Transform extends Command {
-  static description = `Transform API specifications from one format to another. Supports [10+ different formats](https://www.apimatic.io/transformer/#supported-formats) including OpenApi/Swagger, RAML, WSDL and Postman Collections.`;
+  static readonly summary = "Transform API specifications between different formats";
+
+  static readonly description = `Transform API specifications from one format to another.
+Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.`;
+
+  static readonly cmdTxt = format.cmd("apimatic", "api", "transform");
 
   static examples = [
-    `apimatic api:transform --format=OPENAPI3YAML --file="./specs/sample.json" --destination="D:/"`,
-    `apimatic api:transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json"  --destination="D:/"`
+    `${Transform.cmdTxt} ${format.flag("format", "OPENAPI3YAML")} ${format.flag(
+      "file",
+      "./specs/sample.json"
+    )} ${format.flag("destination", "./")}`,
+    `${Transform.cmdTxt} ${format.flag("format", "RAML")} ${format.flag(
+      "url",
+      '"https://petstore.swagger.io/v2/swagger.json"'
+    )} ${format.flag("destination", "./")}`
   ];
 
   static flags = {
-    format: Flags.string({
-      parse: async (format: string) => getValidFormat(format),
-      required: true,
-      description: `specification format to transform API specification into
-${formats}`
-    }),
+      format: Flags.string({
+        required: true,
+        description: "Specification format to transform API specification into",
+        options: Object.keys(TransformationFormats)
+      }),
     file: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: "",
-      description: "path to the API specification file to transform"
+      description: "Path to the API specification file to transform"
     }),
     url: Flags.string({
-      default: "",
-      description:
-        "URL to the API specification file to transform. Can be used in place of the --file option if the API specification is publicly available."
+      description: "URL to the API specification file to transform (publicly accessible)"
     }),
     destination: Flags.string({
-      parse: async (input) => path.resolve(input),
-      default: path.resolve("./"),
-      description: "directory to download transformed file to",
-      char: "d"
+      char: "d",
+      description: "Directory to save the transformed file to",
+      default: DEFAULT_WORKING_DIRECTORY
     }),
     ...FlagsProvider.force,
     ...FlagsProvider.authKey
   };
 
   async run() {
-    const { flags } = await this.parse(Transform);
-    const fileName = flags.file ? getFileNameFromPath(flags.file) : getFileNameFromPath(flags.url);
-    const destinationFormat: string = DestinationFormats[flags.format as keyof typeof DestinationFormats];
-    const destinationFilePath: string = path.join(
-      flags.destination,
-      `${fileName}_${flags.format}.${destinationFormat}`.toLowerCase()
-    );
+    const {
+      flags: { format, file, url, destination, force, "auth-key": authKey }
+    } = await this.parse(Transform);
 
-    // Check if destination file already exist and throw error if force flag is not set
-    if (fsExtra.existsSync(destinationFilePath) && !flags.force) {
-      throw new Error(`Can't download transformed file to path ${destinationFilePath}, because it already exists`);
-    }
+  const workingDirectory = new DirectoryPath(destination ?? DEFAULT_WORKING_DIRECTORY);
+  const transformedApiDirectory = workingDirectory.join("transformations");
+  const specFile = createResourceInput(file, url);
+  // Directly map the format flag to ExportFormats using TransformationFormats
+  const key = format as keyof typeof TransformationFormats;
+  const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;
+  const parsedFormat = ExportFormats[transformationFormat];
 
-    try {
-      // Check if paths provided are valid
-      if (flags.file && !(await fsExtra.pathExists(flags.file))) {
-        throw new Error(`Transformation file: ${flags.file} does not exist`);
-      } else if (!(await fsExtra.pathExists(flags.destination))) {
-        throw new Error(`Destination path: ${flags.destination} does not exist`);
-      }
-      const overrideAuthKey = flags["auth-key"] ? flags["auth-key"] : null;
+    const commandMetadata: CommandMetadata = {
+      commandName: Transform.id,
+      shell: this.config.shell
+    };
 
-      const authInfo: AuthInfo | null = await getAuthInfo(this.config.configDir);
-      const authorizationHeader = createAuthorizationHeader(authInfo, overrideAuthKey);
-      const client: Client = createApiClient(authorizationHeader, 0);
-      const transformationController: TransformationController = new TransformationController(client);
-
-      const { id, apiValidationSummary }: Transformation = await getTransformationId(flags, transformationController);
-
-      const logFunctions: loggers = {
-        log: (message) => this.log(message),
-        warn: (message) => this.warn(message),
-        error: (message) => this.error(message)
-      };
-      printValidationMessages(apiValidationSummary, logFunctions);
-
-      const savedTransformationFile: string = await downloadTransformationFile({
-        id,
-        destinationFilePath,
-        transformationController
-      });
-      this.log(`Success! Your transformed file is located at ${savedTransformationFile}`);
-    } catch (error) {
-      if ((error as ApiError).result) {
-        const apiError = error as ApiError;
-
-        // TODO: Hopefully, this type-cast won't be necessary when the SDK is
-        // updated to throw the right exception type for this status code.
-        const result = apiError.result as Record<string, unknown> | undefined;
-        if (apiError.statusCode === 422 && result && "errors" in result && Array.isArray(result.errors)) {
-          this.error(replaceHTML(`${result.errors}`));
-        } else if (apiError.statusCode === 422 && apiError.body && typeof apiError.body === "string") {
-          this.error(JSON.parse(apiError.body)["dto.FileUrl"][0]);
-        } else if (apiError.statusCode === 401 && apiError.body && typeof apiError.body === "string") {
-          this.error("You are not authorized to perform this action");
-        } else if (apiError.statusCode === 500) {
-          this.error(apiError.message);
-        }
-      } else if ((error as AuthenticationError).statusCode === 401) {
-        this.error("You are not authorized to perform this action");
-      } else if (
-        (error as AuthenticationError).statusCode === 402 &&
-        (error as AuthenticationError).body &&
-        typeof (error as AuthenticationError).body === "string"
-      ) {
-        this.error((error as AuthenticationError).body);
-      } else {
-        this.error(`${(error as Error).message}`);
-      }
-    }
+    intro("Transform API");
+    const action = new TransformAction(this.getConfigDir(), commandMetadata, authKey);
+    const result = await action.execute(specFile, parsedFormat, transformedApiDirectory, force);
+    outro(result);
   }
+
+  private readonly getConfigDir = () => {
+    return new DirectoryPath(this.config.configDir);
+  };
 }

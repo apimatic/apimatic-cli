@@ -12,9 +12,15 @@ export class PortalContext {
   constructor(private readonly portalDirectory: DirectoryPath) {
   }
 
-  public get ZipPath(): FilePath {
+  private get ZipPath(): FilePath {
     // TODO: add checks for build file path
     return new FilePath(this.portalDirectory, new FileName("portal.zip"));
+  }
+
+  private get reportPath(): FilePath {
+    // TODO: add checks for build file path
+    const debugPath = this.portalDirectory.join('apimatic-debug');
+    return new FilePath(debugPath, new FileName("apimatic-report.html"))
   }
 
   public async exists() {
@@ -28,5 +34,11 @@ export class PortalContext {
     } else {
       await this.zipService.unArchive(tempPortalFilePath, this.portalDirectory);
     }
+  }
+
+  public async saveError(tempErrorFilePath: FilePath) {
+    await this.fileService.cleanDirectory(this.portalDirectory);
+    await this.zipService.unArchive(tempErrorFilePath, this.portalDirectory);
+    return this.reportPath;
   }
 }

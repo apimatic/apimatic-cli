@@ -15,12 +15,12 @@ const hook: Hook.CommandNotFound = async function (opts) {
 
   let binHelp = `${opts.config.bin} help`;
   const idSplit = opts.id.split(":");
-  if (opts.config.findTopic(idSplit[0])) {    
+  if (opts.config.findTopic(idSplit[0])) {
     binHelp = `${binHelp} ${idSplit[0]}`;
   }
-  
+
   let suggestion: string | null;
-  if (/:?help:?/.test(opts.id)) {  
+  if (/:?help:?/.test(opts.id)) {
     suggestion = ["help", ...opts.id.split(":").filter((cmd) => cmd !== "help")].join(":");
   } else {
     suggestion = utils.closest(opts.id, commandIDs);
@@ -30,14 +30,14 @@ const hook: Hook.CommandNotFound = async function (opts) {
 
   const originalCmd = toConfiguredId(opts.id, this.config);
   this.warn(`${yellow(originalCmd)} is not a ${opts.config.bin} command.`);
-  
+
   if (!process.stdin.isTTY || !suggestion) {
     this.error(`Run ${cyan.bold(binHelp)} for a list of available commands.`, {
       exit: 127
     });
   }
 
-  let response = false;
+  let response: boolean;
   try {
     response = await utils.getConfirmation(readableSuggestion!);
   } catch {

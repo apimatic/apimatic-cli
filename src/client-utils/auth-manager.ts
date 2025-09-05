@@ -14,9 +14,8 @@ export type AuthInfo = {
  */
 export async function getAuthInfo(configDir: string): Promise<AuthInfo | null> {
   try {
-    const data: AuthInfo | null = JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
-    return data;
-  } catch (e) {
+    return JSON.parse(await fs.readFile(path.join(configDir, "config.json"), "utf8"));
+  } catch {
     return null;
   }
 }
@@ -47,12 +46,12 @@ export async function setAuthInfo(
   return await fs.writeFile(configFilePath, JSON.stringify(credentials));
 }
 
-export async function removeAuthInfo(configDir: string): Promise<void> {
+export async function removeAuthInfo(configDir: DirectoryPath): Promise<void> {
   const credentials: AuthInfo = {
     email: "",
     authKey: ""
   };
-  const configFilePath = path.join(configDir, "config.json");
+  const configFilePath = path.join(configDir.toString(), "config.json");
 
   if (!fs.existsSync(configFilePath)) fs.createFileSync(configFilePath);
 

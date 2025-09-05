@@ -1,4 +1,6 @@
-export class WatcherHandler {
+import { clearTimeout, setTimeout } from "timers";
+
+export class DebounceService {
   private isProcessing = false;
   private latestHandler: (() => Promise<void>) | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
@@ -8,7 +10,7 @@ export class WatcherHandler {
     this.debounceMs = debounceMs;
   }
 
-  async execute(handler: () => Promise<void>): Promise<void> {
+  async batchSingleRequest(handler: () => Promise<void>): Promise<void> {
     // Always store the latest handler
     this.latestHandler = handler;
 
@@ -49,7 +51,7 @@ export class WatcherHandler {
   }
 
   // Method to clear any pending execution.
-  public cancel(): void {
+  public close(): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;

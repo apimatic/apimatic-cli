@@ -1,27 +1,32 @@
-import * as path from "path";
-import fs from "fs";
 import prettier from "prettier";
 import { stringify } from "yaml";
 import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../../types/recipe/recipe.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { FileService } from "../../../infrastructure/file-service.js";
+import { Toc } from "../../../types/toc/toc.js";
+import { FilePath } from "../../../types/file/filePath.js";
+import { FileName } from "../../../types/file/fileName.js";
+import { BuildContext } from "../../../types/build-context.js";
 
 export class PortalRecipeGenerator {
   //TODO: Replace tocFileContent any type with concrete type.
+  private readonly fileService: FileService = new FileService();
+
   public async createRecipe(
     recipe: SerializableRecipe,
-    buildConfig: any,
-    tocFileContent: any,
-    tocFilePath: string,
+    tocFileContent: Toc,
+    tocFilePath: FilePath,
     recipeName: string,
-    recipeFileName: string,
-    buildConfigFilePath: string,
-    contentFolderPath: string
+    recipeFileName: FileName,
+    buildContext: BuildContext,
+    buildDirectory: DirectoryPath
   ) {
     await this.addRecipeToToc(tocFileContent, tocFilePath, recipeName, recipeFileName);
-    await this.registerRecipeInBuildConfigFile(buildConfig, recipeName, recipeFileName, buildConfigFilePath);
-    await this.createMarkdownFile(recipeFileName, contentFolderPath);
+    await this.registerRecipeInBuildConfigFile(buildContext, recipeName, recipeFileName);
+    await this.createMarkdownFile(recipeFileName, buildDirectory.join("content"));
 
     const generatedRecipeScript = await this.createScriptFromRecipe(recipe);
-    const generatedRecipeScriptsDirectoryPath = path.join(contentFolderPath, "static", "scripts", "recipes");
+    const generatedRecipeScriptsDirectoryPath = buildDirectory.join("static", "scripts", "recipes");
     await this.saveGeneratedRecipeScriptToBuildDirectory(
       generatedRecipeScript,
       generatedRecipeScriptsDirectoryPath,
@@ -30,12 +35,12 @@ export class PortalRecipeGenerator {
   }
 
   private async addRecipeToToc(
-    tocData: any,
-    tocFilePath: string,
+    tocData: Toc,
+    tocFilePath: FilePath,
     recipeName: string,
-    recipeFileName: string
+    recipeFileName: FileName
   ): Promise<void> {
-    let toc = tocData.toc;
+    let toc = tocData.toc as any;
     let apiRecipesGroup = toc.find((item: any) => item.group === "API Recipes");
 
     if (!apiRecipesGroup) {
@@ -44,7 +49,7 @@ export class PortalRecipeGenerator {
         group: "API Recipes",
         items: []
       };
-      // Insert after the last group section, before any generate sections
+      // Insert after the last group section, before generate sections
       let lastGroupIdx = -1;
       for (let i = 0; i < toc.length; i++) {
         if (toc[i].group) lastGroupIdx = i;
@@ -61,20 +66,21 @@ export class PortalRecipeGenerator {
         page: recipeName,
         file: `recipes/${recipeFileName}.md`
       });
-      await fs.promises.writeFile(tocFilePath, stringify(tocData));
+      await this.fileService.writeContents(tocFilePath, stringify(tocData));
     }
   }
 
   private async registerRecipeInBuildConfigFile(
-    buildConfig: any,
+    buildContext: BuildContext,
     recipeName: string,
-    recipeFileName: string,
-    buildConfigFilePath: string
+    recipeFileName: FileName,
   ): Promise<void> {
+
+    const buildConfig = await buildContext.getBuildFileContents();
     if (!buildConfig.recipes) {
       buildConfig.recipes = {};
     }
-    const recipesConfig = buildConfig.recipes;
+    const recipesConfig = buildConfig.recipes as any;
 
     if (!recipesConfig.workflows) {
       recipesConfig.workflows = [];
@@ -98,24 +104,15 @@ export class PortalRecipeGenerator {
       recipesConfig.workflows.push(newWorkflow);
     }
 
-    await this.writeRecipesConfigToBuildConfigFile(recipesConfig, buildConfigFilePath);
+    await buildContext.updateBuildFileContents(buildConfig)
   }
 
-  private async writeRecipesConfigToBuildConfigFile(recipesConfig: string, buildConfigFilePath: string): Promise<void> {
-    const fileData = await fs.promises.readFile(buildConfigFilePath, "utf-8");
-    const buildConfig = JSON.parse(fileData);
-
-    buildConfig.recipes = recipesConfig;
-
-    await fs.promises.writeFile(buildConfigFilePath, JSON.stringify(buildConfig, null, 2));
-  }
-
-  private async createMarkdownFile(recipeFileName: string, contentFolder: string): Promise<void> {
-    const directory = path.join(contentFolder, "content", "recipes");
+  private async createMarkdownFile(recipeFileName: FileName, contentFolder: DirectoryPath): Promise<void> {
+    const directory = contentFolder.join("recipes");
     const markdownFileContent = this.getMarkdownFileContent();
 
-    fs.mkdirSync(directory, { recursive: true });
-    fs.writeFileSync(`${directory}/${recipeFileName}.md`, markdownFileContent);
+    await this.fileService.createDirectoryIfNotExists(directory);
+    await this.fileService.writeContents(new FilePath(directory, new FileName(`${recipeFileName}.md`)), markdownFileContent);
   }
 
   private async createScriptFromRecipe(recipe: SerializableRecipe): Promise<string> {
@@ -149,20 +146,16 @@ export class PortalRecipeGenerator {
 
   private async saveGeneratedRecipeScriptToBuildDirectory(
     generatedRecipeScript: string,
-    generatedRecipeScriptsDirectoryPath: string,
-    recipeFileName: string,
+    generatedRecipeScriptsDirectoryPath: DirectoryPath,
+    recipeFileName: FileName,
     format: boolean = false
   ): Promise<void> {
     if (format) {
       generatedRecipeScript = await this.formatScript(generatedRecipeScript);
     }
 
-    fs.mkdirSync(generatedRecipeScriptsDirectoryPath, { recursive: true });
-    await fs.promises.writeFile(
-      `${generatedRecipeScriptsDirectoryPath}/${recipeFileName}.js`,
-      generatedRecipeScript,
-      "utf8"
-    );
+    await this.fileService.createDirectoryIfNotExists(generatedRecipeScriptsDirectoryPath);
+    await this.fileService.writeContents(new FilePath(generatedRecipeScriptsDirectoryPath, new FileName(`${recipeFileName}.js`)), generatedRecipeScript);
   }
 
   private generateVerifyFunction(): string {

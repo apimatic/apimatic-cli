@@ -1,11 +1,16 @@
+import { DirectoryPath } from "../file/directoryPath.js";
+
 export interface BuildConfig {
   generatePortal?: PortalConfig;
-  apiCopilotConfig?: CopilotConfig;  
+  apiCopilotConfig?: CopilotConfig;
   [key: string]: unknown;
 }
 
 export interface PortalConfig {
   contentFolder?: string;
+  languageConfig: { [key: string]: object };
+  [key: string]: unknown;
+  apiSpecPath?: DirectoryPath;
 }
 
 export interface CopilotConfig {
@@ -14,14 +19,9 @@ export interface CopilotConfig {
   welcomeMessage: string;
 }
 
-export function updateCopilotConfig(
-  buildConfig: BuildConfig,
-  copilotConfig: CopilotConfig
-): BuildConfig {
-  return {
-    ...buildConfig,
-    apiCopilotConfig: {
-      ...copilotConfig,
-    },
-  };
+export function getLanguagesConfig(selectedLanguages: string[]) {
+  return selectedLanguages.reduce((config, lang) => {
+    config[lang] = {};
+    return config;
+  }, {} as { [key: string]: object });
 }

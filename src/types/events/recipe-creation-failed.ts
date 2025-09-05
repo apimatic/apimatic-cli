@@ -1,4 +1,4 @@
-import { DomainEvent } from "../../types/events/domain-event.js";
+import { DomainEvent } from "./domain-event.js";
 
 export class RecipeCreationFailedEvent extends DomainEvent {
   protected readonly eventName = RecipeCreationFailedEvent.name;

@@ -1,212 +1,92 @@
-import fs from "fs";
-import * as path from "path";
-import treeify from "treeify";
-import { intro, outro, text, select, multiselect, log, isCancel, cancel, password } from "@clack/prompts";
-import {
-  getMessageInCyanColor,
-  getMessageInGreenColor,
-  getMessageInOrangeColor,
-  getMessageInMagentaColor,
-  getMessageInRedColor,
-  isValidUrl,
-  directoryToJson
-} from "../../utils/utils.js";
-import { BasePrompts } from "./common/base-prompts.js";
-import axios from "axios";
+import { Result } from "neverthrow";
+import { isCancel, log, multiselect, note, select, text } from "@clack/prompts";
+import { UrlPath } from "../../types/file/urlPath.js";
+import { format as f, getTree, withSpinner } from "../format.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { removeQuotes } from "../../utils/string-utils.js";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { Directory } from "../../types/file/directory.js";
+import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
+import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
 
-export class PortalQuickstartPrompts extends BasePrompts {
-  private readonly vscodeExtensionUrl =
-    "\u001b[4mhttps://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode\u001b[0m";
-  private readonly serverUrl = "\u001b[4mhttp://localhost:3000\u001b[0m";
-  private readonly referenceDocumentationUrl =
-    "\u001b[4mhttps://docs.apimatic.io/cli-getting-started/advanced-portal-setup\u001b[0m";
-  private readonly customizeTheSdksUrl =
-    "\u001b[4mhttps://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview\u001b[0m";
-  private readonly defaultPortalDirectoryPath = process.cwd();
+const vscodeExtensionUrl =
+  "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
+const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/advanced-portal-setup";
+const defaultPortalDirectoryPath = process.cwd();
 
-  displayWelcomeMessage(): void {
-    intro(`Hello there 👋`);
-    log.message(
-      `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.`
-    );
-    log.message(`Let's get started! 🚀`);
+export class PortalQuickstartPrompts {
+  public welcomeMessage() {
+    log.info(`Welcome to the Portal Quickstart Wizard.`);
+    const message = `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.
+
+Let's get started!`;
+    log.message(message);
+  }
+  public importSpecStep() {
+    log.info(`Step 1 of 4: Import your OpenAPI Definition`);
   }
 
-  async loginPrompt(): Promise<{ email: string; password: string }> {
-    log.message(`Please log in to continue.`);
-
-    const email = await text({
-      message: "Enter your registered email:",
-      validate: (input) => {
-        if (!input) {
-          return getMessageInRedColor("Email is required.");
-        }
-
-        const emailRegex =
-          /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-        if (!emailRegex.test(input)) {
-          return getMessageInRedColor("Please enter a valid email address.");
-        }
-      }
-    });
-
-    if (isCancel(email)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
-    }
-
-    const pass = await password({
-      message: "Enter your password:",
-      validate: (input) => {
-        if (!input) {
-          return getMessageInRedColor("Password is required.");
-        }
-      }
-    });
-
-    if (isCancel(pass)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
-    }
-
-    return { email: String(email).trim(), password: String(pass).trim() };
-  }
-
-
-  removeQuotes(str: string): string {
-    const quotes = ['"', "'"];
-
-    for (const quote of quotes) {
-      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-        return this.removeQuotes(str.slice(1, -1)); // Recursive call
-      }
-    }
-    return str;
-  }
-
-  async specPrompt(): Promise<string> {
-  log.step(getMessageInOrangeColor(`Step 1 of 4: Import your OpenAPI Definition`));
-
-  while (true) {
+  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<ResourceInput | undefined> {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI definition file:`,
       placeholder: "Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.",
-      defaultValue:
-        "https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json",
-      validate: (input) => {
-        if (!input) return;
+      defaultValue: defaultSpecUrl.toString(),
 
-        const cleanedPath = this.removeQuotes(input.trim() ?? "");
-
-        if (!isValidUrl(cleanedPath)) {
-          const dirPath = path.resolve(cleanedPath);
-
-          if (!fs.existsSync(dirPath)) {
-            return getMessageInRedColor("Error: The specified file does not exist. Please enter a valid file path.");
-          }
-
-          if (!fs.statSync(dirPath).isFile()) {
-            return getMessageInRedColor(
-              "Error: The specified path does not point to a valid API Definition file or a zip archive containing API definition files. Please try again."
-            );
-          }
+      validate: (value) => {
+        if (value && !createResourceInputFromInput(value)) {
+          return "Please enter a valid file path or URL.";
         }
-
-        return; // pass sync validation
-      },
-    });
-
-    if (isCancel(spec)) {
-      cancel("Operation cancelled.");
-      process.exit(0);
-    }
-
-    const cleanedPath = this.removeQuotes(String(spec).trim());
-
-    // Async validation for URLs
-    if (isValidUrl(cleanedPath)) {
-      try {
-        const response = await axios.head(cleanedPath);
-        const contentType = response.headers["content-type"];
-
-        if (contentType?.includes("text/html")) {
-          log.error(
-            getMessageInRedColor(
-              `Invalid URL. Please check the URL and ensure it points to a valid OpenAPI definition.`
-            )
-          );
-          continue; // re-prompt
-        }
-      } catch (err) {
-        log.error(
-          getMessageInRedColor(`Failed to reach the URL. Please check your internet connection or the URL.`)
-        );
-        continue; // re-prompt
       }
+    });
+    if (isCancel(spec)) {
+      return undefined;
     }
-
-    return cleanedPath; // valid local file or valid URL
-  }
-}
-
-
-  displaySpecValidationMessage(): void {
-    log.step(getMessageInOrangeColor(`Step 2 of 4: Validate and Lint your OpenAPI file`));
-    this.spin.start(
-      getMessageInMagentaColor(
-        `Running your API Definition through APIMatic's 1200+ CodeGen Specific validation and linting rules 🔍 `
-      )
-    );
+    return createResourceInputFromInput(spec);
   }
 
-  displaySpecValidationSuccessMessage(): void {
-    this.spin.stop(getMessageInCyanColor(`Validation Successful.`));
+  public specFileDoesNotExist() {
+    log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");
   }
 
-  displaySpecValidationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while validating your spec.`), 1);
+  public noSpecSpecified() {
+    log.error("No API definition was provided.");
   }
 
-  displaySpecValidationFailureMessage(): void {
-    this.spin.stop(getMessageInRedColor(`❗ Oops, it looks like there are some errors in your API Definition.`), 1);
-  }
-
-  async specValidationFailurePrompt(): Promise<void> {
-    const useSampleSpec = await select({
+  public async useDefaultSpecPrompt(): Promise<boolean> {
+    const useDefaultSpec = await select({
       message: `How would you like to proceed?`,
       options: [
         {
-          value: "exit",
-          label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${this.vscodeExtensionUrl}`
+          value: "no",
+          label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${vscodeExtensionUrl}`
         },
-        { value: "continue", label: `2. Use an example API spec instead (recommended)` }
+        { value: "yes", label: `2. Use an example API spec instead (recommended)` }
       ]
     });
-
-    if (isCancel(useSampleSpec)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+    if (isCancel(useDefaultSpec)) {
+      return false;
     }
-
-    if (useSampleSpec === "exit") {
-      outro(
-        getMessageInCyanColor(
-          "Good luck fixing your API definition! 🛠️  Feel free to run this command again once you're done."
-        )
-      );
-      return process.exit(0);
-    }
+    return useDefaultSpec === "yes";
   }
 
-  async sdkLanguagesPrompt(): Promise<string[]> {
-    log.step(getMessageInOrangeColor(`Step 3 of 4: Select programming languages`));
+  public fixYourSpec() {
+    const message = `Good luck fixing your API definition! Feel free to run this command again once you're done.`;
+    log.info(message);
+  }
 
+  public validateSpecStep() {
+    log.info(`Step 2 of 4: Validate and Lint your OpenAPI file`);
+  }
+
+  public selectLanguagesStep() {
+    log.info(`Step 3 of 4: Select programming languages`);
+  }
+
+  public async selectLanguagesPrompt(): Promise<string[] | undefined> {
     const languages = (await multiselect({
       message:
-        "💻 Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and spacebar to customize your selection:",
+        "Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
       options: [
-        { label: "HTTP", value: "http" },
         { label: "Typescript", value: "typescript" },
         { label: "Ruby", value: "ruby" },
         { label: "Python", value: "python" },
@@ -215,114 +95,92 @@ export class PortalQuickstartPrompts extends BasePrompts {
         { label: "PHP", value: "php" },
         { label: "Go", value: "go" }
       ],
-      initialValues: ["http", "typescript", "ruby", "python", "java", "csharp", "php", "go"]
+      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"]
     })) as string[];
 
     if (isCancel(languages)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return undefined;
     }
 
-    return languages;
+    return ["http", ...languages];
   }
 
-  async workingDirectoryPrompt(): Promise<string> {
-    log.step(getMessageInOrangeColor(`Step 4 of 4: Generate source files for Docs as Code`));
+  public noLanguagesSelected() {
+    log.error("No programming languages were selected.");
+  }
 
-    const directory = await text({
+  public selectInputDirectoryStep() {
+    log.info(`Step 4 of 4: Generate source files for Docs as Code`);
+  }
+
+  public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
+    const inputDirectory = await text({
       message: "Enter the directory path where you would like to setup the API Portal (Requires an empty directory):",
       placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
-      defaultValue: "./",
-      validate: (input) => {
-        const cleanedPath = this.removeQuotes(input?.trim() ?? "");
-        const dirPath = path.resolve(cleanedPath);
-
-        if (!fs.existsSync(dirPath) && dirPath != this.defaultPortalDirectoryPath) {
-          return getMessageInRedColor("Error: The specified directory path does not exist. Please try again.");
-        }
-
-        if (dirPath !== this.defaultPortalDirectoryPath) {
-          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
-          if (files.length > 0) {
-            return getMessageInRedColor(
-              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-            );
-          }
-        } else if (fs.existsSync(dirPath)) {
-          // For ignoring hidden files and folders in the current directory in MacOS.
-          const files = fs.readdirSync(dirPath).filter((item) => !item.startsWith("."));
-          if (files.length > 0) {
-            return getMessageInRedColor(
-              "Error: The target directory is not empty. Please provide a path to an empty directory or clear its contents."
-            );
-          }
-        }
-      }
+      defaultValue: "./"
     });
 
-    if (isCancel(directory)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+    if (isCancel(inputDirectory)) {
+      return undefined;
     }
 
-    if (directory === "./") {
-      return this.defaultPortalDirectoryPath;
+    const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
+    const directoryPath = new DirectoryPath(cleanedPath);
+
+    if (inputDirectory === "./") {
+      return new DirectoryPath(defaultPortalDirectoryPath);
     } else {
-      return this.removeQuotes(String(directory).trim());
+      return directoryPath;
     }
   }
 
-  displayBuildDirectoryGenerationMessage(): void {
-    this.spin.start(getMessageInMagentaColor("Generating build directory ⚙️"));
+  public inputDirectoryPathDoesNotExist(inputDirectory: DirectoryPath) {
+    log.error(`The specified directory path ${f.path(inputDirectory)} does not exist.`);
   }
 
-  displayBuildDirectoryGenerationErrorMessage(): void {
-    this.spin.stop(getMessageInRedColor(`Something went wrong while setting up your build directory.`), 1);
-  }
-
-  displayBuildDirectoryGenerationSuccessMessage(targetFolder: string): void {
-    this.spin.stop(getMessageInCyanColor(`📁 Directory created at ${targetFolder}`));
-  }
-
-  displayBuildDirectoryAsTree(targetFolder: string): void {
-    const buildDirectory = directoryToJson(targetFolder) as treeify.TreeObject;
-
-    const tree = treeify.asTree(buildDirectory, true, true);
-
-    const coloredLogString = tree
-      .split("\n")
-      .map((line) => line.replace(/#.*/, (match) => getMessageInGreenColor(match)))
-      .join("\n");
-
-    log.step(coloredLogString);
-  }
-
-  displayOutroMessage(buildDirectory: string): void {
-    log.step(
-      getMessageInCyanColor(`📢  Your API Portal is live at: ${this.serverUrl}\n`) +
-      getMessageInCyanColor(
-        `Hot reload enabled! Edit files in ${buildDirectory} to see changes instantly reflected in your API Portal.\n`
-      ) +
-      getMessageInCyanColor(`Press CTRL+C to stop the server.`)
-    );
-    outro(
-      getMessageInCyanColor(`What's next?\n`) +
-      getMessageInCyanColor(`- Use the API Playground or an SDK to call your API.\n`) +
-      getMessageInCyanColor(
-        `- Customize the Portal theme, add API recipes and enable AI features: ${this.referenceDocumentationUrl}`
-      )
+  public inputDirectoryNotEmpty(inputDirectory: DirectoryPath) {
+    log.error(
+      `The target directory ${f.path(
+        inputDirectory
+      )} is not empty. Please provide a path to an empty directory or clear its contents.`
     );
   }
 
-  getLoggedInFirst() {
-    log.step("You need to be logged in to continue.")
+  public noInputDirectoryProvided() {
+    log.error("No source directory was provided.");
   }
 
-  displayLoggedInMessage(email: string): void {
-    log.success(`Successfully logged in as ${email}`);
+  public downloadBuildDirectory(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
+    return withSpinner(
+      "Setting up source directory",
+      `Source directory set up successfully`,
+      "Unable to set up source directory",
+      fn
+    );
   }
 
-  logError(error: string) {
-    log.error(error);
+  public downloadSpecFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
+    return withSpinner("Downloading Spec file", `Spec file downloaded`, "Unable to download spec file", fn);
+  }
+
+  public nextSteps(): void {
+    const message = `- Use the API Playground or an SDK to call your API.
+- Customize the Portal theme, add API recipes and enable AI features
+  ${f.link(referenceDocumentationUrl)}`;
+    note(message, "Next steps");
+  }
+
+  public serviceError(error: ServiceError) {
+    log.error(getErrorMessage(error));
+  }
+
+  public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
+    const heading = `${f.var('src')} directory containing source files created at ${f.path(inputDirectory)}\n`;
+    const message = getTree(directory.toTreeNode());
+    log.info(heading + message);
+  }
+
+  public specValidationFailed() {
+    log.error(`Oops, it looks like there are some errors in your API Definition`);
   }
 }

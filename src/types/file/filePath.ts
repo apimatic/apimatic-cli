@@ -1,6 +1,6 @@
+import path from "path";
 import { FileName } from "./fileName.js";
 import { DirectoryPath } from "./directoryPath.js";
-import path from "path";
 
 export class FilePath {
   private readonly fileName: FileName;
@@ -10,8 +10,29 @@ export class FilePath {
     this.fileName = name;
     this.directoryPath = path;
   }
-  
+
+  public replaceDirectory(newDirectory: DirectoryPath): FilePath {
+    return new FilePath(newDirectory, this.fileName);
+  }
+
   public toString(): string {
-    return path.join(this.directoryPath.toString() , this.fileName.toString());
+    return path.join(this.directoryPath.toString(), this.fileName.toString());
+  }
+
+  public static create(filePath: string): FilePath | undefined {
+    if (!filePath) {
+      return undefined;
+    }
+
+    try {
+      const normalizedPath = path.normalize(filePath);
+      const directory = path.dirname(normalizedPath);
+      const filename = path.basename(normalizedPath);
+      const directoryPath = new DirectoryPath(directory);
+      const fileName = new FileName(filename);
+      return new FilePath(directoryPath, fileName);
+    } catch {
+      return undefined;
+    }
   }
 }

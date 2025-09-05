@@ -1,29 +1,54 @@
-export class ActionResult {
-  private readonly message: string | undefined;
+enum ResultType {
+  Success= 0,
+  Cancel = 130,
+  Failure= 1
+}
 
-  private constructor(message?: string) {
+export class ActionResult {
+  private readonly message: string;
+  private readonly resultType: ResultType;
+
+  private constructor(resultType: ResultType, message: string) {
+    this.resultType = resultType;
     this.message = message;
   }
 
-  static error(message: string) {
-    return new ActionResult(message);
-  }
-
   static success() {
-    return new ActionResult();
+    return new ActionResult(ResultType.Success, " Succeeded ");
   }
 
-  map(onError: (message: string) => void) {
-    if (this.message) {
-      onError(this.message);
-    }
+  static failed() {
+    return new ActionResult(ResultType.Failure, " Failed ");
   }
 
-  mapAll<T>(onSuccess:() => T, onError: (message: string) => T) {
-    if (this.message) {
-      return onError(this.message);
-    }else {
-      return onSuccess();
+  static cancelled() {
+    return new ActionResult(ResultType.Cancel, " Cancelled ");
+  }
+
+  static stopped() {
+    return new ActionResult(ResultType.Cancel, " Stopped ");
+  }
+
+  public getMessage() {
+    return this.message;
+  }
+
+  public getExitCode() {
+    return this.resultType.valueOf();
+  }
+
+  public isFailed() {
+    return this.resultType === ResultType.Failure;
+  }
+
+  public mapAll<T>(onSuccess: () => T, onFailure: () => T, onCancel: () => T): T {
+    switch (this.resultType) {
+      case ResultType.Success:
+        return onSuccess();
+      case ResultType.Failure:
+        return onFailure();
+      case ResultType.Cancel:
+        return onCancel();
     }
   }
 }

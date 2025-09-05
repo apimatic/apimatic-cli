@@ -1,11 +1,12 @@
 import axios from "axios";
+import { format as f } from "../prompts/format.js";
 
 export const enum ServiceError {
   NotFound = "NOT_FOUND",
   ServerError = "SERVER_ERROR",
   NetworkError = "NETWORK_ERROR",
   InvalidResponse = "INVALID_RESPONSE",
-  UnAuthorized = "UNAUTHORIZED",
+  UnAuthorized = "UNAUTHORIZED"
 }
 
 export function getErrorMessage(error: ServiceError): string {
@@ -18,14 +19,14 @@ export function getErrorMessage(error: ServiceError): string {
     case ServiceError.ServerError:
     case ServiceError.InvalidResponse:
     default:
-      return "An unexpected error occurred, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+      return `An unexpected error occurred, please try again later. If the problem persists, please reach out to our team at ${f.var('support@apimatic.io')}`;
   }
 }
 
 export function handleServiceError(error: unknown): ServiceError {
   if (axios.isAxiosError(error)) {
     if (error.response?.status === 401) {
-      return ServiceError.UnAuthorized ;
+      return ServiceError.UnAuthorized;
     }
     if (error.response?.status === 404) {
       return ServiceError.NotFound;
@@ -33,7 +34,7 @@ export function handleServiceError(error: unknown): ServiceError {
     if (error.response?.status === 500) {
       return ServiceError.ServerError;
     }
-    if (error.code === "ECONNABORTED" || error.code === "ECONNREFUSED") {
+    if (error.code === "ECONNABORTED" || error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
       return ServiceError.NetworkError;
     }
   }

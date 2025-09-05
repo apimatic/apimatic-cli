@@ -1,21 +1,4 @@
-export type GenerationIdParams = {
-  file: string;
-  url: string;
-  platform: string;
-};
-
-export type DownloadSDKParams = {
-  codeGenId: string;
-  zip: boolean;
-  zippedSDKPath: string;
-  sdkFolderPath: string;
-};
-
-export type SDKGenerateUnprocessableError = {
-  message: string;
-};
-
-export enum LanguagePlatform {
+export enum Language {
   CSHARP = "csharp",
   JAVA = "java",
   PHP = "php",
@@ -23,4 +6,20 @@ export enum LanguagePlatform {
   RUBY = "ruby",
   TYPESCRIPT = "typescript",
   GO = "go"
+}
+
+const languageMap: { [key: number]: Language } = {
+  1: Language.CSHARP,
+  2: Language.GO,
+  4: Language.JAVA,
+  8: Language.PHP,
+  16: Language.PYTHON,
+  32: Language.RUBY,
+  128: Language.TYPESCRIPT,
+};
+
+export function mapLanguages(languageFlag: number): Language[] {
+  return Object.entries(languageMap)
+    .filter(([flag]) => (languageFlag & parseInt(flag)) !== 0)
+    .map(([, language]) => language);
 }
