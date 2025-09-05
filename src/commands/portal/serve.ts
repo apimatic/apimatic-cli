@@ -1,99 +1,67 @@
-import { Command, Config, Flags } from "@oclif/core";
-import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { ServeFlags, ServePaths } from "../../types/portal/serve.js";
+import { Command, Flags } from "@oclif/core";
 import { PortalServeAction } from "../../actions/portal/serve.js";
-import { getMessageInRedColor } from "../../utils/utils.js";
-import { ServeHandler } from "../../application/portal/serve/serve-handler.js";
-import { PortalService } from "../../infrastructure/services/portal-service.js";
-import { GenerateAction } from "../../actions/portal/generate.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { format, intro, outro } from "../../prompts/format.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class PortalServe extends Command {
-  static description = "Generate and deploy a Docs as Code portal with hot reload.";
+  static summary = "Generate and serve an API Documentation Portal with hot reload.";
+
+  static description =
+    "Requires an input directory with API specifications, a config file, and optionally markdown guides. Supports disabling hot reload and opening the portal in the default browser.";
 
   static flags = {
     port: Flags.integer({
       char: "p",
-      description: "[default: 3000] port to serve the portal."
+      description: "port to serve the portal.",
+      default: 3000,
+      helpValue: "3000"
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.destination("portal", "portal"),
     open: Flags.boolean({
       char: "o",
-      description: "Open the portal in the default browser.",
+      description: "open the portal in the default browser.",
       default: false
     }),
     "no-reload": Flags.boolean({
-      description: "Disable hot reload.",
+      description: "disable hot reload.",
       default: false
     }),
     ...FlagsProvider.authKey
   };
 
-  private readonly prompts: PortalServePrompts;
-
-  constructor(argv: string[], config: Config) {
-    super(argv, config);
-    this.prompts = new PortalServePrompts();
-  }
-
+  static cmdTxt = format.cmd("apimatic", "portal", "serve");
   static examples = [
-    "apimatic portal serve",
-    'apimatic portal serve --input="./" --destination="./portal" --port=3000 --open --no-reload'
+    this.cmdTxt,
+    `${this.cmdTxt} ` +
+      `${format.flag("input", './')} ` +
+      `${format.flag("destination", './portal')} ` +
+      `${format.flag("port", "3000")} ` +
+      `${format.flag("open")} ` +
+      `${format.flag("no-reload")}`
   ];
 
   public async run() {
-    const { flags } = await this.parse(PortalServe);
-    const portalServePrompts = new PortalServePrompts();
-    const portalServeAction = new PortalServeAction(portalServePrompts, new ServeHandler(), new PortalService());
+    const {
+      flags: { input, destination, port, open, "no-reload": noReload, "auth-key": authKey }
+    } = await this.parse(PortalServe);
 
-    const workingDirectory = new DirectoryPath(flags.input ?? DEFAULT_WORKING_DIRECTORY);
-    const buildDirectory = flags.input ? new DirectoryPath(flags.input, "src") : workingDirectory.join("src");
-    const portalDirectory = flags.destination ? new DirectoryPath(flags.destination) : workingDirectory.join("portal");
-
+    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
+    const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
     const commandMetadata: CommandMetadata = {
       commandName: PortalServe.id,
       shell: this.config.shell
     };
 
-    const generatePortalAction = new GenerateAction(this.getConfigDir(), commandMetadata, flags["auth-key"]);
-
-    const serveFlags: ServeFlags = {
-      input: buildDirectory.toString(),
-      destination: portalDirectory.toString(),
-      "auth-key": flags["auth-key"],
-      port: flags.port,
-      open: flags.open,
-      "no-reload": flags["no-reload"]
-    };
-
-    const servePaths: ServePaths = {
-      sourceDirectoryPath: buildDirectory.toString(),
-      destinationDirectoryPath: portalDirectory.toString()
-    };
-
-    const servePortalResult = await portalServeAction.servePortal(serveFlags, servePaths, generatePortalAction.execute);
-    //TODO: Convert below statements to result.mapAll after changing servePortalResult to ActionResult.
-    if (servePortalResult.isFailed()) {
-      portalServePrompts.logError(getMessageInRedColor(servePortalResult.error!));
-    }
-
-    if (servePortalResult.isCancelled()) {
-      portalServePrompts.logError(getMessageInRedColor(servePortalResult.value!));
-    }
-
-    if (servePortalResult.isSuccess()) {
-      this.prompts.displayOutroMessage(
-        buildDirectory.toString(),
-        portalDirectory.toString(),
-        servePortalResult.value!,
-        flags["no-reload"]
-      );
-    }
+    intro("Portal Serve");
+    const portalServeAction = new PortalServeAction(this.getConfigDir(), commandMetadata, authKey);
+    const result = await portalServeAction.execute(buildDirectory, portalDirectory, port, open, !noReload);
+    outro(result);
   }
 
   private getConfigDir(): DirectoryPath {

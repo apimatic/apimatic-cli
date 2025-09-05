@@ -2,60 +2,55 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { ApiValidationSummary } from "@apimatic/sdk";
-import { Result } from "../../types/common/result.js";
-import { validateFileInputParams } from "../../infrastructure/api-utils.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { ResourceInput } from "../../types/file/resource-input.js";
+import { withDirPath } from "../../infrastructure/tmp-extensions.js";
+import { ResourceContext } from "../../types/resource-context.js";
 
 export class ValidateAction {
   private readonly prompts: ApiValidatePrompts = new ApiValidatePrompts();
   private readonly validationService: ValidationService;
   private readonly authKey: string | null;
+  private readonly commandMetadata: CommandMetadata;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.authKey = authKey;
-    this.validationService = new ValidationService(configDir, commandMetadata);
+    this.validationService = new ValidationService(configDir);
+    this.commandMetadata = commandMetadata;
   }
 
-  public readonly execute = async (file?: FilePath, url?: string): Promise<ActionResult> => {
-    const validationResult = await validateFileInputParams(file, url);
+  public readonly execute = async (
+    resourcePath: ResourceInput,
+    displayValidationSummary = true
+  ): Promise<ActionResult> => {
+    return await withDirPath(async (tempDirectory) => {
+      const resourceContext = new ResourceContext(tempDirectory);
+      const specFileDirResult = await resourceContext.resolveTo(resourcePath);
+      if (specFileDirResult.isErr()) {
+        this.prompts.networkError(specFileDirResult.error);
+        return ActionResult.failed();
+      }
+      const validationSummaryResult = await this.prompts.validateApi(
+        this.validationService.validateViaFile({
+          file: specFileDirResult.value,
+          commandMetadata: this.commandMetadata,
+          authKey: this.authKey
+        })
+      );
 
-    if (!validationResult.isSuccess()) {
-      return ActionResult.error(validationResult.error!);
-    }
-
-    this.prompts.displayValidationStartMessage();
-
-    let validationSummaryResult: Result<ApiValidationSummary, string>;
-
-    if (file) {
-      validationSummaryResult = await this.validationService.validateViaFile({
-        file,
-        authKey: this.authKey
-      });
-    } else {
-      validationSummaryResult = await this.validationService.validateViaUrl({
-        url: url!,
-        authKey: this.authKey
-      });
-    }
-
-    if (!validationSummaryResult.isSuccess()) {
-      return ActionResult.error(validationSummaryResult.error! || "Validation failed with an unknown error");
-    }
-
-    const validationSummary = validationSummaryResult.value;
-    if (!validationSummary?.success) {
-      this.prompts.displayValidationFailureMessage();
-      if (validationSummary) {
+      if (validationSummaryResult.isErr()) {
+        this.prompts.logValidationError(validationSummaryResult.error);
+        return ActionResult.failed();
+      }
+      const validationSummary = validationSummaryResult.value;
+      if (displayValidationSummary) {
         this.prompts.displayValidationMessages(validationSummary);
       }
-      return ActionResult.error("Specification file provided is invalid");
-    }
+      if (!validationSummary.success) {
+        return ActionResult.failed();
+      }
 
-    this.prompts.displayValidationSuccessMessage();
-    this.prompts.displayValidationMessages(validationSummary);
-    return ActionResult.success();
+      return ActionResult.success();
+    });
   };
 }

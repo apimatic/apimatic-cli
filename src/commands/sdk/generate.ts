@@ -1,44 +1,51 @@
 import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
-import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
 import { Language } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { format, intro, outro } from "../../prompts/format.js";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
 export default class SdkGenerate extends Command {
-  static description = "Generate an SDK for your API";
+  static readonly summary = "Generate an SDK for your API";
+
+  static readonly description = `Generate Software Development Kits (SDKs) from API specifications.
+Supports multiple programming languages including Java, C#, Python, JavaScript, and more.`;
+
+  static readonly cmdTxt = format.cmd("apimatic", "sdk", "generate");
+
   static flags = {
     language: Flags.string({
       char: "l",
       required: true,
-      options: Object.values(Language).map((p) => p.toString()),
-      description: `language for which the sdk will be generated.`
+      description: "Programming language for SDK generation",
+      options: Object.values(Language).map((p) => p.valueOf()),
     }),
     spec: Flags.string({
-      description: "path to the folder containing the API specification file.",
+      description: "Path to the folder containing the API specification file",
       default: "./src/spec"
     }),
     destination: Flags.string({
       char: "d",
-      description: `[default: ./sdk/<language>] path where the sdk will be generated.`
+      description: "Directory where the SDK will be generated"
     }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
-      description: "download the generated SDK as a .zip archive."
+      description: "Download the generated SDK as a .zip archive"
     }),
     ...FlagsProvider.authKey
   };
 
   static examples = [
-    `apimatic sdk generate --language=java`,
-    `apimatic sdk generate --language=csharp --spec="./src/spec"`
+    `${SdkGenerate.cmdTxt} ${format.flag("language", "java")}`,
+    `${SdkGenerate.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("spec", "./src/spec")}`,
+    `${SdkGenerate.cmdTxt} ${format.flag("language", "python")} ${format.flag("destination", "./sdk")} ${format.flag(
+      "zip"
+    )}`
   ];
-
-  private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
 
   async run() {
     const {
@@ -47,24 +54,20 @@ export default class SdkGenerate extends Command {
 
     const workingDirectory = new DirectoryPath(DEFAULT_WORKING_DIRECTORY);
     const specDirectory = new DirectoryPath(spec);
-
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk").join(language);
+    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
       shell: this.config.shell
     };
 
-    var action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
+    intro("Generate SDK");
+    const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk);
-    result.mapAll(
-      () => this.prompts.displayOutroMessage(sdkDirectory),
-      (message) => this.prompts.logError(message),
-      (message) => this.prompts.logError(message)
-    );
+    outro(result);
   }
 
-  private getConfigDir = () => {
+  private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
   };
 }

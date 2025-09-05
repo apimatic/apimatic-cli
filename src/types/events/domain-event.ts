@@ -4,7 +4,7 @@ export abstract class DomainEvent {
   private readonly commandName: string;
   private readonly flags: string[];
 
-  constructor(message: string, commandName: string, flags: Record<string, unknown>) {
+  protected constructor(message: string, commandName: string, flags: Record<string, unknown>) {
     this.message = message;
     this.commandName = commandName;
     this.flags = this.extractFlagKeys(flags);

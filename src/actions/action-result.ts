@@ -1,62 +1,54 @@
-export enum ActionResultType {
-  Success,
-  Error,
-  Cancelled
+enum ResultType {
+  Success= 0,
+  Cancel = 130,
+  Failure= 1
 }
 
 export class ActionResult {
-  private readonly type: ActionResultType;
-  private readonly message: string | undefined;
+  private readonly message: string;
+  private readonly resultType: ResultType;
 
-  private constructor(type: ActionResultType, message?: string) {
-    this.type = type;
+  private constructor(resultType: ResultType, message: string) {
+    this.resultType = resultType;
     this.message = message;
   }
 
-  static error(message: string) {
-    return new ActionResult(ActionResultType.Error, message);
+  static success() {
+    return new ActionResult(ResultType.Success, " Succeeded ");
   }
 
-  static success(message?: string) {
-    return new ActionResult(ActionResultType.Success, message);
+  static failed() {
+    return new ActionResult(ResultType.Failure, " Failed ");
   }
 
-  static cancelled(message?: string) {
-    return new ActionResult(ActionResultType.Cancelled, message);
+  static cancelled() {
+    return new ActionResult(ResultType.Cancel, " Cancelled ");
   }
 
-  map(onError: (message: string) => void) {
-    if (this.type === ActionResultType.Error && this.message) {
-      onError(this.message);
+  static stopped() {
+    return new ActionResult(ResultType.Cancel, " Stopped ");
+  }
+
+  public getMessage() {
+    return this.message;
+  }
+
+  public getExitCode() {
+    return this.resultType.valueOf();
+  }
+
+  public isFailed() {
+    return this.resultType === ResultType.Failure;
+  }
+
+  public mapAll<T>(onSuccess: () => T, onFailure: () => T, onCancel: () => T): T {
+    switch (this.resultType) {
+      case ResultType.Success:
+        return onSuccess();
+      case ResultType.Failure:
+        return onFailure();
+      case ResultType.Cancel:
+        return onCancel();
     }
-  }
-
-  mapAll<T>(onSuccess: (message?: string) => T, onError: (message: string) => T, onCancelled: (message: string) => T) {
-    switch (this.type) {
-      case ActionResultType.Success:
-        return onSuccess(this.message);
-      case ActionResultType.Error:
-        return onError(this.message || "Unknown error");
-      case ActionResultType.Cancelled:
-        return onCancelled(this.message || "Operation cancelled");
-      default:
-        throw new Error(`Unknown ActionResultType: ${this.type}`);
-    }
-  }
-
-  getType(): ActionResultType {
-    return this.type;
-  }
-
-  isSuccess(): boolean {
-    return this.type === ActionResultType.Success;
-  }
-
-  isError(): boolean {
-    return this.type === ActionResultType.Error;
-  }
-
-  isCancelled(): boolean {
-    return this.type === ActionResultType.Cancelled;
   }
 }

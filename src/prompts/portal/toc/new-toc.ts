@@ -1,48 +1,56 @@
-import { cancel, outro, confirm, spinner, isCancel, log } from "@clack/prompts";
+import { confirm, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
+import { Result } from "neverthrow";
+import { format as f, withSpinner } from "../../format.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { ServiceError } from "../../../infrastructure/api-utils.js";
+import { Sdl } from "../../../types/sdl/sdl.js";
 
 export class PortalNewTocPrompts {
-  private readonly spin = spinner();
-
-  async overwriteExistingTocPrompt(tocPath: FilePath): Promise<boolean> {
+  public async overwriteToc(tocPath: FilePath): Promise<boolean> {
     const overwrite = await confirm({
-      message: `⚠️ The destination file '${tocPath}' already exists, do you want to overwrite it?`,
+      message: `The destination file ${f.path(tocPath)} already exists, do you want to overwrite it?`,
       initialValue: false
     });
 
     if (isCancel(overwrite)) {
-      cancel("Operation cancelled.");
       return false;
-    }
-
-    if (!overwrite) {
-      log.error("Please enter a different destination path or delete the existing toc.yml file and try again.");
     }
 
     return overwrite;
   }
 
-  startProgressIndicatorWithMessage(message: string): void {
-    this.spin.start(message);
+  public fallingBackToDefault() {
+    log.warn(`Falling back to the default TOC structure.`);
   }
 
-  stopProgressIndicatorWithMessage(message: string): void {
-    this.spin.stop(message);
+  public tocFileAlreadyExists() {
+    log.error(`Please enter a different destination path or delete the existing toc.yml file and try again.`);
   }
 
-  displayOutroMessage(tocPath: FilePath): void {
-    outro(`toc.yml file successfully created at: ${tocPath}`);
+  public logError(message: string) {
+    log.error(message);
   }
 
-  logError(error: string): void {
-    outro(error);
+  public contentDirectoryNotFound(contentFolderPath: DirectoryPath) {
+    log.error(`Content folder not found at: ${contentFolderPath}`);
   }
 
-  displayWarning(message: string): void {
-    log.warning(message);
+  public invalidBuildDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
   }
 
-  displayInfo(message: string): void {
-    log.step(message);
+  public extractEndpointGroupsAndModels(fn: Promise<Result<Sdl, ServiceError>>) {
+    return withSpinner(
+      "Extracting endpoint groups and models",
+      "Endpoint groups and models extracted",
+      "Endpoint groups and models extraction failed",
+      fn
+    );
+  }
+
+  public tocCreated(tocPath: FilePath) {
+    log.info(`The TOC file successfully created at: ${f.path(tocPath)}`);
   }
 }

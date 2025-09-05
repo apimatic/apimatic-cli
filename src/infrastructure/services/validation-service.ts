@@ -11,33 +11,27 @@ import {
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
-import { Result } from "../../types/common/result.js";
+import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export interface ValidateViaFileParams {
   file: FilePath;
-  authKey?: string | null;
-}
-
-export interface ValidateViaUrlParams {
-  url: string;
+  commandMetadata: CommandMetadata;
   authKey?: string | null;
 }
 
 export class ValidationService {
-  private readonly configDirectory: DirectoryPath;
-  private readonly commandMetadata: CommandMetadata;
+  constructor(private readonly configDir: DirectoryPath) {}
 
-  constructor(configDirectory: DirectoryPath, commandMetadata: CommandMetadata) {
-    this.configDirectory = configDirectory;
-    this.commandMetadata = commandMetadata;
-  }
-
-  async validateViaFile({ file, authKey }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(this.configDirectory.toString());
+  async validateViaFile({
+    file,
+    commandMetadata,
+    authKey
+  }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, this.commandMetadata.shell);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const controller = new ApiValidationExternalApisController(client);
 
     try {
@@ -48,24 +42,9 @@ export class ValidationService {
         fileDescriptor
       );
 
-      return Result.success(validation.result as ApiValidationSummary);
+      return ok(validation.result as ApiValidationSummary);
     } catch (error) {
-      return Result.failure(await this.handleValidationErrors(error));
-    }
-  }
-
-  async validateViaUrl({ url, authKey }: ValidateViaUrlParams): Promise<Result<ApiValidationSummary, string>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(this.configDirectory.toString());
-    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, this.commandMetadata.shell);
-    const controller = new ApiValidationExternalApisController(client);
-
-    try {
-      //TODO: Update spec to include origin query parameter.
-      const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaUrl(url);
-      return Result.success(validation.result as ApiValidationSummary);
-    } catch (error) {
-      return Result.failure(await this.handleValidationErrors(error));
+      return err(await this.handleValidationErrors(error));
     }
   }
 
@@ -79,7 +58,7 @@ export class ValidationService {
       const apiError = error as ApiError;
 
       if (apiError.statusCode === 400) {
-        return "Your API Definition is invalid. Please check the errors and try again.";
+        return "Your API Definition is invalid. Please fix the issues and try again.";
       } else if (apiError.statusCode === 401) {
         return "You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";
       } else if (apiError.statusCode === 403) {

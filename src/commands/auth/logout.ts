@@ -1,20 +1,20 @@
 import { Command } from "@oclif/core";
+import { format, intro, outro } from "../../prompts/format.js";
+import { LogoutAction } from "../../actions/auth/logout.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 
-import { SDKClient } from "../../client-utils/sdk-client.js";
+export default class Logout extends Command {
+  static summary = "Clears the local login credentials.";
 
-export default class Login extends Command {
-  static description = "Clears the local login credentials.";
+  static description = "Clears the local login credentials. This will also clear any cached credentials from the CLI.";
 
-  static examples = [`apimatic auth logout`];
+  private static cmdTxt = format.cmd('apimatic',  'auth' ,'logout');
+  static examples = [Logout.cmdTxt];
 
   async run() {
-    try {
-      const client = SDKClient.getInstance();
-      const response = await client.logout(this.config.configDir);
 
-      this.log(response);
-    } catch (error) {
-      this.error(error as string);
-    }
+    intro("Logout");
+    const actionResult = await new LogoutAction(new DirectoryPath(this.config.configDir)).execute();
+    outro(actionResult)
   }
 }

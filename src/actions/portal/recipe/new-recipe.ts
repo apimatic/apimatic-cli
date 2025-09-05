@@ -1,327 +1,210 @@
-import * as path from "path";
-import fs from "fs";
-import fsExtra from "fs-extra";
-import { parse } from "yaml";
-import { TreeObject } from "treeify";
-import { tmpdir } from "os";
-import { execa } from "execa";
 import { PortalRecipePrompts } from "../../../prompts/portal/recipe/new-recipe.js";
-import { SerializableRecipe, StepType, DirectoryNode } from "../../../types/recipe/recipe.js";
-import { Result } from "../../../types/common/result.js";
-import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
-import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
-import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
+import { StepType } from "../../../types/recipe/recipe.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
-import { SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { getEndpointDescription, getEndpointGroupsFromSdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
+import { ActionResult } from "../../action-result.js";
+import { TocContext } from "../../../types/toc-context.js";
+import { FileName } from "../../../types/file/fileName.js";
+import { PortalRecipe } from "../../../application/portal/recipe/portal-recipe.js";
+import { PortalRecipeGenerator } from "../../../application/portal/recipe/recipe-generator.js";
+import { BuildContext } from "../../../types/build-context.js";
+import { ContentContext } from "../toc/new-toc.js";
+import { SpecContext } from "../../../types/spec-context.js";
+import { LauncherService } from "../../../infrastructure/launcher-service.js";
+import { FileService } from "../../../infrastructure/file-service.js";
+import { FilePath } from "../../../types/file/filePath.js";
+import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
+import { TempContext } from "../../../types/temp-context.js";
+import { RecipeContext } from "../../../types/recipe-context.js";
+import { TreeNode } from "../../../prompts/format.js";
 
 export class PortalRecipeAction {
   private readonly prompts: PortalRecipePrompts = new PortalRecipePrompts();
-  private readonly sdlParser: SdlParser;
-  private readonly BUILD_FILE_NAME: string = "APIMATIC-BUILD.json" as const;
+  private readonly launcherService = new LauncherService();
+  private readonly fileService = new FileService();
+  private readonly portalService = new PortalService();
 
-  constructor(configDirectory: DirectoryPath, commandMetadata: CommandMetadata) {
-    this.sdlParser = new SdlParser(new PortalService(), configDirectory, commandMetadata);
-  }
+  constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
-  public async createRecipe(buildDirectoryPath: DirectoryPath, name?: string): Promise<Result<string, string>> {
+  public async execute(buildDirectory: DirectoryPath, name?: string): Promise<ActionResult> {
     this.prompts.displayWelcomeMessage();
 
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.validate())) {
+      this.prompts.invalidBuildDirectory(buildDirectory);
+      return ActionResult.failed();
+    }
+
     const recipeName = name ?? (await this.prompts.recipeNamePrompt());
-    const recipeFileName = this.createRecipeFileName(recipeName);
-
-    const validateBuildDirectoryPathResult = await this.validateBuildDirectoryPath(buildDirectoryPath);
-    if (validateBuildDirectoryPathResult.isFailed()) {
-      return Result.failure(
-        `Unable to locate a valid "src" directory. Navigate to the directory containing your APIMatic Portal source or set up a new project by running \`apimatic portal quickstart\`.`
-      );
+    if (!recipeName) {
+      this.prompts.recipeNameEmpty();
+      return ActionResult.cancelled();
     }
 
-    //TODO: Create a type for the build config and use that here instead of any.
-    const buildConfigFilePath = await this.getBuildConfigFilePath(buildDirectoryPath);
-    const buildConfigResult = await this.parseBuildConfig(buildConfigFilePath);
-    if (buildConfigResult.isFailed()) {
-      return Result.failure(`Unable to generate API Recipe: ${buildConfigResult.error!}`);
+    const contentDirectory = buildDirectory.join("content");
+    const contentContext = new ContentContext(contentDirectory);
+
+    if (!(await contentContext.exists())) {
+      this.prompts.contentFolderNotFound();
+      return ActionResult.failed();
     }
 
-    const contentFolderPath = this.getContentFolderPath(buildConfigResult.value, buildDirectoryPath);
-    const tocFilePath = path.join(contentFolderPath, "content", "toc.yml");
-    //TODO: Replace any type of tocFileResult.value to concrete type.
-    const tocFileResult = await this.parseTocFile(tocFilePath);
-    if (tocFileResult.isFailed()) {
-      return Result.failure(`Unable to generate API Recipe: ${tocFileResult.error!}`);
+    const specDirectory = buildDirectory.join("spec");
+    const specContext = new SpecContext(specDirectory);
+
+    if (!(await specContext.validate())) {
+      this.prompts.specFileEmptyInvalid();
+      return ActionResult.failed();
     }
 
-    const recipeAlreadyExists = this.checkRecipeAlreadyExists(tocFileResult.value, recipeName, recipeFileName);
-    if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt())) {
-      return Result.cancelled("Operation was cancelled by the user.");
+    // Setup TOC context
+    const tocContext = new TocContext(contentDirectory);
+    const tocData = await tocContext.parseTocData();
+
+    // Setup recipe context
+    const recipeContext = new RecipeContext(recipeName);
+    const recipeFileName = recipeContext.getRecipeName();
+
+    // Check if the recipe already exists
+    const recipeAlreadyExists = recipeContext.exists(tocData, recipeName, recipeFileName);
+    if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt(recipeName))) {
+      return ActionResult.cancelled();
     }
 
-    const recipeResult = await this.promptUserAndBuildNewRecipe(buildConfigResult.value, contentFolderPath, recipeName);
-    if (recipeResult.isFailed()) {
-      return Result.failure(`Unable to generate API Recipe: ${recipeResult.error!}`);
-    }
-
-    const recipeGenerator = new PortalRecipeGenerator();
-    await recipeGenerator.createRecipe(
-      recipeResult.value!,
-      buildConfigResult.value!,
-      tocFileResult.value,
-      tocFilePath,
-      recipeName,
-      recipeFileName,
-      buildConfigFilePath,
-      contentFolderPath
-    );
-
-    const buildDirectoryStructure = await this.getBuildDirectoryStructure(recipeFileName);
-
-    this.prompts.displayBuildDirectoryStructureAsTree(buildDirectoryStructure as TreeObject);
-    this.prompts.displayRecipeGenerationSuccessMessage(contentFolderPath);
-    return Result.success("Generated recipe successfully.");
-  }
-
-  private createRecipeFileName(recipeName: string): string {
-    return this.toPascalCase(recipeName.trim());
-  }
-
-  private toPascalCase(str: string): string {
-    return str
-      .split(" ")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join("");
-  }
-
-  private async validateBuildDirectoryPath(buildDirectoryPath: DirectoryPath): Promise<Result<string, string>> {
-    if (!(await fsExtra.pathExists(buildDirectoryPath.toString()))) {
-      return Result.failure(`Portal build input folder ${buildDirectoryPath.toString()} does not exist.`);
-    }
-
-    return Result.success("Portal build input folder path validated successfully.");
-  }
-
-  //TODO: Figure out a better way to do this without the while loop.
-  private async promptUserAndBuildNewRecipe(
-    buildConfig: any,
-    contentFolderPath: string,
-    recipeName: string
-  ): Promise<Result<SerializableRecipe, string>> {
+    // Build the recipe
     const recipe = new PortalRecipe(recipeName);
-    let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
-    let idx: number = 1;
-    let addAnotherStep = true;
+
+    let stepIndex: number = 0;
+
     this.prompts.displayStepsInformation();
-    while (addAnotherStep) {
+
+    let endpointGroups: Map<string, SdlEndpoint[]> | undefined;
+
+    do {
       const stepType = await this.prompts.stepTypeSelectionPrompt();
-      const stepName = await this.prompts.stepNamePrompt("Step " + idx);
+      if (!stepType) return ActionResult.cancelled();
+
+      const stepName = await this.prompts.stepNamePrompt(`Step ${++stepIndex}`);
+      if (!stepName) return ActionResult.cancelled();
+
       switch (stepType) {
         case StepType.Content: {
-          const addContentStepResult = await this.promptUserAndAddContentStepToRecipe(recipe, stepName);
-          if (addContentStepResult.isFailed()) {
-            return Result.failure(addContentStepResult.error!);
-          }
+          const contentResult = await this.promptForContent();
+          recipe.addContentStep(stepName, contentResult);
+          this.prompts.displayStepAddedSuccessfullyMessage();
           break;
         }
+
         case StepType.Endpoint: {
           if (!endpointGroups) {
-            const extractEndpointGroupsFromSdlResult = await this.extractEndpointGroupsFromSdl(
-              buildConfig,
-              contentFolderPath
-            );
-            if (extractEndpointGroupsFromSdlResult.isFailed()) {
-              return Result.failure(`${extractEndpointGroupsFromSdlResult.error!}`);
+            const sdlResult = await withDirPath(async (tempDirectory) => {
+              const tempContext = new TempContext(tempDirectory);
+              const specZipPath = await tempContext.zip(specDirectory);
+
+              const specFileStream = await this.fileService.getStream(specZipPath);
+
+              try {
+                return await this.prompts.generateSdl(this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata))
+              } finally {
+                specFileStream.close();
+              }
+            });
+
+            if (sdlResult.isErr()) {
+              this.prompts.serviceError(sdlResult.error);
+              return ActionResult.failed();
             }
-            endpointGroups = extractEndpointGroupsFromSdlResult.value!;
+            endpointGroups = getEndpointGroupsFromSdl(sdlResult.value);
           }
-          await this.promptUserAndAddEndpointStepToRecipe(recipe, endpointGroups, stepName);
+
+          const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
+          if (!endpointGroupName) return ActionResult.cancelled();
+          const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
+          if (!endpointName) return ActionResult.cancelled();
+
+          const defaultDescription = getEndpointDescription(endpointGroups, endpointGroupName, endpointName);
+          const description = await this.prompts.endpointDescriptionPrompt(defaultDescription);
+          if (!description) return ActionResult.cancelled();
+
+          recipe.addEndpointStep(stepName, description, endpointGroupName, endpointName);
+          this.prompts.displayStepAddedSuccessfullyMessage();
           break;
         }
       }
-      addAnotherStep = await this.prompts.addAnotherStepSelectionPrompt();
-      idx++;
-    }
+    } while (await this.prompts.addAnotherStepSelectionPrompt());
 
-    return Result.success(recipe.toSerializableRecipe());
-  }
+    const serializableRecipe = recipe.toSerializableRecipe();
 
-  private async promptUserAndAddContentStepToRecipe(
-    recipe: PortalRecipe,
-    stepName: string
-  ): Promise<Result<string, string>> {
-    this.prompts.displayContentStepInfo();
-    let editor = process.env.EDITOR;
-    let editorArgs: string[] = [];
-    const tempFilePath = path.join(tmpdir(), `recipe-markdown-content-${Date.now()}.txt`);
-    const template = `# The Heading Goes Here\n\nThis is placeholder text for your API Recipe content step. Feel free to edit this. Save your changes and then close the file once you're done.`;
-    await fsExtra.writeFile(tempFilePath, template, "utf-8");
-
-    try {
-      if (!editor) {
-        if (process.platform === "win32") {
-          await execa("cmd", ["/c", "start", "/wait", "notepad", tempFilePath], { stdio: "ignore" });
-        } else if (process.platform === "darwin" || process.platform === "linux") {
-          editor = "vim";
-          try {
-            await execa(editor, [tempFilePath], { stdio: "inherit" });
-          } catch {
-            // User exiting vim can throw a non-zero exit code leading to exception, ignore it.
-          }
-        }
-      } else {
-        if (editor === "code" || editor.endsWith("code.cmd") || editor.endsWith("code.exe")) {
-          editorArgs.push("--wait");
-        }
-        editorArgs.push(tempFilePath);
-        await execa(editor, editorArgs, { stdio: "ignore" });
-      }
-
-      const fileContent = await fsExtra.readFile(tempFilePath, "utf-8");
-      recipe.addContentStep(stepName, stepName, fileContent);
-
-      this.prompts.displayStepAddedSuccessfullyMessage();
-      return Result.success("Added content step successfully.");
-    } catch {
-      return Result.failure(`Unable to add content step. Please try again later.`);
-    } finally {
-      await fsExtra.unlink(tempFilePath);
-    }
-  }
-
-  private async promptUserAndAddEndpointStepToRecipe(
-    recipe: PortalRecipe,
-    endpointGroups: Map<string, SdlEndpoint[]>,
-    stepName: string
-  ): Promise<void> {
-    const endpointGroupName = await this.prompts.endpointGroupNamePrompt(endpointGroups);
-    const endpointName = await this.prompts.endpointNamePrompt(endpointGroups, endpointGroupName);
-    const description = await this.prompts.endpointDescriptionPrompt(endpointGroups, endpointGroupName, endpointName);
-    const endpointPermalink = await this.createPermalink([endpointGroupName, endpointName]);
-    recipe.addEndpointStep(stepName, stepName, description, endpointPermalink);
-    this.prompts.displayStepAddedSuccessfullyMessage();
-  }
-
-  //TODO: Replace any with concrete toc file object.
-  private async parseTocFile(tocFilePath: string): Promise<Result<any, string>> {
-    // Check if the file exists
-    if (!fs.existsSync(tocFilePath)) {
-      return Result.failure<any, string>(
-        `toc.yml file not found at ${tocFilePath}. Please run 'apimatic:toc:new' to create your toc.yml file first.`
-      );
-    }
-
-    try {
-      const tocContent = await fs.promises.readFile(tocFilePath, "utf-8");
-      return Result.success(parse(tocContent));
-    } catch {
-      return Result.failure(
-        `Unable to parse the toc.yml file located at ${tocFilePath}. Please make sure that the toc.yml is a valid YAML file.`
-      );
-    }
-  }
-
-  private async createPermalink(pathPieces: string[]): Promise<string> {
-    return `$e/${pathPieces.map(encodeURIComponent).join("/")}`;
-  }
-
-  private async getBuildConfigFilePath(buildDirectoryPath: DirectoryPath): Promise<string> {
-    const files = await fs.promises.readdir(buildDirectoryPath.toString());
-    const buildFileExists = files.find((file) => file === this.BUILD_FILE_NAME);
-    if (!buildFileExists) {
-      return await this.prompts.buildConfigFilePathPrompt(buildDirectoryPath.toString());
-    }
-
-    return path.join(buildDirectoryPath.toString(), this.BUILD_FILE_NAME);
-  }
-
-  //TODO: Create a type for the build config and use that here instead of any.
-  private async parseBuildConfig(buildConfigFilePath: string): Promise<Result<any, string>> {
-    try {
-      const fileData = await fs.promises.readFile(buildConfigFilePath, "utf-8");
-      return Result.success(JSON.parse(fileData));
-    } catch {
-      return Result.failure(
-        `There was an error parsing the build config file located at "${buildConfigFilePath}". Please check your build config file and try again later.`
-      );
-    }
-  }
-
-  private checkRecipeAlreadyExists(tocData: any, recipeName: string, recipeFileName: string): boolean {
-    let apiRecipesGroup = tocData.toc?.find((item: any) => item.group === "API Recipes");
-    if (!apiRecipesGroup) {
-      return false;
-    }
-
-    // Check if recipe name or file name already exists
-    const existingRecipe = apiRecipesGroup.items.find(
-      (item: any) => item.page === recipeName || item.file === `recipes/${recipeFileName}.md`
+    // Generate the recipe
+    const recipeGenerator = new PortalRecipeGenerator();
+    await recipeGenerator.createRecipe(
+      serializableRecipe,
+      tocData,
+      tocContext.tocPath,
+      recipeName,
+      recipeFileName,
+      buildContext,
+      buildDirectory
     );
-    if (existingRecipe) {
-      return true;
-    }
 
-    return false;
+    const tocStructure = this.getTocStructure(recipeFileName);
+    this.prompts.recipeCreated();
+    this.prompts.displayRecipeStructure(tocStructure);
+    this.prompts.nextSteps();
+    return ActionResult.success();
   }
 
-  private async getBuildDirectoryStructure(recipeFileName: string): Promise<DirectoryNode> {
+  private async promptForContent(): Promise<string> {
+    return await withDirPath(async (tempDir) => {
+      const tempFile = new FilePath(tempDir, new FileName(`recipe-markdown-content.md`));
+      const defaultContent =
+        "# The Heading Goes Here\n\n" +
+        "This is placeholder text for your API Recipe content step. " +
+        "Feel free to edit this. Save your changes and then close the file once you're done.";
+
+      await this.fileService.writeContents(tempFile, defaultContent);
+      this.prompts.openRecipeMarkdownEditor();
+      await this.launcherService.openInEditor(tempFile);
+      const fileContent = await this.fileService.getContents(tempFile);
+      return fileContent.replace(/\r\n|\r/g, "\n");
+    });
+  }
+
+  private getTocStructure(recipeFileName: FileName): TreeNode {
     return {
-      content: {
-        "toc.yml : # Contains the API Recipes group with a new page for your API recipe": null
-      },
-      static: {
-        scripts: {
-          recipes: {
-            [`${recipeFileName}.js : # Generated recipe script file containing all of the steps`]: null
-          }
+      name: "src",
+      items: [
+        {
+          name: "content",
+          items: [
+            {
+              name: "toc.yml",
+              description: "# Contains the API Recipes group with a new page for your API recipe"
+            }
+          ]
+        },
+        {
+          name: "static",
+          items: [
+            {
+              name: "scripts",
+              items: [
+                {
+                  name: "recipes",
+                  items: [
+                    {
+                      name: `${recipeFileName}`,
+                      description: "# Generated recipe script file containing all of the steps"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
-      }
+      ]
     };
-  }
-
-  //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
-  private async extractEndpointGroupsFromSdl(
-    buildConfig: any,
-    contentFolderPath: string
-  ): Promise<Result<Map<string, SdlEndpoint[]>, string>> {
-    const specFolderPath = this.getSpecFolderPath(buildConfig, contentFolderPath);
-    if (!(await fsExtra.pathExists(specFolderPath))) {
-      return Result.failure(`API specification file not found at ${specFolderPath}.`);
-    }
-
-    this.prompts.startProgressIndicatorWithMessage(
-      "Extracting endpoint groups and endpoints from the API specification."
-    );
-
-    const endpointGroupsResult = await this.sdlParser.getEndpointGroupsFromSdl(specFolderPath);
-
-    if (endpointGroupsResult.isFailed()) {
-      this.prompts.stopProgressIndicatorWithMessage("Unable to extract endpoints from your API specification.");
-      return Result.failure(`${endpointGroupsResult.error!}`);
-    }
-
-    this.prompts.stopProgressIndicatorWithMessage(
-      "Successfully extracted endpoint groups and endpoints from the API specification."
-    );
-    return Result.success(endpointGroupsResult.value!);
-  }
-
-  //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
-  private getSpecFolderPath(buildConfig: any, contentFolderPath: string): string {
-    const apiSpecPath = buildConfig.generatePortal?.apiSpecPath;
-    if (apiSpecPath) {
-      return path.join(contentFolderPath, apiSpecPath);
-    }
-
-    return path.join(contentFolderPath, "spec");
-  }
-
-  //TODO: Replace type of buildConfig from any to actual BuildConfig type after creating it.
-  private getContentFolderPath(buildConfig: any, buildDirectoryPath: DirectoryPath): string {
-    const contentFolder = buildConfig.generatePortal?.contentFolder;
-    if (contentFolder) {
-      return path.join(buildDirectoryPath.toString(), contentFolder);
-    }
-
-    return buildDirectoryPath.toString();
   }
 }

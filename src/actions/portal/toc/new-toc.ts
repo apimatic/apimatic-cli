@@ -1,182 +1,129 @@
-import * as path from "path";
-import fsExtra from "fs-extra";
+import { err, ok, Result } from "neverthrow";
 import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc.js";
-import { Result } from "../../../types/common/result.js";
-import { getMessageInRedColor } from "../../../utils/utils.js";
-import { SdlParser } from "../../../application/portal/toc/sdl-parser.js";
 import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator.js";
-import { TocContentParser } from "../../../application/portal/toc/toc-content-parser.js";
 import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc.js";
-import { PortalService } from "../../../infrastructure/services/portal-service.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
-import { FilePath } from "../../../types/file/filePath.js";
-import { FileName } from "../../../types/file/fileName.js";
-import { BuildContext } from "../../../types/build-context.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
+import { ActionResult } from "../../action-result.js";
+import { TocContext } from "../../../types/toc-context.js";
+import { FileService } from "../../../infrastructure/file-service.js";
+import { FilePath } from "../../../types/file/filePath.js";
+import { BuildContext } from "../../../types/build-context.js";
+import { getEndpointGroupsAndModels } from "../../../types/sdl/sdl.js";
+import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
+import { TempContext } from "../../../types/temp-context.js";
+import { PortalService } from "../../../infrastructure/services/portal-service.js";
 
-export class PortalNewTocAction {
-  private readonly prompts: PortalNewTocPrompts;
-  private readonly sdlParser: SdlParser;
-  private readonly tocGenerator: TocStructureGenerator;
-  private readonly contentParser: TocContentParser;
-  private readonly DEFAULT_TOC_FILENAME: string = "toc.yml" as const;
-  private readonly APIMATIC_BUILD_FILENAME: string = "APIMATIC-BUILD.json" as const;
+export class ContentContext {
+  private readonly fileService = new FileService();
 
-  constructor(configDirectory: DirectoryPath, commandMetadata: CommandMetadata) {
-    this.prompts = new PortalNewTocPrompts();
-    this.sdlParser = new SdlParser(new PortalService(), configDirectory, commandMetadata);
-    this.tocGenerator = new TocStructureGenerator();
-    this.contentParser = new TocContentParser();
+  constructor(private readonly contentDirectory: DirectoryPath) {}
+
+  public async exists(): Promise<boolean> {
+    return this.fileService.directoryExists(this.contentDirectory);
   }
 
-  public async createToc(
+  public async extractContentGroups(): Promise<TocGroup[]> {
+    const directory = await this.fileService.getDirectory(this.contentDirectory);
+    return await directory.parseContentFolder(this.contentDirectory);
+  }
+}
+
+type SdlComponents = {
+  endpointGroups: Map<string, TocEndpoint[]>;
+  models: TocModel[];
+};
+
+export class PortalNewTocAction {
+  private readonly prompts: PortalNewTocPrompts = new PortalNewTocPrompts();
+  private readonly tocGenerator: TocStructureGenerator = new TocStructureGenerator();
+  private readonly fileService = new FileService();
+  private readonly portalService = new PortalService();
+
+  constructor(private readonly configDirectory: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
+
+  public async execute(
     buildDirectory: DirectoryPath,
     tocDirectory?: DirectoryPath,
     force: boolean = false,
     expandEndpoints: boolean = false,
     expandModels: boolean = false
-  ): Promise<Result<string, string>> {
-    try {
-      const tocDir = await this.getDestinationPath(buildDirectory, tocDirectory);
-      const tocPath = new FilePath(tocDir, new FileName(this.DEFAULT_TOC_FILENAME));
-      const tocCheckResult = await this.handleExistingToc(tocPath, force);
-      if (!tocCheckResult.isSuccess()) {
-        return Result.cancelled(tocCheckResult.value!);
-      }
-
-      const { endpointGroups, models } = await this.extractSdlComponents(buildDirectory, expandEndpoints, expandModels);
-
-      const contentGroups = await this.extractContentGroups(buildDirectory);
-
-      const toc = this.tocGenerator.createTocStructure(
-        endpointGroups,
-        models,
-        expandEndpoints,
-        expandModels,
-        contentGroups
-      );
-      const yamlString = this.tocGenerator.transformToYaml(toc);
-      await this.writeToc(tocPath.toString(), yamlString, "utf8");
-
-      this.prompts.displayOutroMessage(tocPath);
-      return Result.success(tocPath.toString());
-    } catch (error) {
-      this.prompts.logError(getMessageInRedColor(`${(error as Error).message}`));
-      return Result.failure(`An unexpected error occurred while generating the TOC file.`);
-    }
-  }
-
-  private async writeToc(path: string, content: string, encoding: string) {
-    await fsExtra.ensureFile(path);
-    await fsExtra.writeFile(path, content, encoding);
-  }
-
-  private async handleExistingToc(tocPath: FilePath, force: boolean): Promise<Result<string, string>> {
-    const shouldContinue = await this.checkExistingToc(tocPath, force);
-    if (!shouldContinue) {
-      return Result.cancelled("Operation was cancelled by the user.");
-    }
-    return Result.success("TOC check passed.");
-  }
-
-  private async extractSdlComponents(
-    buildDirectory: DirectoryPath,
-    expandEndpoints: boolean,
-    expandModels: boolean
-  ): Promise<{ endpointGroups: Map<string, TocEndpoint[]>; models: TocModel[] }> {
-    if (!expandEndpoints && !expandModels) {
-      return { endpointGroups: new Map(), models: [] };
-    }
-
-    this.prompts.startProgressIndicatorWithMessage("Extracting endpoints and/or models from the API specification...");
-    const specFolderPath = await this.getSpecFolderPath(buildDirectory);
-
-    if (!(await fsExtra.pathExists(specFolderPath))) {
-      this.prompts.stopProgressIndicatorWithMessage(`⚠️ Could not find the specification folder at: ${specFolderPath}`);
-      this.prompts.displayInfo("Falling back to default TOC structure without expanded endpoints or models...");
-      return { endpointGroups: new Map(), models: [] };
-    }
-
-    const sdlResult = await this.sdlParser.getTocComponentsFromSdl(specFolderPath);
-
-    if (!sdlResult.isSuccess()) {
-      this.prompts.stopProgressIndicatorWithMessage(`⚠️ ${sdlResult.error!}`);
-      this.prompts.displayInfo("Falling back to default TOC structure without expanded endpoints or models...");
-      return { endpointGroups: new Map(), models: [] };
-    }
-
-    this.prompts.stopProgressIndicatorWithMessage(
-      "Successfully extracted endpoints and/or models from the specification."
-    );
-    return sdlResult.value!;
-  }
-
-  private async extractContentGroups(buildDirectory: DirectoryPath): Promise<TocGroup[]> {
-    const contentFolderPath = await this.getContentFolderPath(buildDirectory);
-
-    if (!(await fsExtra.pathExists(contentFolderPath.toString()))) {
-      this.prompts.displayInfo(`⚠️ Could not locate the content folder at: ${contentFolderPath}`);
-      this.prompts.displayInfo("Skipping custom content addition in TOC...");
-      return [];
-    }
-
-    return await this.contentParser.parseContentFolder(contentFolderPath.toString(), contentFolderPath.toString());
-  }
-
-  private async getDestinationPath(
-    buildDirectory: DirectoryPath,
-    providedTocDirectory?: DirectoryPath
-  ): Promise<DirectoryPath> {
-    if (providedTocDirectory === undefined) {
-      const inferredDestination = await this.getContentFolderPath(buildDirectory);
-      return inferredDestination;
-    }
-    return providedTocDirectory;
-  }
-
-  private async checkExistingToc(tocPath: FilePath, force: boolean): Promise<boolean> {
-    if ((await fsExtra.pathExists(tocPath.toString())) && !force) {
-      return await this.prompts.overwriteExistingTocPrompt(tocPath);
-    }
-    return true;
-  }
-
-  private async getContentFolderPath(buildDirectory: DirectoryPath): Promise<DirectoryPath> {
+  ): Promise<ActionResult> {
+    // Validate build directory
     const buildContext = new BuildContext(buildDirectory);
-    const defaultContentFolder = buildDirectory.join("content");
-
     if (!(await buildContext.validate())) {
-      return defaultContentFolder;
+      this.prompts.invalidBuildDirectory(buildDirectory);
+      return ActionResult.failed();
+    }
+    const buildConfig = await buildContext.getBuildFileContents();
+    const contentDirectory = buildDirectory.join(buildConfig.generatePortal?.contentFolder ?? "content");
+
+    const tocDir = tocDirectory ?? contentDirectory;
+    const tocContext = new TocContext(tocDir);
+
+    if (!force && (await tocContext.exists()) && !(await this.prompts.overwriteToc(tocContext.tocPath))) {
+      this.prompts.tocFileAlreadyExists();
+      return ActionResult.cancelled();
     }
 
-    try {
-      const buildConfig = await buildContext.getBuildFileContents();
-      if (buildConfig.generatePortal?.contentFolder == null) {
-        return defaultContentFolder;
+    let sdlComponents: SdlComponents = { endpointGroups: new Map(), models: [] };
+    if (expandEndpoints || expandModels) {
+      const specDirectory = buildDirectory.join("spec");
+
+      if (!(await this.fileService.directoryExists(specDirectory))) {
+        this.prompts.fallingBackToDefault();
+      } else {
+        const sdlResult = await withDirPath(async (tempDirectory) => {
+          const tempContext = new TempContext(tempDirectory);
+          const specZipPath = await tempContext.zip(specDirectory);
+          const specFileStream = await this.fileService.getStream(specZipPath);
+          try {
+            const result = await this.prompts.extractEndpointGroupsAndModels(
+              this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata)
+            );
+            if (result.isErr()) {
+              this.prompts.fallingBackToDefault();
+              return ok({ endpointGroups: new Map(), models: [] } as SdlComponents);
+            }
+            return ok(getEndpointGroupsAndModels(result.value));
+          } finally {
+            specFileStream.close();
+          }
+        });
+
+        if (sdlResult.isErr()) {
+          this.prompts.logError(sdlResult.error);
+          return ActionResult.failed();
+        }
+        sdlComponents = sdlResult.value;
       }
-      return buildDirectory.join(buildConfig.generatePortal.contentFolder).join("content");
-    } catch {
-      return defaultContentFolder;
     }
-  }
+    const contentContext = new ContentContext(contentDirectory);
+    const contentExists = await contentContext.exists();
 
-  private async getSpecFolderPath(buildDirectory: DirectoryPath): Promise<string> {
-    const buildFilePath = path.join(buildDirectory.toString(), this.APIMATIC_BUILD_FILENAME);
-    const defaultSpecFolder = path.join(buildDirectory.toString(), "spec");
-
-    if (!(await fsExtra.pathExists(buildFilePath))) {
-      return defaultSpecFolder;
+    let contentGroups: TocGroup[];
+    if (!contentExists) {
+      this.prompts.contentDirectoryNotFound(contentDirectory);
+      contentGroups = [];
+    } else {
+      contentGroups = await contentContext.extractContentGroups();
     }
 
-    try {
-      const buildConfig = await fsExtra.readJson(buildFilePath, "utf8");
 
-      if (buildConfig.generatePortal?.apiSpecPath == null) {
-        return defaultSpecFolder;
-      }
-      return path.join(buildDirectory.toString(), buildConfig.generatePortal.apiSpecPath);
-    } catch {
-      return defaultSpecFolder;
-    }
+    const toc = this.tocGenerator.createTocStructure(
+      sdlComponents.endpointGroups,
+      sdlComponents.models,
+      expandEndpoints,
+      expandModels,
+      contentGroups
+    );
+
+    const yamlString = this.tocGenerator.transformToYaml(toc);
+    const tocFilePath = await tocContext.save(yamlString);
+
+
+    this.prompts.tocCreated(tocFilePath)
+
+    return ActionResult.success();
   }
 }

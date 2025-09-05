@@ -180,3 +180,4 @@ test-source/
 test-destination/
 test-portal/
 /.idea/
+.github/copilot-instructions.md

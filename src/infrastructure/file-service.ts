@@ -1,10 +1,12 @@
 import fs from "fs";
 import fsExtra from "fs-extra";
 import * as path from "path";
-import { FilePath } from "../types/file/filePath.js";
-import { DirectoryPath } from "../types/file/directoryPath.js";
 import { pipeline } from "stream";
 import { promisify } from "util";
+import { FilePath } from "../types/file/filePath.js";
+import { DirectoryPath } from "../types/file/directoryPath.js";
+import { Directory } from "../types/file/directory.js";
+import { FileName } from "../types/file/fileName.js";
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -39,8 +41,20 @@ export class FileService {
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
-  public async copyDirectory(source: DirectoryPath, destination: DirectoryPath) {
-    await fsExtra.copy(source.toString(), destination.toString());
+  public async createDirectoryIfNotExists(dir: DirectoryPath): Promise<void> {
+    await fsExtra.ensureDir(dir.toString());
+  }
+
+  public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
+    const entries = await fsExtra.readdir(directoryPath.toString());
+    const results = await Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = path.join(directoryPath.toString(), entry);
+        const stat = await fsExtra.stat(fullPath);
+        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : new FileName(entry);
+      })
+    );
+    return new Directory(directoryPath, results);
   }
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
@@ -68,6 +82,19 @@ export class FileService {
     }
   }
 
+  public getRelativePath(filePath: FilePath, basePath: DirectoryPath): string {
+    const filePathStr = filePath.toString();
+    const basePathStr = basePath.toString();
+
+    if (filePathStr.startsWith(basePathStr)) {
+      const relativePath = filePathStr.substring(basePathStr.length).replace(/^[/\\]/, "");
+      return relativePath.replace(/\\/g, "/");
+    }
+
+    // Normalize the full path if it doesn't start with basePath
+    return filePathStr.replace(/\\/g, "/");
+  }
+
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }
@@ -81,12 +108,31 @@ export class FileService {
     await streamPipeline(stream, writeStream);
   }
 
+  public async ensurePathExists(filePath: FilePath) {
+    await fsExtra.ensureFile(filePath.toString());
+  }
+
   public async writeContents(filePath: FilePath, contents: string) {
     await fsExtra.writeFile(filePath.toString(), contents, "utf-8");
   }
 
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
+  }
+
+  public async isZipFile(filePath: FilePath): Promise<boolean> {
+    try {
+      const buffer = await fsExtra.readFile(filePath.toString());
+      return (
+        buffer.length >= 4 &&
+        buffer[0] === 0x50 && // P
+        buffer[1] === 0x4b && // K
+        buffer[2] === 0x03 && // \x03
+        buffer[3] === 0x04
+      ); // \x04
+    } catch {
+      return false;
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.21",
+    "version": "1.1.0-alpha.22",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -70,7 +70,6 @@
         "prettier": "^2.8.8",
         "striptags": "^3.2.0",
         "tmp-promise": "^3.0.3",
-        "treeify": "^1.1.0",
         "tslib": "^2.8.1",
         "uuid": "^11.1.0",
         "yaml": "^2.8.0"
@@ -78,6 +77,7 @@
     "devDependencies": {
         "@commitlint/cli": "^15.0.0",
         "@commitlint/config-conventional": "^15.0.0",
+        "@eslint/js": "^9.34.0",
         "@oclif/test": "^4.1.13",
         "@types/archiver": "^5.3.4",
         "@types/base-64": "^1.0.0",

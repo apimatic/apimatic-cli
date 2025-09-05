@@ -1,28 +1,41 @@
-import * as fs from "fs";
-import * as path from "path";
-import treeify from "treeify";
-import { intro, spinner, select, text, cancel, isCancel, outro, log, autocomplete } from "@clack/prompts";
-import { getMessageInGreenColor } from "../../../utils/utils.js";
-import { SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { select, text, isCancel, log, autocomplete, confirm, note } from "@clack/prompts";
+import { Sdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
+import { DirectoryPath } from "../../../types/file/directoryPath.js";
+import { format as f, getTree, TreeNode, withSpinner } from "../../format.js";
+import { StepType } from "../../../types/recipe/recipe.js";
+import { getErrorMessage, ServiceError } from "../../../infrastructure/api-utils.js";
+import { Result } from "neverthrow";
 
 export class PortalRecipePrompts {
-  private readonly spin = spinner();
-
   public displayWelcomeMessage(): void {
-    intro(`Welcome to the API Recipe Generation Wizard. 🪄`);
-    log.step(`This wizard will guide you through the process of creating an API Recipe.`);
-    log.message(
-      `An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.`
-    );
-    log.message(
-      `ℹ️  Learn more: https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes`
-    );
-    log.message(`Let's get started! 🚀`);
+    log.step(`Welcome to the API Recipe Generation Wizard.`);
+    const message = `This wizard will guide you through the process of creating an API Recipe.
+
+An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.
+Learn more: ${f.link("https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes")}
+
+Let's get started!`;
+    log.info(message);
   }
 
-  public async recipeNamePrompt(): Promise<string> {
+  public recipeNameEmpty() {
+    const message = "No recipe name provided";
+    log.error(message);
+  }
+
+  public contentFolderNotFound() {
+    const message = "Content folder not found.";
+    log.error(message);
+  }
+
+  public specFileEmptyInvalid() {
+    const message = "Spec file is empty or invalid.";
+    log.error(message);
+  }
+
+  public async recipeNamePrompt(): Promise<string | undefined> {
     const recipeName = await text({
-      message: `📘 Enter a name for your API Recipe:`,
+      message: `Enter a name for your API Recipe:`,
       placeholder: "This name will be displayed in your API Documentation portal sidebar.",
       validate: (name) => {
         if (!name) {
@@ -32,55 +45,13 @@ export class PortalRecipePrompts {
     });
 
     if (isCancel(recipeName)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return undefined;
     }
 
     return (recipeName as string).trim();
   }
-  //Todo: Find a better place for this function
-  removeQuotes(str: string): string {
-    const quotes = ['"', "'"];
 
-    for (const quote of quotes) {
-      if (str.startsWith(quote) && str.endsWith(quote) && str.length > 1) {
-        return this.removeQuotes(str.slice(1, -1)); // Recursive call
-      }
-    }
-    return str;
-  }
-  public async buildConfigFilePathPrompt(buildDirectoryPath: string): Promise<string> {
-    const buildConfigFilePath = await text({
-      message: `⚠️  APIMATIC-BUILD.json is required and was not found in "${buildDirectoryPath}".\nPlease enter the path to your build config file (relative to this directory):`,
-      validate: (filePath) => {
-        if (!filePath) {
-          return "Build config file path cannot be empty. Please provide a valid file path.";
-        }
-        const cleanedPath = this.removeQuotes(filePath.trim());
-        const resolvedPath = path.resolve(buildDirectoryPath, cleanedPath);
-        
-        if (!resolvedPath.endsWith(".json")) {
-          return "The content file must be a JSON (.json) file. Please provide a valid file path.";
-        }
-
-      
-        if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
-          return;
-        }
-
-        return "The specified path is either not a valid relative file path or it doesn't exist. Please provide a valid relative file path.";
-      }
-    });
-
-    if (isCancel(buildConfigFilePath)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
-    }
-
-    return path.resolve(buildDirectoryPath, this.removeQuotes((buildConfigFilePath as string).trim()));
-  }
-
-  public async stepNamePrompt(defaultStepName: string): Promise<string> {
+  public async stepNamePrompt(defaultStepName: string): Promise<string | undefined> {
     const stepName = await text({
       message: `Enter a name for the step:`,
       defaultValue: defaultStepName,
@@ -88,46 +59,37 @@ export class PortalRecipePrompts {
     });
 
     if (isCancel(stepName)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return undefined;
     }
 
     return (stepName as string).trim();
   }
 
   public displayStepsInformation(): void {
-    log.step(`🔧 Add Steps to your API Recipe:`);
-    log.message(`You can add:`)
-    log.message(
-      `1. 📄 Content Step: Display custom content, such as instructions or information related to your API.`
-    );
-    log.message(`2. 🔗 Endpoint Step: Display an API endpoint, its playground and other relevant details.`);
-    log.message(`💡 Steps appear in the order you add them.`);
-    log.message(`📝 Let's proceed to adding steps to your API Recipe. `);
+    log.step(`Add Steps to your API Recipe:`);
+    const message = `You can add:
+1. Content Step: Display custom content, such as instructions or information related to your API.
+2. Endpoint Step: Display an API endpoint, its playground and other relevant details.
+Steps appear in the order you add them.
+Let's proceed to adding steps to your API Recipe.`;
+    log.message(message);
   }
 
-  public async stepTypeSelectionPrompt(): Promise<string> {
+  public async stepTypeSelectionPrompt(): Promise<StepType | undefined> {
     const stepType = await select({
-      message: `➕ Select the type of step you want to add:`,
+      message: `Select the type of step you want to add:`,
       options: [
         { value: "content", label: "Content Step", hint: "For displaying custom content" },
         { value: "endpoint", label: "Endpoint Step", hint: "For displaying an API endpoint with its details" }
       ]
     });
-
     if (isCancel(stepType)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return undefined;
     }
-
-    return stepType as string;
+    return stepType as StepType;
   }
 
-  public displayContentStepInfo(): void {
-    log.step("📝 Opening markdown editor for you to add content in...");
-  }
-
-  public async endpointGroupNamePrompt(endpointGroups: Map<string, SdlEndpoint[]>): Promise<string> {
+  public async endpointGroupNamePrompt(endpointGroups: Map<string, SdlEndpoint[]>): Promise<string | undefined> {
     const groupNames = Array.from(endpointGroups.keys()).map((name) => ({
       value: name,
       label: name
@@ -139,14 +101,16 @@ export class PortalRecipePrompts {
     });
 
     if (isCancel(endpointGroupName)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return undefined;
     }
 
     return (endpointGroupName as string).trim();
   }
 
-  public async endpointNamePrompt(endpointGroups: Map<string, SdlEndpoint[]>, endpointGroupName: string): Promise<string> {
+  public async endpointNamePrompt(
+    endpointGroups: Map<string, SdlEndpoint[]>,
+    endpointGroupName: string
+  ): Promise<string | undefined> {
     const endpoints = endpointGroups.get(endpointGroupName);
     const endpointName = await autocomplete({
       message: `Select the name of the endpoint:`,
@@ -158,15 +122,13 @@ export class PortalRecipePrompts {
     });
 
     if (isCancel(endpointName)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return undefined;
     }
 
     return (endpointName as string).trim();
   }
 
-  public async endpointDescriptionPrompt(endpointGroups: Map<string, SdlEndpoint[]>, endpointGroupName: string, endpointName: string): Promise<string> {
-    const defaultDescription = endpointGroups.get(endpointGroupName)!.find((e) => e.Name === endpointName)!.Description;
+  public async endpointDescriptionPrompt(defaultDescription: string): Promise<string | undefined> {
     const endpointDescription = await text({
       message: `Enter a description for the endpoint:`,
       placeholder: `Optional. Leave this empty to use the endpoint description defined in the API Specification`,
@@ -174,79 +136,74 @@ export class PortalRecipePrompts {
     });
 
     if (isCancel(endpointDescription)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return undefined;
     }
 
     return (endpointDescription as string).trim();
   }
 
   public async addAnotherStepSelectionPrompt(): Promise<boolean> {
-    const addAnotherStep = await select({
+    const addAnotherStep = await confirm({
       message: `Do you want to add another step?`,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" }
-      ],
-      initialValue: "yes"
+      initialValue: true
     });
 
     if (isCancel(addAnotherStep)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+      return false;
     }
-
-    return addAnotherStep === "yes";
+    return addAnotherStep;
   }
 
-  public async overwriteApiRecipeInTocPrompt(): Promise<boolean> {
-    const overwriteApiRecipeInToc = await select({
-      message: `⚠️  An API Recipe with this name already exists. Do you want to overwrite it?`,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" }
-      ]
+  public async overwriteApiRecipeInTocPrompt(name: string): Promise<boolean> {
+    const overwrite = await confirm({
+      message: `An API Recipe with name ${f.var(name)} already exists. Do you want to overwrite it?`,
+      initialValue: false
     });
 
-    if (isCancel(overwriteApiRecipeInToc)) {
-      cancel("Operation cancelled.");
-      return process.exit(0);
+    if (isCancel(overwrite)) {
+      return false;
     }
-
-    return overwriteApiRecipeInToc === "yes";
+    return overwrite;
   }
 
   public displayStepAddedSuccessfullyMessage() {
     log.step(`Step has been added successfully.`);
   }
 
-  public displayRecipeGenerationSuccessMessage(buildDirectoryPath: string) {
-    log.message(`🎉 Your new API Recipe has been added to the source directory at: ${buildDirectoryPath}`);
-    outro(
-      `▶ Run the command \`apimatic portal serve\` to preview your documentation portal.`
+  public invalidBuildDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
+  }
+
+  public serviceError(serviceError: ServiceError) {
+    log.error(getErrorMessage(serviceError));
+  }
+
+  public openRecipeMarkdownEditor() {
+    log.step("Opening markdown editor for you to enter recipe content...");
+  }
+
+  public displayRecipeStructure(tocStructure: TreeNode) {
+    const heading = `You can edit the following files to customize your API Recipe:\n`;
+    const message  = getTree(tocStructure);
+    log.info(heading + message);
+  }
+
+  public nextSteps() {
+    const message = `Run the command '${f.cmdAlt(`apimatic`, 'portal', 'serve')}' to preview your documentation portal`;
+    note(message, "Next Steps");
+  }
+
+  public generateSdl(fn: Promise<Result<Sdl, ServiceError>>) {
+    return withSpinner(
+      "Extracting endpoints",
+      "Endpoints extracted",
+      "Endpoints extraction failed",
+      fn
     );
   }
 
-  public startProgressIndicatorWithMessage(message: string): void {
-    this.spin.start(message);
-  }
-
-  public stopProgressIndicatorWithMessage(message: string): void {
-    this.spin.stop(message);
-  }
-
-  public displayBuildDirectoryStructureAsTree(buildDirectoryTreeObject: treeify.TreeObject) {
-    const tree = treeify.asTree(buildDirectoryTreeObject, true, true);
-
-    const coloredLogString = tree
-      .split("\n")
-      .map((line: string) => line.replace(/#.*/, (match: string) => getMessageInGreenColor(match)))
-      .join("\n");
-
-    log.step(`🛠️  You can edit the following files to customize your API Recipe :\n\n` + coloredLogString);
-  }
-
-  public logError(error: string): void {
-    outro(error);
+  public recipeCreated() {
+    log.info(`A new API Recipe has been created successfully.`);
   }
 }

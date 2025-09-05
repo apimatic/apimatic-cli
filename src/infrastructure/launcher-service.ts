@@ -2,6 +2,8 @@ import { FilePath } from "../types/file/filePath.js";
 import { execa } from "execa";
 import os from "os";
 import { spawn } from "child_process";
+import open from "open";
+import { UrlPath } from "../types/file/urlPath.js";
 
 export class LauncherService {
 
@@ -46,5 +48,9 @@ export class LauncherService {
     } catch {
       // Silently ignore errors
     }
+  }
+
+  public openUrlInBrowser(url: UrlPath) {
+    return open(url.toString());
   }
 }
