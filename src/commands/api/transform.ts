@@ -7,7 +7,6 @@ import { format, intro, outro } from "../../prompts/format.js";
 import { createResourceInput } from "../../types/file/resource-input.js";
 import { TransformationFormats } from "../../types/api/transform.js";
 import { ExportFormats } from "@apimatic/sdk";
-import { err, ok, Result } from "neverthrow";
 
 const DEFAULT_WORKING_DIRECTORY = "./";
 
@@ -31,10 +30,11 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
   ];
 
   static flags = {
-    format: Flags.string({
-      required: true,
-      description: "Specification format to transform API specification into"
-    }),
+      format: Flags.string({
+        required: true,
+        description: "Specification format to transform API specification into",
+        options: Object.keys(TransformationFormats)
+      }),
     file: Flags.string({
       description: "Path to the API specification file to transform"
     }),
@@ -55,15 +55,13 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
       flags: { format, file, url, destination, force, "auth-key": authKey }
     } = await this.parse(Transform);
 
-    const workingDirectory = new DirectoryPath(destination ?? DEFAULT_WORKING_DIRECTORY);
-    const transformedApiDirectory = workingDirectory.join("transformations");
-    const specFile = createResourceInput(file, url);
-    const parsedFormatResult = this.getValidFormat(format);
-
-    if (parsedFormatResult.isErr()) {
-      this.error(parsedFormatResult.error);
-    }
-    const parsedFormat = parsedFormatResult.value;
+  const workingDirectory = new DirectoryPath(destination ?? DEFAULT_WORKING_DIRECTORY);
+  const transformedApiDirectory = workingDirectory.join("transformations");
+  const specFile = createResourceInput(file, url);
+  // Directly map the format flag to ExportFormats using TransformationFormats
+  const key = format as keyof typeof TransformationFormats;
+  const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;
+  const parsedFormat = ExportFormats[transformationFormat];
 
     const commandMetadata: CommandMetadata = {
       commandName: Transform.id,
@@ -78,18 +76,5 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
 
   private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
-  };
-  
-  private readonly getValidFormat = (format: string): Result<ExportFormats, string> => {
-    const key = Object.keys(TransformationFormats).find((value) => value === format) as
-      | keyof typeof TransformationFormats
-      | undefined;
-    if (key) {
-      const transformationFormat = TransformationFormats[key] as keyof typeof ExportFormats;
-      return ok(ExportFormats[transformationFormat]);
-    } else {
-      const formats = Object.keys(TransformationFormats).join("|");
-      return err(`Please provide a valid platform, e.g. ${formats}`);
-    }
   };
 }
