@@ -6,7 +6,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 export default class Logout extends Command {
   static summary = "Clears the local login credentials.";
 
-  static description = "Clears the local login credentials. This will also clear any cached credentials from the CLI. To clear the browser credentials, please visit https://app.apimatic.io/account/manage.";
+  static description = "Clears the local login credentials. This will also clear any cached credentials from the CLI.";
 
   private static cmdTxt = format.cmd('apimatic',  'auth' ,'logout');
   static examples = [Logout.cmdTxt];

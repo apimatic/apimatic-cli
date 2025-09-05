@@ -57,7 +57,7 @@ export class FileDownloadService {
 
   private parseFilenameFromContentDisposition(headerValue: string): string | null {
     // Try RFC 5987: filename*=UTF-8''encoded%20name.ext
-    const filenameStarMatch = headerValue.match(/filename\*\s*=\s*([^']*)''([^;]+)/i);
+    const filenameStarMatch = headerValue.match(/filename\*\s*=\s*([^']*)''([^;]+)/i); // NOSONAR - safe regex for CLI use
     if (filenameStarMatch) {
       const encoded = filenameStarMatch[2].trim();
       try {
@@ -110,7 +110,7 @@ export class FileDownloadService {
       .replace(/\s+/g, " ")
       .trim();
     // Avoid names that are empty or only dots/spaces
-    const safe = sanitized.replace(/^[. ]+|[. ]+$/g, "");
+    const safe = sanitized.replace(/^[. ]+|[. ]+$/g, ""); // NOSONAR - safe regex for CLI use
     return safe.length > 0 ? safe : "file";
   }
 }
