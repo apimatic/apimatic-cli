@@ -1,3 +1,10 @@
+# [1.1.0-alpha.22](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.21...v1.1.0-alpha.22) (2025-09-05)
+
+
+### Features
+
+* add new prompt framework ([#189](https://github.com/apimatic/apimatic-cli/issues/189)) ([1181f9e](https://github.com/apimatic/apimatic-cli/commit/1181f9ec60bacb634b585ce5ff0a482e9654778b))
+
 # [1.1.0-alpha.21](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.20...v1.1.0-alpha.21) (2025-08-18)
 
 
