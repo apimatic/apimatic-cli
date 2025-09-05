@@ -45,7 +45,7 @@ export class PortalServeAction {
     }
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-    if (servePort != port) {
+    if (servePort != port && !onAfterServe) {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
