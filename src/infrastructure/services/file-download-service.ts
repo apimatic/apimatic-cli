@@ -57,7 +57,7 @@ export class FileDownloadService {
 
   private parseFilenameFromContentDisposition(headerValue: string): string | null {
     // Try RFC 5987: filename*=UTF-8''encoded%20name.ext
-    const filenameStarMatch = headerValue.match(/filename\*\s*=\s*([^']*?)''([^;]+)/i);
+    const filenameStarMatch = headerValue.match(/filename\*\s*=\s*([^']*)''([^;]+)/i);
     if (filenameStarMatch) {
       const encoded = filenameStarMatch[2].trim();
       try {
@@ -105,12 +105,12 @@ export class FileDownloadService {
 
   private sanitizeFilename(name: string): string {
     // Replace characters not allowed in common filesystems and trim dots/spaces
-    const sanitized = name.replace('/[<>:"/\\|?*\x00-\x1F]/g', "_").replace(/\s+/g, " ").trim();
+    const sanitized = name
+      .replace('/[<>:"/\\|?*\x00-\x1F]/g', "_")
+      .replace(/\s+/g, " ")
+      .trim();
     // Avoid names that are empty or only dots/spaces
-    const safe = sanitized
-      .replace(/^\.+/, "") // remove all leading dots
-      .replace(/\.+$/, "") // remove all trailing dots (not just one)
-      .trim(); // remove spaces on both sides
+    const safe = sanitized.replace(/^[. ]+|[. ]+$/g, "");
     return safe.length > 0 ? safe : "file";
   }
 }
