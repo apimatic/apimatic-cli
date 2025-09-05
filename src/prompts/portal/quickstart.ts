@@ -18,6 +18,7 @@ export class PortalQuickstartPrompts {
   public welcomeMessage() {
     log.info(`Welcome to the Portal Quickstart Wizard.`);
     const message = `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.
+
 Let's get started!`;
     log.message(message);
   }
@@ -146,14 +147,14 @@ Let's get started!`;
   }
 
   public noInputDirectoryProvided() {
-    log.error("No build directory was provided.");
+    log.error("No source directory was provided.");
   }
 
   public downloadBuildDirectory(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner(
-      "Downloading build directory",
-      `Build directory downloaded successfully`,
-      "Unable to download build directory",
+      "Setting up source directory",
+      `Source directory set up successfully`,
+      "Unable to set up source directory",
       fn
     );
   }
@@ -163,9 +164,9 @@ Let's get started!`;
   }
 
   public nextSteps(): void {
-    const message = `Use the API Playground or an SDK to call your API.
-Customize the Portal theme, add API recipes and enable AI features
-${f.link(referenceDocumentationUrl)}`;
+    const message = `- Use the API Playground or an SDK to call your API.
+- Customize the Portal theme, add API recipes and enable AI features
+  ${f.link(referenceDocumentationUrl)}`;
     note(message, "Next steps");
   }
 

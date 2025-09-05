@@ -13,6 +13,7 @@ export class PortalRecipePrompts {
 
 An API Recipe is a collection of steps that allows you to define a single use case for your API Documentation portal.
 Learn more: ${f.link("https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/api-recipes")}
+
 Let's get started!`;
     log.info(message);
   }
