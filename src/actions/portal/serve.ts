@@ -120,7 +120,7 @@ export class PortalServeAction {
             return;
           }
 
-          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false, false);
 
           liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();

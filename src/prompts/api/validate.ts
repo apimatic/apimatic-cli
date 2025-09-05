@@ -5,6 +5,8 @@ import { Result } from "neverthrow";
 import { withSpinner } from "../format.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { format as f } from "../format.js";
 
 export class ApiValidatePrompts {
   public async validateApi(fn: Promise<Result<ApiValidationSummary, string>>) {
@@ -39,5 +41,9 @@ export class ApiValidatePrompts {
   public networkError(serviceError: ServiceError): void {
     const message = getErrorMessage(serviceError);
     log.error(message);
+  }
+
+  public transformedApiSaved(filePath: FilePath): void {
+    log.info(`Transformed API has been saved to ${f.path(filePath)}.`);
   }
 }

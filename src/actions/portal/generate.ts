@@ -27,7 +27,8 @@ export class GenerateAction {
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
     force: boolean,
-    zipPortal: boolean
+    zipPortal: boolean,
+    displayMessages: boolean = true
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
@@ -51,12 +52,7 @@ export class GenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generatePortal(
-        this.portalService.generatePortal(
-        buildZipPath,
-        this.configDir,
-        this.commandMetadata,
-        this.authKey
-      )
+        this.portalService.generatePortal(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
       );
 
       if (response.isErr()) {
@@ -75,7 +71,9 @@ export class GenerateAction {
       const tempPortalZipPath = await tempContext.save(response.value);
       await portalContext.save(tempPortalZipPath, zipPortal);
 
-      this.prompts.portalGenerated(portalDirectory);
+      if (displayMessages) {
+        this.prompts.portalGenerated(portalDirectory);
+      }
 
       return ActionResult.success();
     });

@@ -10,7 +10,6 @@ import { TransformContext } from "../../types/transform-context.js";
 import { ResourceInput } from "../../types/file/resource-input.js";
 import { ResourceContext } from "../../types/resource-context.js";
 
-
 export class TransformAction {
   private readonly prompts: ApiTransformPrompts = new ApiTransformPrompts();
   private readonly validatePrompts: ApiValidatePrompts = new ApiValidatePrompts();
@@ -34,7 +33,7 @@ export class TransformAction {
     return await withDirPath(async (tempDirectory) => {
       const resourceContext = new ResourceContext(tempDirectory);
       const specFileDirResult = await resourceContext.resolveTo(resourcePath);
-      if (specFileDirResult.isErr()){
+      if (specFileDirResult.isErr()) {
         this.prompts.networkError(specFileDirResult.error);
         return ActionResult.failed();
       }
@@ -59,8 +58,11 @@ export class TransformAction {
         return ActionResult.failed();
       }
 
-      await transformContext.save(result.value.stream);
+      const transformedFilePath = await transformContext.save(result.value.stream);
       this.validatePrompts.displayValidationMessages(result.value.apiValidationSummary);
+
+      this.validatePrompts.transformedApiSaved(transformedFilePath);
+
       return ActionResult.success();
     });
   };

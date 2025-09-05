@@ -27,9 +27,10 @@ export class TransformContext {
 
   }
 
-  public async save(stream: NodeJS.ReadableStream): Promise<void> {
+  public async save(stream: NodeJS.ReadableStream): Promise<FilePath> {
     await this.fileService.createDirectoryIfNotExists(this.destinationDirectory);
     await this.fileService.writeFile(this.specPath, stream);
+    return this.specPath;
   }
 
   private parseFileName(format: string, file: FilePath): FileName {

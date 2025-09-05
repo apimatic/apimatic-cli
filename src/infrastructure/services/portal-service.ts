@@ -191,9 +191,9 @@ export class PortalService {
     // Check if it has the expected structure with Errors
     if (parsedResult.Errors && Array.isArray(parsedResult.Errors) && parsedResult.Errors.length > 0) {
       // Get the first error and clean it up
-      const firstError = parsedResult.Errors[0];
+      return parsedResult.Errors[0].split(".")[0] + ".";
       // Split on <br/> and take the first part, then strip remaining HTML tags
-      return firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
+      // return firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
     } else if (parsedResult.Success === false) {
       return "API definition file validation failed.";
     }
