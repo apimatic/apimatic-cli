@@ -1,6 +1,7 @@
 // eslint-disable-next-line no-undef
 module.exports = {
   branches: [
+    "main",
     {
       name: "alpha",
       prerelease: true
