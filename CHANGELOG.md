@@ -1,3 +1,56 @@
+# 1.0.0-beta.1 (2025-09-08)
+
+
+### Bug Fixes
+
+* add missing content header to telemetry api call ([#139](https://github.com/apimatic/apimatic-cli/issues/139)) ([f2b0e64](https://github.com/apimatic/apimatic-cli/commit/f2b0e64826d987ca844b285d8862ebf25e0fe286))
+* **documentation:** improve messages for each command ([a2c0bfb](https://github.com/apimatic/apimatic-cli/commit/a2c0bfbd5c1867302cf27170dc3b2d3ca5bd64ca))
+* **feature:** add force flag and change sdk version and package ([38db116](https://github.com/apimatic/apimatic-cli/commit/38db116b65b94f01a15c7c2d6351401a60ee1393))
+* **help inconsistent:** fix help being inconsistent with actual platforms supported in sdk generate ([23b6e6d](https://github.com/apimatic/apimatic-cli/commit/23b6e6da15a073afa71962458c825ba54bcd5f50))
+* **package:** change version in package file ([903c619](https://github.com/apimatic/apimatic-cli/commit/903c6196ef5e37fbffd8d6b744d6eedcdd7167f5))
+* **path:** resolve paths to absolute ([f68bdde](https://github.com/apimatic/apimatic-cli/commit/f68bdde7e8c927602ea87e07d0e558b699082154))
+* **portal:** override authkey not working if user is never logged in ever ([fb5d188](https://github.com/apimatic/apimatic-cli/commit/fb5d1884e7dc12917387903e5292e50367190162))
+* quickstart fails for zipped specs ([#107](https://github.com/apimatic/apimatic-cli/issues/107)) ([49b403c](https://github.com/apimatic/apimatic-cli/commit/49b403c2b18fee6f203e9f0193531927fb47ca56))
+* **readme & bug fix:** update readme, fix bugs ([141f1a9](https://github.com/apimatic/apimatic-cli/commit/141f1a9ad53b80fdb91d39ca87f61b6cdfc7d700))
+* **refactor:** move print validation logic to utils file as common function and pretty the code ([05dbe41](https://github.com/apimatic/apimatic-cli/commit/05dbe41c875c70e4a2e6183e647c6fea1e10ad83))
+* **refactor:** refactor code ([d7cb486](https://github.com/apimatic/apimatic-cli/commit/d7cb4863bcfd44f297f0525e0c7eae7ecef12695))
+* **release:** add lock file to gitignore restore check_build workflow ([2eb959a](https://github.com/apimatic/apimatic-cli/commit/2eb959afc2a7ee2317959fc8525930acde2989dc))
+* remove ignore flag from portal serve ([#140](https://github.com/apimatic/apimatic-cli/issues/140)) ([336f5b7](https://github.com/apimatic/apimatic-cli/commit/336f5b750997dd6d1a8b5a1da4f85137283bb3ad))
+* remove simple-git dependency ([#151](https://github.com/apimatic/apimatic-cli/issues/151)) ([04d4669](https://github.com/apimatic/apimatic-cli/commit/04d466994722c116422d7e0d281a308c5c7dc355))
+* removed existing spec in quickstart when providing spec explicitly ([#147](https://github.com/apimatic/apimatic-cli/issues/147)) ([126318f](https://github.com/apimatic/apimatic-cli/commit/126318f0c497fc105a51ede3febe07731c09b41f))
+* resolve bug in unarchive method ([#144](https://github.com/apimatic/apimatic-cli/issues/144)) ([e70b7d2](https://github.com/apimatic/apimatic-cli/commit/e70b7d2c03069297a1c0fba1cf7529a74eadd2bd))
+* resolve multiple visual issues and minor fixes  ([#136](https://github.com/apimatic/apimatic-cli/issues/136)) ([4589a6e](https://github.com/apimatic/apimatic-cli/commit/4589a6e988f0cddfa49fb9e7a995f41912c9451d))
+* resolved import for filetype to conform with esm ([#106](https://github.com/apimatic/apimatic-cli/issues/106)) ([234d00f](https://github.com/apimatic/apimatic-cli/commit/234d00f2eeae0b7ff89f2386108d951b7658d1eb))
+* **sdk & transform:** Fix bugs related to content and corner cases in transform and sdk generate ([e08ba51](https://github.com/apimatic/apimatic-cli/commit/e08ba51d6fc98e991f06f910702fd6b106868fbc))
+* **sdk package:** get sdk package from npm ([4c8e178](https://github.com/apimatic/apimatic-cli/commit/4c8e1787eb21f04d81cab95b5a58e3133a61f7af))
+* **types:** Add graphql type in destination format of schema ([019aed3](https://github.com/apimatic/apimatic-cli/commit/019aed39c8a9cb8425f2d46d1b9b58f6b8c69475))
+* update user-agent format in api calls ([#135](https://github.com/apimatic/apimatic-cli/issues/135)) ([b16e374](https://github.com/apimatic/apimatic-cli/commit/b16e3747f9f62851c4d4b0cc975bfecdd7076d5d))
+* updated dependency version of apimatic/sdk ([#90](https://github.com/apimatic/apimatic-cli/issues/90)) ([8efd8f8](https://github.com/apimatic/apimatic-cli/commit/8efd8f810b9d71914e1ffc762d2ab4b65a9040f9))
+* **version:** update sdk and cli versions ([75cc181](https://github.com/apimatic/apimatic-cli/commit/75cc18146f2ec198ca7e82189f2d16281dce80f8))
+
+
+### Features
+
+* add better error messaging for sdk generation failures ([bac2b62](https://github.com/apimatic/apimatic-cli/commit/bac2b623a2a3efd2a78c711c731cb6c2764913cd))
+* add new prompt framework ([#189](https://github.com/apimatic/apimatic-cli/issues/189)) ([1181f9e](https://github.com/apimatic/apimatic-cli/commit/1181f9ec60bacb634b585ce5ff0a482e9654778b))
+* add responses for generate-via-file ([#143](https://github.com/apimatic/apimatic-cli/issues/143)) ([386be66](https://github.com/apimatic/apimatic-cli/commit/386be66c7f24df2b0fe9a9456bf23c998f9c00c3))
+* add tracking events and improve messaging ([#171](https://github.com/apimatic/apimatic-cli/issues/171)) ([20c45de](https://github.com/apimatic/apimatic-cli/commit/20c45deed7a10cceb5d587290e4e31905e69c552))
+* adds user-agent and various other improvements for serve, quickstart and recipe commands ([#110](https://github.com/apimatic/apimatic-cli/issues/110)) ([5eecf75](https://github.com/apimatic/apimatic-cli/commit/5eecf754b366015edf6a20f5ee354f9aec814abd))
+* **auth-key in authorization flow:** add authorization in auth flow ([7522c43](https://github.com/apimatic/apimatic-cli/commit/7522c4340043958e4e8b3eb6ff8a45fc249bf524))
+* **environment:** now cli will use production environment, make subscription messages more readable ([7868f76](https://github.com/apimatic/apimatic-cli/commit/7868f76f36af65f1bf774711c888d5d365a9094a))
+* improve copilot prompts and messages ([#137](https://github.com/apimatic/apimatic-cli/issues/137)) ([a0906a6](https://github.com/apimatic/apimatic-cli/commit/a0906a641f631f7d9f4043eb27935122c16b52af))
+* **login command:** implement login command ([47a9fca](https://github.com/apimatic/apimatic-cli/commit/47a9fca890c2ac30030761ca6c419259fff2c743))
+* **portal:** adds portal quickstart and serve commands ([#33](https://github.com/apimatic/apimatic-cli/issues/33)) ([ab2da9a](https://github.com/apimatic/apimatic-cli/commit/ab2da9a0bcea520abcb92bba7e0d75b7dce6af60)), closes [#10](https://github.com/apimatic/apimatic-cli/issues/10)
+* **portal:** adds portal:new:toc command and other various improvements ([#93](https://github.com/apimatic/apimatic-cli/issues/93)) ([cfae452](https://github.com/apimatic/apimatic-cli/commit/cfae452b26f2ebf393b22afb82740e5b18c78738)), closes [#55](https://github.com/apimatic/apimatic-cli/issues/55) [#56](https://github.com/apimatic/apimatic-cli/issues/56) [#72](https://github.com/apimatic/apimatic-cli/issues/72) [#73](https://github.com/apimatic/apimatic-cli/issues/73)
+* **portal:** adds portal:recipe:new command for api recipes and migrates codebase to esm from commonjs ([#103](https://github.com/apimatic/apimatic-cli/issues/103)) ([adb6d0d](https://github.com/apimatic/apimatic-cli/commit/adb6d0dfdf878744fe744f6cee70acbecf8b269d)), closes [#62](https://github.com/apimatic/apimatic-cli/issues/62)
+* rename portal:new:toc command to portal:toc:new ([#99](https://github.com/apimatic/apimatic-cli/issues/99)) ([1a6b1c4](https://github.com/apimatic/apimatic-cli/commit/1a6b1c4aa42aa23bf5439f473f8176f2733f41bf))
+* restructure working directory usage across all portal commands ([#123](https://github.com/apimatic/apimatic-cli/issues/123)) ([a842d8f](https://github.com/apimatic/apimatic-cli/commit/a842d8ff05d198a35e0630d8dd3971e4f39ebabd))
+* update apimatic.io base url with new subdomain base url ([a8796cd](https://github.com/apimatic/apimatic-cli/commit/a8796cd84f4f3b415e094b1af93f3e144272626b))
+* update apimatic.io sdk ([1c4c576](https://github.com/apimatic/apimatic-cli/commit/1c4c576ed933e95362f198372f258782e5f4788a))
+* update input directory structure for most commands and device login flow ([#134](https://github.com/apimatic/apimatic-cli/issues/134)) ([e172aa8](https://github.com/apimatic/apimatic-cli/commit/e172aa80c7978aa5b20591befceb09f70198f9a6)), closes [#111](https://github.com/apimatic/apimatic-cli/issues/111) [#113](https://github.com/apimatic/apimatic-cli/issues/113) [#116](https://github.com/apimatic/apimatic-cli/issues/116) [#117](https://github.com/apimatic/apimatic-cli/issues/117) [#119](https://github.com/apimatic/apimatic-cli/issues/119) [#124](https://github.com/apimatic/apimatic-cli/issues/124) [#125](https://github.com/apimatic/apimatic-cli/issues/125) [#126](https://github.com/apimatic/apimatic-cli/issues/126) [#130](https://github.com/apimatic/apimatic-cli/issues/130) [#129](https://github.com/apimatic/apimatic-cli/issues/129) [#127](https://github.com/apimatic/apimatic-cli/issues/127)
+* update tslib dependency version to match apimatic sdk ([be06f73](https://github.com/apimatic/apimatic-cli/commit/be06f735eafdd93204800efeebc2d85f5c0e8613))
+* **usage tracking:** update sdk to send cli user agent for tracking ([768c60b](https://github.com/apimatic/apimatic-cli/commit/768c60b14a7fac3b824d4178697971ecf9d431b2))
+
 # [1.1.0-alpha.22](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-alpha.21...v1.1.0-alpha.22) (2025-09-05)
 
 

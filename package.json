@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-alpha.22",
+    "version": "1.0.0-beta.1",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -79,6 +79,8 @@
         "@commitlint/config-conventional": "^15.0.0",
         "@eslint/js": "^9.34.0",
         "@oclif/test": "^4.1.13",
+        "@semantic-release/changelog": "^6.0.3",
+        "@semantic-release/git": "^10.0.1",
         "@types/archiver": "^5.3.4",
         "@types/base-64": "^1.0.0",
         "@types/chai": "^4.3.20",
