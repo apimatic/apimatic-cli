@@ -14,7 +14,7 @@ The official CLI for APIMatic.
 To get started with APIMatic's CLI using a step by step wizard, run the following command: 
 
 ```sh-session
-$ apimatic portal:quickstart
+$ apimatic portal quickstart
 ```
 
 # Usage

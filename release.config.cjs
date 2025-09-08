@@ -1,9 +1,12 @@
 // eslint-disable-next-line no-undef
 module.exports = {
   branches: [
-    "v3",
     {
       name: "alpha",
+      prerelease: true
+    },
+    {
+      name: "beta",
       prerelease: true
     }
   ],
@@ -21,8 +24,9 @@ module.exports = {
     [
       "@semantic-release/git",
       {
-        assets: ["CHANGELOG.md", "dist/**"],
-        message: "chore(release): set `package.json` to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        assets: ["CHANGELOG.md", "package.json"],
+        message:
+          "chore(release): set `package.json` to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ]
   ]
