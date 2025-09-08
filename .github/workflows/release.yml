@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [ alpha ]
+    branches: [ alpha, beta ]
 
 jobs:
   release:
@@ -13,7 +13,7 @@ jobs:
     name: Release with Node version ${{ matrix.node }}
     steps:
       - name: Checkout CLI
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: apimatic/apimatic-cli
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -22,7 +22,7 @@ jobs:
           path: cli
 
       - name: setup node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
 
       - name: Install dependencies
         working-directory: cli
