@@ -145,7 +145,7 @@
             }
         },
         "topicSeparator": " ",
-        "state": "Alpha"
+        "state": "beta"
     },
     "lint-staged": {
         "*.js": "eslint --cache --fix",

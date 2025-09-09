@@ -19,11 +19,11 @@ Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Col
   static readonly cmdTxt = format.cmd("apimatic", "api", "transform");
 
   static examples = [
-    `${Transform.cmdTxt} ${format.flag("format", "OPENAPI3YAML")} ${format.flag(
+    `${Transform.cmdTxt} ${format.flag("format", "openapi3yaml")} ${format.flag(
       "file",
       "./specs/sample.json"
     )} ${format.flag("destination", "./")}`,
-    `${Transform.cmdTxt} ${format.flag("format", "RAML")} ${format.flag(
+    `${Transform.cmdTxt} ${format.flag("format", "raml")} ${format.flag(
       "url",
       '"https://petstore.swagger.io/v2/swagger.json"'
     )} ${format.flag("destination", "./")}`
