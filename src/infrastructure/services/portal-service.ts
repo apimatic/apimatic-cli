@@ -52,8 +52,10 @@ export class PortalService {
 
     let generationId: string;
     try {
-      // Step 1: Start portal generation
-      const portalInstance = await docsPortalAsyncController.generateOnPremPortalViaBuildInputAsync(this.CONTENT_TYPE, file);
+      const portalInstance = await docsPortalAsyncController.generateOnPremPortalViaBuildInputAsync(
+        this.CONTENT_TYPE,
+        file
+      );
       generationId = portalInstance.result.id;
     } catch (error: unknown) {
       return err(await PortalService.handlePortalGenerationErrors(error));
@@ -61,30 +63,22 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    while (true) {
-      let statusResult;
-      try {
-        statusResult = await this.apiService.getPortalGenerationStatus(
-          generationId,
-          configDir,
-          commandMetadata.shell,
-          authKey
-        );
-      } catch {
-        return err("Error while polling portal generation status.");
-      }
-
+    let statusResult;
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      statusResult = await this.apiService.getPortalGenerationStatus(
+        generationId,
+        configDir,
+        commandMetadata.shell,
+        authKey
+      );
       if (statusResult.isErr()) {
         return err(statusResult.error);
       }
-
-      if (statusResult.value.status === "Completed") break;
-      
       if (statusResult.value.status === "Failed") {
         return err("Portal generation failed.");
       }
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
+    } while (statusResult.value.status !== "Completed");
 
     try {
       const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
