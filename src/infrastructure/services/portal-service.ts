@@ -45,46 +45,53 @@ export class PortalService {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
 
-    const authInfo = await getAuthInfo(configDir.toString());
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const docsPortalAsyncController = new DocsPortalGenerationAsyncController(client);
 
-
-    // Step 1;
-    let generationId;
+    let generationId: string;
     try {
-
-      const startResp = await docsPortalAsyncController.generateOnPremPortalViaBuildInputAsync(this.CONTENT_TYPE, file);
-      generationId = startResp.result.id;
-    }catch (error: unknown) {
+      // Step 1: Start portal generation
+      const portalInstance = await docsPortalAsyncController.generateOnPremPortalViaBuildInputAsync(this.CONTENT_TYPE, file);
+      generationId = portalInstance.result.id;
+    } catch (error: unknown) {
       return err(await PortalService.handlePortalGenerationErrors(error));
     } finally {
       buildFileStream.close();
     }
-      while (true) {
 
-
-        try {
-        const statusResult = await this.apiService.getPortalGenerationStatus(
+    while (true) {
+      let statusResult;
+      try {
+        statusResult = await this.apiService.getPortalGenerationStatus(
           generationId,
           configDir,
           commandMetadata.shell,
           authKey
         );
-        if (statusResult.isErr()) return err(statusResult.error);
-        } catch (error: unknown) {
-
-        }
-
-        if (statusResult.value.status === "Completed") {
-          const downloadResp = await docsPortalAsyncController.downloadGeneratedPortal(requestId);
-          return ok(downloadResp.result as NodeJS.ReadableStream);
-        }
-        if (status === "Failed") return err("Portal generation failed.");
+      } catch {
+        return err("Error while polling portal generation status.");
       }
+
+      if (statusResult.isErr()) {
+        return err(statusResult.error);
+      }
+
+      if (statusResult.value.status === "Completed") break;
+      
+      if (statusResult.value.status === "Failed") {
+        return err("Portal generation failed.");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 
+    try {
+      const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
+      return ok(portalDownloadResponse.result as NodeJS.ReadableStream);
+    } catch {
+      return err("Failed to download generated portal.");
+    }
   }
 
   // TODO: Pass stream as parameter instead of file path.

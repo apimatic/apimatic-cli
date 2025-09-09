@@ -6,7 +6,6 @@ import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../api-utils.js";
 import { PortalGenerationStatusResponse } from "@apimatic/sdk";
-import { Status } from "@apimatic/sdk/src/models/status.js";
 
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
@@ -58,7 +57,7 @@ export class ApiService {
       }
 
       if (response.status === 302) {
-        return ok( new { status: "Completed"});
+        return ok({ status: "Completed" } as PortalGenerationStatusResponse);
       }
 
       return err(ServiceError.InvalidResponse);
