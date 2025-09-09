@@ -83,8 +83,8 @@ export class PortalService {
     try {
       const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
       return ok(portalDownloadResponse.result as NodeJS.ReadableStream);
-    } catch {
-      return err("Failed to download generated portal.");
+    } catch (error) {
+      return err(await PortalService.handlePortalGenerationErrors(error));
     }
   }
 
