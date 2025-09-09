@@ -3,6 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, withSpinner } from "../format.js";
 import { Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
+import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
@@ -35,12 +36,12 @@ export class PortalGeneratePrompts {
     log.error(message);
   }
 
-  public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>>) {
+  public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>>) {
     return withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
   }
 
-  public portalGenerationError(error: string) {
-    log.error(error);
+  public portalGenerationError(error: ServiceError) {
+    log.error(getErrorMessage(error));
   }
 
   portalGenerationErrorWithReport(reportPath: FilePath) {

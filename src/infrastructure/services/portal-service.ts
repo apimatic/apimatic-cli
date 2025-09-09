@@ -41,7 +41,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
+  ): Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
 
@@ -58,7 +58,7 @@ export class PortalService {
       );
       generationId = portalInstance.result.id;
     } catch (error: unknown) {
-      return err(await PortalService.handlePortalGenerationErrors(error));
+      return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
     }
@@ -76,7 +76,7 @@ export class PortalService {
         return err(statusResult.error);
       }
       if (statusResult.value.status === "Failed") {
-        return err("Portal generation failed.");
+        return err(ServiceError.ServerError);
       }
     } while (statusResult.value.status !== "Completed");
 
@@ -84,7 +84,10 @@ export class PortalService {
       const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
       return ok(portalDownloadResponse.result as NodeJS.ReadableStream);
     } catch (error) {
-      return err(await PortalService.handlePortalGenerationErrors(error));
+      if (error instanceof ApiError && error.statusCode === 422) {
+        return err(error.body as NodeJS.ReadableStream);
+      }
+      return err(handleServiceError(error));
     }
   }
 
