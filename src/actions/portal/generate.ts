@@ -9,6 +9,7 @@ import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { TempContext } from "../../types/temp-context.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import isInCi from "is-in-ci";
+import { Readable } from "stream";
 import { ServiceError } from "../../infrastructure/api-utils.js";
 
 export class GenerateAction {
@@ -56,10 +57,9 @@ export class GenerateAction {
       const response = await this.prompts.generatePortal(
         this.portalService.generatePortal(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
       );
-
       if (response.isErr()) {
         const error = response.error;
-         if (typeof error === "string" && error in ServiceError) {
+         if (error instanceof Readable) {
           const errorZipPath = await tempContext.save(error);
           const reportPath = await portalContext.saveError(errorZipPath);
           if (!isInCi) {
@@ -67,8 +67,8 @@ export class GenerateAction {
           }
           this.prompts.portalGenerationErrorWithReport(reportPath);
         }
-        else{
-          this.prompts.portalGenerationError(error);
+        else {
+          this.prompts.portalGenerationError(error as ServiceError);
         }
         return ActionResult.failed();
       }
