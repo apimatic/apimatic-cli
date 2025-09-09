@@ -8,6 +8,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { TempContext } from "../../types/temp-context.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import isInCi from "is-in-ci";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
@@ -52,7 +53,7 @@ export class GenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generatePortal(
-        this.portalService.generatePortalAsync(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
+        this.portalService.generatePortal(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
       );
 
       if (response.isErr()) {
@@ -62,7 +63,9 @@ export class GenerateAction {
         } else {
           const errorZipPath = await tempContext.save(error);
           const reportPath = await portalContext.saveError(errorZipPath);
-          await this.launcherService.openFile(reportPath);
+          if (!isInCi) {
+            await this.launcherService.openFile(reportPath);
+          }
           this.prompts.portalGenerationErrorWithReport(reportPath);
         }
         return ActionResult.failed();

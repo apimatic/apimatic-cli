@@ -36,7 +36,7 @@ export class PortalService {
   private readonly apiService = new ApiService();
 
   // TODO: Pass stream as parameter instead of file path.
-  public async generatePortalAsync(
+  public async generatePortal(
     buildPath: FilePath,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
