@@ -6,7 +6,7 @@ import {
   BadRequestResponseSdkError,
   CodeGenerationExternalApisController,
   ContentType,
-  DocsPortalManagementController,
+  DocsPortalGenerationAsyncController,
   UnauthorizedResponseError,
   ProblemDetailsError,
   FileWrapper,
@@ -28,32 +28,47 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result } from "neverthrow";
 import { Language } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../api-utils.js";
+import { ApiService } from "./api-service.js";
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly fileService = new FileService();
 
   // TODO: Pass stream as parameter instead of file path.
-  public async generatePortal(
+  public async generatePortalAsync(
     buildPath: FilePath,
     configDir: DirectoryPath,
-    eventMetadata: CommandMetadata,
+    commandMetadata: CommandMetadata,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    
+    const authInfo = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
-    const client = apiClientFactory.createApiClient(authorizationHeader, eventMetadata.shell);
-    const docsPortalManagementController = new DocsPortalManagementController(client);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
+    const docsPortalAsyncController = new DocsPortalGenerationAsyncController(client);
+    const apiService = new ApiService();
 
+    const startResp = await docsPortalAsyncController.generateOnPremPortalViaBuildInputAsync(this.CONTENT_TYPE, file);
+    const requestId = startResp.result.id;
     try {
-      const response = await docsPortalManagementController.generateOnPremPortalViaBuildInput(
-        this.CONTENT_TYPE,
-        file,
-        this.createOriginQueryParameter(eventMetadata.commandName)
-      );
-      return ok(response.result as NodeJS.ReadableStream);
+      while (true) {
+        const statusResult = await apiService.getPortalGenerationStatus(
+          requestId,
+          configDir,
+          commandMetadata.shell,
+          authKey
+        );
+        if (statusResult.isErr()) return err(statusResult.error);
+
+        const { status } = statusResult.value;
+        if (status === "Completed") {
+          const downloadResp = await docsPortalAsyncController.downloadGeneratedPortal(requestId);
+          return ok(downloadResp.result as NodeJS.ReadableStream);
+        }
+        if (status === "Failed") return err("Portal generation failed.");
+      }
     } catch (error) {
       return err(await PortalService.handlePortalGenerationErrors(error));
     } finally {

@@ -52,7 +52,7 @@ export class GenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generatePortal(
-        this.portalService.generatePortal(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
+        this.portalService.generatePortalAsync(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
       );
 
       if (response.isErr()) {

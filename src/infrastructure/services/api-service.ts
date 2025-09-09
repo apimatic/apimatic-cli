@@ -32,6 +32,43 @@ export class ApiService {
     }
   }
 
+  public async getPortalGenerationStatus(
+    requestId: string,
+    configDir: DirectoryPath,
+    shell: string,
+    authKey: string | null
+  ): Promise<Result<{ status: string }, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    if (authInfo === null && !authKey) {
+      return err(ServiceError.UnAuthorized);
+    }
+
+    try {
+      const token = authKey || authInfo?.authKey;
+      const response = await this.axiosInstance(shell, token).get(`/portal/v2/${requestId}/status`, {
+        headers: { Accept: "application/json" },
+        maxRedirects: 0, 
+        validateStatus: () => true 
+      });
+
+      if (response.status === 200) {
+        return ok(response.data as { status: string });
+      }
+
+      if (response.status === 302) {
+        return ok({ status: "Completed" });
+      }
+
+      if (response.status === 400 || response.status === 401) {
+        return err(ServiceError.UnAuthorized);
+      }
+
+      return err(ServiceError.InvalidResponse);
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
+    }
+  }
+
   public async sendTelemetry(payload: string, authKey: string, shell: string): Promise<Result<string, string>> {
     try {
       const response = await this.axiosInstance(shell, authKey).post("/telemetry/track", payload, {
