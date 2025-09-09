@@ -5,6 +5,8 @@ import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../api-utils.js";
+import { PortalGenerationStatusResponse } from "@apimatic/sdk";
+import { Status } from "@apimatic/sdk/src/models/status.js";
 
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
@@ -37,7 +39,7 @@ export class ApiService {
     configDir: DirectoryPath,
     shell: string,
     authKey: string | null
-  ): Promise<Result<{ status: string }, ServiceError>> {
+  ): Promise<Result<PortalGenerationStatusResponse, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     if (authInfo === null && !authKey) {
       return err(ServiceError.UnAuthorized);
@@ -47,20 +49,16 @@ export class ApiService {
       const token = authKey || authInfo?.authKey;
       const response = await this.axiosInstance(shell, token).get(`/portal/v2/${requestId}/status`, {
         headers: { Accept: "application/json" },
-        maxRedirects: 0, 
-        validateStatus: () => true 
+        maxRedirects: 0,
+        validateStatus: () => true
       });
 
       if (response.status === 200) {
-        return ok(response.data as { status: string });
+        return ok(response.data as PortalGenerationStatusResponse);
       }
 
       if (response.status === 302) {
-        return ok({ status: "Completed" });
-      }
-
-      if (response.status === 400 || response.status === 401) {
-        return err(ServiceError.UnAuthorized);
+        return ok( new { status: "Completed"});
       }
 
       return err(ServiceError.InvalidResponse);
