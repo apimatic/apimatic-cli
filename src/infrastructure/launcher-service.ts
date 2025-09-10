@@ -4,10 +4,12 @@ import os from "os";
 import { spawn } from "child_process";
 import open from "open";
 import { UrlPath } from "../types/file/urlPath.js";
+import isInCi from "is-in-ci";
 
 export class LauncherService {
 
   public async openInEditor(filePath: FilePath): Promise<void> {
+    if (!isInCi) return;
     try {
       await execa("code", ["--wait", filePath.toString()]);
     } catch {
@@ -51,6 +53,11 @@ export class LauncherService {
   }
 
   public openUrlInBrowser(url: UrlPath) {
-    return open(url.toString());
+    if (!isInCi) return;
+    try{
+      return open(url.toString());
+    } catch {
+      // Silently ignore errors
+    }
   }
 }
