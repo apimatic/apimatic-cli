@@ -19,6 +19,10 @@ export class BuildContext {
     return new FilePath(this.buildDirectory, new FileName("APIMATIC-BUILD.json"));
   }
 
+  private get readmeFile(): FilePath {
+    return new FilePath(this.buildDirectory, new FileName("README.md"));
+  }
+
   private get specDirectory(): DirectoryPath {
     return this.buildDirectory.join("spec");
   }
@@ -54,6 +58,22 @@ export class BuildContext {
 
   public async deleteWorkflowDir() {
     await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
+  }
+
+  public async deleteContentDir() {
+    await this.fileService.deleteDirectory(this.buildDirectory.join("content"));
+  }
+
+  public async deleteStaticDir() {
+    await this.fileService.deleteDirectory(this.buildDirectory.join("static"));
+  }
+
+  public async deleteReadmeFile() {
+    await this.fileService.deleteFile(this.readmeFile);
+  }
+
+  public async deleteBuildFile() {
+    await this.fileService.deleteFile(this.buildFile);
   }
 }
 
