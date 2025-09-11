@@ -9,6 +9,10 @@ export const enum ServiceError {
   UnAuthorized = "UNAUTHORIZED"
 }
 
+export function isServiceError(e: unknown): e is ServiceError {
+  return typeof e === "string";
+}
+
 export function getErrorMessage(error: ServiceError): string {
   switch (error) {
     case ServiceError.NetworkError:
