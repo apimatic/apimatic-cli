@@ -53,7 +53,7 @@ export class LauncherService {
   }
 
   public openUrlInBrowser(url: UrlPath) {
-    if (!isInCi) return;
+   // if (!isInCi) return;
     try{
       return open(url.toString());
     } catch {
