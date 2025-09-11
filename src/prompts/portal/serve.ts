@@ -40,16 +40,6 @@ export class PortalServePrompts {
   }
 
   public hotReloadEnabled(srcDirectory: DirectoryPath) {
-    const testDir = new DirectoryPath(
-      "C:\\playground\\generate-cli test\\src\\saeed"
-    );
-    noteWrapped(
-      `Hot reload is enabled.
-
-Watching the directory ${f.path(testDir)} for any changes`,
-      `Note`
-    );
-
     noteWrapped(
       `Hot reload is enabled.
 
