@@ -1,9 +1,10 @@
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
-import { format, withSpinner } from "../format.js";
+import { format } from "../format.js";
 import { log } from "@clack/prompts";
 import { mapLanguages } from "../../types/sdk/generate.js";
+import { withSpinner } from "../prompt.js";
 
 export class StatusPrompts {
   public accountInfoSpinner(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {

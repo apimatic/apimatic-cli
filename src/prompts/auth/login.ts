@@ -2,7 +2,7 @@ import { log } from "@clack/prompts";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { Result } from "neverthrow";
-import { withSpinner } from "../format.js";
+import { withSpinner } from "../prompt.js";
 
 export class LoginPrompts {
   public loginSuccessful(email: string) {
