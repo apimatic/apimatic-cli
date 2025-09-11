@@ -1,13 +1,14 @@
 import { Result } from "neverthrow";
-import { isCancel, log, multiselect, note, select, text } from "@clack/prompts";
+import { isCancel, log, multiselect, select, text } from "@clack/prompts";
 import { UrlPath } from "../../types/file/urlPath.js";
-import { format as f, getTree, withSpinner } from "../format.js";
+import { format as f, getTree } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { Directory } from "../../types/file/directory.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
+import { noteWrapped, withSpinner } from "../prompt.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -167,7 +168,7 @@ Let's get started!`;
     const message = `- Use the API Playground or an SDK to call your API.
 - Customize the Portal theme, add API recipes and enable AI features
   ${f.link(referenceDocumentationUrl)}`;
-    note(message, "Next steps");
+    noteWrapped(message, "Next steps");
   }
 
   public serviceError(error: ServiceError) {
