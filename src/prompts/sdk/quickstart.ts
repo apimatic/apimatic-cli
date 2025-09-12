@@ -1,6 +1,7 @@
 import { isCancel, log, select, text } from "@clack/prompts";
 import { Result } from "neverthrow";
-import { format as f, getTree, withSpinner } from "../format.js";
+import { format as f, getTree } from "../format.js";
+import { withSpinner } from "../prompt.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
