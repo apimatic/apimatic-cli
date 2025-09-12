@@ -5,6 +5,7 @@ import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../api-utils.js";
+import { PortalGenerationStatusResponse } from "@apimatic/sdk";
 
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
@@ -26,6 +27,39 @@ export class ApiService {
       if (response.status === 200) {
         return ok(response.data as SubscriptionInfo);
       }
+      return err(ServiceError.InvalidResponse);
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
+    }
+  }
+
+  public async getPortalGenerationStatus(
+    requestId: string,
+    configDir: DirectoryPath,
+    shell: string,
+    authKey: string | null
+  ): Promise<Result<PortalGenerationStatusResponse, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    if (authInfo === null && !authKey) {
+      return err(ServiceError.UnAuthorized);
+    }
+
+    try {
+      const token = authKey || authInfo?.authKey;
+      const response = await this.axiosInstance(shell, token).get(`/portal/v2/${requestId}/status`, {
+        headers: { Accept: "application/json" },
+        maxRedirects: 0,
+        validateStatus: () => true
+      });
+
+      if (response.status === 200) {
+        return ok(response.data as PortalGenerationStatusResponse);
+      }
+
+      if (response.status === 302) {
+        return ok({ status: "Completed" } as PortalGenerationStatusResponse);
+      }
+
       return err(ServiceError.InvalidResponse);
     } catch (error: unknown) {
       return err(handleServiceError(error));

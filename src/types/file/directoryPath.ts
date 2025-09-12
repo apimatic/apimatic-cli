@@ -16,10 +16,6 @@ export class DirectoryPath {
     return new DirectoryPath(path.join(this.directoryPath, ...subPath));
   }
 
-  public joinWith(other: DirectoryPath) {
-    return new DirectoryPath(path.join(this.directoryPath, other.toString()));
-  }
-
   public isEqual(other: DirectoryPath) {
     return this.directoryPath === other.directoryPath;
   }
