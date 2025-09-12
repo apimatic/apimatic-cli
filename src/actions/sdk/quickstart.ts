@@ -13,6 +13,7 @@ import { FileDownloadService } from "../../infrastructure/services/file-download
 import { FileService } from "../../infrastructure/file-service.js";
 import { GenerateAction } from "./generate.js";
 import { Language } from "../../types/sdk/generate.js";
+import { LauncherService } from "../../infrastructure/launcher-service.js";
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json`
@@ -25,6 +26,7 @@ export class SdkQuickstartAction {
   private readonly prompts = new SdkQuickstartPrompts();
   private readonly fileDownloadService = new FileDownloadService();
   private readonly fileService = new FileService();
+  private readonly launcherService = new LauncherService();
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -158,6 +160,12 @@ export class SdkQuickstartAction {
       if (result.isFailed()) {
         return ActionResult.failed();
       }
+
+      if (await this.launcherService.openInEditorDetached(sdkDirectory.join(language))) {
+        this.prompts.sdkOpenedInEditor();
+      }
+
+      this.prompts.nextSteps(specDirectory, language);
 
       return ActionResult.success();
     });

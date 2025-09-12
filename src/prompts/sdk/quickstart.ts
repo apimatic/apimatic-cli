@@ -1,7 +1,7 @@
 import { isCancel, log, select, text } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { format as f, getTree } from "../format.js";
-import { withSpinner } from "../prompt.js";
+import { noteWrapped, withSpinner } from "../prompt.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
@@ -182,5 +182,14 @@ Let's get started!`);
     const heading = `${f.var("src")} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());
     log.info(heading + message);
+  }
+
+  public sdkOpenedInEditor() {
+    log.info("Opened the SDK directory in VS Code.");
+  }
+
+  public nextSteps(specDirectory: DirectoryPath, language: string): void {
+    const message = `- Run the command '${f.cmdAlt('apimatic', 'sdk', 'generate', `spec=${specDirectory.toString()}`, `language=${language}`)}' to regenerate your SDK.`
+    noteWrapped(message, "Next steps");
   }
 }

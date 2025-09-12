@@ -5,11 +5,21 @@ import { spawn } from "child_process";
 import open from "open";
 import { UrlPath } from "../types/file/urlPath.js";
 import isInCi from "is-in-ci";
+import { DirectoryPath } from "../types/file/directoryPath.js";
 
 export class LauncherService {
+  public async openInEditorDetached(directoryPath: DirectoryPath): Promise<boolean> {
+    if (isInCi) return false;
+    try {
+      await execa("code", [directoryPath.toString()]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   public async openInEditor(filePath: FilePath): Promise<void> {
-    if (!isInCi) return;
+    if (isInCi) return;
     try {
       await execa("code", ["--wait", filePath.toString()]);
     } catch {
@@ -17,7 +27,7 @@ export class LauncherService {
       if (process.platform === "win32") {
         await execa("cmd", ["/c", "start", "/wait", "notepad", filePath.toString()], { stdio: "ignore" });
       } else if (process.platform === "darwin") {
-        await execa("vim", [filePath.toString()], { stdio: "inherit"});
+        await execa("vim", [filePath.toString()], { stdio: "inherit" });
       }
     }
   }
@@ -53,8 +63,8 @@ export class LauncherService {
   }
 
   public openUrlInBrowser(url: UrlPath) {
-   // if (!isInCi) return;
-    try{
+    // if (!isInCi) return;
+    try {
       return open(url.toString());
     } catch {
       // Silently ignore errors
