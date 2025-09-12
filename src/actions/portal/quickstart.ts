@@ -17,7 +17,6 @@ import { getLanguagesConfig } from "../../types/build/build.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { SpecContext } from "../../types/spec-context.js";
 
-
 const defaultPort: number = 3000 as const;
 
 export class PortalQuickstartAction {
@@ -27,8 +26,12 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
-  private readonly buildFileUrl = new UrlPath(`https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`);
-  private readonly defaultSpecUrl = new UrlPath(`https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json`);
+  private readonly buildFileUrl = new UrlPath(
+    `https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`
+  );
+  private readonly defaultSpecUrl = new UrlPath(
+    `https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json`
+  );
   private readonly repositoryFolderName = "static-portal-workflow-master" as const;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
@@ -66,7 +69,7 @@ export class PortalQuickstartAction {
           if (downloadFileResult.isErr()) {
             this.prompts.serviceError(downloadFileResult.error);
           } else {
-            const specContext = new SpecContext(tempDirectory)
+            const specContext = new SpecContext(tempDirectory);
             specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
           }
         } else {
@@ -96,7 +99,7 @@ export class PortalQuickstartAction {
         if (downloadFileResult.isErr()) {
           this.prompts.serviceError(downloadFileResult.error);
         } else {
-          const specContext = new SpecContext(tempDirectory)
+          const specContext = new SpecContext(tempDirectory);
           specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
         }
       }
@@ -145,7 +148,6 @@ export class PortalQuickstartAction {
       const extractedFolder = tempDirectory.join(this.repositoryFolderName);
 
       const tempBuildContext = new BuildContext(extractedFolder);
-      await tempBuildContext.replaceDefaultSpec(specPath);
       await tempBuildContext.deleteWorkflowDir();
 
       const buildFile = await tempBuildContext.getBuildFileContents();
@@ -154,6 +156,10 @@ export class PortalQuickstartAction {
 
       const sourceDirectory = inputDirectory.join("src");
       await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
+
+      const specDirectory = sourceDirectory.join("spec");
+      const specContext = new SpecContext(specDirectory);
+      await specContext.replaceDefaultSpec(specPath);
 
       const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);

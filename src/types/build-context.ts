@@ -23,10 +23,6 @@ export class BuildContext {
     return new FilePath(this.buildDirectory, new FileName("README.md"));
   }
 
-  private get specDirectory(): DirectoryPath {
-    return this.buildDirectory.join("spec");
-  }
-
   public async validate(): Promise<boolean> {
     // TODO: add more checks here
     if (!(await this.fileService.directoryExists(this.buildDirectory))) return false;
@@ -45,15 +41,6 @@ export class BuildContext {
 
   public async updateBuildFileContents(buildJson: BuildConfig) {
     await this.fileService.writeContents(this.buildFile, JSON.stringify(buildJson, null, 2));
-  }
-
-  public async replaceDefaultSpec(specPath: FilePath) {
-    await this.fileService.deleteFile(new FilePath(this.specDirectory, new FileName("openapi.json")));
-    if (await this.fileService.isZipFile(specPath)) {
-      await this.zipService.unArchive(specPath, this.specDirectory);
-    } else {
-      await this.fileService.copy(specPath, specPath.replaceDirectory(this.specDirectory));
-    }
   }
 
   public async deleteWorkflowDir() {

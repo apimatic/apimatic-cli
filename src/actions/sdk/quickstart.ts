@@ -11,23 +11,20 @@ import { SpecContext } from "../../types/spec-context.js";
 import { ValidateAction } from "../api/validate.js";
 import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
 import { FileService } from "../../infrastructure/file-service.js";
-import { TempContext } from "../../types/temp-context.js";
-import { ZipService } from "../../infrastructure/zip-service.js";
-import { BuildContext } from "../../types/build-context.js";
 import { GenerateAction } from "./generate.js";
 import { Language } from "../../types/sdk/generate.js";
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json`
 );
-const buildFileUrl = new UrlPath(`https://github.com/apimatic/static-portal-workflow/archive/refs/heads/master.zip`);
-const repositoryFolderName = "static-portal-workflow-master" as const;
+const metadataFileUrl = new UrlPath(
+  `https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/APIMATIC-META.json`
+);
 
 export class SdkQuickstartAction {
   private readonly prompts = new SdkQuickstartPrompts();
   private readonly fileDownloadService = new FileDownloadService();
   private readonly fileService = new FileService();
-  private readonly zipService = new ZipService();
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -130,35 +127,32 @@ export class SdkQuickstartAction {
         break;
       }
 
-      // Setup directory for SDK generation
-      const masterBuildFile = await this.prompts.downloadBuildDirectory(
-        this.fileDownloadService.downloadFile(buildFileUrl)
+      // Setup source directory with spec folder
+      const metadataFileResult = await this.prompts.downloadMetadataFile(
+        this.fileDownloadService.downloadFile(metadataFileUrl)
       );
-      if (masterBuildFile.isErr()) {
-        this.prompts.serviceError(masterBuildFile.error);
+      if (metadataFileResult.isErr()) {
+        this.prompts.serviceError(metadataFileResult.error);
         return ActionResult.failed();
       }
-      const tempContext = new TempContext(tempDirectory);
-      const masterBuildFilePath = await tempContext.save(masterBuildFile.value.stream);
-      await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
-      const extractedFolder = tempDirectory.join(repositoryFolderName);
-
-      const tempBuildContext = new BuildContext(extractedFolder);
-      await tempBuildContext.replaceDefaultSpec(specPath);
-      await tempBuildContext.deleteWorkflowDir();
-      await tempBuildContext.deleteContentDir();
-      await tempBuildContext.deleteStaticDir();
-      await tempBuildContext.deleteBuildFile();
-      await tempBuildContext.deleteReadmeFile();
 
       const sourceDirectory = inputDirectory.join("src");
-      await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
+      const specDirectory = sourceDirectory.join("spec");
+      await this.fileService.createDirectoryIfNotExists(specDirectory);
+
+      const specContext = new SpecContext(specDirectory);
+      await specContext.replaceDefaultSpec(specPath);
+
+      const metadataFilePath = await specContext.save(
+        metadataFileResult.value.stream,
+        metadataFileResult.value.filename
+      );
+      await this.fileService.copy(metadataFilePath, metadataFilePath.replaceDirectory(specDirectory));
 
       const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
 
       const sdkDirectory = inputDirectory.join("sdk");
-      const specDirectory = sourceDirectory.join("spec");
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const result = await sdkGenerateAction.execute(specDirectory, sdkDirectory, language as Language, true, false);
       if (result.isFailed()) {

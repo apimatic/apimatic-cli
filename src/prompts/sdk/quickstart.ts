@@ -168,7 +168,7 @@ Let's get started!`);
     );
   }
 
-  public downloadBuildDirectory(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
+  public downloadMetadataFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner(
       "Setting up source directory",
       `Source directory set up successfully`,
