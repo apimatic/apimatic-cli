@@ -1,9 +1,10 @@
-import { confirm, isCancel, log, note, select } from "@clack/prompts";
+import { confirm, isCancel, log, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f, withSpinner } from "../format.js";
+import { format as f } from "../format.js";
+import { noteWrapped, withSpinner } from "../prompt.js";
 
 export class PortalCopilotPrompts {
   public async displayApiCopilotKeyUsageWarning() {
@@ -43,7 +44,7 @@ export class PortalCopilotPrompts {
   Configuration saved to: ${f.var("APIMATIC-BUILD.json")}`
     );
 
-    note(
+    noteWrapped(
       `API Copilot will index your content the next time you run
 '${f.cmdAlt("apimatic", "portal", "generate")}' or '${f.cmdAlt("apimatic", "portal", "serve")}'.
 This process can take up to 10 minutes, depending on your API’s size.

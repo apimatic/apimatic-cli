@@ -17,20 +17,21 @@ export class PortalRecipeGenerator {
     tocFileContent: Toc,
     tocFilePath: FilePath,
     recipeName: string,
-    recipeFileName: FileName,
+    recipeScriptFileName: FileName,
+    recipeMarkdownFileName: FileName,
     buildContext: BuildContext,
     buildDirectory: DirectoryPath
   ) {
-    await this.addRecipeToToc(tocFileContent, tocFilePath, recipeName, recipeFileName);
-    await this.registerRecipeInBuildConfigFile(buildContext, recipeName, recipeFileName);
-    await this.createMarkdownFile(recipeFileName, buildDirectory.join("content"));
+    await this.addRecipeToToc(tocFileContent, tocFilePath, recipeName, recipeMarkdownFileName);
+    await this.registerRecipeInBuildConfigFile(buildContext, recipeName, recipeScriptFileName);
+    await this.createMarkdownFile(recipeMarkdownFileName, buildDirectory.join("content"));
 
     const generatedRecipeScript = await this.createScriptFromRecipe(recipe);
     const generatedRecipeScriptsDirectoryPath = buildDirectory.join("static", "scripts", "recipes");
     await this.saveGeneratedRecipeScriptToBuildDirectory(
       generatedRecipeScript,
       generatedRecipeScriptsDirectoryPath,
-      recipeFileName
+      recipeScriptFileName
     );
   }
 
@@ -38,7 +39,7 @@ export class PortalRecipeGenerator {
     tocData: Toc,
     tocFilePath: FilePath,
     recipeName: string,
-    recipeFileName: FileName
+    recipeMarkdownFileName: FileName
   ): Promise<void> {
     let toc = tocData.toc as any;
     let apiRecipesGroup = toc.find((item: any) => item.group === "API Recipes");
@@ -59,12 +60,12 @@ export class PortalRecipeGenerator {
 
     // Only add the recipe if it doesn't already exist
     const existingRecipe = apiRecipesGroup.items.find(
-      (item: any) => item.page === recipeName || item.file === `recipes/${recipeFileName}.md`
+      (item: any) => item.page === recipeName || item.file === `recipes/${recipeMarkdownFileName}`
     );
     if (!existingRecipe) {
       apiRecipesGroup.items.push({
         page: recipeName,
-        file: `recipes/${recipeFileName}.md`
+        file: `recipes/${recipeMarkdownFileName}`
       });
       await this.fileService.writeContents(tocFilePath, stringify(tocData));
     }
@@ -73,9 +74,8 @@ export class PortalRecipeGenerator {
   private async registerRecipeInBuildConfigFile(
     buildContext: BuildContext,
     recipeName: string,
-    recipeFileName: FileName,
+    recipeScriptFileName: FileName
   ): Promise<void> {
-
     const buildConfig = await buildContext.getBuildFileContents();
     if (!buildConfig.recipes) {
       buildConfig.recipes = {};
@@ -86,14 +86,14 @@ export class PortalRecipeGenerator {
       recipesConfig.workflows = [];
     }
     const existingIndex = recipesConfig.workflows.findIndex(
-      (workflow: any) => workflow.permalink === `page:recipes/${recipeFileName}`
+      (workflow: any) => workflow.permalink === `page:recipes/${this.toPascalCase(recipeName)}`
     );
 
     const newWorkflow = {
       name: recipeName,
-      permalink: `page:recipes/${recipeFileName}`,
+      permalink: `page:recipes/${this.toPascalCase(recipeName)}`,
       functionName: this.toPascalCase(recipeName),
-      scriptPath: `./static/scripts/recipes/${recipeFileName}.js`
+      scriptPath: `./static/scripts/recipes/${recipeScriptFileName}`
     };
 
     if (existingIndex !== -1) {
@@ -104,15 +104,15 @@ export class PortalRecipeGenerator {
       recipesConfig.workflows.push(newWorkflow);
     }
 
-    await buildContext.updateBuildFileContents(buildConfig)
+    await buildContext.updateBuildFileContents(buildConfig);
   }
 
-  private async createMarkdownFile(recipeFileName: FileName, contentFolder: DirectoryPath): Promise<void> {
+  private async createMarkdownFile(recipeMarkdownFileName: FileName, contentFolder: DirectoryPath): Promise<void> {
     const directory = contentFolder.join("recipes");
     const markdownFileContent = this.getMarkdownFileContent();
 
     await this.fileService.createDirectoryIfNotExists(directory);
-    await this.fileService.writeContents(new FilePath(directory, new FileName(`${recipeFileName}.md`)), markdownFileContent);
+    await this.fileService.writeContents(new FilePath(directory, recipeMarkdownFileName), markdownFileContent);
   }
 
   private async createScriptFromRecipe(recipe: SerializableRecipe): Promise<string> {
@@ -147,7 +147,7 @@ export class PortalRecipeGenerator {
   private async saveGeneratedRecipeScriptToBuildDirectory(
     generatedRecipeScript: string,
     generatedRecipeScriptsDirectoryPath: DirectoryPath,
-    recipeFileName: FileName,
+    recipeScriptFileName: FileName,
     format: boolean = false
   ): Promise<void> {
     if (format) {
@@ -155,7 +155,10 @@ export class PortalRecipeGenerator {
     }
 
     await this.fileService.createDirectoryIfNotExists(generatedRecipeScriptsDirectoryPath);
-    await this.fileService.writeContents(new FilePath(generatedRecipeScriptsDirectoryPath, new FileName(`${recipeFileName}.js`)), generatedRecipeScript);
+    await this.fileService.writeContents(
+      new FilePath(generatedRecipeScriptsDirectoryPath, recipeScriptFileName),
+      generatedRecipeScript
+    );
   }
 
   private generateVerifyFunction(): string {

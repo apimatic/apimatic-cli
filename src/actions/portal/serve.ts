@@ -22,7 +22,6 @@ export class PortalServeAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
-  private isPortalServed: boolean = false;
 
   public constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
@@ -50,7 +49,7 @@ export class PortalServeAction {
     }
 
     const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
-    const liveReloadServer = createLiveReloadServer({ port: liveReloadPort});
+    const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
     const server = this.application
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
@@ -136,7 +135,6 @@ export class PortalServeAction {
 
     await watcher.close();
     debounceService.close();
-
     liveReloadServer.close();
     server.close();
     return ActionResult.success();

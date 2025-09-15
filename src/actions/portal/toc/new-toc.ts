@@ -1,4 +1,4 @@
-import { err, ok, Result } from "neverthrow";
+import { ok } from "neverthrow";
 import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc.js";
 import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator.js";
 import { TocEndpoint, TocGroup, TocModel } from "../../../types/toc/toc.js";
@@ -7,7 +7,6 @@ import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { ActionResult } from "../../action-result.js";
 import { TocContext } from "../../../types/toc-context.js";
 import { FileService } from "../../../infrastructure/file-service.js";
-import { FilePath } from "../../../types/file/filePath.js";
 import { BuildContext } from "../../../types/build-context.js";
 import { getEndpointGroupsAndModels } from "../../../types/sdl/sdl.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
