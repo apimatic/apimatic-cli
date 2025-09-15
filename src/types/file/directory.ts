@@ -25,7 +25,9 @@ export class Directory {
 
   private static readonly fileDescriptions: Record<string, string> = {
     "toc.yml": "# Controls the structure of the side navigation bar in the API portal",
-    "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes"
+    "APIMATIC-BUILD.json":
+      "# Defines all configurations for the API portal, including programming languages and themes",
+    "APIMATIC-META.json": "# Defines configurations for customizing import, export, and code generation"
   };
 
   public toTreeNode(): TreeNode {

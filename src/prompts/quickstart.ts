@@ -1,0 +1,31 @@
+import { isCancel, log, select } from "@clack/prompts";
+
+export type QuickstartFlow = "sdk" | "portal" | undefined;
+
+export class QuickstartPrompts {
+  public welcomeMessage() {
+    log.info(`Welcome to the APIMatic Quickstart Wizard.`);
+    log.message(`This wizard will help you set up an SDK or an API Documentation Portal in 4 simple steps.
+Let's get started!`);
+  }
+
+  public async selectQuickstartFlow(): Promise<QuickstartFlow> {
+    const option = await select({
+      message: "Choose what you want to set up:",
+      options: [
+        { value: "portal", label: "Docs Portal", hint: "API Documentation + SDKs " },
+        { value: "sdk", label: "SDK" }
+      ]
+    });
+
+    if (isCancel(option)) {
+      return undefined;
+    }
+
+    return option;
+  }
+
+  public noQuickstartFlowSelected() {
+    log.error("No option was selected.");
+  }
+}

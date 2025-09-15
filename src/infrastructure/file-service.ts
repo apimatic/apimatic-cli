@@ -120,6 +120,10 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
+  public async copyToDir(source: FilePath, destination: DirectoryPath) {
+    await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
+  }
+
   public async isZipFile(filePath: FilePath): Promise<boolean> {
     try {
       const buffer = await fsExtra.readFile(filePath.toString());
