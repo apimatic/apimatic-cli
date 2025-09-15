@@ -149,8 +149,8 @@ export class SdkQuickstartAction {
       );
       await this.fileService.copy(metadataFilePath, metadataFilePath.replaceDirectory(specDirectory));
 
-      const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
-      this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
+      const srcDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
+      this.prompts.printDirectoryStructure(inputDirectory, srcDirectoryStructure);
 
       const sdkDirectory = inputDirectory.join("sdk");
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);

@@ -1,4 +1,4 @@
-import { QuickstartPrompts, QuickstartType } from "../prompts/quickstart.js";
+import { QuickstartPrompts } from "../prompts/quickstart.js";
 import { CommandMetadata } from "../types/common/command-metadata.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { ActionResult } from "./action-result.js";
@@ -12,19 +12,20 @@ export class QuickstartAction {
 
   public readonly execute = async (): Promise<ActionResult> => {
     this.prompts.welcomeMessage();
-    const selection = await this.prompts.selectQuickstartType();
-    switch (selection) {
-      case QuickstartType.Sdk: {
-        const action = new SdkQuickstartAction(this.configDir, this.commandMetadata);
-        return await action.execute();
-      }
-      case QuickstartType.Portal: {
+    const selectedFlow = await this.prompts.selectQuickstartFlow();
+    switch (selectedFlow) {
+      case "portal": {
         const action = new PortalQuickstartAction(this.configDir, this.commandMetadata);
         return await action.execute();
       }
-      default:
+      case "sdk": {
+        const action = new SdkQuickstartAction(this.configDir, this.commandMetadata);
+        return await action.execute();
+      }
+      case undefined: {
         this.prompts.noQuickstartTypeSelected();
         return ActionResult.failed();
+      }
     }
   };
 }

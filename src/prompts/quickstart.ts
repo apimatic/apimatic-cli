@@ -1,9 +1,7 @@
 import { isCancel, log, select } from "@clack/prompts";
 
-export enum QuickstartType {
-  Sdk = "sdk",
-  Portal = "portal"
-}
+
+export type QuickstartFlow = "sdk" | "portal" | undefined;
 
 export class QuickstartPrompts {
   public welcomeMessage() {
@@ -12,12 +10,12 @@ export class QuickstartPrompts {
 Let's get started!`);
   }
 
-  public async selectQuickstartType() {
+  public async selectQuickstartFlow(): Promise<QuickstartFlow> {
     const option = await select({
       message: "Choose what you want to set up:",
       options: [
-        { value: QuickstartType.Portal, label: "Docs Portal", hint: "includes SDKs" },
-        { value: QuickstartType.Sdk, label: "SDK" }
+        { value: "portal", label: "Docs Portal", hint: "API Documentation + SDKs " },
+        { value: "sdk", label: "SDK" }
       ]
     });
 
