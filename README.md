@@ -1,6 +1,6 @@
 @apimatic/cli
 =============
-apimatic is in Alpha.
+apimatic is in beta.
 
 The official CLI for APIMatic.
 
@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-alpha.22 win32-x64 node-v23.4.0
+@apimatic/cli/1.0.0-beta.2 win32-x64 node-v23.4.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -43,10 +43,10 @@ USAGE
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic portal copilot`](#apimatic-portal-copilot)
 * [`apimatic portal generate`](#apimatic-portal-generate)
-* [`apimatic portal quickstart`](#apimatic-portal-quickstart)
 * [`apimatic portal recipe new`](#apimatic-portal-recipe-new)
 * [`apimatic portal serve`](#apimatic-portal-serve)
 * [`apimatic portal toc new`](#apimatic-portal-toc-new)
+* [`apimatic quickstart`](#apimatic-quickstart)
 * [`apimatic sdk generate`](#apimatic-sdk-generate)
 
 ## `apimatic api transform`
@@ -76,12 +76,12 @@ DESCRIPTION
   Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.
 
 EXAMPLES
-  apimatic api transform --format=OPENAPI3YAML --file=./specs/sample.json --destination=./
+  apimatic api transform --format=openapi3yaml --file=./specs/sample.json --destination=./
 
-  apimatic api transform --format=RAML --url="https://petstore.swagger.io/v2/swagger.json" --destination=./
+  apimatic api transform --format=raml --url="https://petstore.swagger.io/v2/swagger.json" --destination=./
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/api/transform.ts)_
 
 ## `apimatic api validate`
 
@@ -107,7 +107,7 @@ EXAMPLES
   apimatic api validate --url="https://petstore.swagger.io/v2/swagger.json"
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/api/validate.ts)_
 
 ## `apimatic auth login`
 
@@ -131,7 +131,7 @@ EXAMPLES
   apimatic auth login --auth-key={api-key}
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/login.ts)_
 
 ## `apimatic auth logout`
 
@@ -150,7 +150,7 @@ EXAMPLES
   apimatic auth logout
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/logout.ts)_
 
 ## `apimatic auth status`
 
@@ -167,7 +167,7 @@ EXAMPLES
   apimatic auth status
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -248,7 +248,7 @@ EXAMPLES
   apimatic portal copilot --input=./ --disable
 ```
 
-_See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/copilot.ts)_
+_See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/copilot.ts)_
 
 ## `apimatic portal generate`
 
@@ -279,26 +279,7 @@ EXAMPLES
   apimatic portal generate --input="./" --destination="./portal"
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/generate.ts)_
-
-## `apimatic portal quickstart`
-
-Get started with your first API Portal in four easy steps.
-
-```
-USAGE
-  $ apimatic portal quickstart
-
-DESCRIPTION
-  Get started with your first API Portal in four easy steps.
-
-  Create your first API Portal using APIMatic's Docs as Code offering.
-
-EXAMPLES
-  apimatic portal quickstart
-```
-
-_See code: [src/commands/portal/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/quickstart.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/generate.ts)_
 
 ## `apimatic portal recipe new`
 
@@ -328,7 +309,7 @@ EXAMPLES
   apimatic portal recipe new --name="My API Recipe" --input="./"
 ```
 
-_See code: [src/commands/portal/recipe/new.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/recipe/new.ts)_
+_See code: [src/commands/portal/recipe/new.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/recipe/new.ts)_
 
 ## `apimatic portal serve`
 
@@ -359,7 +340,7 @@ EXAMPLES
   apimatic portal serve --input=./ --destination=./portal --port=3000 --open --no-reload
 ```
 
-_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/serve.ts)_
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/serve.ts)_
 
 ## `apimatic portal toc new`
 
@@ -398,7 +379,26 @@ EXAMPLES
   apimatic portal toc new --input=./ --destination=./src/content/
 ```
 
-_See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/alpha/src/commands/portal/toc/new.ts)_
+_See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/toc/new.ts)_
+
+## `apimatic quickstart`
+
+Create your first SDK or API Portal using APIMatic.
+
+```
+USAGE
+  $ apimatic quickstart
+
+DESCRIPTION
+  Create your first SDK or API Portal using APIMatic.
+
+  Get started with your first SDK or API Portal in four easy steps.
+
+EXAMPLES
+  apimatic quickstart
+```
+
+_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/quickstart.ts)_
 
 ## `apimatic sdk generate`
 
@@ -432,5 +432,5 @@ EXAMPLES
   apimatic sdk generate --language=python --destination=./sdk --zip
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0-alpha.21/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/generate.ts)_
 <!-- commandsstop -->
