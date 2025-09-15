@@ -16,8 +16,8 @@ Let's get started!`);
     const option = await select({
       message: "Choose what you want to set up:",
       options: [
-        { value: QuickstartType.Portal, label: "Generate a Portal", hint: "includes SDKs" },
-        { value: QuickstartType.Sdk, label: "Generate an SDK" }
+        { value: QuickstartType.Portal, label: "Docs Portal", hint: "includes SDKs" },
+        { value: QuickstartType.Sdk, label: "SDK" }
       ]
     });
 
