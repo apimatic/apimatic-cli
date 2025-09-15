@@ -15,12 +15,6 @@ const vscodeExtensionUrl =
 const defaultSrcDirectoryPath = process.cwd();
 
 export class SdkQuickstartPrompts {
-  public welcomeMessage() {
-    log.info(`Welcome to the SDK Quickstart Wizard.`);
-    log.message(`This wizard will help you set up an SDK of your desired language in 4 simple steps.
-Let's get started!`);
-  }
-
   public importSpecStep() {
     log.info(`Step 1 of 4: Import your OpenAPI Definition`);
   }
@@ -105,7 +99,7 @@ Let's get started!`);
 
   public async selectLanguagePrompt(): Promise<string | undefined> {
     const language = await select({
-      message: "Your SDK will be generated for the following language:",
+      message: "Choose the programming language for your SDK:",
       options: [
         { label: "Typescript", value: "typescript" },
         { label: "Ruby", value: "ruby" },
@@ -189,7 +183,13 @@ Let's get started!`);
   }
 
   public nextSteps(specDirectory: DirectoryPath, language: string): void {
-    const message = `- Run the command '${f.cmdAlt('apimatic', 'sdk', 'generate', `spec=${specDirectory.toString()}`, `language=${language}`)}' to regenerate your SDK.`
+    const message = `- Run the command '${f.cmdAlt(
+      "apimatic",
+      "sdk",
+      "generate",
+      `${f.flag("spec", specDirectory.toString())}`,
+      `${f.flag("language", language)}`
+    )}' to regenerate your SDK.`;
     noteWrapped(message, "Next steps");
   }
 }

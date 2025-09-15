@@ -36,8 +36,6 @@ export class PortalQuickstartAction {
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
-    this.prompts.welcomeMessage();
-
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (!storedAuth?.authKey) {
       const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();

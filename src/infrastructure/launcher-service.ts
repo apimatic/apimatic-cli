@@ -11,7 +11,8 @@ export class LauncherService {
   public async openInEditorDetached(directoryPath: DirectoryPath): Promise<boolean> {
     if (isInCi) return false;
     try {
-      await execa("code", [directoryPath.toString()]);
+      const readmePath = directoryPath.join("README.md");
+      await execa("code", [directoryPath.toString(), readmePath.toString()]);
       return true;
     } catch {
       return false;

@@ -6,12 +6,18 @@ export enum QuickstartType {
 }
 
 export class QuickstartPrompts {
+  public welcomeMessage() {
+    log.info(`Welcome to the APIMatic Quickstart Wizard.`);
+    log.message(`This wizard will help you set up an SDK or an API Documentation Portal in 4 simple steps.
+Let's get started!`);
+  }
+
   public async selectQuickstartType() {
     const option = await select({
-      message: "What would you like to get started with?",
+      message: "Choose what you want to set up:",
       options: [
-        { value: QuickstartType.Sdk, label: "Generate an SDK" },
-        { value: QuickstartType.Portal, label: "Generate a Portal" }
+        { value: QuickstartType.Portal, label: "Generate a Portal", hint: "includes SDKs" },
+        { value: QuickstartType.Sdk, label: "Generate an SDK" }
       ]
     });
 

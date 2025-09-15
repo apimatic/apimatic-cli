@@ -11,6 +11,7 @@ export class QuickstartAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (): Promise<ActionResult> => {
+    this.prompts.welcomeMessage();
     const selection = await this.prompts.selectQuickstartType();
     switch (selection) {
       case QuickstartType.Sdk: {

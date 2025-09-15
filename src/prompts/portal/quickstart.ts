@@ -16,13 +16,6 @@ const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/
 const defaultSrcDirectoryPath = process.cwd();
 
 export class PortalQuickstartPrompts {
-  public welcomeMessage() {
-    log.info(`Welcome to the Portal Quickstart Wizard.`);
-    const message = `This wizard will help you set up an API Portal via APIMatic's Docs as Code workflow in 4 simple steps.
-
-Let's get started!`;
-    log.message(message);
-  }
   public importSpecStep() {
     log.info(`Step 1 of 4: Import your OpenAPI Definition`);
   }

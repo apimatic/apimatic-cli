@@ -31,8 +31,6 @@ export class SdkQuickstartAction {
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (): Promise<ActionResult> => {
-    this.prompts.welcomeMessage();
-
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (!storedAuth?.authKey) {
       const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
@@ -130,11 +128,11 @@ export class SdkQuickstartAction {
       }
 
       // Setup source directory with spec folder
-      const metadataFileResult = await this.prompts.downloadMetadataFile(
+      const apimaticMetaFile = await this.prompts.downloadMetadataFile(
         this.fileDownloadService.downloadFile(metadataFileUrl)
       );
-      if (metadataFileResult.isErr()) {
-        this.prompts.serviceError(metadataFileResult.error);
+      if (apimaticMetaFile.isErr()) {
+        this.prompts.serviceError(apimaticMetaFile.error);
         return ActionResult.failed();
       }
 
@@ -146,8 +144,8 @@ export class SdkQuickstartAction {
       await specContext.replaceDefaultSpec(specPath);
 
       const metadataFilePath = await specContext.save(
-        metadataFileResult.value.stream,
-        metadataFileResult.value.filename
+        apimaticMetaFile.value.stream,
+        apimaticMetaFile.value.filename
       );
       await this.fileService.copy(metadataFilePath, metadataFilePath.replaceDirectory(specDirectory));
 
@@ -161,7 +159,8 @@ export class SdkQuickstartAction {
         return ActionResult.failed();
       }
 
-      if (await this.launcherService.openInEditorDetached(sdkDirectory.join(language))) {
+      const languageDirectory = sdkDirectory.join(language);
+      if (await this.launcherService.openInEditorDetached(languageDirectory)) {
         this.prompts.sdkOpenedInEditor();
       }
 
