@@ -65,10 +65,11 @@ export class PortalRecipeAction {
 
     // Setup recipe context
     const recipeContext = new RecipeContext(recipeName);
-    const recipeFileName = recipeContext.getRecipeName();
+    const recipeScriptFileName = recipeContext.getRecipeScriptFileName();
+    const recipeMarkdownFileName = recipeContext.getRecipeMarkdownFileName();
 
     // Check if the recipe already exists
-    const recipeAlreadyExists = recipeContext.exists(tocData, recipeName, recipeFileName);
+    const recipeAlreadyExists = recipeContext.exists(tocData, recipeName, recipeMarkdownFileName);
     if (recipeAlreadyExists && !(await this.prompts.overwriteApiRecipeInTocPrompt(recipeName))) {
       return ActionResult.cancelled();
     }
@@ -106,7 +107,9 @@ export class PortalRecipeAction {
               const specFileStream = await this.fileService.getStream(specZipPath);
 
               try {
-                return await this.prompts.generateSdl(this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata))
+                return await this.prompts.generateSdl(
+                  this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata)
+                );
               } finally {
                 specFileStream.close();
               }
@@ -144,12 +147,13 @@ export class PortalRecipeAction {
       tocData,
       tocContext.tocPath,
       recipeName,
-      recipeFileName,
+      recipeScriptFileName,
+      recipeMarkdownFileName,
       buildContext,
       buildDirectory
     );
 
-    const tocStructure = this.getTocStructure(recipeFileName);
+    const tocStructure = this.getTocStructure(recipeScriptFileName);
     this.prompts.recipeCreated();
     this.prompts.displayRecipeStructure(tocStructure);
     this.prompts.nextSteps();
