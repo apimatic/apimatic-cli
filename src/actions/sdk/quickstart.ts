@@ -14,6 +14,7 @@ import { FileService } from "../../infrastructure/file-service.js";
 import { GenerateAction } from "./generate.js";
 import { Language } from "../../types/sdk/generate.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
+import { ZipService } from "../../infrastructure/zip-service.js";
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json`
@@ -27,6 +28,7 @@ export class SdkQuickstartAction {
   private readonly fileDownloadService = new FileDownloadService();
   private readonly fileService = new FileService();
   private readonly launcherService = new LauncherService();
+  private readonly zipService = new ZipService();
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -128,6 +130,10 @@ export class SdkQuickstartAction {
       }
 
       // Setup source directory with spec folder
+      const sourceDirectory = inputDirectory.join("src");
+      const specDirectory = sourceDirectory.join("spec");
+      await this.fileService.createDirectoryIfNotExists(specDirectory);
+
       const apimaticMetaFile = await this.prompts.downloadMetadataFile(
         this.fileDownloadService.downloadFile(metadataFileUrl)
       );
@@ -135,19 +141,14 @@ export class SdkQuickstartAction {
         this.prompts.serviceError(apimaticMetaFile.error);
         return ActionResult.failed();
       }
+      const metadataFilePath = new FilePath(specDirectory, apimaticMetaFile.value.filename);
+      await this.fileService.writeFile(metadataFilePath, apimaticMetaFile.value.stream);
 
-      const sourceDirectory = inputDirectory.join("src");
-      const specDirectory = sourceDirectory.join("spec");
-      await this.fileService.createDirectoryIfNotExists(specDirectory);
-
-      const specContext = new SpecContext(specDirectory);
-      await specContext.replaceDefaultSpec(specPath);
-
-      const metadataFilePath = await specContext.save(
-        apimaticMetaFile.value.stream,
-        apimaticMetaFile.value.filename
-      );
-      await this.fileService.copy(metadataFilePath, metadataFilePath.replaceDirectory(specDirectory));
+      if (await this.fileService.isZipFile(specPath)) {
+        await this.zipService.unArchive(specPath, specDirectory);
+      } else {
+        await this.fileService.copy(specPath, specPath.replaceDirectory(specDirectory));
+      }
 
       const srcDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, srcDirectoryStructure);

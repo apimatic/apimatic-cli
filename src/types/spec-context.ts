@@ -26,7 +26,7 @@ export class SpecContext {
     }
   }
 
-  async save(stream: NodeJS.ReadableStream, fileName: FileName): Promise<FilePath> {
+  public async save(stream: NodeJS.ReadableStream, fileName: FileName): Promise<FilePath> {
     const filePath = new FilePath(this.specDirectory, fileName);
     await this.fileService.writeFile(filePath, stream);
     return filePath;

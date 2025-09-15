@@ -3,12 +3,10 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { BuildConfig } from "./build/build.js";
-import { ZipService } from "../infrastructure/zip-service.js";
 
 export class BuildContext {
   private readonly fileService = new FileService();
   private readonly buildDirectory: DirectoryPath;
-  private readonly zipService = new ZipService();
 
   constructor(buildDirectory: DirectoryPath) {
     this.buildDirectory = buildDirectory;
@@ -17,10 +15,6 @@ export class BuildContext {
   private get buildFile(): FilePath {
     // TODO: add checks for build file path
     return new FilePath(this.buildDirectory, new FileName("APIMATIC-BUILD.json"));
-  }
-
-  private get readmeFile(): FilePath {
-    return new FilePath(this.buildDirectory, new FileName("README.md"));
   }
 
   public async validate(): Promise<boolean> {
@@ -45,22 +39,6 @@ export class BuildContext {
 
   public async deleteWorkflowDir() {
     await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
-  }
-
-  public async deleteContentDir() {
-    await this.fileService.deleteDirectory(this.buildDirectory.join("content"));
-  }
-
-  public async deleteStaticDir() {
-    await this.fileService.deleteDirectory(this.buildDirectory.join("static"));
-  }
-
-  public async deleteReadmeFile() {
-    await this.fileService.deleteFile(this.readmeFile);
-  }
-
-  public async deleteBuildFile() {
-    await this.fileService.deleteFile(this.buildFile);
   }
 }
 

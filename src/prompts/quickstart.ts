@@ -1,6 +1,5 @@
 import { isCancel, log, select } from "@clack/prompts";
 
-
 export type QuickstartFlow = "sdk" | "portal" | undefined;
 
 export class QuickstartPrompts {
@@ -26,7 +25,7 @@ Let's get started!`);
     return option;
   }
 
-  public noQuickstartTypeSelected() {
-    log.error("No quickstart type was selected.");
+  public noQuickstartFlowSelected() {
+    log.error("No option was selected.");
   }
 }

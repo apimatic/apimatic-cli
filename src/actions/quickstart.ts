@@ -23,7 +23,7 @@ export class QuickstartAction {
         return await action.execute();
       }
       case undefined: {
-        this.prompts.noQuickstartTypeSelected();
+        this.prompts.noQuickstartFlowSelected();
         return ActionResult.failed();
       }
     }
