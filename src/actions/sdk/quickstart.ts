@@ -15,12 +15,13 @@ import { GenerateAction } from "./generate.js";
 import { Language } from "../../types/sdk/generate.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
+import { FileName } from "../../types/file/fileName.js";
 
 const defaultSpecUrl = new UrlPath(
-  `https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/openapi.json`
+  `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
 );
 const metadataFileUrl = new UrlPath(
-  `https://raw.githubusercontent.com/apimatic/static-portal-workflow/refs/heads/master/spec/APIMATIC-META.json`
+  `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/APIMATIC-META.json`
 );
 
 export class SdkQuickstartAction {
@@ -161,7 +162,8 @@ export class SdkQuickstartAction {
       }
 
       const languageDirectory = sdkDirectory.join(language);
-      if (await this.launcherService.openInEditorDetached(languageDirectory)) {
+      const readmeFilePath = new FilePath(languageDirectory, new FileName("README.md"));
+      if (await this.launcherService.openFolderInIDE(languageDirectory, readmeFilePath)) {
         this.prompts.sdkOpenedInEditor();
       }
 
