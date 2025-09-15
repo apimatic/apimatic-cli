@@ -130,10 +130,6 @@ export class SdkQuickstartAction {
       }
 
       // Setup source directory with spec folder
-      const sourceDirectory = inputDirectory.join("src");
-      const specDirectory = sourceDirectory.join("spec");
-      await this.fileService.createDirectoryIfNotExists(specDirectory);
-
       const apimaticMetaFile = await this.prompts.downloadMetadataFile(
         this.fileDownloadService.downloadFile(metadataFileUrl)
       );
@@ -141,19 +137,22 @@ export class SdkQuickstartAction {
         this.prompts.serviceError(apimaticMetaFile.error);
         return ActionResult.failed();
       }
-      const metadataFilePath = new FilePath(specDirectory, apimaticMetaFile.value.filename);
+      const tempSpecDirectory = tempDirectory.join("spec");
+      const metadataFilePath = new FilePath(tempSpecDirectory, apimaticMetaFile.value.filename);
       await this.fileService.writeFile(metadataFilePath, apimaticMetaFile.value.stream);
 
       if (await this.fileService.isZipFile(specPath)) {
-        await this.zipService.unArchive(specPath, specDirectory);
+        await this.zipService.unArchive(specPath, tempSpecDirectory);
       } else {
-        await this.fileService.copy(specPath, specPath.replaceDirectory(specDirectory));
+        await this.fileService.copyToDir(specPath, tempSpecDirectory);
       }
 
-      const srcDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
-      this.prompts.printDirectoryStructure(inputDirectory, srcDirectoryStructure);
+      const sourceDirectory = inputDirectory.join("src");
+      await this.fileService.copyDirectoryContents(tempSpecDirectory, sourceDirectory);
+
 
       const sdkDirectory = inputDirectory.join("sdk");
+      const specDirectory = sourceDirectory.join("spec");
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const result = await sdkGenerateAction.execute(specDirectory, sdkDirectory, language as Language, true, false);
       if (result.isFailed()) {
