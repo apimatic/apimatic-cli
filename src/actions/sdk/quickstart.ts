@@ -139,6 +139,7 @@ export class SdkQuickstartAction {
         return ActionResult.failed();
       }
       const tempSpecDirectory = tempDirectory.join("spec");
+      await this.fileService.createDirectoryIfNotExists(tempSpecDirectory);
       const metadataFilePath = new FilePath(tempSpecDirectory, apimaticMetaFile.value.filename);
       await this.fileService.writeFile(metadataFilePath, apimaticMetaFile.value.stream);
 
@@ -148,12 +149,12 @@ export class SdkQuickstartAction {
         await this.fileService.copyToDir(specPath, tempSpecDirectory);
       }
 
-      const sourceDirectory = inputDirectory.join("src");
-      await this.fileService.copyDirectoryContents(tempSpecDirectory, sourceDirectory);
 
+      const sourceDirectory = inputDirectory.join("src");
+      const specDirectory = sourceDirectory.join("spec");
+      await this.fileService.copyDirectoryContents(tempSpecDirectory, specDirectory);
 
       const sdkDirectory = inputDirectory.join("sdk");
-      const specDirectory = sourceDirectory.join("spec");
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const result = await sdkGenerateAction.execute(specDirectory, sdkDirectory, language as Language, true, false);
       if (result.isFailed()) {
@@ -162,7 +163,7 @@ export class SdkQuickstartAction {
 
       const languageDirectory = sdkDirectory.join(language);
       const readmeFilePath = new FilePath(languageDirectory, new FileName("README.md"));
-      if (await this.launcherService.openFolderInIDE(languageDirectory, readmeFilePath)) {
+      if (await this.launcherService.openFolderInIde(languageDirectory, readmeFilePath)) {
         this.prompts.sdkOpenedInEditor();
       }
 
