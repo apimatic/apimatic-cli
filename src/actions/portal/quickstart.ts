@@ -26,9 +26,9 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
-  private readonly buildFileUrl = new UrlPath(`https://github.com/apimatic/static-portal-workflow-v2/archive/refs/heads/master.zip`);
-  private readonly defaultSpecUrl = new UrlPath(`https://raw.githubusercontent.com/apimatic/static-portal-workflow-v2/refs/heads/master/src/spec/openapi.json`);
-  private readonly repositoryFolderName = "static-portal-workflow-v2-master/src" as const;
+  private readonly buildFileUrl = new UrlPath(`https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`);
+  private readonly defaultSpecUrl = new UrlPath(`https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`);
+  private readonly repositoryFolderName = "sample-docs-as-code-portal-master/src" as const;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
