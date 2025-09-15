@@ -24,7 +24,7 @@ export class QuickstartAction {
       }
       case undefined: {
         this.prompts.noQuickstartFlowSelected();
-        return ActionResult.failed();
+        return ActionResult.cancelled();
       }
     }
   };
