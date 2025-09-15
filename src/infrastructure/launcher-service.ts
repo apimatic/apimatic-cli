@@ -9,7 +9,7 @@ import isInCi from "is-in-ci";
 export class LauncherService {
 
   public async openInEditor(filePath: FilePath): Promise<void> {
-    if (!isInCi) return;
+    if (isInCi) return;
     try {
       await execa("code", ["--wait", filePath.toString()]);
     } catch {
@@ -53,7 +53,7 @@ export class LauncherService {
   }
 
   public openUrlInBrowser(url: UrlPath) {
-   // if (!isInCi) return;
+    if (isInCi) return;
     try{
       return open(url.toString());
     } catch {
