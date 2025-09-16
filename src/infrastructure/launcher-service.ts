@@ -11,7 +11,11 @@ export class LauncherService {
   public async openFolderInIde(directoryPath: DirectoryPath, fileToOpen: FilePath): Promise<boolean> {
     if (isInCi) return false;
     try {
-      await execa("code", [directoryPath.toString(), fileToOpen.toString()]);
+      if (process.platform === "win32") {
+        await execa("code", [directoryPath.toString(), fileToOpen.toString()]);
+      } else {
+        await execa("code", [fileToOpen.toString()]);
+      }
       return true;
     } catch {
       return false;
