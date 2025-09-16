@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
@@ -15,7 +15,7 @@ export class LoginPrompts {
 
   public invalidKeyProvided(serviceError: ServiceError) {
     const message =
-      serviceError === ServiceError.NetworkError ? "Invalid API key provided." : getErrorMessage(serviceError);
+      serviceError === ServiceError.NetworkError ? "Invalid API key provided." : serviceError.errorMessage;
     log.error(message);
   }
 

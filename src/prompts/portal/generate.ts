@@ -3,7 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
-import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import {ServiceError } from "../../infrastructure/service-error.js";
 import { withSpinner } from "../prompt.js";
 
 export class PortalGeneratePrompts {
@@ -41,11 +41,15 @@ export class PortalGeneratePrompts {
     return withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
   }
 
-  public portalGenerationError(error: ServiceError) {
-    log.error(getErrorMessage(error));
+  public portalGenerationError(error: string) {
+    log.error(error);
   }
 
-  portalGenerationErrorWithReport(reportPath: FilePath) {
+  public portalGenerationServiceError(serviceError: ServiceError) {
+    log.error(serviceError.errorMessage);
+  }
+
+  public portalGenerationErrorWithReport(reportPath: FilePath) {
     const message = `An error occurred during portal generation.
 A report has been written at the destination path ${f.path(reportPath)}`;
     log.error(message);

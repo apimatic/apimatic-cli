@@ -1,7 +1,7 @@
 import axios from "axios";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { err, ok, Result } from "neverthrow";
-import { handleServiceError, ServiceError } from "../api-utils.js";
+import { handleServiceError, ServiceError } from "../service-error.js";
 import { FileName } from "../../types/file/fileName.js";
 
 export type FileDownloadResponse = {

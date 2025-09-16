@@ -3,7 +3,7 @@ import { Sdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { format as f, getTree, TreeNode } from "../../format.js";
 import { StepType } from "../../../types/recipe/recipe.js";
-import { getErrorMessage, ServiceError } from "../../../infrastructure/api-utils.js";
+import { ServiceError } from "../../../infrastructure/service-error.js";
 import { Result } from "neverthrow";
 import { noteWrapped, withSpinner } from "../../prompt.js";
 
@@ -177,7 +177,7 @@ Let's proceed to adding steps to your API Recipe.`;
   }
 
   public serviceError(serviceError: ServiceError) {
-    log.error(getErrorMessage(serviceError));
+    log.error(serviceError.errorMessage);
   }
 
   public openRecipeMarkdownEditor() {

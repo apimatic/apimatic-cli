@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
-import { ServiceError, handleServiceError } from "../api-utils.js";
+import { ServiceError, handleServiceError } from "../service-error.js";
 
 export interface DeviceAuthToken {
   apiKey: string;

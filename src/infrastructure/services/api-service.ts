@@ -4,7 +4,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
-import { handleServiceError, ServiceError } from "../api-utils.js";
+import { handleServiceError, ServiceError } from "../service-error.js";
 import { PortalGenerationStatusResponse } from "@apimatic/sdk";
 
 export class ApiService {
@@ -66,7 +66,7 @@ export class ApiService {
     }
   }
 
-  public async sendTelemetry(payload: string, authKey: string, shell: string): Promise<Result<string, string>> {
+  public async sendTelemetry(payload: string, authKey: string, shell: string): Promise<Result<string, string | ServiceError>> {
     try {
       const response = await this.axiosInstance(shell, authKey).post("/telemetry/track", payload, {
         headers: { "Content-Type": "application/json" }
