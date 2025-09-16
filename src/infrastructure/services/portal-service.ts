@@ -41,7 +41,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>> {
+  ): Promise<Result<NodeJS.ReadableStream, string | ServiceError | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
 
@@ -58,6 +58,15 @@ export class PortalService {
       );
       generationId = portalInstance.result.id;
     } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        if (error.statusCode === 400 || error.statusCode === 403) {
+          const data = error.body as string;
+          const parsedData = JSON.parse(data) as ProblemDetailsError;
+          const d = parsedData as Record<string, string[]>;
+          const message = Object.values(parsedData.result as Record<string, string[]>)[0]?.[0] ?? null;
+          return err(error.result!.title + "\n- " + message);
+        }
+      }
       return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
@@ -175,8 +184,7 @@ export class PortalService {
     }
     if (error instanceof ProblemDetailsError) {
       // 400 & 403
-      const probDetailsError = error as ProblemDetailsError;
-      const message = Object.values(probDetailsError.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
+      const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
       return error.result!.title + "\n- " + message;
     }
     if (error instanceof ApiError && error.statusCode === 422) {

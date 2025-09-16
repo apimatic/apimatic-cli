@@ -8,7 +8,6 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { TempContext } from "../../types/temp-context.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { isServiceError } from "../../infrastructure/api-utils.js";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
@@ -58,7 +57,7 @@ export class GenerateAction {
 
       if (response.isErr()) {
         const error = response.error;
-        if (isServiceError(error)) {
+        if (typeof error === "string") {
           this.prompts.portalGenerationError(error);
         } else {
           const errorZipPath = await tempContext.save(error);

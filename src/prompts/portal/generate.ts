@@ -37,12 +37,13 @@ export class PortalGeneratePrompts {
     log.error(message);
   }
 
-  public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>>) {
+  public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, string | ServiceError | NodeJS.ReadableStream>>) {
     return withSpinner("Generating portal", "Portal generated successfully.", "Portal Generation failed.", fn);
   }
 
-  public portalGenerationError(error: ServiceError) {
-    log.error(getErrorMessage(error));
+  public portalGenerationError(error: ServiceError | string) {
+    let message = typeof error === "string" ? error : getErrorMessage(error);
+    log.error(message);
   }
 
   portalGenerationErrorWithReport(reportPath: FilePath) {
