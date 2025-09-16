@@ -29,7 +29,7 @@ export class FileService {
 
   public async directoryEmpty(dir: DirectoryPath): Promise<boolean> {
     try {
-      const files = await fsExtra.readdir(dir.toString());
+      const files = (await fsExtra.readdir(dir.toString())).filter((file) => !file.startsWith("."));
       return files.length === 0;
     } catch (error) {
       return error instanceof Error && "code" in error && error.code === "ENOENT";
