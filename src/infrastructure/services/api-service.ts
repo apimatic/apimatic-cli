@@ -66,7 +66,7 @@ export class ApiService {
     }
   }
 
-  public async sendTelemetry(payload: string, authKey: string, shell: string): Promise<Result<string, string>> {
+  public async sendTelemetry(payload: string, authKey: string, shell: string): Promise<Result<string, string | ServiceError>> {
     try {
       const response = await this.axiosInstance(shell, authKey).post("/telemetry/track", payload, {
         headers: { "Content-Type": "application/json" }

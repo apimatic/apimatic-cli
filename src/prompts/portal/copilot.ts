@@ -1,7 +1,7 @@
 import { confirm, isCancel, log, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
-import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/api-utils.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
 import { noteWrapped, withSpinner } from "../prompt.js";
@@ -104,7 +104,7 @@ look for the chat icon in the bottom-right corner.`,
   }
 
   public serviceError(serviceError: ServiceError) {
-    log.error(getErrorMessage(serviceError));
+    log.error(serviceError.errorMessage);
   }
 
   public noCopilotKeyFound() {

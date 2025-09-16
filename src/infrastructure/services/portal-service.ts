@@ -13,7 +13,6 @@ import {
   TransformationController,
   Transformation,
   ExportFormats,
-  InternalServerErrorResponseError,
   Platforms
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
@@ -41,7 +40,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, string | ServiceError | NodeJS.ReadableStream>> {
+  ): Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
 
@@ -58,7 +57,18 @@ export class PortalService {
       );
       generationId = portalInstance.result.id;
     } catch (error) {
-        return err(await PortalService.handlePortalGenerationErrors(error));            
+      if (error instanceof ProblemDetailsError) {
+        const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = error.result!.title + "\n- " + message;
+        if (error.statusCode === 400) {
+          return err(ServiceError.badRequest(errorMessage));
+        }
+        if (error.statusCode === 403) {
+          return err(ServiceError.forbidden(errorMessage));
+        }
+      }
+      const serviceError = handleServiceError(error);
+      return err(serviceError);
     } finally {
       buildFileStream.close();
     }
@@ -166,26 +176,6 @@ export class PortalService {
     return {
       origin: `APIMATIC CLI ${commandName}`
     };
-  };
-
-  private static handlePortalGenerationErrors = async (error: unknown): Promise<string> => {
-    if (error instanceof UnauthorizedResponseError) {
-      // 401
-      return error.result?.message ?? "Authorization has been denied for this request.";
-    }
-    if (error instanceof ProblemDetailsError) {
-      // 400 & 403
-      const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
-      return error.result!.title + "\n- " + message;
-    }
-    if (error instanceof InternalServerErrorResponseError) {
-      // 422
-      const message = error.result?.message;
-      return `${
-        message ?? "An unknown error occurred."
-      } Please try again later or reach out to our team at support@apimatic.io for help if your problem persists.`;
-    }
-    return "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
   };
 
   private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
