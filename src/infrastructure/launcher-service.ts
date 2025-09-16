@@ -64,7 +64,7 @@ export class LauncherService {
 
   public openUrlInBrowser(url: UrlPath) {
     if (isInCi) return;
-    try{
+    try {
       return open(url.toString());
     } catch {
       // Silently ignore errors

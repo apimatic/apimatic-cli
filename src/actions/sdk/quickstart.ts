@@ -149,10 +149,12 @@ export class SdkQuickstartAction {
         await this.fileService.copyToDir(specPath, tempSpecDirectory);
       }
 
-
       const sourceDirectory = inputDirectory.join("src");
       const specDirectory = sourceDirectory.join("spec");
       await this.fileService.copyDirectoryContents(tempSpecDirectory, specDirectory);
+
+      const srcDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
+      this.prompts.printDirectoryStructure(inputDirectory, srcDirectoryStructure);
 
       const sdkDirectory = inputDirectory.join("sdk");
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
