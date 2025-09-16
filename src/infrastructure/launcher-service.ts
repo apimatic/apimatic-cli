@@ -11,11 +11,7 @@ export class LauncherService {
   public async openFolderInIde(directoryPath: DirectoryPath, fileToOpen: FilePath): Promise<boolean> {
     if (isInCi) return false;
     try {
-      if (process.platform === "win32") {
-        await execa("code", [directoryPath.toString(), fileToOpen.toString()]);
-      } else {
-        await execa("code", [fileToOpen.toString()]);
-      }
+      await execa("code", [directoryPath.toString(), fileToOpen.toString()]);
       return true;
     } catch {
       return false;
@@ -68,7 +64,7 @@ export class LauncherService {
 
   public openUrlInBrowser(url: UrlPath) {
     if (isInCi) return;
-    try{
+    try {
       return open(url.toString());
     } catch {
       // Silently ignore errors
