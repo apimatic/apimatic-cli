@@ -57,17 +57,8 @@ export class PortalService {
         file
       );
       generationId = portalInstance.result.id;
-    } catch (error: unknown) {
-      if (error instanceof ApiError) {
-        if (error.statusCode === 400 || error.statusCode === 403) {
-          const data = error.body as string;
-          const parsedData = JSON.parse(data) as ProblemDetailsError;
-          const d = parsedData as Record<string, string[]>;
-          const message = Object.values(parsedData.result as Record<string, string[]>)[0]?.[0] ?? null;
-          return err(error.result!.title + "\n- " + message);
-        }
-      }
-      return err(handleServiceError(error));
+    } catch (error) {
+        return err(await PortalService.handlePortalGenerationErrors(error));            
     } finally {
       buildFileStream.close();
     }
@@ -177,7 +168,7 @@ export class PortalService {
     };
   };
 
-  private static handlePortalGenerationErrors = async (error: unknown): Promise<string | NodeJS.ReadableStream> => {
+  private static handlePortalGenerationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof UnauthorizedResponseError) {
       // 401
       return error.result?.message ?? "Authorization has been denied for this request.";
@@ -186,10 +177,6 @@ export class PortalService {
       // 400 & 403
       const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
       return error.result!.title + "\n- " + message;
-    }
-    if (error instanceof ApiError && error.statusCode === 422) {
-      // 422
-      return error.body as NodeJS.ReadableStream;
     }
     if (error instanceof InternalServerErrorResponseError) {
       // 422
