@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";

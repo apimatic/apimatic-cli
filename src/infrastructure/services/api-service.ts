@@ -4,7 +4,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
-import { handleServiceError, ServiceError } from "../api-utils.js";
+import { handleServiceError, ServiceError } from "../service-error.js";
 import { PortalGenerationStatusResponse } from "@apimatic/sdk";
 
 export class ApiService {

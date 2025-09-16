@@ -26,7 +26,7 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result } from "neverthrow";
 import { Language } from "../../types/sdk/generate.js";
-import { handleServiceError, ServiceError } from "../api-utils.js";
+import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
 
 export class PortalService {

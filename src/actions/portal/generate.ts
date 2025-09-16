@@ -8,7 +8,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { TempContext } from "../../types/temp-context.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();

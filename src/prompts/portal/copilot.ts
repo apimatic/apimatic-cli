@@ -1,7 +1,7 @@
 import { confirm, isCancel, log, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
-import { ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
 import { noteWrapped, withSpinner } from "../prompt.js";

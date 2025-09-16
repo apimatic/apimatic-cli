@@ -5,7 +5,7 @@ import { noteWrapped, withSpinner } from "../prompt.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
-import { ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { Directory } from "../../types/file/directory.js";

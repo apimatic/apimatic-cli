@@ -1,6 +1,6 @@
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
-import { ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 import { format } from "../format.js";
 import { log } from "@clack/prompts";
 import { mapLanguages } from "../../types/sdk/generate.js";
