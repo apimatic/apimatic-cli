@@ -138,10 +138,6 @@ export class FileService {
       return false;
     }
   }
-
-  public getCurrentWorkingDirectory(): DirectoryPath {
-    return new DirectoryPath(process.cwd());
-  }
 }
 
 const streamPipeline = promisify(pipeline);
