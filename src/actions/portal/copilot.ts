@@ -35,10 +35,6 @@ export class CopilotAction {
     force: boolean,
     enable: boolean
   ): Promise<ActionResult> => {
-
-
-    this.prompts.copilotConfigured(enable, 'asdfadsfadsf');
-
     const buildContext = new BuildContext(buildDirectory);
 
     if (!(await buildContext.validate())) {
