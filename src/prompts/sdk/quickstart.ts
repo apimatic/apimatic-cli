@@ -9,6 +9,7 @@ import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { Directory } from "../../types/file/directory.js";
+import { Language } from "../../types/sdk/generate.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -98,7 +99,7 @@ export class SdkQuickstartPrompts {
     log.info(`Step 3 of 4: Select programming language`);
   }
 
-  public async selectLanguagePrompt(): Promise<string | undefined> {
+  public async selectLanguagePrompt(): Promise<Language | undefined> {
     const language = await select({
       message: "Choose the programming language for your SDK:",
       options: [
@@ -116,7 +117,7 @@ export class SdkQuickstartPrompts {
       return undefined;
     }
 
-    return language;
+    return language as Language;
   }
 
   public noLanguageSelected() {
@@ -180,12 +181,10 @@ export class SdkQuickstartPrompts {
   }
 
   public sdkOpenedInEditor() {
-    log.info(
-      "Opened the SDK directory in VS Code. To get started with your SDK, review the README file."
-    );
+    log.info("Opened the SDK directory in VS Code. To get started with your SDK, review the README file.");
   }
 
-  public nextSteps(language: string, specDirectory?: DirectoryPath): void {
+  public nextSteps(language: Language, specDirectory?: DirectoryPath): void {
     const message = `Run the command '${f.cmdAlt(
       "apimatic",
       "sdk",
