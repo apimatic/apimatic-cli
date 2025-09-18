@@ -1,10 +1,11 @@
-import { confirm, isCancel, log, select } from "@clack/prompts";
+import { confirm, isCancel, log, note, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
-import { noteWrapped, withSpinner } from "../prompt.js";
+import { ct, nl, noteWrapped, noteWrappedEx, t, withSpinner } from "../prompt.js";
+import { Language } from "../../types/sdk/generate.js";
 
 export class PortalCopilotPrompts {
   public async displayApiCopilotKeyUsageWarning() {
@@ -34,6 +35,7 @@ export class PortalCopilotPrompts {
     return selectedKey;
   }
 
+
   public copilotConfigured(status: boolean, copilotId: string): void {
     log.info(
       `API Copilot configured successfully!
@@ -44,7 +46,8 @@ export class PortalCopilotPrompts {
   Configuration saved to: ${f.var("APIMATIC-BUILD.json")}`
     );
 
-    noteWrapped(
+
+    note(
       `API Copilot will index your content the next time you run
 '${f.cmdAlt("apimatic", "portal", "generate")}' or '${f.cmdAlt("apimatic", "portal", "serve")}'.
 This process can take up to 10 minutes, depending on your API’s size.
@@ -55,6 +58,42 @@ select any programming language in the Portal and
 look for the chat icon in the bottom-right corner.`,
       `Next Steps`
     );
+
+    const messages = [
+      t(`API Copilot will index your content the next time you run `),
+      nl(),
+      ct(`'${f.cmdAlt("apimatic", "portal", "generate")}' `),
+      t(`or `),
+      ct(`'${f.cmdAlt("apimatic", "portal", "serve")}' `),
+      nl(),
+      ct('This process can take up to 10 minutes, depending on your API’s size.'),
+      nl(),
+      nl(),
+
+      t(`To see your copilot: If your portal is already running, refresh the page. `),
+      nl(),
+      t(`Otherwise, run `),
+      ct(`'${f.cmdAlt("apimatic", "portal", "serve")}' `),
+      nl(),
+      t(`select any programming language in the Portal and look for the chat icon in the bottom-right corner.`),
+    ]
+
+
+    noteWrappedEx(messages, `Next Steps`);
+
+
+
+    const messages2 = [
+      t(`Run the command `),
+      ct(`'${f.cmdAlt("apimatic", "sdk", "generate")}'  ${f.flag("spec", 'C:\\playground\\generate-cli-test\\portal\\apimatic-debug')} ${f.flag("language", 'TS')}`),
+      nl(),
+      t(`to regenerate your SDK`),
+      nl(),
+      t(`To learn more about customizing your SDK, visit:`),
+      nl(),
+      ct(`${f.linkAlt(`https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/`)}`)
+    ];
+    noteWrappedEx(messages2, "Next steps");
   }
 
   public async confirmOverwrite(): Promise<boolean> {
