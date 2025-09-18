@@ -140,13 +140,7 @@ export class SdkQuickstartPrompts {
     }
 
     const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
-    const directoryPath = new DirectoryPath(cleanedPath);
-
-    if (inputDirectory === "./") {
-      return new DirectoryPath(defaultSrcDirectoryPath);
-    } else {
-      return directoryPath;
-    }
+    return new DirectoryPath(cleanedPath);
   }
 
   public noInputDirectoryProvided() {

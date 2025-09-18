@@ -7,8 +7,6 @@ import { FlagsProvider } from "../../../types/flags-provider.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../../prompts/format.js";
 
-const DEFAULT_WORKING_DIRECTORY = "./";
-
 export default class PortalTocNew extends Command {
   static summary = "Generate a Table of Contents (TOC) file for your API documentation portal";
 
@@ -52,7 +50,7 @@ ${format.link(
       flags: { input, destination, force, "expand-endpoints": expandEndpoints, "expand-models": expandModels }
     } = await this.parse(PortalTocNew);
 
-    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const tocDirectory = destination ? new DirectoryPath(destination) : undefined;
 
