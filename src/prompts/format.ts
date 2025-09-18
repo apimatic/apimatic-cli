@@ -15,7 +15,8 @@ export const format = {
   description: (text: string) => pc.greenBright(`${text}`),
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
-      return `${pc.green(`--${name}`)}=${pc.dim(value)}`;
+      const sanitizedValue = value.includes(" ") ? `'${value}'` : value;
+      return `${pc.green(`--${name}`)}=${pc.dim(sanitizedValue)}`;
     }
     return `${pc.green(`--${name}`)}`;
   },

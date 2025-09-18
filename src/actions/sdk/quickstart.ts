@@ -169,10 +169,7 @@ export class SdkQuickstartAction {
         this.prompts.sdkOpenedInEditor();
       }
 
-      this.prompts.nextSteps(
-        language,
-        !inputDirectory.isEqual(this.fileService.getCurrentWorkingDirectory()) ? specDirectory : undefined
-      );
+      this.prompts.nextSteps(language, inputDirectory);
       return ActionResult.success();
     });
   };

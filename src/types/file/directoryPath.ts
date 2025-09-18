@@ -8,6 +8,8 @@ export class DirectoryPath {
     this.directoryPath = path.resolve(directoryPath, ...subPaths);
   }
 
+  public static default = new DirectoryPath("./");
+
   public toString(): string {
     return this.directoryPath;
   }

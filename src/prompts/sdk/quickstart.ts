@@ -1,7 +1,7 @@
 import { isCancel, log, select, text } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { format as f, getTree } from "../format.js";
-import { withSpinner, noteWrapped } from "../prompt.js";
+import { noteWrapped, withSpinner } from "../prompt.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
@@ -103,13 +103,13 @@ export class SdkQuickstartPrompts {
     const language = await select({
       message: "Choose the programming language for your SDK:",
       options: [
-        { label: "Typescript", value: "typescript" },
-        { label: "Ruby", value: "ruby" },
-        { label: "Python", value: "python" },
-        { label: "Java", value: "java" },
-        { label: "C#", value: "csharp" },
-        { label: "PHP", value: "php" },
-        { label: "Go", value: "go" }
+        { label: "Typescript", value: Language.TYPESCRIPT },
+        { label: "Ruby", value: Language.RUBY },
+        { label: "Python", value: Language.PYTHON },
+        { label: "Java", value: Language.JAVA },
+        { label: "C#", value: Language.CSHARP },
+        { label: "PHP", value: Language.PHP },
+        { label: "Go", value: Language.GO }
       ]
     });
 
@@ -117,7 +117,7 @@ export class SdkQuickstartPrompts {
       return undefined;
     }
 
-    return language as Language;
+    return language;
   }
 
   public noLanguageSelected() {
@@ -184,9 +184,10 @@ export class SdkQuickstartPrompts {
     log.info("Opened the SDK directory in VS Code. To get started with your SDK, review the README file.");
   }
 
-  public nextSteps(language: Language, specDirectory?: DirectoryPath): void {
+  public nextSteps(language: Language, specDirectory: DirectoryPath): void {
+    const specDirectoryFlag = !specDirectory.isEqual(DirectoryPath.default) ? `${f.flag("spec", specDirectory.toString())} `: "";
     const message = `Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate")} ${specDirectory ? f.flag("spec", specDirectory.toString()) : ""} ${f.flag("language", language)}'
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${specDirectoryFlag}${f.flag("language", language)}'
 to regenerate your SDK.
 
 To learn more about customizing your SDK, visit:
