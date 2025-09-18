@@ -10,7 +10,7 @@ export const format = {
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
   cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
-  cmdAlt: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map(arg => pc.dim(pc.blueBright(arg))).join(" ")}`,
+  cmdAlt: (cmd: string, ...args: string[]) => `${pc.dim(pc.blueBright(cmd))} ${args.map(arg => pc.blueBright(arg)).join(" ")}`,
   link: (text: string) => pc.underline(pc.blueBright(text)),
   description: (text: string) => pc.greenBright(`${text}`),
   flag: (name: string, value: string | undefined = undefined) => {
