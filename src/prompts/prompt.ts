@@ -3,6 +3,7 @@ import pc from "picocolors";
 import { getColumns } from "@clack/core";
 import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from "@clack/prompts";
 import { Result } from "neverthrow";
+import { stripAnsi } from "../utils/string-utils.js";
 
 export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
   const s = spinner({
@@ -23,7 +24,10 @@ export const noteWrapped = (message: string, title: string) => {
   const output: Writable = process.stdout;
   const columns = getColumns(output) || 80;
   const messages = message.split("\n");
-  const messageHasOverFlow = messages.some((msg) => msg.length + 6 > columns);
+  const messageHasOverFlow = messages.some((msg) => {
+    const clean = stripAnsi(msg);
+    return clean.length + 6 > columns;
+  });
   if (messageHasOverFlow) {
     const startLine = S_BAR_H.repeat(columns - title.length - 4);
     log.step(`${title} ${pc.gray(startLine)}`);
