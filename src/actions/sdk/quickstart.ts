@@ -169,8 +169,7 @@ export class SdkQuickstartAction {
         this.prompts.sdkOpenedInEditor();
       }
 
-      this.prompts.nextSteps(specDirectory, language);
-
+      this.prompts.nextSteps(language, inputDirectory.toString() !== process.cwd() ? specDirectory : undefined);
       return ActionResult.success();
     });
   };

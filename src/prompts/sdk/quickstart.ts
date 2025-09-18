@@ -12,6 +12,7 @@ import { Directory } from "../../types/file/directory.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
+const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/";
 const defaultSrcDirectoryPath = process.cwd();
 
 export class SdkQuickstartPrompts {
@@ -179,17 +180,22 @@ export class SdkQuickstartPrompts {
   }
 
   public sdkOpenedInEditor() {
-    log.info("Opened the SDK directory in VS Code.");
+    log.info(
+      "Opened the SDK directory in VS Code. To get started with your SDK, review the README file."
+    );
   }
 
-  public nextSteps(specDirectory: DirectoryPath, language: string): void {
-    const message = `- Run the command '${f.cmdAlt(
+  public nextSteps(language: string, specDirectory?: DirectoryPath): void {
+    const message = `Run the command '${f.cmdAlt(
       "apimatic",
       "sdk",
       "generate",
-      `${f.flag("spec", specDirectory.toString())}`,
+      `${specDirectory ? f.flag("spec", specDirectory.toString()) : ""}`,
       `${f.flag("language", language)}`
-    )}' to regenerate your SDK.`;
+    )}' to regenerate your SDK.
+
+To learn more about customizing your SDK, visit: 
+${f.linkAlt(sdkCustomizationUrl)}`;
     noteWrapped(message, "Next steps");
   }
 }
