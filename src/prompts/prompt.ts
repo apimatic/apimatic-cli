@@ -1,6 +1,7 @@
-import { note, spinner } from "@clack/prompts";
+import console from "console";
+import pc from "picocolors";
+import { spinner, log } from "@clack/prompts";
 import { Result } from "neverthrow";
-import { wrapToColumns } from "../utils/string-utils.js";
 
 export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
   const s = spinner({
@@ -18,7 +19,10 @@ export async function withSpinner<T, E>(intro: string, success: string, failure:
 }
 
 export function noteWrapped(message: string, title?: string) {
-  const columns = (process.stdout.columns || 80) - 8; // 8 is for the padding
-  const finalMessage = wrapToColumns(message, columns).join("\n");
-  note(finalMessage, title);
+  const columns = (process.stdout.columns || 80);
+    const startLine = "─".repeat((columns-14));
+  const endLine = ("├─" + "─".repeat(columns-2));
+  log.step(title + " " + pc.gray(startLine));
+  log.message(message);
+  console.log(pc.gray(endLine));
 }

@@ -166,7 +166,7 @@ export class PortalQuickstartPrompts {
     const message = `Use the API Playground or an SDK to call your API.
 Customize the Portal theme, add API recipes and enable AI features
 ${f.linkAlt(referenceDocumentationUrl)}`;
-    noteWrapped(message, "Next steps");
+    noteWrapped(message, "Next Steps");
   }
 
   public serviceError(serviceError: ServiceError) {

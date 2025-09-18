@@ -18,7 +18,6 @@ export default class PortalCopilot extends Command {
       description: "marks the API Copilot as disabled in the configuration"
     }),
     ...FlagsProvider.force,
-    ...FlagsProvider.force,
     ...FlagsProvider.authKey
   };
 

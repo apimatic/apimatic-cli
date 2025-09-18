@@ -1,7 +1,7 @@
 import { isCancel, log, select, text } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { format as f, getTree } from "../format.js";
-import { noteWrapped, withSpinner } from "../prompt.js";
+import { withSpinner, noteWrapped } from "../prompt.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
@@ -195,6 +195,6 @@ export class SdkQuickstartPrompts {
 
 To learn more about customizing your SDK, visit: 
 ${f.linkAlt(sdkCustomizationUrl)}`;
-    noteWrapped(message, "Next steps");
+    noteWrapped(message, "Next Steps");
   }
 }
