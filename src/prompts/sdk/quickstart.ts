@@ -185,13 +185,9 @@ export class SdkQuickstartPrompts {
   }
 
   public nextSteps(language: Language, specDirectory?: DirectoryPath): void {
-    const message = `Run the command '${f.cmdAlt(
-      "apimatic",
-      "sdk",
-      "generate",
-      `${specDirectory ? f.flag("spec", specDirectory.toString()) : ""}`,
-      `${f.flag("language", language)}`
-    )}' to regenerate your SDK.
+    const message = `Run the command
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${specDirectory ? f.flag("spec", specDirectory.toString()) : ""} ${f.flag("language", language)}'
+to regenerate your SDK.
 
 To learn more about customizing your SDK, visit:
 ${f.link(sdkCustomizationUrl)}`;
