@@ -193,8 +193,8 @@ export class SdkQuickstartPrompts {
       `${f.flag("language", language)}`
     )}' to regenerate your SDK.
 
-To learn more about customizing your SDK, visit: 
-${f.linkAlt(sdkCustomizationUrl)}`;
+To learn more about customizing your SDK, visit:
+${f.link(sdkCustomizationUrl)}`;
     noteWrapped(message, "Next Steps");
   }
 }
