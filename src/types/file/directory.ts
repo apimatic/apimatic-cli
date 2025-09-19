@@ -27,7 +27,7 @@ export class Directory {
     "toc.yml": "# Controls the structure of the side navigation bar in the API portal",
     "APIMATIC-BUILD.json":
       "# Defines all configurations for the API portal, including programming languages and themes",
-    "APIMATIC-META.json": "# Defines configurations for customizing import, export, and code generation"
+    "APIMATIC-META.json": "# Defines customization for SDK generation",
   };
 
   public toTreeNode(): TreeNode {
