@@ -2,11 +2,11 @@ import { log } from "@clack/prompts";
 import { replaceHTML } from "../../utils/utils.js";
 import { ValidationMessages } from "../../types/utils.js";
 import { Result } from "neverthrow";
-import { withSpinner } from "../format.js";
 import { ApiValidationSummary } from "@apimatic/sdk";
-import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { format as f } from "../format.js";
+import { withSpinner } from "../prompt.js";
 
 export class ApiValidatePrompts {
   public async validateApi(fn: Promise<Result<ApiValidationSummary, string>>) {
@@ -39,7 +39,7 @@ export class ApiValidatePrompts {
   }
 
   public networkError(serviceError: ServiceError): void {
-    const message = getErrorMessage(serviceError);
+    const message = serviceError.errorMessage;
     log.error(message);
   }
 

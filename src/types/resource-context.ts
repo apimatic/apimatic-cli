@@ -7,7 +7,7 @@ import { FileName } from "./file/fileName.js";
 import { FileDownloadService } from "../infrastructure/services/file-download-service.js";
 import { FileService } from "../infrastructure/file-service.js";
 import { ResourceInput } from "./file/resource-input.js";
-import { ServiceError } from "../infrastructure/api-utils.js";
+import { ServiceError } from "../infrastructure/service-error.js";
 
 export class ResourceContext {
   private readonly fileDownloadService = new FileDownloadService();

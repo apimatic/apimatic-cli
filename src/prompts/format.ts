@@ -1,6 +1,5 @@
 import pc from "picocolors";
-import { Result } from "neverthrow";
-import { intro as i, outro as o, spinner } from '@clack/prompts';
+import { intro as i, outro as o } from '@clack/prompts';
 import { ActionResult } from "../actions/action-result.js";
 import { Directory } from "../types/file/directory.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
@@ -11,12 +10,13 @@ export const format = {
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
   cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
-  cmdAlt: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map(arg => pc.blueBright(arg)).join(" ")}`,
+  cmdAlt: (cmd: string, ...args: string[]) => `${pc.dim(pc.blueBright(cmd))} ${args.map(arg => pc.blueBright(arg)).join(" ")}`,
   link: (text: string) => pc.underline(pc.blueBright(text)),
   description: (text: string) => pc.greenBright(`${text}`),
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
-      return `${pc.green(`--${name}`)}=${pc.dim(value)}`;
+      const sanitizedValue = value.includes(" ") ? `'${value}'` : value;
+      return `${pc.green(`--${name}`)}=${pc.dim(sanitizedValue)}`;
     }
     return `${pc.green(`--${name}`)}`;
   },
@@ -46,21 +46,6 @@ export function outro(result: ActionResult) {
   );
   o(outroMessage);
   process.exitCode = exitCode;
-}
-
-export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
-  const s = spinner({
-    cancelMessage: "cancelled",
-    errorMessage: "failed",
-    frames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
-  });
-  s.start(intro);
-  const result = await fn;
-  result.match(
-    () => s.stop(success, 0),
-    () => s.stop(failure, 1)
-  );
-  return result;
 }
 
 export function getDirectoryTree(dir: Directory, prefix: string = "", isLast: boolean = true): string {

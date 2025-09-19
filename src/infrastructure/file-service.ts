@@ -30,7 +30,7 @@ export class FileService {
   public async directoryEmpty(dir: DirectoryPath): Promise<boolean> {
     try {
       const files = await fsExtra.readdir(dir.toString());
-      return files.length === 0;
+      return files.filter((file) => !file.startsWith(".")).length === 0;
     } catch (error) {
       return error instanceof Error && "code" in error && error.code === "ENOENT";
     }
@@ -118,6 +118,10 @@ export class FileService {
 
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
+  }
+
+  public async copyToDir(source: FilePath, destination: DirectoryPath) {
+    await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
   }
 
   public async isZipFile(filePath: FilePath): Promise<boolean> {

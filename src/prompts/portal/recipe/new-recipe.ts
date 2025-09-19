@@ -1,10 +1,11 @@
-import { select, text, isCancel, log, autocomplete, confirm, note } from "@clack/prompts";
+import { select, text, isCancel, log, autocomplete, confirm } from "@clack/prompts";
 import { Sdl, SdlEndpoint } from "../../../types/sdl/sdl.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
-import { format as f, getTree, TreeNode, withSpinner } from "../../format.js";
+import { format as f, getTree, TreeNode } from "../../format.js";
 import { StepType } from "../../../types/recipe/recipe.js";
-import { getErrorMessage, ServiceError } from "../../../infrastructure/api-utils.js";
+import { ServiceError } from "../../../infrastructure/service-error.js";
 import { Result } from "neverthrow";
+import { noteWrapped, withSpinner } from "../../prompt.js";
 
 export class PortalRecipePrompts {
   public displayWelcomeMessage(): void {
@@ -176,7 +177,7 @@ Let's proceed to adding steps to your API Recipe.`;
   }
 
   public serviceError(serviceError: ServiceError) {
-    log.error(getErrorMessage(serviceError));
+    log.error(serviceError.errorMessage);
   }
 
   public openRecipeMarkdownEditor() {
@@ -191,7 +192,7 @@ Let's proceed to adding steps to your API Recipe.`;
 
   public nextSteps() {
     const message = `Run the command '${f.cmdAlt(`apimatic`, 'portal', 'serve')}' to preview your documentation portal`;
-    note(message, "Next Steps");
+    noteWrapped(message, "Next Steps");
   }
 
   public generateSdl(fn: Promise<Result<Sdl, ServiceError>>) {

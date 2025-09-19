@@ -16,13 +16,13 @@ export class TempContext {
     return new FilePath(this.tempDirectory, new FileName(`${uuid}`));
   }
 
-  async zip(buildDirectory: DirectoryPath): Promise<FilePath> {
+  public async zip(buildDirectory: DirectoryPath): Promise<FilePath> {
     const tempFile = this.getTempFileName;
     await this.zipService.archive(buildDirectory, tempFile);
     return tempFile;
   }
 
-  async save(portalStream: NodeJS.ReadableStream): Promise<FilePath> {
+  public async save(portalStream: NodeJS.ReadableStream): Promise<FilePath> {
     const tempFile = this.getTempFileName;
     await this.fileService.writeFile(tempFile, portalStream);
     return tempFile;

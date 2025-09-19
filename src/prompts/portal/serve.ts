@@ -1,8 +1,9 @@
-import { log, note } from "@clack/prompts";
+import { log } from "@clack/prompts";
 import { format as f } from "../format.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { once } from "events";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { noteWrapped } from "../prompt.js";
 
 export class PortalServePrompts {
   public usingFallbackPort(currentPort: number, availablePort: number) {
@@ -28,8 +29,9 @@ export class PortalServePrompts {
   }
 
   public watcherError() {
-    const message =
-      `An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at ${f.var('support@apimatic.io')}`;
+    const message = `An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at ${f.var(
+      "support@apimatic.io"
+    )}`;
     log.error(message);
   }
 
@@ -38,7 +40,11 @@ export class PortalServePrompts {
   }
 
   public hotReloadEnabled(srcDirectory: DirectoryPath) {
-    note(`Hot reload is enabled.
-Watching the directory ${f.path(srcDirectory)} for any changes`, `Note`);
+    noteWrapped(
+      `Hot reload is enabled.
+
+Watching the directory ${f.path(srcDirectory)} for any changes`,
+      `Note`
+    );
   }
 }

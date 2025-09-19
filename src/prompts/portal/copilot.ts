@@ -1,9 +1,10 @@
-import { confirm, isCancel, log, note, select } from "@clack/prompts";
+import { confirm, isCancel, log, select } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
-import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f, withSpinner } from "../format.js";
+import { format as f } from "../format.js";
+import { noteWrapped, withSpinner } from "../prompt.js";
 
 export class PortalCopilotPrompts {
   public async displayApiCopilotKeyUsageWarning() {
@@ -43,17 +44,14 @@ export class PortalCopilotPrompts {
   Configuration saved to: ${f.var("APIMATIC-BUILD.json")}`
     );
 
-    note(
-      `API Copilot will index your content the next time you run
+    noteWrapped(`API Copilot will index your content the next time you run
 '${f.cmdAlt("apimatic", "portal", "generate")}' or '${f.cmdAlt("apimatic", "portal", "serve")}'.
 This process can take up to 10 minutes, depending on your API’s size.
 
 To see your copilot: If your portal is already running, refresh the page.
 Otherwise, run '${f.cmdAlt("apimatic", "portal", "serve")}',
 select any programming language in the Portal and
-look for the chat icon in the bottom-right corner.`,
-      `Next Steps`
-    );
+look for the chat icon in the bottom-right corner.`, "Next Steps");
   }
 
   public async confirmOverwrite(): Promise<boolean> {
@@ -103,7 +101,7 @@ look for the chat icon in the bottom-right corner.`,
   }
 
   public serviceError(serviceError: ServiceError) {
-    log.error(getErrorMessage(serviceError));
+    log.error(serviceError.errorMessage);
   }
 
   public noCopilotKeyFound() {

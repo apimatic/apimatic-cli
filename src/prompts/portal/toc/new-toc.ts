@@ -1,10 +1,11 @@
 import { confirm, isCancel, log } from "@clack/prompts";
 import { FilePath } from "../../../types/file/filePath.js";
 import { Result } from "neverthrow";
-import { format as f, withSpinner } from "../../format.js";
+import { format as f } from "../../format.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
-import { ServiceError } from "../../../infrastructure/api-utils.js";
+import { ServiceError } from "../../../infrastructure/service-error.js";
 import { Sdl } from "../../../types/sdl/sdl.js";
+import { withSpinner } from "../../prompt.js";
 
 export class PortalNewTocPrompts {
   public async overwriteToc(tocPath: FilePath): Promise<boolean> {

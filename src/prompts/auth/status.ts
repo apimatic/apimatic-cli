@@ -1,9 +1,10 @@
 import { Result } from "neverthrow";
 import { SubscriptionInfo } from "../../types/api/account.js";
-import { getErrorMessage, ServiceError } from "../../infrastructure/api-utils.js";
-import { format, withSpinner } from "../format.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
+import { format } from "../format.js";
 import { log } from "@clack/prompts";
 import { mapLanguages } from "../../types/sdk/generate.js";
+import { withSpinner } from "../prompt.js";
 
 export class StatusPrompts {
   public accountInfoSpinner(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
@@ -17,7 +18,7 @@ export class StatusPrompts {
 
   public invalidKeyProvided(serviceError: ServiceError) {
     const message =
-      serviceError === ServiceError.UnAuthorized ? "Invalid API key provided." : getErrorMessage(serviceError);
+      serviceError === ServiceError.UnAuthorized ? "Invalid API key provided." : serviceError.errorMessage;
     log.error(message);
   }
 

@@ -5,8 +5,6 @@ import { FlagsProvider } from "../../types/flags-provider.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 
-const DEFAULT_WORKING_DIRECTORY = "./";
-
 export default class PortalServe extends Command {
   static summary = "Generate and serve an API Documentation Portal with hot reload.";
 
@@ -50,7 +48,7 @@ export default class PortalServe extends Command {
       flags: { input, destination, port, open, "no-reload": noReload, "auth-key": authKey }
     } = await this.parse(PortalServe);
 
-    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
     const commandMetadata: CommandMetadata = {
