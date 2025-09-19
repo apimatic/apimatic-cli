@@ -1,3 +1,10 @@
+# [1.1.0-beta.1](https://github.com/apimatic/apimatic-cli/compare/v1.0.0-beta.1...v1.1.0-beta.1) (2025-09-19)
+
+
+### Features
+
+* add sdk quickstart flow and other various improvements ([#210](https://github.com/apimatic/apimatic-cli/issues/210)) ([2750491](https://github.com/apimatic/apimatic-cli/commit/2750491d68f53979d8bf7651f6e14568e57d2476))
+
 # 1.0.0-beta.1 (2025-09-08)
 
 
