@@ -14,7 +14,7 @@ The official CLI for APIMatic.
 To get started with APIMatic's CLI using a step by step wizard, run the following command: 
 
 ```sh-session
-$ apimatic portal quickstart
+$ apimatic quickstart
 ```
 
 # Usage
@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.0.0-beta.2 win32-x64 node-v23.4.0
+@apimatic/cli/1.0.0-beta.1 win32-x64 node-v23.4.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
