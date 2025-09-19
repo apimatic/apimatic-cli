@@ -1,6 +1,9 @@
-import { note, spinner } from "@clack/prompts";
+import type { Writable } from "node:stream";
+import pc from "picocolors";
+import { getColumns } from "@clack/core";
+import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from "@clack/prompts";
 import { Result } from "neverthrow";
-import { wrapToColumns } from "../utils/string-utils.js";
+import { stripAnsi } from "../utils/string-utils.js";
 
 export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
   const s = spinner({
@@ -17,8 +20,23 @@ export async function withSpinner<T, E>(intro: string, success: string, failure:
   return result;
 }
 
-export function noteWrapped(message: string, title?: string) {
-  const columns = (process.stdout.columns || 80) - 8; // 8 is for the padding
-  const finalMessage = wrapToColumns(message, columns).join("\n");
-  note(finalMessage, title);
-}
+export const noteWrapped = (message: string, title: string) => {
+  const output: Writable = process.stdout;
+  const columns = getColumns(output) || 80;
+  const messages = message.split("\n");
+  const messageHasOverFlow = messages.some((msg) => {
+    const clean = stripAnsi(msg);
+    return clean.length + 6 > columns;
+  });
+  if (messageHasOverFlow) {
+    const startLine = S_BAR_H.repeat(columns - title.length - 4);
+    log.step(`${title} ${pc.gray(startLine)}`);
+    log.message(message);
+    output.write(pc.gray(S_CONNECT_LEFT + S_BAR_H.repeat(columns - 1)) + "\n");
+  } else {
+    const opts: NoteOptions = {
+      format: (line) => line
+    };
+    note(message, title, opts);
+  }
+};

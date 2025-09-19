@@ -13,7 +13,6 @@ import { noteWrapped, withSpinner } from "../prompt.js";
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
 const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/advanced-portal-setup";
-const defaultSrcDirectoryPath = process.cwd();
 
 export class PortalQuickstartPrompts {
   public importSpecStep() {
@@ -119,13 +118,7 @@ export class PortalQuickstartPrompts {
     }
 
     const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
-    const directoryPath = new DirectoryPath(cleanedPath);
-
-    if (inputDirectory === "./") {
-      return new DirectoryPath(defaultSrcDirectoryPath);
-    } else {
-      return directoryPath;
-    }
+    return new DirectoryPath(cleanedPath);
   }
 
   public inputDirectoryPathDoesNotExist(inputDirectory: DirectoryPath) {
@@ -165,8 +158,8 @@ export class PortalQuickstartPrompts {
   public nextSteps(): void {
     const message = `Use the API Playground or an SDK to call your API.
 Customize the Portal theme, add API recipes and enable AI features
-${f.linkAlt(referenceDocumentationUrl)}`;
-    noteWrapped(message, "Next steps");
+${f.link(referenceDocumentationUrl)}`;
+    noteWrapped(message, "Next Steps");
   }
 
   public serviceError(serviceError: ServiceError) {

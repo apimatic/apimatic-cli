@@ -6,8 +6,6 @@ import { Language } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 
-const DEFAULT_WORKING_DIRECTORY = "./";
-
 export default class SdkGenerate extends Command {
   static readonly summary = "Generate an SDK for your API";
 
@@ -52,9 +50,8 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       flags: { language, spec, destination, force, zip: zipSdk, "auth-key": authKey }
     } = await this.parse(SdkGenerate);
 
-    const workingDirectory = new DirectoryPath(DEFAULT_WORKING_DIRECTORY);
     const specDirectory = new DirectoryPath(spec);
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
+    const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join("sdk");
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,

@@ -130,7 +130,7 @@ export class SdkQuickstartAction {
         break;
       }
 
-      // Setup source directory with spec folder
+      // Setup source directory with the spec folder
       const apimaticMetaFile = await this.prompts.downloadMetadataFile(
         this.fileDownloadService.downloadFile(metadataFileUrl)
       );
@@ -169,8 +169,7 @@ export class SdkQuickstartAction {
         this.prompts.sdkOpenedInEditor();
       }
 
-      this.prompts.nextSteps(specDirectory, language);
-
+      this.prompts.nextSteps(language, inputDirectory);
       return ActionResult.success();
     });
   };

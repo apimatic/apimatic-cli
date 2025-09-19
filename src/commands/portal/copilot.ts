@@ -18,7 +18,6 @@ export default class PortalCopilot extends Command {
       description: "marks the API Copilot as disabled in the configuration"
     }),
     ...FlagsProvider.force,
-    ...FlagsProvider.force,
     ...FlagsProvider.authKey
   };
 
@@ -39,7 +38,7 @@ export default class PortalCopilot extends Command {
     };
 
     intro("Configure API Copilot");
-    const buildDirectory = new DirectoryPath(input ?? "./", "src");
+    const buildDirectory = DirectoryPath.createInput(input).join("src");
     const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), commandMetadata, authKey);
     const result = await copilotConfigAction.execute(buildDirectory, force, !disable);
     outro(result);

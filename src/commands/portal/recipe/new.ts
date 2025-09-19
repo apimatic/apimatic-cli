@@ -7,8 +7,6 @@ import { FlagsProvider } from "../../../types/flags-provider.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../../prompts/format.js";
 
-const DEFAULT_WORKING_DIRECTORY = "./";
-
 export default class PortalRecipeNew extends Command {
   static summary = "Add an API Recipe to your API documentation portal.";
 
@@ -36,7 +34,7 @@ ${format.link(
       flags: { name, input, force }
     } = await this.parse(PortalRecipeNew);
 
-    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
 
     const commandMetadata: CommandMetadata = {

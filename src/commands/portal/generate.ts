@@ -5,8 +5,6 @@ import { FlagsProvider } from "../../types/flags-provider.js";
 import { format, intro, outro } from "../../prompts/format.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 
-const DEFAULT_WORKING_DIRECTORY = "./";
-
 export class PortalGenerate extends Command {
   static summary = "Generate an API Documentation portal";
 
@@ -35,7 +33,7 @@ export class PortalGenerate extends Command {
       flags: { input, destination, force, zip: zipPortal, "auth-key": authKey }
     } = await this.parse(PortalGenerate);
 
-    const workingDirectory = new DirectoryPath(input ?? DEFAULT_WORKING_DIRECTORY);
+    const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("portal");
     const commandMetadata: CommandMetadata = {

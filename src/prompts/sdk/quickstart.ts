@@ -9,9 +9,11 @@ import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { Directory } from "../../types/file/directory.js";
+import { Language } from "../../types/sdk/generate.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
+const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/";
 const defaultSrcDirectoryPath = process.cwd();
 
 export class SdkQuickstartPrompts {
@@ -97,17 +99,17 @@ export class SdkQuickstartPrompts {
     log.info(`Step 3 of 4: Select programming language`);
   }
 
-  public async selectLanguagePrompt(): Promise<string | undefined> {
+  public async selectLanguagePrompt(): Promise<Language | undefined> {
     const language = await select({
       message: "Choose the programming language for your SDK:",
       options: [
-        { label: "Typescript", value: "typescript" },
-        { label: "Ruby", value: "ruby" },
-        { label: "Python", value: "python" },
-        { label: "Java", value: "java" },
-        { label: "C#", value: "csharp" },
-        { label: "PHP", value: "php" },
-        { label: "Go", value: "go" }
+        { label: "Typescript", value: Language.TYPESCRIPT },
+        { label: "Ruby", value: Language.RUBY },
+        { label: "Python", value: Language.PYTHON },
+        { label: "Java", value: Language.JAVA },
+        { label: "C#", value: Language.CSHARP },
+        { label: "PHP", value: Language.PHP },
+        { label: "Go", value: Language.GO }
       ]
     });
 
@@ -138,13 +140,7 @@ export class SdkQuickstartPrompts {
     }
 
     const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
-    const directoryPath = new DirectoryPath(cleanedPath);
-
-    if (inputDirectory === "./") {
-      return new DirectoryPath(defaultSrcDirectoryPath);
-    } else {
-      return directoryPath;
-    }
+    return new DirectoryPath(cleanedPath);
   }
 
   public noInputDirectoryProvided() {
@@ -179,17 +175,17 @@ export class SdkQuickstartPrompts {
   }
 
   public sdkOpenedInEditor() {
-    log.info("Opened the SDK directory in VS Code.");
+    log.info("Opened the SDK directory in VS Code. To get started with your SDK, review the README file.");
   }
 
-  public nextSteps(specDirectory: DirectoryPath, language: string): void {
-    const message = `- Run the command '${f.cmdAlt(
-      "apimatic",
-      "sdk",
-      "generate",
-      `${f.flag("spec", specDirectory.toString())}`,
-      `${f.flag("language", language)}`
-    )}' to regenerate your SDK.`;
-    noteWrapped(message, "Next steps");
+  public nextSteps(language: Language, specDirectory: DirectoryPath): void {
+    const specDirectoryFlag = !specDirectory.isEqual(DirectoryPath.default) ? `${f.flag("spec", specDirectory.toString())} `: "";
+    const message = `Run the command
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${specDirectoryFlag}${f.flag("language", language)}'
+to regenerate your SDK.
+
+To learn more about customizing your SDK, visit:
+${f.link(sdkCustomizationUrl)}`;
+    noteWrapped(message, "Next Steps");
   }
 }

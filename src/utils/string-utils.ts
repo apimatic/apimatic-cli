@@ -10,20 +10,31 @@ export const removeQuotes = (input: string): string => {
 };
 
 
-export function wrapToColumns(input: string, maxWidth: number): string[] {
-  const inputRows = input.split('\n');
-  return inputRows.flatMap((textLine: string): string[] => {
-    if (textLine.length <= maxWidth) {
-      return [textLine];
+
+export function stripAnsi(str: string) {
+  let result = '';
+  let i = 0;
+
+  while (i < str.length) {
+    const char = str[i];
+    // Detect ESC (0x1B)
+    if (char === '\x1B' && str[i + 1] === '[') {
+      // We’re at the start of an ANSI sequence. Skip until 'm' or end.
+      i += 2; // skip ESC[
+      while (i < str.length && str[i] !== 'm') {
+        i++;
+      }
+      // Skip the 'm' itself
+      i++;
+    } else if (char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) {
+      // Skip other control chars (optional)
+      i++;
+    } else {
+      // Normal printable char — keep it
+      result += char;
+      i++;
     }
-    // Find last space before width limit for natural word breaking
-    let breakPosition: number = textLine.substring(0, maxWidth + 1).lastIndexOf(" ");
-    // If no space found, force break at width limit
-    if (breakPosition === -1) {
-      breakPosition = maxWidth;
-    }
-    const wrappedLine: string = textLine.substring(0, breakPosition);
-    const remainingText: string = textLine.substring(breakPosition + 1);
-    return [wrappedLine, ...wrapToColumns(remainingText, maxWidth)];
-  });
+  }
+  return result;
 }
+
