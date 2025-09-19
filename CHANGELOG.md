@@ -1,3 +1,10 @@
+# [1.1.0-beta.2](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.1...v1.1.0-beta.2) (2025-09-19)
+
+
+### Bug Fixes
+
+* **readme:** remove portal quickstart references ([#212](https://github.com/apimatic/apimatic-cli/issues/212)) ([0840e19](https://github.com/apimatic/apimatic-cli/commit/0840e19c502d2b493c5d14ac0ffb16fc5a65ce28))
+
 # [1.1.0-beta.1](https://github.com/apimatic/apimatic-cli/compare/v1.0.0-beta.1...v1.1.0-beta.1) (2025-09-19)
 
 
