@@ -109,8 +109,8 @@ export class CopilotAction {
         "\n" +
         "Ask me anything about this API or try one of these example prompts:\n" +
         "\n" +
-        "`- What authentication methods does this API support?`\n" +
-        "`- [Enter another prompt here]`";
+        "- `What authentication methods does this API support?`\n" +
+        "- `[Enter another prompt here]`";
       await this.fileService.writeContents(tempFile, defaultContent);
       this.prompts.openWelcomeMessageEditor();
       await this.launcherService.openInEditor(tempFile);

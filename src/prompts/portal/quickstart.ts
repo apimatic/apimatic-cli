@@ -78,7 +78,7 @@ export class PortalQuickstartPrompts {
   public async selectLanguagesPrompt(): Promise<string[] | undefined> {
     const languages = (await multiselect({
       message:
-        "Your API Portal will contain SDKs and SDK Documentation in the following Languages. Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
+        "Your API Portal will contain SDKs and SDK Documentation in the following Languages (HTTP is enabled by default). Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
       options: [
         { label: "Typescript", value: "typescript" },
         { label: "Ruby", value: "ruby" },
@@ -88,7 +88,8 @@ export class PortalQuickstartPrompts {
         { label: "PHP", value: "php" },
         { label: "Go", value: "go" }
       ],
-      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"]
+      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"],
+      required: false,
     })) as string[];
 
     if (isCancel(languages)) {
