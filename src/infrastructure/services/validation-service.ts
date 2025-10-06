@@ -1,11 +1,11 @@
 import fsExtra from "fs-extra";
 import {
   ApiResponse,
-  ApiValidationExternalApisController,
-  ApiValidationSummary,
+  ApiValidationV2ExternalApisController,
+  ValidateApiResult,
   ContentType,
   FileWrapper,
-  ApiError
+  ApiError,
 } from "@apimatic/sdk";
 
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -28,21 +28,21 @@ export class ValidationService {
     file,
     commandMetadata,
     authKey
-  }: ValidateViaFileParams): Promise<Result<ApiValidationSummary, string>> {
+  }: ValidateViaFileParams): Promise<Result<ValidateApiResult, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
-    const controller = new ApiValidationExternalApisController(client);
+    const controller = new ApiValidationV2ExternalApisController(client);
 
     try {
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
       //TODO: Update spec to include origin query parameter.
-      const validation: ApiResponse<ApiValidationSummary> = await controller.validateApiViaFile(
+      const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
         fileDescriptor
       );
 
-      return ok(validation.result as ApiValidationSummary);
+      return ok(validation.result as ValidateApiResult);
     } catch (error) {
       return err(await this.handleValidationErrors(error));
     }

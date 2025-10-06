@@ -44,9 +44,9 @@ export class ValidateAction {
       }
       const validationSummary = validationSummaryResult.value;
       if (displayValidationSummary) {
-        this.prompts.displayValidationMessages(validationSummary);
+        this.prompts.displayValidationMessagesV2(validationSummary);
       }
-      if (!validationSummary.success) {
+      if (!validationSummary.validation.isSuccess) {
         return ActionResult.failed();
       }
 
