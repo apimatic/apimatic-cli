@@ -46,7 +46,7 @@ export class ValidateAction {
       if (displayValidationSummary) {
         this.prompts.displayValidationMessagesV2(validationSummary);
       }
-      if (!validationSummary.validation.isSuccess) {
+      if (!validationSummary.validation.isSuccess || !validationSummary.linting.isSuccess) {
         return ActionResult.failed();
       }
 
