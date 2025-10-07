@@ -1,5 +1,5 @@
 import { stringify } from "yaml";
-import { Toc, TocGroup, TocEndpoint, TocModel, TocEndpointGroupOverview } from "../../../types/toc/toc.js";
+import { Toc, TocGroup, TocEndpoint, TocModel, TocCallbackPage, TocWebhookPage, TocEndpointGroupOverview } from "../../../types/toc/toc.js";
 
 export class TocStructureGenerator {
   createTocStructure(
@@ -7,7 +7,11 @@ export class TocStructureGenerator {
     models: TocModel[],
     expandEndpoints: boolean = false,
     expandModels: boolean = false,
-    contentGroups: TocGroup[] = []
+    contentGroups: TocGroup[] = [],
+    webhooks: Map<string, TocWebhookPage[]>,
+    callbacks: Map<string, TocCallbackPage[]>,
+    expandWebhooks: boolean = false,
+    expandCallbacks: boolean = false
   ): Toc {
     const tocStructure: Toc = {
       toc: []
@@ -51,6 +55,55 @@ export class TocStructureGenerator {
         }))
       });
     }
+
+    // Add Events section
+    const eventsItems: any[] = [];
+
+    if (!expandCallbacks || callbacks.size === 0) {
+      eventsItems.push({
+        generate: null,
+        from: "callbacks"
+      });
+    } else if (callbacks.size === 1) {
+      eventsItems.push({
+        group: Array.from(callbacks.keys())[0],
+        items: Array.from(callbacks.values())[0]
+      });
+    } else {
+      eventsItems.push({
+        group: "Callbacks",
+        items: Array.from(callbacks).map(([groupName, eventList]) => ({
+          group: groupName,
+          items: eventList
+        }))
+      });
+    }
+
+    if (!expandWebhooks || webhooks.size === 0) {
+      eventsItems.push({
+        generate: null,
+        from: "webhooks"
+      });
+    } else if (webhooks.size === 1) {
+      eventsItems.push({
+        group: Array.from(webhooks.keys())[0],
+        items: Array.from(webhooks.values())[0]
+      });
+    } else {
+      eventsItems.push({
+        group: "Webhooks",
+        items: Array.from(webhooks).map(([groupName, eventList]) => ({
+          group: groupName,
+          items: eventList
+        }))
+      });
+    }
+
+    tocStructure.toc.push({
+      group: "Events",
+      items: eventsItems
+    });
+
 
     // Add Models section
     if (!expandModels || models.length === 0) {

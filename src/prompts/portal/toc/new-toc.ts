@@ -42,11 +42,12 @@ export class PortalNewTocPrompts {
     log.error(message);
   }
 
-  public extractEndpointGroupsAndModels(fn: Promise<Result<Sdl, ServiceError>>) {
+  public extractComponents(fn: Promise<Result<Sdl, ServiceError>>, componentNames: string[]) {
+    const components = `${componentNames.join(" and ")}`;
     return withSpinner(
-      "Extracting endpoint groups and models",
-      "Endpoint groups and models extracted",
-      "Endpoint groups and models extraction failed",
+      `Extracting ${components}`,
+      `${components} extracted`,
+      `${components} extraction failed`,
       fn
     );
   }
