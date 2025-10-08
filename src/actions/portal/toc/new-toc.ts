@@ -1,14 +1,14 @@
 import { ok } from "neverthrow";
 import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc.js";
 import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator.js";
-import { TocEndpoint, TocGroup, TocModel, TocWebhookPage, TocCallbackPage } from "../../../types/toc/toc.js";
+import { TocGroup } from "../../../types/toc/toc.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { CommandMetadata } from "../../../types/common/command-metadata.js";
 import { ActionResult } from "../../action-result.js";
 import { TocContext } from "../../../types/toc-context.js";
 import { FileService } from "../../../infrastructure/file-service.js";
 import { BuildContext } from "../../../types/build-context.js";
-import { getSdlTocComponents } from "../../../types/sdl/sdl.js";
+import { getSdlTocComponents, SdlTocComponents } from "../../../types/sdl/sdl.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
 import { TempContext } from "../../../types/temp-context.js";
 import { PortalService } from "../../../infrastructure/services/portal-service.js";
@@ -27,13 +27,6 @@ export class ContentContext {
     return await directory.parseContentFolder(this.contentDirectory);
   }
 }
-
-export type SdlComponents = {
-  endpointGroups: Map<string, TocEndpoint[]>;
-  models: TocModel[];
-  webhookGroups: Map<string, TocWebhookPage[]>;
-  callbackGroups: Map<string, TocCallbackPage[]>;
-};
 
 export class PortalNewTocAction {
   private readonly prompts: PortalNewTocPrompts = new PortalNewTocPrompts();
@@ -69,14 +62,15 @@ export class PortalNewTocAction {
       return ActionResult.cancelled();
     }
 
-    const sdlComponents = await this.getSdlComponents(
+    const sdlTocComponents = await this.tryExtractingSdlTocComponents(
       buildDirectory,
       expandEndpoints,
       expandModels,
       expandWebhooks,
       expandCallbacks
     );
-    if (sdlComponents === null) {
+
+    if (!sdlTocComponents) {
       return ActionResult.failed();
     }
 
@@ -91,7 +85,7 @@ export class PortalNewTocAction {
       contentGroups = await contentContext.extractContentGroups();
     }
 
-    const toc = this.tocGenerator.createTocStructure(sdlComponents, contentGroups);
+    const toc = this.tocGenerator.createTocStructure(sdlTocComponents, contentGroups);
     const yamlString = this.tocGenerator.transformToYaml(toc);
     const tocFilePath = await tocContext.save(yamlString);
 
@@ -100,14 +94,14 @@ export class PortalNewTocAction {
     return ActionResult.success();
   }
 
-  private async getSdlComponents(
+  private async tryExtractingSdlTocComponents(
     buildDirectory: DirectoryPath,
     expandEndpoints: boolean,
     expandModels: boolean,
     expandWebhooks: boolean,
     expandCallbacks: boolean
-  ): Promise<SdlComponents | null> {
-    let sdlComponents: SdlComponents = {
+  ): Promise<SdlTocComponents | false> {
+    let sdlComponents: SdlTocComponents = {
       endpointGroups: new Map(),
       models: [],
       webhookGroups: new Map(),
@@ -146,7 +140,7 @@ export class PortalNewTocAction {
 
     if (sdlResult.isErr()) {
       this.prompts.logError(sdlResult.error);
-      return null;
+      return false;
     }
 
     return sdlResult.value;
