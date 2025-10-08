@@ -11,21 +11,26 @@ export type SdlTocComponents = {
 export interface Sdl {
   readonly Endpoints: SdlEndpoint[];
   readonly CustomTypes: SdlModel[];
-  readonly Webhooks: SdlEvent[];
+  readonly Webhooks: SdlWebhook[];
 }
 
 export interface SdlEndpoint {
   readonly Name: string;
   readonly Description: string;
   readonly Group: string;
-  readonly Callbacks?: { Id: string, CallbackGroupName: string }[];
+  readonly Callbacks: SdlCallback[];
 }
 
 export interface SdlModel {
   readonly Name: string;
 }
 
-export interface SdlEvent {
+export interface SdlCallback {
+  readonly Id: string;
+  readonly CallbackGroupName?: string;
+}
+
+export interface SdlWebhook {
   readonly Id: string;
   readonly WebhookGroupName?: string;
 }
@@ -59,14 +64,13 @@ function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
   }
 
   let webhookGroups = new Map<string, TocWebhookPage[]>();
-  const ungrouped: TocWebhookPage[] = [];
+  const ungrouped: TocWebhook[] = [];
 
   for (const webhook of sdl.Webhooks) {
     const event = createTocWebhook(webhook);
-    const groupKey = webhook.WebhookGroupName ? toTitleCase(webhook.WebhookGroupName) : null;
 
-    if (groupKey) {
-      addToWebhookGroup(webhookGroups, groupKey, webhook.WebhookGroupName ?? null, event);
+    if (webhook.WebhookGroupName) {
+      addToWebhookGroup(webhookGroups, webhook.WebhookGroupName, event);
     } else {
       ungrouped.push(event);
     }
@@ -78,18 +82,8 @@ function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
 
   if (ungrouped.length > 0) {
     const uniqueGroupName = getUniqueGroupName("Webhooks", webhookGroups);
-    const uniqueGroupNameFormatted = toTitleCase(uniqueGroupName);
-
-    webhookGroups.set(uniqueGroupNameFormatted, [
-      {
-        generate: null,
-        from: "webhook-group-overview",
-        webhookGroup: uniqueGroupName
-      }
-    ]);
-    for (const ungroupedEvent of ungrouped) {
-      ungroupedEvent.webhookGroup = uniqueGroupName;
-      webhookGroups.get(uniqueGroupNameFormatted)?.push(ungroupedEvent);
+    for (const event of ungrouped) {
+      addToWebhookGroup(webhookGroups, uniqueGroupName, event);
     }
   }
 
@@ -98,12 +92,12 @@ function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
 
 function addToWebhookGroup(
   webhookGroups: Map<string, TocWebhookPage[]>,
-  groupKey: string,
-  groupName: string | null,
+  groupName: string,
   event: TocWebhook
 ): void {
-  if (!webhookGroups.has(groupKey)) {
-    webhookGroups.set(groupKey, [
+  const groupTitle = toTitleCase(groupName);
+  if (!webhookGroups.has(groupTitle)) {
+    webhookGroups.set(groupTitle, [
       {
         generate: null,
         from: "webhook-group-overview",
@@ -111,10 +105,10 @@ function addToWebhookGroup(
       }
     ]);
   }
-  webhookGroups.get(groupKey)?.push(event);
+  webhookGroups.get(groupTitle)!.push(event);
 }
 
-function createTocWebhook(webhook: { Id: string; WebhookGroupName?: string }): TocWebhook {
+function createTocWebhook(webhook: SdlWebhook): TocWebhook {
   return {
     generate: null,
     from: "webhook",
@@ -131,21 +125,14 @@ function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]> {
   let callbackGroups = new Map<string, TocCallbackPage[]>();
   const ungrouped: TocCallbackPage[] = [];
 
-  for (const endpoint of sdl.Endpoints) {
-    if (!endpoint.Callbacks || endpoint.Callbacks.length === 0) {
-      continue;
-    }
+  for (const callback of sdl.Endpoints.flatMap(e => e.Callbacks)) {
+    const event = createTocCallback(callback);
+    const groupKey = callback.CallbackGroupName ? toTitleCase(callback.CallbackGroupName) : null;
 
-    for (const callback of endpoint.Callbacks) {
-      const event = createTocCallback(callback);
-
-      const groupKey = callback.CallbackGroupName ? toTitleCase(callback.CallbackGroupName) : null;
-
-      if (groupKey) {
-        addToCallbackGroup(callbackGroups, groupKey, callback.CallbackGroupName ?? null, event);
-      } else {
-        ungrouped.push(event);
-      }
+    if (groupKey) {
+      addToCallbackGroup(callbackGroups, groupKey, callback.CallbackGroupName ?? null, event);
+    } else {
+      ungrouped.push(event);
     }
   }
 
@@ -200,7 +187,7 @@ function addToCallbackGroup(
   callbackGroups.get(groupKey)?.push(event);
 }
 
-function createTocCallback(callback: { Id: string, CallbackGroupName: string }): TocCallback {
+function createTocCallback(callback: SdlCallback): TocCallback {
   return {
     generate: null,
     from: "callback",
@@ -251,7 +238,8 @@ export function getEndpointGroupsFromSdl(sdl: Sdl): Map<string, SdlEndpoint[]> {
     endpointGroups.get(endpoint.Group)!.push({
       Name: endpoint.Name,
       Description: endpoint.Description,
-      Group: endpoint.Group
+      Group: endpoint.Group,
+      Callbacks: endpoint.Callbacks
     });
   }
   return endpointGroups;
