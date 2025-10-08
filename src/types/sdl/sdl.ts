@@ -1,7 +1,12 @@
-import { TocEndpoint, TocModel, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage } from "../toc/toc.js";
+import { TocEndpoint, TocModelPage, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage } from "../toc/toc.js";
 import { toTitleCase, getUniqueGroupName } from "../../utils/utils.js";
-export type EndpointGroup = Map<string, TocEndpoint[]>;
-export type SdlTocComponents = { endpointGroups: EndpointGroup; models: TocModel[]; webhookGroups: Map<string, TocWebhookPage[]>; callbackGroups: Map<string, TocCallbackPage[]>; };
+
+export type SdlTocComponents = {
+  endpointGroups: Map<string, TocEndpoint[]>;
+  models: TocModelPage[];
+  webhookGroups: Map<string, TocWebhookPage[]>;
+  callbackGroups: Map<string, TocCallbackPage[]>;
+};
 
 export interface Sdl {
   readonly Endpoints: SdlEndpoint[];
@@ -194,9 +199,9 @@ function createTocCallback(callback: { Id: string, CallbackGroupName: string }):
   };
 }
 
-function extractModelsForToc(sdl: Sdl): TocModel[] {
+function extractModelsForToc(sdl: Sdl): TocModelPage[] {
   return sdl.CustomTypes.map(
-    (e: SdlModel): TocModel => ({
+    (e: SdlModel): TocModelPage => ({
       generate: null,
       from: "model",
       modelName: e.Name

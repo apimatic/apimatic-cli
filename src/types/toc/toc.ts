@@ -4,13 +4,17 @@ export interface Toc {
 
 export interface TocGroup {
   readonly group: string,
-  readonly items: Array<TocGroup | TocGenerated | TocEndpoint | TocEndpointGroupOverview | TocModel | TocWebhookPage | TocCallbackPage | TocCustomPage>
+  readonly items: Array<TocGroup | TocGenerated | TocEndpointPage | TocWebhookPage | TocCallbackPage | TocModelPage | TocCustomPage>
 }
 
 export interface TocGenerated {
   readonly generate: string;
   readonly from: string;
 }
+
+export type TocEndpointPage = TocEndpoint | TocEndpointGroupOverview;
+export type TocWebhookPage = TocWebhook | TocWebhookOverview;
+export type TocCallbackPage = TocCallback | TocCallbackOverview;
 
 export interface TocEndpointGroupOverview {
   readonly generate: null;
@@ -25,14 +29,11 @@ export interface TocEndpoint {
   readonly endpointGroup: string;
 }
 
-export interface TocModel {
+export interface TocModelPage {
   readonly generate: null;
   readonly from: "model";
   readonly modelName: string;
 }
-
-export type TocWebhookPage = TocWebhook | TocWebhookOverview;
-export type TocCallbackPage = TocCallback | TocCallbackOverview;
 
 export interface TocWebhookOverview {
   readonly generate: null;

@@ -1,121 +1,36 @@
 import { stringify } from "yaml";
-import { Toc, TocGroup, TocEndpointGroupOverview } from "../../../types/toc/toc.js";
-import { SdlComponents } from "../../../actions/portal/toc/new-toc.js";
+import { Toc, TocGroup, TocEndpointGroupOverview, TocModelPage, TocGenerated, TocCallbackPage, TocWebhookPage, TocEndpoint } from "../../../types/toc/toc.js";
+import { SdlTocComponents } from "../../../types/sdl/sdl.js";
 
 export class TocStructureGenerator {
-  createTocStructure(sdlComponents: SdlComponents, contentGroups: TocGroup[] = []): Toc {
-    const tocStructure: Toc = {
-      toc: []
-    };
-
-    // Add Getting Started section
-    tocStructure.toc.push({
-      group: "Getting Started",
-      items: [
+  createTocStructure(sdlTocComponents: SdlTocComponents, contentGroups: TocGroup[] = []): Toc {
+    return {
+      toc: [
         {
-          generate: "How to Get Started",
-          from: "getting-started"
-        }
-      ]
-    });
-
-    // Add content groups
-    if (contentGroups.length > 0) {
-      tocStructure.toc.push(...contentGroups);
-    }
-
-    // Add API Endpoints section
-    if (sdlComponents.endpointGroups.size === 0) {
-      tocStructure.toc.push({
-        generate: "API Endpoints",
-        from: "endpoints"
-      });
-    } else {
-      tocStructure.toc.push({
-        group: "API Endpoints",
-        items: Array.from(sdlComponents.endpointGroups).map(([groupName, endpoints]) => ({
-          group: groupName,
+          group: "Getting Started",
           items: [
             {
-              generate: null,
-              from: "endpoint-group-overview",
-              endpointGroup: groupName
-            } as TocEndpointGroupOverview,
-            ...endpoints
+              generate: "How to Get Started",
+              from: "getting-started"
+            }
           ]
-        }))
-      });
-    }
-
-    // Add Events section
-    const eventsItems: any[] = [];
-
-    if (sdlComponents.callbackGroups.size === 0) {
-      eventsItems.push({
-        generate: null,
-        from: "callbacks"
-      });
-    } else if (sdlComponents.callbackGroups.size === 1) {
-      eventsItems.push({
-        group: Array.from(sdlComponents.callbackGroups.keys())[0],
-        items: Array.from(sdlComponents.callbackGroups.values())[0]
-      });
-    } else {
-      eventsItems.push({
-        group: "Callbacks",
-        items: Array.from(sdlComponents.callbackGroups).map(([groupName, eventList]) => ({
-          group: groupName,
-          items: eventList
-        }))
-      });
-    }
-
-    if (sdlComponents.webhookGroups.size === 0) {
-      eventsItems.push({
-        generate: null,
-        from: "webhooks"
-      });
-    } else if (sdlComponents.webhookGroups.size === 1) {
-      eventsItems.push({
-        group: Array.from(sdlComponents.webhookGroups.keys())[0],
-        items: Array.from(sdlComponents.webhookGroups.values())[0]
-      });
-    } else {
-      eventsItems.push({
-        group: "Webhooks",
-        items: Array.from(sdlComponents.webhookGroups).map(([groupName, eventList]) => ({
-          group: groupName,
-          items: eventList
-        }))
-      });
-    }
-
-    tocStructure.toc.push({
-      group: "Events",
-      items: eventsItems
-    });
-
-
-    // Add Models section
-    if (sdlComponents.models.length === 0) {
-      tocStructure.toc.push({
-        generate: "Models",
-        from: "models"
-      });
-    } else {
-      tocStructure.toc.push({
-        group: "Models",
-        items: sdlComponents.models
-      });
-    }
-
-    //Add Sdk Infra section
-    tocStructure.toc.push({
-      generate: "SDK Infrastructure",
-      from: "sdk-infra"
-    });
-
-    return tocStructure;
+        },
+        ...contentGroups,
+        this.getEndpointsSection(sdlTocComponents.endpointGroups),
+        {
+          group: "Events",
+          items: [
+            this.getCallbacksSection(sdlTocComponents.callbackGroups),
+            this.getWebhooksSection(sdlTocComponents.webhookGroups)
+          ]
+        },
+        this.getModelsSection(sdlTocComponents.models),
+        {
+          generate: "SDK Infrastructure",
+          from: "sdk-infra"
+        }
+      ]
+    };
   }
 
   transformToYaml(toc: Toc): string {
@@ -124,6 +39,86 @@ export class TocStructureGenerator {
       indent: 2,
       nullStr: ""
     });
+  }
+
+  private getEndpointsSection(endpointGroups: Map<string, TocEndpoint[]>): TocGroup | TocGenerated {
+    if (endpointGroups.size === 0) {
+      return {
+        generate: "API Endpoints",
+        from: "endpoints"
+      };
+    }
+    return {
+      group: "API Endpoints",
+      items: Array.from(endpointGroups).map(([groupName, endpoints]) => ({
+        group: groupName,
+        items: [
+          {
+            generate: null,
+            from: "endpoint-group-overview",
+            endpointGroup: groupName
+          } as TocEndpointGroupOverview,
+          ...endpoints
+        ]
+      }))
+    };
+  }
+
+  private getCallbacksSection(callbackGroups: Map<string, TocCallbackPage[]>): TocGroup | TocGenerated {
+    if (callbackGroups.size === 0) {
+      return {
+        generate: "",
+        from: "callbacks"
+      };
+    }
+    if (callbackGroups.size === 1) {
+      return {
+        group: Array.from(callbackGroups.keys())[0],
+        items: Array.from(callbackGroups.values())[0]
+      };
+    }
+    return {
+      group: "Callbacks",
+      items: Array.from(callbackGroups).map(([groupName, eventList]) => ({
+        group: groupName,
+        items: eventList
+      }))
+    };
+  }
+
+  private getWebhooksSection(webhookGroups: Map<string, TocWebhookPage[]>): TocGroup | TocGenerated {
+    if (webhookGroups.size === 0) {
+      return {
+        generate: "Webhooks",
+        from: "webhooks"
+      };
+    }
+    if (webhookGroups.size === 1) {
+      return {
+        group: Array.from(webhookGroups.keys())[0],
+        items: Array.from(webhookGroups.values())[0]
+      };
+    } 
+    return {
+      group: "Webhooks",
+      items: Array.from(webhookGroups).map(([groupName, eventList]) => ({
+        group: groupName,
+        items: eventList
+      }))
+    };
+  }
+
+  private getModelsSection(models: TocModelPage[]): TocGroup | TocGenerated {
+    if (models.length === 0) {
+      return {
+        generate: "Models",
+        from: "models"
+      };
+    }
+    return {
+      group: "Models",
+      items: models
+    };
   }
 
   private transformKeys(obj: any): any {
