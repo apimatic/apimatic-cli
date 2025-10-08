@@ -97,6 +97,8 @@ export class PortalQuickstartAction {
           specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
         }
       }
+      // add a step which calls the pruning endpoint from apimatic io and passes the unallowed features and spec stream and 
+      // get back the pruned spec stream and use that for further steps.
 
       // Step 3/4
       this.prompts.selectLanguagesStep();

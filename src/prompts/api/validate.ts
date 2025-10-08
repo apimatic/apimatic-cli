@@ -7,9 +7,10 @@ import { ServiceError } from "../../infrastructure/service-error.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { format as f } from "../format.js";
 import { withSpinner } from "../prompt.js";
+import { ValidateApiResponse } from "../../infrastructure/services/validation-service.js";
 
 export class ApiValidatePrompts {
-  public async validateApi(fn: Promise<Result<ValidateApiResult, string>>) {
+  public async validateApi(fn: Promise<Result<ValidateApiResponse, string>>) {
     return withSpinner("Validating API", "API validation completed", "API validation failed", fn);
   }
 

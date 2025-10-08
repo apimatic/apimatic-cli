@@ -5,7 +5,7 @@ import {
   ValidateApiResult,
   ContentType,
   FileWrapper,
-  ApiError,
+  ApiError
 } from "@apimatic/sdk";
 
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -21,6 +21,11 @@ export interface ValidateViaFileParams {
   authKey?: string | null;
 }
 
+export interface ValidateApiResponse {
+  result: ValidateApiResult;
+  unallowedFeatures: unknown[] | null;
+}
+
 export class ValidationService {
   constructor(private readonly configDir: DirectoryPath) {}
 
@@ -28,7 +33,7 @@ export class ValidationService {
     file,
     commandMetadata,
     authKey
-  }: ValidateViaFileParams): Promise<Result<ValidateApiResult, string>> {
+  }: ValidateViaFileParams): Promise<Result<ValidateApiResponse, string>> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
@@ -37,12 +42,24 @@ export class ValidationService {
     try {
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
       //TODO: Update spec to include origin query parameter.
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
       const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
         fileDescriptor
       );
 
-      return ok(validation.result as ValidateApiResult);
+      const headerValue = validation.headers?.["x-unallowed-features"];
+      let unallowedFeatures: unknown[] | null = null;
+
+      if (headerValue) {
+        const decodedJson = Buffer.from(headerValue, "base64").toString("utf8");
+        unallowedFeatures = JSON.parse(decodedJson);
+      }
+
+      return ok({
+        result: validation.result as ValidateApiResult,
+        unallowedFeatures
+      });
     } catch (error) {
       return err(await this.handleValidationErrors(error));
     }
