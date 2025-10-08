@@ -153,23 +153,33 @@ function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]> {
     [...callbackGroups].sort((a, b) => a[0].localeCompare(b[0]))
   );
 
-  if (ungrouped.length > 0) {
-    const uniqueGroupName = getUniqueGroupName("Callbacks", callbackGroups);
-    const uniqueGroupNameFormatted = toTitleCase(uniqueGroupName);
-
-    callbackGroups.set(uniqueGroupNameFormatted, [
-      {
-        generate: null,
-        from: "callback-group-overview",
-        callbackGroup: uniqueGroupName
-      }
-    ]);
-    for (const ungroupedEvent of ungrouped) {
-      ungroupedEvent.callbackGroup = uniqueGroupName;
-      callbackGroups.get(uniqueGroupNameFormatted)?.push(ungroupedEvent);
-    }
-  }
+  addUngroupedCallbacks(callbackGroups, ungrouped);
   return callbackGroups;
+}
+
+function addUngroupedCallbacks(
+  callbackGroups: Map<string, TocCallbackPage[]>,
+  ungrouped: TocCallbackPage[]
+): void {
+  if (ungrouped.length === 0) {
+    return;
+  }
+
+  const uniqueGroupName = getUniqueGroupName("Callbacks", callbackGroups);
+  const uniqueGroupNameFormatted = toTitleCase(uniqueGroupName);
+
+  callbackGroups.set(uniqueGroupNameFormatted, [
+    {
+      generate: null,
+      from: "callback-group-overview",
+      callbackGroup: uniqueGroupName
+    }
+  ]);
+
+  for (const ungroupedEvent of ungrouped) {
+    ungroupedEvent.callbackGroup = uniqueGroupName;
+    callbackGroups.get(uniqueGroupNameFormatted)?.push(ungroupedEvent);
+  }
 }
 
 function addToCallbackGroup(
@@ -209,11 +219,17 @@ function extractModelsForToc(sdl: Sdl): TocModelPage[] {
   );
 }
 
-export function getSdlTocComponents(sdl: Sdl): SdlTocComponents {
-  const endpointGroups = extractEndpointGroupsForToc(sdl);
-  const models = extractModelsForToc(sdl);
-  const webhookGroups = extractWebhooksForToc(sdl);
-  const callbackGroups = extractCallbacksForToc(sdl);
+export function getSdlTocComponents(
+  sdl: Sdl,
+  expandEndpoints: boolean,
+  expandModels: boolean,
+  expandWebhooks: boolean,
+  expandCallbacks: boolean
+): SdlTocComponents {
+  const endpointGroups = expandEndpoints ? extractEndpointGroupsForToc(sdl) : new Map();
+  const models = expandModels ? extractModelsForToc(sdl) : [];
+  const webhookGroups = expandWebhooks ? extractWebhooksForToc(sdl) : new Map();
+  const callbackGroups = expandCallbacks ? extractCallbacksForToc(sdl) : new Map();
   return { endpointGroups, models, webhookGroups, callbackGroups };
 }
 
