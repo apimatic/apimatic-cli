@@ -57,26 +57,11 @@ function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
   const ungrouped: TocWebhookPage[] = [];
 
   for (const webhook of sdl.Webhooks) {
-    const event: TocWebhook = {
-      generate: null,
-      from: "webhook",
-      webhookName: webhook.Id,
-      webhookGroup: webhook.WebhookGroupName ?? null
-    };
-
+    const event = createTocWebhook(webhook);
     const groupKey = webhook.WebhookGroupName ? toTitleCase(webhook.WebhookGroupName) : null;
 
     if (groupKey) {
-      if (!webhookGroups.has(groupKey)) {
-        webhookGroups.set(groupKey, [
-          {
-            generate: null,
-            from: "webhook-group-overview",
-            webhookGroup: webhook.WebhookGroupName ?? null
-          }
-        ]);
-      }
-      webhookGroups.get(groupKey)?.push(event);
+      addToWebhookGroup(webhookGroups, groupKey, webhook.WebhookGroupName ?? null, event);
     } else {
       ungrouped.push(event);
     }
@@ -106,6 +91,33 @@ function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
   return webhookGroups;
 }
 
+function addToWebhookGroup(
+  webhookGroups: Map<string, TocWebhookPage[]>,
+  groupKey: string,
+  groupName: string | null,
+  event: TocWebhook
+): void {
+  if (!webhookGroups.has(groupKey)) {
+    webhookGroups.set(groupKey, [
+      {
+        generate: null,
+        from: "webhook-group-overview",
+        webhookGroup: groupName
+      }
+    ]);
+  }
+  webhookGroups.get(groupKey)?.push(event);
+}
+
+function createTocWebhook(webhook: { Id: string; WebhookGroupName?: string }): TocWebhook {
+  return {
+    generate: null,
+    from: "webhook",
+    webhookName: webhook.Id,
+    webhookGroup: webhook.WebhookGroupName ?? null
+  };
+}
+
 function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]> {
   if (sdl.Endpoints.length === 0) {
     return new Map();
@@ -120,26 +132,12 @@ function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]> {
     }
 
     for (const callback of endpoint.Callbacks) {
-      const event: TocCallback = {
-        generate: null,
-        from: "callback",
-        callbackName: callback.Id,
-        callbackGroup: callback.CallbackGroupName ?? null
-      };
+      const event = createTocCallback(callback);
 
       const groupKey = callback.CallbackGroupName ? toTitleCase(callback.CallbackGroupName) : null;
 
       if (groupKey) {
-        if (!callbackGroups.has(groupKey)) {
-          callbackGroups.set(groupKey, [
-            {
-              generate: null,
-              from: "callback-group-overview",
-              callbackGroup: callback.CallbackGroupName ?? null
-            }
-          ]);
-        }
-        callbackGroups.get(groupKey)?.push(event);
+        addToCallbackGroup(callbackGroups, groupKey, callback.CallbackGroupName ?? null, event);
       } else {
         ungrouped.push(event);
       }
@@ -167,6 +165,33 @@ function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]> {
     }
   }
   return callbackGroups;
+}
+
+function addToCallbackGroup(
+  callbackGroups: Map<string, TocCallbackPage[]>,
+  groupKey: string,
+  groupName: string | null,
+  event: TocCallback
+): void {
+  if (!callbackGroups.has(groupKey)) {
+    callbackGroups.set(groupKey, [
+      {
+        generate: null,
+        from: "callback-group-overview",
+        callbackGroup: groupName
+      }
+    ]);
+  }
+  callbackGroups.get(groupKey)?.push(event);
+}
+
+function createTocCallback(callback: { Id: string, CallbackGroupName: string }): TocCallback {
+  return {
+    generate: null,
+    from: "callback",
+    callbackName: callback.Id,
+    callbackGroup: callback.CallbackGroupName ?? null
+  };
 }
 
 function extractModelsForToc(sdl: Sdl): TocModel[] {
