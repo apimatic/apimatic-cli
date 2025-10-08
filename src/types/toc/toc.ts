@@ -8,7 +8,7 @@ export interface TocGroup {
 }
 
 export interface TocGenerated {
-  readonly generate: string;
+  readonly generate: string | null;
   readonly from: string;
 }
 

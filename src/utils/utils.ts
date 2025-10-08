@@ -26,20 +26,9 @@ export const toPascalCase = (str: string): string => {
     .join("");
 };
 
-export function getUniqueGroupName(baseName: string, existingGroups: Map<string, unknown>): string {
-  let counter = 1;
-  let name = baseName;
-
-  while (existingGroups.has(toTitleCase(name))) {
-    name = `${baseName}${counter}`;
-    counter++;
-  }
-
-  return name;
-}
-
 export function toTitleCase(str: string): string {
-  if (!str) return '';
+  if (str === '') return '';
+
   let current = '';
   let shouldCapitalizeNext = false;
 
@@ -62,7 +51,7 @@ export function toTitleCase(str: string): string {
   }
 
   current = current.charAt(0).toUpperCase() + current.slice(1);
-  return current.trim();
+  return current.trimStart();
 }
 
 function isLowercase(char: string): boolean {

@@ -67,7 +67,7 @@ export class TocStructureGenerator {
   private getCallbacksSection(callbackGroups: Map<string, TocCallbackPage[]>): TocGroup | TocGenerated {
     if (callbackGroups.size === 0) {
       return {
-        generate: "",
+        generate: null,
         from: "callbacks"
       };
     }
@@ -89,7 +89,7 @@ export class TocStructureGenerator {
   private getWebhooksSection(webhookGroups: Map<string, TocWebhookPage[]>): TocGroup | TocGenerated {
     if (webhookGroups.size === 0) {
       return {
-        generate: "Webhooks",
+        generate: null,
         from: "webhooks"
       };
     }

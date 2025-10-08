@@ -1,5 +1,5 @@
 import { TocEndpoint, TocModelPage, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage } from "../toc/toc.js";
-import { toTitleCase, getUniqueGroupName } from "../../utils/utils.js";
+import { toTitleCase } from "../../utils/utils.js";
 
 export type SdlTocComponents = {
   endpointGroups: Map<string, TocEndpoint[]>;
@@ -69,6 +69,7 @@ function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
   for (const webhook of sdl.Webhooks) {
     const event = createTocWebhook(webhook);
 
+    // separate grouped and ungrouped webhooks
     if (webhook.WebhookGroupName) {
       addToWebhookGroup(webhookGroups, webhook.WebhookGroupName, event);
     } else {
@@ -76,10 +77,12 @@ function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
     }
   }
 
+  // sort groups before adding ungrouped webhooks
   webhookGroups = new Map(
     [...webhookGroups].sort((a, b) => a[0].localeCompare(b[0]))
   );
 
+  // add ungrouped webhooks to a unique group
   if (ungrouped.length > 0) {
     const uniqueGroupName = getUniqueGroupName("Webhooks", webhookGroups);
     for (const event of ungrouped) {
@@ -123,60 +126,43 @@ function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]> {
   }
 
   let callbackGroups = new Map<string, TocCallbackPage[]>();
-  const ungrouped: TocCallbackPage[] = [];
+  const ungrouped: TocCallback[] = [];
 
   for (const callback of sdl.Endpoints.flatMap(e => e.Callbacks)) {
     const event = createTocCallback(callback);
-    const groupKey = callback.CallbackGroupName ? toTitleCase(callback.CallbackGroupName) : null;
 
-    if (groupKey) {
-      addToCallbackGroup(callbackGroups, groupKey, callback.CallbackGroupName ?? null, event);
+    // separate grouped and ungrouped callbacks
+    if (callback.CallbackGroupName) {
+      addToCallbackGroup(callbackGroups, callback.CallbackGroupName, event);
     } else {
       ungrouped.push(event);
     }
   }
 
+  // sort groups before adding ungrouped callbacks
   callbackGroups = new Map(
     [...callbackGroups].sort((a, b) => a[0].localeCompare(b[0]))
   );
 
-  addUngroupedCallbacks(callbackGroups, ungrouped);
-  return callbackGroups;
-}
-
-function addUngroupedCallbacks(
-  callbackGroups: Map<string, TocCallbackPage[]>,
-  ungrouped: TocCallbackPage[]
-): void {
-  if (ungrouped.length === 0) {
-    return;
-  }
-
-  const uniqueGroupName = getUniqueGroupName("Callbacks", callbackGroups);
-  const uniqueGroupNameFormatted = toTitleCase(uniqueGroupName);
-
-  callbackGroups.set(uniqueGroupNameFormatted, [
-    {
-      generate: null,
-      from: "callback-group-overview",
-      callbackGroup: uniqueGroupName
+  // add ungrouped callbacks to a unique group
+  if (ungrouped.length > 0) {
+    const uniqueGroupName = getUniqueGroupName("Callbacks", callbackGroups);
+    for (const event of ungrouped) {
+      addToCallbackGroup(callbackGroups, uniqueGroupName, event);
     }
-  ]);
-
-  for (const ungroupedEvent of ungrouped) {
-    ungroupedEvent.callbackGroup = uniqueGroupName;
-    callbackGroups.get(uniqueGroupNameFormatted)?.push(ungroupedEvent);
   }
+
+  return callbackGroups;
 }
 
 function addToCallbackGroup(
   callbackGroups: Map<string, TocCallbackPage[]>,
-  groupKey: string,
-  groupName: string | null,
+  groupName: string,
   event: TocCallback
 ): void {
-  if (!callbackGroups.has(groupKey)) {
-    callbackGroups.set(groupKey, [
+  const groupTitle = toTitleCase(groupName);
+  if (!callbackGroups.has(groupTitle)) {
+    callbackGroups.set(groupTitle, [
       {
         generate: null,
         from: "callback-group-overview",
@@ -184,7 +170,7 @@ function addToCallbackGroup(
       }
     ]);
   }
-  callbackGroups.get(groupKey)?.push(event);
+  callbackGroups.get(groupTitle)!.push(event);
 }
 
 function createTocCallback(callback: SdlCallback): TocCallback {
@@ -243,4 +229,16 @@ export function getEndpointGroupsFromSdl(sdl: Sdl): Map<string, SdlEndpoint[]> {
     });
   }
   return endpointGroups;
+}
+
+export function getUniqueGroupName(baseName: string, existingGroups: Map<string, unknown>): string {
+  let counter = 1;
+  let name = baseName;
+
+  while (existingGroups.has(toTitleCase(name))) {
+    name = `${baseName}${counter}`;
+    counter++;
+  }
+
+  return name;
 }
