@@ -44,7 +44,6 @@ export function toTitleCase(str: string): string {
   let shouldCapitalizeNext = false;
 
   for (const char of str) {
-
     if (isLowercase(char)) {
       if (shouldCapitalizeNext) {
         current += ' ' + char.toUpperCase();
