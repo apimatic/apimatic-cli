@@ -98,7 +98,7 @@ export class TocStructureGenerator {
         group: Array.from(webhookGroups.keys())[0],
         items: Array.from(webhookGroups.values())[0]
       };
-    } 
+    }
     return {
       group: "Webhooks",
       items: Array.from(webhookGroups).map(([groupName, eventList]) => ({
