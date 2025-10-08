@@ -50,12 +50,12 @@ export class PortalNewTocPrompts {
     expandCallbacks: boolean
   ): Promise<Result<Sdl, ServiceError>> {
     const components = [
-        expandEndpoints && "Endpoints groups",
-        expandModels && "Models",
-        expandWebhooks && "Webhooks",
-        expandCallbacks && "Callbacks"
-      ].filter(Boolean).join(" and ");
-      
+      expandEndpoints && "Endpoint groups",
+      expandModels && "Models",
+      expandWebhooks && "Webhooks",
+      expandCallbacks && "Callbacks"
+    ].filter(Boolean).join(" and ");
+
     return withSpinner(
       `Extracting ${components}`,
       `${components} extracted`,

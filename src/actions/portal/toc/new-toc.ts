@@ -135,7 +135,7 @@ export class PortalNewTocAction {
         this.prompts.fallingBackToDefault();
         return ok(sdlComponents);
       }
-      return ok(getSdlTocComponents(result.value));
+      return ok(getSdlTocComponents(result.value, expandEndpoints, expandModels, expandWebhooks, expandCallbacks));
     });
 
     if (sdlResult.isErr()) {

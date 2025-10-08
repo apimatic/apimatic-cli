@@ -1,9 +1,9 @@
 import { stringify } from "yaml";
 import { Toc, TocGroup, TocEndpointGroupOverview } from "../../../types/toc/toc.js";
-import { SdlComponents } from "../../../actions/portal/toc/new-toc.js";
+import { SdlTocComponents } from "../../../types/sdl/sdl.js";
 
 export class TocStructureGenerator {
-  createTocStructure(sdlComponents: SdlComponents, contentGroups: TocGroup[] = []): Toc {
+  createTocStructure(sdlComponents: SdlTocComponents, contentGroups: TocGroup[] = []): Toc {
     const tocStructure: Toc = {
       toc: []
     };
