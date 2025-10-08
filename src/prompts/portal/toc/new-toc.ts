@@ -42,8 +42,20 @@ export class PortalNewTocPrompts {
     log.error(message);
   }
 
-  public extractComponents(fn: Promise<Result<Sdl, ServiceError>>, componentNames: string[]) {
-    const components = `${componentNames.join(" and ")}`;
+  public extractComponents(
+    fn: Promise<Result<Sdl, ServiceError>>,
+    expandEndpoints: boolean,
+    expandModels: boolean,
+    expandWebhooks: boolean,
+    expandCallbacks: boolean
+  ): Promise<Result<Sdl, ServiceError>> {
+    const components = [
+        expandEndpoints && "Endpoints groups",
+        expandModels && "Models",
+        expandWebhooks && "Webhooks",
+        expandCallbacks && "Callbacks"
+      ].filter(Boolean).join(" and ");
+      
     return withSpinner(
       `Extracting ${components}`,
       `${components} extracted`,

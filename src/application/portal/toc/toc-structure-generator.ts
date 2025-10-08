@@ -1,18 +1,9 @@
 import { stringify } from "yaml";
-import { Toc, TocGroup, TocEndpoint, TocModel, TocCallbackPage, TocWebhookPage, TocEndpointGroupOverview } from "../../../types/toc/toc.js";
+import { Toc, TocGroup, TocEndpointGroupOverview } from "../../../types/toc/toc.js";
+import { SdlComponents } from "../../../actions/portal/toc/new-toc.js";
 
 export class TocStructureGenerator {
-  createTocStructure(
-    endpointGroups: Map<string, TocEndpoint[]>,
-    models: TocModel[],
-    expandEndpoints: boolean = false,
-    expandModels: boolean = false,
-    contentGroups: TocGroup[] = [],
-    webhooks: Map<string, TocWebhookPage[]>,
-    callbacks: Map<string, TocCallbackPage[]>,
-    expandWebhooks: boolean = false,
-    expandCallbacks: boolean = false
-  ): Toc {
+  createTocStructure(sdlComponents: SdlComponents, contentGroups: TocGroup[] = []): Toc {
     const tocStructure: Toc = {
       toc: []
     };
@@ -34,7 +25,7 @@ export class TocStructureGenerator {
     }
 
     // Add API Endpoints section
-    if (!expandEndpoints || endpointGroups.size === 0) {
+    if (sdlComponents.endpointGroups.size === 0) {
       tocStructure.toc.push({
         generate: "API Endpoints",
         from: "endpoints"
@@ -42,7 +33,7 @@ export class TocStructureGenerator {
     } else {
       tocStructure.toc.push({
         group: "API Endpoints",
-        items: Array.from(endpointGroups).map(([groupName, endpoints]) => ({
+        items: Array.from(sdlComponents.endpointGroups).map(([groupName, endpoints]) => ({
           group: groupName,
           items: [
             {
@@ -59,40 +50,40 @@ export class TocStructureGenerator {
     // Add Events section
     const eventsItems: any[] = [];
 
-    if (!expandCallbacks || callbacks.size === 0) {
+    if (sdlComponents.callbackGroups.size === 0) {
       eventsItems.push({
         generate: null,
         from: "callbacks"
       });
-    } else if (callbacks.size === 1) {
+    } else if (sdlComponents.callbackGroups.size === 1) {
       eventsItems.push({
-        group: Array.from(callbacks.keys())[0],
-        items: Array.from(callbacks.values())[0]
+        group: Array.from(sdlComponents.callbackGroups.keys())[0],
+        items: Array.from(sdlComponents.callbackGroups.values())[0]
       });
     } else {
       eventsItems.push({
         group: "Callbacks",
-        items: Array.from(callbacks).map(([groupName, eventList]) => ({
+        items: Array.from(sdlComponents.callbackGroups).map(([groupName, eventList]) => ({
           group: groupName,
           items: eventList
         }))
       });
     }
 
-    if (!expandWebhooks || webhooks.size === 0) {
+    if (sdlComponents.webhookGroups.size === 0) {
       eventsItems.push({
         generate: null,
         from: "webhooks"
       });
-    } else if (webhooks.size === 1) {
+    } else if (sdlComponents.webhookGroups.size === 1) {
       eventsItems.push({
-        group: Array.from(webhooks.keys())[0],
-        items: Array.from(webhooks.values())[0]
+        group: Array.from(sdlComponents.webhookGroups.keys())[0],
+        items: Array.from(sdlComponents.webhookGroups.values())[0]
       });
     } else {
       eventsItems.push({
         group: "Webhooks",
-        items: Array.from(webhooks).map(([groupName, eventList]) => ({
+        items: Array.from(sdlComponents.webhookGroups).map(([groupName, eventList]) => ({
           group: groupName,
           items: eventList
         }))
@@ -106,7 +97,7 @@ export class TocStructureGenerator {
 
 
     // Add Models section
-    if (!expandModels || models.length === 0) {
+    if (sdlComponents.models.length === 0) {
       tocStructure.toc.push({
         generate: "Models",
         from: "models"
@@ -114,7 +105,7 @@ export class TocStructureGenerator {
     } else {
       tocStructure.toc.push({
         group: "Models",
-        items: models
+        items: sdlComponents.models
       });
     }
 

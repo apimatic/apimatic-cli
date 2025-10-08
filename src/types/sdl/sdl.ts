@@ -179,7 +179,7 @@ function extractModelsForToc(sdl: Sdl): TocModel[] {
   );
 }
 
-export function getComponents(sdl: Sdl): SdlTocComponents {
+export function getSdlTocComponents(sdl: Sdl): SdlTocComponents {
   const endpointGroups = extractEndpointGroupsForToc(sdl);
   const models = extractModelsForToc(sdl);
   const webhookGroups = extractWebhooksForToc(sdl);
