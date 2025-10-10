@@ -1,7 +1,7 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { ApiValidatePrompts } from "../../prompts/api/validate.js";
-import { ValidationService } from "../../infrastructure/services/validation-service.js";
+import { UnallowedFeaturesResponse, ValidationService } from "../../infrastructure/services/validation-service.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { ResourceInput } from "../../types/file/resource-input.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
@@ -22,7 +22,8 @@ export class ValidateAction {
   public readonly execute = async (
     resourcePath: ResourceInput,
     displayValidationSummary = true
-  ): Promise<ActionResult> => {
+
+  ): Promise<ActionResult<UnallowedFeaturesResponse | null>> => {
     return await withDirPath(async (tempDirectory) => {
       const resourceContext = new ResourceContext(tempDirectory);
       const specFileDirResult = await resourceContext.resolveTo(resourcePath);
@@ -50,7 +51,7 @@ export class ValidateAction {
         return ActionResult.failed();
       }
 
-      return ActionResult.success();
+      return ActionResult.success(validationSummary.unallowedFeatures);
     });
   };
 }

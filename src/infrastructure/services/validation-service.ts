@@ -21,9 +21,19 @@ export interface ValidateViaFileParams {
   authKey?: string | null;
 }
 
+export interface PruneFeature {
+  Name: string;
+}
+
+export interface UnallowedFeaturesResponse {
+  Features: PruneFeature[];
+  ExceededEndpointLimit: boolean;
+  EndpointsToRemove: number;
+}
+
 export interface ValidateApiResponse {
   result: ValidateApiResult;
-  unallowedFeatures: unknown[] | null;
+  unallowedFeatures: UnallowedFeaturesResponse | null;
 }
 
 export class ValidationService {
@@ -41,19 +51,21 @@ export class ValidationService {
 
     try {
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
-      //TODO: Update spec to include origin query parameter.
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
       const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
         fileDescriptor
       );
 
       const headerValue = validation.headers?.["x-unallowed-features"];
-      let unallowedFeatures: unknown[] | null = null;
+      let unallowedFeatures: UnallowedFeaturesResponse | null = null;
 
       if (headerValue) {
-        const decodedJson = Buffer.from(headerValue, "base64").toString("utf8");
-        unallowedFeatures = JSON.parse(decodedJson);
+        const decodedJson = globalThis.Buffer.from(headerValue, "base64").toString("utf8");
+        const parsed = JSON.parse(decodedJson);
+
+        unallowedFeatures = parsed as UnallowedFeaturesResponse;
       }
 
       return ok({
@@ -74,17 +86,18 @@ export class ValidationService {
     if (error instanceof ApiError) {
       const apiError = error as ApiError;
 
-      if (apiError.statusCode === 400) {
-        return "Your API Definition is invalid. Please fix the issues and try again.";
-      } else if (apiError.statusCode === 401) {
-        return "You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";
-      } else if (apiError.statusCode === 403) {
-        return "You do not have permission to perform this action.";
-      } else if (apiError.statusCode === 500) {
-        return "An unexpected error occurred validating the API specification, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+      switch (apiError.statusCode) {
+        case 400:
+          return "Your API Definition is invalid. Please fix the issues and try again.";
+        case 401:
+          return "You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";
+        case 403:
+          return "You do not have permission to perform this action.";
+        case 500:
+          return "An unexpected error occurred validating the API specification, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+        default:
+          return `Error ${apiError.statusCode}: An error occurred during validation.`;
       }
-
-      return `Error ${apiError.statusCode}: An error occurred during validation.`;
     }
 
     return "Unexpected error occurred while validating API specification.";
