@@ -9,19 +9,17 @@ export const removeQuotes = (input: string): string => {
   return input;
 };
 
-
-
 export function stripAnsi(str: string) {
-  let result = '';
+  let result = "";
   let i = 0;
 
   while (i < str.length) {
     const char = str[i];
     // Detect ESC (0x1B)
-    if (char === '\x1B' && str[i + 1] === '[') {
+    if (char === "\x1B" && str[i + 1] === "[") {
       // We’re at the start of an ANSI sequence. Skip until 'm' or end.
       i += 2; // skip ESC[
-      while (i < str.length && str[i] !== 'm') {
+      while (i < str.length && str[i] !== "m") {
         i++;
       }
       // Skip the 'm' itself
@@ -38,3 +36,53 @@ export function stripAnsi(str: string) {
   return result;
 }
 
+export function toTitleCase(str: string): string {
+  if (str === "") return "";
+
+  let current = "";
+  let shouldCapitalizeNext = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    const prevChar = i > 0 ? str[i - 1] : "";
+
+    if (isLowercase(char)) {
+      if (shouldCapitalizeNext) {
+        current += " " + char.toUpperCase();
+        shouldCapitalizeNext = false;
+      } else {
+        current += char;
+      }
+    } else if (isUppercase(char)) {
+      if (prevChar && !isUppercase(prevChar)) {
+        current += " " + char;
+      } else {
+        current += char;
+      }
+    } else if (isDigit(char)) {
+      if (prevChar && !isDigit(prevChar)) {
+        current += " " + char;
+      } else {
+        current += char;
+      }
+      shouldCapitalizeNext = true;
+    } else {
+      shouldCapitalizeNext = true;
+    }
+  }
+
+  current = current.charAt(0).toUpperCase() + current.slice(1);
+  return current.trimStart();
+}
+
+function isLowercase(char: string): boolean {
+  return char >= "a" && char <= "z";
+}
+
+function isUppercase(char: string): boolean {
+  return char >= "A" && char <= "Z";
+}
+
+function isDigit(char: string): boolean {
+  return char.length === 1 && char >= "0" && char <= "9";
+}

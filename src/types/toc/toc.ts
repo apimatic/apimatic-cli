@@ -1,10 +1,12 @@
 export interface Toc {
-  toc: Array<TocGroup | TocGenerated>
+  toc: Array<TocGroup | TocGenerated>;
 }
 
 export interface TocGroup {
-  readonly group: string,
-  readonly items: Array<TocGroup | TocGenerated | TocEndpointPage | TocWebhookPage | TocCallbackPage | TocModelPage | TocCustomPage>
+  readonly group: string;
+  readonly items: Array<
+    TocGroup | TocGenerated | TocEndpointPage | TocWebhookPage | TocCallbackPage | TocModelPage | TocCustomPage
+  >;
 }
 
 export interface TocGenerated {
@@ -38,27 +40,27 @@ export interface TocModelPage {
 export interface TocWebhookOverview {
   readonly generate: null;
   readonly from: "webhook-group-overview";
-  webhookGroup: string | null;
+  readonly webhookGroup: string | null;
 }
 
 export interface TocWebhook {
   readonly generate: null;
   readonly from: "webhook";
   readonly webhookName: string;
-  webhookGroup: string | null;
+  readonly webhookGroup: string | null;
 }
 
 export interface TocCallbackOverview {
   readonly generate: null;
   readonly from: "callback-group-overview";
-  callbackGroup: string | null;
+  readonly callbackGroup: string | null;
 }
 
 export interface TocCallback {
   readonly generate: null;
   readonly from: "callback";
   readonly callbackName: string;
-  callbackGroup: string | null;
+  readonly callbackGroup: string | null;
 }
 
 export interface TocCustomPage {

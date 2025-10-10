@@ -1,9 +1,23 @@
 import { stringify } from "yaml";
-import { Toc, TocGroup, TocEndpointGroupOverview, TocModelPage, TocGenerated, TocCallbackPage, TocWebhookPage, TocEndpoint } from "../../../types/toc/toc.js";
-import { SdlTocComponents } from "../../../types/sdl/sdl.js";
+import {
+  Toc,
+  TocGroup,
+  TocEndpointGroupOverview,
+  TocModelPage,
+  TocGenerated,
+  TocCallbackPage,
+  TocWebhookPage,
+  TocEndpoint
+} from "../../../types/toc/toc.js";
 
 export class TocStructureGenerator {
-  createTocStructure(sdlTocComponents: SdlTocComponents, contentGroups: TocGroup[] = []): Toc {
+  createTocStructure(
+    endpointGroups: Map<string, TocEndpoint[]>,
+    models: TocModelPage[],
+    webhookGroups: Map<string, TocWebhookPage[]>,
+    callbackGroups: Map<string, TocCallbackPage[]>,
+    contentGroups: TocGroup[] = []
+  ): Toc {
     return {
       toc: [
         {
@@ -16,15 +30,12 @@ export class TocStructureGenerator {
           ]
         },
         ...contentGroups,
-        this.getEndpointsSection(sdlTocComponents.endpointGroups),
+        this.getEndpointsSection(endpointGroups),
         {
           group: "Events",
-          items: [
-            this.getCallbacksSection(sdlTocComponents.callbackGroups),
-            this.getWebhooksSection(sdlTocComponents.webhookGroups)
-          ]
+          items: [this.getCallbacksSection(callbackGroups), this.getWebhooksSection(webhookGroups)]
         },
-        this.getModelsSection(sdlTocComponents.models),
+        this.getModelsSection(models),
         {
           generate: "SDK Infrastructure",
           from: "sdk-infra"

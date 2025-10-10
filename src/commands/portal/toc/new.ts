@@ -17,8 +17,8 @@ The output is a YAML file with the .yml extension.
 
 To learn more about the TOC file and APIMatic build directory structure, visit:
 ${format.link(
-    "https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal"
-  )}`;
+  "https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/overview-generating-api-portal"
+)}`;
 
   static flags = {
     ...FlagsProvider.destination("src/content", `toc.yml`),
@@ -52,14 +52,22 @@ ${format.link(
 
   static cmdTxt = format.cmd("apimatic", "portal", "toc", "new");
   static examples = [
-    `${this.cmdTxt} ${format.flag("destination", './src/content/')}`,
-    `${this.cmdTxt} ${format.flag("input", './')}`,
-    `${this.cmdTxt} ${format.flag("input", './')} ${format.flag("destination", './src/content/')}`
+    `${this.cmdTxt} ${format.flag("destination", "./src/content/")}`,
+    `${this.cmdTxt} ${format.flag("input", "./")}`,
+    `${this.cmdTxt} ${format.flag("input", "./")} ${format.flag("destination", "./src/content/")}`
   ];
 
   async run(): Promise<void> {
     const {
-      flags: { input, destination, force, "expand-endpoints": expandEndpoints, "expand-models": expandModels, "expand-webhooks": expandWebhooks, "expand-callbacks": expandCallbacks }
+      flags: {
+        input,
+        destination,
+        force,
+        "expand-endpoints": expandEndpoints,
+        "expand-models": expandModels,
+        "expand-webhooks": expandWebhooks,
+        "expand-callbacks": expandCallbacks
+      }
     } = await this.parse(PortalTocNew);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -73,11 +81,19 @@ ${format.link(
 
     intro("New TOC");
     const action = new PortalNewTocAction(new DirectoryPath(this.config.configDir), commandMetadata);
-    const result = await action.execute(buildDirectory, tocDirectory, force, expandEndpoints, expandModels, expandWebhooks, expandCallbacks);
+    const result = await action.execute(
+      buildDirectory,
+      tocDirectory,
+      force,
+      expandEndpoints,
+      expandModels,
+      expandWebhooks,
+      expandCallbacks
+    );
     outro(result);
 
     result.mapAll(
-      () => { },
+      () => {},
       async () => {
         const telemetryService = new TelemetryService(new DirectoryPath(this.config.configDir));
         await telemetryService.trackEvent(
@@ -94,7 +110,7 @@ ${format.link(
           commandMetadata.shell
         );
       },
-      () => { }
+      () => {}
     );
   }
 }

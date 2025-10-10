@@ -54,14 +54,11 @@ export class PortalNewTocPrompts {
       expandModels && "Models",
       expandWebhooks && "Webhooks",
       expandCallbacks && "Callbacks"
-    ].filter(Boolean).join(" and ");
+    ]
+      .filter(Boolean)
+      .join(" and ");
 
-    return withSpinner(
-      `Extracting ${components}`,
-      `${components} extracted`,
-      `${components} extraction failed`,
-      fn
-    );
+    return withSpinner(`Extracting ${components}`, `${components} extracted`, `${components} extraction failed`, fn);
   }
 
   public tocCreated(tocPath: FilePath) {
