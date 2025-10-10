@@ -16,6 +16,7 @@ import { FileDownloadService } from "../../infrastructure/services/file-download
 import { getLanguagesConfig } from "../../types/build/build.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { SpecContext } from "../../types/spec-context.js";
+import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
 
 const defaultPort: number = 3000 as const;
 
@@ -97,8 +98,16 @@ export class PortalQuickstartAction {
           specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
         }
       }
-      // add a step which calls the pruning endpoint from apimatic io and passes the unallowed features and spec stream and 
-      // get back the pruned spec stream and use that for further steps.
+
+      const unallowed = validationResult.getValue();
+      if (unallowed && unallowed.Features && unallowed.Features.length > 0) {
+        this.prompts.logInfo("Your API includes features/endpoints that will be stripped to match your current plan:");
+        this.prompts.logInfo(JSON.stringify(unallowed, null, 2));
+        const prunedStream = await this.stripUnallowedFeatures(specPath, unallowed, tempDirectory);
+        const specContext = new SpecContext(tempDirectory);
+        specPath = await specContext.save(prunedStream, "pruned-spec.json");
+        this.prompts.logInfo("Unsupported features successfully stripped.");
+      }
 
       // Step 3/4
       this.prompts.selectLanguagesStep();
@@ -165,9 +174,11 @@ export class PortalQuickstartAction {
       const result = await portalServeAction.execute(sourceDirectory, portalDirectory, defaultPort, true, false, () => {
         this.prompts.nextSteps();
       });
+
       if (result.isFailed()) {
         return ActionResult.failed();
       }
+
       return ActionResult.success();
     });
   };
