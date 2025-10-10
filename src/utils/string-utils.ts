@@ -39,7 +39,7 @@ export function stripAnsi(str: string) {
 export function toTitleCase(str: string): string {
   if (str === "") return "";
 
-  let current = "";
+  let result = "";
   let shouldCapitalizeNext = false;
 
   for (let i = 0; i < str.length; i++) {
@@ -47,32 +47,49 @@ export function toTitleCase(str: string): string {
     const prevChar = i > 0 ? str[i - 1] : "";
 
     if (isLowercase(char)) {
-      if (shouldCapitalizeNext) {
-        current += " " + char.toUpperCase();
-        shouldCapitalizeNext = false;
-      } else {
-        current += char;
-      }
+      const processed = processLowercase(char, shouldCapitalizeNext);
+      result += processed.text;
+      shouldCapitalizeNext = processed.capitalizeNext;
     } else if (isUppercase(char)) {
-      if (prevChar && !isUppercase(prevChar)) {
-        current += " " + char;
-      } else {
-        current += char;
-      }
+      const processed = processUppercase(char, prevChar);
+      result += processed.text;
+      shouldCapitalizeNext = processed.capitalizeNext;
     } else if (isDigit(char)) {
-      if (prevChar && !isDigit(prevChar)) {
-        current += " " + char;
-      } else {
-        current += char;
-      }
-      shouldCapitalizeNext = true;
+      const processed = processDigit(char, prevChar);
+      result += processed.text;
+      shouldCapitalizeNext = processed.capitalizeNext;
     } else {
       shouldCapitalizeNext = true;
     }
   }
+  result = result.charAt(0).toUpperCase() + result.slice(1);
+  return result.trimStart();
+}
 
-  current = current.charAt(0).toUpperCase() + current.slice(1);
-  return current.trimStart();
+function processLowercase(
+  char: string,
+  shouldCapitalize: boolean
+): { text: string; capitalizeNext: boolean } {
+  if (shouldCapitalize) {
+    return { text: " " + char.toUpperCase(), capitalizeNext: false };
+  }
+  return { text: char, capitalizeNext: false };
+}
+
+function processUppercase(
+  char: string,
+  prevChar: string
+): { text: string; capitalizeNext: boolean } {
+  const needsSpace = prevChar && !isUppercase(prevChar);
+  return { text: needsSpace ? " " + char : char, capitalizeNext: false };
+}
+
+function processDigit(
+  char: string,
+  prevChar: string
+): { text: string; capitalizeNext: boolean } {
+  const needsSpace = prevChar && !isDigit(prevChar);
+  return { text: needsSpace ? " " + char : char, capitalizeNext: true };
 }
 
 function isLowercase(char: string): boolean {

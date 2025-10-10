@@ -13,7 +13,6 @@ import {
   extractEndpointGroupsForToc,
   extractModelsForToc,
   extractWebhooksForToc,
-  Sdl,
   SdlTocComponents
 } from "../../../types/sdl/sdl.js";
 import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
@@ -69,21 +68,46 @@ export class PortalNewTocAction {
       return ActionResult.cancelled();
     }
 
-    const sdlTocComponents = await tryExtractingSdlTocComponents(
-      buildDirectory,
-      expandEndpoints,
-      expandModels,
-      expandWebhooks,
-      expandCallbacks,
-      this.fileService,
-      this.prompts,
-      this.portalService,
-      this.configDirectory,
-      this.commandMetadata
-    );
+    let sdlTocComponents: SdlTocComponents = {
+      endpointGroups: new Map(),
+      models: [],
+      webhookGroups: new Map(),
+      callbackGroups: new Map()
+    };
 
-    if (!sdlTocComponents) {
-      return ActionResult.failed();
+    if (expandEndpoints || expandModels || expandWebhooks || expandCallbacks) {
+      const specDirectory = buildDirectory.join("spec");
+
+      if (!(await this.fileService.directoryExists(specDirectory))) {
+        this.prompts.fallingBackToDefault();
+      } else {
+        const sdlResult = await withDirPath(async (tempDirectory) => {
+          const tempContext = new TempContext(tempDirectory);
+          const specZipPath = await tempContext.zip(specDirectory);
+          const specFileStream = await this.fileService.getStream(specZipPath);
+          const result = await this.prompts.extractComponents(
+            this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata),
+            expandEndpoints,
+            expandModels,
+            expandWebhooks,
+            expandCallbacks
+          );
+          specFileStream.close();
+          if (result.isErr()) {
+            this.prompts.fallingBackToDefault();
+            return ok(sdlTocComponents);
+          }
+
+          return ok(extractSdlTocComponents(result.value, expandEndpoints, expandModels, expandWebhooks, expandCallbacks));
+        });
+
+        if (sdlResult.isErr()) {
+          this.prompts.logError(sdlResult.error);
+          return ActionResult.failed();
+        }
+
+        sdlTocComponents = sdlResult.value;
+      }
     }
 
     const contentContext = new ContentContext(contentDirectory);
@@ -113,66 +137,17 @@ export class PortalNewTocAction {
   }
 }
 
-async function tryExtractingSdlTocComponents(
-  buildDirectory: DirectoryPath,
+function extractSdlTocComponents(
+  sdl: any,
   expandEndpoints: boolean,
   expandModels: boolean,
   expandWebhooks: boolean,
-  expandCallbacks: boolean,
-  fileService: FileService,
-  prompts: PortalNewTocPrompts,
-  portalService: PortalService,
-  configDirectory: DirectoryPath,
-  commandMetadata: CommandMetadata
-): Promise<SdlTocComponents | false> {
-  let sdlComponents: SdlTocComponents = {
-    endpointGroups: new Map(),
-    models: [],
-    webhookGroups: new Map(),
-    callbackGroups: new Map()
-  };
+  expandCallbacks: boolean
+): SdlTocComponents {
+  const endpointGroups = expandEndpoints ? extractEndpointGroupsForToc(sdl) : new Map();
+  const models = expandModels ? extractModelsForToc(sdl) : [];
+  const webhookGroups = expandWebhooks ? extractWebhooksForToc(sdl) : new Map();
+  const callbackGroups = expandCallbacks ? extractCallbacksForToc(sdl) : new Map();
 
-  if (!(expandEndpoints || expandModels || expandWebhooks || expandCallbacks)) {
-    return sdlComponents;
-  }
-
-  const specDirectory = buildDirectory.join("spec");
-
-  if (!(await fileService.directoryExists(specDirectory))) {
-    prompts.fallingBackToDefault();
-    return sdlComponents;
-  }
-
-  const sdlResult = await withDirPath(async (tempDirectory) => {
-    const tempContext = new TempContext(tempDirectory);
-    const specZipPath = await tempContext.zip(specDirectory);
-    const specFileStream = await fileService.getStream(specZipPath);
-    const result = await prompts.extractComponents(
-      portalService.generateSdl(specFileStream, configDirectory, commandMetadata),
-      expandEndpoints,
-      expandModels,
-      expandWebhooks,
-      expandCallbacks
-    );
-    specFileStream.close();
-    if (result.isErr()) {
-      prompts.fallingBackToDefault();
-      return ok(sdlComponents);
-    }
-
-    const sdl = result.value;
-    const endpointGroups = expandEndpoints ? extractEndpointGroupsForToc(sdl) : new Map();
-    const models = expandModels ? extractModelsForToc(sdl) : [];
-    const webhookGroups = expandWebhooks ? extractWebhooksForToc(sdl) : new Map();
-    const callbackGroups = expandCallbacks ? extractCallbacksForToc(sdl) : new Map();
-
-    return ok({ endpointGroups, models, webhookGroups, callbackGroups });
-  });
-
-  if (sdlResult.isErr()) {
-    prompts.logError(sdlResult.error);
-    return false;
-  }
-
-  return sdlResult.value;
+  return { endpointGroups, models, webhookGroups, callbackGroups };
 }
