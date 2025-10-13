@@ -16,7 +16,8 @@ import { FileDownloadService } from "../../infrastructure/services/file-download
 import { getLanguagesConfig } from "../../types/build/build.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { SpecContext } from "../../types/spec-context.js";
-import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
+import { ValidationService } from "../../infrastructure/services/validation-service.js";
+import { FileName } from "../../types/file/fileName.js";
 
 const defaultPort: number = 3000 as const;
 
@@ -27,19 +28,25 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
-  private readonly buildFileUrl = new UrlPath(`https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`);
-  private readonly defaultSpecUrl = new UrlPath(`https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`);
+  private readonly buildFileUrl = new UrlPath(
+    `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
+  );
+  private readonly defaultSpecUrl = new UrlPath(
+    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
+  );
   private readonly repositoryFolderName = "sample-docs-as-code-portal-master/src" as const;
+  private readonly validationService: ValidationService;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
+    this.validationService = new ValidationService(this.configDir);
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (!storedAuth?.authKey) {
-      const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute(); 
+      const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
       if (loginResult.isFailed()) {
         return ActionResult.failed();
       }
@@ -99,14 +106,16 @@ export class PortalQuickstartAction {
         }
       }
 
-      const unallowed = validationResult.getValue();
+      const unallowed = validationResult.unwrap();
       if (unallowed && unallowed.Features && unallowed.Features.length > 0) {
-        this.prompts.logInfo("Your API includes features/endpoints that will be stripped to match your current plan:");
-        this.prompts.logInfo(JSON.stringify(unallowed, null, 2));
-        const prunedStream = await this.stripUnallowedFeatures(specPath, unallowed, tempDirectory);
+        this.prompts.stripUnallowedFeaturesStep(unallowed);
+        const prunedStream = await this.validationService.stripUnallowedFeatures(
+          specPath,
+          unallowed,
+          this.commandMetadata
+        );
         const specContext = new SpecContext(tempDirectory);
-        specPath = await specContext.save(prunedStream, "pruned-spec.json");
-        this.prompts.logInfo("Unsupported features successfully stripped.");
+        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.json"));
       }
 
       // Step 3/4

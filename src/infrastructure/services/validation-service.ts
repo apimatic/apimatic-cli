@@ -2,10 +2,13 @@ import fsExtra from "fs-extra";
 import {
   ApiResponse,
   ApiValidationV2ExternalApisController,
+  ApiFeaturesController,
   ValidateApiResult,
   ContentType,
   FileWrapper,
-  ApiError
+  ApiError,
+  FeaturesToRemove,
+  RemovableFeature
 } from "@apimatic/sdk";
 
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -21,14 +24,10 @@ export interface ValidateViaFileParams {
   authKey?: string | null;
 }
 
-export interface PruneFeature {
-  Name: string;
-}
-
 export interface UnallowedFeaturesResponse {
-  Features: PruneFeature[];
-  ExceededEndpointLimit: boolean;
-  EndpointsToRemove: number;
+  Features: RemovableFeature[];
+  EndpointLimit: number;
+  EndpointCount: number;
 }
 
 export interface ValidateApiResponse {
@@ -75,6 +74,30 @@ export class ValidationService {
     } catch (error) {
       return err(await this.handleValidationErrors(error));
     }
+  }
+
+  public async stripUnallowedFeatures(
+    specPath: FilePath,
+    unallowedFeatures: UnallowedFeaturesResponse,
+    commandMetadata: CommandMetadata,
+    authKey?: string | null
+  ): Promise<NodeJS.ReadableStream> {
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
+    const controller = new ApiFeaturesController(client);
+
+    const featuresToRemove: FeaturesToRemove = {
+      features: unallowedFeatures.Features as RemovableFeature[],
+      ...(unallowedFeatures.EndpointCount > unallowedFeatures.EndpointLimit && {
+        endpointsToKeep: unallowedFeatures.EndpointLimit
+      })
+    };
+    const fileWrapper = new FileWrapper(fsExtra.createReadStream(specPath.toString()));
+
+    const response = await controller.stripFeatures(fileWrapper, featuresToRemove);
+
+    return response.result as NodeJS.ReadableStream;
   }
 
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {

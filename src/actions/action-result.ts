@@ -19,15 +19,15 @@ export class ActionResult<T = void> {
     return new ActionResult<T>(ResultType.Success, "Succeeded", value);
   }
 
-  static failed(message = "Failed"): ActionResult<never> {
+  static failed<T = never>(message = "Failed"): ActionResult<T> {
     return new ActionResult(ResultType.Failure, message);
   }
 
-  static cancelled(message = "Cancelled"): ActionResult<never> {
+  static cancelled<T = never>(message = "Cancelled"): ActionResult<T> {
     return new ActionResult(ResultType.Cancel, message);
   }
 
-  static stopped(message = "Stopped"): ActionResult<never> {
+  static stopped<T = never>(message = "Stopped"): ActionResult<T> {
     return new ActionResult(ResultType.Cancel, message);
   }
 
@@ -51,8 +51,30 @@ export class ActionResult<T = void> {
     return this.resultType === ResultType.Cancel;
   }
 
-  public getValue(): T | undefined {
-    return this.value;
+  public match<R>(
+    onSuccess: (value: T) => R,
+    onFailure: (message: string) => R,
+    onCancel: (message: string) => R
+  ): R {
+    switch (this.resultType) {
+      case ResultType.Success:
+        return onSuccess(this.value!);
+      case ResultType.Failure:
+        return onFailure(this.message);
+      case ResultType.Cancel:
+        return onCancel(this.message);
+    }
+  }
+
+  public unwrap(): T {
+    if (!this.isSuccess()) {
+      throw new Error(`Cannot unwrap ${ResultType[this.resultType]} result: ${this.message}`);
+    }
+    return this.value!;
+  }
+
+  public getValueOr(defaultValue: T): T {
+    return this.isSuccess() ? this.value! : defaultValue;
   }
 
   public mapAll<R>(

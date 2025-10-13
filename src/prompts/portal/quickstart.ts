@@ -9,6 +9,7 @@ import { Directory } from "../../types/file/directory.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
 import { noteWrapped, withSpinner } from "../prompt.js";
+import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -71,6 +72,14 @@ export class PortalQuickstartPrompts {
     log.info(`Step 2 of 4: Validate and Lint your OpenAPI Definition`);
   }
 
+  public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
+    log.info(`Your API includes features/endpoints that will be stripped to match your current plan:`);
+
+    log.info(JSON.stringify(unallowed, null, 2));
+
+    log.info(`Endpoints allowed: ${unallowed.EndpointLimit}, your spec has: ${unallowed.EndpointCount}`);
+  }
+
   public selectLanguagesStep() {
     log.info(`Step 3 of 4: Select programming languages`);
   }
@@ -89,7 +98,7 @@ export class PortalQuickstartPrompts {
         { label: "Go", value: "go" }
       ],
       initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"],
-      required: false,
+      required: false
     })) as string[];
 
     if (isCancel(languages)) {
