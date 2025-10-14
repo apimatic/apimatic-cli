@@ -84,15 +84,18 @@ export class ValidationService {
   ): Promise<NodeJS.ReadableStream> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell,true);
     const controller = new ApiFeaturesController(client);
 
     const featuresToRemove: FeaturesToRemove = {
-      features: unallowedFeatures.Features as RemovableFeature[],
+      features: unallowedFeatures.Features.map((f: RemovableFeature & { Name?: string; name?: string }) => f.Name ?? f.name).filter(
+        (name): name is RemovableFeature => Object.values(RemovableFeature).includes(name as RemovableFeature)
+      ),
       ...(unallowedFeatures.EndpointCount > unallowedFeatures.EndpointLimit && {
         endpointsToKeep: unallowedFeatures.EndpointLimit
       })
     };
+
     const fileWrapper = new FileWrapper(fsExtra.createReadStream(specPath.toString()));
 
     const response = await controller.stripFeatures(fileWrapper, featuresToRemove);
