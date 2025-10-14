@@ -10,6 +10,11 @@ export interface ApiResponse<T = unknown> {
   headers: Record<string, unknown>;
 }
 
+interface AxiosServiceError extends Error {
+  status?: number;
+  data?: unknown;
+}
+
 class AxiosService {
   private readonly instance: AxiosInstance;
 
@@ -32,11 +37,10 @@ class AxiosService {
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        throw {
-          status: error.response?.status,
-          message: error.response?.statusText || error.message,
-          data: error.response?.data,
-        };
+        const err = new Error(error.response?.statusText || error.message) as AxiosServiceError;
+        err.status = error.response?.status;
+        err.data = error.response?.data;
+        throw err;
       }
       throw error;
     }
