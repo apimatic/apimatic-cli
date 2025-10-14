@@ -66,7 +66,7 @@ export class ActionResult<T = void> {
     }
   }
 
-  public unwrap(): T {
+  public getValue(): T {
     if (!this.isSuccess()) {
       throw new Error(`Cannot unwrap ${ResultType[this.resultType]} result: ${this.message}`);
     }

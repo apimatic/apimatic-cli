@@ -50,7 +50,6 @@ export class ValidateAction {
       if (!validationSummary.result.validation.isSuccess || !validationSummary.result.linting.isSuccess) {
         return ActionResult.failed();
       }
-
       return ActionResult.success(validationSummary.unallowedFeatures);
     });
   };

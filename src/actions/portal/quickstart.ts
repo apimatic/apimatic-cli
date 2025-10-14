@@ -106,16 +106,15 @@ export class PortalQuickstartAction {
         }
       }
 
-      const unallowed = validationResult.unwrap();
+      const unallowed = validationResult.getValue();
       if (unallowed && unallowed.Features && unallowed.Features.length > 0) {
         this.prompts.stripUnallowedFeaturesStep(unallowed);
         const prunedStream = await this.validationService.stripUnallowedFeatures(
           specPath,
           unallowed,
-          this.commandMetadata
         );
         const specContext = new SpecContext(tempDirectory);
-        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.json"));
+        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.zip"));
       }
 
       // Step 3/4

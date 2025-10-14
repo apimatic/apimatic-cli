@@ -1,13 +1,12 @@
+import { createReadStream } from "fs";
 import fsExtra from "fs-extra";
 import {
   ApiResponse,
   ApiValidationV2ExternalApisController,
-  ApiFeaturesController,
   ValidateApiResult,
   ContentType,
   FileWrapper,
   ApiError,
-  FeaturesToRemove,
   RemovableFeature
 } from "@apimatic/sdk";
 
@@ -17,6 +16,8 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
+import AxiosService from "../axios-service.js";
+import FormData from "form-data";
 
 export interface ValidateViaFileParams {
   file: FilePath;
@@ -79,28 +80,38 @@ export class ValidationService {
   public async stripUnallowedFeatures(
     specPath: FilePath,
     unallowedFeatures: UnallowedFeaturesResponse,
-    commandMetadata: CommandMetadata,
     authKey?: string | null
   ): Promise<NodeJS.ReadableStream> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell,true);
-    const controller = new ApiFeaturesController(client);
 
-    const featuresToRemove: FeaturesToRemove = {
-      features: unallowedFeatures.Features.map((f: RemovableFeature & { Name?: string; name?: string }) => f.Name ?? f.name).filter(
-        (name): name is RemovableFeature => Object.values(RemovableFeature).includes(name as RemovableFeature)
-      ),
+    const rawBaseUrl = process.env.APIMATIC_BASE_URL!;
+    const baseUrl = rawBaseUrl.replace(/\/api\/?$/, "");
+    const apiService = new AxiosService(baseUrl);
+
+    apiService.setAuthHeader(authorizationHeader);
+    const featuresToRemove = {
+      features: unallowedFeatures.Features.map((f: RemovableFeature & { Name?: string; name?: string }) => ({
+        Name: f.Name ?? f.name
+      })),
       ...(unallowedFeatures.EndpointCount > unallowedFeatures.EndpointLimit && {
         endpointsToKeep: unallowedFeatures.EndpointLimit
       })
     };
 
-    const fileWrapper = new FileWrapper(fsExtra.createReadStream(specPath.toString()));
-
-    const response = await controller.stripFeatures(fileWrapper, featuresToRemove);
-
-    return response.result as NodeJS.ReadableStream;
+    const formData = new FormData();
+    formData.append("file", createReadStream(specPath.toString()));
+    formData.append("featuresToRemove", JSON.stringify(featuresToRemove));
+    try {
+      const response = await apiService.postFormData<FormData, NodeJS.ReadableStream>("/api-features/strip", formData, {
+        headers: formData.getHeaders(),
+        responseType: "stream",
+        validateStatus: () => true
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(await this.handlePruningErrors(error));
+    }
   }
 
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {
@@ -127,5 +138,24 @@ export class ValidationService {
     }
 
     return "Unexpected error occurred while validating API specification.";
+  }
+  private async handlePruningErrors(error: unknown): Promise<string> {
+    if (error instanceof ApiError) {
+      const apiError = error as ApiError;
+
+      switch (apiError.statusCode) {
+        case 400:
+          return "Your API Definition is invalid. Please fix the issues and try again.";
+        case 401:
+          return "You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";
+        case 403:
+          return "You do not have permission to perform this action.";
+        case 500:
+          return "An unexpected error occurred stripping the API specification, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+        default:
+          return `Error ${apiError.statusCode}: An error occurred during stripping the API specification.`;
+      }
+    }
+    return "Unexpected error occurred stripping API specification.";
   }
 }

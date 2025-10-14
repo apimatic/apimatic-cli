@@ -73,11 +73,19 @@ export class PortalQuickstartPrompts {
   }
 
   public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
-    log.info(`Your API includes features/endpoints that will be stripped to match your current plan:`);
+    const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
+    const message = [
+"Your API includes features or endpoints that will be removed to match your current plan:",
+"",
+"Features to be removed:",
+featuresList,
+"",
+"Endpoint usage:",
+`  Allowed: ${unallowed.EndpointLimit}`,
+`  In your spec: ${unallowed.EndpointCount}`
+    ].join("\n");
 
-    log.info(JSON.stringify(unallowed, null, 2));
-
-    log.info(`Endpoints allowed: ${unallowed.EndpointLimit}, your spec has: ${unallowed.EndpointCount}`);
+    log.info(message);
   }
 
   public selectLanguagesStep() {
