@@ -1,4 +1,4 @@
-import { createReadStream } from "fs";
+import { createReadStream } from "node:fs";
 import fsExtra from "fs-extra";
 import {
   ApiResponse,

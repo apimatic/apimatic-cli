@@ -71,33 +71,32 @@ export class ApiValidatePrompts {
   }
 
   private displayValidationSummary(summary: ValidationSummary): void {
-    // Display blocking issues
     if (summary.blocking.length > 0) {
       log.error("Blocking");
-      summary.blocking.forEach((entry) => {
-        log.message(`${this.formatValidationEntry(entry)}`);
-      });
+      for (const entry of summary.blocking) {
+        log.message(this.formatValidationEntry(entry));
+      }
     }
 
     if (summary.errors.length > 0) {
       log.error("Errors");
-      summary.errors.forEach((entry) => {
-        log.message(`${this.formatValidationEntry(entry)}`);
-      });
+      for (const entry of summary.errors) {
+        log.message(this.formatValidationEntry(entry));
+      }
     }
 
     if (summary.warnings.length > 0) {
       log.warning("Warnings");
-      summary.warnings.forEach((entry) => {
-        log.message(`${this.formatValidationEntry(entry)}`);
-      });
+      for (const entry of summary.warnings) {
+        log.message(this.formatValidationEntry(entry));
+      }
     }
 
     if (summary.information.length > 0) {
       log.info("Information");
-      summary.information.forEach((entry) => {
-        log.message(`${this.formatValidationEntry(entry)}`);
-      });
+      for (const entry of summary.information) {
+        log.message(this.formatValidationEntry(entry));
+      }
     }
   }
 

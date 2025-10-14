@@ -107,7 +107,7 @@ export class PortalQuickstartAction {
       }
 
       const unallowed = validationResult.getValue();
-      if (unallowed && unallowed.Features && unallowed.Features.length > 0) {
+      if (unallowed && unallowed.Features?.length > 0) {
         this.prompts.stripUnallowedFeaturesStep(unallowed);
         const prunedStream = await this.validationService.stripUnallowedFeatures(
           specPath,

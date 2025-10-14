@@ -11,7 +11,7 @@ export interface ApiResponse<T = unknown> {
 }
 
 class AxiosService {
-  private instance: AxiosInstance;
+  private readonly instance: AxiosInstance;
 
   constructor(baseURL: string) {
     this.instance = axios.create({
@@ -30,7 +30,7 @@ class AxiosService {
         data: response.data,
         headers: response.headers,
       };
-    } catch (error: unknown) {
+    } catch (error) {
       if (axios.isAxiosError(error)) {
         throw {
           status: error.response?.status,
