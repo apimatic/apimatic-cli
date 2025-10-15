@@ -10,16 +10,16 @@ export const removeQuotes = (input: string): string => {
 };
 
 export function stripAnsi(str: string) {
-  let result = "";
+  let result = '';
   let i = 0;
 
   while (i < str.length) {
     const char = str[i];
     // Detect ESC (0x1B)
-    if (char === "\x1B" && str[i + 1] === "[") {
+    if (char === '\x1B' && str[i + 1] === '[') {
       // We’re at the start of an ANSI sequence. Skip until 'm' or end.
       i += 2; // skip ESC[
-      while (i < str.length && str[i] !== "m") {
+      while (i < str.length && str[i] !== 'm') {
         i++;
       }
       // Skip the 'm' itself
@@ -37,14 +37,14 @@ export function stripAnsi(str: string) {
 }
 
 export function toTitleCase(str: string): string {
-  if (str === "") return "";
+  if (str === '') return '';
 
-  let result = "";
+  let result = '';
   let shouldCapitalizeNext = false;
 
   for (let i = 0; i < str.length; i++) {
     const char = str[i];
-    const prevChar = i > 0 ? str[i - 1] : "";
+    const prevChar = i > 0 ? str[i - 1] : '';
 
     if (isLowercase(char)) {
       const processed = processLowercase(char, shouldCapitalizeNext);
@@ -66,40 +66,31 @@ export function toTitleCase(str: string): string {
   return result.trimStart();
 }
 
-function processLowercase(
-  char: string,
-  shouldCapitalize: boolean
-): { text: string; capitalizeNext: boolean } {
+function processLowercase(char: string, shouldCapitalize: boolean): { text: string; capitalizeNext: boolean } {
   if (shouldCapitalize) {
-    return { text: " " + char.toUpperCase(), capitalizeNext: false };
+    return { text: ' ' + char.toUpperCase(), capitalizeNext: false };
   }
   return { text: char, capitalizeNext: false };
 }
 
-function processUppercase(
-  char: string,
-  prevChar: string
-): { text: string; capitalizeNext: boolean } {
+function processUppercase(char: string, prevChar: string): { text: string; capitalizeNext: boolean } {
   const needsSpace = prevChar && !isUppercase(prevChar);
-  return { text: needsSpace ? " " + char : char, capitalizeNext: false };
+  return { text: needsSpace ? ' ' + char : char, capitalizeNext: false };
 }
 
-function processDigit(
-  char: string,
-  prevChar: string
-): { text: string; capitalizeNext: boolean } {
+function processDigit(char: string, prevChar: string): { text: string; capitalizeNext: boolean } {
   const needsSpace = prevChar && !isDigit(prevChar);
-  return { text: needsSpace ? " " + char : char, capitalizeNext: true };
+  return { text: needsSpace ? ' ' + char : char, capitalizeNext: true };
 }
 
 function isLowercase(char: string): boolean {
-  return char >= "a" && char <= "z";
+  return char >= 'a' && char <= 'z';
 }
 
 function isUppercase(char: string): boolean {
-  return char >= "A" && char <= "Z";
+  return char >= 'A' && char <= 'Z';
 }
 
 function isDigit(char: string): boolean {
-  return char.length === 1 && char >= "0" && char <= "9";
+  return char.length === 1 && char >= '0' && char <= '9';
 }

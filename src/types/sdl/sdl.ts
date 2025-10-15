@@ -1,5 +1,5 @@
-import { TocEndpoint, TocModelPage, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage } from "../toc/toc.js";
-import { toTitleCase } from "../../utils/string-utils.js";
+import { TocEndpoint, TocModelPage, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage } from '../toc/toc.js';
+import { toTitleCase } from '../../utils/string-utils.js';
 
 export type SdlTocComponents = {
   endpointGroups: Map<string, TocEndpoint[]>;
@@ -66,7 +66,7 @@ export function extractEndpointGroupsForToc(sdl: Sdl): Map<string, TocEndpoint[]
   const endpoints = sdl.Endpoints.map(
     (e: SdlEndpoint): TocEndpoint => ({
       generate: null,
-      from: "endpoint",
+      from: 'endpoint',
       endpointName: e.Name,
       endpointGroup: e.Group
     })
@@ -87,7 +87,7 @@ export function extractModelsForToc(sdl: Sdl): TocModelPage[] {
   return sdl.CustomTypes.map(
     (e: SdlModel): TocModelPage => ({
       generate: null,
-      from: "model",
+      from: 'model',
       modelName: e.Name
     })
   );
@@ -98,51 +98,53 @@ export function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
     return new Map();
   }
 
-  let webhookGroups = new Map<string, TocWebhookPage[]>();
+  let groupedWebhooks = new Map<string, TocWebhookPage[]>();
   const ungrouped: TocWebhook[] = [];
 
   for (const webhook of sdl.Webhooks) {
     const event: TocWebhook = {
       generate: null,
-      from: "webhook",
+      from: 'webhook',
       webhookName: webhook.Id,
       webhookGroup: webhook.WebhookGroupName ?? null
     };
 
-    // separate grouped and ungrouped webhooks
     if (webhook.WebhookGroupName) {
-      addToWebhookGroup(webhookGroups, webhook.WebhookGroupName, event);
+      const groupTitle = toTitleCase(webhook.WebhookGroupName);
+      if (!groupedWebhooks.has(groupTitle)) {
+        groupedWebhooks.set(groupTitle, [
+          {
+            generate: null,
+            from: 'webhook-group-overview',
+            webhookGroup: webhook.WebhookGroupName
+          }
+        ]);
+      }
+      groupedWebhooks.get(groupTitle)!.push(event);
     } else {
       ungrouped.push(event);
     }
   }
 
-  // sort groups before adding ungrouped webhooks
-  webhookGroups = new Map([...webhookGroups].sort((a, b) => a[0].localeCompare(b[0])));
+  let ungroupedWebhooks = new Map<string, TocWebhookPage[]>();
 
-  // add ungrouped webhooks to a unique group
   if (ungrouped.length > 0) {
-    const uniqueGroupName = getUniqueGroupName("Webhooks", webhookGroups);
+    const uniqueGroupName = getUniqueGroupName('Webhooks', groupedWebhooks);
+    const uniqueGroupTitle = toTitleCase(uniqueGroupName);
+    ungroupedWebhooks.set(uniqueGroupTitle, [
+      {
+        generate: null,
+        from: 'webhook-group-overview',
+        webhookGroup: uniqueGroupName
+      }
+    ]);
     for (const event of ungrouped) {
-      addToWebhookGroup(webhookGroups, uniqueGroupName, event);
+      ungroupedWebhooks.get(uniqueGroupTitle)!.push(event);
+      event.webhookGroup = uniqueGroupName;
     }
   }
 
-  return webhookGroups;
-}
-
-function addToWebhookGroup(webhookGroups: Map<string, TocWebhookPage[]>, groupName: string, event: TocWebhook): void {
-  const groupTitle = toTitleCase(groupName);
-  if (!webhookGroups.has(groupTitle)) {
-    webhookGroups.set(groupTitle, [
-      {
-        generate: null,
-        from: "webhook-group-overview",
-        webhookGroup: groupName
-      }
-    ]);
-  }
-  webhookGroups.get(groupTitle)!.push(event);
+  return new Map([...[...groupedWebhooks].sort((a, b) => a[0].localeCompare(b[0])), ...ungroupedWebhooks]);
 }
 
 export function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]> {
@@ -150,55 +152,53 @@ export function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]>
     return new Map();
   }
 
-  let callbackGroups = new Map<string, TocCallbackPage[]>();
+  let groupedCallbacks = new Map<string, TocCallbackPage[]>();
   const ungrouped: TocCallback[] = [];
 
   for (const callback of sdl.Endpoints.flatMap((e) => e.Callbacks)) {
     const event: TocCallback = {
       generate: null,
-      from: "callback",
+      from: 'callback',
       callbackName: callback.Id,
       callbackGroup: callback.CallbackGroupName ?? null
     };
 
-    // separate grouped and ungrouped callbacks
     if (callback.CallbackGroupName) {
-      addToCallbackGroup(callbackGroups, callback.CallbackGroupName, event);
+      const groupTitle = toTitleCase(callback.CallbackGroupName);
+      if (!groupedCallbacks.has(groupTitle)) {
+        groupedCallbacks.set(groupTitle, [
+          {
+            generate: null,
+            from: 'callback-group-overview',
+            callbackGroup: callback.CallbackGroupName
+          }
+        ]);
+      }
+      groupedCallbacks.get(groupTitle)!.push(event);
     } else {
       ungrouped.push(event);
     }
   }
 
-  // sort groups before adding ungrouped callbacks
-  callbackGroups = new Map([...callbackGroups].sort((a, b) => a[0].localeCompare(b[0])));
+  let ungroupedCallbacks = new Map<string, TocCallbackPage[]>();
 
-  // add ungrouped callbacks to a unique group
   if (ungrouped.length > 0) {
-    const uniqueGroupName = getUniqueGroupName("Callbacks", callbackGroups);
+    const uniqueGroupName = getUniqueGroupName('Callbacks', groupedCallbacks);
+    const uniqueGroupTitle = toTitleCase(uniqueGroupName);
+    ungroupedCallbacks.set(uniqueGroupTitle, [
+      {
+        generate: null,
+        from: 'callback-group-overview',
+        callbackGroup: uniqueGroupName
+      }
+    ]);
     for (const event of ungrouped) {
-      addToCallbackGroup(callbackGroups, uniqueGroupName, event);
+      ungroupedCallbacks.get(uniqueGroupTitle)!.push(event);
+      event.callbackGroup = uniqueGroupName;
     }
   }
 
-  return callbackGroups;
-}
-
-function addToCallbackGroup(
-  callbackGroups: Map<string, TocCallbackPage[]>,
-  groupName: string,
-  event: TocCallback
-): void {
-  const groupTitle = toTitleCase(groupName);
-  if (!callbackGroups.has(groupTitle)) {
-    callbackGroups.set(groupTitle, [
-      {
-        generate: null,
-        from: "callback-group-overview",
-        callbackGroup: groupName
-      }
-    ]);
-  }
-  callbackGroups.get(groupTitle)!.push(event);
+  return new Map([...[...groupedCallbacks].sort((a, b) => a[0].localeCompare(b[0])), ...ungroupedCallbacks]);
 }
 
 function getUniqueGroupName(baseName: string, existingGroups: Map<string, unknown>): string {

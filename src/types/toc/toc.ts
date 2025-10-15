@@ -47,7 +47,7 @@ export interface TocWebhook {
   readonly generate: null;
   readonly from: "webhook";
   readonly webhookName: string;
-  readonly webhookGroup: string | null;
+  webhookGroup: string | null;
 }
 
 export interface TocCallbackOverview {
@@ -60,7 +60,7 @@ export interface TocCallback {
   readonly generate: null;
   readonly from: "callback";
   readonly callbackName: string;
-  readonly callbackGroup: string | null;
+  callbackGroup: string | null;
 }
 
 export interface TocCustomPage {

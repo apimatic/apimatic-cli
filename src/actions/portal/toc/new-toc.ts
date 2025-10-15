@@ -1,23 +1,23 @@
-import { ok } from "neverthrow";
-import { PortalNewTocPrompts } from "../../../prompts/portal/toc/new-toc.js";
-import { TocStructureGenerator } from "../../../application/portal/toc/toc-structure-generator.js";
-import { TocGroup } from "../../../types/toc/toc.js";
-import { DirectoryPath } from "../../../types/file/directoryPath.js";
-import { CommandMetadata } from "../../../types/common/command-metadata.js";
-import { ActionResult } from "../../action-result.js";
-import { TocContext } from "../../../types/toc-context.js";
-import { FileService } from "../../../infrastructure/file-service.js";
-import { BuildContext } from "../../../types/build-context.js";
+import { ok } from 'neverthrow';
+import { PortalNewTocPrompts } from '../../../prompts/portal/toc/new-toc.js';
+import { TocStructureGenerator } from '../../../application/portal/toc/toc-structure-generator.js';
+import { TocGroup } from '../../../types/toc/toc.js';
+import { DirectoryPath } from '../../../types/file/directoryPath.js';
+import { CommandMetadata } from '../../../types/common/command-metadata.js';
+import { ActionResult } from '../../action-result.js';
+import { TocContext } from '../../../types/toc-context.js';
+import { FileService } from '../../../infrastructure/file-service.js';
+import { BuildContext } from '../../../types/build-context.js';
 import {
   extractCallbacksForToc,
   extractEndpointGroupsForToc,
   extractModelsForToc,
   extractWebhooksForToc,
   SdlTocComponents
-} from "../../../types/sdl/sdl.js";
-import { withDirPath } from "../../../infrastructure/tmp-extensions.js";
-import { TempContext } from "../../../types/temp-context.js";
-import { PortalService } from "../../../infrastructure/services/portal-service.js";
+} from '../../../types/sdl/sdl.js';
+import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
+import { TempContext } from '../../../types/temp-context.js';
+import { PortalService } from '../../../infrastructure/services/portal-service.js';
 
 export class ContentContext {
   private readonly fileService = new FileService();
@@ -58,7 +58,7 @@ export class PortalNewTocAction {
       return ActionResult.failed();
     }
     const buildConfig = await buildContext.getBuildFileContents();
-    const contentDirectory = buildDirectory.join(buildConfig.generatePortal?.contentFolder ?? "content");
+    const contentDirectory = buildDirectory.join(buildConfig.generatePortal?.contentFolder ?? 'content');
 
     const tocDir = tocDirectory ?? contentDirectory;
     const tocContext = new TocContext(tocDir);
@@ -76,7 +76,7 @@ export class PortalNewTocAction {
     };
 
     if (expandEndpoints || expandModels || expandWebhooks || expandCallbacks) {
-      const specDirectory = buildDirectory.join("spec");
+      const specDirectory = buildDirectory.join('spec');
 
       if (!(await this.fileService.directoryExists(specDirectory))) {
         this.prompts.fallingBackToDefault();
@@ -98,7 +98,12 @@ export class PortalNewTocAction {
             return ok(sdlTocComponents);
           }
 
-          return ok(extractSdlTocComponents(result.value, expandEndpoints, expandModels, expandWebhooks, expandCallbacks));
+          const endpointGroups = expandEndpoints ? extractEndpointGroupsForToc(result.value) : new Map();
+          const models = expandModels ? extractModelsForToc(result.value) : [];
+          const webhookGroups = expandWebhooks ? extractWebhooksForToc(result.value) : new Map();
+          const callbackGroups = expandCallbacks ? extractCallbacksForToc(result.value) : new Map();
+
+          return ok({ endpointGroups, models, webhookGroups, callbackGroups });
         });
 
         if (sdlResult.isErr()) {
@@ -135,19 +140,4 @@ export class PortalNewTocAction {
 
     return ActionResult.success();
   }
-}
-
-function extractSdlTocComponents(
-  sdl: any,
-  expandEndpoints: boolean,
-  expandModels: boolean,
-  expandWebhooks: boolean,
-  expandCallbacks: boolean
-): SdlTocComponents {
-  const endpointGroups = expandEndpoints ? extractEndpointGroupsForToc(sdl) : new Map();
-  const models = expandModels ? extractModelsForToc(sdl) : [];
-  const webhookGroups = expandWebhooks ? extractWebhooksForToc(sdl) : new Map();
-  const callbackGroups = expandCallbacks ? extractCallbacksForToc(sdl) : new Map();
-
-  return { endpointGroups, models, webhookGroups, callbackGroups };
 }
