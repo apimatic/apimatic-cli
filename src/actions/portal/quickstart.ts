@@ -18,6 +18,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { SpecContext } from "../../types/spec-context.js";
 import { ValidationService } from "../../infrastructure/services/validation-service.js";
 import { FileName } from "../../types/file/fileName.js";
+import { FeaturesToRemove, RemovableFeature } from "@apimatic/sdk";
 
 const defaultPort: number = 3000 as const;
 
@@ -109,12 +110,19 @@ export class PortalQuickstartAction {
       const unallowed = validationResult.getValue();
       if (unallowed && unallowed.Features?.length > 0) {
         this.prompts.stripUnallowedFeaturesStep(unallowed);
-        const prunedStream = await this.validationService.stripUnallowedFeatures(
-          specPath,
-          unallowed,
-        );
+        const config: FeaturesToRemove = {
+          features: unallowed.Features.map(
+            (f: RemovableFeature & { Name?: string; name?: string }) => f.Name ?? f.name
+          ).filter((name): name is RemovableFeature => !!name)
+        };
+
+        if (unallowed.EndpointCount > unallowed.EndpointLimit) {
+          config.endpointsToKeep = unallowed.EndpointLimit;
+        }
+
+        const prunedStream = await this.validationService.stripUnallowedFeatures(specPath, config);
         const specContext = new SpecContext(tempDirectory);
-        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.zip"));
+        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.json"));
       }
 
       // Step 3/4

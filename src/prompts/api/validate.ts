@@ -2,7 +2,7 @@ import { log } from "@clack/prompts";
 import { replaceHTML } from "../../utils/utils.js";
 import { ValidationMessages } from "../../types/utils.js";
 import { Result } from "neverthrow";
-import { ValidateApiResult, ValidationEntry, ValidationSummary } from "@apimatic/sdk";
+import {  ValidationEntry, ValidationSummary } from "@apimatic/sdk";
 import { ServiceError } from "../../infrastructure/service-error.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { format as f } from "../format.js";
@@ -49,28 +49,7 @@ export class ApiValidatePrompts {
     return formatted;
   }
 
-  displayValidationMessagesV2(result: ValidateApiResult): void {
-    if (this.hasValidationIssues(result.validation)) {
-      log.info("Validation");
-      this.displayValidationSummary(result.validation);
-    }
-
-    if (this.hasValidationIssues(result.linting)) {
-      log.info("Linting");
-      this.displayValidationSummary(result.linting);
-    }
-  }
-
-  private hasValidationIssues(summary: ValidationSummary): boolean {
-    return (
-      summary.blocking.length > 0 ||
-      summary.errors.length > 0 ||
-      summary.warnings.length > 0 ||
-      summary.information.length > 0
-    );
-  }
-
-  private displayValidationSummary(summary: ValidationSummary): void {
+  public displayValidationSummary(summary: ValidationSummary): void {
     if (summary.blocking.length > 0) {
       log.error("Blocking");
       for (const entry of summary.blocking) {

@@ -7,7 +7,8 @@ import {
   ContentType,
   FileWrapper,
   ApiError,
-  RemovableFeature
+  RemovableFeature,
+  FeaturesToRemove
 } from "@apimatic/sdk";
 
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -51,7 +52,6 @@ export class ValidationService {
 
     try {
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
       const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
@@ -79,29 +79,19 @@ export class ValidationService {
 
   public async stripUnallowedFeatures(
     specPath: FilePath,
-    unallowedFeatures: UnallowedFeaturesResponse,
+    featuresToRemove: FeaturesToRemove,
     authKey?: string | null
   ): Promise<NodeJS.ReadableStream> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-
-    const rawBaseUrl = process.env.APIMATIC_BASE_URL!;
-    const baseUrl = rawBaseUrl.replace(/\/api\/?$/, "");
-    const apiService = new AxiosService(baseUrl);
+    const apiService = new AxiosService(process.env.APIMATIC_BASE_URL!);
 
     apiService.setAuthHeader(authorizationHeader);
-    const featuresToRemove = {
-      features: unallowedFeatures.Features.map((f: RemovableFeature & { Name?: string; name?: string }) => ({
-        Name: f.Name ?? f.name
-      })),
-      ...(unallowedFeatures.EndpointCount > unallowedFeatures.EndpointLimit && {
-        endpointsToKeep: unallowedFeatures.EndpointLimit
-      })
-    };
 
     const formData = new FormData();
     formData.append("file", createReadStream(specPath.toString()));
     formData.append("featuresToRemove", JSON.stringify(featuresToRemove));
+
     try {
       const response = await apiService.postFormData<FormData, NodeJS.ReadableStream>("/api-features/strip", formData, {
         headers: formData.getHeaders(),
