@@ -122,7 +122,7 @@ export class PortalQuickstartAction {
 
         const prunedStream = await this.validationService.stripUnallowedFeatures(specPath, config);
         const specContext = new SpecContext(tempDirectory);
-        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.json"));
+        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.zip"));
       }
 
       // Step 3/4
