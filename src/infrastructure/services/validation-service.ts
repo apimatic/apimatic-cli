@@ -17,9 +17,9 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import AxiosService from "../axios-service.js";
 import FormData from "form-data";
 import { handleServiceError, ServiceError } from "../service-error.js";
+import axios from "axios";
 
 export interface ValidateViaFileParams {
   file: FilePath;
@@ -86,25 +86,29 @@ export class ValidationService {
   ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
-    const apiService = new AxiosService(process.env.APIMATIC_BASE_URL!);
-
-    apiService.setAuthHeader(authorizationHeader);
 
     const formData = new FormData();
     formData.append("file", createReadStream(specPath.toString()));
     formData.append("featuresToRemove", JSON.stringify(featuresToRemove));
 
-    try {
-      const response = await apiService.postFormData<FormData, NodeJS.ReadableStream>("/api-features/strip", formData, {
-        headers: formData.getHeaders(),
-        responseType: "stream",
-        validateStatus: () => true
-      });
+    const baseURL = process.env.APIMATIC_BASE_URL!;
 
-      return ok(response.data);
-    } catch (error: unknown) {
-      return err(handleServiceError(error));
-    }
+    const response = await axios({
+      method: "POST",
+      url: `${baseURL}/api-features/strip`,
+      data: formData,
+      headers: {
+        ...formData.getHeaders(),
+        Authorization: authorizationHeader
+      },
+      responseType: "stream",
+      validateStatus: () => true
+    });
+
+    return ok(response.data);
+  }
+  catch(error: unknown) {
+    return err(handleServiceError(error));
   }
 
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {
