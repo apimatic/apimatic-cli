@@ -19,6 +19,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import AxiosService from "../axios-service.js";
 import FormData from "form-data";
+import { handleServiceError, ServiceError } from "../service-error.js";
 
 export interface ValidateViaFileParams {
   file: FilePath;
@@ -52,6 +53,7 @@ export class ValidationService {
 
     try {
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
       const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
@@ -81,7 +83,7 @@ export class ValidationService {
     specPath: FilePath,
     featuresToRemove: FeaturesToRemove,
     authKey?: string | null
-  ): Promise<NodeJS.ReadableStream> {
+  ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const apiService = new AxiosService(process.env.APIMATIC_BASE_URL!);
@@ -98,9 +100,10 @@ export class ValidationService {
         responseType: "stream",
         validateStatus: () => true
       });
-      return response.data;
-    } catch (error) {
-      throw new Error(await this.handlePruningErrors(error));
+
+      return ok(response.data);
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
     }
   }
 
@@ -128,24 +131,5 @@ export class ValidationService {
     }
 
     return "Unexpected error occurred while validating API specification.";
-  }
-  private async handlePruningErrors(error: unknown): Promise<string> {
-    if (error instanceof ApiError) {
-      const apiError = error as ApiError;
-
-      switch (apiError.statusCode) {
-        case 400:
-          return "Your API Definition is invalid. Please fix the issues and try again.";
-        case 401:
-          return "You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";
-        case 403:
-          return "You do not have permission to perform this action.";
-        case 500:
-          return "An unexpected error occurred stripping the API specification, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
-        default:
-          return `Error ${apiError.statusCode}: An error occurred during stripping the API specification.`;
-      }
-    }
-    return "Unexpected error occurred stripping API specification.";
   }
 }
