@@ -53,7 +53,6 @@ export class ValidationService {
 
     try {
       const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
       const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
