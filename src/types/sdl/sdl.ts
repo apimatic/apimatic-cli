@@ -129,19 +129,21 @@ export function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {
   let ungroupedWebhooks = new Map<string, TocWebhookPage[]>();
 
   if (ungrouped.length > 0) {
-    const uniqueGroupName = getUniqueGroupName('Webhooks', groupedWebhooks);
+    const uniqueGroupName = getUniqueGroupName('Webhooks', new Set(groupedWebhooks.keys()));
     const uniqueGroupTitle = toTitleCase(uniqueGroupName);
     ungroupedWebhooks.set(uniqueGroupTitle, [
       {
         generate: null,
         from: 'webhook-group-overview',
         webhookGroup: uniqueGroupName
-      }
+      },
+      ...ungrouped.map(
+        (event): TocWebhook => ({
+          ...event,
+          webhookGroup: uniqueGroupName
+        })
+      )
     ]);
-    for (const event of ungrouped) {
-      ungroupedWebhooks.get(uniqueGroupTitle)!.push(event);
-      event.webhookGroup = uniqueGroupName;
-    }
   }
 
   return new Map([...[...groupedWebhooks].sort((a, b) => a[0].localeCompare(b[0])), ...ungroupedWebhooks]);
@@ -183,25 +185,27 @@ export function extractCallbacksForToc(sdl: Sdl): Map<string, TocCallbackPage[]>
   let ungroupedCallbacks = new Map<string, TocCallbackPage[]>();
 
   if (ungrouped.length > 0) {
-    const uniqueGroupName = getUniqueGroupName('Callbacks', groupedCallbacks);
+    const uniqueGroupName = getUniqueGroupName('Callbacks', new Set(groupedCallbacks.keys()));
     const uniqueGroupTitle = toTitleCase(uniqueGroupName);
     ungroupedCallbacks.set(uniqueGroupTitle, [
       {
         generate: null,
         from: 'callback-group-overview',
         callbackGroup: uniqueGroupName
-      }
+      },
+      ...ungrouped.map(
+        (event): TocCallback => ({
+          ...event,
+          callbackGroup: uniqueGroupName
+        })
+      )
     ]);
-    for (const event of ungrouped) {
-      ungroupedCallbacks.get(uniqueGroupTitle)!.push(event);
-      event.callbackGroup = uniqueGroupName;
-    }
   }
 
   return new Map([...[...groupedCallbacks].sort((a, b) => a[0].localeCompare(b[0])), ...ungroupedCallbacks]);
 }
 
-function getUniqueGroupName(baseName: string, existingGroups: Map<string, unknown>): string {
+function getUniqueGroupName(baseName: string, existingGroups: Set<string>): string {
   let counter = 1;
   let name = baseName;
 

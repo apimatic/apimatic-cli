@@ -1,4 +1,3 @@
-import { ok } from 'neverthrow';
 import { PortalNewTocPrompts } from '../../../prompts/portal/toc/new-toc.js';
 import { TocStructureGenerator } from '../../../application/portal/toc/toc-structure-generator.js';
 import { TocGroup } from '../../../types/toc/toc.js';
@@ -95,7 +94,7 @@ export class PortalNewTocAction {
           specFileStream.close();
           if (result.isErr()) {
             this.prompts.fallingBackToDefault();
-            return ok(sdlTocComponents);
+            return sdlTocComponents;
           }
 
           const endpointGroups = expandEndpoints ? extractEndpointGroupsForToc(result.value) : new Map();
@@ -103,15 +102,10 @@ export class PortalNewTocAction {
           const webhookGroups = expandWebhooks ? extractWebhooksForToc(result.value) : new Map();
           const callbackGroups = expandCallbacks ? extractCallbacksForToc(result.value) : new Map();
 
-          return ok({ endpointGroups, models, webhookGroups, callbackGroups });
+          return { endpointGroups, models, webhookGroups, callbackGroups };
         });
 
-        if (sdlResult.isErr()) {
-          this.prompts.logError(sdlResult.error);
-          return ActionResult.failed();
-        }
-
-        sdlTocComponents = sdlResult.value;
+        sdlTocComponents = sdlResult;
       }
     }
 

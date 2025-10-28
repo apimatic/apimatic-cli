@@ -1,4 +1,4 @@
-import { stringify } from "yaml";
+import { stringify } from 'yaml';
 import {
   Toc,
   TocGroup,
@@ -8,7 +8,9 @@ import {
   TocCallbackPage,
   TocWebhookPage,
   TocEndpoint
-} from "../../../types/toc/toc.js";
+} from '../../../types/toc/toc.js';
+
+// TODO: Refactor
 
 export class TocStructureGenerator {
   createTocStructure(
@@ -21,24 +23,24 @@ export class TocStructureGenerator {
     return {
       toc: [
         {
-          group: "Getting Started",
+          group: 'Getting Started',
           items: [
             {
-              generate: "How to Get Started",
-              from: "getting-started"
+              generate: 'How to Get Started',
+              from: 'getting-started'
             }
           ]
         },
         ...contentGroups,
         this.getEndpointsSection(endpointGroups),
         {
-          group: "Events",
+          group: 'Events',
           items: [this.getCallbacksSection(callbackGroups), this.getWebhooksSection(webhookGroups)]
         },
         this.getModelsSection(models),
         {
-          generate: "SDK Infrastructure",
-          from: "sdk-infra"
+          generate: 'SDK Infrastructure',
+          from: 'sdk-infra'
         }
       ]
     };
@@ -48,25 +50,25 @@ export class TocStructureGenerator {
     const transformedToc = this.transformKeys(toc);
     return stringify(transformedToc, {
       indent: 2,
-      nullStr: ""
+      nullStr: ''
     });
   }
 
   private getEndpointsSection(endpointGroups: Map<string, TocEndpoint[]>): TocGroup | TocGenerated {
     if (endpointGroups.size === 0) {
       return {
-        generate: "API Endpoints",
-        from: "endpoints"
+        generate: 'API Endpoints',
+        from: 'endpoints'
       };
     }
     return {
-      group: "API Endpoints",
+      group: 'API Endpoints',
       items: Array.from(endpointGroups).map(([groupName, endpoints]) => ({
         group: groupName,
         items: [
           {
             generate: null,
-            from: "endpoint-group-overview",
+            from: 'endpoint-group-overview',
             endpointGroup: groupName
           } as TocEndpointGroupOverview,
           ...endpoints
@@ -79,7 +81,7 @@ export class TocStructureGenerator {
     if (callbackGroups.size === 0) {
       return {
         generate: null,
-        from: "callbacks"
+        from: 'callbacks'
       };
     }
     if (callbackGroups.size === 1) {
@@ -89,7 +91,7 @@ export class TocStructureGenerator {
       };
     }
     return {
-      group: "Callbacks",
+      group: 'Callbacks',
       items: Array.from(callbackGroups).map(([groupName, eventList]) => ({
         group: groupName,
         items: eventList
@@ -101,7 +103,7 @@ export class TocStructureGenerator {
     if (webhookGroups.size === 0) {
       return {
         generate: null,
-        from: "webhooks"
+        from: 'webhooks'
       };
     }
     if (webhookGroups.size === 1) {
@@ -111,7 +113,7 @@ export class TocStructureGenerator {
       };
     }
     return {
-      group: "Webhooks",
+      group: 'Webhooks',
       items: Array.from(webhookGroups).map(([groupName, eventList]) => ({
         group: groupName,
         items: eventList
@@ -122,12 +124,12 @@ export class TocStructureGenerator {
   private getModelsSection(models: TocModelPage[]): TocGroup | TocGenerated {
     if (models.length === 0) {
       return {
-        generate: "Models",
-        from: "models"
+        generate: 'Models',
+        from: 'models'
       };
     }
     return {
-      group: "Models",
+      group: 'Models',
       items: models
     };
   }
@@ -136,10 +138,10 @@ export class TocStructureGenerator {
     if (Array.isArray(obj)) {
       return obj.map((item) => this.transformKeys(item));
     }
-    if (obj !== null && typeof obj === "object") {
+    if (obj !== null && typeof obj === 'object') {
       return Object.fromEntries(
         Object.entries(obj).map(([key, value]) => [
-          key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase(),
+          key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(),
           this.transformKeys(value)
         ])
       );
