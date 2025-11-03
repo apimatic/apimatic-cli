@@ -10,6 +10,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { Directory } from "../../types/file/directory.js";
 import { Language } from "../../types/sdk/generate.js";
+import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -41,6 +42,22 @@ export class SdkQuickstartPrompts {
 
     return createResourceInputFromInput(spec);
   }
+
+    public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
+      const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
+      const message = [
+  "Your API includes features or endpoints that will be removed to match your current plan:",
+  "",
+  "Features to be removed:",
+  featuresList,
+  "",
+  "Endpoint usage:",
+  `  Allowed: ${unallowed.EndpointLimit}`,
+  `  In your spec: ${unallowed.EndpointCount}`
+      ].join("\n");
+  
+      log.info(message);
+    }
 
   public specFileDoesNotExist() {
     log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");

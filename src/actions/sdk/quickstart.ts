@@ -16,6 +16,8 @@ import { Language } from "../../types/sdk/generate.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { FileName } from "../../types/file/fileName.js";
+import { FeaturesToRemove, RemovableFeature } from "@apimatic/sdk";
+import { ValidationService } from "../../infrastructure/services/validation-service.js";
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
@@ -30,6 +32,7 @@ export class SdkQuickstartAction {
   private readonly fileService = new FileService();
   private readonly launcherService = new LauncherService();
   private readonly zipService = new ZipService();
+  private readonly validationService = new ValidationService(this.configDir);
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -95,6 +98,24 @@ export class SdkQuickstartAction {
           const specContext = new SpecContext(tempDirectory);
           specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
         }
+      }
+
+      const unallowed = validationResult.getValue();
+      if (unallowed && unallowed.Features?.length > 0) {
+        this.prompts.stripUnallowedFeaturesStep(unallowed);
+        const config: FeaturesToRemove = {
+          features: unallowed.Features.map(
+            (f: RemovableFeature & { Name?: string; name?: string }) => f.Name ?? f.name
+          ).filter((name): name is RemovableFeature => !!name)
+        };
+
+        if (unallowed.EndpointCount > unallowed.EndpointLimit) {
+          config.endpointsToKeep = unallowed.EndpointLimit;
+        }
+
+        const prunedStream = await this.validationService.stripUnallowedFeatures(specPath, config);
+        const specContext = new SpecContext(tempDirectory);
+        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.zip"));
       }
 
       // Step 3/4
