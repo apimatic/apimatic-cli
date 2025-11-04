@@ -1,11 +1,15 @@
 import { TocEndpoint, TocModelPage, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage } from '../toc/toc.js';
 import { toTitleCase } from '../../utils/string-utils.js';
 
+export type EndpointGroup = Map<string, TocEndpoint[]>;
+export type WebhookGroup = Map<string, TocWebhookPage[]>;
+export type CallbackGroup = Map<string, TocCallbackPage[]>;
+
 export type SdlTocComponents = {
-  endpointGroups: Map<string, TocEndpoint[]>;
+  endpointGroups: EndpointGroup;
   models: TocModelPage[];
-  webhookGroups: Map<string, TocWebhookPage[]>;
-  callbackGroups: Map<string, TocCallbackPage[]>;
+  webhookGroups: WebhookGroup;
+  callbackGroups: CallbackGroup;
 };
 
 export interface Sdl {
