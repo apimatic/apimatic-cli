@@ -72,6 +72,23 @@ export class PortalQuickstartPrompts {
     log.info(`Step 2 of 4: Validate and Lint your OpenAPI Definition`);
   }
 
+  public splitSpecDetected(unallowed: UnallowedFeaturesResponse): void {
+     const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
+    const message = [
+"Your API includes features or endpoints that are not allowed in your current plan.",
+"You can remove these features to proceed or upload a single spec file instead of a split spec to remove these automatically.",
+"",
+"Features to be removed:",
+featuresList,
+"",
+"Endpoint usage:",
+`  Allowed: ${unallowed.EndpointLimit}`,
+`  In your spec: ${unallowed.EndpointCount}`
+    ].join("\n");
+
+    log.info(message);
+  }
+
   public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
     const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
     const message = [

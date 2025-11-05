@@ -31,6 +31,7 @@ export interface UnallowedFeaturesResponse {
   Features: RemovableFeature[];
   EndpointLimit: number;
   EndpointCount: number;
+  IsSplitSpec: boolean;
 }
 
 export interface ValidateApiResponse {
