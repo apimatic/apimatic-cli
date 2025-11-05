@@ -93,22 +93,22 @@ export class ValidationService {
 
     const baseURL = process.env.APIMATIC_BASE_URL!;
 
-    const response = await axios({
-      method: "POST",
-      url: `${baseURL}/api-features/strip`,
-      data: formData,
-      headers: {
-        ...formData.getHeaders(),
-        Authorization: authorizationHeader
-      },
-      responseType: "stream",
-      validateStatus: () => true
-    });
-
-    return ok(response.data);
-  }
-  catch(error: unknown) {
-    return err(handleServiceError(error));
+    try {
+      const response = await axios({
+        method: "POST",
+        url: `${baseURL}/api-features/strip`,
+        data: formData,
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: authorizationHeader
+        },
+        responseType: "stream",
+        validateStatus: () => true
+      });
+      return ok(response.data);
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
+    }
   }
 
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {

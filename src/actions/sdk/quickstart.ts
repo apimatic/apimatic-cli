@@ -117,9 +117,13 @@ export class SdkQuickstartAction {
           config.endpointsToKeep = unallowed.EndpointLimit;
         }
 
-        const prunedStream = await this.validationService.stripUnallowedFeatures(specPath, config);
-        const specContext = new SpecContext(tempDirectory);
-        specPath = await specContext.save(prunedStream, new FileName("pruned-spec.zip"));
+        const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
+        if (stripUnallowedFeaturesResult.isErr()) {
+          this.prompts.serviceError(stripUnallowedFeaturesResult.error);
+        } else {
+          const specContext = new SpecContext(tempDirectory);
+          specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName("pruned-spec.zip"));
+        }
       }
 
       // Step 3/4
