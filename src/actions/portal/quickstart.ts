@@ -16,9 +16,8 @@ import { FileDownloadService } from "../../infrastructure/services/file-download
 import { getLanguagesConfig } from "../../types/build/build.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { SpecContext } from "../../types/spec-context.js";
-import { ValidationService } from "../../infrastructure/services/validation-service.js";
+import { FeaturesToRemove, ValidationService } from "../../infrastructure/services/validation-service.js";
 import { FileName } from "../../types/file/fileName.js";
-import { FeaturesToRemove, RemovableFeature } from "@apimatic/sdk";
 
 const defaultPort: number = 3000 as const;
 
@@ -116,9 +115,7 @@ export class PortalQuickstartAction {
       if (unallowed && unallowed.Features?.length > 0) {
         this.prompts.stripUnallowedFeaturesStep(unallowed);
         const config: FeaturesToRemove = {
-          features: unallowed.Features.map(
-            (f: RemovableFeature & { Name?: string; name?: string }) => f.Name ?? f.name
-          ).filter((name): name is RemovableFeature => !!name)
+          features: unallowed.Features.filter((name) => !!name)
         };
 
         if (unallowed.EndpointCount > unallowed.EndpointLimit) {

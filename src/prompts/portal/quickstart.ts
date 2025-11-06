@@ -90,7 +90,7 @@ featuresList,
   }
 
   public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
-    const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
+    const featuresList = unallowed.Features.map(f => `  • ${f}`).join('\n');
     const message = [
 "Your API includes features or endpoints that will be removed to match your current plan:",
 "",

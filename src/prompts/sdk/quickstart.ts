@@ -15,7 +15,6 @@ import { UnallowedFeaturesResponse } from "../../infrastructure/services/validat
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
 const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/";
-const defaultSrcDirectoryPath = process.cwd();
 
 export class SdkQuickstartPrompts {
   public importSpecStep() {
@@ -61,7 +60,7 @@ featuresList,
   }
 
     public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
-      const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
+      const featuresList = unallowed.Features.map(f => `  • ${f}`).join('\n');
       const message = [
   "Your API includes features or endpoints that will be removed to match your current plan:",
   "",

@@ -6,9 +6,7 @@ import {
   ValidateApiResult,
   ContentType,
   FileWrapper,
-  ApiError,
-  RemovableFeature,
-  FeaturesToRemove
+  ApiError
 } from "@apimatic/sdk";
 
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -20,6 +18,21 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import FormData from "form-data";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
+import { envInfo } from "../env-info.js";
+
+export enum RemovableFeature {
+  Merging = 'Merging',
+  Pagination = 'Pagination',
+  Webhooks = 'Webhooks',
+  Callbacks = 'Callbacks',
+  MultipleAuthSchemes = 'MultipleAuthSchemes',
+  Oauth2 = 'OAuth2',
+}
+
+export interface FeaturesToRemove {
+  features?: RemovableFeature[];
+  endpointsToKeep?: number;
+}
 
 export interface ValidateViaFileParams {
   file: FilePath;
@@ -91,7 +104,7 @@ export class ValidationService {
     formData.append("file", createReadStream(specPath.toString()));
     formData.append("featuresToRemove", JSON.stringify(featuresToRemove));
 
-    const baseURL = process.env.APIMATIC_BASE_URL!;
+    const baseURL = envInfo.getBaseUrl();
 
     try {
       const response = await axios({
