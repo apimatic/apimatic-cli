@@ -73,7 +73,7 @@ export class PortalQuickstartPrompts {
   }
 
   public splitSpecDetected(unallowed: UnallowedFeaturesResponse): void {
-     const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
+    const featuresList = unallowed.Features.map(f => `  • ${f}`).join('\n');
     const message = [
 "Your API includes features or endpoints that are not allowed in your current plan.",
 "You can remove these features to proceed or upload a single spec file instead of a split spec to remove these automatically.",
