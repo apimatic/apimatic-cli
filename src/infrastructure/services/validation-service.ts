@@ -19,6 +19,7 @@ import FormData from "form-data";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
 import { envInfo } from "../env-info.js";
+import { Buffer } from "node:buffer";
 
 export enum RemovableFeature {
   Merging = 'Merging',
@@ -118,6 +119,11 @@ export class ValidationService {
         responseType: "stream",
         validateStatus: () => true
       });
+
+      if (response.status >= 400) {
+        return err(await this.parseErrorResponse(response));
+      }
+
       return ok(response.data);
     } catch (error: unknown) {
       return err(handleServiceError(error));
@@ -148,5 +154,33 @@ export class ValidationService {
     }
 
     return "Unexpected error occurred while validating API specification.";
+  }
+
+  private async parseErrorResponse(response: any): Promise<ServiceError> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.data) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const errorBody = Buffer.concat(chunks).toString('utf-8');
+
+    let errorMessage = `Error ${response.status}: Failed to strip unallowed features.`;
+
+    try {
+      const errorData = JSON.parse(errorBody);
+      if (errorData.errors?.summary?.[0]) {
+        errorMessage = errorData.errors.summary[0];
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.title) {
+        errorMessage = errorData.title;
+      }
+    } catch {
+      errorMessage = errorBody || errorMessage;
+    }
+
+    return {
+      message: errorMessage,
+      statusCode: response.status
+    } as unknown as ServiceError;
   }
 }

@@ -100,12 +100,7 @@ export class SdkQuickstartAction {
       }
 
       const unallowed = validationResult.getValue();
-      if (unallowed && unallowed?.IsSplitSpec) {
-        this.prompts.splitSpecDetected(unallowed);
-        return ActionResult.cancelled();
-      }
       if (unallowed && unallowed.Features?.length > 0) {
-        this.prompts.stripUnallowedFeaturesStep(unallowed);
         const config: FeaturesToRemove = {
           features: unallowed.Features.filter((name) => !!name),
           endpointsToKeep: unallowed.EndpointLimit
@@ -113,8 +108,10 @@ export class SdkQuickstartAction {
 
         const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
         if (stripUnallowedFeaturesResult.isErr()) {
-          this.prompts.serviceError(stripUnallowedFeaturesResult.error);
+          this.prompts.splitSpecDetected(unallowed);
+          return ActionResult.cancelled();
         } else {
+          this.prompts.stripUnallowedFeaturesStep(unallowed);
           const specContext = new SpecContext(tempDirectory);
           specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName("pruned-spec.zip"));
         }
