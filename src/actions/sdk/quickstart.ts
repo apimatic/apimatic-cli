@@ -107,12 +107,9 @@ export class SdkQuickstartAction {
       if (unallowed && unallowed.Features?.length > 0) {
         this.prompts.stripUnallowedFeaturesStep(unallowed);
         const config: FeaturesToRemove = {
-          features: unallowed.Features.filter((name) => !!name)
+          features: unallowed.Features.filter((name) => !!name),
+          endpointsToKeep: unallowed.EndpointLimit
         };
-
-        if (unallowed.EndpointCount > unallowed.EndpointLimit) {
-          config.endpointsToKeep = unallowed.EndpointLimit;
-        }
 
         const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
         if (stripUnallowedFeaturesResult.isErr()) {
