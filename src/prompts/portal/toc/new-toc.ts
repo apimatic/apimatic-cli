@@ -42,13 +42,23 @@ export class PortalNewTocPrompts {
     log.error(message);
   }
 
-  public extractEndpointGroupsAndModels(fn: Promise<Result<Sdl, ServiceError>>) {
-    return withSpinner(
-      "Extracting endpoint groups and models",
-      "Endpoint groups and models extracted",
-      "Endpoint groups and models extraction failed",
-      fn
-    );
+  public extractComponents(
+    fn: Promise<Result<Sdl, ServiceError>>,
+    expandEndpoints: boolean,
+    expandModels: boolean,
+    expandWebhooks: boolean,
+    expandCallbacks: boolean
+  ): Promise<Result<Sdl, ServiceError>> {
+    const components = [
+      expandEndpoints && "Endpoint groups",
+      expandModels && "Models",
+      expandWebhooks && "Webhooks",
+      expandCallbacks && "Callbacks"
+    ]
+      .filter(Boolean)
+      .join(" and ");
+
+    return withSpinner(`Extracting ${components}`, `${components} extracted`, `${components} extraction failed`, fn);
   }
 
   public tocCreated(tocPath: FilePath) {
