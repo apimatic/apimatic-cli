@@ -16,6 +16,8 @@ import { FileDownloadService } from "../../infrastructure/services/file-download
 import { getLanguagesConfig } from "../../types/build/build.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { SpecContext } from "../../types/spec-context.js";
+import { FeaturesToRemove, ValidationService } from "../../infrastructure/services/validation-service.js";
+import { FileName } from "../../types/file/fileName.js";
 
 const defaultPort: number = 3000 as const;
 
@@ -26,19 +28,25 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
-  private readonly buildFileUrl = new UrlPath(`https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`);
-  private readonly defaultSpecUrl = new UrlPath(`https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`);
+  private readonly buildFileUrl = new UrlPath(
+    `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
+  );
+  private readonly defaultSpecUrl = new UrlPath(
+    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
+  );
   private readonly repositoryFolderName = "sample-docs-as-code-portal-master/src" as const;
+  private readonly validationService: ValidationService;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
+    this.validationService = new ValidationService(this.configDir);
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (!storedAuth?.authKey) {
-      const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute(); 
+      const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
       if (loginResult.isFailed()) {
         return ActionResult.failed();
       }
@@ -95,6 +103,24 @@ export class PortalQuickstartAction {
         } else {
           const specContext = new SpecContext(tempDirectory);
           specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
+        }
+      }
+
+      const unallowed = validationResult.getValue();
+      if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
+        const config: FeaturesToRemove = {
+          features: unallowed.Features.filter((name) => !!name),
+          endpointsToKeep: unallowed.EndpointLimit
+        };
+
+        const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
+        if (stripUnallowedFeaturesResult.isErr()) {
+          this.prompts.splitSpecDetected(unallowed);
+          return ActionResult.failed();
+        } else {
+          this.prompts.stripUnallowedFeaturesStep(unallowed);
+          const specContext = new SpecContext(tempDirectory);
+          specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName("pruned-spec.zip"));
         }
       }
 
@@ -163,9 +189,11 @@ export class PortalQuickstartAction {
       const result = await portalServeAction.execute(sourceDirectory, portalDirectory, defaultPort, true, false, () => {
         this.prompts.nextSteps();
       });
+
       if (result.isFailed()) {
         return ActionResult.failed();
       }
+
       return ActionResult.success();
     });
   };

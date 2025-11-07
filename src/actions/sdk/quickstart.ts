@@ -16,6 +16,7 @@ import { Language } from "../../types/sdk/generate.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { FileName } from "../../types/file/fileName.js";
+import { FeaturesToRemove, ValidationService } from "../../infrastructure/services/validation-service.js";
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
@@ -30,6 +31,7 @@ export class SdkQuickstartAction {
   private readonly fileService = new FileService();
   private readonly launcherService = new LauncherService();
   private readonly zipService = new ZipService();
+  private readonly validationService = new ValidationService(this.configDir);
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -94,6 +96,24 @@ export class SdkQuickstartAction {
         } else {
           const specContext = new SpecContext(tempDirectory);
           specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
+        }
+      }
+
+      const unallowed = validationResult.getValue();
+      if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
+        const config: FeaturesToRemove = {
+          features: unallowed.Features.filter((name) => !!name),
+          endpointsToKeep: unallowed.EndpointLimit
+        };
+
+        const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
+        if (stripUnallowedFeaturesResult.isErr()) {
+          this.prompts.splitSpecDetected(unallowed);
+          return ActionResult.failed();
+        } else {
+          this.prompts.stripUnallowedFeaturesStep(unallowed);
+          const specContext = new SpecContext(tempDirectory);
+          specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName("pruned-spec.zip"));
         }
       }
 
