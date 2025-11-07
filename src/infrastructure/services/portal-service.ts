@@ -192,7 +192,7 @@ export class PortalService {
       const message = (error.result!.errors as Record<string, string[]>)?.[""]?.[0];
       return error.result!.title + "\n- " + message;
     }
-    return "An unexpected error occurred while generating the portal, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+    return "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
   };
 
   private parseBadRequestResponse(errorMessage: string | undefined): string {
