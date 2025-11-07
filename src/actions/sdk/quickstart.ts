@@ -109,7 +109,7 @@ export class SdkQuickstartAction {
         const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
         if (stripUnallowedFeaturesResult.isErr()) {
           this.prompts.splitSpecDetected(unallowed);
-          return ActionResult.cancelled();
+          return ActionResult.failed();
         } else {
           this.prompts.stripUnallowedFeaturesStep(unallowed);
           const specContext = new SpecContext(tempDirectory);

@@ -73,17 +73,15 @@ export class PortalQuickstartPrompts {
   }
 
   public splitSpecDetected(unallowed: UnallowedFeaturesResponse): void {
-    const featuresList = unallowed.Features.map(f => `  • ${f}`).join('\n');
-    const message = [
-"Your API includes features or endpoints that are not allowed in your current plan.",
-"You can remove these features to proceed or upload a single spec file instead of a split spec to remove these automatically.",
-"",
-"Features to be removed:",
+    const featuresList = unallowed.Features.map(f => `  • ${Object.values(f)[0]}`).join('\n');
+  const message = [
+"Your API Specification includes components not available on your current subscription plan:",
 featuresList,
 "",
-"Endpoint usage:",
-`  Allowed: ${unallowed.EndpointLimit}`,
-`  In your spec: ${unallowed.EndpointCount}`
+"To continue:",
+"Remove these components from your API Specification and re-run this command",
+"Combine your split API Specification files into a single file. We can automatically remove unsupported components from single-file specs",
+"Upgrade your subscription to unlock additional features: `\"https://www.apimatic.io/pricing\"`"
     ].join("\n");
 
     log.info(message);
@@ -92,14 +90,12 @@ featuresList,
   public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
     const featuresList = unallowed.Features.map(f => `  • ${f}`).join('\n');
     const message = [
-"Your API includes features or endpoints that will be removed to match your current plan:",
-"",
-"Features to be removed:",
+"Your API Specification includes components not available on your current subscription plan.",
+"We'll automatically remove these components before proceeding:",
 featuresList,
 "",
-"Endpoint usage:",
-`  Allowed: ${unallowed.EndpointLimit}`,
-`  In your spec: ${unallowed.EndpointCount}`
+"You won't see these components in the generated SDKs or documentation.",
+"Want to keep them? Upgrade your subscription to unlock additional features: `\"https://www.apimatic.io/pricing\"`",
     ].join("\n");
 
     log.info(message);
