@@ -107,7 +107,7 @@ export class PortalQuickstartAction {
       }
 
       const unallowed = validationResult.getValue();
-      if (unallowed && unallowed.Features?.length > 0) {
+      if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
         const config: FeaturesToRemove = {
           features: unallowed.Features.filter((name) => !!name),
           endpointsToKeep: unallowed.EndpointLimit
