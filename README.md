@@ -349,16 +349,21 @@ Generate a Table of Contents (TOC) file for your API documentation portal
 ```
 USAGE
   $ apimatic portal toc new [-d <value>] [-i <value>] [-f] [--expand-endpoints] [--expand-models]
+    [--expand-webhooks] [--expand-callbacks]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/src/content] path where the toc.yml will be generated.
   -f, --force                overwrite changes without asking for user consent.
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
+      --expand-callbacks     include individual entries for each callback in the generated 'toc.yml'. Requires a valid
+                             API specification in the working directory.
       --expand-endpoints     include individual entries for each endpoint in the generated 'toc.yml'. Requires a valid
                              API specification in the working directory.
       --expand-models        include individual entries for each model in the generated 'toc.yml'. Requires a valid API
                              specification in the working directory.
+      --expand-webhooks      include individual entries for each webhook in the generated 'toc.yml'. Requires a valid
+                             API specification in the working directory.
 
 DESCRIPTION
   Generate a Table of Contents (TOC) file for your API documentation portal
