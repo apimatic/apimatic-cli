@@ -61,6 +61,7 @@ export class ValidationService {
     commandMetadata,
     authKey
   }: ValidateViaFileParams): Promise<Result<ValidateApiResponse, string>> {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // Only for local testing.
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
