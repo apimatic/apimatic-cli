@@ -54,6 +54,8 @@ export interface ValidateApiResponse {
 }
 
 export class ValidationService {
+  private readonly apiBaseUrl = "https://api.apimatic.io" as const;
+
   constructor(private readonly configDir: DirectoryPath) {}
 
   async validateViaFile({
@@ -105,7 +107,7 @@ export class ValidationService {
     formData.append("file", createReadStream(specPath.toString()));
     formData.append("featuresToRemove", JSON.stringify(featuresToRemove));
 
-    const baseURL = envInfo.getBaseUrl();
+    const baseURL = envInfo.getBaseUrl() ?? this.apiBaseUrl;
 
     try {
       const response = await axios({
