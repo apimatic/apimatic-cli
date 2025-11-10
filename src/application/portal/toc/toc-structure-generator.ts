@@ -12,14 +12,36 @@ import {
 
 // TODO: Refactor
 
+type Endpoints = {
+  data: Map<string, TocEndpoint[]>;
+  expand: boolean;
+};
+
+type Webhooks = {
+  data: Map<string, TocWebhookPage[]>;
+  expand: boolean;
+};
+
+type Callbacks = {
+  data: Map<string, TocCallbackPage[]>;
+  expand: boolean;
+};
+
+type Models = {
+  data: TocModelPage[];
+  expand: boolean;
+};
+
 export class TocStructureGenerator {
   createTocStructure(
-    endpointGroups: Map<string, TocEndpoint[]>,
-    models: TocModelPage[],
-    webhookGroups: Map<string, TocWebhookPage[]>,
-    callbackGroups: Map<string, TocCallbackPage[]>,
+    endpoints: Endpoints,
+    models: Models,
+    webhooks: Webhooks,
+    callbacks: Callbacks,
     contentGroups: TocGroup[] = []
   ): Toc {
+    const events = [...this.getCallbacksSection(callbacks), ...this.getWebhooksSection(webhooks)];
+
     return {
       toc: [
         {
@@ -32,11 +54,16 @@ export class TocStructureGenerator {
           ]
         },
         ...contentGroups,
-        this.getEndpointsSection(endpointGroups),
-        {
-          group: 'Events',
-          items: [this.getCallbacksSection(callbackGroups), this.getWebhooksSection(webhookGroups)]
-        },
+        this.getEndpointsSection(endpoints),
+        // only add if events exist
+        ...(events.length > 0
+          ? [
+              {
+                group: 'Events',
+                items: events
+              }
+            ]
+          : []),
         this.getModelsSection(models),
         {
           generate: 'SDK Infrastructure',
@@ -54,8 +81,8 @@ export class TocStructureGenerator {
     });
   }
 
-  private getEndpointsSection(endpointGroups: Map<string, TocEndpoint[]>): TocGroup | TocGenerated {
-    if (endpointGroups.size === 0) {
+  private getEndpointsSection(endpoints: Endpoints): TocGroup | TocGenerated {
+    if (!endpoints.expand || endpoints.data.size === 0) {
       return {
         generate: 'API Endpoints',
         from: 'endpoints'
@@ -63,7 +90,7 @@ export class TocStructureGenerator {
     }
     return {
       group: 'API Endpoints',
-      items: Array.from(endpointGroups).map(([groupName, endpoints]) => ({
+      items: Array.from(endpoints.data).map(([groupName, endpoints]) => ({
         group: groupName,
         items: [
           {
@@ -77,52 +104,70 @@ export class TocStructureGenerator {
     };
   }
 
-  private getCallbacksSection(callbackGroups: Map<string, TocCallbackPage[]>): TocGroup | TocGenerated {
-    if (callbackGroups.size === 0) {
-      return {
+  private getCallbacksSection(callbacks: Callbacks): (TocGroup | TocGenerated)[] {
+    if (callbacks.data.size === 0) {
+      return [];
+    }
+    if (callbacks.expand === true) {
+      if (callbacks.data.size === 1) {
+        return [
+          {
+            group: Array.from(callbacks.data.keys())[0],
+            items: Array.from(callbacks.data.values())[0]
+          }
+        ];
+      }
+      return [
+        {
+          group: 'Callbacks',
+          items: Array.from(callbacks.data).map(([groupName, eventList]) => ({
+            group: groupName,
+            items: eventList
+          }))
+        }
+      ];
+    }
+    return [
+      {
         generate: null,
         from: 'callbacks'
-      };
-    }
-    if (callbackGroups.size === 1) {
-      return {
-        group: Array.from(callbackGroups.keys())[0],
-        items: Array.from(callbackGroups.values())[0]
-      };
-    }
-    return {
-      group: 'Callbacks',
-      items: Array.from(callbackGroups).map(([groupName, eventList]) => ({
-        group: groupName,
-        items: eventList
-      }))
-    };
+      }
+    ];
   }
 
-  private getWebhooksSection(webhookGroups: Map<string, TocWebhookPage[]>): TocGroup | TocGenerated {
-    if (webhookGroups.size === 0) {
-      return {
+  private getWebhooksSection(webhooks: Webhooks): (TocGroup | TocGenerated)[] {
+    if (webhooks.data.size === 0) {
+      return [];
+    }
+    if (webhooks.expand === true) {
+      if (webhooks.data.size === 1) {
+        return [
+          {
+            group: Array.from(webhooks.data.keys())[0],
+            items: Array.from(webhooks.data.values())[0]
+          }
+        ];
+      }
+      return [
+        {
+          group: 'Webhooks',
+          items: Array.from(webhooks.data).map(([groupName, eventList]) => ({
+            group: groupName,
+            items: eventList
+          }))
+        }
+      ];
+    }
+    return [
+      {
         generate: null,
         from: 'webhooks'
-      };
-    }
-    if (webhookGroups.size === 1) {
-      return {
-        group: Array.from(webhookGroups.keys())[0],
-        items: Array.from(webhookGroups.values())[0]
-      };
-    }
-    return {
-      group: 'Webhooks',
-      items: Array.from(webhookGroups).map(([groupName, eventList]) => ({
-        group: groupName,
-        items: eventList
-      }))
-    };
+      }
+    ];
   }
 
-  private getModelsSection(models: TocModelPage[]): TocGroup | TocGenerated {
-    if (models.length === 0) {
+  private getModelsSection(models: Models): TocGroup | TocGenerated {
+    if (!models.expand || models.data.length === 0) {
       return {
         generate: 'Models',
         from: 'models'
@@ -130,7 +175,7 @@ export class TocStructureGenerator {
     }
     return {
       group: 'Models',
-      items: models
+      items: models.data
     };
   }
 
