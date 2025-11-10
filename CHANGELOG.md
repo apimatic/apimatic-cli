@@ -1,3 +1,10 @@
+# [1.1.0-beta.4](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.3...v1.1.0-beta.4) (2025-11-10)
+
+
+### Bug Fixes
+
+* failing pruning api call ([#224](https://github.com/apimatic/apimatic-cli/issues/224)) ([04110e6](https://github.com/apimatic/apimatic-cli/commit/04110e618fd68b89797e2d8d376c3e918a66dede))
+
 # [1.1.0-beta.3](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.2...v1.1.0-beta.3) (2025-11-07)
 
 
