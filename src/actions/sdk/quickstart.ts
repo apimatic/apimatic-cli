@@ -32,6 +32,7 @@ export class SdkQuickstartAction {
   private readonly launcherService = new LauncherService();
   private readonly zipService = new ZipService();
   private readonly validationService = new ValidationService(this.configDir);
+  private readonly validationService = new ValidationService(this.configDir);
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 

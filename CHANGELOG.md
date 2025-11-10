@@ -1,3 +1,11 @@
+# [1.1.0-beta.3](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.2...v1.1.0-beta.3) (2025-11-07)
+
+
+### Features
+
+* add support for spec pruning and webhooks callbacks flags in toc command  ([#220](https://github.com/apimatic/apimatic-cli/issues/220)) ([241d4be](https://github.com/apimatic/apimatic-cli/commit/241d4bed12dc705cdc10584cb91b08317b91e583))
+* portal quickstart http multiselect ([#214](https://github.com/apimatic/apimatic-cli/issues/214)) ([0ee9f50](https://github.com/apimatic/apimatic-cli/commit/0ee9f5035f97803035fcc319718fe9e6c672d022))
+
 # [1.1.0-beta.2](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.1...v1.1.0-beta.2) (2025-09-19)
 
 
