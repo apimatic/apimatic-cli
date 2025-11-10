@@ -99,20 +99,6 @@ export class ValidationService {
         result: validation.result as ValidateApiResult,
         unallowedFeatures
       });
-      const headerValue = validation.headers?.["x-unallowed-features"];
-      let unallowedFeatures: UnallowedFeaturesResponse | null = null;
-
-      if (headerValue) {
-        const decodedJson = globalThis.Buffer.from(headerValue, "base64").toString("utf8");
-        const parsed = JSON.parse(decodedJson);
-
-        unallowedFeatures = parsed as UnallowedFeaturesResponse;
-      }
-
-      return ok({
-        result: validation.result as ValidateApiResult,
-        unallowedFeatures
-      });
     } catch (error) {
       return err(await this.handleValidationErrors(error));
     }
