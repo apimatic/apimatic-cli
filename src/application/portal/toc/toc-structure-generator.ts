@@ -55,7 +55,6 @@ export class TocStructureGenerator {
         },
         ...contentGroups,
         this.getEndpointsSection(endpoints),
-        // only add if events exist
         ...(events.length > 0
           ? [
               {
@@ -64,7 +63,7 @@ export class TocStructureGenerator {
               }
             ]
           : []),
-        this.getModelsSection(models),
+        ...this.getModelsSection(models),
         {
           generate: 'SDK Infrastructure',
           from: 'sdk-infra'
@@ -166,17 +165,24 @@ export class TocStructureGenerator {
     ];
   }
 
-  private getModelsSection(models: Models): TocGroup | TocGenerated {
-    if (!models.expand || models.data.length === 0) {
-      return {
-        generate: 'Models',
-        from: 'models'
-      };
+  private getModelsSection(models: Models): (TocGroup | TocGenerated)[] {
+    if (models.data.length === 0) {
+      return [];
     }
-    return {
-      group: 'Models',
-      items: models.data
-    };
+    if (!models.expand) {
+      return [
+        {
+          generate: 'Models',
+          from: 'models'
+        }
+      ];
+    }
+    return [
+      {
+        group: 'Models',
+        items: models.data
+      }
+    ];
   }
 
   private transformKeys(obj: any): any {
