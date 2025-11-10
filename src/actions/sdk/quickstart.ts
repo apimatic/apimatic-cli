@@ -17,6 +17,7 @@ import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { ZipService } from '../../infrastructure/zip-service.js';
 import { FileName } from '../../types/file/fileName.js';
 import { ValidationService } from '../../infrastructure/services/validation-service.js';
+import { stripPrompts } from '../../prompts/strip/strip.js';
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
@@ -27,6 +28,7 @@ const metadataFileUrl = new UrlPath(
 
 export class SdkQuickstartAction {
   private readonly prompts = new SdkQuickstartPrompts();
+  private readonly stripSpecPrompts = new stripPrompts();
   private readonly fileDownloadService = new FileDownloadService();
   private readonly fileService = new FileService();
   private readonly launcherService = new LauncherService();
@@ -103,12 +105,12 @@ export class SdkQuickstartAction {
       const featureResult = await this.validationService.processUnallowedFeatures(specPath, unallowed, tempDirectory);
 
       if (!featureResult.success && featureResult.unallowedInfo) {
-        this.prompts.splitSpecDetected(featureResult.unallowedInfo);
+        this.stripSpecPrompts.splitSpecDetected(featureResult.unallowedInfo);
         return ActionResult.failed();
       }
 
       if (featureResult.featuresWereStripped && featureResult.unallowedInfo) {
-        this.prompts.stripUnallowedFeaturesStep(featureResult.unallowedInfo);
+        this.stripSpecPrompts.stripUnallowedFeaturesStep(featureResult.unallowedInfo);
       }
       specPath = featureResult.updatedSpecPath ?? specPath;
 
