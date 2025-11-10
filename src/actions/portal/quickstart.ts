@@ -16,8 +16,8 @@ import { FileDownloadService } from "../../infrastructure/services/file-download
 import { getLanguagesConfig } from "../../types/build/build.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { SpecContext } from "../../types/spec-context.js";
-import { FeaturesToRemove, ValidationService } from "../../infrastructure/services/validation-service.js";
-import { FileName } from "../../types/file/fileName.js";
+import { ValidationService } from "../../infrastructure/services/validation-service.js";
+
 
 const defaultPort: number = 3000 as const;
 
@@ -107,22 +107,17 @@ export class PortalQuickstartAction {
       }
 
       const unallowed = validationResult.getValue();
-      if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
-        const config: FeaturesToRemove = {
-          features: unallowed.Features.filter((name) => !!name),
-          endpointsToKeep: unallowed.EndpointLimit
-        };
+      const featureResult = await this.validationService.processUnallowedFeatures(specPath, unallowed, tempDirectory);
 
-        const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
-        if (stripUnallowedFeaturesResult.isErr()) {
-          this.prompts.splitSpecDetected(unallowed);
-          return ActionResult.failed();
-        } else {
-          this.prompts.stripUnallowedFeaturesStep(unallowed);
-          const specContext = new SpecContext(tempDirectory);
-          specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName("pruned-spec.zip"));
-        }
+      if (!featureResult.success && featureResult.unallowedInfo) {
+        this.prompts.splitSpecDetected(featureResult.unallowedInfo);
+        return ActionResult.failed();
       }
+
+      if (featureResult.featuresWereStripped && featureResult.unallowedInfo) {
+        this.prompts.stripUnallowedFeaturesStep(featureResult.unallowedInfo);
+      }
+      specPath = featureResult.updatedSpecPath ?? specPath;
 
       // Step 3/4
       this.prompts.selectLanguagesStep();

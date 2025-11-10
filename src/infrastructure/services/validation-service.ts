@@ -20,6 +20,8 @@ import { handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
 import { envInfo } from "../env-info.js";
 import { Buffer } from "node:buffer";
+import { FileName } from "../../types/file/fileName.js";
+import { SpecContext } from "../../types/spec-context.js";
 
 export enum RemovableFeature {
   Merging = 'Merging',
@@ -52,6 +54,15 @@ export interface ValidateApiResponse {
   result: ValidateApiResult;
   unallowedFeatures: UnallowedFeaturesResponse | null;
 }
+
+export interface ProcessUnallowedFeaturesResult {
+  success: boolean;
+  updatedSpecPath?: FilePath;
+  splitSpecDetected?: boolean;
+  featuresWereStripped?: boolean;
+  unallowedInfo?: UnallowedFeaturesResponse;
+}
+
 
 export class ValidationService {
   constructor(private readonly configDir: DirectoryPath) {}
@@ -129,6 +140,58 @@ export class ValidationService {
       return err(handleServiceError(error));
     }
   }
+
+  public async processUnallowedFeatures(
+    specPath: FilePath,
+    unallowed: UnallowedFeaturesResponse | null,
+    tempDirectory: DirectoryPath,
+    authKey?: string | null
+  ): Promise<ProcessUnallowedFeaturesResult> {
+    if (!unallowed || (unallowed.Features?.length === 0 && unallowed.EndpointCount <= unallowed.EndpointLimit)) {
+      return {
+        success: true,
+        updatedSpecPath: specPath,
+        featuresWereStripped: false
+      };
+    }
+
+    if (unallowed.IsSplitSpec) {
+      return {
+        success: false,
+        splitSpecDetected: true,
+        unallowedInfo: unallowed
+      };
+    }
+
+    const config: FeaturesToRemove = {
+      features: unallowed.Features.filter((name) => !!name),
+      endpointsToKeep: unallowed.EndpointLimit
+    };
+
+    const stripResult = await this.stripUnallowedFeatures(specPath, config, authKey);
+
+    if (stripResult.isErr()) {
+      return {
+        success: false,
+        splitSpecDetected: true,
+        unallowedInfo: unallowed
+      };
+    }
+
+    const specContext = new SpecContext(tempDirectory);
+    const updatedSpecPath = await specContext.save(
+      stripResult.value,
+      new FileName("pruned-spec.zip")
+    );
+
+    return {
+      success: true,
+      updatedSpecPath,
+      featuresWereStripped: true,
+      unallowedInfo: unallowed
+    };
+  }
+
 
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {
     const key = overrideAuthKey || authInfo?.authKey;
