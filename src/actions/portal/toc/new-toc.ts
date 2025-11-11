@@ -75,10 +75,6 @@ export class PortalNewTocAction {
         callbackGroups: new Map()
       };
 
-      if (!expandEndpoints && !expandModels && !expandWebhooks && !expandCallbacks) {
-        return defaultComponents;
-      }
-
       const specDirectory = buildDirectory.join('spec');
 
       if (!(await this.fileService.directoryExists(specDirectory))) {
@@ -103,12 +99,12 @@ export class PortalNewTocAction {
           return defaultComponents;
         }
 
-        const endpointGroups = expandEndpoints ? extractEndpointGroupsForToc(result.value) : new Map();
-        const models = expandModels ? extractModelsForToc(result.value) : [];
-        const webhookGroups = expandWebhooks ? extractWebhooksForToc(result.value) : new Map();
-        const callbackGroups = expandCallbacks ? extractCallbacksForToc(result.value) : new Map();
-
-        return { endpointGroups, models, webhookGroups, callbackGroups };
+        return {
+          endpointGroups: extractEndpointGroupsForToc(result.value),
+          models: extractModelsForToc(result.value),
+          webhookGroups: extractWebhooksForToc(result.value),
+          callbackGroups: extractCallbacksForToc(result.value)
+        };
       });
     })();
     const contentContext = new ContentContext(contentDirectory);
@@ -123,10 +119,10 @@ export class PortalNewTocAction {
     }
 
     const toc = this.tocGenerator.createTocStructure(
-      sdlTocComponents.endpointGroups,
-      sdlTocComponents.models,
-      sdlTocComponents.webhookGroups,
-      sdlTocComponents.callbackGroups,
+      { data: sdlTocComponents.endpointGroups, expand: expandEndpoints },
+      { data: sdlTocComponents.models, expand: expandModels },
+      { data: sdlTocComponents.webhookGroups, expand: expandWebhooks },
+      { data: sdlTocComponents.callbackGroups, expand: expandCallbacks },
       contentGroups
     );
     const yamlString = this.tocGenerator.transformToYaml(toc);
