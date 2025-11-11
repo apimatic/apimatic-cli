@@ -128,7 +128,7 @@ export class TocStructureGenerator {
     }
     return [
       {
-        generate: null,
+        generate: "Callbacks",
         from: 'callbacks'
       }
     ];
@@ -159,7 +159,7 @@ export class TocStructureGenerator {
     }
     return [
       {
-        generate: null,
+        generate: "Webhooks",
         from: 'webhooks'
       }
     ];
