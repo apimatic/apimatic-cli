@@ -1,22 +1,22 @@
-import { SdkQuickstartPrompts } from "../../prompts/sdk/quickstart.js";
-import { ActionResult } from "../action-result.js";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { LoginAction } from "../auth/login.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { getAuthInfo } from "../../client-utils/auth-manager.js";
-import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { SpecContext } from "../../types/spec-context.js";
-import { ValidateAction } from "../api/validate.js";
-import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
-import { FileService } from "../../infrastructure/file-service.js";
-import { GenerateAction } from "./generate.js";
-import { Language } from "../../types/sdk/generate.js";
-import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { ZipService } from "../../infrastructure/zip-service.js";
-import { FileName } from "../../types/file/fileName.js";
-import { FeaturesToRemove, ValidationService } from "../../infrastructure/services/validation-service.js";
+import { SdkQuickstartPrompts } from '../../prompts/sdk/quickstart.js';
+import { ActionResult } from '../action-result.js';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { LoginAction } from '../auth/login.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { getAuthInfo } from '../../client-utils/auth-manager.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { SpecContext } from '../../types/spec-context.js';
+import { ValidateAction } from '../api/validate.js';
+import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
+import { FileService } from '../../infrastructure/file-service.js';
+import { GenerateAction } from './generate.js';
+import { Language } from '../../types/sdk/generate.js';
+import { LauncherService } from '../../infrastructure/launcher-service.js';
+import { ZipService } from '../../infrastructure/zip-service.js';
+import { FileName } from '../../types/file/fileName.js';
+import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
@@ -99,21 +99,23 @@ export class SdkQuickstartAction {
         }
       }
 
-      const unallowed = validationResult.getValue();
-      if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
-        const config: FeaturesToRemove = {
-          features: unallowed.Features.filter((name) => !!name),
-          endpointsToKeep: unallowed.EndpointLimit
-        };
+      if (validationResult.isSuccess()) {
+        const unallowed = validationResult.getValue();
+        if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
+          const config: FeaturesToRemove = {
+            features: unallowed.Features.filter((name) => !!name),
+            endpointsToKeep: unallowed.EndpointLimit
+          };
 
-        const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
-        if (stripUnallowedFeaturesResult.isErr()) {
-          this.prompts.splitSpecDetected(unallowed);
-          return ActionResult.failed();
-        } else {
-          this.prompts.stripUnallowedFeaturesStep(unallowed);
-          const specContext = new SpecContext(tempDirectory);
-          specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName("pruned-spec.zip"));
+          const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
+          if (stripUnallowedFeaturesResult.isErr()) {
+            this.prompts.splitSpecDetected(unallowed);
+            return ActionResult.failed();
+          } else {
+            this.prompts.stripUnallowedFeaturesStep(unallowed);
+            const specContext = new SpecContext(tempDirectory);
+            specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName('pruned-spec.zip'));
+          }
         }
       }
 
@@ -158,7 +160,7 @@ export class SdkQuickstartAction {
         this.prompts.serviceError(apimaticMetaFile.error);
         return ActionResult.failed();
       }
-      const tempSpecDirectory = tempDirectory.join("spec");
+      const tempSpecDirectory = tempDirectory.join('spec');
       await this.fileService.createDirectoryIfNotExists(tempSpecDirectory);
       const metadataFilePath = new FilePath(tempSpecDirectory, apimaticMetaFile.value.filename);
       await this.fileService.writeFile(metadataFilePath, apimaticMetaFile.value.stream);
@@ -169,14 +171,14 @@ export class SdkQuickstartAction {
         await this.fileService.copyToDir(specPath, tempSpecDirectory);
       }
 
-      const sourceDirectory = inputDirectory.join("src");
-      const specDirectory = sourceDirectory.join("spec");
+      const sourceDirectory = inputDirectory.join('src');
+      const specDirectory = sourceDirectory.join('spec');
       await this.fileService.copyDirectoryContents(tempSpecDirectory, specDirectory);
 
       const srcDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, srcDirectoryStructure);
 
-      const sdkDirectory = inputDirectory.join("sdk");
+      const sdkDirectory = inputDirectory.join('sdk');
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const result = await sdkGenerateAction.execute(specDirectory, sdkDirectory, language as Language, true, false);
       if (result.isFailed()) {
@@ -184,7 +186,7 @@ export class SdkQuickstartAction {
       }
 
       const languageDirectory = sdkDirectory.join(language);
-      const readmeFilePath = new FilePath(languageDirectory, new FileName("README.md"));
+      const readmeFilePath = new FilePath(languageDirectory, new FileName('README.md'));
       if (await this.launcherService.openFolderInIde(languageDirectory, readmeFilePath)) {
         this.prompts.sdkOpenedInEditor();
       }

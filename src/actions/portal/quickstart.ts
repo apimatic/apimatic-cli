@@ -1,23 +1,23 @@
-import { getAuthInfo } from "../../client-utils/auth-manager.js";
-import { FileService } from "../../infrastructure/file-service.js";
-import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { ZipService } from "../../infrastructure/zip-service.js";
-import { PortalQuickstartPrompts } from "../../prompts/portal/quickstart.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { LoginAction } from "../auth/login.js";
-import { ActionResult } from "../action-result.js";
-import { PortalServeAction } from "./serve.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { ValidateAction } from "../api/validate.js";
-import { BuildContext } from "../../types/build-context.js";
-import { TempContext } from "../../types/temp-context.js";
-import { FileDownloadService } from "../../infrastructure/services/file-download-service.js";
-import { getLanguagesConfig } from "../../types/build/build.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { SpecContext } from "../../types/spec-context.js";
-import { FeaturesToRemove, ValidationService } from "../../infrastructure/services/validation-service.js";
-import { FileName } from "../../types/file/fileName.js";
+import { getAuthInfo } from '../../client-utils/auth-manager.js';
+import { FileService } from '../../infrastructure/file-service.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { ZipService } from '../../infrastructure/zip-service.js';
+import { PortalQuickstartPrompts } from '../../prompts/portal/quickstart.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { LoginAction } from '../auth/login.js';
+import { ActionResult } from '../action-result.js';
+import { PortalServeAction } from './serve.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ValidateAction } from '../api/validate.js';
+import { BuildContext } from '../../types/build-context.js';
+import { TempContext } from '../../types/temp-context.js';
+import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
+import { getLanguagesConfig } from '../../types/build/build.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { SpecContext } from '../../types/spec-context.js';
+import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
+import { FileName } from '../../types/file/fileName.js';
 
 const defaultPort: number = 3000 as const;
 
@@ -34,7 +34,7 @@ export class PortalQuickstartAction {
   private readonly defaultSpecUrl = new UrlPath(
     `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
   );
-  private readonly repositoryFolderName = "sample-docs-as-code-portal-master/src" as const;
+  private readonly repositoryFolderName = 'sample-docs-as-code-portal-master/src' as const;
   private readonly validationService: ValidationService;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
@@ -106,21 +106,23 @@ export class PortalQuickstartAction {
         }
       }
 
-      const unallowed = validationResult.getValue();
-      if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
-        const config: FeaturesToRemove = {
-          features: unallowed.Features.filter((name) => !!name),
-          endpointsToKeep: unallowed.EndpointLimit
-        };
+      if (validationResult.isSuccess()) {
+        const unallowed = validationResult.getValue();
+        if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
+          const config: FeaturesToRemove = {
+            features: unallowed.Features.filter((name) => !!name),
+            endpointsToKeep: unallowed.EndpointLimit
+          };
 
-        const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
-        if (stripUnallowedFeaturesResult.isErr()) {
-          this.prompts.splitSpecDetected(unallowed);
-          return ActionResult.failed();
-        } else {
-          this.prompts.stripUnallowedFeaturesStep(unallowed);
-          const specContext = new SpecContext(tempDirectory);
-          specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName("pruned-spec.zip"));
+          const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
+          if (stripUnallowedFeaturesResult.isErr()) {
+            this.prompts.splitSpecDetected(unallowed);
+            return ActionResult.failed();
+          } else {
+            this.prompts.stripUnallowedFeaturesStep(unallowed);
+            const specContext = new SpecContext(tempDirectory);
+            specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName('pruned-spec.zip'));
+          }
         }
       }
 
@@ -174,17 +176,17 @@ export class PortalQuickstartAction {
       buildFile.generatePortal!.languageConfig = getLanguagesConfig(languages);
       await tempBuildContext.updateBuildFileContents(buildFile);
 
-      const sourceDirectory = inputDirectory.join("src");
+      const sourceDirectory = inputDirectory.join('src');
       await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
 
-      const specDirectory = sourceDirectory.join("spec");
+      const specDirectory = sourceDirectory.join('spec');
       const specContext = new SpecContext(specDirectory);
       await specContext.replaceDefaultSpec(specPath);
 
       const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
 
-      const portalDirectory = inputDirectory.join("portal");
+      const portalDirectory = inputDirectory.join('portal');
       const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
       const result = await portalServeAction.execute(sourceDirectory, portalDirectory, defaultPort, true, false, () => {
         this.prompts.nextSteps();
