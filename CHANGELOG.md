@@ -1,3 +1,10 @@
+# [1.1.0-beta.5](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.4...v1.1.0-beta.5) (2025-11-25)
+
+
+### Bug Fixes
+
+* broken quickstart sample flow and empty events in toc ([#227](https://github.com/apimatic/apimatic-cli/issues/227)) ([acd2837](https://github.com/apimatic/apimatic-cli/commit/acd2837548179a4c46fe4b39ef020b345d8c2115))
+
 # [1.1.0-beta.4](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.3...v1.1.0-beta.4) (2025-11-10)
 
 
