@@ -60,6 +60,18 @@ export class ApiService {
         return ok({ status: "Completed" } as PortalGenerationStatusResponse);
       }
 
+      if (response.status === 400) {
+        const message = Object.values(response.data.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = response.data.title + "\n- " + message;
+        return err(ServiceError.badRequest(errorMessage));
+      }
+
+      if (response.status === 403) {
+        const message = Object.values(response.data.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = response.data.title + "\n- " + message;
+        return err(ServiceError.forbidden(errorMessage));
+      }
+
       return err(ServiceError.InvalidResponse);
     } catch (error: unknown) {
       return err(handleServiceError(error));
