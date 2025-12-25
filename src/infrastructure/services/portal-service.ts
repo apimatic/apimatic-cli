@@ -13,7 +13,8 @@ import {
   TransformationController,
   Transformation,
   ExportFormats,
-  Platforms
+  Platforms,
+  Status
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { parseStreamBodyToJson } from "../../utils/utils.js";
@@ -85,10 +86,10 @@ export class PortalService {
       if (statusResult.isErr()) {
         return err(statusResult.error);
       }
-      if (statusResult.value.status === "Failed") {
+      if (statusResult.value.status === Status.Failed) {
         return err(ServiceError.ServerError);
       }
-    } while (statusResult.value.status !== "Completed");
+    } while (statusResult.value.status !== Status.Completed);
 
     try {
       const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);

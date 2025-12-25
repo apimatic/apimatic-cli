@@ -5,7 +5,7 @@ import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../service-error.js";
-import { PortalGenerationStatusResponse } from "@apimatic/sdk";
+import { PortalGenerationStatusResponse, Status } from "@apimatic/sdk";
 
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
@@ -53,7 +53,22 @@ export class ApiService {
       });
 
       if (response.status === 200) {
-        return ok(response.data as PortalGenerationStatusResponse);
+        var status = response.data as PortalGenerationStatusResponse;
+        if (status.detail && status.status === Status.ValidationFailure) {
+          const messages = Object.entries(status.detail.errors as Record<string, string[]>)
+          .flatMap(([field, errors]) => errors.map(error => `${field}: ${error}`))
+          .join("\n- ");
+          const errorMessage = status.detail.title + "\n- " + messages;
+          return err(ServiceError.badRequest(errorMessage));
+        }
+        if (status.detail && status.status === Status.SubscriptionFailure) {
+          const messages = Object.entries(status.detail.errors as Record<string, string[]>)
+          .flatMap(([field, errors]) => errors.map(error => `${field}: ${error}`))
+          .join("\n- ");
+          const errorMessage = status.detail.title + "\n- " + messages;
+          return err(ServiceError.forbidden(errorMessage));
+        }
+        return ok(status);
       }
 
       if (response.status === 302) {
