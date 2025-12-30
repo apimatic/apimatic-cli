@@ -53,22 +53,20 @@ export class ApiService {
       });
 
       if (response.status === 200) {
-        var status = response.data as PortalGenerationStatusResponse;
-        if (status.detail && status.status === Status.ValidationFailure) {
-          const messages = Object.entries(status.detail.errors as Record<string, string[]>)
-          .flatMap(([field, errors]) => errors.map(error => `${field}: ${error}`))
-          .join("\n- ");
-          const errorMessage = status.detail.title + "\n- " + messages;
+        var statusResponse = response.data as PortalGenerationStatusResponse;
+        if (statusResponse.errors && statusResponse.status === Status.ValidationError) {
+          // TODO: This only picks the first error message, improve it to show all errors.
+          const message = Object.values(statusResponse.errors as Record<string, string[]>)[0]?.[0] ?? null;
+          const errorMessage = "One or more validation errors occurred." + "\n- " + message;
           return err(ServiceError.badRequest(errorMessage));
         }
-        if (status.detail && status.status === Status.SubscriptionFailure) {
-          const messages = Object.entries(status.detail.errors as Record<string, string[]>)
-          .flatMap(([field, errors]) => errors.map(error => `${field}: ${error}`))
-          .join("\n- ");
-          const errorMessage = status.detail.title + "\n- " + messages;
+        if (statusResponse.errors && statusResponse.status === Status.SubscriptionError) {
+          // TODO: This only picks the first error message, improve it to show all errors.
+          const message = Object.values(statusResponse.errors as Record<string, string[]>)[0]?.[0] ?? null;
+          const errorMessage = "Access denied to resource." + "\n- " + message;
           return err(ServiceError.forbidden(errorMessage));
         }
-        return ok(status);
+        return ok(statusResponse);
       }
 
       if (response.status === 302) {
