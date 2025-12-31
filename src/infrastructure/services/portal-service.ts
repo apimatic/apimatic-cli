@@ -59,6 +59,7 @@ export class PortalService {
       generationId = portalInstance.result.id;
     } catch (error) {
       if (error instanceof ProblemDetailsError) {
+        // TODO: This only picks the first error message, improve it to show all errors.
         const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
         const errorMessage = error.result!.title + "\n- " + message;
         if (error.statusCode === 400) {
