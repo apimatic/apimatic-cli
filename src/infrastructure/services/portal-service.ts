@@ -90,6 +90,18 @@ export class PortalService {
       if (statusResult.value.status === Status.Failed) {
         return err(ServiceError.ServerError);
       }
+      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
+        // TODO: This only picks the first error message, improve it to show all errors.
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = "One or more validation errors occurred." + "\n- " + message;
+        return err(ServiceError.badRequest(errorMessage));
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
+        // TODO: This only picks the first error message, improve it to show all errors.
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = "Access denied to resource." + "\n- " + message;
+        return err(ServiceError.forbidden(errorMessage));
+      }
     } while (statusResult.value.status !== Status.Completed);
 
     try {

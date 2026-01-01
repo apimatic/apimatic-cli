@@ -5,7 +5,7 @@ import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../service-error.js";
-import { PortalGenerationStatusResponse, Status } from "@apimatic/sdk";
+import { PortalGenerationStatusResponse } from "@apimatic/sdk";
 
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
@@ -53,20 +53,7 @@ export class ApiService {
       });
 
       if (response.status === 200) {
-        var statusResponse = response.data as PortalGenerationStatusResponse;
-        if (statusResponse.errors && statusResponse.status === Status.ValidationError) {
-          // TODO: This only picks the first error message, improve it to show all errors.
-          const message = Object.values(statusResponse.errors as Record<string, string[]>)[0]?.[0] ?? null;
-          const errorMessage = "One or more validation errors occurred." + "\n- " + message;
-          return err(ServiceError.badRequest(errorMessage));
-        }
-        if (statusResponse.errors && statusResponse.status === Status.SubscriptionError) {
-          // TODO: This only picks the first error message, improve it to show all errors.
-          const message = Object.values(statusResponse.errors as Record<string, string[]>)[0]?.[0] ?? null;
-          const errorMessage = "Access denied to resource." + "\n- " + message;
-          return err(ServiceError.forbidden(errorMessage));
-        }
-        return ok(statusResponse);
+        return ok(response.data as PortalGenerationStatusResponse);
       }
 
       if (response.status === 302) {
