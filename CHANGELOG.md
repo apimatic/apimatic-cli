@@ -1,3 +1,10 @@
+# [1.1.0-beta.6](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.5...v1.1.0-beta.6) (2026-01-02)
+
+
+### Features
+
+* update status response handling for portal generation ([#232](https://github.com/apimatic/apimatic-cli/issues/232)) ([703b14d](https://github.com/apimatic/apimatic-cli/commit/703b14d1b32be37075bb780ed9a6a390a276b1a6))
+
 # [1.1.0-beta.5](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.4...v1.1.0-beta.5) (2025-11-25)
 
 
