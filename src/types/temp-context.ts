@@ -9,7 +9,7 @@ export class TempContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
 
-  constructor(private readonly tempDirectory: DirectoryPath) {}
+  constructor(private readonly tempDirectory: DirectoryPath) { }
 
   private get getTempFileName(): FilePath {
     const uuid = randomUUID();
@@ -26,5 +26,9 @@ export class TempContext {
     const tempFile = this.getTempFileName;
     await this.fileService.writeFile(tempFile, portalStream);
     return tempFile;
+  }
+
+  public getTempDirectory(): DirectoryPath {
+    return this.tempDirectory;
   }
 }

@@ -27,7 +27,9 @@ export class GenerateAction {
     sdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
-    zipSdk: boolean
+    zipSdk: boolean,
+    noCustomization: boolean,
+    input?: string
   ): Promise<ActionResult> => {
     if (specDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameSpecAndSdkDir(specDirectory);

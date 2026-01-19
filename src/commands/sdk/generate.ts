@@ -21,6 +21,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       description: "Programming language for SDK generation",
       options: Object.values(Language).map((p) => p.valueOf()),
     }),
+    ...FlagsProvider.input,
     spec: Flags.string({
       description: "Path to the folder containing the API specification file",
       default: "./src/spec"
@@ -28,6 +29,10 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     destination: Flags.string({
       char: "d",
       description: "Directory where the SDK will be generated"
+    }),
+    "no-customization": Flags.boolean({
+      default: false,
+      description: "Do not apply customization to the generated SDKs"
     }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
@@ -47,7 +52,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, spec, destination, force, zip: zipSdk, "auth-key": authKey }
+      flags: { language, input, spec, destination, "no-customization": noCustomization, force, zip: zipSdk, "auth-key": authKey }
     } = await this.parse(SdkGenerate);
 
     const specDirectory = new DirectoryPath(spec);
@@ -60,7 +65,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk);
+    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk, noCustomization, input);
     outro(result);
   }
 
