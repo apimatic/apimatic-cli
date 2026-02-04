@@ -236,6 +236,7 @@ export class PortalService {
     [Language.PYTHON]: Platforms.PythonGenericLib,
     [Language.RUBY]: Platforms.RubyGenericLib,
     [Language.TYPESCRIPT]: Platforms.TsGenericLib,
-    [Language.GO]: Platforms.GoGenericLib
+    [Language.GO]: Platforms.GoGenericLib,
+    [Language.CSHARP_V2]: Platforms.CsNetStandardLibV2
   };
 }

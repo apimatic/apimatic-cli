@@ -153,7 +153,8 @@ export class SdkQuickstartPrompts {
         { label: "Java", value: Language.JAVA },
         { label: "C#", value: Language.CSHARP },
         { label: "PHP", value: Language.PHP },
-        { label: "Go", value: Language.GO }
+        { label: "Go", value: Language.GO },
+        { label: "C# V2 (alpha)", value: Language.CSHARP_V2, hint: "New ✨" }
       ]
     });
 

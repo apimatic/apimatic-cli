@@ -5,7 +5,8 @@ export enum Language {
   PYTHON = "python",
   RUBY = "ruby",
   TYPESCRIPT = "typescript",
-  GO = "go"
+  GO = "go",
+  CSHARP_V2 = "csharp_v2",
 }
 
 const languageMap: { [key: number]: Language } = {
@@ -16,6 +17,7 @@ const languageMap: { [key: number]: Language } = {
   16: Language.PYTHON,
   32: Language.RUBY,
   128: Language.TYPESCRIPT,
+  256: Language.CSHARP_V2,
 };
 
 export function mapLanguages(languageFlag: number): Language[] {
