@@ -71,6 +71,30 @@ export class FileService {
     );
   }
 
+  public async copyDirectoryExcluding(
+    source: DirectoryPath,
+    destination: DirectoryPath,
+    excludeNames: string[] = []
+  ): Promise<void> {
+    await this.createDirectoryIfNotExists(destination);
+
+    const entries = await fsExtra.readdir(source.toString(), { withFileTypes: true });
+    const excludeSet = new Set(excludeNames);
+
+    await Promise.all(
+      entries
+        .filter((entry) => !excludeSet.has(entry.name))
+        .map((entry) => {
+          const sourcePath = path.join(source.toString(), entry.name);
+          const destPath = path.join(destination.toString(), entry.name);
+
+          return entry.isDirectory()
+            ? this.copyDirectoryExcluding(new DirectoryPath(sourcePath), new DirectoryPath(destPath), excludeNames)
+            : fsExtra.copyFile(sourcePath, destPath);
+        })
+    );
+  }
+
   public async deleteFile(filePath: FilePath): Promise<void> {
     const exists = await this.fileExists(filePath);
     if (exists) {

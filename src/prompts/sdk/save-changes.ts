@@ -5,37 +5,41 @@ import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
 
 export class SaveChangesPrompts {
+  public srcDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
+  }
+
   public invalidSdkDirectory(directory: DirectoryPath) {
     const message = `SDK directory does not exist: ${f.path(directory)}`;
     log.error(message);
   }
 
-  public invalidSpecDirectory(directory: DirectoryPath) {
-    const message = `Invalid spec directory: ${f.path(directory)}`;
+  public sdkSourceTreeNotFound(language: string) {
+    const message = `No existing sdk source tree found for ${f.var(language)}. Please run the initial setup first.`;
     log.error(message);
   }
 
-  public generateSDK(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
-    return withSpinner("Generating fresh SDK", "Fresh SDK generated successfully.", "SDK generation failed.", fn);
+  public operationCancelled() {
+    log.info("Exiting without saving any changes.");
   }
 
-  public sdkGenerationFailed(error: string) {
-    log.error(`Failed to generate SDK: ${error}`);
+  public copyingSdkFiles(fn: Promise<Result<void, string>>) {
+    return withSpinner("Analyzing SDK for changes", "Analysis complete", "Analysis failed", fn);
   }
 
-  public comparingSDKs() {
-    log.step("Compared your changes with the fresh SDK");
-  }
-
-  public changesDetected(fileNames: string[]) {
+  public modifiedFilesDetected(fileNames: string[]) {
     log.info(`Detected changes in ${fileNames.length} file(s):`);
     fileNames.forEach(file => {
       log.message(`  - ${f.var(file)}`);
     });
-    log.message("");
   }
 
-  public async confirmPatchGeneration(): Promise<boolean> {
+  public noChangesDetected() {
+    log.info("No changes detected in the SDK.");
+  }
+
+  public async confirmSaveChanges(): Promise<boolean> {
     const proceed = await confirm({
       message: "Do you want to save these changes?",
       initialValue: true
@@ -48,25 +52,7 @@ export class SaveChangesPrompts {
     return proceed;
   }
 
-  public operationCancelled() {
-    log.info("Operation cancelled by user.");
-  }
-
-  public async generatePatches<T>(fn: Promise<T>, directory: DirectoryPath): Promise<T> {
-    const { spinner } = await import("@clack/prompts");
-    const s = spinner();
-    s.start("Generating patch files");
-    try {
-      const result = await fn;
-      s.stop(`All changes saved to: ${f.path(directory)}`);
-      return result;
-    } catch (error) {
-      s.stop("Patch generation failed.", 1);
-      throw error;
-    }
-  }
-
-  public patchesGenerated(count: number) {
-    log.info(`Generated ${count} patch file(s)`);
+  public changesSaved() {
+    log.success("Changes saved successfully!");
   }
 }

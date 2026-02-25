@@ -67,6 +67,7 @@
     "fs-extra": "^11.3.0",
     "get-port": "^7.1.0",
     "is-in-ci": "^2.0.0",
+    "isomorphic-git": "^1.36.3",
     "livereload": "^0.9.3",
     "neverthrow": "^8.2.0",
     "open": "^8.4.0",

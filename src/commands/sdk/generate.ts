@@ -63,9 +63,11 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       shell: this.config.shell
     };
 
+    const inputDir = DirectoryPath.createInput(input);
+
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk, noCustomization, input);
+    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk, inputDir, noCustomization);
     outro(result);
   }
 

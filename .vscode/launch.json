@@ -19,7 +19,10 @@
             // "auth:login",
             // "auth:status"
             // "portal:quickstart",
-            // "portal:generate",
+            "portal:generate",
+            "--input=D:/calculator",
+            "--destination=D:/calculator-portal",
+            // "--force",
             // "portal:toc:new",
             //"--expand-endpoints",
             //"--expand-models",

@@ -1,6 +1,6 @@
 import { isCancel, confirm, log } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f, } from "../format.js";
+import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
 

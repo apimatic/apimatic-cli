@@ -8,10 +8,15 @@ import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
+import { FileService } from "../../infrastructure/file-service.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { ResolveConflictsAction } from "./resolve-conflicts.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
+  private readonly fileService: FileService = new FileService();
+  private readonly resolveConflictsAction: ResolveConflictsAction = new ResolveConflictsAction();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -28,8 +33,8 @@ export class GenerateAction {
     language: Language,
     force: boolean,
     zipSdk: boolean,
-    noCustomization: boolean,
-    input?: string
+    inputDirectory?: DirectoryPath,
+    noCustomization?: boolean
   ): Promise<ActionResult> => {
     if (specDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameSpecAndSdkDir(specDirectory);
@@ -50,24 +55,55 @@ export class GenerateAction {
 
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
+
+      // TODO: remove input dir from the condition
+      if (noCustomization && inputDirectory) {
+        await this.removeCustomizations(inputDirectory);
+      }
+
       const specZipPath = await tempContext.zip(specDirectory);
 
+      // TODO: pass build file
       const response = await this.prompts.generateSDK(
         this.portalService.generateSdk(specZipPath, language, this.configDir, this.commandMetadata, this.authKey)
       );
 
-      // TODO: this should be service error
+      // TODO: this should be a service error
       if (response.isErr()) {
         this.prompts.logGenerationError(response.error);
         return ActionResult.failed();
       }
 
       const tempSdkFilePath = await tempContext.save(response.value);
-      const sdkLanguageDirectory = await sdkContext.save(tempSdkFilePath, zipSdk);
+      const tempSdkDir = tempDirectory.join("sdk-temp");
+      await this.fileService.createDirectoryIfNotExists(tempSdkDir);
+      await this.fileService.unzipFile(tempSdkFilePath, tempSdkDir);
 
+      // TOTO: remove this condition for input dir
+      if (inputDirectory) {
+        const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, inputDirectory);
+        if (conflictResult.isFailed()) {
+          return ActionResult.failed();
+        }
+      }
+
+      const finalZipPath = FilePath.create(tempDirectory.join("final-sdk.zip").toString());
+      if (!finalZipPath) {
+        return ActionResult.failed();
+      }
+
+      await this.fileService.zipDirectory(tempSdkDir, finalZipPath);
+      const sdkLanguageDirectory = await sdkContext.save(finalZipPath, zipSdk);
       this.prompts.sdkGenerated(sdkLanguageDirectory);
 
       return ActionResult.success();
     });
+  };
+
+  private readonly removeCustomizations = async (inputDirectory: DirectoryPath): Promise<void> => {
+    const customizationsDir = inputDirectory.join("src").join("customizations");
+    if (await this.fileService.directoryExists(customizationsDir)) {
+      await this.fileService.deleteDirectory(customizationsDir);
+    }
   };
 }

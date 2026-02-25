@@ -116,6 +116,9 @@ export class PortalService {
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const sdkGenerationController = new CodeGenerationExternalApisController(client);
 
+    // TODO: change this flow
+    // need apimatic build.json (gen from quickstart) - need stream
+    // customizations stream
     try {
       const response = await sdkGenerationController.generateSdkViaFile(
         Accept.EnumApplicationjson,

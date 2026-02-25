@@ -1,284 +1,148 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FilePath } from "../../types/file/filePath.js";
 import { ActionResult } from "../action-result.js";
+import { ok } from "neverthrow";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { TempContext } from "../../types/temp-context.js";
-import { SpecContext } from "../../types/spec-context.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
-import { createTwoFilesPatch } from "diff";
+import git from "isomorphic-git";
+import * as fsSync from "fs";
 import * as path from "path";
-import * as fs from "fs/promises";
+import * as fsPromises from "fs/promises";
+import { BuildContext } from "../../types/build-context.js";
+
+const GIT_AUTHOR = { name: "APIMatic-bot", email: "developer@apimatic.io" } as const;
+const CUSTOM_BRANCH = "custom-code";
+const MAIN_BRANCH = "main";
 
 export class SaveChangesAction {
-  private readonly configDir: DirectoryPath;
-  private readonly commandMetadata: CommandMetadata;
-  private readonly prompts: SaveChangesPrompts = new SaveChangesPrompts();
-  private readonly fileService: FileService = new FileService();
-  private readonly portalService: PortalService = new PortalService();
-  private readonly zipService: ZipService = new ZipService();
+  private readonly prompts = new SaveChangesPrompts();
+  private readonly fileService = new FileService();
+  private readonly portalService = new PortalService();
+  private readonly zipService = new ZipService();
 
-  // Language-specific exclusions
-  private readonly languageExclusions: Record<string, string[]> = {
-    'typescript': ['node_modules', 'dist', 'coverage', 'package-lock.json', 'yarn.lock'],
-    'python': ['__pycache__', 'venv', '.venv', 'env', '.env', 'dist', 'build', '.pytest_cache', '.coverage', '*.pyc'],
-    'java': ['target', 'build', '.gradle', '.idea', '*.class', '.classpath', '.project', '.settings'],
-    'csharp': ['bin', 'obj', 'packages', '.vs', '*.user', '*.suo'],
-    'ruby': ['vendor/bundle', '.bundle', 'coverage', 'pkg', 'tmp'],
-    'php': ['vendor', 'composer.lock', '.phpunit.result.cache'],
-    'go': ['vendor', 'bin', 'pkg'],
-  };
+  constructor(
+    private readonly configDir: DirectoryPath,
+    private readonly commandMetadata: CommandMetadata
+  ) {}
 
-  constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
-    this.configDir = configDir;
-    this.commandMetadata = commandMetadata;
-  }
+  public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language, force: boolean): Promise<ActionResult> {
+    const buildContext = new BuildContext(buildDirectory);
+        if (!(await buildContext.validate())) {
+          this.prompts.srcDirectoryEmpty(buildDirectory);
+          return ActionResult.failed();
+        }
 
-  public readonly execute = async (sdkPath: string, language: Language, inputPath: string, force: boolean = false): Promise<ActionResult> => {
-
-    // 1. check if the path is correct and is a valid directory
-    const sdkDirectory = new DirectoryPath(sdkPath);
-    if (!(await this.fileService.directoryExists(sdkDirectory))) {
-      this.prompts.invalidSdkDirectory(sdkDirectory);
+    if (!(await this.fileService.directoryExists(updatedSdkDirectory))) {
+      this.prompts.invalidSdkDirectory(updatedSdkDirectory);
       return ActionResult.failed();
     }
 
-    // 2. generate a new sdk
-    const sdkLanguage = language;
-    const inputDirectory = new DirectoryPath(inputPath);
-    const specDirectory = inputDirectory.join('src').join('spec');
+    const sdkSourceTreeDir = buildDirectory.join("sdk-source-tree");
+    const zipFilePath = path.join(sdkSourceTreeDir.toString(), `.${language}`);
+    const existingZipFile = FilePath.create(zipFilePath);
 
-    // Validate spec directory
-    const specContext = new SpecContext(specDirectory);
-    if (!(await specContext.validate())) {
-      this.prompts.invalidSpecDirectory(specDirectory);
+    if (!existingZipFile || !(await this.fileService.fileExists(existingZipFile))) {
+      this.prompts.sdkSourceTreeNotFound(language);
       return ActionResult.failed();
     }
 
-    // Generate fresh SDK and compare in temporary directory
-    await withDirPath(async (tempDirectory) => {
-      const tempContext = new TempContext(tempDirectory);
-      const specZipPath = await tempContext.zip(specDirectory);
+    return withDirPath(async (tempDirectory) => {
+      await this.zipService.unArchive(existingZipFile, tempDirectory);
+      const tempDirStr = tempDirectory.toString();
 
-      const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(
-          specZipPath,
-          sdkLanguage,
-          this.configDir,
-          this.commandMetadata,
-          null
-        )
+      await this.checkoutToCustomBranch(tempDirStr);
+
+      await this.prompts.copyingSdkFiles(
+        this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"])
+        .then(() => ok<void, string>(undefined))
       );
 
-      if (response.isErr()) {
-        this.prompts.sdkGenerationFailed(response.error);
-        throw new Error("SDK generation failed");
-      }
+      const modifiedFiles = await this.getModifiedFiles(tempDirStr);
 
-      const tempSdkZipPath = await tempContext.save(response.value);
-
-      // Unzip fresh SDK to temp directory
-      const newSdkDirectory = tempDirectory.join("new-sdk");
-      await this.zipService.unArchive(tempSdkZipPath, newSdkDirectory);
-
-      this.prompts.comparingSDKs();
-
-      // 3. compare both sdks and detect changed files (without generating patches yet)
-      const changedFiles = await this.detectChangedFiles(sdkDirectory, newSdkDirectory, sdkLanguage);
-
-      // 4. Show changed files and ask for confirmation
-      if (changedFiles.length === 0) {
-        this.prompts.patchesGenerated(0);
+      if (modifiedFiles.length === 0) {
+        this.prompts.noChangesDetected();
         return ActionResult.success();
       }
 
-      this.prompts.changesDetected(changedFiles);
-
-      // Ask for confirmation unless force flag is set
       if (!force) {
-        const shouldProceed = await this.prompts.confirmPatchGeneration();
-        if (!shouldProceed) {
+        this.prompts.modifiedFilesDetected(modifiedFiles);
+        const shouldSave = await this.prompts.confirmSaveChanges();
+        if (!shouldSave) {
           this.prompts.operationCancelled();
-          return ActionResult.success();
+          return ActionResult.cancelled();
         }
       }
 
-      // 5. Generate patch files only after user confirmation (or if forced)
-      const customizationsDirectory = inputDirectory.join('src').join('customizations').join(language);
-      const patches = await this.prompts.generatePatches(
-        this.generatePatchesForChangedFiles(sdkDirectory, newSdkDirectory, changedFiles),
-        customizationsDirectory
-      );
-      await this.storePatchFiles(patches, inputDirectory, language);
-    });
-
-    return ActionResult.success();
-  };
-
-  private readonly detectChangedFiles = async (
-    customizedSdkDir: DirectoryPath,
-    freshSdkDir: DirectoryPath,
-    language: Language
-  ): Promise<string[]> => {
-    const changedFiles: string[] = [];
-
-    // Get all files from both directories
-    const customizedFiles = await this.getAllFiles(customizedSdkDir.toString(), language);
-    const freshFiles = await this.getAllFiles(freshSdkDir.toString(), language);
-
-    // Create a set of all unique file paths (relative)
-    const allFiles = new Set([
-      ...customizedFiles.map(f => path.relative(customizedSdkDir.toString(), f)),
-      ...freshFiles.map(f => path.relative(freshSdkDir.toString(), f))
-    ]);
-
-    for (const relativeFilePath of allFiles) {
-      const customizedFilePath = path.join(customizedSdkDir.toString(), relativeFilePath);
-      const freshFilePath = path.join(freshSdkDir.toString(), relativeFilePath);
-
-      const customizedExists = await this.fileExists(customizedFilePath);
-      const freshExists = await this.fileExists(freshFilePath);
-
-      let oldContent = "";
-      let newContent = "";
-
-      if (freshExists) {
-        oldContent = await fs.readFile(freshFilePath, 'utf-8');
-      }
-
-      if (customizedExists) {
-        newContent = await fs.readFile(customizedFilePath, 'utf-8');
-      }
-
-      // Check if files differ (without generating patches yet)
-      if (oldContent !== newContent) {
-        changedFiles.push(relativeFilePath.replace(/\\/g, '/'));
-      }
-    }
-
-    return changedFiles;
-  };
-
-  private readonly generatePatchesForChangedFiles = async (
-    customizedSdkDir: DirectoryPath,
-    freshSdkDir: DirectoryPath,
-    changedFiles: string[]
-  ): Promise<Array<{ fileName: string; patch: string }>> => {
-    const patches: Array<{ fileName: string; patch: string }> = [];
-
-    for (const relativeFilePath of changedFiles) {
-      const customizedFilePath = path.join(customizedSdkDir.toString(), relativeFilePath);
-      const freshFilePath = path.join(freshSdkDir.toString(), relativeFilePath);
-
-      const customizedExists = await this.fileExists(customizedFilePath);
-      const freshExists = await this.fileExists(freshFilePath);
-
-      let oldContent = "";
-      let newContent = "";
-
-      if (freshExists) {
-        oldContent = await fs.readFile(freshFilePath, 'utf-8');
-      }
-
-      if (customizedExists) {
-        newContent = await fs.readFile(customizedFilePath, 'utf-8');
-      }
-
-      const normalizedPath = relativeFilePath.split(path.sep).join('/');
-      const oldPath = freshExists ? `a/${normalizedPath}` : '/dev/null';
-      const newPath = customizedExists ? `b/${normalizedPath}` : '/dev/null';
-
-      const patch = createTwoFilesPatch(
-        oldPath,
-        newPath,
-        oldContent,
-        newContent,
-        '',
-        '',
-        { context: 3 }
-      );
-
-      patches.push({
-        fileName: normalizedPath,
-        patch
+      await this.normalizeLineEndings(tempDirStr, modifiedFiles);
+      await this.stageChanges(tempDirStr, modifiedFiles);
+      await git.commit({
+        fs: fsSync,
+        dir: tempDirStr,
+        message: "add customizations",
+        author: GIT_AUTHOR,
       });
+
+      await git.checkout({ fs: fsSync, dir: tempDirStr, ref: MAIN_BRANCH });
+      await this.zipService.archive(
+        new DirectoryPath(path.join(tempDirStr, ".git")),
+        FilePath.create(zipFilePath)!,
+        ".git"
+      );
+
+      this.prompts.changesSaved();
+      return ActionResult.success();
+    });
+  }
+
+  private async checkoutToCustomBranch(dir: string): Promise<void> {
+    const branches = await git.listBranches({ fs: fsSync, dir });
+
+    if (!branches.includes(CUSTOM_BRANCH)) {
+      await git.branch({ fs: fsSync, dir, ref: CUSTOM_BRANCH });
     }
 
-    return patches;
-  };
+    await git.checkout({ fs: fsSync, dir, ref: CUSTOM_BRANCH });
+  }
 
-  private readonly getAllFiles = async (dirPath: string, language: Language): Promise<string[]> => {
-    const files: string[] = [];
-    const exclusions = this.languageExclusions[language] || [];
+  private async getModifiedFiles(dir: string): Promise<string[]> {
+    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
 
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    return statusMatrix
+      // If the working directory differs from HEAD then consider the file as modified
+      .filter(([, headStatus, workdirStatus]) =>
+        headStatus !== workdirStatus
+      )
+      .map(([filepath]) => filepath);
+  }
 
-    for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
-
-      // Check if this entry should be excluded
-      if (this.shouldExclude(entry.name, fullPath, exclusions)) {
-        continue;
-      }
-
-      if (entry.isDirectory()) {
-        const subFiles = await this.getAllFiles(fullPath, language);
-        files.push(...subFiles);
-      } else {
-        files.push(fullPath);
-      }
-    }
-
-    return files;
-  };
-
-  private readonly shouldExclude = (entryName: string, fullPath: string, exclusions: string[]): boolean => {
-    for (const exclusion of exclusions) {
-      // Handle wildcard patterns (e.g., *.class, *.pyc)
-      if (exclusion.includes('*')) {
-        const pattern = exclusion.replace(/\./g, '\\.').replace(/\*/g, '.*');
-        const regex = new RegExp(`^${pattern}$`);
-        if (regex.test(entryName)) {
-          return true;
+  private async normalizeLineEndings(dir: string, modifiedFiles: string[]): Promise<void> {
+    await Promise.all(
+      modifiedFiles.map(async (filepath) => {
+        const fullPath = path.join(dir, filepath);
+        try {
+          const content = await fsPromises.readFile(fullPath, 'utf8');
+          const normalized = content.replace(/\r\n/g, '\n'); // Convert CRLF to LF
+          await fsPromises.writeFile(fullPath, normalized, 'utf8');
+        } catch {
+          // Skip binary files or files that can't be read as text
         }
-      }
-      // Exact match for file/directory name
-      else if (entryName === exclusion || fullPath.endsWith(path.sep + exclusion)) {
-        return true;
-      }
-    }
-    return false;
-  };
+      })
+    );
+  }
 
-  private readonly fileExists = async (filePath: string): Promise<boolean> => {
-    try {
-      await fs.access(filePath);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  private readonly storePatchFiles = async (
-    patches: Array<{ fileName: string; patch: string }>,
-    inputDirectory: DirectoryPath,
-    language: Language
-  ): Promise<void> => {
-    // Store customizations in inputPath/src/customizations
-    const customizationsDirectory = inputDirectory.join('src').join('customizations').join(language);
-    await this.fileService.createDirectoryIfNotExists(customizationsDirectory);
-
-    // Clear existing customizations
-    await this.fileService.cleanDirectory(customizationsDirectory);
-
-    for (const { fileName, patch } of patches) {
-      const patchFileName = `${fileName.replace(/[/\\]/g, '_')}.patch`;
-      const patchFilePath = path.join(customizationsDirectory.toString(), patchFileName);
-
-      await fs.writeFile(patchFilePath, patch, 'utf-8');
-    }
-  };
+  private async stageChanges(dir: string, modifiedFiles: string[]): Promise<void> {
+    await Promise.all(
+      modifiedFiles.map(async (filepath) => {
+        const fullPath = path.join(dir, filepath);
+        return fsSync.existsSync(fullPath)
+          ? git.add({ fs: fsSync, dir, filepath })
+          : git.remove({ fs: fsSync, dir, filepath });
+      })
+    );
+  }
 }

@@ -4,39 +4,33 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { SaveChangesAction } from "../../actions/sdk/save-changes.js";
 import { Language } from "../../types/sdk/generate.js";
+import { FlagsProvider } from "../../types/flags-provider.js";
 
 export default class SaveChanges extends Command {
-  static description = "Generate a .patch file.";
+  static summary = "Save customizations made to an auto-generated SDK";
 
-  static summary = "Generate a .patch file from SDK customizations.";
+  static description =
+    "Requires an input directory with API specifications, a path to the updated SDK directory, and the programming language.";
 
   static cmdTxt = format.cmd("apimatic", "sdk", "save-changes");
 
   static flags = {
-    "updated-sdk": Flags.string({
-      description: "Path to the updated SDK directory",
-      required: true
-    }),
     language: Flags.string({
       char: "l",
       required: true,
       description: "Programming language of the SDK",
       options: Object.values(Language).map((p) => p.valueOf())
     }),
-    input: Flags.string({
-      description: "path to the parent directory containing the 'src' directory, which includes API specifications and configuration files.",
-      default: "./"
+    ...FlagsProvider.input,
+    "updated-sdk": Flags.string({
+      description: "Path to the folder containing the updated SDK"
     }),
-    force: Flags.boolean({
-      char: "f",
-      description: "Force save without confirmation",
-      default: false
-    })
+    ...FlagsProvider.force
   };
 
   static examples = [
-    `${SaveChanges.cmdTxt} ${format.flag("sdk", "./sdk")}`,
-    `${SaveChanges.cmdTxt} ${format.flag("sdk", "./sdk")} ${format.flag("language", "java")}`
+    `${SaveChanges.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("input", "./")}`,
+    `${SaveChanges.cmdTxt} ${format.flag("language", "java")} ${format.flag("updated-sdk", "./sdk")}`
   ];
 
   async run() {
@@ -44,15 +38,17 @@ export default class SaveChanges extends Command {
       flags: { "updated-sdk": updatedSdk, language, input, force }
     } = await this.parse(SaveChanges);
 
+    const workingDirectory = DirectoryPath.createInput(input);
+    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
+    const updatedSdkDirectory = updatedSdk ? new DirectoryPath(updatedSdk) : workingDirectory.join("sdk").join(language);
     const commandMetadata: CommandMetadata = {
       commandName: SaveChanges.id,
       shell: this.config.shell
     };
 
-    intro("Sync Changes");
-
+    intro("Save Changes");
     const action = new SaveChangesAction(this.getConfigDir(), commandMetadata);
-    const result = await action.execute(updatedSdk, language as Language, input, force);
+    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language, force);
     outro(result);
   }
 
