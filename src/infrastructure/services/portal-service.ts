@@ -1,10 +1,10 @@
 import { ReadStream } from "fs";
 import {
-  Accept,
+  // Accept,
   ApiError,
   ApiResponse,
   BadRequestResponseSdkError,
-  CodeGenerationExternalApisController,
+  // CodeGenerationExternalApisController,
   ContentType,
   DocsPortalGenerationAsyncController,
   UnauthorizedResponseError,
@@ -117,32 +117,72 @@ export class PortalService {
 
   // TODO: Pass stream as parameter instead of file path.
   public async generateSdk(
-    specPath: FilePath,
+    buildPath: FilePath,
     language: Language,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string>> {
-    const specFileStream = await this.fileService.getStream(specPath);
-    const file = new FileWrapper(specFileStream);
+    const buildFileStream = await this.fileService.getStream(buildPath);
+    const file = new FileWrapper(buildFileStream);
+
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
-    const sdkGenerationController = new CodeGenerationExternalApisController(client);
+    // const sdkGenerationController = new CodeGenerationExternalApisController(client);
+    const docsPortalAsyncController = new DocsPortalGenerationAsyncController(client);
 
+    let generationId: string;
     try {
-      const response = await sdkGenerationController.generateSdkViaFile(
-        Accept.EnumApplicationjson,
-        file,
-        this.languagePlatform[language],
-        this.createOriginQueryParameter(commandMetadata.commandName)
+      const response = await docsPortalAsyncController.generateOnPremPortalViaBuildInputAsync(
+        this.CONTENT_TYPE,
+        file
       );
-      const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
-      return ok(sdkResponse.result as NodeJS.ReadableStream);
+      // const response = await sdkGenerationController.generateSdkViaFile(
+      //   Accept.EnumApplicationjson,
+      //   file,
+      //   this.languagePlatform[language],
+      //   this.createOriginQueryParameter(commandMetadata.commandName)
+      // );
+      generationId = response.result.id;
     } catch (error) {
       return err(await this.handleSdkGenerationErrors(error));
     } finally {
-      specFileStream.close();
+      buildFileStream.close();
+    }
+
+    let statusResult;
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      
+      statusResult = await this.apiService.getPortalGenerationStatus(
+      generationId,
+      configDir,
+      commandMetadata.shell,
+      authKey
+      );
+      if (statusResult.isErr()) {
+        return err(statusResult.error.errorMessage);
+      }
+      if (statusResult.value.status === Status.Failed) {
+        return err("SDK generation failed. Please try again later.");
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        return err("One or more validation errors occurred." + "\n- " + message);
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        return err("Access denied to resource." + "\n- " + message);
+      }
+    } while (statusResult.value.status !== Status.Completed);
+
+    try {
+      // const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
+      const sdkResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
+      return ok(sdkResponse.result as NodeJS.ReadableStream);
+    } catch (error) {
+      return err(await this.handleSdkGenerationErrors(error));
     }
   }
 
