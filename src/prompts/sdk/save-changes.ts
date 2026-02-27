@@ -1,8 +1,6 @@
 import { log, confirm, isCancel } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f } from "../format.js";
-import { Result } from "neverthrow";
-import { withSpinner } from "../prompt.js";
+import { format as f, getTree, LeafNode, TreeNode } from "../format.js";
 
 export class SaveChangesPrompts {
   public srcDirectoryEmpty(directory: DirectoryPath) {
@@ -24,15 +22,10 @@ export class SaveChangesPrompts {
     log.info("Exiting without saving any changes.");
   }
 
-  public copyingSdkFiles(fn: Promise<Result<void, string>>) {
-    return withSpinner("Analyzing SDK for changes", "Analysis complete", "Analysis failed", fn);
-  }
-
-  public modifiedFilesDetected(fileNames: string[]) {
-    log.info(`Detected changes in ${fileNames.length} file(s):`);
-    fileNames.forEach(file => {
-      log.message(`  - ${f.var(file)}`);
-    });
+  public modifiedFilesDetected(language: string, fileStatuses: Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>) {
+    log.message(`Detected changes in ${fileStatuses.length} file(s):`);
+    const tree = this.buildFileTree(language, fileStatuses);
+    log.message(tree);
   }
 
   public noChangesDetected() {
@@ -54,5 +47,48 @@ export class SaveChangesPrompts {
 
   public changesSaved() {
     log.success("Changes saved successfully!");
+  }
+
+  private buildFileTree(language: string, fileStatuses: Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>): string {
+    const root: TreeNode = { name: language, items: [] };
+
+    const addFileToTree = (filePath: string, status: 'modified' | 'added' | 'deleted') => {
+      const parts = filePath.split(/[\\/]/);
+      let currentLevel = root.items;
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isLastPart = i === parts.length - 1;
+
+        if (isLastPart) {
+          let description = "";
+          if (status === 'modified') {
+            description = "# Modified";
+          } else if (status === 'added') {
+            description = "# Added";
+          } else if (status === 'deleted') {
+            description = "# Deleted";
+          }
+          currentLevel.push({
+            name: part,
+            description
+          });
+        } else {
+          let existingDir = currentLevel.find(
+            (item: TreeNode | LeafNode) => "items" in item && item.name === part
+          ) as TreeNode | undefined;
+
+          if (!existingDir) {
+            existingDir = { name: part, items: [] };
+            currentLevel.push(existingDir);
+          }
+          currentLevel = existingDir.items;
+        }
+      }
+    };
+
+    fileStatuses.forEach(({ file, status }) => addFileToTree(file, status));
+
+    return getTree(root);
   }
 }

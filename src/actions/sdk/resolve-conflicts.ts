@@ -21,13 +21,24 @@ export class ResolveConflictsAction {
   public readonly execute = async (
     sdkDir: DirectoryPath,
     language: string,
-    inputDirectory: DirectoryPath
+    inputDirectory: DirectoryPath,
+    noCustomization: boolean
   ): Promise<ActionResult> => {
     const hasMergeConflicts = await this.detectMergeConflicts(sdkDir);
 
     if (hasMergeConflicts) {
+      if (noCustomization) {
+        await this.abortMergeAndCheckoutCustom(sdkDir);
+        await this.saveSdkSourceTree(sdkDir, language, inputDirectory);
+        return ActionResult.success();
+      }
+
       const resolved = await this.handleConflicts(sdkDir, language, inputDirectory);
       return resolved ? ActionResult.success() : ActionResult.failed();
+    }
+
+    if (noCustomization) {
+      await git.checkout({ fs: fsSync, dir: sdkDir.toString(), ref: MAIN_BRANCH, force: true });
     }
 
     await this.saveSdkSourceTree(sdkDir, language, inputDirectory);
@@ -91,6 +102,12 @@ export class ResolveConflictsAction {
     return fsSync.existsSync(path.join(dir.toString(), ".git", "MERGE_HEAD"));
   };
 
+  private readonly abortMergeAndCheckoutCustom = async (sdkDir: DirectoryPath): Promise<void> => {
+    const dir = sdkDir.toString();
+    this.cleanupMergeFiles(dir);
+    await git.checkout({ fs: fsSync, dir, ref: MAIN_BRANCH, force: true });
+  };
+
   public readonly getConflictedFiles = async (dir: DirectoryPath): Promise<string[]> => {
     const matrix = await git.statusMatrix({ fs: fsSync, dir: dir.toString() });
     const candidates = matrix
@@ -114,8 +131,18 @@ export class ResolveConflictsAction {
     const dir = sdkTempDir.toString();
     await this.stageChanges(dir);
     await git.commit({ fs: fsSync, dir, message: "resolve conflicts", author: GIT_AUTHOR });
-    await git.checkout({ fs: fsSync, dir, ref: MAIN_BRANCH });
+    this.cleanupMergeFiles(dir);
   };
+
+  private cleanupMergeFiles(dir: string): void {
+    const mergeFiles = ["MERGE_HEAD", "MERGE_MODE", "MERGE_MSG"];
+    for (const file of mergeFiles) {
+      const filePath = path.join(dir, ".git", file);
+      if (fsSync.existsSync(filePath)) {
+        fsSync.unlinkSync(filePath);
+      }
+    }
+  }
 
   private async stageChanges(dir: string): Promise<void> {
     const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
@@ -141,8 +168,7 @@ export class ResolveConflictsAction {
     const sdkSourceTreeDir = inputDirectory.join("sdk-source-tree");
     await this.fileService.createDirectoryIfNotExists(sdkSourceTreeDir);
 
-    // Point HEAD to main before archiving, without modifying working directory files
-    // fsSync.writeFileSync(path.join(gitDir.toString(), "HEAD"), `ref: refs/heads/${MAIN_BRANCH}\n`);
+    fsSync.writeFileSync(path.join(gitDir.toString(), "HEAD"), `ref: refs/heads/${MAIN_BRANCH}\n`);
 
     const outputZipPath = FilePath.create(path.join(sdkSourceTreeDir.toString(), `.${language}`));
     if (outputZipPath) {
@@ -150,6 +176,4 @@ export class ResolveConflictsAction {
     }
     await this.fileService.deleteDirectory(gitDir);
   };
-
-
 }

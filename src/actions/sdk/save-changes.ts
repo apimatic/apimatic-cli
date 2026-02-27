@@ -1,10 +1,8 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { ActionResult } from "../action-result.js";
-import { ok } from "neverthrow";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { FileService } from "../../infrastructure/file-service.js";
-import { PortalService } from "../../infrastructure/services/portal-service.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
@@ -22,7 +20,6 @@ const MAIN_BRANCH = "main";
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
   private readonly fileService = new FileService();
-  private readonly portalService = new PortalService();
   private readonly zipService = new ZipService();
 
   constructor(
@@ -57,20 +54,17 @@ export class SaveChangesAction {
 
       await this.checkoutToCustomBranch(tempDirStr);
 
-      await this.prompts.copyingSdkFiles(
-        this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"])
-        .then(() => ok<void, string>(undefined))
-      );
+      await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"]);
 
-      const modifiedFiles = await this.getModifiedFiles(tempDirStr);
+      const fileStatuses = await this.getModifiedFilesWithStatus(tempDirStr);
 
-      if (modifiedFiles.length === 0) {
+      if (fileStatuses.length === 0) {
         this.prompts.noChangesDetected();
         return ActionResult.success();
       }
 
       if (!force) {
-        this.prompts.modifiedFilesDetected(modifiedFiles);
+        this.prompts.modifiedFilesDetected(language, fileStatuses);
         const shouldSave = await this.prompts.confirmSaveChanges();
         if (!shouldSave) {
           this.prompts.operationCancelled();
@@ -78,6 +72,8 @@ export class SaveChangesAction {
         }
       }
 
+      // new added
+      const modifiedFiles = fileStatuses.map(fs => fs.file);
       await this.normalizeLineEndings(tempDirStr, modifiedFiles);
       await this.stageChanges(tempDirStr, modifiedFiles);
       await git.commit({
@@ -118,6 +114,29 @@ export class SaveChangesAction {
         headStatus !== workdirStatus
       )
       .map(([filepath]) => filepath);
+  }
+
+  private async getModifiedFilesWithStatus(dir: string): Promise<Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>> {
+    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
+
+    return statusMatrix
+      .filter(([, headStatus, workdirStatus]) => headStatus !== workdirStatus)
+      .map(([filepath, headStatus, workdirStatus]) => {
+        let status: 'modified' | 'added' | 'deleted';
+
+        if (workdirStatus === 0) {
+          // File is gone from working directory
+          status = 'added';
+        } else if (headStatus === 0) {
+          // File didn't exist in HEAD
+          status = 'deleted';
+        } else {
+          // File existed in HEAD and still exists, but differs
+          status = 'modified';
+        }
+
+        return { file: filepath, status };
+      });
   }
 
   private async normalizeLineEndings(dir: string, modifiedFiles: string[]): Promise<void> {

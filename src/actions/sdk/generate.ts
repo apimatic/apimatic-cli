@@ -34,7 +34,7 @@ export class GenerateAction {
     force: boolean,
     zipSdk: boolean,
     inputDirectory?: DirectoryPath,
-    noCustomization?: boolean
+    noCustomization: boolean = false
   ): Promise<ActionResult> => {
     if (specDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameSpecAndSdkDir(specDirectory);
@@ -81,7 +81,7 @@ export class GenerateAction {
 
       // TOTO: remove this condition for input dir
       if (inputDirectory) {
-        const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, inputDirectory);
+        const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, inputDirectory, noCustomization);
         if (conflictResult.isFailed()) {
           return ActionResult.failed();
         }

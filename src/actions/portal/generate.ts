@@ -82,19 +82,15 @@ export class GenerateAction {
 
       const tempPortalZipPath = await tempContext.save(response.value);
 
-      if (noCustomization) {
-        await portalContext.save(tempPortalZipPath, zipPortal);
-      }
-      else {
-        await this.savePortalWithSdkResolution(
-          tempPortalZipPath,
-          tempDirectory,
-          tempContext,
-          buildDirectory,
-          portalContext,
-          zipPortal
-        );
-      }
+      await this.savePortalWithSdkResolution(
+        tempPortalZipPath,
+        tempDirectory,
+        tempContext,
+        buildDirectory,
+        portalContext,
+        zipPortal,
+        noCustomization
+      );
 
       if (displayMessages) {
         this.prompts.portalGenerated(portalDirectory);
@@ -110,13 +106,14 @@ export class GenerateAction {
     tempContext: TempContext,
     buildDirectory: DirectoryPath,
     portalContext: PortalContext,
-    zipPortal: boolean
+    zipPortal: boolean,
+    noCustomization: boolean
   ): Promise<void> => {
     const tempPortalDir = tempDirectory.join('portal-temp');
     await this.fileService.createDirectoryIfNotExists(tempPortalDir);
     await this.fileService.unzipFile(tempPortalZipPath, tempPortalDir);
 
-    await this.resolveSdkConflicts(tempPortalDir, tempContext, buildDirectory);
+    await this.resolveSdkConflicts(tempPortalDir, tempContext, buildDirectory, noCustomization);
 
     const resolvedPortalZipPath = FilePath.create(tempDirectory.join('portal-resolved.zip').toString());
     if (resolvedPortalZipPath) {
@@ -125,7 +122,7 @@ export class GenerateAction {
     }
   };
 
-  public readonly resolveSdkConflicts = async (portalDirectory: DirectoryPath, tempContext: TempContext, buildDirectory: DirectoryPath): Promise<void> => {
+  public readonly resolveSdkConflicts = async (portalDirectory: DirectoryPath, tempContext: TempContext, buildDirectory: DirectoryPath, noCustomization: boolean): Promise<void> => {
     const sdksPath = portalDirectory.join('static').join('sdks');
 
     if (!(await this.fileService.directoryExists(sdksPath))) {
@@ -147,7 +144,7 @@ export class GenerateAction {
       await this.fileService.unzipFile(sdkZipFile, sdkTempDir);
 
       //
-      const conflictResult = await this.resolveConflictsAction.execute(sdkTempDir, language ?? '', buildDirectory);
+      const conflictResult = await this.resolveConflictsAction.execute(sdkTempDir, language ?? '', buildDirectory, noCustomization);
       if (conflictResult.isFailed()) {
         ActionResult.failed();
         return;
