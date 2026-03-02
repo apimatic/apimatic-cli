@@ -14,7 +14,6 @@ import {
   Transformation,
   ExportFormats,
   SdkLanguages,
-  SdkGenerationStatusResponse,
   Status,
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
@@ -162,26 +161,33 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    let statusResult: ApiResponse<SdkGenerationStatusResponse>;
+    let statusResult;
     do {
       await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      statusResult = await sdkGenerationController.getSdkGenerationStatus(generationId);
+      statusResult = await this.apiService.getSdkGenerationStatus(
+        generationId,
+        configDir,
+        commandMetadata.shell,
+        authKey
+      );
       
-      if (statusResult.result.status === Status.Failed) {
+      if (statusResult.isErr()) {
+        return err(statusResult.error.errorMessage);
+      }
+      if (statusResult.value.status === Status.Failed) {
         return err("SDK generation failed. Please try again later.");
       }
-      if (statusResult.result.errors && statusResult.result.status === Status.ValidationError) {
-        const messages = Object.values(statusResult.result.errors as Record<string, string[]>).flat();
+      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
+        const messages = Object.values(statusResult.value.errors as Record<string, string[]>).flat();
         const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown validation error.";
         return err("One or more validation errors occurred." + "\n- " + errorMessage);
       }
-      if (statusResult.result.errors && statusResult.result.status === Status.SubscriptionError) {
-        const messages = Object.values(statusResult.result.errors as Record<string, string[]>).flat();
+      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
+        const messages = Object.values(statusResult.value.errors as Record<string, string[]>).flat();
         const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown subscription error.";
         return err("Access denied to resource." + "\n- " + errorMessage);
       }
-    } while (statusResult.result.status !== Status.Completed);
+    } while (statusResult.value.status !== Status.Completed);
 
     try {
       const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
