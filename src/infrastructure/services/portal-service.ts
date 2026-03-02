@@ -1,20 +1,21 @@
 import { ReadStream } from "fs";
 import {
-  // Accept,
   ApiError,
   ApiResponse,
   BadRequestResponseSdkError,
-  // CodeGenerationExternalApisController,
+  SdkGenerationAsyncController,
   ContentType,
   DocsPortalGenerationAsyncController,
   UnauthorizedResponseError,
   ProblemDetailsError,
+  InternalServerErrorResponseError,
   FileWrapper,
   TransformationController,
   Transformation,
   ExportFormats,
-  Platforms,
-  Status
+  SdkLanguages,
+  SdkGenerationStatusResponse,
+  Status,
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { parseStreamBodyToJson } from "../../utils/utils.js";
@@ -129,57 +130,61 @@ export class PortalService {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
-    // const sdkGenerationController = new CodeGenerationExternalApisController(client);
-    const docsPortalAsyncController = new DocsPortalGenerationAsyncController(client);
+    const sdkGenerationController = new SdkGenerationAsyncController(client);
 
     let generationId: string;
     try {
-      const response = await docsPortalAsyncController.generateOnPremPortalViaBuildInputAsync(
+      const response = await sdkGenerationController.generateSdkViaBuildInputOrApiSpecificationAsync(
         this.CONTENT_TYPE,
-        file
+        file,
+        this.languageSdk[language],
       );
-      // const response = await sdkGenerationController.generateSdkViaFile(
-      //   Accept.EnumApplicationjson,
-      //   file,
-      //   this.languagePlatform[language],
-      //   this.createOriginQueryParameter(commandMetadata.commandName)
-      // );
       generationId = response.result.id;
     } catch (error) {
-      return err(await this.handleSdkGenerationErrors(error));
+      if (error instanceof ProblemDetailsError) {
+        const messages = Object.values(error.result!.errors as Record<string, string[]>).flat();
+        const errorMessage = error.result!.title + "\n- " + (messages.length > 0 ? messages.join("\n- ") : "Unknown error.");
+        if (error.statusCode === 400) {
+          return err(errorMessage);
+        }
+        if (error.statusCode === 403) {
+          return err(errorMessage);
+        }
+      }
+      if (error instanceof UnauthorizedResponseError) {
+        return err(error.result?.message ?? "Authorization has been denied for this request.");
+      }
+      if (error instanceof InternalServerErrorResponseError) {
+        return err(error.result?.message ?? "An internal server error occurred. Please try again later.");
+      }
+      return err(handleServiceError(error).errorMessage);
     } finally {
       buildFileStream.close();
     }
 
-    let statusResult;
+    let statusResult: ApiResponse<SdkGenerationStatusResponse>;
     do {
       await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      statusResult = await sdkGenerationController.getSdkGenerationStatus(generationId);
       
-      statusResult = await this.apiService.getPortalGenerationStatus(
-      generationId,
-      configDir,
-      commandMetadata.shell,
-      authKey
-      );
-      if (statusResult.isErr()) {
-        return err(statusResult.error.errorMessage);
-      }
-      if (statusResult.value.status === Status.Failed) {
+      if (statusResult.result.status === Status.Failed) {
         return err("SDK generation failed. Please try again later.");
       }
-      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
-        return err("One or more validation errors occurred." + "\n- " + message);
+      if (statusResult.result.errors && statusResult.result.status === Status.ValidationError) {
+        const messages = Object.values(statusResult.result.errors as Record<string, string[]>).flat();
+        const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown validation error.";
+        return err("One or more validation errors occurred." + "\n- " + errorMessage);
       }
-      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
-        return err("Access denied to resource." + "\n- " + message);
+      if (statusResult.result.errors && statusResult.result.status === Status.SubscriptionError) {
+        const messages = Object.values(statusResult.result.errors as Record<string, string[]>).flat();
+        const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown subscription error.";
+        return err("Access denied to resource." + "\n- " + errorMessage);
       }
-    } while (statusResult.value.status !== Status.Completed);
+    } while (statusResult.result.status !== Status.Completed);
 
     try {
-      // const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
-      const sdkResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
+      const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
       return ok(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
       return err(await this.handleSdkGenerationErrors(error));
@@ -269,13 +274,13 @@ export class PortalService {
     return errorMessage;
   }
 
-  private readonly languagePlatform: Record<Language, Platforms> = {
-    [Language.CSHARP]: Platforms.CsNetStandardLib,
-    [Language.JAVA]: Platforms.JavaEclipseJreLib,
-    [Language.PHP]: Platforms.PhpGenericLibV2,
-    [Language.PYTHON]: Platforms.PythonGenericLib,
-    [Language.RUBY]: Platforms.RubyGenericLib,
-    [Language.TYPESCRIPT]: Platforms.TsGenericLib,
-    [Language.GO]: Platforms.GoGenericLib
+  private readonly languageSdk: Record<Language, SdkLanguages> = {
+    [Language.CSHARP]: SdkLanguages.Csharp,
+    [Language.JAVA]: SdkLanguages.Java,
+    [Language.PHP]: SdkLanguages.Php,
+    [Language.PYTHON]: SdkLanguages.Python,
+    [Language.RUBY]: SdkLanguages.Ruby,
+    [Language.TYPESCRIPT]: SdkLanguages.Typescript,
+    [Language.GO]: SdkLanguages.Go
   };
 }

@@ -20,7 +20,8 @@
         "./bin",
         "./lib",
         "/npm-shrinkwrap.json",
-        "/oclif.manifest.json"
+        "/oclif.manifest.json",
+        "/apimatic-sdk-0.2.0-alpha.6-test.tgz"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
     "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
@@ -47,7 +48,7 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.2.0-alpha.6",
+        "@apimatic/sdk": "file:apimatic-sdk-0.2.0-alpha.6-test.tgz",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
