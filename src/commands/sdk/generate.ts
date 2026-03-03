@@ -22,10 +22,6 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       options: Object.values(Language).map((p) => p.valueOf()),
     }),
     ...FlagsProvider.input,
-    spec: Flags.string({
-      description: "Path to the folder containing the API specification file",
-      default: "./src/spec"
-    }),
     destination: Flags.string({
       char: "d",
       description: "Directory where the SDK will be generated"
@@ -44,7 +40,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   static examples = [
     `${SdkGenerate.cmdTxt} ${format.flag("language", "java")}`,
-    `${SdkGenerate.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("spec", "./src/spec")}`,
+    `${SdkGenerate.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("input", "./")}`,
     `${SdkGenerate.cmdTxt} ${format.flag("language", "python")} ${format.flag("destination", "./sdk")} ${format.flag(
       "zip"
     )}`
@@ -52,10 +48,11 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, input, spec, destination, "no-customization": noCustomization, force, zip: zipSdk, "auth-key": authKey }
+      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "no-customization": noCustomization }
     } = await this.parse(SdkGenerate);
 
-    const specDirectory = new DirectoryPath(spec);
+    const workingDirectory = DirectoryPath.createInput(input);
+    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join("sdk");
 
     const commandMetadata: CommandMetadata = {
@@ -63,11 +60,10 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       shell: this.config.shell
     };
 
-    const inputDir = DirectoryPath.createInput(input);
-
+    
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk, inputDir, noCustomization);
+    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, noCustomization);
     outro(result);
   }
 

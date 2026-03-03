@@ -17,13 +17,17 @@ import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { ZipService } from '../../infrastructure/zip-service.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
+import { BuildContext } from '../../types/build-context.js';
+import { TempContext } from '../../types/temp-context.js';
+import { getLanguagesConfig } from '../../types/build/build.js';
 
 const defaultSpecUrl = new UrlPath(
   `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
 );
-const metadataFileUrl = new UrlPath(
-  `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/APIMATIC-META.json`
+const buildFileUrl = new UrlPath(
+  `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
 );
+const repositoryFolderName = 'sample-docs-as-code-portal-master/src' as const;
 
 export class SdkQuickstartAction {
   private readonly prompts = new SdkQuickstartPrompts();
@@ -152,35 +156,39 @@ export class SdkQuickstartAction {
         break;
       }
 
-      // Setup source directory with the spec folder
-      const apimaticMetaFile = await this.prompts.downloadMetadataFile(
-        this.fileDownloadService.downloadFile(metadataFileUrl)
+      // Setup source directory with the build structure
+      const masterBuildFile = await this.prompts.downloadBuildDirectory(
+        this.fileDownloadService.downloadFile(buildFileUrl)
       );
-      if (apimaticMetaFile.isErr()) {
-        this.prompts.serviceError(apimaticMetaFile.error);
+      if (masterBuildFile.isErr()) {
+        this.prompts.serviceError(masterBuildFile.error);
         return ActionResult.failed();
       }
-      const tempSpecDirectory = tempDirectory.join('spec');
-      await this.fileService.createDirectoryIfNotExists(tempSpecDirectory);
-      const metadataFilePath = new FilePath(tempSpecDirectory, apimaticMetaFile.value.filename);
-      await this.fileService.writeFile(metadataFilePath, apimaticMetaFile.value.stream);
+      const tempContext = new TempContext(tempDirectory);
+      const masterBuildFilePath = await tempContext.save(masterBuildFile.value.stream);
+      await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
+      const extractedFolder = tempDirectory.join(repositoryFolderName);
 
-      if (await this.fileService.isZipFile(specPath)) {
-        await this.zipService.unArchive(specPath, tempSpecDirectory);
-      } else {
-        await this.fileService.copyToDir(specPath, tempSpecDirectory);
-      }
+      const tempBuildContext = new BuildContext(extractedFolder);
+      await tempBuildContext.deleteWorkflowDir();
+
+      const buildFile = await tempBuildContext.getBuildFileContents();
+      buildFile.generatePortal!.languageConfig = getLanguagesConfig([language]);
+      await tempBuildContext.updateBuildFileContents(buildFile);
 
       const sourceDirectory = inputDirectory.join('src');
-      const specDirectory = sourceDirectory.join('spec');
-      await this.fileService.copyDirectoryContents(tempSpecDirectory, specDirectory);
+      await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
 
-      const srcDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
-      this.prompts.printDirectoryStructure(inputDirectory, srcDirectoryStructure);
+      const specDirectory = sourceDirectory.join('spec');
+      const specContext = new SpecContext(specDirectory);
+      await specContext.replaceDefaultSpec(specPath);
+
+      const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
+      this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
 
       const sdkDirectory = inputDirectory.join('sdk');
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
-      const result = await sdkGenerateAction.execute(specDirectory, sdkDirectory, language as Language, true, false);
+      const result = await sdkGenerateAction.execute(sourceDirectory, sdkDirectory, language as Language, true, false);
       if (result.isFailed()) {
         return ActionResult.failed();
       }

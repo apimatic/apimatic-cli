@@ -1,16 +1,16 @@
 import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { FileService } from "../../infrastructure/file-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { SdkContext } from "../../types/sdk-context.js";
-import { SpecContext } from "../../types/spec-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
-import { FileService } from "../../infrastructure/file-service.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { ResolveConflictsAction } from "./resolve-conflicts.js";
+import { BuildContext } from "../../types/build-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -28,22 +28,30 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    specDirectory: DirectoryPath,
+    buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
     zipSdk: boolean,
-    inputDirectory?: DirectoryPath,
     noCustomization: boolean = false
   ): Promise<ActionResult> => {
-    if (specDirectory.isEqual(sdkDirectory)) {
-      this.prompts.sameSpecAndSdkDir(specDirectory);
+    if (buildDirectory.isEqual(sdkDirectory)) {
+      this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
     }
 
-    const specContext = new SpecContext(specDirectory);
-    if (!(await specContext.validate())) {
-      this.prompts.invalidSpecDirectory(specDirectory);
+    const versionedDocsDir = buildDirectory.join("versioned_docs");
+    if (await this.fileService.directoryExists(versionedDocsDir)) {
+      const subDirs = await this.fileService.getSubDirectories(versionedDocsDir);
+      if (subDirs.length > 0) {
+        buildDirectory = subDirs[0];
+        this.prompts.versionedBuild(`.\\src\\versioned_docs\\${buildDirectory.leafName()}`);
+      }
+    }
+
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.validate())) {
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
@@ -55,17 +63,11 @@ export class GenerateAction {
 
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-
-      // TODO: remove input dir from the condition
-      if (noCustomization && inputDirectory) {
-        await this.removeCustomizations(inputDirectory);
-      }
-
-      const specZipPath = await tempContext.zip(specDirectory);
+      const buildZipPath = await tempContext.zip(buildDirectory);
 
       // TODO: pass build file
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(specZipPath, language, this.configDir, this.commandMetadata, this.authKey)
+        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey)
       );
 
       // TODO: this should be a service error
@@ -80,8 +82,8 @@ export class GenerateAction {
       await this.fileService.unzipFile(tempSdkFilePath, tempSdkDir);
 
       // TOTO: remove this condition for input dir
-      if (inputDirectory) {
-        const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, inputDirectory, noCustomization);
+      if (buildDirectory) {
+        const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, buildDirectory, noCustomization);
         if (conflictResult.isFailed()) {
           return ActionResult.failed();
         }

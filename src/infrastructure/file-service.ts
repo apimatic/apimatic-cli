@@ -60,6 +60,17 @@ export class FileService {
     return new Directory(directoryPath, results);
   }
 
+  public async getSubDirectories(dir: DirectoryPath): Promise<DirectoryPath[]> {
+  try {
+    const entries = await fsExtra.readdir(dir.toString(), { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => dir.join(entry.name));
+  } catch {
+    return [];
+  }
+}
+
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
     const entries = await fsExtra.readdir(source.toString());
     await Promise.all(

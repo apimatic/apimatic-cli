@@ -203,7 +203,7 @@ export class SdkQuickstartPrompts {
     );
   }
 
-  public downloadMetadataFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
+  public downloadBuildDirectory(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner(
       "Setting up source directory",
       `Source directory set up successfully`,
@@ -224,7 +224,7 @@ export class SdkQuickstartPrompts {
 
   public nextSteps(language: Language, specDirectory: DirectoryPath): void {
     const specDirectoryFlag = !specDirectory.isEqual(DirectoryPath.default)
-      ? `${f.flag("spec", specDirectory.toString())} `
+      ? `${f.flag("destination", specDirectory.toString())} `
       : "";
     const message = `Run the command
 '${f.cmdAlt("apimatic", "sdk", "generate")} ${specDirectoryFlag}${f.flag("language", language)}'

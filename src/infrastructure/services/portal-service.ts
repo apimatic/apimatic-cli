@@ -1,19 +1,20 @@
 import { ReadStream } from "fs";
 import {
-  Accept,
   ApiError,
   ApiResponse,
   BadRequestResponseSdkError,
-  CodeGenerationExternalApisController,
+  SdkGenerationAsyncController,
   ContentType,
   DocsPortalGenerationAsyncController,
   UnauthorizedResponseError,
   ProblemDetailsError,
+  InternalServerErrorResponseError,
   FileWrapper,
   TransformationController,
   Transformation,
   ExportFormats,
-  Platforms
+  SdkLanguages,
+  Status,
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { parseStreamBodyToJson } from "../../utils/utils.js";
@@ -58,6 +59,7 @@ export class PortalService {
       generationId = portalInstance.result.id;
     } catch (error) {
       if (error instanceof ProblemDetailsError) {
+        // TODO: This only picks the first error message, improve it to show all errors.
         const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
         const errorMessage = error.result!.title + "\n- " + message;
         if (error.statusCode === 400) {
@@ -85,10 +87,22 @@ export class PortalService {
       if (statusResult.isErr()) {
         return err(statusResult.error);
       }
-      if (statusResult.value.status === "Failed") {
+      if (statusResult.value.status === Status.Failed) {
         return err(ServiceError.ServerError);
       }
-    } while (statusResult.value.status !== "Completed");
+      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
+        // TODO: This only picks the first error message, improve it to show all errors.
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = "One or more validation errors occurred." + "\n- " + message;
+        return err(ServiceError.badRequest(errorMessage));
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
+        // TODO: This only picks the first error message, improve it to show all errors.
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = "Access denied to resource." + "\n- " + message;
+        return err(ServiceError.forbidden(errorMessage));
+      }
+    } while (statusResult.value.status !== Status.Completed);
 
     try {
       const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
@@ -103,35 +117,86 @@ export class PortalService {
 
   // TODO: Pass stream as parameter instead of file path.
   public async generateSdk(
-    specPath: FilePath,
+    buildPath: FilePath,
     language: Language,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
   ): Promise<Result<NodeJS.ReadableStream, string>> {
-    const specFileStream = await this.fileService.getStream(specPath);
-    const file = new FileWrapper(specFileStream);
+    const buildFileStream = await this.fileService.getStream(buildPath);
+    const file = new FileWrapper(buildFileStream);
+
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
-    const sdkGenerationController = new CodeGenerationExternalApisController(client);
+    const sdkGenerationController = new SdkGenerationAsyncController(client);
+
+    let generationId: string;
+    try {
+      const response = await sdkGenerationController.generateSdkViaBuildInputAsync(
+        this.CONTENT_TYPE,
+        file,
+        this.languageSdk[language],
+      );
+      generationId = response.result.id;
+    } catch (error) {
+      if (error instanceof ProblemDetailsError) {
+        const messages = Object.values(error.result!.errors as Record<string, string[]>).flat();
+        const errorMessage = error.result!.title + "\n- " + (messages.length > 0 ? messages.join("\n- ") : "Unknown error.");
+        if (error.statusCode === 400) {
+          return err(errorMessage);
+        }
+        if (error.statusCode === 403) {
+          return err(errorMessage);
+        }
+      }
+      if (error instanceof UnauthorizedResponseError) {
+        return err(error.result?.message ?? "Authorization has been denied for this request.");
+      }
+      if (error instanceof InternalServerErrorResponseError) {
+        return err(error.result?.message ?? "An internal server error occurred. Please try again later.");
+      }
+      return err(handleServiceError(error).errorMessage);
+    } finally {
+      buildFileStream.close();
+    }
+
+    let statusResult;
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      statusResult = await this.apiService.getSdkGenerationStatus(
+        generationId,
+        configDir,
+        commandMetadata.shell,
+        authKey
+      );
+      
+      if (statusResult.isErr()) {
+        return err(statusResult.error.errorMessage);
+      }
+      if (statusResult.value.status === Status.Failed) {
+        return err("SDK generation failed. Please try again later.");
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
+        const messages = Object.values(statusResult.value.errors as Record<string, string[]>).flat();
+        const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown validation error.";
+        return err("One or more validation errors occurred." + "\n- " + errorMessage);
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
+        const messages = Object.values(statusResult.value.errors as Record<string, string[]>).flat();
+        const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown subscription error.";
+        return err("Access denied to resource." + "\n- " + errorMessage);
+      }
+    } while (statusResult.value.status !== Status.Completed);
 
     // TODO: change this flow
     // need apimatic build.json (gen from quickstart) - need stream
     // customizations stream
     try {
-      const response = await sdkGenerationController.generateSdkViaFile(
-        Accept.EnumApplicationjson,
-        file,
-        this.languagePlatform[language],
-        this.createOriginQueryParameter(commandMetadata.commandName)
-      );
-      const sdkResponse = await sdkGenerationController.downloadSdk(response.result.id);
+      const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
       return ok(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
       return err(await this.handleSdkGenerationErrors(error));
-    } finally {
-      specFileStream.close();
     }
   }
 
@@ -218,13 +283,13 @@ export class PortalService {
     return errorMessage;
   }
 
-  private readonly languagePlatform: Record<Language, Platforms> = {
-    [Language.CSHARP]: Platforms.CsNetStandardLib,
-    [Language.JAVA]: Platforms.JavaEclipseJreLib,
-    [Language.PHP]: Platforms.PhpGenericLibV2,
-    [Language.PYTHON]: Platforms.PythonGenericLib,
-    [Language.RUBY]: Platforms.RubyGenericLib,
-    [Language.TYPESCRIPT]: Platforms.TsGenericLib,
-    [Language.GO]: Platforms.GoGenericLib
+  private readonly languageSdk: Record<Language, SdkLanguages> = {
+    [Language.CSHARP]: SdkLanguages.Csharp,
+    [Language.JAVA]: SdkLanguages.Java,
+    [Language.PHP]: SdkLanguages.Php,
+    [Language.PYTHON]: SdkLanguages.Python,
+    [Language.RUBY]: SdkLanguages.Ruby,
+    [Language.TYPESCRIPT]: SdkLanguages.Typescript,
+    [Language.GO]: SdkLanguages.Go
   };
 }

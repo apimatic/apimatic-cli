@@ -1,166 +1,164 @@
 {
-  "name": "@apimatic/cli",
-  "description": "The official CLI for APIMatic.",
-  "version": "1.1.0-beta.5",
-  "author": "APIMatic",
-  "bin": {
-    "apimatic": "./bin/run.js"
-  },
-  "bugs": {
-    "url": "https://github.com/apimatic/apimatic-cli/issues",
-    "email": "support@apimatic.io"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "files": [
-    "./bin",
-    "./lib",
-    "/npm-shrinkwrap.json",
-    "/oclif.manifest.json"
-  ],
-  "repository": "git://github.com/apimatic/apimatic-cli.git",
-  "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
-  "keywords": [
-    "apimatic",
-    "cli",
-    "sdk generation",
-    "openapi",
-    "api",
-    "automation"
-  ],
-  "license": "MIT",
-  "type": "module",
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
-  "scripts": {
-    "build": "tsc -b",
-    "postpack": "rimraf oclif.manifest.json",
-    "posttest": "eslint . --ext .ts",
-    "prettier": "prettier \"src/**/*.{js,ts}\"",
-    "format": "prettier --write \"src/**/*.{js,ts}\"",
-    "lint": "eslint \"src/**/*.{js,ts}\"",
-    "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
-    "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
-  },
-  "dependencies": {
-    "@apimatic/sdk": "^0.2.0-alpha.5",
-    "@clack/prompts": "1.0.0-alpha.1",
-    "@oclif/core": "^4.2.8",
-    "@oclif/plugin-autocomplete": "^3.2.24",
-    "@oclif/plugin-help": "^6.2.26",
-    "@types/diff": "^7.0.2",
-    "archiver": "^7.0.1",
-    "async-mutex": "^0.5.0",
-    "axios": "^1.8.1",
-    "chokidar": "^3.6.0",
-    "connect-livereload": "^0.6.1",
-    "diff": "^8.0.2",
-    "execa": "^9.6.0",
-    "express": "^4.17.1",
-    "extract-zip": "^2.0.1",
-    "fast-levenshtein": "^3.0.0",
-    "form-data": "^4.0.2",
-    "fs-extra": "^11.3.0",
-    "get-port": "^7.1.0",
-    "is-in-ci": "^2.0.0",
-    "isomorphic-git": "^1.36.3",
-    "livereload": "^0.9.3",
-    "neverthrow": "^8.2.0",
-    "open": "^8.4.0",
-    "prettier": "^2.8.8",
-    "striptags": "^3.2.0",
-    "tmp-promise": "^3.0.3",
-    "tslib": "^2.8.1",
-    "uuid": "^11.1.0",
-    "yaml": "^2.8.0"
-  },
-  "devDependencies": {
-    "@commitlint/cli": "^15.0.0",
-    "@commitlint/config-conventional": "^15.0.0",
-    "@eslint/js": "^9.34.0",
-    "@oclif/test": "^4.1.13",
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
-    "@types/archiver": "^5.3.4",
-    "@types/base-64": "^1.0.0",
-    "@types/chai": "^4.3.20",
-    "@types/connect-livereload": "^0.5.32",
-    "@types/express": "^4.17.23",
-    "@types/fast-levenshtein": "^0.0.4",
-    "@types/fs-extra": "^9.0.13",
-    "@types/livereload": "^0.9.5",
-    "@types/mocha": "^5.2.7",
-    "@types/mock-fs": "^4.13.4",
-    "@types/node": "^20.17.50",
-    "@types/prettier": "^2.7.3",
-    "@types/sinon": "^17.0.4",
-    "@types/treeify": "^1.0.3",
-    "@types/unzipper": "^0.10.4",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "chai": "^4.5.0",
-    "eslint": "^9.21.0",
-    "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-import": "^2.25.2",
-    "husky": "^7.0.4",
-    "lint-staged": "^11.2.6",
-    "mocha": "^11.7.1",
-    "mock-fs": "^5.5.0",
-    "nock": "^14.0.4",
-    "nyc": "^17.1.0",
-    "oclif": "^4.17.34",
-    "rimraf": "^6.0.1",
-    "sinon": "^21.0.0",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.3",
-    "typescript": "^5.2.2"
-  },
-  "oclif": {
-    "commands": "./lib/commands",
-    "dirname": "apimatic",
-    "bin": "apimatic",
-    "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
-    "hooks": {
-      "command_not_found": "./lib/hooks/not-found"
+    "name": "@apimatic/cli",
+    "description": "The official CLI for APIMatic.",
+    "version": "1.1.0-beta.6",
+    "author": "APIMatic",
+    "bin": {
+        "apimatic": "./bin/run.js"
     },
-    "plugins": [
-      "@oclif/plugin-autocomplete",
-      "@oclif/plugin-help"
+    "bugs": {
+        "url": "https://github.com/apimatic/apimatic-cli/issues",
+        "email": "support@apimatic.io"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    },
+    "files": [
+        "./bin",
+        "./lib",
+        "/npm-shrinkwrap.json",
+        "/oclif.manifest.json",
+        "/apimatic-sdk-0.2.0-alpha.6-test-new.tgz"
     ],
-    "topics": {
-      "api": {
-        "description": "Transform & Validate your API specifications."
-      },
-      "auth": {
-        "description": "Login using your APIMatic credentials, or view your authentication status."
-      },
-      "portal": {
-        "description": "Generate, download and serve an API Documentation portal for your APIs."
-      },
-      "sdk": {
-        "description": "Generate SDKs for your APIs in multiple languages."
-      },
-      "portal:toc": {
-        "description": "Generate a Table of Contents (TOC) file for your API documentation portal."
-      }
+    "repository": "git://github.com/apimatic/apimatic-cli.git",
+    "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
+    "keywords": [
+        "apimatic",
+        "cli",
+        "sdk generation",
+        "openapi",
+        "api",
+        "automation"
+    ],
+    "license": "MIT",
+    "type": "module",
+    "main": "lib/index.js",
+    "types": "lib/index.d.ts",
+    "scripts": {
+        "build": "tsc -b",
+        "postpack": "rimraf oclif.manifest.json",
+        "posttest": "eslint . --ext .ts",
+        "prettier": "prettier \"src/**/*.{js,ts}\"",
+        "format": "prettier --write \"src/**/*.{js,ts}\"",
+        "lint": "eslint \"src/**/*.{js,ts}\"",
+        "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
+        "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
-    "topicSeparator": " ",
-    "state": "beta"
-  },
-  "lint-staged": {
-    "*.js": "eslint --cache --fix",
-    "*.{js,ts}": "prettier --write"
-  },
-  "overrides": {
-    "inflight": "npm:lru-cache@^7.14.1",
-    "lodash.get": "npm:lodash@^4.17.21",
-    "@humanwhocodes/config-array": "npm:@eslint/config-array@latest",
-    "rimraf": "^6.0.1",
-    "glob": "^10.4.5",
-    "q": "npm:promise@^8.3.0"
-  }
+    "dependencies": {
+        "@apimatic/sdk": "file:apimatic-sdk-0.2.0-alpha.6-test-new.tgz",
+        "@clack/prompts": "1.0.0-alpha.1",
+        "@oclif/core": "^4.2.8",
+        "@oclif/plugin-autocomplete": "^3.2.24",
+        "@oclif/plugin-help": "^6.2.26",
+        "archiver": "^7.0.1",
+        "async-mutex": "^0.5.0",
+        "axios": "^1.8.1",
+        "chokidar": "^3.6.0",
+        "connect-livereload": "^0.6.1",
+        "execa": "^9.6.0",
+        "express": "^4.17.1",
+        "extract-zip": "^2.0.1",
+        "fast-levenshtein": "^3.0.0",
+        "form-data": "^4.0.2",
+        "fs-extra": "^11.3.0",
+        "get-port": "^7.1.0",
+        "is-in-ci": "^2.0.0",
+        "livereload": "^0.9.3",
+        "neverthrow": "^8.2.0",
+        "open": "^8.4.0",
+        "prettier": "^2.8.8",
+        "striptags": "^3.2.0",
+        "tmp-promise": "^3.0.3",
+        "tslib": "^2.8.1",
+        "uuid": "^11.1.0",
+        "yaml": "^2.8.0"
+    },
+    "devDependencies": {
+        "@commitlint/cli": "^15.0.0",
+        "@commitlint/config-conventional": "^15.0.0",
+        "@eslint/js": "^9.34.0",
+        "@oclif/test": "^4.1.13",
+        "@semantic-release/changelog": "^6.0.3",
+        "@semantic-release/git": "^10.0.1",
+        "@types/archiver": "^5.3.4",
+        "@types/base-64": "^1.0.0",
+        "@types/chai": "^4.3.20",
+        "@types/connect-livereload": "^0.5.32",
+        "@types/express": "^4.17.23",
+        "@types/fast-levenshtein": "^0.0.4",
+        "@types/fs-extra": "^9.0.13",
+        "@types/livereload": "^0.9.5",
+        "@types/mocha": "^5.2.7",
+        "@types/mock-fs": "^4.13.4",
+        "@types/node": "^20.17.50",
+        "@types/prettier": "^2.7.3",
+        "@types/sinon": "^17.0.4",
+        "@types/treeify": "^1.0.3",
+        "@types/unzipper": "^0.10.4",
+        "@typescript-eslint/eslint-plugin": "^8.0.0",
+        "@typescript-eslint/parser": "^8.0.0",
+        "chai": "^4.5.0",
+        "eslint": "^9.21.0",
+        "eslint-config-prettier": "^8.3.0",
+        "eslint-plugin-import": "^2.25.2",
+        "husky": "^7.0.4",
+        "lint-staged": "^11.2.6",
+        "mocha": "^11.7.1",
+        "mock-fs": "^5.5.0",
+        "nock": "^14.0.4",
+        "nyc": "^17.1.0",
+        "oclif": "^4.17.34",
+        "rimraf": "^6.0.1",
+        "sinon": "^21.0.0",
+        "ts-node": "^10.9.2",
+        "tsx": "^4.20.3",
+        "typescript": "^5.2.2"
+    },
+    "oclif": {
+        "commands": "./lib/commands",
+        "dirname": "apimatic",
+        "bin": "apimatic",
+        "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
+        "hooks": {
+            "command_not_found": "./lib/hooks/not-found"
+        },
+        "plugins": [
+            "@oclif/plugin-autocomplete",
+            "@oclif/plugin-help"
+        ],
+        "topics": {
+            "api": {
+                "description": "Transform & Validate your API specifications."
+            },
+            "auth": {
+                "description": "Login using your APIMatic credentials, or view your authentication status."
+            },
+            "portal": {
+                "description": "Generate, download and serve an API Documentation portal for your APIs."
+            },
+            "sdk": {
+                "description": "Generate SDKs for your APIs in multiple languages."
+            },
+            "portal:toc": {
+                "description": "Generate a Table of Contents (TOC) file for your API documentation portal."
+            }
+        },
+        "topicSeparator": " ",
+        "state": "beta"
+    },
+    "lint-staged": {
+        "*.js": "eslint --cache --fix",
+        "*.{js,ts}": "prettier --write"
+    },
+    "overrides": {
+        "inflight": "npm:lru-cache@^7.14.1",
+        "lodash.get": "npm:lodash@^4.17.21",
+        "@humanwhocodes/config-array": "npm:@eslint/config-array@latest",
+        "rimraf": "^6.0.1",
+        "glob": "^10.4.5",
+        "q": "npm:promise@^8.3.0"
+    }
 }

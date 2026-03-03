@@ -18,13 +18,13 @@ export class SdkGeneratePrompts {
     return overwrite;
   }
 
-  public sameSpecAndSdkDir(directory: DirectoryPath) {
+  public sameBuildAndSdkDir(directory: DirectoryPath) {
    const message = `The ${f.var("src")} and ${f.var("portal")} directories must be different. Current value: ${f.path(
       directory
     )}`;    this.logGenerationError(message);
   }
 
-  public invalidSpecDirectory(directory: DirectoryPath) {
+  public srcDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
@@ -40,6 +40,10 @@ export class SdkGeneratePrompts {
 
   public logGenerationError(error: string): void {
     log.error(error);
+  }
+
+  public versionedBuild(relativePath: string) {
+    log.warning(`Multi-versioned build to SDK is not supported. Generating SDK for ${f.var(relativePath)} instead.`);
   }
 
   public sdkGenerated(sdk: DirectoryPath) {
