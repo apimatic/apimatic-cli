@@ -60,7 +60,7 @@ export class FileService {
     return new Directory(directoryPath, results);
   }
 
-  public async getSubDirectories(dir: DirectoryPath): Promise<DirectoryPath[]> {
+  public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
   try {
     const entries = await fsExtra.readdir(dir.toString(), { withFileTypes: true });
     return entries

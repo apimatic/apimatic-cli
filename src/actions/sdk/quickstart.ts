@@ -21,14 +21,6 @@ import { BuildContext } from '../../types/build-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { getLanguagesConfig } from '../../types/build/build.js';
 
-const defaultSpecUrl = new UrlPath(
-  `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
-);
-const buildFileUrl = new UrlPath(
-  `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
-);
-const repositoryFolderName = 'sample-docs-as-code-portal-master/src' as const;
-
 export class SdkQuickstartAction {
   private readonly prompts = new SdkQuickstartPrompts();
   private readonly fileDownloadService = new FileDownloadService();
@@ -36,6 +28,13 @@ export class SdkQuickstartAction {
   private readonly launcherService = new LauncherService();
   private readonly zipService = new ZipService();
   private readonly validationService = new ValidationService(this.configDir);
+  private readonly buildFileUrl = new UrlPath(
+    `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
+  );
+  private readonly defaultSpecUrl = new UrlPath(
+    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
+  );
+  private readonly repositoryFolderName = 'sample-docs-as-code-portal-master/src' as const;
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -54,7 +53,7 @@ export class SdkQuickstartAction {
 
       let specPath: FilePath | undefined;
       while (!specPath) {
-        const inputPath = await this.prompts.specPathPrompt(defaultSpecUrl);
+        const inputPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
         if (!inputPath) {
           this.prompts.noSpecSpecified();
           return ActionResult.cancelled();
@@ -93,7 +92,7 @@ export class SdkQuickstartAction {
           return ActionResult.cancelled();
         }
         const downloadFileResult = await this.prompts.downloadSpecFile(
-          this.fileDownloadService.downloadFile(defaultSpecUrl)
+          this.fileDownloadService.downloadFile(this.defaultSpecUrl)
         );
         if (downloadFileResult.isErr()) {
           this.prompts.serviceError(downloadFileResult.error);
@@ -158,7 +157,7 @@ export class SdkQuickstartAction {
 
       // Setup source directory with the build structure
       const masterBuildFile = await this.prompts.downloadBuildDirectory(
-        this.fileDownloadService.downloadFile(buildFileUrl)
+        this.fileDownloadService.downloadFile(this.buildFileUrl)
       );
       if (masterBuildFile.isErr()) {
         this.prompts.serviceError(masterBuildFile.error);
@@ -167,7 +166,7 @@ export class SdkQuickstartAction {
       const tempContext = new TempContext(tempDirectory);
       const masterBuildFilePath = await tempContext.save(masterBuildFile.value.stream);
       await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
-      const extractedFolder = tempDirectory.join(repositoryFolderName);
+      const extractedFolder = tempDirectory.join(this.repositoryFolderName);
 
       const tempBuildContext = new BuildContext(extractedFolder);
       await tempBuildContext.deleteWorkflowDir();

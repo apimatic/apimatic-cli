@@ -2,13 +2,10 @@ import { ReadStream } from "fs";
 import {
   ApiError,
   ApiResponse,
-  BadRequestResponseSdkError,
   SdkGenerationAsyncController,
   ContentType,
   DocsPortalGenerationAsyncController,
-  UnauthorizedResponseError,
   ProblemDetailsError,
-  InternalServerErrorResponseError,
   FileWrapper,
   TransformationController,
   Transformation,
@@ -122,7 +119,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, string>> {
+  ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
 
@@ -141,22 +138,18 @@ export class PortalService {
       generationId = response.result.id;
     } catch (error) {
       if (error instanceof ProblemDetailsError) {
-        const messages = Object.values(error.result!.errors as Record<string, string[]>).flat();
-        const errorMessage = error.result!.title + "\n- " + (messages.length > 0 ? messages.join("\n- ") : "Unknown error.");
+        // TODO: This only picks the first error message, improve it to show all errors.
+        const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = error.result!.title + "\n- " + message;
         if (error.statusCode === 400) {
-          return err(errorMessage);
+          return err(ServiceError.badRequest(errorMessage));
         }
         if (error.statusCode === 403) {
-          return err(errorMessage);
+          return err(ServiceError.forbidden(errorMessage));
         }
       }
-      if (error instanceof UnauthorizedResponseError) {
-        return err(error.result?.message ?? "Authorization has been denied for this request.");
-      }
-      if (error instanceof InternalServerErrorResponseError) {
-        return err(error.result?.message ?? "An internal server error occurred. Please try again later.");
-      }
-      return err(handleServiceError(error).errorMessage);
+      const serviceError = handleServiceError(error);
+      return err(serviceError);
     } finally {
       buildFileStream.close();
     }
@@ -172,20 +165,20 @@ export class PortalService {
       );
       
       if (statusResult.isErr()) {
-        return err(statusResult.error.errorMessage);
+        return err(statusResult.error);
       }
       if (statusResult.value.status === Status.Failed) {
-        return err("SDK generation failed. Please try again later.");
+        return err(ServiceError.ServerError);
       }
       if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const messages = Object.values(statusResult.value.errors as Record<string, string[]>).flat();
-        const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown validation error.";
-        return err("One or more validation errors occurred." + "\n- " + errorMessage);
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = "One or more validation errors occurred." + "\n- " + message;
+        return err(ServiceError.badRequest(errorMessage));
       }
       if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const messages = Object.values(statusResult.value.errors as Record<string, string[]>).flat();
-        const errorMessage = messages.length > 0 ? messages.join("\n- ") : "Unknown subscription error.";
-        return err("Access denied to resource." + "\n- " + errorMessage);
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errorMessage = "Access denied to resource." + "\n- " + message;
+        return err(ServiceError.forbidden(errorMessage));
       }
     } while (statusResult.value.status !== Status.Completed);
 
@@ -196,7 +189,7 @@ export class PortalService {
       const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
       return ok(sdkResponse.result as NodeJS.ReadableStream);
     } catch (error) {
-      return err(await this.handleSdkGenerationErrors(error));
+      return err(handleServiceError(error));
     }
   }
 
@@ -245,43 +238,6 @@ export class PortalService {
       origin: `APIMATIC CLI ${commandName}`
     };
   };
-
-  private handleSdkGenerationErrors = async (error: unknown): Promise<string> => {
-    if (error instanceof BadRequestResponseSdkError) {
-      //400
-      return this.parseBadRequestResponse(error.result?.message);
-    }
-    if (error instanceof UnauthorizedResponseError) {
-      //401
-      return error.result?.message ?? "Authorization has been denied for this request.";
-    }
-    if (error instanceof ProblemDetailsError) {
-      // 403
-      const message = (error.result!.errors as Record<string, string[]>)?.[""]?.[0];
-      return error.result!.title + "\n- " + message;
-    }
-    return "An unexpected error occurred while generating the SDK, please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
-  };
-
-  private parseBadRequestResponse(errorMessage: string | undefined): string {
-    // #TODO: Fix server-side error message and simplify this function
-    if (!errorMessage) {
-      return "Bad request.";
-    }
-    // Parse the JSON string
-    const parsedResult = JSON.parse(errorMessage);
-
-    // Check if it has the expected structure with Errors
-    if (parsedResult.Errors && Array.isArray(parsedResult.Errors) && parsedResult.Errors.length > 0) {
-      // Get the first error and clean it up
-      return parsedResult.Errors[0].split(".")[0] + ".";
-      // Split on <br/> and take the first part, then strip remaining HTML tags
-      // return firstError.split("<br/>")[0].replace(/<[^<>]*?>/g, "");
-    } else if (parsedResult.Success === false) {
-      return "API definition file validation failed.";
-    }
-    return errorMessage;
-  }
 
   private readonly languageSdk: Record<Language, SdkLanguages> = {
     [Language.CSHARP]: SdkLanguages.Csharp,
