@@ -1,9 +1,9 @@
 import { PortalService } from "../../infrastructure/services/portal-service.js";
-import { FileService } from "../../infrastructure/file-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { SdkContext } from "../../types/sdk-context.js";
+import { VersionedBuildContext } from "../../types/versioned-build-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
@@ -13,7 +13,6 @@ import { BuildContext } from "../../types/build-context.js";
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
-  private readonly fileService: FileService = new FileService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -36,13 +35,14 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const versionedDocsDir = buildDirectory.join("versioned_docs");
-    if (await this.fileService.directoryExists(versionedDocsDir)) {
-      const subDirs = await this.fileService.getSubDirectories(versionedDocsDir);
-      if (subDirs.length > 0) {
-        buildDirectory = subDirs[0];
-        this.prompts.versionedBuild(`.\\src\\versioned_docs\\${buildDirectory.leafName()}`);
+    const versionedBuildContext = new VersionedBuildContext(buildDirectory);
+    if (await versionedBuildContext.exists()) {
+      if (!(await versionedBuildContext.validate())) {
+        this.prompts.versionedBuildEmpty();
+        return ActionResult.failed();
       }
+      buildDirectory = versionedBuildContext.resolvedBuildDirectory;
+      this.prompts.versionedBuild(versionedBuildContext.relativePath);
     }
 
     const buildContext = new BuildContext(buildDirectory);
@@ -67,7 +67,7 @@ export class GenerateAction {
 
       // TODO: this should be service error
       if (response.isErr()) {
-        this.prompts.logGenerationError(response.error);
+        this.prompts.logGenerationError(response.error.errorMessage);
         return ActionResult.failed();
       }
 
