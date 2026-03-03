@@ -133,7 +133,7 @@ export class PortalService {
 
     let generationId: string;
     try {
-      const response = await sdkGenerationController.generateSdkViaBuildInputOrApiSpecificationAsync(
+      const response = await sdkGenerationController.generateSdkViaBuildInputAsync(
         this.CONTENT_TYPE,
         file,
         this.languageSdk[language],
