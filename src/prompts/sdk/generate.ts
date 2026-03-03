@@ -42,6 +42,10 @@ export class SdkGeneratePrompts {
     log.error(error);
   }
 
+  public versionedBuild(relativePath: string) {
+    log.warning(`Multi-versioned build to SDK is not supported. Generating SDK for ${f.var(relativePath)} instead.`);
+  }
+
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }

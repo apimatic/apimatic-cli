@@ -48,6 +48,15 @@
             // "--no-reload",
             // "--auth-key=\"invalidApiKey\"",
             // "--help"
+            // "quickstart",
+            // "--help"
+            "sdk:generate",
+            // "portal:generate",
+            "--language=typescript",
+            "--destination=D:/calculator/gen-sdk",
+            // "--input=D:/calculator",
+            "--input=C:/Users/pc/Downloads/PayQuicker Build",
+            // "--input=C:/Users/pc/Downloads/maxioBuild"
         ],
         "console": "externalTerminal",
         "preLaunchTask": "tsc: build - tsconfig.json"

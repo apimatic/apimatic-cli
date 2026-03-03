@@ -1,4 +1,5 @@
 import { PortalService } from "../../infrastructure/services/portal-service.js";
+import { FileService } from "../../infrastructure/file-service.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
@@ -12,6 +13,7 @@ import { BuildContext } from "../../types/build-context.js";
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
+  private readonly fileService: FileService = new FileService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -32,6 +34,15 @@ export class GenerateAction {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
+    }
+
+    const versionedDocsDir = buildDirectory.join("versioned_docs");
+    if (await this.fileService.directoryExists(versionedDocsDir)) {
+      const subDirs = await this.fileService.getSubDirectories(versionedDocsDir);
+      if (subDirs.length > 0) {
+        buildDirectory = subDirs[0];
+        this.prompts.versionedBuild(`.\\src\\versioned_docs\\${buildDirectory.leafName()}`);
+      }
     }
 
     const buildContext = new BuildContext(buildDirectory);
