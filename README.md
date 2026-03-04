@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-beta.6 win32-x64 node-v23.4.0
+@apimatic/cli/1.1.0-beta.7 win32-x64 node-v23.4.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -411,16 +411,17 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [--spec <value>] [-d <value>] [-f] [--zip]
-    [-k <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-i <value>] [-d <value>] [-f] [--zip] [-k
+    <value>]
 
 FLAGS
   -d, --destination=<value>  directory where the SDK will be generated
   -f, --force                overwrite changes without asking for user consent.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
   -l, --language=<option>    (required) programming language for SDK generation
                              <options: csharp|java|php|python|ruby|typescript|go>
-      --spec=<value>         [default: ./src/spec] path to the folder containing the API specification file
       --zip                  download the generated SDK as a .zip archive
 
 DESCRIPTION
@@ -432,7 +433,7 @@ DESCRIPTION
 EXAMPLES
   apimatic sdk generate --language=java
 
-  apimatic sdk generate --language=csharp --spec=./src/spec
+  apimatic sdk generate --language=csharp --input=./
 
   apimatic sdk generate --language=python --destination=./sdk --zip
 ```
