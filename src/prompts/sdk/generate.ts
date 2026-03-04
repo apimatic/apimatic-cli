@@ -43,6 +43,10 @@ export class SdkGeneratePrompts {
     log.error(error);
   }
 
+  public sdkGenerationServiceError(serviceError: ServiceError) {
+    log.error(serviceError.errorMessage);
+  }
+
   public versionedBuildEmpty() {
     const message = `The ${f.var("versioned_docs")} directory is empty or contains no valid versions.`;
     this.logGenerationError(message);

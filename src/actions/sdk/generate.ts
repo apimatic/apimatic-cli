@@ -43,12 +43,13 @@ export class GenerateAction {
 
     const versionedBuildContext = new VersionedBuildContext(buildDirectory);
     if (await versionedBuildContext.exists()) {
-      if (!(await versionedBuildContext.validate())) {
+      const resolvedDirectory = await versionedBuildContext.getResolvedBuildDirectory();
+      if (!resolvedDirectory) {
         this.prompts.versionedBuildEmpty();
         return ActionResult.failed();
       }
-      buildDirectory = versionedBuildContext.resolvedBuildDirectory;
-      this.prompts.versionedBuild(versionedBuildContext.relativePath);
+      buildDirectory = resolvedDirectory;
+      this.prompts.versionedBuild(versionedBuildContext.getRelativePath(resolvedDirectory));
     }
 
     const buildContext = new BuildContext(buildDirectory);
@@ -74,7 +75,7 @@ export class GenerateAction {
 
       // TODO: this should be a service error
       if (response.isErr()) {
-        this.prompts.logGenerationError(response.error.errorMessage);
+        this.prompts.sdkGenerationServiceError(response.error);
         return ActionResult.failed();
       }
 
