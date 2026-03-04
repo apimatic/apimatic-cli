@@ -11,6 +11,7 @@ import { Language } from "../../types/sdk/generate.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { ResolveConflictsAction } from "./resolve-conflicts.js";
 import { BuildContext } from "../../types/build-context.js";
+import { FileService } from "../../infrastructure/file-service.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -82,12 +83,9 @@ export class GenerateAction {
       await this.fileService.createDirectoryIfNotExists(tempSdkDir);
       await this.fileService.unzipFile(tempSdkFilePath, tempSdkDir);
 
-      // TOTO: remove this condition for input dir
-      if (buildDirectory) {
-        const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, buildDirectory, noCustomization);
-        if (conflictResult.isFailed()) {
-          return ActionResult.failed();
-        }
+      const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, buildDirectory, noCustomization);
+      if (conflictResult.isFailed()) {
+        return ActionResult.failed();
       }
 
       const finalZipPath = FilePath.create(tempDirectory.join("final-sdk.zip").toString());
@@ -101,12 +99,5 @@ export class GenerateAction {
 
       return ActionResult.success();
     });
-  };
-
-  private readonly removeCustomizations = async (inputDirectory: DirectoryPath): Promise<void> => {
-    const customizationsDir = inputDirectory.join("src").join("customizations");
-    if (await this.fileService.directoryExists(customizationsDir)) {
-      await this.fileService.deleteDirectory(customizationsDir);
-    }
   };
 }
