@@ -171,12 +171,12 @@ export class PortalService {
         return err(ServiceError.ServerError);
       }
       if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>).flat()[0] ?? null;
         const errorMessage = "One or more validation errors occurred." + "\n- " + message;
         return err(ServiceError.badRequest(errorMessage));
       }
       if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const message = Object.values(statusResult.value.errors as Record<string, string[]>).flat()[0] ?? null;
         const errorMessage = "Access denied to resource." + "\n- " + message;
         return err(ServiceError.forbidden(errorMessage));
       }
