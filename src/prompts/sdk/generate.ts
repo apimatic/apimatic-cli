@@ -3,6 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, } from "../format.js";
 import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 
 export class SdkGeneratePrompts {
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -18,13 +19,13 @@ export class SdkGeneratePrompts {
     return overwrite;
   }
 
-  public sameSpecAndSdkDir(directory: DirectoryPath) {
-   const message = `The ${f.var("src")} and ${f.var("portal")} directories must be different. Current value: ${f.path(
+  public sameBuildAndSdkDir(directory: DirectoryPath) {
+   const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
       directory
     )}`;    this.logGenerationError(message);
   }
 
-  public invalidSpecDirectory(directory: DirectoryPath) {
+  public srcDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
@@ -34,12 +35,25 @@ export class SdkGeneratePrompts {
     this.logGenerationError(message);
   }
 
-  public generateSDK(fn: Promise<Result<NodeJS.ReadableStream, string>>) {
+  public generateSDK(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
   public logGenerationError(error: string): void {
     log.error(error);
+  }
+
+  public sdkGenerationServiceError(serviceError: ServiceError) {
+    log.error(serviceError.errorMessage);
+  }
+
+  public versionedBuildEmpty() {
+    const message = `The ${f.var("versioned_docs")} directory is empty or contains no valid versions.`;
+    this.logGenerationError(message);
+  }
+
+  public versionedBuild(relativePath: string) {
+    log.warning(`SDK Generation for multi-versioned builds is not supported. Generating SDK for ${f.var(relativePath)} instead.`);
   }
 
   public sdkGenerated(sdk: DirectoryPath) {

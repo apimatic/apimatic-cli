@@ -21,10 +21,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       description: "Programming language for SDK generation",
       options: Object.values(Language).map((p) => p.valueOf()),
     }),
-    spec: Flags.string({
-      description: "Path to the folder containing the API specification file",
-      default: "./src/spec"
-    }),
+    ...FlagsProvider.input,
     destination: Flags.string({
       char: "d",
       description: "Directory where the SDK will be generated"
@@ -39,7 +36,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   static examples = [
     `${SdkGenerate.cmdTxt} ${format.flag("language", "java")}`,
-    `${SdkGenerate.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("spec", "./src/spec")}`,
+    `${SdkGenerate.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("input", "./")}`,
     `${SdkGenerate.cmdTxt} ${format.flag("language", "python")} ${format.flag("destination", "./sdk")} ${format.flag(
       "zip"
     )}`
@@ -47,10 +44,11 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, spec, destination, force, zip: zipSdk, "auth-key": authKey }
+      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey }
     } = await this.parse(SdkGenerate);
 
-    const specDirectory = new DirectoryPath(spec);
+    const workingDirectory = DirectoryPath.createInput(input);
+    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join("sdk");
 
     const commandMetadata: CommandMetadata = {
@@ -60,7 +58,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(specDirectory, sdkDirectory, language as Language, force, zipSdk);
+    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk);
     outro(result);
   }
 
