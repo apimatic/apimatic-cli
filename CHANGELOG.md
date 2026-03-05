@@ -1,3 +1,10 @@
+# [1.1.0-beta.7](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.6...v1.1.0-beta.7) (2026-03-05)
+
+
+### Features
+
+* update sdk generate to accept build input instead of a spec file ([#243](https://github.com/apimatic/apimatic-cli/issues/243)) ([ea8e088](https://github.com/apimatic/apimatic-cli/commit/ea8e0888f5cbbf71c3a1d7dcb64e7e360546e804))
+
 # [1.1.0-beta.6](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.5...v1.1.0-beta.6) (2026-01-02)
 
 
