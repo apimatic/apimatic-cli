@@ -3,11 +3,12 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { SdkContext } from "../../types/sdk-context.js";
-import { SpecContext } from "../../types/spec-context.js";
+import { VersionedBuildContext } from "../../types/versioned-build-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
+import { BuildContext } from "../../types/build-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -23,20 +24,31 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    specDirectory: DirectoryPath,
+    buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
     zipSdk: boolean
   ): Promise<ActionResult> => {
-    if (specDirectory.isEqual(sdkDirectory)) {
-      this.prompts.sameSpecAndSdkDir(specDirectory);
+    if (buildDirectory.isEqual(sdkDirectory)) {
+      this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
     }
 
-    const specContext = new SpecContext(specDirectory);
-    if (!(await specContext.validate())) {
-      this.prompts.invalidSpecDirectory(specDirectory);
+    const versionedBuildContext = new VersionedBuildContext(buildDirectory);
+    if (await versionedBuildContext.exists()) {
+      const resolvedDirectory = await versionedBuildContext.getResolvedBuildDirectory();
+      if (!resolvedDirectory) {
+        this.prompts.versionedBuildEmpty();
+        return ActionResult.failed();
+      }
+      buildDirectory = resolvedDirectory;
+      this.prompts.versionedBuild(versionedBuildContext.getRelativePath(resolvedDirectory));
+    }
+
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.validate())) {
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
@@ -48,15 +60,15 @@ export class GenerateAction {
 
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const specZipPath = await tempContext.zip(specDirectory);
+      const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(specZipPath, language, this.configDir, this.commandMetadata, this.authKey)
+        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey)
       );
 
       // TODO: this should be service error
       if (response.isErr()) {
-        this.prompts.logGenerationError(response.error);
+        this.prompts.sdkGenerationServiceError(response.error);
         return ActionResult.failed();
       }
 

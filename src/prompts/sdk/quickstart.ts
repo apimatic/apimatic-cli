@@ -203,7 +203,7 @@ export class SdkQuickstartPrompts {
     );
   }
 
-  public downloadMetadataFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
+  public downloadBuildDirectory(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner(
       "Setting up source directory",
       `Source directory set up successfully`,
@@ -222,12 +222,12 @@ export class SdkQuickstartPrompts {
     log.info("Opened the SDK directory in VS Code. To get started with your SDK, review the README file.");
   }
 
-  public nextSteps(language: Language, specDirectory: DirectoryPath): void {
-    const specDirectoryFlag = !specDirectory.isEqual(DirectoryPath.default)
-      ? `${f.flag("spec", specDirectory.toString())} `
+  public nextSteps(language: Language, inputDirectory: DirectoryPath): void {
+    const inputDirectoryFlag = !inputDirectory.isEqual(DirectoryPath.default)
+      ? `${f.flag("input", inputDirectory.toString())} `
       : "";
     const message = `Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate")} ${specDirectoryFlag}${f.flag("language", language)}'
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)}'
 to regenerate your SDK.
 
 To learn more about customizing your SDK, visit:
