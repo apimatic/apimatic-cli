@@ -182,9 +182,6 @@ export class PortalService {
       }
     } while (statusResult.value.status !== Status.Completed);
 
-    // TODO: change this flow
-    // need apimatic build.json (gen from quickstart) - need stream
-    // customizations stream
     try {
       const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
       return ok(sdkResponse.result as NodeJS.ReadableStream);
