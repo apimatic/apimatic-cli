@@ -46,9 +46,10 @@ export class GenerateAction {
       this.prompts.versionedBuild(versionedBuildContext.getRelativePath(resolvedDirectory));
     }
 
-    const specContext = new SpecContext(buildDirectory.join("spec"));
+    const specDirectory = buildDirectory.join("spec");
+    const specContext = new SpecContext(specDirectory);
     if (!(await specContext.validate())) {
-      this.prompts.specDirectoryEmpty(buildDirectory);
+      this.prompts.specDirectoryEmpty(specDirectory);
       return ActionResult.failed();
     }
 

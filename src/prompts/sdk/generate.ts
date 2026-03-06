@@ -26,7 +26,7 @@ export class SdkGeneratePrompts {
   }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory.join("spec"))}`;
+    const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
 
