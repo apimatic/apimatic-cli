@@ -26,16 +26,20 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       char: "d",
       description: "Directory where the SDK will be generated"
     }),
-    "no-customization": Flags.boolean({
+    "skip-apply-source-tree": Flags.boolean({
       default: false,
-      description: "Do not apply customization to the generated SDKs"
+      description: "Do not apply the source tree customizations to the generated SDK"
     }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
       description: "Download the generated SDK as a .zip archive"
     }),
-    ...FlagsProvider.authKey
+    ...FlagsProvider.authKey,
+    "build-source-tree": Flags.boolean({
+      default: false,
+      description: "Retain the source tree of the build directory in the generated SDK"
+    })
   };
 
   static examples = [
@@ -48,7 +52,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "no-customization": noCustomization }
+      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-apply-source-tree": skipApplySourceTree, "build-source-tree": buildSourceTree }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -59,11 +63,10 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       commandName: SdkGenerate.id,
       shell: this.config.shell
     };
-
     
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, noCustomization);
+    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, skipApplySourceTree, buildSourceTree);
     outro(result);
   }
 

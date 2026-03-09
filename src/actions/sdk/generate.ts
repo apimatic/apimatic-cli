@@ -9,7 +9,7 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
 import { FilePath } from "../../types/file/filePath.js";
-import { ResolveConflictsAction } from "./resolve-conflicts.js";
+import { MergeSourceTreeAction } from "./resolve-conflicts.js";
 import { BuildContext } from "../../types/build-context.js";
 import { FileService } from "../../infrastructure/file-service.js";
 
@@ -17,7 +17,7 @@ export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
   private readonly fileService: FileService = new FileService();
-  private readonly resolveConflictsAction: ResolveConflictsAction = new ResolveConflictsAction();
+  private readonly mergeSourceTreeAction: MergeSourceTreeAction = new MergeSourceTreeAction();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -34,7 +34,8 @@ export class GenerateAction {
     language: Language,
     force: boolean,
     zipSdk: boolean,
-    noCustomization: boolean = false
+    skipApplySourceTree: boolean,
+    buildSourceTree: boolean
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
@@ -84,7 +85,7 @@ export class GenerateAction {
       await this.fileService.createDirectoryIfNotExists(tempSdkDir);
       await this.fileService.unzipFile(tempSdkFilePath, tempSdkDir);
 
-      const conflictResult = await this.resolveConflictsAction.execute(tempSdkDir, language, buildDirectory, noCustomization);
+      const conflictResult = await this.mergeSourceTreeAction.execute(tempSdkDir, language, buildDirectory, skipApplySourceTree, buildSourceTree);
       if (conflictResult.isFailed()) {
         return ActionResult.failed();
       }

@@ -187,7 +187,7 @@ export class SdkQuickstartAction {
 
       const sdkDirectory = inputDirectory.join('sdk');
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
-      const result = await sdkGenerateAction.execute(sourceDirectory, sdkDirectory, language as Language, true, false);
+      const result = await sdkGenerateAction.execute(sourceDirectory, sdkDirectory, language as Language, true, false, false, false);
       if (result.isFailed()) {
         return ActionResult.failed();
       }

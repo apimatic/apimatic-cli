@@ -8,11 +8,12 @@ import { ResolveConflictsPrompts } from "../../prompts/sdk/resolve-conflicts.js"
 import git from "isomorphic-git";
 import * as fsSync from "fs";
 import * as path from "path";
+import isInCi from "is-in-ci";
 
 const GIT_AUTHOR = { name: "APIMatic CLI", email: "support@apimatic.io" } as const;
 const MAIN_BRANCH = "main";
 
-export class ResolveConflictsAction {
+export class MergeSourceTreeAction {
   private readonly prompts: ResolveConflictsPrompts = new ResolveConflictsPrompts();
   private readonly fileService: FileService = new FileService();
   private readonly launcherService: LauncherService = new LauncherService();
@@ -22,39 +23,47 @@ export class ResolveConflictsAction {
     sdkDir: DirectoryPath,
     language: string,
     inputDirectory: DirectoryPath,
-    noCustomization: boolean
+    skipApplySourceTree: boolean,
+    buildSourceTree: boolean
   ): Promise<ActionResult> => {
     const hasMergeConflicts = await this.detectMergeConflicts(sdkDir);
 
     if (hasMergeConflicts) {
-      if (noCustomization) {
+      if (skipApplySourceTree) {
         await this.abortMergeAndCheckoutCustom(sdkDir);
-        await this.saveSdkSourceTree(sdkDir, language, inputDirectory);
+        await this.saveSdkSourceTree(sdkDir, language, inputDirectory, buildSourceTree);
         return ActionResult.success();
       }
 
-      const resolved = await this.handleConflicts(sdkDir, language, inputDirectory);
+      if (isInCi) {
+        this.prompts.displayFileTree(language, await this.getConflictedFiles(sdkDir), []);
+        this.prompts.warnUnresolvedConflicts(language);
+        return ActionResult.failed();
+      }
+
+      const resolved = await this.handleConflicts(sdkDir, language, inputDirectory, buildSourceTree);
       return resolved ? ActionResult.success() : ActionResult.failed();
     }
 
-    if (noCustomization) {
+    if (skipApplySourceTree) {
       await git.checkout({ fs: fsSync, dir: sdkDir.toString(), ref: MAIN_BRANCH, force: true });
     }
 
-    await this.saveSdkSourceTree(sdkDir, language, inputDirectory);
+    await this.saveSdkSourceTree(sdkDir, language, inputDirectory, buildSourceTree);
     return ActionResult.success();
   };
 
   private readonly handleConflicts = async (
     sdkTempDir: DirectoryPath,
     language: string,
-    inputDirectory: DirectoryPath
+    inputDirectory: DirectoryPath,
+    buildSourceTree: boolean = false
   ): Promise<boolean> => {
     const resolved = await this.handleConflictsInteractive(sdkTempDir, language);
     if (!resolved) return false;
 
     await this.commitResolvedConflicts(sdkTempDir);
-    await this.saveSdkSourceTree(sdkTempDir, language, inputDirectory);
+    await this.saveSdkSourceTree(sdkTempDir, language, inputDirectory, buildSourceTree);
 
     return true;
   };
@@ -85,12 +94,18 @@ export class ResolveConflictsAction {
         : false;
 
     if (!opened) {
-      this.prompts.sdkOpenError(languageDisplayName);
+      this.prompts.vscodeOpenError(languageDisplayName);
       return false;
     }
 
-    const resolved = await this.prompts.askIfConflictsResolved(languageDisplayName);
-    if (!resolved) {
+    const continued = await this.prompts.waitForConflictsResolved(languageDisplayName);
+    if (!continued) {
+      return false;
+    }
+
+    const remainingConflicts = await this.getConflictedFiles(sdkTempDir);
+    if (remainingConflicts.length > 0) {
+      this.prompts.conflictsStillPresent();
       return this.handleConflictsInteractive(sdkTempDir, languageDisplayName);
     }
 
@@ -160,20 +175,24 @@ export class ResolveConflictsAction {
   public readonly saveSdkSourceTree = async (
     sdkDir: DirectoryPath,
     language: string,
-    inputDirectory: DirectoryPath
+    inputDirectory: DirectoryPath,
+    buildSourceTree: boolean = false
   ): Promise<void> => {
     const gitDir = sdkDir.join(".git");
     if (!(await this.fileService.directoryExists(gitDir))) return;
 
-    const sdkSourceTreeDir = inputDirectory.join("sdk-source-tree");
-    await this.fileService.createDirectoryIfNotExists(sdkSourceTreeDir);
+    if (buildSourceTree) {
+      const sdkSourceTreeDir = inputDirectory.join("sdk-source-tree");
+      await this.fileService.createDirectoryIfNotExists(sdkSourceTreeDir);
 
-    fsSync.writeFileSync(path.join(gitDir.toString(), "HEAD"), `ref: refs/heads/${MAIN_BRANCH}\n`);
+      fsSync.writeFileSync(path.join(gitDir.toString(), "HEAD"), `ref: refs/heads/${MAIN_BRANCH}\n`);
 
-    const outputZipPath = FilePath.create(path.join(sdkSourceTreeDir.toString(), `.${language}`));
-    if (outputZipPath) {
-      await this.zipService.archive(gitDir, outputZipPath, ".git");
+      const outputZipPath = FilePath.create(path.join(sdkSourceTreeDir.toString(), `.${language}`));
+      if (outputZipPath) {
+        await this.zipService.archive(gitDir, outputZipPath, ".git");
+      }
     }
+
     await this.fileService.deleteDirectory(gitDir);
   };
 }

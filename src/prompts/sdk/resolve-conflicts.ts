@@ -1,4 +1,4 @@
-import { confirm, isCancel, log } from "@clack/prompts";
+import { isCancel, log, text } from "@clack/prompts";
 import { format as f, getTree, LeafNode, TreeNode } from "../format.js";
 
 export class ResolveConflictsPrompts {
@@ -8,29 +8,27 @@ export class ResolveConflictsPrompts {
     log.message(tree);
   }
 
-  public async askIfConflictsResolved(sdkName: string): Promise<boolean> {
-    const resolved = await confirm({
-      message: `Have you resolved all conflicts in ${f.var(sdkName)} SDK?`,
-      initialValue: true
+  public async waitForConflictsResolved(sdkName: string): Promise<boolean> {
+    const result = await text({
+      message: `Press enter once you have resolved all conflicts in the ${f.var(sdkName)} SDK.`,
+      defaultValue: ""
     });
 
-    if (isCancel(resolved)) {
-      return false;
-    }
-
-    return resolved;
+    return !isCancel(result);
   }
 
-  public sdkOpenError(sdkName: string) {
-    log.error(`Error opening ${sdkName} SDK in VS Code.`);
+  public warnUnresolvedConflicts(sdkName: string) {
+    log.error(
+      `Merge conflicts detected in the generated ${f.var(sdkName)} SDK. Manually run the same command to resolve the conflicts interactively.`
+    );
   }
 
-  public conflictsStillPresent(unresolvedFiles: string[]) {
-    log.error("Conflict markers are still present in the following files:");
-    unresolvedFiles.forEach((file) => {
-      log.error(`  - ${file}`);
-    });
-    log.message("Please resolve all conflict markers (<<<<<<<, =======, >>>>>>>) and try again.");
+  public vscodeOpenError(sdkName: string) {
+    log.error(`Could not open ${sdkName} SDK in VS Code.`);
+  }
+
+  public conflictsStillPresent() {
+    log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
   }
 
   public conflictsResolved(sdkName: string) {
