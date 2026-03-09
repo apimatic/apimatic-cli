@@ -8,7 +8,7 @@ import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
-import { BuildContext } from "../../types/build-context.js";
+import { SpecContext } from "../../types/spec-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -46,9 +46,10 @@ export class GenerateAction {
       this.prompts.versionedBuild(versionedBuildContext.getRelativePath(resolvedDirectory));
     }
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.validate())) {
-      this.prompts.srcDirectoryEmpty(buildDirectory);
+    const specDirectory = buildDirectory.join("spec");
+    const specContext = new SpecContext(specDirectory);
+    if (!(await specContext.validate())) {
+      this.prompts.specDirectoryEmpty(specDirectory);
       return ActionResult.failed();
     }
 
