@@ -20,6 +20,26 @@ export class LauncherService {
     }
   }
 
+  public async openDiffsInSourceControl(
+    directoryPath: DirectoryPath,
+    diffPairs: Array<{ base: string; working: string }>,
+    standaloneFiles?: string[]
+  ): Promise<boolean> {
+    if (isInCi) return false;
+    try {
+      await execa("code", [directoryPath.toString()]);
+      for (const { base, working } of diffPairs) {
+        await execa("code", ["--reuse-window", "--diff", base, working]);
+      }
+      for (const file of standaloneFiles ?? []) {
+        await execa("code", ["--reuse-window", file]);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public async openInEditor(filePath: FilePath): Promise<void> {
     if (isInCi) return;
     try {

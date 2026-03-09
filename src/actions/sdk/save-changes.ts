@@ -7,6 +7,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
+import { LauncherService } from "../../infrastructure/launcher-service.js";
 import git from "isomorphic-git";
 import * as fsSync from "fs";
 import * as path from "path";
@@ -21,13 +22,14 @@ export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
+  private readonly launcherService = new LauncherService();
 
   constructor(
     private readonly configDir: DirectoryPath,
     private readonly commandMetadata: CommandMetadata
   ) {}
 
-  public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language, force: boolean): Promise<ActionResult> {
+  public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language): Promise<ActionResult> {
     const buildContext = new BuildContext(buildDirectory);
         if (!(await buildContext.validate())) {
           this.prompts.srcDirectoryEmpty(buildDirectory);
@@ -44,7 +46,7 @@ export class SaveChangesAction {
     const existingZipFile = FilePath.create(zipFilePath);
 
     if (!existingZipFile || !(await this.fileService.fileExists(existingZipFile))) {
-      this.prompts.sdkSourceTreeNotFound(language);
+      this.prompts.sdkSourceTreeNotFound(language, buildDirectory);
       return ActionResult.failed();
     }
 
@@ -56,6 +58,9 @@ export class SaveChangesAction {
 
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"]);
 
+      const allFiles = await this.getAllTrackedFiles(tempDirStr);
+      await this.normalizeLineEndings(tempDirStr, allFiles);
+
       const fileStatuses = await this.getModifiedFilesWithStatus(tempDirStr);
 
       if (fileStatuses.length === 0) {
@@ -63,19 +68,58 @@ export class SaveChangesAction {
         return ActionResult.success();
       }
 
-      if (!force) {
-        this.prompts.modifiedFilesDetected(language, fileStatuses);
-        const shouldSave = await this.prompts.confirmSaveChanges();
-        if (!shouldSave) {
-          this.prompts.operationCancelled();
-          return ActionResult.cancelled();
+      this.prompts.modifiedFilesDetected(language, fileStatuses);
+
+      const reviewDir = path.join(tempDirStr, "review");
+      await fsPromises.mkdir(reviewDir, { recursive: true });
+      await fsPromises.cp(
+        path.join(tempDirStr, ".git"),
+        path.join(reviewDir, ".git"),
+        { recursive: true }
+      );
+      await git.checkout({ fs: fsSync, dir: reviewDir, ref: CUSTOM_BRANCH, force: true });
+
+      const diffPairs: Array<{ base: string; working: string }> = [];
+      const standaloneFiles: string[] = [];
+      for (const { file, status } of fileStatuses) {
+        if (status === 'added') {
+          standaloneFiles.push(path.join(updatedSdkDirectory.toString(), file));
+        } else if (status === 'deleted') {
+          const basePath = path.join(reviewDir, file);
+          const { dir, name, ext } = path.parse(file);
+          const deletedPath = path.join(reviewDir, dir, `${name} [deleted]${ext}`);
+          await fsPromises.rename(basePath, deletedPath);
+          standaloneFiles.push(deletedPath);
+        } else {
+          const basePath = path.join(reviewDir, file);
+          const workingPath = path.join(updatedSdkDirectory.toString(), file);
+          diffPairs.push({ base: basePath, working: workingPath });
         }
       }
 
-      // new added
-      const modifiedFiles = fileStatuses.map(fs => fs.file);
-      await this.normalizeLineEndings(tempDirStr, modifiedFiles);
-      await this.stageChanges(tempDirStr, modifiedFiles);
+      const hasFilesToOpen = diffPairs.length > 0 || standaloneFiles.length > 0;
+      const opened = hasFilesToOpen
+        ? await this.launcherService.openDiffsInSourceControl(updatedSdkDirectory, diffPairs, standaloneFiles)
+        : false;
+
+      if (opened) {
+        this.prompts.reviewInIde();
+      } else {
+        this.prompts.ideOpenError();
+      }
+
+      const confirmed = await this.prompts.confirmSaveChanges();
+      if (!confirmed) {
+        this.prompts.operationCancelled();
+        return ActionResult.cancelled();
+      }
+
+      await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"]);
+
+      const latestStatuses = await this.getModifiedFilesWithStatus(tempDirStr);
+      const allChangedFiles = latestStatuses.map(fs => fs.file);
+      await this.stageChanges(tempDirStr, allChangedFiles);
+
       await git.commit({
         fs: fsSync,
         dir: tempDirStr,
@@ -105,17 +149,6 @@ export class SaveChangesAction {
     await git.checkout({ fs: fsSync, dir, ref: CUSTOM_BRANCH });
   }
 
-  private async getModifiedFiles(dir: string): Promise<string[]> {
-    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
-
-    return statusMatrix
-      // If the working directory differs from HEAD then consider the file as modified
-      .filter(([, headStatus, workdirStatus]) =>
-        headStatus !== workdirStatus
-      )
-      .map(([filepath]) => filepath);
-  }
-
   private async getModifiedFilesWithStatus(dir: string): Promise<Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>> {
     const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
 
@@ -123,20 +156,20 @@ export class SaveChangesAction {
       .filter(([, headStatus, workdirStatus]) => headStatus !== workdirStatus)
       .map(([filepath, headStatus, workdirStatus]) => {
         let status: 'modified' | 'added' | 'deleted';
-
-        if (workdirStatus === 0) {
-          // File is gone from working directory
+        if (headStatus === 0) {
           status = 'added';
-        } else if (headStatus === 0) {
-          // File didn't exist in HEAD
+        } else if (workdirStatus === 0) {
           status = 'deleted';
         } else {
-          // File existed in HEAD and still exists, but differs
           status = 'modified';
         }
-
         return { file: filepath, status };
       });
+  }
+
+  private async getAllTrackedFiles(dir: string): Promise<string[]> {
+    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
+    return statusMatrix.map(([filepath]) => filepath);
   }
 
   private async normalizeLineEndings(dir: string, modifiedFiles: string[]): Promise<void> {

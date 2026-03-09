@@ -22,25 +22,25 @@ export default class SaveChanges extends Command {
       options: Object.values(Language).map((p) => p.valueOf())
     }),
     ...FlagsProvider.input,
-    "updated-sdk": Flags.string({
+    "sdk": Flags.string({
       description: "Path to the folder containing the updated SDK"
-    }),
-    ...FlagsProvider.force
+    })
   };
 
   static examples = [
     `${SaveChanges.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("input", "./")}`,
-    `${SaveChanges.cmdTxt} ${format.flag("language", "java")} ${format.flag("updated-sdk", "./sdk")}`
+    `${SaveChanges.cmdTxt} ${format.flag("language", "java")} ${format.flag("sdk", "./sdk")}`
   ];
 
   async run() {
     const {
-      flags: { "updated-sdk": updatedSdk, language, input, force }
+      flags: { sdk, language, input }
     } = await this.parse(SaveChanges);
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const updatedSdkDirectory = updatedSdk ? new DirectoryPath(updatedSdk) : workingDirectory.join("sdk").join(language);
+    const updatedSdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk").join(language);
+    
     const commandMetadata: CommandMetadata = {
       commandName: SaveChanges.id,
       shell: this.config.shell
@@ -48,7 +48,7 @@ export default class SaveChanges extends Command {
 
     intro("Save Changes");
     const action = new SaveChangesAction(this.getConfigDir(), commandMetadata);
-    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language, force);
+    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language);
     outro(result);
   }
 

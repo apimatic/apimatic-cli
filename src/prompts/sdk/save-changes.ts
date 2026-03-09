@@ -1,6 +1,7 @@
-import { log, confirm, isCancel } from "@clack/prompts";
+import { log, text, isCancel } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, getTree, LeafNode, TreeNode } from "../format.js";
+import { noteWrapped } from "../prompt.js";
 
 export class SaveChangesPrompts {
   public srcDirectoryEmpty(directory: DirectoryPath) {
@@ -13,9 +14,15 @@ export class SaveChangesPrompts {
     log.error(message);
   }
 
-  public sdkSourceTreeNotFound(language: string) {
-    const message = `No existing sdk source tree found for ${f.var(language)}. Please run the initial setup first.`;
-    log.error(message);
+  public sdkSourceTreeNotFound(language: string, inputDirectory: DirectoryPath) {
+    log.error(`No existing sdk source tree found for ${f.var(language)}.`);
+    const inputDirectoryFlag = !inputDirectory.isEqual(DirectoryPath.default)
+      ? `${f.flag("input", inputDirectory.toString())} `
+      : "";
+    const message = `Run the command
+      '${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag("build-source-tree")}'
+      to generate SDK with a source tree.`;
+    noteWrapped(message, "Next Steps");
   }
 
   public operationCancelled() {
@@ -32,17 +39,23 @@ export class SaveChangesPrompts {
     log.info("No changes detected in the SDK.");
   }
 
+  public reviewInIde() {
+    log.info(
+      `The changed files have been opened in VS Code.`
+    );
+  }
+
+  public ideOpenError() {
+    log.warning("Could not open files in VS Code. Please review the file changes listed above manually.");
+  }
+
   public async confirmSaveChanges(): Promise<boolean> {
-    const proceed = await confirm({
-      message: "Do you want to save these changes?",
-      initialValue: true
+    const result = await text({
+      message: "Press Enter to save these changes.",
+      defaultValue: ""
     });
 
-    if (isCancel(proceed)) {
-      return false;
-    }
-
-    return proceed;
+    return !isCancel(result);
   }
 
   public changesSaved() {
