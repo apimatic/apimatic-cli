@@ -19,10 +19,6 @@ export class PortalGenerate extends Command {
       default: false,
       description: "Download the generated portal as a .zip archive"
     }),
-    "no-customization": Flags.boolean({
-      default: false,
-      description: "Do not apply customization to the generated SDKs"
-    }),
     ...FlagsProvider.authKey
   };
 
@@ -34,7 +30,7 @@ export class PortalGenerate extends Command {
 
   async run(): Promise<void> {
     const {
-      flags: { input, destination, force, zip: zipPortal, "auth-key": authKey, "no-customization": noCustomization }
+      flags: { input, destination, force, zip: zipPortal, "auth-key": authKey }
     } = await this.parse(PortalGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -47,7 +43,7 @@ export class PortalGenerate extends Command {
 
     intro("Generate Portal");
     const action = new GenerateAction(new DirectoryPath(this.config.configDir), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal, noCustomization);
+    const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
     outro(result);
   }
 }
