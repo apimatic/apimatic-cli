@@ -38,7 +38,7 @@ export class PortalServeAction {
     onAfterServe?: () => void
   ): Promise<ActionResult> {
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false, false);
     if (result.isFailed()) {
       return ActionResult.failed();
     }
