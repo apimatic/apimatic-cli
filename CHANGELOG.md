@@ -1,3 +1,10 @@
+# [1.1.0-beta.8](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.7...v1.1.0-beta.8) (2026-03-09)
+
+
+### Bug Fixes
+
+* update sdk quickstart to create minimal build ([#247](https://github.com/apimatic/apimatic-cli/issues/247)) ([9e54611](https://github.com/apimatic/apimatic-cli/commit/9e546110e3db251e0bc5d5a6747b31fa7b0d90b5)), closes [#246](https://github.com/apimatic/apimatic-cli/issues/246)
+
 # [1.1.0-beta.7](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.6...v1.1.0-beta.7) (2026-03-05)
 
 
