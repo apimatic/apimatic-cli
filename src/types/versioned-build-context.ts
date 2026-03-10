@@ -1,27 +1,27 @@
 import { FileService } from "../infrastructure/file-service.js";
 import { DirectoryPath } from "./file/directoryPath.js";
-import { FilePath } from "./file/filePath.js";
-import { FileName } from "./file/fileName.js";
+import { BuildContext } from "./build-context.js";
+import { BuildConfig } from "./build/build.js";
 
 export class VersionedBuildContext {
   private readonly fileService = new FileService();
+  private readonly buildContext: BuildContext;
   private readonly buildDirectory: DirectoryPath;
-  private buildConfig: Record<string, unknown> | undefined;
+  private buildConfig: BuildConfig | undefined;
 
   constructor(buildDirectory: DirectoryPath) {
     this.buildDirectory = buildDirectory;
+    this.buildContext = new BuildContext(buildDirectory);
   }
 
-  private async getBuildConfig(): Promise<Record<string, unknown> | undefined> {
+  private async getBuildConfig(): Promise<BuildConfig | undefined> {
     if (this.buildConfig !== undefined) {
       return this.buildConfig;
     }
-    const buildJsonPath = new FilePath(this.buildDirectory, new FileName("APIMATIC-BUILD.json"));
-    if (!(await this.fileService.fileExists(buildJsonPath))) {
+    if (!(await this.buildContext.validate())) {
       return undefined;
     }
-    const contents = await this.fileService.getContents(buildJsonPath);
-    this.buildConfig = JSON.parse(contents);
+    this.buildConfig = await this.buildContext.getBuildFileContents();
     return this.buildConfig;
   }
 
@@ -41,8 +41,7 @@ export class VersionedBuildContext {
     if (!(await this.fileService.directoryExists(versionsDir))) {
       return [];
     }
-    const subDirs = await this.fileService.getSubDirectoriesPaths(versionsDir);
-    return subDirs.filter((d) => d.leafName().startsWith("version-"));
+    return await this.fileService.getSubDirectoriesPaths(versionsDir);
   }
 
   public async resolveVersionDirectory(apiVersion: string): Promise<DirectoryPath | null> {

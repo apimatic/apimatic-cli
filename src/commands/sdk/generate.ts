@@ -27,7 +27,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       description: "Directory where the SDK will be generated"
     }),
     "api-version": Flags.string({
-      description: "Version of the API documentation to use for SDK generation (if multiple versions exist)"
+      description: "Version of the API to use for SDK generation (if multiple versions exist)"
     }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
