@@ -3,6 +3,7 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { BuildContext } from "./build-context.js";
 import { BuildConfig } from "./build/build.js";
 
+// TODO: remove BuildContext from this class
 export class VersionedBuildContext {
   private readonly fileService = new FileService();
   private readonly buildContext: BuildContext;
