@@ -1,4 +1,4 @@
-import { isCancel, confirm, log } from "@clack/prompts";
+import { isCancel, confirm, log, select } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, } from "../format.js";
 import { Result } from "neverthrow";
@@ -47,13 +47,26 @@ export class SdkGeneratePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public versionedBuildEmpty() {
-    const message = `The ${f.var("versioned_docs")} directory is empty or contains no valid versions.`;
+  public versionedBuildEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var(directory.leafName())} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
 
-  public versionedBuild(relativePath: string) {
-    log.warning(`SDK Generation for multi-versioned builds is not supported. Generating SDK for ${f.var(relativePath)} instead.`);
+  public versionNotFound() {
+    this.logGenerationError(`The API version is invalid.`);
+  }
+
+  public async selectVersion(versions: DirectoryPath[]): Promise<DirectoryPath | undefined> {
+    const version = await select({
+      message: "Select an API version for SDK generation:",
+      options: versions.map((v) => ({ label: v.leafName(), value: v }))
+    });
+
+    if (isCancel(version)) {
+      return undefined;
+    }
+
+    return version;
   }
 
   public sdkGenerated(sdk: DirectoryPath) {

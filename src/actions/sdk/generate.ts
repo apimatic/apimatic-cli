@@ -28,7 +28,8 @@ export class GenerateAction {
     sdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
-    zipSdk: boolean
+    zipSdk: boolean,
+    apiVersion?: string
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
@@ -36,14 +37,26 @@ export class GenerateAction {
     }
 
     const versionedBuildContext = new VersionedBuildContext(buildDirectory);
-    if (await versionedBuildContext.exists()) {
-      const resolvedDirectory = await versionedBuildContext.getResolvedBuildDirectory();
-      if (!resolvedDirectory) {
-        this.prompts.versionedBuildEmpty();
+    if (await versionedBuildContext.isVersioned()) {
+      const versionDirs = await versionedBuildContext.getVersionDirectories();
+      if (versionDirs.length === 0) {
+        this.prompts.versionedBuildEmpty(await versionedBuildContext.getVersionsDirectory());
         return ActionResult.failed();
       }
+
+      const resolvedDirectory = versionDirs.length === 1
+        ? versionDirs[0]
+        : apiVersion
+          ? await versionedBuildContext.resolveVersionDirectory(apiVersion)
+          : await this.prompts.selectVersion(versionDirs);
+
+      if (!resolvedDirectory) {
+        if (apiVersion) this.prompts.versionNotFound();
+        return apiVersion ? ActionResult.failed() : ActionResult.cancelled();
+      }
+
       buildDirectory = resolvedDirectory;
-      this.prompts.versionedBuild(versionedBuildContext.getRelativePath(resolvedDirectory));
+      sdkDirectory = sdkDirectory.join(resolvedDirectory.leafName());
     }
 
     const specDirectory = buildDirectory.join("spec");
