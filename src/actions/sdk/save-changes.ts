@@ -8,21 +8,17 @@ import { Language } from "../../types/sdk/generate.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
-import git from "isomorphic-git";
-import * as fsSync from "fs";
+import { GitService } from "../../infrastructure/git-service.js";
 import * as path from "path";
 import * as fsPromises from "fs/promises";
 import { BuildContext } from "../../types/build-context.js";
-
-const GIT_AUTHOR = { name: "APIMatic-bot", email: "developer@apimatic.io" } as const;
-const CUSTOM_BRANCH = "custom-code";
-const MAIN_BRANCH = "main";
 
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
   private readonly launcherService = new LauncherService();
+  private readonly gitService = new GitService();
 
   constructor(
     private readonly configDir: DirectoryPath,
@@ -54,30 +50,26 @@ export class SaveChangesAction {
       await this.zipService.unArchive(existingZipFile, tempDirectory);
       const tempDirStr = tempDirectory.toString();
 
-      await this.checkoutToCustomBranch(tempDirStr);
+      await this.gitService.checkoutToCustomBranch(tempDirStr);
 
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"]);
 
-      const allFiles = await this.getAllTrackedFiles(tempDirStr);
-      await this.normalizeLineEndings(tempDirStr, allFiles);
-
-      const fileStatuses = await this.getModifiedFilesWithStatus(tempDirStr);
+      const fileStatuses = await this.gitService.getModifiedFilesWithStatus(tempDirStr);
 
       if (fileStatuses.length === 0) {
         this.prompts.noChangesDetected();
         return ActionResult.success();
       }
 
+      await this.gitService.normalizeLineEndings(tempDirStr, fileStatuses.map(f => f.file));
       this.prompts.modifiedFilesDetected(language, fileStatuses);
 
       const reviewDir = path.join(tempDirStr, "review");
-      await fsPromises.mkdir(reviewDir, { recursive: true });
-      await fsPromises.cp(
-        path.join(tempDirStr, ".git"),
-        path.join(reviewDir, ".git"),
-        { recursive: true }
-      );
-      await git.checkout({ fs: fsSync, dir: reviewDir, ref: CUSTOM_BRANCH, force: true });
+      const reviewDirPath = new DirectoryPath(reviewDir);
+      const reviewGitDir = reviewDirPath.join(".git");
+      await this.fileService.createDirectoryIfNotExists(reviewGitDir);
+      await this.fileService.copyDirectoryContents(tempDirectory.join(".git"), reviewGitDir);
+      await this.gitService.checkoutToCustomBranch(reviewDir, true);
 
       const diffPairs: Array<{ base: string; working: string }> = [];
       const standaloneFiles: string[] = [];
@@ -116,18 +108,11 @@ export class SaveChangesAction {
 
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"]);
 
-      const latestStatuses = await this.getModifiedFilesWithStatus(tempDirStr);
+      const latestStatuses = await this.gitService.getModifiedFilesWithStatus(tempDirStr);
       const allChangedFiles = latestStatuses.map(fs => fs.file);
-      await this.stageChanges(tempDirStr, allChangedFiles);
-
-      await git.commit({
-        fs: fsSync,
-        dir: tempDirStr,
-        message: "add customizations",
-        author: GIT_AUTHOR,
-      });
-
-      await git.checkout({ fs: fsSync, dir: tempDirStr, ref: MAIN_BRANCH });
+      await this.gitService.stageFiles(tempDirStr, allChangedFiles);
+      await this.gitService.commit(tempDirStr, "add customizations");
+      await this.gitService.checkoutToMain(tempDirStr);
       await this.zipService.archive(
         new DirectoryPath(path.join(tempDirStr, ".git")),
         FilePath.create(zipFilePath)!,
@@ -137,64 +122,5 @@ export class SaveChangesAction {
       this.prompts.changesSaved();
       return ActionResult.success();
     });
-  }
-
-  private async checkoutToCustomBranch(dir: string): Promise<void> {
-    const branches = await git.listBranches({ fs: fsSync, dir });
-
-    if (!branches.includes(CUSTOM_BRANCH)) {
-      await git.branch({ fs: fsSync, dir, ref: CUSTOM_BRANCH });
-    }
-
-    await git.checkout({ fs: fsSync, dir, ref: CUSTOM_BRANCH });
-  }
-
-  private async getModifiedFilesWithStatus(dir: string): Promise<Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>> {
-    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
-
-    return statusMatrix
-      .filter(([, headStatus, workdirStatus]) => headStatus !== workdirStatus)
-      .map(([filepath, headStatus, workdirStatus]) => {
-        let status: 'modified' | 'added' | 'deleted';
-        if (headStatus === 0) {
-          status = 'added';
-        } else if (workdirStatus === 0) {
-          status = 'deleted';
-        } else {
-          status = 'modified';
-        }
-        return { file: filepath, status };
-      });
-  }
-
-  private async getAllTrackedFiles(dir: string): Promise<string[]> {
-    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
-    return statusMatrix.map(([filepath]) => filepath);
-  }
-
-  private async normalizeLineEndings(dir: string, modifiedFiles: string[]): Promise<void> {
-    await Promise.all(
-      modifiedFiles.map(async (filepath) => {
-        const fullPath = path.join(dir, filepath);
-        try {
-          const content = await fsPromises.readFile(fullPath, 'utf8');
-          const normalized = content.replace(/\r\n/g, '\n'); // Convert CRLF to LF
-          await fsPromises.writeFile(fullPath, normalized, 'utf8');
-        } catch {
-          // Skip binary files or files that can't be read as text
-        }
-      })
-    );
-  }
-
-  private async stageChanges(dir: string, modifiedFiles: string[]): Promise<void> {
-    await Promise.all(
-      modifiedFiles.map(async (filepath) => {
-        const fullPath = path.join(dir, filepath);
-        return fsSync.existsSync(fullPath)
-          ? git.add({ fs: fsSync, dir, filepath })
-          : git.remove({ fs: fsSync, dir, filepath });
-      })
-    );
   }
 }

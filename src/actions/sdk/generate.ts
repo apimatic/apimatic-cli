@@ -86,11 +86,11 @@ export class GenerateAction {
       const gitSourceTreeDir = tempSdkDir.join(".git");
       await this.fileService.createDirectoryIfNotExists(tempSdkDir);
       await this.fileService.unzipFile(tempSdkFilePath, tempSdkDir);
-      // await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
+      await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
       await this.fileService.unzipFile(tempSdkSourceTreePath, gitSourceTreeDir);
 
-      const conflictResult = await this.mergeSourceTreeAction.execute(tempSdkDir, language, buildDirectory, skipApplySourceTree, buildSourceTree);
-      if (conflictResult.isFailed()) {
+      const finalSdk = await this.mergeSourceTreeAction.execute(tempSdkDir, language, buildDirectory, skipApplySourceTree, buildSourceTree);
+      if (finalSdk.isFailed()) {
         return ActionResult.failed();
       }
 
