@@ -44,19 +44,21 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      if (apiVersion && !versionedBuildResult.versions.includes(apiVersion)) {
-        this.prompts.versionNotFound();
+      let version: string;
+      if (apiVersion) {
+        if (!versionedBuildResult.versions.includes(apiVersion)) {
+          this.prompts.versionNotFound();
           return ActionResult.failed();
         }
-
-      const version = versionedBuildResult.versions.length === 1
-        ? versionedBuildResult.versions[0]
-        : apiVersion
-          ? apiVersion
-          : await this.prompts.selectVersion(versionedBuildResult.versions);
-
-      if (!version) {
-        return ActionResult.cancelled();
+        version = apiVersion;
+      } else if (versionedBuildResult.versions.length === 1) {
+        version = versionedBuildResult.versions[0];
+      } else {
+        const selectedVersion = await this.prompts.selectVersion(versionedBuildResult.versions);
+        if (!selectedVersion) {
+          return ActionResult.cancelled();
+        }
+        version = selectedVersion;
       }
 
       buildDirectory = versionedBuildResult.versionsDirectory.join(version);
