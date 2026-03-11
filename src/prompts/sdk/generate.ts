@@ -56,10 +56,10 @@ export class SdkGeneratePrompts {
     this.logGenerationError(`The API version is invalid.`);
   }
 
-  public async selectVersion(versions: DirectoryPath[]): Promise<DirectoryPath | undefined> {
+  public async selectVersion(versions: string[]): Promise<string | undefined> {
     const version = await select({
       message: "Select an API version for SDK generation:",
-      options: versions.map((v) => ({ label: v.leafName(), value: v }))
+      options: versions.map((v) => ({ label: v, value: v }))
     });
 
     if (isCancel(version)) {

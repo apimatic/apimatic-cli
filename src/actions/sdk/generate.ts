@@ -37,26 +37,30 @@ export class GenerateAction {
     }
 
     const versionedBuildContext = new VersionedBuildContext(buildDirectory);
-    if (await versionedBuildContext.isVersioned()) {
-      const versionDirs = await versionedBuildContext.getVersionDirectories();
-      if (versionDirs.length === 0) {
-        this.prompts.versionedBuildEmpty(await versionedBuildContext.getVersionsDirectory());
+    const versionedBuildResult = await versionedBuildContext.validate();
+    if (versionedBuildResult.isValid) {
+      if (versionedBuildResult.versions.length === 0) {
+        this.prompts.versionedBuildEmpty(versionedBuildResult.versionsDirectory);
         return ActionResult.failed();
       }
 
-      const resolvedDirectory = versionDirs.length === 1
-        ? versionDirs[0]
-        : apiVersion
-          ? await versionedBuildContext.resolveVersionDirectory(apiVersion)
-          : await this.prompts.selectVersion(versionDirs);
+      if (apiVersion && !versionedBuildResult.versions.includes(apiVersion)) {
+        this.prompts.versionNotFound();
+          return ActionResult.failed();
+        }
 
-      if (!resolvedDirectory) {
-        if (apiVersion) this.prompts.versionNotFound();
-        return apiVersion ? ActionResult.failed() : ActionResult.cancelled();
+      const version = versionedBuildResult.versions.length === 1
+        ? versionedBuildResult.versions[0]
+        : apiVersion
+          ? apiVersion
+          : await this.prompts.selectVersion(versionedBuildResult.versions);
+
+      if (!version) {
+        return ActionResult.cancelled();
       }
 
-      buildDirectory = resolvedDirectory;
-      sdkDirectory = sdkDirectory.join(resolvedDirectory.leafName());
+      buildDirectory = versionedBuildResult.versionsDirectory.join(version);
+      sdkDirectory = sdkDirectory.join(version);
     }
 
     const specDirectory = buildDirectory.join("spec");
