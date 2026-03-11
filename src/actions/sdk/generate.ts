@@ -80,10 +80,14 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const tempSdkFilePath = await tempContext.save(response.value);
+      const tempSdkFilePath = await tempContext.save(response.value.sdk);
+      const tempSdkSourceTreePath = await tempContext.save(response.value.sdkSourceTree);
       const tempSdkDir = tempDirectory.join("sdk-temp");
+      const gitSourceTreeDir = tempSdkDir.join(".git");
       await this.fileService.createDirectoryIfNotExists(tempSdkDir);
       await this.fileService.unzipFile(tempSdkFilePath, tempSdkDir);
+      // await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
+      await this.fileService.unzipFile(tempSdkSourceTreePath, gitSourceTreeDir);
 
       const conflictResult = await this.mergeSourceTreeAction.execute(tempSdkDir, language, buildDirectory, skipApplySourceTree, buildSourceTree);
       if (conflictResult.isFailed()) {

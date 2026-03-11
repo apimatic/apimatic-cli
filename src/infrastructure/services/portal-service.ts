@@ -5,6 +5,7 @@ import {
   SdkGenerationAsyncController,
   ContentType,
   DocsPortalGenerationAsyncController,
+  SdkSourceTreeGenerationAsyncController,
   ProblemDetailsError,
   FileWrapper,
   TransformationController,
@@ -26,6 +27,11 @@ import { err, ok, Result } from "neverthrow";
 import { Language } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
+
+export interface GeneratedSdkResult {
+  sdk: NodeJS.ReadableStream;
+  sdkSourceTree: NodeJS.ReadableStream;
+}
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -88,9 +94,20 @@ export class PortalService {
         return err(ServiceError.ServerError);
       }
       if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
-        const errorMessage = "One or more validation errors occurred." + "\n- " + message;
+        const errors = statusResult.value.errors as Record<string, string[]>;
+        const sdkMergeFailedLanguages = errors.sdkMergeFailed;
+        if (sdkMergeFailedLanguages?.length) {
+          const errorMessage =
+            "SDK generation failed for the following languages due to merge conflicts:" +
+            "\n- " +
+            sdkMergeFailedLanguages.join("\n- ");
+          return err(ServiceError.sdkMergeError(errorMessage));
+        }
+
+        const message = Object.values(errors)[0]?.[0] ?? null;
+        const errorMessage =
+          "One or more validation errors occurred." +
+           "\n- " + message;
         return err(ServiceError.badRequest(errorMessage));
       }
       if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
@@ -119,7 +136,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
+  ): Promise<Result<GeneratedSdkResult, ServiceError>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
 
@@ -171,8 +188,20 @@ export class PortalService {
         return err(ServiceError.ServerError);
       }
       if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>).flat()[0] ?? null;
-        const errorMessage = "One or more validation errors occurred." + "\n- " + message;
+        const errors = statusResult.value.errors as Record<string, string[]>;
+        const sdkMergeFailedLanguages = errors.sdkMergeFailed;
+        if (sdkMergeFailedLanguages?.length) {
+          const errorMessage =
+            "SDK generation failed for these languages due to merge conflict." +
+            "\n- " +
+            sdkMergeFailedLanguages.join("\n- ");
+          return err(ServiceError.badRequest(errorMessage));
+        }
+
+        const messages = Object.values(errors).flat();
+        const errorMessage =
+          "One or more validation errors occurred." +
+          (messages.length ? "\n- " + messages.join("\n- ") : "");
         return err(ServiceError.badRequest(errorMessage));
       }
       if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
@@ -184,7 +213,12 @@ export class PortalService {
 
     try {
       const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
-      return ok(sdkResponse.result as NodeJS.ReadableStream);
+      const sdkSourceTreeController = new SdkSourceTreeGenerationAsyncController(client);
+      const sdkSourceTreeResponse = await sdkSourceTreeController.downloadGeneratedSdkSourceTree(generationId);
+      return ok({
+        sdk: sdkResponse.result as NodeJS.ReadableStream,
+        sdkSourceTree: sdkSourceTreeResponse.result as NodeJS.ReadableStream
+      });
     } catch (error) {
       return err(handleServiceError(error));
     }

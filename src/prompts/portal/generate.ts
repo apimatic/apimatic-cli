@@ -4,7 +4,7 @@ import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import {ServiceError } from "../../infrastructure/service-error.js";
-import { withSpinner } from "../prompt.js";
+import { withSpinner, noteWrapped } from "../prompt.js";
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
@@ -47,6 +47,14 @@ export class PortalGeneratePrompts {
 
   public portalGenerationServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
+  }
+
+  public portalGenerationSdkMergeError(serviceError: ServiceError) {
+    log.error(serviceError.errorMessage);
+    const message = `Run the command
+      ${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", "<language>")} 
+      to resolve any SDK merge conflicts first, then re-run portal generation.`;
+    noteWrapped(message, "Next Steps");
   }
 
   public portalGenerationErrorWithReport(reportPath: FilePath) {

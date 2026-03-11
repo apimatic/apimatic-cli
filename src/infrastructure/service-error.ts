@@ -1,21 +1,35 @@
 import axios from "axios";
 import { format as f } from "../prompts/format.js";
 
+export enum ServiceErrorCode {
+  NotFound = "NOT_FOUND",
+  ServerError = "SERVER_ERROR",
+  NetworkError = "NETWORK_ERROR",
+  InvalidResponse = "INVALID_RESPONSE",
+  UnAuthorized = "UNAUTHORIZED",
+  BadRequest = "BAD_REQUEST",
+  Forbidden = "FORBIDDEN",
+  SdkMergeError = "SDK_MERGE_ERROR"
+}
+
 export class ServiceError {
   private static defaultErrorMessage = `An unexpected error occurred, please try again later. If the problem persists, please reach out to our team at ${f.var(
     "support@apimatic.io"
   )}`;
 
-  static readonly NotFound = new ServiceError("NOT_FOUND", "Resource not found.");
-  static readonly ServerError = new ServiceError("SERVER_ERROR", this.defaultErrorMessage);
-  static readonly NetworkError = new ServiceError("NETWORK_ERROR", "Unable to connect to the server.");
-  static readonly InvalidResponse = new ServiceError("INVALID_RESPONSE", this.defaultErrorMessage);
-  static readonly UnAuthorized = new ServiceError("UNAUTHORIZED", "Unauthorized access.");
+  static readonly NotFound = new ServiceError(ServiceErrorCode.NotFound, "Resource not found.");
+  static readonly ServerError = new ServiceError(ServiceErrorCode.ServerError, this.defaultErrorMessage);
+  static readonly NetworkError = new ServiceError(ServiceErrorCode.NetworkError, "Unable to connect to the server.");
+  static readonly InvalidResponse = new ServiceError(ServiceErrorCode.InvalidResponse, this.defaultErrorMessage);
+  static readonly UnAuthorized = new ServiceError(ServiceErrorCode.UnAuthorized, "Unauthorized access.");
   static badRequest(customMessage: string): ServiceError {
-    return new ServiceError("BAD_REQUEST", customMessage);
+    return new ServiceError(ServiceErrorCode.BadRequest, customMessage);
   }
   static forbidden(customMessage: string): ServiceError {
-    return new ServiceError("FORBIDDEN", customMessage);
+    return new ServiceError(ServiceErrorCode.Forbidden, customMessage);
+  }
+  static sdkMergeError(customMessage: string): ServiceError {
+    return new ServiceError(ServiceErrorCode.SdkMergeError, customMessage);
   }
 
   static readonly values: ServiceError[] = [
@@ -26,7 +40,7 @@ export class ServiceError {
     ServiceError.UnAuthorized
   ];
 
-  private constructor(public readonly code: string, private readonly defaultMessage: string) {}
+  private constructor(public readonly code: ServiceErrorCode, private readonly defaultMessage: string) {}
 
   public get errorMessage(): string {
     return this.defaultMessage;

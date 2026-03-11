@@ -4,6 +4,7 @@ import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
 import { ServiceError } from "../../infrastructure/service-error.js";
+import { GeneratedSdkResult } from "../../infrastructure/services/portal-service.js";
 
 export class SdkGeneratePrompts {
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -35,7 +36,7 @@ export class SdkGeneratePrompts {
     this.logGenerationError(message);
   }
 
-  public generateSDK(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+  public generateSDK(fn: Promise<Result<GeneratedSdkResult, ServiceError>>) {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
