@@ -1,3 +1,10 @@
+# [1.1.0-beta.9](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.8...v1.1.0-beta.9) (2026-03-11)
+
+
+### Features
+
+* add api-version flag in sdk generate ([#250](https://github.com/apimatic/apimatic-cli/issues/250)) ([2b007e1](https://github.com/apimatic/apimatic-cli/commit/2b007e17a05fba784b487646dc02bdbded3247a3)), closes [#249](https://github.com/apimatic/apimatic-cli/issues/249)
+
 # [1.1.0-beta.8](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.7...v1.1.0-beta.8) (2026-03-09)
 
 
