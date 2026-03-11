@@ -28,7 +28,8 @@ export class GenerateAction {
     sdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
-    zipSdk: boolean
+    zipSdk: boolean,
+    apiVersion?: string
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
@@ -36,14 +37,32 @@ export class GenerateAction {
     }
 
     const versionedBuildContext = new VersionedBuildContext(buildDirectory);
-    if (await versionedBuildContext.exists()) {
-      const resolvedDirectory = await versionedBuildContext.getResolvedBuildDirectory();
-      if (!resolvedDirectory) {
-        this.prompts.versionedBuildEmpty();
+    const versionedBuildResult = await versionedBuildContext.validate();
+    if (versionedBuildResult.isValid) {
+      if (versionedBuildResult.versions.length === 0) {
+        this.prompts.versionedBuildEmpty(versionedBuildResult.versionsDirectory);
         return ActionResult.failed();
       }
-      buildDirectory = resolvedDirectory;
-      this.prompts.versionedBuild(versionedBuildContext.getRelativePath(resolvedDirectory));
+
+      let version: string;
+      if (apiVersion) {
+        if (!versionedBuildResult.versions.includes(apiVersion)) {
+          this.prompts.versionNotFound();
+          return ActionResult.failed();
+        }
+        version = apiVersion;
+      } else if (versionedBuildResult.versions.length === 1) {
+        version = versionedBuildResult.versions[0];
+      } else {
+        const selectedVersion = await this.prompts.selectVersion(versionedBuildResult.versions);
+        if (!selectedVersion) {
+          return ActionResult.cancelled();
+        }
+        version = selectedVersion;
+      }
+
+      buildDirectory = versionedBuildResult.versionsDirectory.join(version);
+      sdkDirectory = sdkDirectory.join(version);
     }
 
     const specDirectory = buildDirectory.join("spec");

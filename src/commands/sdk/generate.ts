@@ -26,6 +26,9 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       char: "d",
       description: "Directory where the SDK will be generated"
     }),
+    "api-version": Flags.string({
+      description: "Version of the API to use for SDK generation (if multiple versions exist)"
+    }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
@@ -44,7 +47,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey }
+      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "api-version": apiVersion }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -58,7 +61,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk);
+    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, apiVersion);
     outro(result);
   }
 
