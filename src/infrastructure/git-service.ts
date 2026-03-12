@@ -107,7 +107,7 @@ export class GitService {
       const fullPath = path.join(dir, filepath);
       if (fsSync.existsSync(fullPath)) {
         const content = fsSync.readFileSync(fullPath, "utf-8");
-        if (/^<{7} /m.test(content)) {
+        if (content.includes("<<<<<<< ")) {
           conflicted.push(filepath);
         }
       }

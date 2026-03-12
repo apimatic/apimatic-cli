@@ -35,9 +35,41 @@ export class MergeSourceTreeAction {
         return ActionResult.failed();
       }
 
-      const resolved = await this.resolveConflicts(sdkDir, language);
-      if (!resolved) return ActionResult.failed();
+      let conflictedFilePaths = await this.gitService.getConflictedFiles(sdkDir.toString());
+      while (conflictedFilePaths.length > 0) {
+        this.prompts.displayFileTree(language, conflictedFilePaths, []);
 
+        const conflictFilesToOpen = (
+          await Promise.all(
+            conflictedFilePaths.map(async (conflictPath) => {
+              const filePath = FilePath.create(sdkDir.join(conflictPath).toString());
+              return filePath && (await this.fileService.fileExists(filePath)) ? filePath : null;
+            })
+          )
+        ).filter((f): f is FilePath => f !== null);
+
+        const opened =
+          conflictFilesToOpen.length > 0
+            ? await this.launcherService.openFolderInIde(sdkDir, conflictFilesToOpen)
+            : false;
+
+        if (!opened) {
+          this.prompts.vscodeOpenError(language);
+          return ActionResult.failed();
+        }
+
+        const continued = await this.prompts.waitForConflictsResolved(language);
+        if (!continued) {
+          return ActionResult.failed();
+        }
+
+        conflictedFilePaths = await this.gitService.getConflictedFiles(sdkDir.toString());
+        if (conflictedFilePaths.length > 0) {
+          this.prompts.conflictsStillPresent();
+        }
+      }
+
+      this.prompts.conflictsResolved(language);
       await this.gitService.commitResolvedConflicts(sdkDir.toString());
       await this.gitService.saveSdkSourceTree(sdkDir, language, inputDirectory, buildSourceTree);
       return ActionResult.success();
@@ -49,50 +81,5 @@ export class MergeSourceTreeAction {
 
     await this.gitService.saveSdkSourceTree(sdkDir, language, inputDirectory, buildSourceTree);
     return ActionResult.success();
-  };
-
-  private readonly resolveConflicts = async (
-    sdkDir: DirectoryPath,
-    language: string
-  ): Promise<boolean> => {
-    const conflictedFilePaths = await this.gitService.getConflictedFiles(sdkDir.toString());
-    if (conflictedFilePaths.length === 0) {
-      return true;
-    }
-
-    this.prompts.displayFileTree(language, conflictedFilePaths, []);
-
-    const conflictFilesToOpen = (
-      await Promise.all(
-        conflictedFilePaths.map(async (conflictPath) => {
-          const filePath = FilePath.create(sdkDir.join(conflictPath).toString());
-          return filePath && (await this.fileService.fileExists(filePath)) ? filePath : null;
-        })
-      )
-    ).filter((f): f is FilePath => f !== null);
-
-    const opened =
-      conflictFilesToOpen.length > 0
-        ? await this.launcherService.openFolderInIde(sdkDir, conflictFilesToOpen)
-        : false;
-
-    if (!opened) {
-      this.prompts.vscodeOpenError(language);
-      return false;
-    }
-
-    const continued = await this.prompts.waitForConflictsResolved(language);
-    if (!continued) {
-      return false;
-    }
-
-    const remainingConflicts = await this.gitService.getConflictedFiles(sdkDir.toString());
-    if (remainingConflicts.length > 0) {
-      this.prompts.conflictsStillPresent();
-      return this.resolveConflicts(sdkDir, language);
-    }
-
-    this.prompts.conflictsResolved(language);
-    return true;
   };
 }

@@ -9,7 +9,7 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
 import { FilePath } from "../../types/file/filePath.js";
-import { MergeSourceTreeAction } from "./resolve-conflicts.js";
+import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { BuildContext } from "../../types/build-context.js";
 import { FileService } from "../../infrastructure/file-service.js";
 
