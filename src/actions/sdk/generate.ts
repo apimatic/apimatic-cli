@@ -148,7 +148,7 @@ export class GenerateAction {
 
             const opened =
               conflictFilesToOpen.length > 0
-                ? await this.launcherService.openFolderInIde(tempSdkDir, conflictFilesToOpen)
+                ? await this.launcherService.openFolderInIde(tempSdkDir, ...conflictFilesToOpen)
                 : false;
 
             if (!opened) {
