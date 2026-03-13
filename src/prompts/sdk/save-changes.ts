@@ -45,13 +45,9 @@ export class SaveChangesPrompts {
     );
   }
 
-  public ideOpenError() {
-    log.warning("Could not open files in VS Code. Please review the file changes listed above manually.");
-  }
-
   public async confirmSaveChanges(): Promise<boolean> {
     const result = await text({
-      message: "Press Enter to save these changes.",
+      message: "After you have reviewed the changes, press Enter to save.",
       defaultValue: ""
     });
 

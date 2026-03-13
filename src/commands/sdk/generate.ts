@@ -24,11 +24,11 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     ...FlagsProvider.input,
     destination: Flags.string({
       char: "d",
-      description: "Directory where the SDK will be generated"
+      description: "[default: <input>/<language>/] path where the SDK will be generated"
     }),
-    "skip-apply-source-tree": Flags.boolean({
+    "skip-changes": Flags.boolean({
       default: false,
-      description: "Do not apply the source tree customizations to the generated SDK"
+      description: "Do not apply the saved changes to the generated SDK"
     }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
@@ -36,9 +36,9 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       description: "Download the generated SDK as a .zip archive"
     }),
     ...FlagsProvider.authKey,
-    "build-source-tree": Flags.boolean({
+    "track-changes": Flags.boolean({
       default: false,
-      description: "Retain the source tree of the build directory in the generated SDK"
+      description: "Generate SDK source tree in the src directory to enable tracking changes across generations"
     })
   };
 
@@ -52,7 +52,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-apply-source-tree": skipApplySourceTree, "build-source-tree": buildSourceTree }
+      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-changes": skipChanges, "track-changes": trackChanges }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -66,7 +66,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, skipApplySourceTree, buildSourceTree);
+    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, skipChanges, trackChanges);
     outro(result);
   }
 

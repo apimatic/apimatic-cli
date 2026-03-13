@@ -98,7 +98,7 @@ export class PortalService {
         const sdkMergeFailedLanguages = errors.sdkMergeFailed;
         if (sdkMergeFailedLanguages?.length) {
           const errorMessage =
-            "SDK generation failed for the following languages due to merge conflicts:" +
+            "While generating portal, there were merge conflicts in the following SDKs:" +
             "\n- " +
             sdkMergeFailedLanguages.join("\n- ");
           return err(ServiceError.sdkMergeError(errorMessage));

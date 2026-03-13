@@ -60,4 +60,8 @@ export class SdkGeneratePrompts {
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }
+
+  public changeTrackingEnabled() {
+    log.info(`Change tracking is enabled.`);
+  }
 }

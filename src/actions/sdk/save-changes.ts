@@ -96,8 +96,6 @@ export class SaveChangesAction {
 
       if (opened) {
         this.prompts.reviewInIde();
-      } else {
-        this.prompts.ideOpenError();
       }
 
       const confirmed = await this.prompts.confirmSaveChanges();

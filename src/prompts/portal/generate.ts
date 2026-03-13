@@ -51,9 +51,9 @@ export class PortalGeneratePrompts {
 
   public portalGenerationSdkMergeError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
-    const message = `Run the command
+    const message = `For each of the failed languages, run the command
       ${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", "<language>")} 
-      to resolve any SDK merge conflicts first, then re-run portal generation.`;
+      to resolve SDK merge conflicts first, then re-run the same command.`;
     noteWrapped(message, "Next Steps");
   }
 

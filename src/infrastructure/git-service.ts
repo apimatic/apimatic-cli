@@ -144,23 +144,28 @@ export class GitService {
     sdkDir: DirectoryPath,
     language: string,
     inputDirectory: DirectoryPath,
-    buildSourceTree: boolean = false
-  ): Promise<void> {
+    trackChanges: boolean = false
+  ): Promise<boolean> {
     const gitDir = sdkDir.join(".git");
-    if (!(await this.fileService.directoryExists(gitDir))) return;
+    if (!(await this.fileService.directoryExists(gitDir))) return false;
 
-    if (buildSourceTree) {
-      const sdkSourceTreeDir = inputDirectory.join("sdk-source-tree");
+    const sdkSourceTreeDir = inputDirectory.join("sdk-source-tree");
+    const outputZipPath = FilePath.create(path.join(sdkSourceTreeDir.toString(), `.${language}`));
+    const sourceTreeExists = outputZipPath && (await this.fileService.fileExists(outputZipPath));
+    let saved = false;
+
+    if (trackChanges || sourceTreeExists) {
       await this.fileService.createDirectoryIfNotExists(sdkSourceTreeDir);
 
       this.setHeadToMain(sdkDir.toString());
 
-      const outputZipPath = FilePath.create(path.join(sdkSourceTreeDir.toString(), `.${language}`));
       if (outputZipPath) {
         await this.zipService.archive(gitDir, outputZipPath, ".git");
+        saved = true;
       }
     }
 
     await this.fileService.deleteDirectory(gitDir);
+    return saved;
   }
 }

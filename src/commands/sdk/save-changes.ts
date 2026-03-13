@@ -23,7 +23,7 @@ export default class SaveChanges extends Command {
     }),
     ...FlagsProvider.input,
     "sdk": Flags.string({
-      description: "Path to the folder containing the updated SDK"
+      description: "[default: <input>/sdk/<language>] path to the folder containing the updated SDK"
     })
   };
 
