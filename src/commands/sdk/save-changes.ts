@@ -22,8 +22,11 @@ export default class SaveChanges extends Command {
     }),
     ...FlagsProvider.input,
     "sdk": Flags.string({
-      description: "[default: <input>/sdk/<language>] path to the folder containing the updated SDK"
-    })
+      description: "[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path to the folder containing the updated SDK"
+    }),
+    "api-version": Flags.string({
+      description: "Version of the API to use for saving changes (if multiple versions exist)"
+    }),
   };
 
   static examples = [
@@ -33,16 +36,16 @@ export default class SaveChanges extends Command {
 
   async run() {
     const {
-      flags: { sdk, language, input }
+      flags: { sdk, language, input, "api-version": apiVersion }
     } = await this.parse(SaveChanges);
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const updatedSdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk").join(language);
+    const updatedSdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk").join(apiVersion ?? "").join(language);
     
     intro("Save Changes");
     const action = new SaveChangesAction();
-    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language);
+    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language, apiVersion);
     outro(result);
   }
 }

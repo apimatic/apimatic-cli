@@ -24,7 +24,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     ...FlagsProvider.input,
     destination: Flags.string({
       char: "d",
-      description: "[default: <input>/<language>/] path where the SDK will be generated"
+      description: "[default: <input>/<language> | <input>/<api-version>/<language>] path where the SDK will be generated"
     }),
     "skip-changes": Flags.boolean({
       default: false,

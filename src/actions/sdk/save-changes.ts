@@ -11,6 +11,7 @@ import { GitService } from "../../infrastructure/git-service.js";
 import * as path from "path";
 import * as fsPromises from "fs/promises";
 import { BuildContext } from "../../types/build-context.js";
+import { VersionedBuildContext } from "../../types/versioned-build-context.js";
 
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
@@ -21,7 +22,40 @@ export class SaveChangesAction {
 
   constructor() {}
 
-  public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language): Promise<ActionResult> {
+  public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language, apiVersion?: string): Promise<ActionResult> {
+    if (buildDirectory.isEqual(updatedSdkDirectory)) {
+      this.prompts.sameBuildAndSdkDir(buildDirectory);
+      return ActionResult.failed();
+    }
+    
+    const versionedBuildContext = new VersionedBuildContext(buildDirectory);
+    const versionedBuildResult = await versionedBuildContext.validate();
+    if (versionedBuildResult.isValid) {
+      if (versionedBuildResult.versions.length === 0) {
+        this.prompts.versionedBuildEmpty(versionedBuildResult.versionsDirectory);
+        return ActionResult.failed();
+      }
+
+      let version: string;
+      if (apiVersion) {
+        if (!versionedBuildResult.versions.includes(apiVersion)) {
+          this.prompts.versionNotFound();
+          return ActionResult.failed();
+        }
+        version = apiVersion;
+      } else if (versionedBuildResult.versions.length === 1) {
+        version = versionedBuildResult.versions[0];
+      } else {
+        const selectedVersion = await this.prompts.selectVersion(versionedBuildResult.versions);
+        if (!selectedVersion) {
+          return ActionResult.cancelled();
+        }
+        version = selectedVersion;
+      }
+
+      buildDirectory = versionedBuildResult.versionsDirectory.join(version);
+    }
+    
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
       this.prompts.srcDirectoryEmpty(buildDirectory);
@@ -105,7 +139,7 @@ export class SaveChangesAction {
       const latestStatuses = await this.gitService.getModifiedFilesWithStatus(tempDirStr);
       const allChangedFiles = latestStatuses.map(fs => fs.file);
       await this.gitService.stageFiles(tempDirStr, allChangedFiles);
-      await this.gitService.commit(tempDirStr, "add customizations");
+      await this.gitService.commit(tempDirStr, "feat: add customizations to generated SDK");
       await this.gitService.checkoutToMain(tempDirStr);
       await this.zipService.archive(
         new DirectoryPath(path.join(tempDirStr, ".git")),

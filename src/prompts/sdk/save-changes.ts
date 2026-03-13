@@ -1,21 +1,53 @@
-import { log, text, isCancel } from "@clack/prompts";
+import { log, text, isCancel, select } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, getTree, LeafNode, TreeNode } from "../format.js";
 import { noteWrapped } from "../prompt.js";
 
 export class SaveChangesPrompts {
+  public sameBuildAndSdkDir(directory: DirectoryPath) {
+   const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
+      directory
+    )}`;    this.logGenerationError(message);
+  }
+
   public srcDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
-    log.error(message);
+    this.logGenerationError(message);
   }
 
   public invalidSdkDirectory(directory: DirectoryPath) {
     const message = `SDK directory does not exist: ${f.path(directory)}`;
-    log.error(message);
+    this.logGenerationError(message);
+  }
+
+  public versionedBuildEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var(directory.leafName())} directory is either empty or invalid: ${f.path(directory)}`;
+    this.logGenerationError(message);
+  }
+
+  public versionNotFound() {
+    this.logGenerationError(`The API version is invalid.`);
+  }
+
+  public async selectVersion(versions: string[]): Promise<string | undefined> {
+    const version = await select({
+      message: "Select an API version for SDK generation:",
+      options: versions.map((v) => ({ label: v, value: v }))
+    });
+
+    if (isCancel(version)) {
+      return undefined;
+    }
+
+    return version;
+  }
+
+  public logGenerationError(error: string): void {
+    log.error(error);
   }
 
   public sdkSourceTreeNotFound(language: string, inputDirectory: DirectoryPath) {
-    log.error(`No existing sdk source tree found for ${f.var(language)}.`);
+    this.logGenerationError(`No existing sdk source tree found for ${f.var(language)}.`);
     const inputDirectoryFlag = !inputDirectory.isEqual(DirectoryPath.default)
       ? `${f.flag("input", inputDirectory.toString())} `
       : "";

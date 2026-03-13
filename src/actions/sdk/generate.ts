@@ -103,12 +103,10 @@ export class GenerateAction {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildDirectory);
 
-      // TODO: pass build file
       const response = await this.prompts.generateSDK(
         this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey)
       );
 
-      // TODO: this should be a service error
       if (response.isErr()) {
         this.prompts.sdkGenerationServiceError(response.error);
         return ActionResult.failed();
