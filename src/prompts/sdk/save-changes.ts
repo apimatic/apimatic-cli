@@ -52,7 +52,7 @@ export class SaveChangesPrompts {
       ? `${f.flag("input", inputDirectory.toString())} `
       : "";
     const message = `Run the command
-      '${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag("build-source-tree")}'
+      '${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag("track-changes")}'
       to generate SDK with a source tree.`;
     noteWrapped(message, "Next Steps");
   }

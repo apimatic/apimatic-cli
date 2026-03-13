@@ -77,7 +77,9 @@ export class SaveChangesAction {
     }
 
     return withDirPath(async (tempDirectory) => {
-      await this.zipService.unArchive(existingZipFile, tempDirectory);
+      const gitDir = tempDirectory.join(".git");
+      await this.fileService.createDirectoryIfNotExists(gitDir);
+      await this.zipService.unArchive(existingZipFile, gitDir);
       const tempDirStr = tempDirectory.toString();
 
       await this.gitService.checkoutToCustomBranch(tempDirStr);
@@ -134,6 +136,7 @@ export class SaveChangesAction {
         return ActionResult.cancelled();
       }
 
+      await this.fileService.deleteDirectory(reviewDirPath);
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"]);
 
       const latestStatuses = await this.gitService.getModifiedFilesWithStatus(tempDirStr);
@@ -143,8 +146,7 @@ export class SaveChangesAction {
       await this.gitService.checkoutToMain(tempDirStr);
       await this.zipService.archive(
         new DirectoryPath(path.join(tempDirStr, ".git")),
-        FilePath.create(zipFilePath)!,
-        ".git"
+        FilePath.create(zipFilePath)!
       );
 
       this.prompts.changesSaved();

@@ -5,7 +5,7 @@ import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FilePath } from "../types/file/filePath.js";
 
 export class ZipService {
-  public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath, nestUnder: string | false = false): Promise<void> {
+  public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
     return new Promise((resolve, reject) => {
       const output = fs.createWriteStream(outputZipPath.toString());
       const archive = archiver("zip");
@@ -14,7 +14,7 @@ export class ZipService {
       archive.on("error", (err) => reject(err));
 
       archive.pipe(output);
-      archive.directory(sourceDir.toString(), nestUnder);
+      archive.directory(sourceDir.toString(), false);
       archive.finalize();
     });
   }

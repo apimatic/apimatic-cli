@@ -160,7 +160,7 @@ export class GitService {
       this.setHeadToMain(sdkDir.toString());
 
       if (outputZipPath) {
-        await this.zipService.archive(gitDir, outputZipPath, ".git");
+        await this.zipService.archive(gitDir, outputZipPath);
         saved = true;
       }
     }
