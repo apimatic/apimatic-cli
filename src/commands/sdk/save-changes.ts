@@ -1,7 +1,6 @@
 import { Command, Flags } from "@oclif/core";
 import { format, intro, outro } from "../../prompts/format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { SaveChangesAction } from "../../actions/sdk/save-changes.js";
 import { Language } from "../../types/sdk/generate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
@@ -41,18 +40,9 @@ export default class SaveChanges extends Command {
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const updatedSdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk").join(language);
     
-    const commandMetadata: CommandMetadata = {
-      commandName: SaveChanges.id,
-      shell: this.config.shell
-    };
-
     intro("Save Changes");
-    const action = new SaveChangesAction(this.getConfigDir(), commandMetadata);
+    const action = new SaveChangesAction();
     const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language);
     outro(result);
   }
-
-  private readonly getConfigDir = () => {
-    return new DirectoryPath(this.config.configDir);
-  };
 }

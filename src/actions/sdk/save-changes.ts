@@ -1,7 +1,6 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { ActionResult } from "../action-result.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { Language } from "../../types/sdk/generate.js";
@@ -20,17 +19,14 @@ export class SaveChangesAction {
   private readonly launcherService = new LauncherService();
   private readonly gitService = new GitService();
 
-  constructor(
-    private readonly configDir: DirectoryPath,
-    private readonly commandMetadata: CommandMetadata
-  ) {}
+  constructor() {}
 
   public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language): Promise<ActionResult> {
     const buildContext = new BuildContext(buildDirectory);
-        if (!(await buildContext.validate())) {
-          this.prompts.srcDirectoryEmpty(buildDirectory);
-          return ActionResult.failed();
-        }
+    if (!(await buildContext.validate())) {
+      this.prompts.srcDirectoryEmpty(buildDirectory);
+      return ActionResult.failed();
+    }
 
     if (!(await this.fileService.directoryExists(updatedSdkDirectory))) {
       this.prompts.invalidSdkDirectory(updatedSdkDirectory);
