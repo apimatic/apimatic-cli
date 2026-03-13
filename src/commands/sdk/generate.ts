@@ -30,6 +30,9 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       default: false,
       description: "Do not apply the saved changes to the generated SDK"
     }),
+    "api-version": Flags.string({
+      description: "Version of the API to use for SDK generation (if multiple versions exist)"
+    }),
     ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
@@ -52,7 +55,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-changes": skipChanges, "track-changes": trackChanges }
+      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-changes": skipChanges, "track-changes": trackChanges,"api-version": apiVersion }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -66,7 +69,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, skipChanges, trackChanges);
+    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, skipChanges, trackChanges, apiVersion);
     outro(result);
   }
 
