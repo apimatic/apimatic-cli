@@ -14,6 +14,10 @@ import { GitService } from "../../infrastructure/git-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { ResolveConflictsPrompts } from "../../prompts/sdk/resolve-conflicts.js";
 import { SpecContext } from "../../types/spec-context.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { SdkConflictsDetectedEvent } from "../../types/events/sdk-conflicts-detected.js";
+import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
+import { SdkGenerateTrackChangesEvent } from "../../types/events/sdk-generate-track-changes.js";
 import isInCi from "is-in-ci";
 
 export class GenerateAction {
@@ -43,6 +47,8 @@ export class GenerateAction {
     trackChanges: boolean,
     apiVersion?: string
   ): Promise<ActionResult> => {
+    const flags: Record<string, unknown> = { language, force, zip: zipSdk, "skip-changes": skipChanges, "track-changes": trackChanges, "api-version": apiVersion, "auth-key": this.authKey };
+
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
@@ -126,6 +132,8 @@ export class GenerateAction {
       let changesTracked = false;
 
       if (hasMergeConflicts) {
+        const telemetryService = new TelemetryService(this.configDir);
+        await telemetryService.trackEvent(new SdkConflictsDetectedEvent(flags), this.commandMetadata.shell);
         if (skipChanges) {
           await this.gitService.abortMergeAndCheckoutMain(tempSdkDir.toString());
         } else if (isInCi) {
@@ -168,6 +176,7 @@ export class GenerateAction {
           }
 
           this.resolveConflictsPrompts.conflictsResolved(language);
+          await telemetryService.trackEvent(new SdkConflictsResolvedEvent(flags), this.commandMetadata.shell);
           await this.gitService.commitResolvedConflicts(tempSdkDir.toString());
           changesTracked = await this.gitService.saveSdkSourceTree(tempSdkDir, language, buildDirectory, trackChanges);
         }
@@ -190,6 +199,11 @@ export class GenerateAction {
 
       if (changesTracked) {
         this.prompts.changeTrackingEnabled();
+      }
+
+      if (trackChanges) {
+        const trackChangesTelemetry = new TelemetryService(this.configDir);
+        await trackChangesTelemetry.trackEvent(new SdkGenerateTrackChangesEvent(flags), this.commandMetadata.shell);
       }
 
       return ActionResult.success();

@@ -136,7 +136,6 @@ export class SaveChangesAction {
         return ActionResult.cancelled();
       }
 
-      await this.fileService.deleteDirectory(reviewDirPath);
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, tempDirectory, [".git"]);
 
       const latestStatuses = await this.gitService.getModifiedFilesWithStatus(tempDirStr);

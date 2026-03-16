@@ -4,6 +4,9 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { SaveChangesAction } from "../../actions/sdk/save-changes.js";
 import { Language } from "../../types/sdk/generate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { CommandMetadata } from "../../types/common/command-metadata.js";
+import { SaveChangesCompletedEvent } from "../../types/events/save-changes-completed.js";
 
 export default class SaveChanges extends Command {
   static summary = "Save customizations made to an auto-generated SDK";
@@ -35,9 +38,17 @@ export default class SaveChanges extends Command {
   ];
 
   async run() {
+    const telemetryService = new TelemetryService(this.getConfigDir());
+    const commandMetadata: CommandMetadata = {
+      commandName: SaveChanges.id,
+      shell: this.config.shell
+    };
+
     const {
       flags: { sdk, language, input, "api-version": apiVersion }
     } = await this.parse(SaveChanges);
+
+    const parsedFlags: Record<string, unknown> = { sdk, language, input, "api-version": apiVersion };
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
@@ -47,5 +58,15 @@ export default class SaveChanges extends Command {
     const action = new SaveChangesAction();
     const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language, apiVersion);
     outro(result);
+
+    await result.mapAll(
+      async () => await telemetryService.trackEvent(new SaveChangesCompletedEvent(parsedFlags), commandMetadata.shell),
+      () => new Promise(() => {}),
+      () => new Promise(() => {})
+    );
   }
+
+  private readonly getConfigDir = () => {
+    return new DirectoryPath(this.config.configDir);
+  };
 }
