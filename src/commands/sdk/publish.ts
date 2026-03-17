@@ -14,7 +14,7 @@ import { SdkPublishFailedEvent } from '../../types/events/sdk-publish-failed.js'
 export default class SdkPublish extends Command {
   static readonly summary = 'Publish an SDK for your API';
 
-  static readonly description = `Generate and publish Software Development Kits (SDKs) to package registries.
+  static readonly description = `Generate and publish SDKs to package registries.
     Supports interactive mode for guided publishing and non-interactive mode for CI/CD flows.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
@@ -130,47 +130,9 @@ export default class SdkPublish extends Command {
         ),
       () => new Promise(() => {})
     );
-
-    // if (interactive) {
-    //   const sdkDirectory = output ? new DirectoryPath(output) : DirectoryPath.default.join("sdk");
-
-    //   intro("Publish SDK (Interactive)");
-    //   const result = await action.executeInteractive(sdkDirectory, force);
-    //   outro(result);
-    // } else {
-    //   const missingFlags: string[] = [];
-    //   if (!profile) missingFlags.push("--profile (-p)");
-    //   if (!version) missingFlags.push("--version (-v)");
-    //   if (!language) missingFlags.push("--language (-l)");
-    //   if (!publishType || publishType.length === 0) missingFlags.push("--publish-type");
-
-    //   if (missingFlags.length > 0) {
-    //     this.error(`Missing required flags: ${missingFlags.join(", ")}`);
-    //   }
-
-    //   const parsedPublishTypes = this.parsePublishTypes(publishType!);
-    //   const sdkDirectory = output ? new DirectoryPath(output) : DirectoryPath.default.join("sdk", language!);
-
-    // intro("Publish SDK");
-    // const result = await action.executeNonInteractive(
-    //   sdkDirectory,
-    //   profile!,
-    //   language! as Language,
-    //   version!,
-    //   parsedPublishTypes,
-    //   force,
-    //   dryRun
-    // );
-    // outro(result);
-    // }
   }
 
   private readonly getConfigDir = () => {
     return new DirectoryPath(this.config.configDir);
   };
 }
-
-// Tasks:
-// - Interactive Flow -> TBD
-// - Non-interactive Flow -> Ayesha
-// - Infrastructure -> Ali
