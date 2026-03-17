@@ -52,11 +52,11 @@ export default class SaveChanges extends Command {
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const updatedSdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk").join(apiVersion ?? "").join(language);
+    const updatedSdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk");
     
     intro("Save Changes");
     const action = new SaveChangesAction();
-    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language, apiVersion);
+    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language, apiVersion, sdk != null);
     outro(result);
 
     await result.mapAll(

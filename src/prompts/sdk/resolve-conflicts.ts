@@ -17,6 +17,10 @@ export class ResolveConflictsPrompts {
     return !isCancel(result);
   }
 
+  public waitingForVscodeClose(sdkName: string) {
+    log.info(`Resolve all conflicts in the ${f.var(sdkName)} SDK in VS Code, then close the VS Code window to continue.`);
+  }
+
   public warnUnresolvedConflicts(sdkName: string) {
     log.error(
       `Merge conflicts detected in the generated ${f.var(sdkName)} SDK. Manually run the same command to resolve the conflicts interactively.`

@@ -19,6 +19,17 @@ export class LauncherService {
     }
   }
 
+  public async openFolderInIdeAndWait(directoryPath: DirectoryPath, ...filesToOpen: FilePath[]): Promise<boolean> {
+    if (isInCi) return false;
+    try {
+      const args = ["--new-window", "--wait", directoryPath.toString(), ...filesToOpen.map(f => f.toString())];
+      await execa("code", args);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public async openDiffsInSourceControl(
     directoryPath: DirectoryPath,
     diffPairs: Array<{ base: string; working: string }>,
@@ -27,6 +38,7 @@ export class LauncherService {
     if (isInCi) return false;
     try {
       const commands = this.buildDiffCommands(directoryPath, diffPairs, standaloneFiles);
+      // TODO: handle multiple commands properly
       for (const args of commands) {
         await execa("code", args);
       }
@@ -44,7 +56,6 @@ export class LauncherService {
     const dir = directoryPath.toString();
     const commands: string[][] = [];
 
-    // First command opens a new window; subsequent commands reuse it
     const [firstDiff, ...remainingDiffs] = diffPairs;
     const [firstFile, ...remainingFiles] = standaloneFiles;
 

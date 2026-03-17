@@ -22,7 +22,7 @@ export class SaveChangesAction {
 
   constructor() {}
 
-  public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language, apiVersion?: string): Promise<ActionResult> {
+  public async execute(buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language, apiVersion?: string, sdkExplicitlyProvided = false): Promise<ActionResult> {
     if (buildDirectory.isEqual(updatedSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
@@ -53,7 +53,13 @@ export class SaveChangesAction {
         version = selectedVersion;
       }
 
+      if (!sdkExplicitlyProvided) {
+        updatedSdkDirectory = updatedSdkDirectory.join(version).join(language);
+      }
       buildDirectory = versionedBuildResult.versionsDirectory.join(version);
+    }
+    else if (!sdkExplicitlyProvided) {
+      updatedSdkDirectory = updatedSdkDirectory.join(language);
     }
     
     const buildContext = new BuildContext(buildDirectory);

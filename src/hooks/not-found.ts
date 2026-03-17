@@ -53,6 +53,8 @@ const hook: Hook.CommandNotFound = async function (opts) {
       suggestion = "help";
     }
 
+    // TODO: filter out the applicable args to the suggested command instead of passing all args
+
     return this.config.runCommand(confirmedSuggestion, argv);
   }
 

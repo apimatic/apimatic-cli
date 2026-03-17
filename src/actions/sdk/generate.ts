@@ -154,18 +154,16 @@ export class GenerateAction {
               )
             ).filter((f): f is FilePath => f !== null);
 
-            const opened =
-              conflictFilesToOpen.length > 0
-                ? await this.launcherService.openFolderInIde(tempSdkDir, ...conflictFilesToOpen)
-                : false;
-
-            if (!opened) {
+            if (conflictFilesToOpen.length === 0) {
               this.resolveConflictsPrompts.vscodeOpenError(language);
               return ActionResult.failed();
             }
 
-            const continued = await this.resolveConflictsPrompts.waitForConflictsResolved(language);
-            if (!continued) {
+            this.resolveConflictsPrompts.waitingForVscodeClose(language);
+            const opened = await this.launcherService.openFolderInIdeAndWait(tempSdkDir, ...conflictFilesToOpen);
+
+            if (!opened) {
+              this.resolveConflictsPrompts.vscodeOpenError(language);
               return ActionResult.failed();
             }
 
