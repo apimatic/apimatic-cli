@@ -49,10 +49,13 @@ export class PortalGeneratePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public portalGenerationSdkMergeError(serviceError: ServiceError) {
+  public portalGenerationSdkMergeError(serviceError: ServiceError, workingDirectory: DirectoryPath) {
     log.error(serviceError.errorMessage);
+    const inputDirectoryFlag = !workingDirectory.isEqual(DirectoryPath.default)
+      ? `${f.flag("input", workingDirectory.toString())} `
+      : "";
     const message = `For each of the failed languages, run the command
-      ${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", "<language>")} 
+      ${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", "<language>")}
       to resolve SDK merge conflicts first, then re-run the same command.`;
     noteWrapped(message, "Next Steps");
   }

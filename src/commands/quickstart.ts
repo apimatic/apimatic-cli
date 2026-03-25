@@ -27,7 +27,8 @@ export default class Quickstart extends Command {
 
     intro("Quickstart");
     const action = new QuickstartAction(this.getConfigDir(), commandMetadata);
-    const result = await action.execute();
+    const workingDirectory = new DirectoryPath(process.cwd());
+    const result = await action.execute(workingDirectory);
     outro(result);
 
     // TODO: Remove this, find a solution for tracking.

@@ -43,7 +43,7 @@ export class PortalGenerate extends Command {
 
     intro("Generate Portal");
     const action = new GenerateAction(new DirectoryPath(this.config.configDir), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, portalDirectory, force, zipPortal);
+    const result = await action.execute(workingDirectory,buildDirectory, portalDirectory, force, zipPortal);
     outro(result);
   }
 }

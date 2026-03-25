@@ -24,7 +24,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     ...FlagsProvider.input,
     destination: Flags.string({
       char: "d",
-      description: "[default: ./sdk/<language> | ./sdk/<api-version>/<language>] path where the SDK will be generated"
+      description: "[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated"
     }),
     "skip-changes": Flags.boolean({
       default: false,
@@ -60,7 +60,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join("sdk");
+    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
