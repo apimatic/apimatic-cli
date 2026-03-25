@@ -1,18 +1,19 @@
-import os from "os";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import fs from "fs-extra";
+import os from 'os';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs-extra';
 
 class EnvInfo {
   private static cachedCliVersion: string | null = null;
   private static cachedUserAgent: string | null = null;
   private static cachedBaseUrl: string | undefined;
   private static cachedAuthBaseUrl: string | undefined;
+  private static cachedPublishingBaseUrl: string | undefined;
 
   public getUserAgent(shell: string): string {
     if (!EnvInfo.cachedUserAgent) {
       const osInfo = `${os.platform()} ${os.release()}`;
-      const engine = "Node.js";
+      const engine = 'Node.js';
       const engineVersion = process.version;
       EnvInfo.cachedUserAgent = `APIMATIC CLI/${this.getCLIVersion()} - (OS: ${osInfo}, Engine: ${engine}/${engineVersion}, Shell: ${shell})`;
     }
@@ -27,14 +28,14 @@ class EnvInfo {
     try {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = dirname(__filename);
-      const pkgPath = join(__dirname, "../../package.json");
-      const pkgJson = fs.readFileSync(pkgPath, "utf-8");
+      const pkgPath = join(__dirname, '../../package.json');
+      const pkgJson = fs.readFileSync(pkgPath, 'utf-8');
       const pkg = JSON.parse(pkgJson);
-      const version = pkg.version || "unknown";
+      const version = pkg.version || 'unknown';
       EnvInfo.cachedCliVersion = version;
       return version;
     } catch {
-      return "unknown";
+      return 'unknown';
     }
   }
 
@@ -44,7 +45,7 @@ class EnvInfo {
     }
     const envBaseUrls = process.env.APIMATIC_BASE_URL;
     if (envBaseUrls) {
-      EnvInfo.cachedBaseUrl = envBaseUrls.split(";")[0];
+      EnvInfo.cachedBaseUrl = envBaseUrls.split(';')[0];
     }
     return EnvInfo.cachedBaseUrl;
   }
@@ -55,8 +56,20 @@ class EnvInfo {
     }
     const envBaseUrls = process.env.APIMATIC_BASE_URL;
     if (envBaseUrls) {
-      const baseUrls = envBaseUrls.split(";");
+      const baseUrls = envBaseUrls.split(';');
       EnvInfo.cachedAuthBaseUrl = baseUrls.length === 2 ? baseUrls[1] : undefined;
+    }
+    return EnvInfo.cachedAuthBaseUrl;
+  }
+
+  public getPublishingBaseUrl(): string | undefined {
+    if (EnvInfo.cachedPublishingBaseUrl) {
+      return EnvInfo.cachedPublishingBaseUrl;
+    }
+    const envBaseUrls = process.env.APIMATIC_BASE_URL;
+    if (envBaseUrls) {
+      const baseUrls = envBaseUrls.split(';');
+      EnvInfo.cachedAuthBaseUrl = baseUrls.length === 3 ? baseUrls[2] : undefined;
     }
     return EnvInfo.cachedAuthBaseUrl;
   }

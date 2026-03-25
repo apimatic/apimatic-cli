@@ -33,9 +33,9 @@ export default class SdkPublish extends Command {
       char: 'v',
       description: 'Package version.'
     }),
-    output: Flags.string({
-      char: 'o',
-      description: 'Directory where the SDK will be generated.'
+    destination: Flags.string({
+      char: 'd',
+      description: 'Directory where the SDK will be generated for publishing.'
     }),
     language: Flags.string({
       char: 'l',
@@ -59,15 +59,15 @@ export default class SdkPublish extends Command {
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'typescript')} ${format.flag(
       'version',
       '1.0.0'
-    )} ${format.flag('publish-type', 'source')}`,
+    )}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'java')} ${format.flag(
       'version',
       '2.0.0'
-    )} ${format.flag('publish-type', 'source')} ${format.flag('publish-type', 'package')}`,
+    )} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'python')} ${format.flag(
       'version',
       '1.0.0'
-    )} ${format.flag('publish-type', 'package')} ${format.flag('dry-run')}`
+    )} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag('dry-run')}`
   ];
 
   async run() {
@@ -77,7 +77,7 @@ export default class SdkPublish extends Command {
         interactive,
         profile,
         version,
-        output,
+        destination,
         language,
         force,
         input,
@@ -92,7 +92,7 @@ export default class SdkPublish extends Command {
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
-    const sdkDirectory = output ? new DirectoryPath(output) : DirectoryPath.default.join('sdk');
+    const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join('sdk');
 
     await telemetryService.trackEvent(new SdkPublishInitiatedEvent(), commandMetadata.shell);
 
@@ -119,7 +119,7 @@ export default class SdkPublish extends Command {
             interactive,
             profile,
             version,
-            output,
+            destination,
             language,
             force,
             input,
