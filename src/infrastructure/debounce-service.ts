@@ -46,6 +46,9 @@ export class DebounceService {
         }
       } finally {
         this.isProcessing = false;
+        if (this.latestHandler) {
+          this.scheduleExecution();
+        }
       }
     }, this.debounceMs);
   }
