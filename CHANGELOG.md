@@ -1,3 +1,10 @@
+# [1.1.0-beta.10](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.9...v1.1.0-beta.10) (2026-03-25)
+
+
+### Bug Fixes
+
+* simplify portal serve caching logic and fix debounce scheduling ([#253](https://github.com/apimatic/apimatic-cli/issues/253)) ([6c28da7](https://github.com/apimatic/apimatic-cli/commit/6c28da782e788b25ada8ad362c42b9cbdf186ba9))
+
 # [1.1.0-beta.9](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.8...v1.1.0-beta.9) (2026-03-11)
 
 
