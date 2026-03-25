@@ -1,5 +1,6 @@
 import { isCancel, log, text } from "@clack/prompts";
 import { format as f, getTree, LeafNode, TreeNode } from "../format.js";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 export class ResolveConflictsPrompts {
   public displayFileTree(sdkName: string, conflictedFiles: string[], missingFiles: string[]) {
@@ -8,9 +9,10 @@ export class ResolveConflictsPrompts {
     log.message(tree);
   }
 
-  public async waitForConflictsResolved(sdkName: string): Promise<boolean> {
+  public async waitForConflictsResolved(sdkName: string, sdkDir?: DirectoryPath): Promise<boolean> {
+    const atPath = sdkDir ? ` at ${f.path(sdkDir)}` : "";
     const result = await text({
-      message: `Press enter once you have resolved all conflicts in the ${f.var(sdkName)} SDK.`,
+      message: `Resolve all conflicts in the ${f.var(sdkName)} SDK${atPath}, then press Enter.`,
       defaultValue: ""
     });
 

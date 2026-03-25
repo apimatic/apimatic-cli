@@ -24,7 +24,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     ...FlagsProvider.input,
     destination: Flags.string({
       char: "d",
-      description: "[default: <input>/<language> | <input>/<api-version>/<language>] path where the SDK will be generated"
+      description: "[default: ./sdk/<language> | ./sdk/<api-version>/<language>] path where the SDK will be generated"
     }),
     "skip-changes": Flags.boolean({
       default: false,
@@ -69,7 +69,17 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, skipChanges, trackChanges, apiVersion);
+    const result = await action.execute(
+      buildDirectory,
+      sdkDirectory,
+      language as Language,
+      force,
+      zipSdk,
+      skipChanges,
+      trackChanges,
+      apiVersion,
+      destination !== undefined
+    );
     outro(result);
   }
 

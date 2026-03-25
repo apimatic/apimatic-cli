@@ -10,8 +10,8 @@ export class SaveChangesPrompts {
     )}`;    this.logGenerationError(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+  public specDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
 
@@ -31,7 +31,7 @@ export class SaveChangesPrompts {
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
     const version = await select({
-      message: "Select an API version for SDK generation:",
+      message: "Select an API version:",
       options: versions.map((v) => ({ label: v, value: v }))
     });
 
@@ -71,15 +71,16 @@ export class SaveChangesPrompts {
     log.info("No changes detected in the SDK.");
   }
 
-  public reviewInIde() {
+
+  public reviewInIdeAndClose() {
     log.info(
-      `The changed files have been opened in VS Code.`
+      `The changed files have been opened in VS Code. Close VS Code when you're done to save the changes.`
     );
   }
 
-  public async confirmSaveChanges(): Promise<boolean> {
+  public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
     const result = await text({
-      message: "After you have reviewed the changes, press Enter to save.",
+      message: `Review the changes at ${f.path(tempDirectory)} and press Enter to continue.`,
       defaultValue: ""
     });
 

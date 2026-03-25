@@ -6,7 +6,7 @@ import { Language } from "../../types/sdk/generate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { SaveChangesCompletedEvent } from "../../types/events/save-changes-completed.js";
+import { SdkSaveChangesEvent } from "../../types/events/sdk-save-changes.js";
 
 export default class SaveChanges extends Command {
   static summary = "Save customizations made to an auto-generated SDK";
@@ -25,7 +25,7 @@ export default class SaveChanges extends Command {
     }),
     ...FlagsProvider.input,
     "sdk": Flags.string({
-      description: "[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path to the folder containing the updated SDK"
+      description: "[default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing the updated SDK"
     }),
     "api-version": Flags.string({
       description: "Version of the API to use for saving changes (if multiple versions exist)"
@@ -56,11 +56,11 @@ export default class SaveChanges extends Command {
     
     intro("Save Changes");
     const action = new SaveChangesAction();
-    const result = await action.execute(buildDirectory, updatedSdkDirectory, language as Language, apiVersion, sdk != null);
+    const result = await action.execute(workingDirectory, buildDirectory, updatedSdkDirectory, language as Language, apiVersion, sdk != null);
     outro(result);
 
     await result.mapAll(
-      async () => await telemetryService.trackEvent(new SaveChangesCompletedEvent(parsedFlags), commandMetadata.shell),
+      async () => await telemetryService.trackEvent(new SdkSaveChangesEvent(parsedFlags), commandMetadata.shell),
       () => new Promise(() => {}),
       () => new Promise(() => {})
     );

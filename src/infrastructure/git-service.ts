@@ -118,12 +118,20 @@ export class GitService {
   public async abortMergeAndCheckoutMain(dir: string): Promise<void> {
     this.cleanupMergeFiles(dir);
     await git.checkout({ fs: fsSync, dir, ref: MAIN_BRANCH, force: true });
+    await this.syncBranchRefsToHead(dir);
   }
 
   public async commitResolvedConflicts(dir: string): Promise<void> {
     await this.stageAll(dir);
     await git.commit({ fs: fsSync, dir, message: "resolve conflicts", author: GIT_AUTHOR });
+    await this.syncBranchRefsToHead(dir);
     this.cleanupMergeFiles(dir);
+  }
+
+  public async syncBranchRefsToHead(dir: string): Promise<void> {
+    const headOid = await git.resolveRef({ fs: fsSync, dir, ref: "HEAD" });
+    await git.writeRef({ fs: fsSync, dir, ref: `refs/heads/${MAIN_BRANCH}`, value: headOid, force: true });
+    await git.writeRef({ fs: fsSync, dir, ref: `refs/heads/${CUSTOM_BRANCH}`, value: headOid, force: true });
   }
 
   public cleanupMergeFiles(dir: string): void {
@@ -157,6 +165,7 @@ export class GitService {
     if (trackChanges || sourceTreeExists) {
       await this.fileService.createDirectoryIfNotExists(sdkSourceTreeDir);
 
+      await this.syncBranchRefsToHead(sdkDir.toString());
       this.setHeadToMain(sdkDir.toString());
 
       if (outputZipPath) {

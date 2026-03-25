@@ -40,5 +40,17 @@ export class BuildContext {
   public async deleteWorkflowDir() {
     await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
   }
+
+  public getSdkSourceTreePath(language: string): FilePath | undefined {
+    return FilePath.create(this.buildDirectory.join("sdk-source-tree", `.${language}`).toString());
+  }
+
+  public async hasSdkSourceTree(language: string): Promise<boolean> {
+    const sourceTreePath = this.getSdkSourceTreePath(language);
+    if (!sourceTreePath) {
+      return false;
+    }
+    return await this.fileService.fileExists(sourceTreePath);
+  }
 }
 
