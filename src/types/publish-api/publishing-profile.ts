@@ -183,28 +183,28 @@ export interface PublishingProfileItem {
   typeScriptGitConfiguration: GitConfigurationItem | null;
 }
 
-export interface LanguageConfig {
+export interface LanguagePublishingConfig {
   language: Language;
-  config: BaseConfigurationItem | null;
+  packageConfig: BaseConfigurationItem | null;
   gitConfig: BaseConfigurationItem | null;
 }
 
-export function getLanguageConfigs(profile: PublishingProfileItem): LanguageConfig[] {
+export function getLanguageConfigs(profile: PublishingProfileItem): LanguagePublishingConfig[] {
   return [
-    { language: Language.CSHARP, config: profile.cSharpConfiguration, gitConfig: profile.cSharpGitConfiguration },
-    { language: Language.JAVA, config: profile.javaConfiguration, gitConfig: profile.javaGitConfiguration },
-    { language: Language.GO, config: profile.goConfiguration, gitConfig: profile.goGitConfiguration },
-    { language: Language.PHP, config: profile.phpConfiguration, gitConfig: profile.phpGitConfiguration },
-    { language: Language.PYTHON, config: profile.pythonConfiguration, gitConfig: profile.pythonGitConfiguration },
-    { language: Language.RUBY, config: profile.rubyConfiguration, gitConfig: profile.rubyGitConfiguration },
+    { language: Language.CSHARP, packageConfig: profile.cSharpConfiguration, gitConfig: profile.cSharpGitConfiguration },
+    { language: Language.JAVA, packageConfig: profile.javaConfiguration, gitConfig: profile.javaGitConfiguration },
+    { language: Language.GO, packageConfig: profile.goConfiguration, gitConfig: profile.goGitConfiguration },
+    { language: Language.PHP, packageConfig: profile.phpConfiguration, gitConfig: profile.phpGitConfiguration },
+    { language: Language.PYTHON, packageConfig: profile.pythonConfiguration, gitConfig: profile.pythonGitConfiguration },
+    { language: Language.RUBY, packageConfig: profile.rubyConfiguration, gitConfig: profile.rubyGitConfiguration },
     {
       language: Language.TYPESCRIPT,
-      config: profile.typeScriptConfiguration,
+      packageConfig: profile.typeScriptConfiguration,
       gitConfig: profile.typeScriptGitConfiguration
     }
   ];
 }
 
 export function hasEnabledLanguage(profile: PublishingProfileItem): boolean {
-  return getLanguageConfigs(profile).some(({ config, gitConfig }) => config?.isEnabled || gitConfig?.isEnabled);
+  return getLanguageConfigs(profile).some(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled);
 }

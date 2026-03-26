@@ -45,7 +45,7 @@ export class PublishingApiService {
     profileId: string,
     language: Language,
     languageVersion: string,
-    publishType: PublishType,
+    publishType: PublishType | undefined,
     configDir: DirectoryPath,
     shell: string
   ): Promise<Result<PublishingInfo, ServiceError>> {

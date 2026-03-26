@@ -64,10 +64,10 @@ export class SdkPublishInteractivePrompts {
 
   public async selectLanguages(publishingProfile: PublishingProfileItem): Promise<Language[] | undefined> {
     const options = getLanguageConfigs(publishingProfile)
-      .filter(({ config, gitConfig }) => config?.isEnabled || gitConfig?.isEnabled)
-      .map(({ language, config, gitConfig }) => ({
+      .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
+      .map(({ language, packageConfig, gitConfig }) => ({
         value: language,
-        label: `${language} (${[gitConfig?.isEnabled && 'Git', config?.isEnabled && 'Package']
+        label: `${language} (${[gitConfig?.isEnabled && 'Source Code', packageConfig?.isEnabled && 'Package']
           .filter(Boolean)
           .join(', ')})`
       }));
@@ -86,6 +86,12 @@ export class SdkPublishInteractivePrompts {
 
   public noLanguageSelected() {
     log.error('No language was selected for publishing.');
+  }
+
+  public packageConfigurationNotFoundForLanguage(language: string) {
+    log.error(
+      `Package configuration for '${language}' not found in the publishing profile. Please check the provided profile and try again.`
+    );
   }
 
   public async inputVersion(): Promise<string | undefined> {

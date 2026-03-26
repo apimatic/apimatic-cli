@@ -1,9 +1,16 @@
-import { BaseConfigurationItem, PublishingProfileItem } from '../publish-api/publishing-profile.js';
+import { BaseConfigurationItem, LanguagePublishingConfig, PublishingProfileItem } from '../publish-api/publishing-profile.js';
 import { Language } from './generate.js';
 
 export enum PublishType {
   PackagePublishing = 'package',
   SourceCodePublishing = 'sourcecode'
+}
+
+export function getPublishTypeForLanguage({ packageConfig, gitConfig }: LanguagePublishingConfig): PublishType | undefined {
+  const packageEnabled = packageConfig?.isEnabled === true;
+  const gitEnabled = gitConfig?.isEnabled === true;
+  if (packageEnabled && gitEnabled) return undefined;
+  return packageEnabled ? PublishType.PackagePublishing : PublishType.SourceCodePublishing;
 }
 
 export function getPackageConfigurationForLanguage(
