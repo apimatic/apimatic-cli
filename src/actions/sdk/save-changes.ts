@@ -20,7 +20,14 @@ export class SaveChangesAction {
   private readonly launcherService = new LauncherService();
   private readonly gitService = new GitService();
 
-  public async execute(workingDirectory: DirectoryPath, buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language, apiVersion?: string, sdkExplicitlyProvided = false): Promise<ActionResult> {
+  public async execute(
+    workingDirectory: DirectoryPath,
+    buildDirectory: DirectoryPath,
+    updatedSdkDirectory: DirectoryPath,
+    language: Language,
+    apiVersion?: string,
+    sdkExplicitlyProvided = false
+  ): Promise<ActionResult> {
     if (buildDirectory.isEqual(updatedSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
@@ -36,13 +43,15 @@ export class SaveChangesAction {
     if (validatedBuildResult.type === "unversioned") {
       effectiveBuildContext = validatedBuildResult.resolvedBuild;
       if (!sdkExplicitlyProvided) {
-      updatedSdkDirectory = updatedSdkDirectory.join(language);
+        updatedSdkDirectory = updatedSdkDirectory.join(language);
       }
     } else if (validatedBuildResult.type === "versionedEmpty") {
       this.prompts.versionedBuildEmpty(validatedBuildResult.versionsDirectory);
       return ActionResult.failed();
     } else {
-      const resolvedVersionResult = await validatedBuildResult.resolveVersion(apiVersion, (versions) => this.prompts.selectVersion(versions));
+      const resolvedVersionResult = await validatedBuildResult.resolveVersion(apiVersion, (versions) =>
+        this.prompts.selectVersion(versions)
+      );
       if (resolvedVersionResult.type === "versionCancelled") {
         return ActionResult.cancelled();
       }
@@ -94,7 +103,10 @@ export class SaveChangesAction {
         return ActionResult.success();
       }
 
-      await this.gitService.normalizeLineEndings(sdkDirStr, fileStatuses.map(f => f.file));
+      await this.gitService.normalizeLineEndings(
+        sdkDirStr,
+        fileStatuses.map((f) => f.file)
+      );
       this.prompts.modifiedFilesDetected(language, fileStatuses);
 
       const reviewDir = path.join(tempDirectory.toString(), "review");
@@ -107,9 +119,9 @@ export class SaveChangesAction {
       const diffPairs: Array<{ base: string; working: string }> = [];
       const standaloneFiles: string[] = [];
       for (const { file, status } of fileStatuses) {
-        if (status === 'added') {
+        if (status === "added") {
           standaloneFiles.push(path.join(updatedSdkDirectory.toString(), file));
-        } else if (status === 'deleted') {
+        } else if (status === "deleted") {
           const basePath = path.join(reviewDir, file);
           const { dir, name, ext } = path.parse(file);
           const deletedPath = path.join(reviewDir, dir, `${name} [deleted]${ext}`);
@@ -122,7 +134,11 @@ export class SaveChangesAction {
         }
       }
 
-      const opened = await this.launcherService.openDiffsInSourceControl(updatedSdkDirectory, diffPairs, standaloneFiles);
+      const opened = await this.launcherService.openDiffsInSourceControl(
+        updatedSdkDirectory,
+        diffPairs,
+        standaloneFiles
+      );
       if (opened) {
         this.prompts.reviewInIdeAndClose();
         await this.launcherService.waitForVscodeToClose(updatedSdkDirectory);
@@ -136,14 +152,11 @@ export class SaveChangesAction {
 
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, sdkDir, [".git"]);
       const latestStatuses = await this.gitService.getModifiedFilesWithStatus(sdkDirStr);
-      const allChangedFiles = latestStatuses.map(fs => fs.file);
+      const allChangedFiles = latestStatuses.map((fs) => fs.file);
       await this.gitService.stageFiles(sdkDirStr, allChangedFiles);
       await this.gitService.commit(sdkDirStr, "feat: add customizations to generated SDK");
       await this.gitService.checkoutToMain(sdkDirStr);
-      await this.zipService.archive(
-        new DirectoryPath(path.join(sdkDirStr, ".git")),
-        sourceTreePath
-      );
+      await this.zipService.archive(new DirectoryPath(path.join(sdkDirStr, ".git")), sourceTreePath);
 
       this.prompts.changesSaved();
       return ActionResult.success();

@@ -5,9 +5,10 @@ import { noteWrapped } from "../prompt.js";
 
 export class SaveChangesPrompts {
   public sameBuildAndSdkDir(directory: DirectoryPath) {
-   const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
+    const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
       directory
-    )}`;    this.logGenerationError(message);
+    )}`;
+    this.logGenerationError(message);
   }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
@@ -52,7 +53,9 @@ export class SaveChangesPrompts {
       ? `${f.flag("input", inputDirectory.toString())} `
       : "";
     const message = `Run the command
-      '${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag("track-changes")}'
+      '${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag(
+      "track-changes"
+    )}'
       to generate SDK with a source tree.`;
     noteWrapped(message, "Next Steps");
   }
@@ -61,7 +64,10 @@ export class SaveChangesPrompts {
     log.info("Exiting without saving any changes.");
   }
 
-  public modifiedFilesDetected(language: string, fileStatuses: Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>) {
+  public modifiedFilesDetected(
+    language: string,
+    fileStatuses: Array<{ file: string; status: "modified" | "added" | "deleted" }>
+  ) {
     log.message(`Detected changes in ${fileStatuses.length} file(s):`);
     const tree = this.buildFileTree(language, fileStatuses);
     log.message(tree);
@@ -71,11 +77,8 @@ export class SaveChangesPrompts {
     log.info("No changes detected in the SDK.");
   }
 
-
   public reviewInIdeAndClose() {
-    log.info(
-      `The changed files have been opened in VS Code. Close VS Code when you're done to save the changes.`
-    );
+    log.info(`The changed files have been opened in VS Code. Close VS Code when you're done to save the changes.`);
   }
 
   public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
@@ -91,10 +94,13 @@ export class SaveChangesPrompts {
     log.success("Changes saved successfully!");
   }
 
-  private buildFileTree(language: string, fileStatuses: Array<{ file: string; status: 'modified' | 'added' | 'deleted' }>): string {
+  private buildFileTree(
+    language: string,
+    fileStatuses: Array<{ file: string; status: "modified" | "added" | "deleted" }>
+  ): string {
     const root: TreeNode = { name: language, items: [] };
 
-    const addFileToTree = (filePath: string, status: 'modified' | 'added' | 'deleted') => {
+    const addFileToTree = (filePath: string, status: "modified" | "added" | "deleted") => {
       const parts = filePath.split(/[\\/]/);
       let currentLevel = root.items;
 
@@ -104,11 +110,11 @@ export class SaveChangesPrompts {
 
         if (isLastPart) {
           let description = "";
-          if (status === 'modified') {
+          if (status === "modified") {
             description = "# Modified";
-          } else if (status === 'added') {
+          } else if (status === "added") {
             description = "# Added";
-          } else if (status === 'deleted') {
+          } else if (status === "deleted") {
             description = "# Deleted";
           }
           currentLevel.push({
@@ -116,9 +122,9 @@ export class SaveChangesPrompts {
             description
           });
         } else {
-          let existingDir = currentLevel.find(
-            (item: TreeNode | LeafNode) => "items" in item && item.name === part
-          ) as TreeNode | undefined;
+          let existingDir = currentLevel.find((item: TreeNode | LeafNode) => "items" in item && item.name === part) as
+            | TreeNode
+            | undefined;
 
           if (!existingDir) {
             existingDir = { name: part, items: [] };
