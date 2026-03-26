@@ -24,7 +24,7 @@ function buildTable(profiles: PublishingProfileItem[]): string {
     return [
       pc.magenta(profile.name),
       pc.dim(profile.id),
-      enabledLanguages.length > 0 ? enabledLanguages.map((l) => pc.cyan(l)).join(pc.dim(', ')) : pc.dim('—')
+      enabledLanguages.length > 0 ? enabledLanguages.map((l) => pc.cyan(l)).join(pc.dim(',')) : pc.dim('—')
     ];
   });
 
