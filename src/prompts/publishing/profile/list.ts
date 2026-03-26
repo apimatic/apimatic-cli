@@ -6,51 +6,50 @@ import { getLanguageConfigs, PublishingProfileItem } from '../../../types/publis
 import { withSpinner } from '../../prompt.js';
 import { stripAnsi } from '../../../utils/string-utils.js';
 
-const COL_GAP = 2;
-
+/** Pad `text` to `width` visible characters (ANSI-safe). */
 function pad(text: string, width: number): string {
-  const visible = stripAnsi(text).length;
-  return text + ' '.repeat(Math.max(0, width - visible));
+  return text + ' '.repeat(Math.max(0, width - stripAnsi(text).length));
 }
 
 function buildTable(profiles: PublishingProfileItem[]): string {
+  const COL_PAD = 2;
   const headers = ['Name', 'ID', 'Languages'];
 
-  const rows = profiles.map((profile) => {
-    const enabledLanguages = getLanguageConfigs(profile)
+  // Raw (no-color) cell values, used for column width calculation
+  const rawRows = profiles.map((profile) => {
+    const langs = getLanguageConfigs(profile)
       .filter(({ config, gitConfig }) => config?.isEnabled || gitConfig?.isEnabled)
       .map(({ language }) => language);
-
-    return [
-      pc.magenta(profile.name),
-      pc.dim(profile.id),
-      enabledLanguages.length > 0 ? enabledLanguages.map((l) => pc.cyan(l)).join(pc.dim(',')) : pc.dim('—')
-    ];
+    return [profile.name, profile.id, langs.join(', ') || '—'];
   });
 
-  const colCount = headers.length;
-  const colWidths = Array.from({ length: colCount }, (_, i) =>
-    Math.max(headers[i].length, ...rows.map((r) => stripAnsi(r[i]).length)) + COL_GAP
+  // Width = max of header length and all raw cell lengths, plus padding
+  const widths = headers.map((h, i) =>
+    Math.max(h.length, ...rawRows.map((r) => r[i].length)) + COL_PAD
   );
 
-  const hr = (left: string, mid: string, right: string, fill: string) =>
-    pc.gray(left + colWidths.map((w) => fill.repeat(w + 2)).join(mid) + right);
+  // Color cells after widths are computed
+  const coloredRows = rawRows.map((row) => [
+    pc.magenta(row[0]),
+    pc.dim(row[1]),
+    row[2] === '—' ? pc.dim('—') : row[2].split(', ').map((l) => pc.cyan(l)).join(pc.dim(', '))
+  ]);
 
-  const row = (cells: string[], color: (s: string) => string = (s) => s) =>
-    pc.gray('│') +
-    cells.map((cell, i) => ` ${color(pad(cell, colWidths[i]))} ` + pc.gray('│')).join('');
+  const divider = (l: string, m: string, r: string) =>
+    pc.gray(l + widths.map((w) => '─'.repeat(w + 2)).join(m) + r);
 
-  const lines: string[] = [
-    '',
-    hr('┌', '┬', '┐', '─'),
-    row(headers, (s) => pc.bold(pc.white(s))),
-    hr('├', '┼', '┤', '─'),
-    ...rows.map((r) => row(r)),
-    hr('└', '┴', '┘', '─'),
-    ''
-  ];
+  const renderRow = (cells: string[]) =>
+    pc.gray('│') + cells.map((cell, i) => ` ${pad(cell, widths[i])} ` + pc.gray('│')).join('');
 
-  return lines.join('\n');
+  const coloredHeaders = headers.map((h) => pc.bold(pc.white(h)));
+
+  return [
+    divider('┌', '┬', '┐'),
+    renderRow(coloredHeaders),
+    divider('├', '┼', '┤'),
+    ...coloredRows.map(renderRow),
+    divider('└', '┴', '┘')
+  ].join('\n');
 }
 
 export class PublishingProfileListPrompts {
@@ -74,6 +73,7 @@ export class PublishingProfileListPrompts {
   public displayProfiles(profiles: PublishingProfileItem[]) {
     const count = profiles.length;
     const label = count === 1 ? '1 profile' : `${count} profiles`;
-    log.info(`${pc.bold('Publishing Profiles')} ${pc.dim(`(${label})`)}\n${buildTable(profiles)}`);
+    log.info(`${pc.bold('Publishing Profiles')} ${pc.dim(`(${label})`)}\n\n${buildTable(profiles)}`);
   }
 }
+
