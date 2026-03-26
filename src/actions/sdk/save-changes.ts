@@ -7,8 +7,8 @@ import { ZipService } from "../../infrastructure/zip-service.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { GitService } from "../../infrastructure/git-service.js";
-import * as path from "path";
-import * as fsPromises from "fs/promises";
+import * as path from "node:path";
+import * as fsPromises from "node:fs/promises";
 import { BuildContext } from "../../types/build-context.js";
 import { VersionedBuildContext } from "../../types/versioned-build-context.js";
 import { SpecContext } from "../../types/spec-context.js";
@@ -19,8 +19,6 @@ export class SaveChangesAction {
   private readonly zipService = new ZipService();
   private readonly launcherService = new LauncherService();
   private readonly gitService = new GitService();
-
-  constructor() {}
 
   public async execute(workingDirectory: DirectoryPath, buildDirectory: DirectoryPath, updatedSdkDirectory: DirectoryPath, language: Language, apiVersion?: string, sdkExplicitlyProvided = false): Promise<ActionResult> {
     if (buildDirectory.isEqual(updatedSdkDirectory)) {
@@ -39,7 +37,7 @@ export class SaveChangesAction {
       effectiveBuildContext = validatedBuildResult.resolvedBuild;
       if (!sdkExplicitlyProvided) {
       updatedSdkDirectory = updatedSdkDirectory.join(language);
-    }
+      }
     } else if (validatedBuildResult.type === "versionedEmpty") {
       this.prompts.versionedBuildEmpty(validatedBuildResult.versionsDirectory);
       return ActionResult.failed();

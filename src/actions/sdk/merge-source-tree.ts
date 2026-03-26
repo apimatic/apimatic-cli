@@ -47,6 +47,8 @@ export class MergeSourceTreeAction {
 
     if (skipChanges) {
       await this.gitService.abortMergeAndCheckoutMain(sdkDirStr);
+      const gitDir = sdkDir.join(".git");
+      await this.fileService.deleteDirectory(gitDir);      
       return { status: "success", changesTracked: false };
     }
 

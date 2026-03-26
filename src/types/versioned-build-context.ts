@@ -3,7 +3,6 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { BuildContext } from "./build-context.js";
 
 export type BuildValidationResult = VersionedResult | UnversionedResult | VersionedEmptyResult;
-
 export type VersionResolutionResult = VersionResolved | VersionCancelled | VersionNotFound;
 
 export interface UnversionedResult {
@@ -98,6 +97,9 @@ export class VersionedBuildContext {
 
   public async validate(): Promise<BuildValidationResult> {
     const buildContext = new BuildContext(this.buildDirectory);
+    if (!(await buildContext.validate())) {
+      return createUnversionedResult(buildContext);
+    }
     const config = await buildContext.getBuildFileContents();
     if (!("generateVersionedPortal" in config)) return createUnversionedResult(buildContext);
     const versionsPath = (config.versionsPath as string) ?? "versioned_docs";

@@ -10,7 +10,7 @@ import { FileName } from "../types/file/fileName.js";
 import { ZipService } from "./zip-service.js";
 
 export class FileService {
-  private zipService = new ZipService();
+  private readonly zipService = new ZipService();
 
   public async fileExists(file: FilePath): Promise<boolean> {
     try {

@@ -1,7 +1,7 @@
 import git from "isomorphic-git";
-import * as fsSync from "fs";
-import * as fsPromises from "fs/promises";
-import * as path from "path";
+import * as fsSync from "node:fs";
+import * as fsPromises from "node:fs/promises";
+import * as path from "node:path";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FilePath } from "../types/file/filePath.js";
 import { FileService } from "./file-service.js";

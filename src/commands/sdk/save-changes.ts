@@ -9,12 +9,12 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { SdkSaveChangesEvent } from "../../types/events/sdk-save-changes.js";
 
 export default class SaveChanges extends Command {
-  static summary = "Save customizations made to an auto-generated SDK";
+  static readonly summary = "Save customizations made to an auto-generated SDK";
 
-  static description =
+  static readonly description =
     "Requires an input directory with API specifications, a path to the updated SDK directory, and the programming language.";
 
-  static cmdTxt = format.cmd("apimatic", "sdk", "save-changes");
+  static readonly cmdTxt = format.cmd("apimatic", "sdk", "save-changes");
 
   static flags = {
     language: Flags.string({
