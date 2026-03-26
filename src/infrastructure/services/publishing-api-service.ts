@@ -14,8 +14,7 @@ import { PublishType } from '../../types/sdk/publish.js';
 
 export class PublishingApiService {
   // TODO: Replace with prod base url
-  // private readonly apiBaseUrl = 'https://api.package-publishing.dev.apimatic.io/api' as const;
-  private readonly apiBaseUrl = 'https://localhost:42000/api' as const;
+  private readonly apiBaseUrl = 'https://api.package-publishing.dev.apimatic.io/api' as const;
   private readonly fileService = new FileService();
 
   public async getPublishingProfiles(
