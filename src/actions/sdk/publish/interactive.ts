@@ -8,7 +8,7 @@ import { FileName } from '../../../types/file/fileName.js';
 import { FilePath } from '../../../types/file/filePath.js';
 import { getLanguageConfigs, hasEnabledLanguage } from '../../../types/publish-api/publishing-profile.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
-import { getPublishTypeForLanguage, PublishType } from '../../../types/sdk/publish.js';
+import { getPackageConfigurationForLanguage, getPublishTypeForLanguage, PublishType } from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { GenerateAction } from '../generate.js';
 
@@ -48,8 +48,8 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    const languages = await this.prompts.selectLanguages(publishingProfile);
-    if (!languages) {
+    const language = await this.prompts.selectLanguage(publishingProfile);
+    if (!language) {
       this.prompts.noLanguageSelected();
       return ActionResult.cancelled();
     }
@@ -63,50 +63,48 @@ export class SdkPublishInteractiveAction {
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
 
-      const languageConfigs = getLanguageConfigs(publishingProfile);
-      const packageSettingsDirectory = tempDirectory.join('package-settings');
-      const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
+      const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
+      const publishType = getPublishTypeForLanguage(languageConfig);
 
-      for (const language of languages) {
-        const languageConfig = languageConfigs.find((lc) => lc.language === language)!;
-        const publishType = getPublishTypeForLanguage(languageConfig);
-
-        if (!publishType || publishType === PublishType.PackagePublishing) {
-          if (!languageConfig.packageConfig) {
-            this.prompts.packageConfigurationNotFoundForLanguage(language);
-            return ActionResult.failed();
-          }
-          await packageSettingsContext.writeConfiguration(languageConfig.packageConfig, language);
-        }
-
-        const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
-        const sdkGenerationResult = await sdkGenerateAction.execute(tempDirectory, sdkDirectory, language, false, true);
-        if (sdkGenerationResult.isFailed()) {
+      if (!publishType || publishType === PublishType.PackagePublishing) {
+        const packageConfiguration = getPackageConfigurationForLanguage(language, publishingProfile);
+        if (!packageConfiguration) {
+          this.prompts.packageConfigurationNotFoundForLanguage(language);
           return ActionResult.failed();
         }
 
-        const sdkLanguageDirectory = sdkDirectory.join(language);
-        const sdkFilePath = new FilePath(sdkLanguageDirectory, new FileName(`${language}.zip`));
-
-        const publishSdkResponse = await this.prompts.publishSdk(
-          this.publishingApiService.publishSdkPackage(
-            sdkFilePath,
-            publishingProfile.id,
-            language,
-            version!,
-            publishType,
-            this.configDir,
-            this.commandMetadata.shell
-          )
-        );
-
-        if (publishSdkResponse.isErr()) {
-          this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
-          return ActionResult.failed();
-        }
-
-        this.prompts.sdkPublished();
+        const packageSettingsDirectory = tempDirectory.join('package-settings');
+        const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
+        await packageSettingsContext.writeConfiguration(packageConfiguration, language);
       }
+
+      const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
+      const sdkGenerationResult = await sdkGenerateAction.execute(tempDirectory, sdkDirectory, language, false, true);
+      if (sdkGenerationResult.isFailed()) {
+        return ActionResult.failed();
+      }
+
+      const sdkLanguageDirectory = sdkDirectory.join(language);
+      const sdkFilePath = new FilePath(sdkLanguageDirectory, new FileName(`${language}.zip`));
+
+      const publishSdkResponse = await this.prompts.publishSdk(
+        this.publishingApiService.publishSdkPackage(
+          sdkFilePath,
+          publishingProfile.id,
+          language,
+          version!,
+          publishType,
+          this.configDir,
+          this.commandMetadata.shell
+        )
+      );
+
+      if (publishSdkResponse.isErr()) {
+        this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
+        return ActionResult.failed();
+      }
+
+      this.prompts.sdkPublishingInProgress(publishSdkResponse.value.publishingLogUrl);
 
       return ActionResult.success();
     });

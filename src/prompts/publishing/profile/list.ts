@@ -18,7 +18,7 @@ function buildTable(profiles: PublishingProfileItem[]): string {
   // Raw (no-color) cell values, used for column width calculation
   const rawRows = profiles.map((profile) => {
     const langs = getLanguageConfigs(profile)
-      .filter(({ config, gitConfig }) => config?.isEnabled || gitConfig?.isEnabled)
+      .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
       .map(({ language }) => language);
     return [profile.name, profile.id, langs.join(', ') || '—'];
   });

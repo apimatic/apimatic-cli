@@ -1,10 +1,12 @@
-import { isCancel, log, select, multiselect, text } from '@clack/prompts';
+import { isCancel, log, select, text } from '@clack/prompts';
+import { Result } from 'neverthrow';
+import { format as f } from '../../../prompts/format.js';
+import { noteWrapped } from '../../prompt.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { getLanguageConfigs, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { withSpinner } from '../../prompt.js';
 import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
-import { Result } from 'neverthrow';
 
 export class SdkPublishInteractivePrompts {
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
@@ -62,7 +64,7 @@ export class SdkPublishInteractivePrompts {
     log.error('No publishing profile was selected.');
   }
 
-  public async selectLanguages(publishingProfile: PublishingProfileItem): Promise<Language[] | undefined> {
+  public async selectLanguage(publishingProfile: PublishingProfileItem): Promise<Language | undefined> {
     const options = getLanguageConfigs(publishingProfile)
       .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
       .map(({ language, packageConfig, gitConfig }) => ({
@@ -72,16 +74,16 @@ export class SdkPublishInteractivePrompts {
           .join(', ')})`
       }));
 
-    const languages = await multiselect({
+    const language = await select({
       message: 'Choose the language for publishing your SDK:',
       options
     });
 
-    if (isCancel(languages)) {
+    if (isCancel(language)) {
       return undefined;
     }
 
-    return languages;
+    return language as Language;
   }
 
   public noLanguageSelected() {
@@ -118,7 +120,9 @@ export class SdkPublishInteractivePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public sdkPublished() {
-    log.success('SDK published successfully.');
+  public sdkPublishingInProgress(publishingLogUrl: string) {
+    const message = `To view the status of publishing, please visit: 
+${f.link(publishingLogUrl)}`;
+    noteWrapped(message, 'Next Steps');
   }
 }
