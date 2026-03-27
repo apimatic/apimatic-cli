@@ -2,8 +2,6 @@ import { createServer as createLiveReloadServer } from "livereload";
 import connectLiveReload from "connect-livereload";
 import express, { Express } from "express";
 import chokidar from "chokidar";
-import crypto from "crypto";
-import { Mutex } from "async-mutex";
 import { PortalServePrompts } from "../../prompts/portal/serve.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
@@ -87,10 +85,6 @@ export class PortalServeAction {
     });
 
     const deletedDirectories = new Set<string>();
-    // TODO: Verify if we need mutex and eventQueue after refactoring.
-    const eventQueue = new Map();
-    const mutex = new Mutex();
-
     const debounceService: DebounceService = new DebounceService();
 
     watcher
@@ -106,22 +100,10 @@ export class PortalServeAction {
             }
           }
         }
-        const eventId: string = `${Date.now()}-${crypto.randomUUID()}`;
-        await mutex.runExclusive(async () => {
-          eventQueue.clear();
-          eventQueue.set(eventId, path);
-        });
 
         await debounceService.batchSingleRequest(async () => {
           this.prompts.changesDetected();
-
-          // TODO: Verify if this is needed.
-          if (!eventQueue.has(eventId)) {
-            return;
-          }
-
           await generatePortalAction.execute(workingDirectory, buildDirectory, portalDirectory, true, false, false);
-
           liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();
         });
