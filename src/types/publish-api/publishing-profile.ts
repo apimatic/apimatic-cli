@@ -30,8 +30,7 @@ export interface CSharpConfigurationItem extends BaseConfigurationItem {
 }
 
 export interface GoConfigurationItem extends BaseConfigurationItem {
-  repositoryName: string;
-  branch: string;
+  packageName: string;
 }
 
 export interface JavaDeveloper {
