@@ -77,8 +77,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       zipSdk,
       skipChanges,
       trackChanges,
-      apiVersion,
-      destination !== undefined
+      apiVersion
     );
     outro(result);
   }

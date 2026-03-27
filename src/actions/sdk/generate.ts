@@ -39,8 +39,7 @@ export class GenerateAction {
     zipSdk: boolean,
     skipChanges: boolean,
     trackChanges: boolean,
-    apiVersion?: string,
-    destinationProvided: boolean = false
+    apiVersion?: string
   ): Promise<ActionResult> => {
     const flags: Record<string, unknown> = { language, force, zip: zipSdk, "skip-changes": skipChanges, "track-changes": trackChanges, "api-version": apiVersion, "auth-key": this.authKey };
 
@@ -86,8 +85,7 @@ export class GenerateAction {
       sdkDirectory = sdkDirectory.join("uncustomized");
     }
 
-    const destinationIsFinal = destinationProvided && !version;
-    const sdkContext = new SdkContext(sdkDirectory, language, version, destinationIsFinal);
+    const sdkContext = new SdkContext(sdkDirectory, language, version);
     if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkContext.sdkLanguageDirectory))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();

@@ -12,8 +12,7 @@ export class SdkContext {
   constructor(
     private readonly sdkDirectory: DirectoryPath,
     private readonly language: Language,
-    private readonly version?: string,
-    private readonly destinationIsFinal: boolean = false
+    private readonly version?: string
   ) {
   }
 
@@ -22,10 +21,6 @@ export class SdkContext {
   }
   
   public get sdkLanguageDirectory(): DirectoryPath {
-    if (this.destinationIsFinal && !this.version) {
-      return this.sdkDirectory;
-    }
-
     if (this.version) {
       return this.sdkDirectory.join(this.version).join(this.language);
     }

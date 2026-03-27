@@ -5,10 +5,9 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
-import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { GitService } from "../../infrastructure/git-service.js";
 import * as path from "node:path";
-import * as fsPromises from "node:fs/promises";
+import { ReviewChangesAction } from "./review-changes.js";
 import { BuildContext } from "../../types/build-context.js";
 import { VersionedBuildContext } from "../../types/versioned-build-context.js";
 import { SpecContext } from "../../types/spec-context.js";
@@ -17,8 +16,8 @@ export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
-  private readonly launcherService = new LauncherService();
   private readonly gitService = new GitService();
+  private readonly reviewChanges = new ReviewChangesAction();
 
   public async execute(
     workingDirectory: DirectoryPath,
@@ -49,9 +48,7 @@ export class SaveChangesAction {
       this.prompts.versionedBuildEmpty(validatedBuildResult.versionsDirectory);
       return ActionResult.failed();
     } else {
-      const resolvedVersionResult = await validatedBuildResult.resolveVersion(apiVersion, (versions) =>
-        this.prompts.selectVersion(versions)
-      );
+      const resolvedVersionResult = await validatedBuildResult.resolveVersion(apiVersion, (versions) => this.prompts.selectVersion(versions));
       if (resolvedVersionResult.type === "versionCancelled") {
         return ActionResult.cancelled();
       }
@@ -86,8 +83,8 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    // Main logic inside withDirPath callback
     return withDirPath(async (tempDirectory) => {
+      // Restore source tree from archive into a temporary git repo
       const sdkDir = tempDirectory.join("sdk");
       const sdkGitDir = sdkDir.join(".git");
       await this.fileService.createDirectoryIfNotExists(sdkGitDir);
@@ -97,59 +94,23 @@ export class SaveChangesAction {
       await this.gitService.checkoutToCustomBranch(sdkDirStr);
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, sdkDir, [".git"]);
 
+      // Detect changes between the updated SDK and the source tree
       const fileStatuses = await this.gitService.getModifiedFilesWithStatus(sdkDirStr);
       if (fileStatuses.length === 0) {
         this.prompts.noChangesDetected();
         return ActionResult.success();
       }
 
-      await this.gitService.normalizeLineEndings(
-        sdkDirStr,
-        fileStatuses.map((f) => f.file)
-      );
+      await this.gitService.normalizeLineEndings(sdkDirStr, fileStatuses.map((f) => f.file));
       this.prompts.modifiedFilesDetected(language, fileStatuses);
 
-      const reviewDir = path.join(tempDirectory.toString(), "review");
-      const reviewDirPath = new DirectoryPath(reviewDir);
-      const reviewGitDir = reviewDirPath.join(".git");
-      await this.fileService.createDirectoryIfNotExists(reviewGitDir);
-      await this.fileService.copyDirectoryContents(sdkDir.join(".git"), reviewGitDir);
-      await this.gitService.checkoutToCustomBranch(reviewDir, true);
-
-      const diffPairs: Array<{ base: string; working: string }> = [];
-      const standaloneFiles: string[] = [];
-      for (const { file, status } of fileStatuses) {
-        if (status === "added") {
-          standaloneFiles.push(path.join(updatedSdkDirectory.toString(), file));
-        } else if (status === "deleted") {
-          const basePath = path.join(reviewDir, file);
-          const { dir, name, ext } = path.parse(file);
-          const deletedPath = path.join(reviewDir, dir, `${name} [deleted]${ext}`);
-          await fsPromises.rename(basePath, deletedPath);
-          standaloneFiles.push(deletedPath);
-        } else {
-          const basePath = path.join(reviewDir, file);
-          const workingPath = path.join(updatedSdkDirectory.toString(), file);
-          diffPairs.push({ base: basePath, working: workingPath });
-        }
+      // Review changes
+      const reviewResult = await this.reviewChanges.execute(sdkDir, updatedSdkDirectory, language, fileStatuses, tempDirectory);
+      if (reviewResult.status === "cancelled") {
+        return ActionResult.cancelled();
       }
 
-      const opened = await this.launcherService.openDiffsInSourceControl(
-        updatedSdkDirectory,
-        diffPairs,
-        standaloneFiles
-      );
-      if (opened) {
-        this.prompts.reviewInIdeAndClose();
-        await this.launcherService.waitForVscodeToClose(updatedSdkDirectory);
-      } else {
-        const confirmed = await this.prompts.reviewChangesManually(sdkDir);
-        if (!confirmed) {
-          this.prompts.operationCancelled();
-          return ActionResult.cancelled();
-        }
-      }
-
+      // Commit reviewed changes back into the source tree archive
       await this.fileService.copyDirectoryExcluding(updatedSdkDirectory, sdkDir, [".git"]);
       const latestStatuses = await this.gitService.getModifiedFilesWithStatus(sdkDirStr);
       const allChangedFiles = latestStatuses.map((fs) => fs.file);

@@ -45,6 +45,7 @@ export class MergeSourceTreeAction {
       return { status: "success", changesTracked };
     }
 
+    // Conflicts present
     if (skipChanges) {
       await this.gitService.abortMergeAndCheckoutMain(sdkDirStr);
       const gitDir = sdkDir.join(".git");
@@ -58,6 +59,7 @@ export class MergeSourceTreeAction {
       return { status: "failed" };
     }
 
+    // Resolve conflicts
     let conflictedFilePaths = await this.gitService.getConflictedFiles(sdkDirStr);
     while (conflictedFilePaths.length > 0) {
       this.prompts.displayFileTree(language, conflictedFilePaths, []);
@@ -92,6 +94,7 @@ export class MergeSourceTreeAction {
     }
 
     this.prompts.conflictsResolved(language);
+
     const telemetryService = new TelemetryService(configDir);
     await telemetryService.trackEvent(new SdkConflictsResolvedEvent(flags), commandMetadata.shell);
     await this.gitService.commitResolvedConflicts(sdkDirStr);
