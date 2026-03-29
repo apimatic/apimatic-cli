@@ -7,7 +7,7 @@ import { PublishingProfileListAction } from '../../../actions/publishing/profile
 export default class PublishingProfileList extends Command {
   static readonly summary = 'List all publishing profiles';
 
-  static readonly description = `Display all publishing profiles associated with your account, including their name, ID and supported languages.`;
+  static readonly description = `Display all publishing profiles associated with your account, including each profile's name, ID and enabled languages.`;
 
   private static readonly cmdTxt = format.cmd('apimatic', 'publishing', 'profile', 'list');
 
