@@ -116,6 +116,7 @@ export class SdkPublishNonInteractiveAction {
         language,
         force,
         true,
+        undefined,
         version
       );
       if (sdkGenerationResult.isFailed()) {

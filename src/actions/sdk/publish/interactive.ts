@@ -85,6 +85,7 @@ export class SdkPublishInteractiveAction {
         language,
         force,
         true,
+        undefined,
         version
       );
       if (sdkGenerationResult.isFailed()) {

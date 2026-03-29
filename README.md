@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-beta.7 win32-x64 node-v23.4.0
+@apimatic/cli/1.1.0-beta.11 win32-x64 node-v23.4.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -432,8 +432,8 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-i <value>] [-d <value>] [-f] [--zip] [-k
-    <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-i <value>] [-d <value>] [--api-version
+    <value>] [-f] [--zip] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  directory where the SDK will be generated
@@ -443,7 +443,8 @@ FLAGS
   -k, --auth-key=<value>     override current authentication state with an authentication key.
   -l, --language=<option>    (required) programming language for SDK generation
                              <options: csharp|java|php|python|ruby|typescript|go>
-      --zip                  download the generated SDK as a .zip archive
+      --api-version=<value>  Version of the API to use for SDK generation (if multiple versions exist)
+      --zip                  Download the generated SDK as a .zip archive
 
 DESCRIPTION
   Generate an SDK for your API

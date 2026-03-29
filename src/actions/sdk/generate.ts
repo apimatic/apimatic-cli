@@ -8,7 +8,7 @@ import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
-import { BuildContext } from "../../types/build-context.js";
+import { SpecContext } from "../../types/spec-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -29,7 +29,8 @@ export class GenerateAction {
     language: Language,
     force: boolean,
     zipSdk: boolean,
-    version: string | undefined = undefined
+    apiVersion?: string,
+    packageVersion: string | undefined = undefined,
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
@@ -37,19 +38,38 @@ export class GenerateAction {
     }
 
     const versionedBuildContext = new VersionedBuildContext(buildDirectory);
-    if (await versionedBuildContext.exists()) {
-      const resolvedDirectory = await versionedBuildContext.getResolvedBuildDirectory();
-      if (!resolvedDirectory) {
-        this.prompts.versionedBuildEmpty();
+    const versionedBuildResult = await versionedBuildContext.validate();
+    if (versionedBuildResult.isValid) {
+      if (versionedBuildResult.versions.length === 0) {
+        this.prompts.versionedBuildEmpty(versionedBuildResult.versionsDirectory);
         return ActionResult.failed();
       }
-      buildDirectory = resolvedDirectory;
-      this.prompts.versionedBuild(versionedBuildContext.getRelativePath(resolvedDirectory));
+
+      let version: string;
+      if (apiVersion) {
+        if (!versionedBuildResult.versions.includes(apiVersion)) {
+          this.prompts.versionNotFound();
+          return ActionResult.failed();
+        }
+        version = apiVersion;
+      } else if (versionedBuildResult.versions.length === 1) {
+        version = versionedBuildResult.versions[0];
+      } else {
+        const selectedVersion = await this.prompts.selectVersion(versionedBuildResult.versions);
+        if (!selectedVersion) {
+          return ActionResult.cancelled();
+        }
+        version = selectedVersion;
+      }
+
+      buildDirectory = versionedBuildResult.versionsDirectory.join(version);
+      sdkDirectory = sdkDirectory.join(version);
     }
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.validate())) {
-      this.prompts.srcDirectoryEmpty(buildDirectory);
+    const specDirectory = buildDirectory.join("spec");
+    const specContext = new SpecContext(specDirectory);
+    if (!(await specContext.validate())) {
+      this.prompts.specDirectoryEmpty(specDirectory);
       return ActionResult.failed();
     }
 
@@ -64,7 +84,7 @@ export class GenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey, version)
+        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey, packageVersion)
       );
 
       // TODO: this should be service error
