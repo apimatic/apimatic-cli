@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { err, ok, Result } from 'neverthrow';
 import { PublishingProfileItem } from '../../types/publish-api/publishing-profile.js';
 import { handleServiceError, ServiceError } from '../service-error.js';
@@ -74,7 +74,25 @@ export class PublishingApiService {
       }
       return err(ServiceError.InvalidResponse);
     } catch (error) {
+      if (error instanceof AxiosError) {
+        const data = error.response?.data;
+        if (error.status === 400) {
+          const detail = data.errors ? Object.values(data.errors as Record<string, string[]>)[0]?.[0] : data.detail;
+          const errorMessage = data.title + '\n- ' + detail;
+          return err(ServiceError.badRequest(errorMessage));
+        }
+        if (error.status === 403) {
+          const errorMessage = data.title + '\n- ' + data.detail;
+          return err(ServiceError.forbidden(errorMessage));
+        }
+        if (error.status === 404) {
+          const errorMessage = data.title + '\n- ' + data.detail;
+          return err(ServiceError.badRequest(errorMessage));
+        }
+      }
       return err(handleServiceError(error));
+    } finally {
+      sdkFileStream.close();
     }
   }
 
