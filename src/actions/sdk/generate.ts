@@ -28,7 +28,8 @@ export class GenerateAction {
     sdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
-    zipSdk: boolean
+    zipSdk: boolean,
+    version: string | undefined = undefined
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
@@ -63,7 +64,7 @@ export class GenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey)
+        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey, version)
       );
 
       // TODO: this should be service error

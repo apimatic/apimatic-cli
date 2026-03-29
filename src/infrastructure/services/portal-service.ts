@@ -118,7 +118,8 @@ export class PortalService {
     language: Language,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
-    authKey: string | null
+    authKey: string | null,
+    version: string | undefined = undefined
   ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
@@ -134,6 +135,8 @@ export class PortalService {
         this.CONTENT_TYPE,
         file,
         this.languageSdk[language],
+        undefined,
+        version
       );
       generationId = response.result.id;
     } catch (error) {
