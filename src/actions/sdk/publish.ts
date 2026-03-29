@@ -22,7 +22,7 @@ export class PublishAction {
   ): Promise<ActionResult> => {
     if (interactive) {
       const action = new SdkPublishInteractiveAction(this.configDir, this.commandMetadata);
-      return await action.execute(buildDirectory, sdkDirectory);
+      return await action.execute(buildDirectory, sdkDirectory, force);
     }
 
     const action = new SdkPublishNonInteractiveAction(this.configDir, this.commandMetadata);

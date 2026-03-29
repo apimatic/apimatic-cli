@@ -64,16 +64,16 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    if (!publishingProfilesResponse.value.some(hasEnabledLanguage)) {
-      this.prompts.noProfileWithEnabledLanguagesFound();
-      return ActionResult.failed();
-    }
-
     const publishingProfile = publishingProfilesResponse.value.find(
       (profile: PublishingProfileItem) => profile.id === profileId
     );
     if (!publishingProfile) {
       this.prompts.publishingProfileNotFound(profileId!);
+      return ActionResult.failed();
+    }
+
+    if (!hasEnabledLanguage(publishingProfile)) {
+      this.prompts.profileHasNoEnabledLanguages();
       return ActionResult.failed();
     }
 

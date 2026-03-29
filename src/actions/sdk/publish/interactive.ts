@@ -25,7 +25,8 @@ export class SdkPublishInteractiveAction {
 
   public readonly execute = async (
     buildDirectory: DirectoryPath,
-    sdkDirectory: DirectoryPath
+    sdkDirectory: DirectoryPath,
+    force: boolean
   ): Promise<ActionResult> => {
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
       this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
@@ -82,7 +83,7 @@ export class SdkPublishInteractiveAction {
         tempDirectory,
         sdkDirectory,
         language,
-        false,
+        force,
         true,
         version
       );

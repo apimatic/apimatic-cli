@@ -41,7 +41,7 @@ export default class SdkPublish extends Command {
     ...FlagsProvider.force,
     ...FlagsProvider.input,
     'publish-type': Flags.string({
-      description: 'Type of publishing (source, package).',
+      description: 'Type of publishing (sourcecode, package).',
       options: Object.values(PublishType).map((t) => t.valueOf())
     }),
     'dry-run': Flags.boolean({

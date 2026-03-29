@@ -29,9 +29,9 @@ export class SdkPublishNonInteractivePrompts {
     log.error('No publishing profiles found. Please create a publishing profile before publishing an SDK.');
   }
 
-  public noProfileWithEnabledLanguagesFound() {
+  public profileHasNoEnabledLanguages() {
     log.error(
-      'No publishing profiles found with languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in a publishing profile before publishing an SDK.'
+      'The selected publishing profile has no languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in the profile before publishing an SDK.'
     );
   }
 
