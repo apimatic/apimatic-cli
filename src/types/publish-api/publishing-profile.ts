@@ -128,11 +128,6 @@ export interface RubyConfigurationItem extends BaseConfigurationItem {
   requirements: string[];
 }
 
-export interface SwiftConfigurationItem extends BaseConfigurationItem {
-  repositoryName: string;
-  branch: string;
-}
-
 export interface TsPerson {
   name: string | null;
   email: string | null;
@@ -170,7 +165,6 @@ export interface PublishingProfileItem {
   phpConfiguration: PhpConfigurationItem | null;
   pythonConfiguration: PythonConfigurationItem | null;
   rubyConfiguration: RubyConfigurationItem | null;
-  swiftConfiguration: SwiftConfigurationItem | null;
   typeScriptConfiguration: TypeScriptConfigurationItem | null;
   cSharpGitConfiguration: GitConfigurationItem | null;
   goGitConfiguration: GitConfigurationItem | null;
@@ -178,7 +172,6 @@ export interface PublishingProfileItem {
   phpGitConfiguration: GitConfigurationItem | null;
   pythonGitConfiguration: GitConfigurationItem | null;
   rubyGitConfiguration: GitConfigurationItem | null;
-  swiftGitConfiguration: GitConfigurationItem | null;
   typeScriptGitConfiguration: GitConfigurationItem | null;
 }
 
