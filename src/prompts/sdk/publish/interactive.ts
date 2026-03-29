@@ -98,7 +98,13 @@ export class SdkPublishInteractivePrompts {
 
   public async inputVersion(): Promise<string | undefined> {
     const version = await text({
-      message: 'Enter the version for the SDK you want to publish (e.g., 1.0.0):'
+      message: 'Enter the version for the SDK you want to publish (e.g. 1.0.0):',
+      validate: (value) => {
+        if (!value) return 'Version is required.';
+        const parts = value.split('-')[0].split('.');
+        const isValid = parts.length === 3 && parts.every((p) => p !== '' && !isNaN(Number(p)) && Number(p) >= 0);
+        if (!isValid) return 'Please enter a valid semantic version (e.g., 1.0.0).';
+      }
     });
 
     if (isCancel(version)) {
@@ -113,7 +119,7 @@ export class SdkPublishInteractivePrompts {
   }
 
   public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
-    return withSpinner('Publishing SDK', 'SDK published successfully.', 'SDK Publishing failed.', fn);
+    return withSpinner('Publishing SDK', 'Publishing has been enqueued.', 'SDK Publishing failed.', fn);
   }
 
   public sdkPublishingServiceError(serviceError: ServiceError) {
