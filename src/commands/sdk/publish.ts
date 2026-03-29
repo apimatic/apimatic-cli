@@ -8,10 +8,9 @@ import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/sdk/publish.js';
 
 export default class SdkPublish extends Command {
-  static readonly summary = 'Publish an SDK for your API';
+  static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
 
-  static readonly description = `Generate and publish SDKs to package registries.
-    Supports interactive mode for guided publishing and non-interactive mode for CI/CD flows.`;
+  static readonly description = `Generate and publish an SDK using your API spec and a publishing profile. Requires an input directory containing the API specification. Supports interactive mode for guided publishing and non-interactive mode for CI/CD automation.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
@@ -19,34 +18,32 @@ export default class SdkPublish extends Command {
     interactive: Flags.boolean({
       char: 'i',
       default: false,
-      description: 'Launch interactive mode for sequentially getting profile, language and publish-type information.'
+      description: 'Launch interactive mode for a guided SDK publishing experience.'
     }),
     profile: Flags.string({
       char: 'p',
-      description: 'Publishing profile id.'
+      description: 'ID of the publishing profile to use.'
     }),
     version: Flags.string({
       char: 'v',
-      description: 'Package version.'
+      description: 'Semantic version of the SDK to be generated and published.'
     }),
-    destination: Flags.string({
-      char: 'd',
-      description: 'Directory where the SDK will be generated for publishing.'
-    }),
+    ...FlagsProvider.destination('sdk', 'sdk'),
     language: Flags.string({
       char: 'l',
-      description: 'Single language for which the SDK will be generated and published.',
+      description: 'Language to generate and publish the SDK for.',
       options: Object.values(Language).map((l) => l.valueOf())
     }),
     ...FlagsProvider.force,
     ...FlagsProvider.input,
     'publish-type': Flags.string({
-      description: 'Type of publishing (sourcecode, package).',
+      description: "Publish to a package registry ('package'), a git repository ('sourcecode'), or both if omitted.",
       options: Object.values(PublishType).map((t) => t.valueOf())
     }),
     'dry-run': Flags.boolean({
       default: false,
-      description: 'Generate SDK with publishing profile for review. Skips the publishing step.'
+      description:
+        'Generate the SDK without publishing. Useful for reviewing generated SDK before publishing. Not applicable to interactive mode.'
     })
   };
 
@@ -59,11 +56,13 @@ export default class SdkPublish extends Command {
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'java')} ${format.flag(
       'version',
       '2.0.0'
-    )} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
+    )}   
+  ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'python')} ${format.flag(
       'version',
       '1.0.0'
-    )} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag('dry-run')}`
+    )} 
+  ${format.flag('dry-run')}`
   ];
 
   async run() {
@@ -87,7 +86,7 @@ export default class SdkPublish extends Command {
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
-    const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join('sdk');
+    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
 
     intro('SDK Publish');
     const action = new PublishAction(this.getConfigDir(), commandMetadata);
