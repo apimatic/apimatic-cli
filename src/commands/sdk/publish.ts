@@ -5,11 +5,7 @@ import { PublishAction } from '../../actions/sdk/publish.js';
 import { Language } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
-import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
 import { PublishType } from '../../types/sdk/publish.js';
-import { SdkPublishCompletedEvent } from '../../types/events/sdk-publish-completed.js';
-import { SdkPublishInitiatedEvent } from '../../types/events/sdk-publish-initiated.js';
-import { SdkPublishFailedEvent } from '../../types/events/sdk-publish-failed.js';
 
 export default class SdkPublish extends Command {
   static readonly summary = 'Publish an SDK for your API';
@@ -71,7 +67,6 @@ export default class SdkPublish extends Command {
   ];
 
   async run() {
-    const telemetryService = new TelemetryService(this.getConfigDir());
     const {
       flags: {
         interactive,
@@ -94,8 +89,6 @@ export default class SdkPublish extends Command {
     const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
     const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join('sdk');
 
-    await telemetryService.trackEvent(new SdkPublishInitiatedEvent(), commandMetadata.shell);
-
     intro('SDK Publish');
     const action = new PublishAction(this.getConfigDir(), commandMetadata);
     const result = await action.execute(
@@ -110,26 +103,6 @@ export default class SdkPublish extends Command {
       version
     );
     outro(result);
-
-    await result.mapAll(
-      async () => await telemetryService.trackEvent(new SdkPublishCompletedEvent(), commandMetadata.shell),
-      async () =>
-        await telemetryService.trackEvent(
-          new SdkPublishFailedEvent('error', SdkPublish.id, {
-            interactive,
-            profile,
-            version,
-            destination,
-            language,
-            force,
-            input,
-            'publish-type': publishType,
-            'dry-run': dryRun
-          }),
-          commandMetadata.shell
-        ),
-      () => new Promise(() => {})
-    );
   }
 
   private readonly getConfigDir = () => {
