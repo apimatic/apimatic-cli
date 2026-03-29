@@ -46,8 +46,10 @@ USAGE
 * [`apimatic portal recipe new`](#apimatic-portal-recipe-new)
 * [`apimatic portal serve`](#apimatic-portal-serve)
 * [`apimatic portal toc new`](#apimatic-portal-toc-new)
+* [`apimatic publishing profile list`](#apimatic-publishing-profile-list)
 * [`apimatic quickstart`](#apimatic-quickstart)
 * [`apimatic sdk generate`](#apimatic-sdk-generate)
+* [`apimatic sdk publish`](#apimatic-sdk-publish)
 
 ## `apimatic api transform`
 
@@ -386,6 +388,25 @@ EXAMPLES
 
 _See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/toc/new.ts)_
 
+## `apimatic publishing profile list`
+
+List all publishing profiles
+
+```
+USAGE
+  $ apimatic publishing profile list
+
+DESCRIPTION
+  List all publishing profiles
+
+  Display all publishing profiles associated with your account, including each profile's name, ID and enabled languages.
+
+EXAMPLES
+  apimatic publishing profile list
+```
+
+_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/publishing/profile/list.ts)_
+
 ## `apimatic quickstart`
 
 Create your first SDK or API Portal using APIMatic.
@@ -439,4 +460,49 @@ EXAMPLES
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/generate.ts)_
+
+## `apimatic sdk publish`
+
+Generate and publish an SDK to a package registry or source repository
+
+```
+USAGE
+  $ apimatic sdk publish [-i] [-p <value>] [-v <value>] [-d <value>] [-l
+    csharp|java|php|python|ruby|typescript|go] [-f] [-i <value>] [--publish-type package|sourcecode] [--dry-run]
+
+FLAGS
+  -d, --destination=<value>    [default: <input>/sdk] path where the sdk will be generated.
+  -f, --force                  overwrite changes without asking for user consent.
+  -i, --input=<value>          [default: ./] path to the parent directory containing the 'src' directory, which includes
+                               API specifications and configuration files.
+  -i, --interactive            Launch interactive mode for a guided SDK publishing experience.
+  -l, --language=<option>      Language to generate and publish the SDK for.
+                               <options: csharp|java|php|python|ruby|typescript|go>
+  -p, --profile=<value>        ID of the publishing profile to use.
+  -v, --version=<value>        Semantic version of the SDK to be generated and published.
+      --dry-run                Generate the SDK without publishing. Useful for reviewing generated SDK before
+                               publishing. Not applicable to interactive mode.
+      --publish-type=<option>  Publish to a package registry ('package'), a git repository ('sourcecode'), or both if
+                               omitted.
+                               <options: package|sourcecode>
+
+DESCRIPTION
+  Generate and publish an SDK to a package registry or source repository
+
+  Generate and publish an SDK using your API spec and a publishing profile. Requires an input directory containing the
+  API specification. Supports interactive mode for guided publishing and non-interactive mode for CI/CD automation.
+
+EXAMPLES
+  apimatic sdk publish --interactive
+
+  apimatic sdk publish --profile=prof-123 --language=typescript --version=1.0.0
+
+  apimatic sdk publish --profile=prof-123 --language=java --version=2.0.0   
+    --publish-type=sourcecode
+
+  apimatic sdk publish --profile=prof-123 --language=python --version=1.0.0 
+    --dry-run
+```
+
+_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_
 <!-- commandsstop -->
