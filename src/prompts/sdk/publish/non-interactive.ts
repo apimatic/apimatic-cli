@@ -36,12 +36,32 @@ export class SdkPublishNonInteractivePrompts {
   }
 
   public publishingProfileNotFound(profileId: string) {
-    log.error(`Publishing profile with id ${profileId} not found. Please check the provided profile id and try again.`);
+    log.error(
+      `Publishing profile with id '${profileId}' not found. Please check the provided profile id and try again.`
+    );
+  }
+
+  public languageNotConfiguredForProfile(language: string) {
+    log.error(
+      `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile and try again.`
+    );
   }
 
   public packageConfigurationNotFoundForLanguage(language: string) {
     log.error(
       `Package configuration for '${language}' not found in the publishing profile. Please check the provided profile and try again.`
+    );
+  }
+
+  public gitConfigurationNotFoundForLanguage(language: string) {
+    log.error(
+      `No source code configuration found for '${language}' in the selected publishing profile. Please check the provided profile and try again.`
+    );
+  }
+
+  public publishTypeNotAllowedForLanguage(publishType: string, language: string) {
+    log.error(
+      `Publish type '${publishType}' is not enabled for '${language}' in the selected publishing profile. Please check your profile configuration and try again.`
     );
   }
 

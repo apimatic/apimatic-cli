@@ -5,22 +5,30 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { FileName } from '../../../types/file/fileName.js';
 import { FilePath } from '../../../types/file/filePath.js';
 import {
-  BaseConfigurationItem,
+  getLanguageConfigs,
   hasEnabledLanguage,
   PublishingProfileItem
 } from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
-import { getPackageConfigurationForLanguage, PublishType } from '../../../types/sdk/publish.js';
+import {
+  getPackageConfigurationForLanguage,
+  getPublishTypeForLanguage,
+  PublishType
+} from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { GenerateAction } from '../generate.js';
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
+import { SdkPublishValidationFailedEvent } from '../../../types/events/sdk-publish-validation-failed.js';
+import SdkPublish from '../../../commands/sdk/publish.js';
+import { TelemetryService } from '../../../infrastructure/services/telemetry-service.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly fileService: FileService = new FileService();
+  private readonly telemetryService = new TelemetryService(this.configDir);
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -69,24 +77,47 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
+    const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
+    if (!languageConfig.packageConfig?.isEnabled && !languageConfig.gitConfig?.isEnabled) {
+      this.prompts.languageNotConfiguredForProfile(language);
+      return ActionResult.failed();
+    }
+
+    if (languageConfig.packageConfig === null && (!publishType || publishType === PublishType.PackagePublishing)) {
+      this.prompts.packageConfigurationNotFoundForLanguage(language);
+      return ActionResult.failed();
+    }
+
+    if (languageConfig.gitConfig === null && (!publishType || publishType === PublishType.SourceCodePublishing)) {
+      this.prompts.gitConfigurationNotFoundForLanguage(language);
+      return ActionResult.failed();
+    }
+
+    const allowedPublishType = getPublishTypeForLanguage(languageConfig);
+    if (publishType && allowedPublishType !== undefined && publishType !== allowedPublishType) {
+      this.prompts.publishTypeNotAllowedForLanguage(publishType, language);
+      return ActionResult.failed();
+    }
+
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
 
-      let packageConfiguration: BaseConfigurationItem | null;
-      if (!publishType || publishType === PublishType.PackagePublishing) {
-        packageConfiguration = getPackageConfigurationForLanguage(language, publishingProfile);
-        if (!packageConfiguration) {
-          this.prompts.packageConfigurationNotFoundForLanguage(language);
-          return ActionResult.failed();
-        }
-
+      const packageConfiguration = getPackageConfigurationForLanguage(language, publishingProfile);
+      if (packageConfiguration !== null) {
         const packageSettingsDirectory = tempDirectory.join('package-settings');
         const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
         await packageSettingsContext.writeConfiguration(packageConfiguration, language);
       }
 
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
-      const sdkGenerationResult = await sdkGenerateAction.execute(tempDirectory, sdkDirectory, language, force, true);
+      const sdkGenerationResult = await sdkGenerateAction.execute(
+        tempDirectory,
+        sdkDirectory,
+        language,
+        force,
+        true,
+        version
+      );
       if (sdkGenerationResult.isFailed()) {
         return ActionResult.failed();
       }
@@ -109,6 +140,18 @@ export class SdkPublishNonInteractiveAction {
 
         if (publishSdkResponse.isErr()) {
           this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
+
+          await this.telemetryService.trackEvent(
+            new SdkPublishValidationFailedEvent(publishSdkResponse.error.errorMessage, SdkPublish.id, {
+              profileId,
+              version,
+              language,
+              ...(force && { force }),
+              ...(publishType && { 'publish-type': publishType })
+            }),
+            this.commandMetadata.shell
+          );
+
           return ActionResult.failed();
         }
 
