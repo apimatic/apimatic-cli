@@ -125,6 +125,9 @@ export class SdkPublishNonInteractiveAction {
       if (sdkGenerationResult.isFailed()) {
         return ActionResult.failed();
       }
+      if (sdkGenerationResult.isCancelled()) {
+        return ActionResult.cancelled();
+      }
 
       if (!dryRun) {
         const sdkLanguageDirectory = sdkDirectory.join(language);
