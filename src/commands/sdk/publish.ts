@@ -6,6 +6,8 @@ import { Language } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/sdk/publish.js';
+import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
+import { SdkPublishValidationFailedEvent } from '../../types/events/sdk-publish-validation-failed.js';
 
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
@@ -88,6 +90,25 @@ export default class SdkPublish extends Command {
     const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
 
+    const telemetryService = new TelemetryService(this.getConfigDir());
+    const onPublishSdkError = interactive
+      ? (errorMessage: string) =>
+          telemetryService.trackEvent(
+            new SdkPublishValidationFailedEvent(errorMessage, SdkPublish.id, { interactive: true }),
+            commandMetadata.shell
+          )
+      : (errorMessage: string) =>
+          telemetryService.trackEvent(
+            new SdkPublishValidationFailedEvent(errorMessage, SdkPublish.id, {
+              profile,
+              version,
+              language,
+              ...(force && { force }),
+              ...(publishType && { 'publish-type': publishType })
+            }),
+            commandMetadata.shell
+          );
+
     intro('SDK Publish');
     const action = new PublishAction(this.getConfigDir(), commandMetadata);
     const result = await action.execute(
@@ -99,7 +120,8 @@ export default class SdkPublish extends Command {
       force,
       dryRun,
       profile,
-      version
+      version,
+      onPublishSdkError
     );
     outro(result);
   }

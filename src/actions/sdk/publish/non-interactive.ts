@@ -20,15 +20,11 @@ import { GenerateAction } from '../generate.js';
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
-import { SdkPublishValidationFailedEvent } from '../../../types/events/sdk-publish-validation-failed.js';
-import SdkPublish from '../../../commands/sdk/publish.js';
-import { TelemetryService } from '../../../infrastructure/services/telemetry-service.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly fileService: FileService = new FileService();
-  private readonly telemetryService = new TelemetryService(this.configDir);
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -40,7 +36,8 @@ export class SdkPublishNonInteractiveAction {
     force: boolean,
     dryRun: boolean,
     profileId: string | undefined = undefined,
-    version: string | undefined = undefined
+    version: string | undefined = undefined,
+    onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const missing = [];
     if (!profileId) missing.push('--profile');
@@ -141,18 +138,7 @@ export class SdkPublishNonInteractiveAction {
 
         if (publishSdkResponse.isErr()) {
           this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
-
-          await this.telemetryService.trackEvent(
-            new SdkPublishValidationFailedEvent(publishSdkResponse.error.errorMessage, SdkPublish.id, {
-              profileId,
-              version,
-              language,
-              ...(force && { force }),
-              ...(publishType && { 'publish-type': publishType })
-            }),
-            this.commandMetadata.shell
-          );
-
+          onPublishSdkError?.(publishSdkResponse.error.errorMessage);
           return ActionResult.failed();
         }
 

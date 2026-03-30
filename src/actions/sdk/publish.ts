@@ -18,14 +18,25 @@ export class PublishAction {
     force: boolean,
     dryRun: boolean,
     profileId: string | undefined = undefined,
-    version: string | undefined = undefined
+    version: string | undefined = undefined,
+    onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     if (interactive) {
       const action = new SdkPublishInteractiveAction(this.configDir, this.commandMetadata);
-      return await action.execute(buildDirectory, sdkDirectory, force);
+      return await action.execute(buildDirectory, sdkDirectory, force, onPublishSdkError);
     }
 
     const action = new SdkPublishNonInteractiveAction(this.configDir, this.commandMetadata);
-    return await action.execute(buildDirectory, sdkDirectory, language, publishType, force, dryRun, profileId, version);
+    return await action.execute(
+      buildDirectory,
+      sdkDirectory,
+      language,
+      publishType,
+      force,
+      dryRun,
+      profileId,
+      version,
+      onPublishSdkError
+    );
   };
 }

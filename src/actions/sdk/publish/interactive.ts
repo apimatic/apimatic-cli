@@ -11,22 +11,19 @@ import { PackageSettingsContext } from '../../../types/package-settings-context.
 import { getPackageConfigurationForLanguage, getPublishTypeForLanguage } from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { GenerateAction } from '../generate.js';
-import { TelemetryService } from '../../../infrastructure/services/telemetry-service.js';
-import { SdkPublishValidationFailedEvent } from '../../../types/events/sdk-publish-validation-failed.js';
-import SdkPublish from '../../../commands/sdk/publish.js';
 
 export class SdkPublishInteractiveAction {
   private readonly prompts: SdkPublishInteractivePrompts = new SdkPublishInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly fileService = new FileService();
-  private readonly telemetryService = new TelemetryService(this.configDir);
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
     buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
-    force: boolean
+    force: boolean,
+    onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
       this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
@@ -109,14 +106,7 @@ export class SdkPublishInteractiveAction {
 
       if (publishSdkResponse.isErr()) {
         this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
-
-        await this.telemetryService.trackEvent(
-          new SdkPublishValidationFailedEvent(publishSdkResponse.error.errorMessage, SdkPublish.id, {
-            interactive: true
-          }),
-          this.commandMetadata.shell
-        );
-
+        onPublishSdkError?.(publishSdkResponse.error.errorMessage);
         return ActionResult.failed();
       }
 
