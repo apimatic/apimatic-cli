@@ -12,6 +12,10 @@ export class SdkPublishNonInteractivePrompts {
     log.error(message);
   }
 
+  public invalidVersion(version: string): void {
+    log.error(`Invalid version provided '${version}'. Please provide a valid semantic version (e.g., 1.0.0).`);
+  }
+
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
     return withSpinner(
       'Fetching publishing profiles',

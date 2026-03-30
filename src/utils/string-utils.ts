@@ -1,3 +1,8 @@
+export function isValidSemVer(value: string): boolean {
+  const parts = value.split('-')[0].split('.');
+  return parts.length === 3 && parts.every((p) => p !== '' && !isNaN(Number(p)) && Number(p) >= 0);
+}
+
 export const removeQuotes = (input: string): string => {
   const quotes = ['"', "'"];
 

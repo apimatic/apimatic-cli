@@ -1,4 +1,5 @@
 import { isCancel, log, select, text } from '@clack/prompts';
+import { isValidSemVer } from '../../../utils/string-utils.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
 import { noteWrapped } from '../../prompt.js';
@@ -101,9 +102,7 @@ export class SdkPublishInteractivePrompts {
       message: 'Enter the version for the SDK you want to publish (e.g. 1.0.0):',
       validate: (value) => {
         if (!value) return 'Version is required.';
-        const parts = value.split('-')[0].split('.');
-        const isValid = parts.length === 3 && parts.every((p) => p !== '' && !isNaN(Number(p)) && Number(p) >= 0);
-        if (!isValid) return 'Please enter a valid semantic version (e.g., 1.0.0).';
+        if (!isValidSemVer(value)) return 'Please enter a valid semantic version (e.g., 1.0.0).';
       }
     });
 

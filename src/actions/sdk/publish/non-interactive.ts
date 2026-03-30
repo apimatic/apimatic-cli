@@ -20,6 +20,7 @@ import { GenerateAction } from '../generate.js';
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
+import { isValidSemVer } from '../../../utils/string-utils.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
@@ -45,6 +46,11 @@ export class SdkPublishNonInteractiveAction {
     if (!version) missing.push('--version');
     if (missing.length > 0) {
       this.prompts.missingRequiredFlags(missing);
+      return ActionResult.failed();
+    }
+
+    if (version && !isValidSemVer(version)) {
+      this.prompts.invalidVersion(version);
       return ActionResult.failed();
     }
 
