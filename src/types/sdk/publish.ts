@@ -3,13 +3,14 @@ import { Language } from './generate.js';
 
 export enum PublishType {
   PackagePublishing = 'package',
-  SourceCodePublishing = 'sourcecode'
+  SourceCodePublishing = 'sourcecode',
+  Both = 'both'
 }
 
-export function getPublishTypeForLanguage({ packageConfig, gitConfig }: LanguagePublishingConfig): PublishType | undefined {
+export function getPublishTypeForLanguage({ packageConfig, gitConfig }: LanguagePublishingConfig): PublishType {
   const packageEnabled = packageConfig?.isEnabled === true;
   const gitEnabled = gitConfig?.isEnabled === true;
-  if (packageEnabled && gitEnabled) return undefined;
+  if (packageEnabled && gitEnabled) return PublishType.Both;
   return packageEnabled ? PublishType.PackagePublishing : PublishType.SourceCodePublishing;
 }
 

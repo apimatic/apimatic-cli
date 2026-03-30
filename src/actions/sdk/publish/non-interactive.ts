@@ -44,6 +44,7 @@ export class SdkPublishNonInteractiveAction {
     if (!profileId) missing.push('--profile');
     if (!language) missing.push('--language');
     if (!version) missing.push('--version');
+    if (!publishType) missing.push('--publish-type');
     if (missing.length > 0) {
       this.prompts.missingRequiredFlags(missing);
       return ActionResult.failed();
@@ -86,18 +87,18 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    if (languageConfig.packageConfig === null && (!publishType || publishType === PublishType.PackagePublishing)) {
+    if (languageConfig.packageConfig === null && (publishType === PublishType.PackagePublishing || publishType === PublishType.Both)) {
       this.prompts.packageConfigurationNotFoundForLanguage(language);
       return ActionResult.failed();
     }
 
-    if (languageConfig.gitConfig === null && (!publishType || publishType === PublishType.SourceCodePublishing)) {
+    if (languageConfig.gitConfig === null && (publishType === PublishType.SourceCodePublishing || publishType === PublishType.Both)) {
       this.prompts.gitConfigurationNotFoundForLanguage(language);
       return ActionResult.failed();
     }
 
     const allowedPublishType = getPublishTypeForLanguage(languageConfig);
-    if (publishType && allowedPublishType !== undefined && publishType !== allowedPublishType) {
+    if (allowedPublishType !== PublishType.Both && publishType !== allowedPublishType) {
       this.prompts.publishTypeNotAllowedForLanguage(publishType, language);
       return ActionResult.failed();
     }

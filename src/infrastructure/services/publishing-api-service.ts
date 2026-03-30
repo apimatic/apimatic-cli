@@ -44,7 +44,7 @@ export class PublishingApiService {
     profileId: string,
     language: Language,
     languageVersion: string,
-    publishType: PublishType | undefined,
+    publishType: PublishType,
     configDir: DirectoryPath,
     shell: string
   ): Promise<Result<PublishingInfo, ServiceError>> {
@@ -60,7 +60,7 @@ export class PublishingApiService {
       formData.append('file', sdkFileStream);
       formData.append('languageVersion', languageVersion);
 
-      if (publishType) {
+      if (publishType !== PublishType.Both) {
         formData.append('publishType', publishType);
       }
 

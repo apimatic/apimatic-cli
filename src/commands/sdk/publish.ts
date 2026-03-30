@@ -39,7 +39,8 @@ export default class SdkPublish extends Command {
     ...FlagsProvider.force,
     ...FlagsProvider.input,
     'publish-type': Flags.string({
-      description: "Publish to a package registry ('package'), a git repository ('sourcecode'), or both if omitted.",
+      description:
+        "Publishing target: 'package' for a package registry, 'sourcecode' for a git repository, or 'both' for both publishing options.",
       options: Object.values(PublishType).map((t) => t.valueOf())
     }),
     'dry-run': Flags.boolean({
@@ -104,7 +105,7 @@ export default class SdkPublish extends Command {
               version,
               language,
               ...(force && { force }),
-              ...(publishType && { 'publish-type': publishType })
+              'publish-type': publishType
             }),
             commandMetadata.shell
           );
