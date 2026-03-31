@@ -8,12 +8,18 @@ import { Language } from "./sdk/generate.js";
 export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
+  private readonly skipChanges: boolean;
+  private readonly hasSdkSourceTree: boolean;
 
   constructor(
     private readonly sdkDirectory: DirectoryPath,
     private readonly language: Language,
-    private readonly version?: string
+    private readonly version?: string,
+    skipChanges = false,
+    hasSdkSourceTree: boolean = false
   ) {
+    this.skipChanges = skipChanges;
+    this.hasSdkSourceTree = hasSdkSourceTree;
   }
 
   private get zipPath(): FilePath {
@@ -21,11 +27,15 @@ export class SdkContext {
   }
   
   public get sdkLanguageDirectory(): DirectoryPath {
+    const baseDirectory = this.skipChanges && this.hasSdkSourceTree
+      ? this.sdkDirectory.join("uncustomized")
+      : this.sdkDirectory;
+
     if (this.version) {
-      return this.sdkDirectory.join(this.version).join(this.language);
+      return baseDirectory.join(this.version).join(this.language);
     }
 
-    return this.sdkDirectory.join(this.language);
+    return baseDirectory.join(this.language);
   }
 
   public async exists() {
