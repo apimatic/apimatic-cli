@@ -6,7 +6,6 @@ import { PublishType } from '../../types/sdk/publish.js';
 import { SdkPublishInteractiveAction } from './publish/interactive.js';
 import { SdkPublishNonInteractiveAction } from './publish/non-interactive.js';
 import { BuildContext } from '../../types/build-context.js';
-import { SdkContext } from '../../types/sdk-context.js';
 import { SdkPublishPrompts } from '../../prompts/sdk/publish.js';
 
 export class PublishAction {
@@ -35,12 +34,6 @@ export class PublishAction {
     if (!(await buildContext.validate())) {
       this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
-    }
-
-    const sdkContext = new SdkContext(sdkDirectory, language);
-    if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkDirectory))) {
-      this.prompts.sdkDirectoryNotEmpty();
-      return ActionResult.cancelled();
     }
 
     if (interactive) {
