@@ -92,6 +92,9 @@ export class SdkPublishInteractiveAction {
       if (sdkGenerationResult.isFailed()) {
         return ActionResult.failed();
       }
+      if (sdkGenerationResult.isCancelled()) {
+        return ActionResult.cancelled();
+      }
 
       const sdkLanguageDirectory = sdkDirectory.join(language);
       const sdkFilePath = new FilePath(sdkLanguageDirectory, new FileName(`${language}.zip`));
