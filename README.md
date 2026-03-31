@@ -496,13 +496,11 @@ DESCRIPTION
 EXAMPLES
   apimatic sdk publish --interactive
 
-  apimatic sdk publish --profile=prof-123 --language=typescript --version=1.0.0
+  apimatic sdk publish --profile=prof-123 --language=typescript --version=1.0.0 --publish-type=both
 
-  apimatic sdk publish --profile=prof-123 --language=java --version=2.0.0   
-    --publish-type=sourcecode
+  apimatic sdk publish --profile=prof-123 --language=java --version=2.0.0 --publish-type=sourcecode
 
-  apimatic sdk publish --profile=prof-123 --language=python --version=1.0.0 
-    --dry-run
+  apimatic sdk publish --profile=prof-123 --language=python --version=1.0.0 --publish-type=package --dry-run
 ```
 
 _See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_

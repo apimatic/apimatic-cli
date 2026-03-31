@@ -55,17 +55,15 @@ export default class SdkPublish extends Command {
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'typescript')} ${format.flag(
       'version',
       '1.0.0'
-    )}`,
+    )} ${format.flag('publish-type', PublishType.Both)}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'java')} ${format.flag(
       'version',
       '2.0.0'
-    )}   
-  ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
+    )} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'python')} ${format.flag(
       'version',
       '1.0.0'
-    )} 
-  ${format.flag('dry-run')}`
+    )} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag('dry-run')}`
   ];
 
   async run() {
