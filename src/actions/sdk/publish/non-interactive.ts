@@ -103,6 +103,10 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
+    if (publishType === PublishType.SourceCodePublishing) {
+      this.prompts.sourceCodeOnlyPublishingNotice();
+    }
+
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
 

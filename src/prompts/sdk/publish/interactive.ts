@@ -102,7 +102,7 @@ export class SdkPublishInteractivePrompts {
       message: 'Enter the version for the SDK you want to publish (e.g. 1.0.0):',
       validate: (value) => {
         if (!value) return 'Version is required.';
-        if (!isValidSemVer(value)) return 'Please enter a valid semantic version (e.g., 1.0.0).';
+        if (!isValidSemVer(value)) return 'Please enter a valid version in the format major.minor.patch (e.g., 1.0.0).';
       }
     });
 
@@ -115,6 +115,10 @@ export class SdkPublishInteractivePrompts {
 
   public noVersionSpecified() {
     log.error('No version was specified for publishing the SDK.');
+  }
+
+  public sourceCodeOnlyPublishingNotice() {
+    log.info('Version tags will not be created in your Git repository because you have opted to publish Source Code only.');
   }
 
   public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {

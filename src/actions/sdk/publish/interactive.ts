@@ -8,7 +8,7 @@ import { FileName } from '../../../types/file/fileName.js';
 import { FilePath } from '../../../types/file/filePath.js';
 import { getLanguageConfigs, hasEnabledLanguage } from '../../../types/publish-api/publishing-profile.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
-import { getPackageConfigurationForLanguage, getPublishTypeForLanguage } from '../../../types/sdk/publish.js';
+import { getPackageConfigurationForLanguage, getPublishTypeForLanguage, PublishType } from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { GenerateAction } from '../generate.js';
 
@@ -64,6 +64,10 @@ export class SdkPublishInteractiveAction {
 
     const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
     const publishType = getPublishTypeForLanguage(languageConfig);
+
+    if (publishType === PublishType.SourceCodePublishing) {
+      this.prompts.sourceCodeOnlyPublishingNotice();
+    }
 
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);

@@ -13,7 +13,7 @@ export class SdkPublishNonInteractivePrompts {
   }
 
   public invalidVersion(version: string): void {
-    log.error(`Invalid version provided '${version}'. Please provide a valid semantic version (e.g., 1.0.0).`);
+    log.error(`Invalid version '${version}'. Please provide a valid version in the format major.minor.patch (e.g., 1.0.0).`);
   }
 
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
@@ -67,6 +67,10 @@ export class SdkPublishNonInteractivePrompts {
     log.error(
       `Publish type '${publishType}' is not enabled for '${language}' in the selected publishing profile. Please check your profile configuration and try again.`
     );
+  }
+
+  public sourceCodeOnlyPublishingNotice() {
+    log.info('Version tags will not be created in your Git repository because you have opted to publish Source Code only.');
   }
 
   public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
