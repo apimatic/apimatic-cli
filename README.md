@@ -469,7 +469,7 @@ Generate and publish an SDK to a package registry or source repository
 ```
 USAGE
   $ apimatic sdk publish [-i] [-p <value>] [-v <value>] [-d <value>] [-l
-    csharp|java|php|python|ruby|typescript|go] [-f] [-i <value>] [--publish-type package|sourcecode] [--dry-run]
+    csharp|java|php|python|ruby|typescript|go] [-f] [-i <value>] [--publish-type package|sourcecode|both] [--dry-run]
 
 FLAGS
   -d, --destination=<value>    [default: <input>/sdk] path where the sdk will be generated.
@@ -483,9 +483,9 @@ FLAGS
   -v, --version=<value>        Semantic version of the SDK to be generated and published.
       --dry-run                Generate the SDK without publishing. Useful for reviewing generated SDK before
                                publishing. Not applicable to interactive mode.
-      --publish-type=<option>  Publish to a package registry ('package'), a git repository ('sourcecode'), or both if
-                               omitted.
-                               <options: package|sourcecode>
+      --publish-type=<option>  Publishing target: 'package' for a package registry, 'sourcecode' for a git repository,
+                               or 'both' for both publishing options.
+                               <options: package|sourcecode|both>
 
 DESCRIPTION
   Generate and publish an SDK to a package registry or source repository
