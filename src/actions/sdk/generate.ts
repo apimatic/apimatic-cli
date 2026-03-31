@@ -81,7 +81,8 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    if (skipChanges && await effectiveBuildContext.hasSdkSourceTree(language)) {
+    const sdkSourceTreePath = await effectiveBuildContext.getSdkSourceTreePath(language);
+    if (skipChanges && sdkSourceTreePath) {
       sdkDirectory = sdkDirectory.join("uncustomized");
     }
 

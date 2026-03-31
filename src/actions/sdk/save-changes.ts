@@ -77,11 +77,11 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    if (!(await effectiveBuildContext.hasSdkSourceTree(language))) {
+    const sourceTreePath = await effectiveBuildContext.getSdkSourceTreePath(language);
+    if (!sourceTreePath) {
       this.prompts.sdkSourceTreeNotFound(language, workingDirectory);
       return ActionResult.failed();
     }
-    const sourceTreePath = effectiveBuildContext.getSdkSourceTreePath(language);
 
     return withDirPath(async (tempDirectory) => {
       // Restore source tree from archive into a temporary git repo

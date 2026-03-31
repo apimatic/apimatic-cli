@@ -45,16 +45,13 @@ export class BuildContext {
     return this.buildDirectory.join("spec");
   }
 
-  public getSdkSourceTreePath(language: string): FilePath {
-    return new FilePath(this.buildDirectory.join("sdk-source-tree"), new FileName(`.${language}`));
-  }
-
-  public async hasSdkSourceTree(language: string): Promise<boolean> {
-    const sourceTreePath = this.getSdkSourceTreePath(language);
+  public async getSdkSourceTreePath(language: string): Promise<FilePath | false> {
+    const sourceTreePath = FilePath.create(this.buildDirectory.join("sdk-source-tree", `.${language}`).toString());
     if (!sourceTreePath) {
       return false;
     }
-    return await this.fileService.fileExists(sourceTreePath);
+    const exists = await this.fileService.fileExists(sourceTreePath);
+    return exists ? sourceTreePath : false;
   }
 }
 
