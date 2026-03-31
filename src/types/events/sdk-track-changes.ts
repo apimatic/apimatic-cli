@@ -6,10 +6,6 @@ export class SdkTrackChangesEvent extends DomainEvent {
   private static readonly commandName = "sdk:generate" as const;
 
   constructor(flags: Record<string, unknown>) {
-    super(SdkTrackChangesEvent.message, SdkTrackChangesEvent.commandName, SdkTrackChangesEvent.flattenFlags(flags));
-  }
-
-  private static flattenFlags(flags: Record<string, unknown>): Record<string, unknown> {
-    return Object.fromEntries(Object.entries(flags).map(([key, value]) => [`${key}=${value}`, true]));
+    super(SdkTrackChangesEvent.message, SdkTrackChangesEvent.commandName, flags);
   }
 }

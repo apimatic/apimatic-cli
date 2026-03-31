@@ -66,9 +66,9 @@ export class SaveChangesAction {
       }
     }
 
-    const specContext = SpecContext.fromBuildDirectory(effectiveBuildDirectory);
+    const specContext = new SpecContext(effectiveBuildDirectory.join("spec"));
     if (!(await specContext.validate())) {
-      this.prompts.specDirectoryEmpty(specContext.getSpecDirectory());
+      this.prompts.specDirectoryEmpty(effectiveBuildContext.getSpecDirectory());
       return ActionResult.failed();
     }
 
@@ -77,11 +77,11 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    const sourceTreePath = effectiveBuildContext.getSdkSourceTreePath(language);
-    if (!sourceTreePath || !(await effectiveBuildContext.hasSdkSourceTree(language))) {
+    if (!(await effectiveBuildContext.hasSdkSourceTree(language))) {
       this.prompts.sdkSourceTreeNotFound(language, workingDirectory);
       return ActionResult.failed();
     }
+    const sourceTreePath = effectiveBuildContext.getSdkSourceTreePath(language);
 
     return withDirPath(async (tempDirectory) => {
       // Restore source tree from archive into a temporary git repo

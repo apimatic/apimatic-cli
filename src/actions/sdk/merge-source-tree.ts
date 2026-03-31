@@ -3,7 +3,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { FileService } from "../../infrastructure/file-service.js";
 import { GitService } from "../../infrastructure/git-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { ResolveConflictsPrompts } from "../../prompts/sdk/merge-source-tree.js";
+import { MergeSourceTreePrompts } from "../../prompts/sdk/merge-source-tree.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
@@ -16,7 +16,7 @@ export type MergeResult =
   | { status: "cancelled" };
 
 export class MergeSourceTreeAction {
-  private readonly prompts = new ResolveConflictsPrompts();
+  private readonly prompts = new MergeSourceTreePrompts();
   private readonly fileService = new FileService();
   private readonly gitService = new GitService();
   private readonly launcherService = new LauncherService();
@@ -96,7 +96,10 @@ export class MergeSourceTreeAction {
     this.prompts.conflictsResolved(language);
 
     const telemetryService = new TelemetryService(configDir);
-    await telemetryService.trackEvent(new SdkConflictsResolvedEvent(flags), commandMetadata.shell);
+    await telemetryService.trackEvent(
+      new SdkConflictsResolvedEvent(Object.fromEntries(Object.entries(flags).map(([key, value]) => [`${key}=${value}`, true]))),
+      commandMetadata.shell
+    );
     await this.gitService.commitResolvedConflicts(sdkDirStr);
     const changesTracked = await this.gitService.saveSdkSourceTree(sdkDir, language, buildDirectory, trackChanges);
     return { status: "success", changesTracked };

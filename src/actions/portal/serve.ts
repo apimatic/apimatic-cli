@@ -28,7 +28,6 @@ export class PortalServeAction {
   }
 
   public async execute(
-    workingDirectory: DirectoryPath,
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
     port: number,
@@ -37,7 +36,7 @@ export class PortalServeAction {
     onAfterServe?: () => void
   ): Promise<ActionResult> {
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    const result = await generatePortalAction.execute(workingDirectory, buildDirectory, portalDirectory, true, false);
+    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
     if (result.isFailed()) {
       return ActionResult.failed();
     }
@@ -103,7 +102,7 @@ export class PortalServeAction {
 
         await debounceService.batchSingleRequest(async () => {
           this.prompts.changesDetected();
-          await generatePortalAction.execute(workingDirectory, buildDirectory, portalDirectory, true, false, false);
+          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false, false);
           liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();
         });

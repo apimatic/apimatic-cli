@@ -43,7 +43,7 @@ export class PortalQuickstartAction {
     this.validationService = new ValidationService(this.configDir);
   }
 
-  public readonly execute = async (workingDirectory: DirectoryPath): Promise<ActionResult> => {
+  public readonly execute = async (): Promise<ActionResult> => {
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (!storedAuth?.authKey) {
       const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
@@ -188,7 +188,7 @@ export class PortalQuickstartAction {
 
       const portalDirectory = inputDirectory.join('portal');
       const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
-      const result = await portalServeAction.execute(workingDirectory, sourceDirectory, portalDirectory, defaultPort, true, false, () => {
+      const result = await portalServeAction.execute(sourceDirectory, portalDirectory, defaultPort, true, false, () => {
         this.prompts.nextSteps();
       });
 

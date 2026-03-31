@@ -6,10 +6,6 @@ export class SdkConflictsResolvedEvent extends DomainEvent {
   private static readonly commandName = "sdk:generate" as const;
 
   constructor(flags: Record<string, unknown>) {
-    super(SdkConflictsResolvedEvent.message, SdkConflictsResolvedEvent.commandName, SdkConflictsResolvedEvent.flattenFlags(flags));
-  }
-
-  private static flattenFlags(flags: Record<string, unknown>): Record<string, unknown> {
-    return Object.fromEntries(Object.entries(flags).map(([key, value]) => [`${key}=${value}`, true]));
+    super(SdkConflictsResolvedEvent.message, SdkConflictsResolvedEvent.commandName, flags);
   }
 }

@@ -13,14 +13,6 @@ export class SpecContext {
     this.specDirectory = specDirectory;
   }
 
-  public static fromBuildDirectory(buildDirectory: DirectoryPath): SpecContext {
-    return new SpecContext(buildDirectory.join("spec"));
-  }
-
-  public getSpecDirectory(): DirectoryPath {
-    return this.specDirectory;
-  }
-
   public async validate(): Promise<boolean> {
     return !(await this.fileService.directoryEmpty(this.specDirectory));
   }

@@ -75,9 +75,9 @@ export class GenerateAction {
       effectiveBuildContext = new BuildContext(effectiveBuildDirectory);
     }
 
-    const specContext = SpecContext.fromBuildDirectory(effectiveBuildDirectory);
+    const specContext = new SpecContext(effectiveBuildDirectory.join("spec"));
     if (!(await specContext.validate())) {
-      this.prompts.specDirectoryEmpty(specContext.getSpecDirectory());
+      this.prompts.specDirectoryEmpty(effectiveBuildContext.getSpecDirectory());
       return ActionResult.failed();
     }
 
@@ -143,7 +143,10 @@ export class GenerateAction {
 
       if (trackChanges) {
         const trackChangesTelemetry = new TelemetryService(this.configDir);
-        await trackChangesTelemetry.trackEvent(new SdkTrackChangesEvent(flags), this.commandMetadata.shell);
+        await trackChangesTelemetry.trackEvent(
+          new SdkTrackChangesEvent(Object.fromEntries(Object.entries(flags).map(([key, value]) => [`${key}=${value}`, true]))),
+          this.commandMetadata.shell
+        );
       }
 
       return ActionResult.success();

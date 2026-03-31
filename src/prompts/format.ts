@@ -95,6 +95,11 @@ export interface TreeNode extends LeafNode {
   items: Array<TreeNode | LeafNode>;
 }
 
+export interface PathTreeEntry {
+  path: string;
+  description?: string;
+}
+
 
 export function getTree(
   dir: TreeNode,
@@ -124,6 +129,40 @@ export function getTree(
   });
 
   return output;
+}
+
+export function buildFilePathTree(rootName: string, entries: PathTreeEntry[]): string {
+  const root: TreeNode = { name: rootName, items: [] };
+
+  for (const entry of entries) {
+    const parts = entry.path.split(/[\\/]/);
+    let currentLevel = root.items;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLastPart = i === parts.length - 1;
+
+      if (isLastPart) {
+        currentLevel.push({
+          name: part,
+          description: entry.description
+        });
+      } else {
+        let existingDir = currentLevel.find(
+          (item: TreeNode | LeafNode) => "items" in item && item.name === part
+        ) as TreeNode | undefined;
+
+        if (!existingDir) {
+          existingDir = { name: part, items: [] };
+          currentLevel.push(existingDir);
+        }
+
+        currentLevel = existingDir.items;
+      }
+    }
+  }
+
+  return getTree(root);
 }
 
 

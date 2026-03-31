@@ -10,13 +10,13 @@ export class QuickstartAction {
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
-  public readonly execute = async (workingDirectory: DirectoryPath): Promise<ActionResult> => {
+  public readonly execute = async (): Promise<ActionResult> => {
     this.prompts.welcomeMessage();
     const selectedFlow = await this.prompts.selectQuickstartFlow();
     switch (selectedFlow) {
       case "portal": {
         const action = new PortalQuickstartAction(this.configDir, this.commandMetadata);
-        return await action.execute(workingDirectory);
+        return await action.execute();
       }
       case "sdk": {
         const action = new SdkQuickstartAction(this.configDir, this.commandMetadata);

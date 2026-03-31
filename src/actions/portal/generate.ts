@@ -25,7 +25,6 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    workingDirectory: DirectoryPath,
     buildDirectory: DirectoryPath,
     portalDirectory: DirectoryPath,
     force: boolean,
@@ -61,7 +60,7 @@ export class GenerateAction {
         const error = response.error;
         if (error instanceof ServiceError) {
           if (error.code === ServiceErrorCode.SdkMergeError) {
-            this.prompts.portalGenerationSdkMergeError(error, workingDirectory);
+            this.prompts.portalGenerationSdkMergeError(error);
           } else {
             this.prompts.portalGenerationServiceError(error);
           }

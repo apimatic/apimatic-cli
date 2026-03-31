@@ -41,8 +41,12 @@ export class BuildContext {
     await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
   }
 
-  public getSdkSourceTreePath(language: string): FilePath | undefined {
-    return FilePath.create(this.buildDirectory.join("sdk-source-tree", `.${language}`).toString());
+  public getSpecDirectory(): DirectoryPath {
+    return this.buildDirectory.join("spec");
+  }
+
+  public getSdkSourceTreePath(language: string): FilePath {
+    return new FilePath(this.buildDirectory.join("sdk-source-tree"), new FileName(`.${language}`));
   }
 
   public async hasSdkSourceTree(language: string): Promise<boolean> {

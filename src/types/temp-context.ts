@@ -27,8 +27,4 @@ export class TempContext {
     await this.fileService.writeFile(tempFile, portalStream);
     return tempFile;
   }
-
-  public getTempDirectory(): DirectoryPath {
-    return this.tempDirectory;
-  }
 }

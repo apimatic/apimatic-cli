@@ -6,10 +6,6 @@ export class SdkSaveChangesEvent extends DomainEvent {
   private static readonly commandName = "sdk:save-changes" as const;
 
   constructor(flags: Record<string, unknown>) {
-    super(SdkSaveChangesEvent.message, SdkSaveChangesEvent.commandName, SdkSaveChangesEvent.flattenFlags(flags));
-  }
-
-  private static flattenFlags(flags: Record<string, unknown>): Record<string, unknown> {
-    return Object.fromEntries(Object.entries(flags).map(([key, value]) => [`${key}=${value}`, true]));
+    super(SdkSaveChangesEvent.message, SdkSaveChangesEvent.commandName, flags);
   }
 }

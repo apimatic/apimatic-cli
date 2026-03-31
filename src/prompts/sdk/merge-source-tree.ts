@@ -1,11 +1,14 @@
 import { isCancel, log, text } from "@clack/prompts";
-import { format as f, getTree, LeafNode, TreeNode } from "../format.js";
+import { buildFilePathTree, format as f } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
-export class ResolveConflictsPrompts {
+export class MergeSourceTreePrompts {
   public displayFileTree(sdkName: string, conflictedFiles: string[], missingFiles: string[]) {
     log.message(`Conflicts found in ${f.var(sdkName)} SDK:`);
-    const tree = this.buildFileTree(sdkName, conflictedFiles, missingFiles);
+    const tree = buildFilePathTree(sdkName, [
+      ...conflictedFiles.map((path) => ({ path, description: "# Conflicted file" })),
+      ...missingFiles.map((path) => ({ path, description: "# Missing file" }))
+    ]);
     log.message(tree);
   }
 
@@ -39,41 +42,5 @@ export class ResolveConflictsPrompts {
 
   public conflictsResolved(sdkName: string) {
     log.info(`All conflicts resolved for ${f.var(sdkName)} SDK.`);
-  }
-
-  private buildFileTree(sdkName: string, conflictedFiles: string[], missingFiles: string[]): string {
-    const root: TreeNode = { name: sdkName, items: [] };
-
-    const addFileToTree = (filePath: string, type: "conflicted" | "missing") => {
-      const parts = filePath.split(/[\\/]/);
-      let currentLevel = root.items;
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        const isLastPart = i === parts.length - 1;
-
-        if (isLastPart) {
-          currentLevel.push({
-            name: part,
-            description: type === "conflicted" ? "# Conflicted file" : "# Missing file"
-          });
-        } else {
-          let existingDir = currentLevel.find(
-            (item: TreeNode | LeafNode) => "items" in item && item.name === part
-          ) as TreeNode | undefined;
-
-          if (!existingDir) {
-            existingDir = { name: part, items: [] };
-            currentLevel.push(existingDir);
-          }
-          currentLevel = existingDir.items;
-        }
-      }
-    };
-
-    conflictedFiles.forEach((file) => addFileToTree(file, "conflicted"));
-    missingFiles.forEach((file) => addFileToTree(file, "missing"));
-
-    return getTree(root);
   }
 }
