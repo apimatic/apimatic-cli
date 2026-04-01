@@ -159,7 +159,6 @@
         "*.{js,ts}": "prettier --write"
     },
     "overrides": {
-        "serialize-javascript": "^7.0.5",
         "diff": "^8.0.4",
         "inflight": "npm:lru-cache@^7.14.1",
         "lodash.get": "npm:lodash@^4.17.21",
