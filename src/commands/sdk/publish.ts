@@ -19,7 +19,7 @@ export default class SdkPublish extends Command {
   static flags = {
     'profile-id': Flags.string({
       char: 'p',
-      description: 'ID of the publishing profile to use.'
+      description: 'Id of the publishing profile to use.'
     }),
     version: Flags.string({
       char: 'v',
@@ -29,7 +29,7 @@ export default class SdkPublish extends Command {
     language: Flags.string({
       char: 'l',
       description: 'Language to generate and publish the SDK for.',
-      options: Object.values(Language).map((l) => l.valueOf())
+      options: Object.values(Language).filter((l) => l !== Language.GO).map((l) => l.valueOf())
     }),
     ...FlagsProvider.force,
     ...FlagsProvider.input,
