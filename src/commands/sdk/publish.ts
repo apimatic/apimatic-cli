@@ -17,11 +17,6 @@ export default class SdkPublish extends Command {
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
   static flags = {
-    interactive: Flags.boolean({
-      char: 'i',
-      default: false,
-      description: 'Launch interactive mode for a guided SDK publishing experience.'
-    }),
     profile: Flags.string({
       char: 'p',
       description: 'ID of the publishing profile to use.'
@@ -51,7 +46,7 @@ export default class SdkPublish extends Command {
   };
 
   static examples = [
-    `${SdkPublish.cmdTxt} ${format.flag('interactive')}`,
+    `${SdkPublish.cmdTxt}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'typescript')} ${format.flag(
       'version',
       '1.0.0'
@@ -69,7 +64,6 @@ export default class SdkPublish extends Command {
   async run() {
     const {
       flags: {
-        interactive,
         profile,
         version,
         destination,
@@ -80,6 +74,8 @@ export default class SdkPublish extends Command {
         'dry-run': dryRun
       }
     } = await this.parse(SdkPublish);
+
+    const interactive = !profile && !language && !version && !publishType;
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
