@@ -61,15 +61,23 @@ export class FileService {
   }
 
   public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
-  try {
-    const entries = await fsExtra.readdir(dir.toString(), { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => dir.join(entry.name));
-  } catch {
-    return [];
+    try {
+      const entries = await fsExtra.readdir(dir.toString());
+      const directories: DirectoryPath[] = [];
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir.toString(), entry);
+        const stat = await fsExtra.stat(fullPath);
+        if (stat.isDirectory()) {
+          directories.push(new DirectoryPath(fullPath));
+        }
+      }
+
+      return directories;
+    } catch {
+      return [];
+    }
   }
-}
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
     const entries = await fsExtra.readdir(source.toString());
@@ -89,19 +97,22 @@ export class FileService {
   ): Promise<void> {
     await this.createDirectoryIfNotExists(destination);
 
-    const entries = await fsExtra.readdir(source.toString(), { withFileTypes: true });
+    const entries = await fsExtra.readdir(source.toString());
     const excludeSet = new Set(excludeNames);
 
     await Promise.all(
       entries
-        .filter((entry) => !excludeSet.has(entry.name))
-        .map((entry) => {
-          const sourcePath = path.join(source.toString(), entry.name);
-          const destPath = path.join(destination.toString(), entry.name);
+        .filter((entry) => !excludeSet.has(entry))
+        .map(async (entry) => {
+          const sourcePath = path.join(source.toString(), entry);
+          const destPath = path.join(destination.toString(), entry);
+          const stat = await fsExtra.stat(sourcePath);
 
-          return entry.isDirectory()
-            ? this.copyDirectoryExcluding(new DirectoryPath(sourcePath), new DirectoryPath(destPath), excludeNames)
-            : fsExtra.copyFile(sourcePath, destPath);
+          if (stat.isDirectory()) {
+            return this.copyDirectoryExcluding(new DirectoryPath(sourcePath), new DirectoryPath(destPath), excludeNames);
+          }
+
+          return fsExtra.copyFile(sourcePath, destPath);
         })
     );
   }
@@ -201,14 +212,6 @@ export class FileService {
     }
   }
 
-  public async unzipFile(zipFilePath: FilePath, destinationDir: DirectoryPath): Promise<void> {
-    await this.zipService.unArchive(zipFilePath, destinationDir);
-  }
-
-  public async zipDirectory(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
-    await this.zipService.archive(sourceDir, outputZipPath);
-  }
-
   public async isZipFile(filePath: FilePath): Promise<boolean> {
     try {
       const buffer = await fsExtra.readFile(filePath.toString());
@@ -222,6 +225,29 @@ export class FileService {
     } catch {
       return false;
     }
+  }
+
+  public async postfixFileName(filePath: FilePath, postfix: string): Promise<FilePath> {
+    const fullPath = filePath.toString();
+    const ext = path.extname(fullPath);
+    const base = path.basename(fullPath, ext);
+    const newPath = path.join(path.dirname(fullPath), `${base}${postfix}${ext}`);
+    await fsExtra.rename(fullPath, newPath);
+    return FilePath.create(newPath)!;
+  }
+
+  public async normalizeFileLineEndings(filePath: FilePath): Promise<void> {
+    const content = await this.readFile(filePath);
+    const normalizedContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    await this.writeContents(filePath, normalizedContent);
+  }
+
+  public async unzipFile(zipFilePath: FilePath, destinationDir: DirectoryPath): Promise<void> {
+    await this.zipService.unArchive(zipFilePath, destinationDir);
+  }
+
+  public async zipDirectory(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
+    await this.zipService.archive(sourceDir, outputZipPath);
   }
 }
 

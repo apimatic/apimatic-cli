@@ -2,32 +2,33 @@ import { log, text, isCancel, select } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { buildFilePathTree, format as f } from "../format.js";
 import { noteWrapped } from "../prompt.js";
+import { GitFileStatus } from "../../infrastructure/git-service.js";
 
 export class SaveChangesPrompts {
   public sameBuildAndSdkDir(directory: DirectoryPath) {
     const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
       directory
     )}`;
-    this.logGenerationError(message);
+    this.logSaveChangesError(message);
   }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logGenerationError(message);
+    this.logSaveChangesError(message);
   }
 
   public invalidSdkDirectory(directory: DirectoryPath) {
     const message = `SDK directory does not exist: ${f.path(directory)}`;
-    this.logGenerationError(message);
+    this.logSaveChangesError(message);
   }
 
   public versionedBuildEmpty(directory: DirectoryPath) {
     const message = `The ${f.var(directory.leafName())} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logGenerationError(message);
+    this.logSaveChangesError(message);
   }
 
   public versionNotFound() {
-    this.logGenerationError(`The API version is invalid.`);
+    this.logSaveChangesError(`The API version is invalid.`);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
@@ -43,12 +44,12 @@ export class SaveChangesPrompts {
     return version;
   }
 
-  public logGenerationError(error: string): void {
+  public logSaveChangesError(error: string): void {
     log.error(error);
   }
 
   public sdkSourceTreeNotFound(language: string, inputDirectory: DirectoryPath) {
-    this.logGenerationError(`No existing sdk source tree found for ${f.var(language)}.`);
+    this.logSaveChangesError(`No existing sdk source tree found for ${f.var(language)}.`);
     const inputDirectoryFlag = !inputDirectory.isEqual(DirectoryPath.default)
       ? `${f.flag("input", inputDirectory.toString())} `
       : "";
@@ -66,13 +67,13 @@ export class SaveChangesPrompts {
 
   public modifiedFilesDetected(
     language: string,
-    fileStatuses: Array<{ file: string; status: "modified" | "added" | "deleted" }>
+    fileStatuses: Array<GitFileStatus>
   ) {
     log.message(`Detected changes in ${fileStatuses.length} file(s):`);
     const tree = buildFilePathTree(
       language,
-      fileStatuses.map(({ file, status }) => ({
-        path: file,
+      fileStatuses.map(({ filePath, status }) => ({
+        path: filePath.toString(),
         description: status === "modified" ? "# Modified" : status === "added" ? "# Added" : "# Deleted"
       }))
     );

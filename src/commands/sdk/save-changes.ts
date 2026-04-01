@@ -38,30 +38,35 @@ export default class SaveChanges extends Command {
   ];
 
   async run() {
+    const {
+      flags: { sdk, language, input, "api-version": apiVersion }
+    } = await this.parse(SaveChanges);
+
     const telemetryService = new TelemetryService(this.getConfigDir());
     const commandMetadata: CommandMetadata = {
       commandName: SaveChanges.id,
       shell: this.config.shell
     };
-
-    const {
-      flags: { sdk, language, input, "api-version": apiVersion }
-    } = await this.parse(SaveChanges);
-
     const parsedFlags: Record<string, unknown> = { sdk, language, input, "api-version": apiVersion };
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = workingDirectory.join("src");
-    const updatedSdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk");
+    const sdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk");
     
     intro("Save Changes");
     const action = new SaveChangesAction();
-    const result = await action.execute(workingDirectory, buildDirectory, updatedSdkDirectory, language as Language, apiVersion, sdk !== undefined);
+    const result = await action.execute(
+      workingDirectory,
+      buildDirectory,
+      sdkDirectory,
+      language as Language,
+      apiVersion
+    );
     outro(result);
 
     await result.mapAll(
       async () => await telemetryService.trackEvent(
-        new SdkSaveChangesEvent(Object.fromEntries(Object.entries(parsedFlags).map(([key, value]) => [`${key}=${value}`, true]))),
+        new SdkSaveChangesEvent(parsedFlags),
         commandMetadata.shell
       ),
       () => new Promise(() => {}),

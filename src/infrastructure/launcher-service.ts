@@ -21,8 +21,8 @@ export class LauncherService {
 
   public async openDiffsInSourceControl(
     directoryPath: DirectoryPath,
-    diffPairs: Array<{ base: string; working: string }>,
-    standaloneFiles: string[] = []
+    diffPairs: Array<{ base: FilePath; working: FilePath }>,
+    standaloneFiles: FilePath[] = []
   ): Promise<boolean> {
     if (isInCi) return false;
     try {
@@ -48,8 +48,8 @@ export class LauncherService {
 
   private buildDiffCommands(
     directoryPath: DirectoryPath,
-    diffPairs: Array<{ base: string; working: string }>,
-    standaloneFiles: string[]
+    diffPairs: Array<{ base: FilePath; working: FilePath }>,
+    standaloneFiles: FilePath[]
   ): string[][] {
     const dir = directoryPath.toString();
     const commands: string[][] = [];
@@ -58,21 +58,21 @@ export class LauncherService {
     const [firstFile, ...remainingFiles] = standaloneFiles;
 
     if (firstDiff) {
-      commands.push(["--new-window", dir, "--diff", firstDiff.base, firstDiff.working]);
+      commands.push(["--new-window", dir, "--diff", firstDiff.base.toString(), firstDiff.working.toString()]);
     } else if (firstFile) {
-      commands.push(["--new-window", dir, firstFile]);
+      commands.push(["--new-window", dir, firstFile.toString()]);
     } else {
       commands.push(["--new-window", dir]);
       return commands;
     }
 
     for (const { base, working } of remainingDiffs) {
-      commands.push(["--reuse-window", "--diff", base, working]);
+      commands.push(["--reuse-window", "--diff", base.toString(), working.toString()]);
     }
 
     const filesToOpen = firstDiff ? standaloneFiles : remainingFiles;
     for (const file of filesToOpen) {
-      commands.push(["--reuse-window", file]);
+      commands.push(["--reuse-window", file.toString()]);
     }
 
     return commands;

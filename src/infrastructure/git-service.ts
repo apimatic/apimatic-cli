@@ -1,112 +1,85 @@
 import git from "isomorphic-git";
-import * as fsSync from "node:fs";
-import * as fsPromises from "node:fs/promises";
-import * as path from "node:path";
+import fs from "fs";
+import path from "path";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FilePath } from "../types/file/filePath.js";
-import { FileService } from "./file-service.js";
-import { ZipService } from "./zip-service.js";
 
-export type FileStatus = { file: string; status: "modified" | "added" | "deleted" };
+export type GitFileStatus = { filePath: FilePath; status: "modified" | "added" | "deleted" };
 
 const GIT_AUTHOR = { name: "APIMatic-bot", email: "developer@apimatic.io" } as const;
 const CUSTOM_BRANCH = "custom-code";
 const MAIN_BRANCH = "main";
 
 export class GitService {
-  private readonly fileService = new FileService();
-  private readonly zipService = new ZipService();
-
-  public async checkoutToCustomBranch(dir: string, force: boolean = false): Promise<void> {
-    const branches = await git.listBranches({ fs: fsSync, dir });
+  public async checkoutCustomBranch(dirPath: DirectoryPath): Promise<void> {
+    const dir = dirPath.toString();
+    const branches = await git.listBranches({ fs, dir });
 
     if (!branches.includes(CUSTOM_BRANCH)) {
-      await git.branch({ fs: fsSync, dir, ref: CUSTOM_BRANCH });
+      await git.branch({ fs, dir, ref: CUSTOM_BRANCH });
     }
 
-    await git.checkout({ fs: fsSync, dir, ref: CUSTOM_BRANCH, force });
+    await git.checkout({ fs, dir, ref: CUSTOM_BRANCH});
   }
 
-  public async checkoutToMain(dir: string, force: boolean = false): Promise<void> {
-    await git.checkout({ fs: fsSync, dir, ref: MAIN_BRANCH, force });
+  public async checkoutMainBranch(dirPath: DirectoryPath): Promise<void> {
+    await git.checkout({ fs, dir: dirPath.toString(), ref: MAIN_BRANCH });
   }
 
-  public async getModifiedFilesWithStatus(dir: string): Promise<FileStatus[]> {
-    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
+  public async forceCheckoutMainBranch(dirPath: DirectoryPath): Promise<void> {
+    this.cleanupMergeFiles(dirPath);
+    await git.checkout({ fs, dir: dirPath.toString(), ref: MAIN_BRANCH, force: true });
+  }
+
+  public async hardReset(dir: DirectoryPath): Promise<void> {
+    await git.checkout({ fs, dir: dir.toString(), force: true });
+  }
+
+  public async getGitFileStatuses(dirPath: DirectoryPath): Promise<GitFileStatus[]> {
+    const statusMatrix = await git.statusMatrix({ fs, dir: dirPath.toString() });
 
     return statusMatrix
       .filter(([, headStatus, workdirStatus]) => headStatus !== workdirStatus)
       .map(([filepath, headStatus, workdirStatus]) => {
-        let status: "modified" | "added" | "deleted";
+        const filePath = FilePath.create(filepath)!;
         if (headStatus === 0) {
-          status = "added";
-        } else if (workdirStatus === 0) {
-          status = "deleted";
-        } else {
-          status = "modified";
+          return { filePath, status: "added" };
         }
-        return { file: filepath, status };
+        if (workdirStatus === 0) {
+          return { filePath, status: "deleted" };
+        }
+        return { filePath, status: "modified" };
       });
   }
 
-  public async normalizeLineEndings(dir: string, files: string[]): Promise<void> {
-    await Promise.all(
-      files.map(async (filepath) => {
-        const fullPath = path.join(dir, filepath);
-        try {
-          const content = await fsPromises.readFile(fullPath, "utf8");
-          const normalized = content.replace(/\r\n/g, "\n");
-          await fsPromises.writeFile(fullPath, normalized, "utf8");
-        } catch {
-          // Skip binary files or files that can't be read as text
-        }
-      })
-    );
-  }
-
-  public async stageFiles(dir: string, files: string[]): Promise<void> {
-    await Promise.all(
-      files.map(async (filepath) => {
-        const fullPath = path.join(dir, filepath);
-        return fsSync.existsSync(fullPath)
-          ? git.add({ fs: fsSync, dir, filepath })
-          : git.remove({ fs: fsSync, dir, filepath });
-      })
-    );
-  }
-
-  public async stageAll(dir: string): Promise<void> {
-    const statusMatrix = await git.statusMatrix({ fs: fsSync, dir });
+  public async stageAll(dir: DirectoryPath): Promise<void> {
+    const statusMatrix = await git.statusMatrix({ fs, dir: dir.toString() });
     await Promise.all(
       statusMatrix
         .filter(([, , workdirStatus, stageStatus]) => workdirStatus !== stageStatus)
         .map(([filepath, , workdirStatus]) =>
           workdirStatus === 0
-            ? git.remove({ fs: fsSync, dir, filepath })
-            : git.add({ fs: fsSync, dir, filepath })
+            ? git.remove({ fs, dir: dir.toString(), filepath })
+            : git.add({ fs, dir: dir.toString(), filepath })
         )
     );
   }
 
-  public async commit(dir: string, message: string): Promise<void> {
-    await git.commit({ fs: fsSync, dir, message, author: GIT_AUTHOR });
+  public detectMergeConflicts(dir: DirectoryPath): boolean {
+    return fs.existsSync(path.join(dir.toString(), ".git", "MERGE_HEAD"));
   }
 
-  public detectMergeConflicts(dir: string): boolean {
-    return fsSync.existsSync(path.join(dir, ".git", "MERGE_HEAD"));
-  }
-
-  public async getConflictedFiles(dir: string): Promise<string[]> {
-    const matrix = await git.statusMatrix({ fs: fsSync, dir });
+  public async getConflictedFiles(dir: DirectoryPath): Promise<string[]> {
+    const matrix = await git.statusMatrix({ fs, dir: dir.toString() });
     const candidates = matrix
       .filter(([, , , stageStatus]) => stageStatus === 2 || stageStatus === 3)
       .map(([filepath]) => filepath);
 
     const conflicted: string[] = [];
     for (const filepath of candidates) {
-      const fullPath = path.join(dir, filepath);
-      if (fsSync.existsSync(fullPath)) {
-        const content = fsSync.readFileSync(fullPath, "utf-8");
+      const fullPath = path.join(dir.toString(), filepath);
+      if (fs.existsSync(fullPath)) {
+        const content = fs.readFileSync(fullPath, "utf-8");
         if (content.includes("<<<<<<< ")) {
           conflicted.push(filepath);
         }
@@ -115,66 +88,36 @@ export class GitService {
     return conflicted;
   }
 
-  public async abortMergeAndCheckoutMain(dir: string): Promise<void> {
-    this.cleanupMergeFiles(dir);
-    await git.checkout({ fs: fsSync, dir, ref: MAIN_BRANCH, force: true });
-    await this.syncBranchRefsToHead(dir);
+  public async abortMergeAndCheckoutMain(dir: DirectoryPath): Promise<void> {
+    await git.checkout({ fs, dir: dir.toString(), ref: MAIN_BRANCH, force: true });
   }
 
-  public async commitResolvedConflicts(dir: string): Promise<void> {
+  public async commitResolvedConflicts(dir: DirectoryPath): Promise<void> {
     await this.stageAll(dir);
-    await git.commit({ fs: fsSync, dir, message: "resolve conflicts", author: GIT_AUTHOR });
-    await this.syncBranchRefsToHead(dir);
+    await git.commit({ fs, dir: dir.toString(), message: "feat: resolve merge conflicts", author: GIT_AUTHOR });
+
+    const headOid = await git.resolveRef({ fs, dir: dir.toString(), ref: "HEAD" });
+    await git.writeRef({ fs, dir: dir.toString(), ref: `refs/heads/${MAIN_BRANCH}`, value: headOid, force: true });
+    await git.writeRef({ fs, dir: dir.toString(), ref: `refs/heads/${CUSTOM_BRANCH}`, value: headOid, force: true });
+
     this.cleanupMergeFiles(dir);
+
+    await git.checkout({ fs, dir: dir.toString(), ref: MAIN_BRANCH });
   }
 
-  public async syncBranchRefsToHead(dir: string): Promise<void> {
-    const headOid = await git.resolveRef({ fs: fsSync, dir, ref: "HEAD" });
-    await git.writeRef({ fs: fsSync, dir, ref: `refs/heads/${MAIN_BRANCH}`, value: headOid, force: true });
-    await git.writeRef({ fs: fsSync, dir, ref: `refs/heads/${CUSTOM_BRANCH}`, value: headOid, force: true });
+  public async commitReviewedChanges(dir: DirectoryPath): Promise<void> {
+    await this.stageAll(dir);
+    await git.commit({ fs, dir: dir.toString(), message: "feat: add customizations to generated SDK", author: GIT_AUTHOR });
+    await git.checkout({ fs, dir: dir.toString(), ref: MAIN_BRANCH });
   }
 
-  public cleanupMergeFiles(dir: string): void {
+  public cleanupMergeFiles(dir: DirectoryPath): void {
     const mergeFiles = ["MERGE_HEAD", "MERGE_MODE", "MERGE_MSG"];
     for (const file of mergeFiles) {
-      const filePath = path.join(dir, ".git", file);
-      if (fsSync.existsSync(filePath)) {
-        fsSync.unlinkSync(filePath);
+      const filePath = path.join(dir.toString(), ".git", file);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
       }
     }
-  }
-
-  public setHeadToMain(dir: string): void {
-    fsSync.writeFileSync(path.join(dir, ".git", "HEAD"), `ref: refs/heads/${MAIN_BRANCH}\n`);
-  }
-
-  public async saveSdkSourceTree(
-    sdkDir: DirectoryPath,
-    language: string,
-    inputDirectory: DirectoryPath,
-    trackChanges: boolean = false
-  ): Promise<boolean> {
-    const gitDir = sdkDir.join(".git");
-    if (!(await this.fileService.directoryExists(gitDir))) return false;
-
-    const sdkSourceTreeDir = inputDirectory.join("sdk-source-tree");
-    const outputZipPath = FilePath.create(path.join(sdkSourceTreeDir.toString(), `.${language}`));
-    const sourceTreeExists = outputZipPath && (await this.fileService.fileExists(outputZipPath));
-    let saved = false;
-
-    if (trackChanges || sourceTreeExists) {
-      await this.fileService.createDirectoryIfNotExists(sdkSourceTreeDir);
-
-      await this.syncBranchRefsToHead(sdkDir.toString());
-      this.setHeadToMain(sdkDir.toString());
-
-      if (outputZipPath) {
-        await this.zipService.archive(gitDir, outputZipPath);
-        saved = true;
-      }
-    }
-
-    await this.fileService.deleteDirectory(gitDir);
-    return saved;
   }
 }

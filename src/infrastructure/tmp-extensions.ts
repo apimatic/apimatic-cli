@@ -1,7 +1,13 @@
 import { DirectoryPath } from "../types/file/directoryPath.js";
-import { dir } from "tmp-promise";
+import { dir, withDir } from "tmp-promise";
 
-export async function withDirPath<T>(
+export function withDirPath<T>(
+  fn: (results: DirectoryPath) => Promise<T>,
+): Promise<T> {
+  return withDir(results => fn(new DirectoryPath(results.path)), { unsafeCleanup: true });
+}
+
+export async function dirPath<T>(
   fn: (results: DirectoryPath) => Promise<T>,
 ): Promise<T> {
   const tmpDir = await dir({ unsafeCleanup: true });

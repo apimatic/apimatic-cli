@@ -41,17 +41,28 @@ export class BuildContext {
     await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
   }
 
+  public getBuildDirectory(): DirectoryPath {
+    return this.buildDirectory;
+  }
+
   public getSpecDirectory(): DirectoryPath {
     return this.buildDirectory.join("spec");
   }
 
-  public async getSdkSourceTreePath(language: string): Promise<FilePath | false> {
-    const sourceTreePath = FilePath.create(this.buildDirectory.join("sdk-source-tree", `.${language}`).toString());
+  public async hasSdkSourceTree(language: string): Promise<boolean> {
+    const sourceTreePath = FilePath.create(this.getSdkSourceTreeDirectory().join(`.${language}`).toString());
     if (!sourceTreePath) {
       return false;
     }
-    const exists = await this.fileService.fileExists(sourceTreePath);
-    return exists ? sourceTreePath : false;
+    return await this.fileService.fileExists(sourceTreePath);
+  }
+
+  public async getSdkSourceTree(language: string): Promise<FilePath> {
+    return FilePath.create(this.getSdkSourceTreeDirectory().join(`.${language}`).toString())!;
+  }
+
+  public getSdkSourceTreeDirectory(): DirectoryPath {
+    return this.buildDirectory.join("sdk-source-tree");
   }
 }
 

@@ -3,11 +3,15 @@ import { buildFilePathTree, format as f } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 
 export class MergeSourceTreePrompts {
-  public displayFileTree(sdkName: string, conflictedFiles: string[], missingFiles: string[]) {
+
+  public operationCancelled() {
+    log.error("Exiting without resolving conflicts.");
+  }
+
+  public displayFileTree(sdkName: string, conflictedFiles: string[]) {
     log.message(`Conflicts found in ${f.var(sdkName)} SDK:`);
     const tree = buildFilePathTree(sdkName, [
-      ...conflictedFiles.map((path) => ({ path, description: "# Conflicted file" })),
-      ...missingFiles.map((path) => ({ path, description: "# Missing file" }))
+      ...conflictedFiles.map((path) => ({ path, description: "# Conflicted file" }))
     ]);
     log.message(tree);
   }
@@ -36,8 +40,12 @@ export class MergeSourceTreePrompts {
     log.error(`Could not open ${sdkName} SDK in VS Code.`);
   }
 
-  public conflictsStillPresent() {
+  public conflictsStillPresent(sdkName: string, conflictedFiles: string[]) {
     log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
+    const tree = buildFilePathTree(sdkName, [
+      ...conflictedFiles.map((path) => ({ path, description: "# Conflicted file" }))
+    ]);
+    log.message(tree);
   }
 
   public conflictsResolved(sdkName: string) {
