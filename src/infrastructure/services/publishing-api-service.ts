@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { err, ok, Result } from 'neverthrow';
+import FormData from 'form-data';
 import { PublishingProfileItem } from '../../types/publish-api/publishing-profile.js';
 import { handleServiceError, ServiceError } from '../service-error.js';
 import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
@@ -9,8 +10,8 @@ import { Language } from '../../types/sdk/generate.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { FileService } from '../file-service.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
-import FormData from 'form-data';
 import { PublishType } from '../../types/sdk/publish.js';
+import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 
 export class PublishingApiService {
   // TODO: Replace with prod base url
@@ -93,6 +94,29 @@ export class PublishingApiService {
       return err(handleServiceError(error));
     } finally {
       sdkFileStream.close();
+    }
+  }
+
+  public async getSdkPublishingLog(
+    publishingLogId: string,
+    configDir: DirectoryPath,
+    shell: string
+  ): Promise<Result<PublishLogItem, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    if (authInfo === null) {
+      return err(ServiceError.UnAuthorized);
+    }
+
+    try {
+      const token = authInfo?.authKey;
+      const response = await this.axiosInstance(shell, token).get(`/publish-logs/${publishingLogId}`);
+
+      if (response.status === 200) {
+        return ok(response.data as PublishLogItem);
+      }
+      return err(ServiceError.InvalidResponse);
+    } catch (error) {
+      return err(handleServiceError(error));
     }
   }
 

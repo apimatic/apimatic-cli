@@ -156,7 +156,15 @@ export class SdkPublishNonInteractiveAction {
           return ActionResult.failed();
         }
 
+        const publishingSucceeded = await this.prompts.pollPublishingStatus(
+          () => this.publishingApiService.getSdkPublishingLog(publishSdkResponse.value.publishLogId, this.configDir, this.commandMetadata.shell)
+        );
+
         this.prompts.sdkPublishingInProgress(publishSdkResponse.value.publishingLogUrl);
+
+        if (!publishingSucceeded) {
+          return ActionResult.failed();
+        }
       }
 
       return ActionResult.success();
