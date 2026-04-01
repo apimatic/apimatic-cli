@@ -21,9 +21,9 @@ export class SdkPublishNonInteractivePrompts {
 
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
     return withSpinner(
-      'Fetching publishing profiles',
-      'Publishing profiles fetched successfully.',
-      'Failed to fetch publishing profiles.',
+      'Searching for publishing profile',
+      'Profile search complete.',
+      'Failed to search for publishing profile.',
       fn
     );
   }
@@ -86,7 +86,7 @@ export class SdkPublishNonInteractivePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public sdkPublishingInProgress(publishingLogUrl: string) {
+  public postPublishingMessage(publishingLogUrl: string) {
     const message = `To view publishing logs, please visit:
 ${f.link(publishingLogUrl)}`;
     noteWrapped(message, 'Next Steps');

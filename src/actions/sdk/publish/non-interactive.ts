@@ -160,7 +160,7 @@ export class SdkPublishNonInteractiveAction {
           () => this.publishingApiService.getSdkPublishingLog(publishSdkResponse.value.publishLogId, this.configDir, this.commandMetadata.shell)
         );
 
-        this.prompts.sdkPublishingInProgress(publishSdkResponse.value.publishingLogUrl);
+        this.prompts.postPublishingMessage(publishSdkResponse.value.publishingLogUrl);
 
         if (!publishingSucceeded) {
           return ActionResult.failed();
