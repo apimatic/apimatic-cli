@@ -41,7 +41,7 @@ export default class SdkPublish extends Command {
     'dry-run': Flags.boolean({
       default: false,
       description:
-        'Generate the SDK without publishing. Useful for reviewing generated SDK before publishing. Not applicable to interactive mode.'
+        'Generate the SDK without publishing. Useful for reviewing generated SDK before publishing.'
     })
   };
 
