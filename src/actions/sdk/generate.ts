@@ -14,7 +14,6 @@ import { TelemetryService } from "../../infrastructure/services/telemetry-servic
 import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { VersionedBuildResolver } from "../../application/sdk/versioned-build-resolver.js";
-import { file } from "mock-fs/lib/filesystem.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -134,7 +133,7 @@ export class GenerateAction {
         this.prompts.changeTrackingEnabled();
         const trackChangesTelemetry = new TelemetryService(this.configDir);
         await trackChangesTelemetry.trackEvent(
-          new SdkTrackChangesEvent(flags),
+          new SdkTrackChangesEvent(language, flags),
           this.commandMetadata.shell
         );
       }

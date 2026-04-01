@@ -90,7 +90,7 @@ export class MergeSourceTreeAction {
 
     const telemetryService = new TelemetryService(configDir);
     await telemetryService.trackEvent(
-      new SdkConflictsResolvedEvent(flags),
+      new SdkConflictsResolvedEvent(language, flags),
       commandMetadata.shell
     );
     await this.gitService.commitResolvedConflicts(sdkDir);
