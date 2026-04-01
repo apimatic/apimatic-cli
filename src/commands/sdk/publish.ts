@@ -17,7 +17,7 @@ export default class SdkPublish extends Command {
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
   static flags = {
-    profile: Flags.string({
+    'profile-id': Flags.string({
       char: 'p',
       description: 'ID of the publishing profile to use.'
     }),
@@ -47,15 +47,15 @@ export default class SdkPublish extends Command {
 
   static examples = [
     `${SdkPublish.cmdTxt}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'typescript')} ${format.flag(
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag('language', 'typescript')} ${format.flag(
       'version',
       '1.0.0'
     )} ${format.flag('publish-type', PublishType.Both)}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'java')} ${format.flag(
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag('language', 'java')} ${format.flag(
       'version',
       '2.0.0'
     )} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile', 'prof-123')} ${format.flag('language', 'python')} ${format.flag(
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag('language', 'python')} ${format.flag(
       'version',
       '1.0.0'
     )} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag('dry-run')}`
@@ -64,7 +64,7 @@ export default class SdkPublish extends Command {
   async run() {
     const {
       flags: {
-        profile,
+        'profile-id': profileId,
         version,
         destination,
         language,
@@ -75,7 +75,7 @@ export default class SdkPublish extends Command {
       }
     } = await this.parse(SdkPublish);
 
-    const interactive = !profile && !language && !version && !publishType;
+    const interactive = !profileId && !language && !version && !publishType;
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
@@ -95,7 +95,7 @@ export default class SdkPublish extends Command {
       : (errorMessage: string) =>
           telemetryService.trackEvent(
             new SdkPublishValidationFailedEvent(errorMessage, SdkPublish.id, {
-              profile,
+              'profile-id': profileId,
               version,
               language,
               ...(force && { force }),
@@ -114,7 +114,7 @@ export default class SdkPublish extends Command {
       interactive,
       force,
       dryRun,
-      profile,
+      profileId,
       version,
       onPublishSdkError
     );

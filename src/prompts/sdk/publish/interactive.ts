@@ -72,7 +72,7 @@ export class SdkPublishInteractivePrompts {
         value: language,
         label: `${language} (${[gitConfig?.isEnabled && 'Source Code', packageConfig?.isEnabled && 'Package']
           .filter(Boolean)
-          .join(', ')})`
+          .join(' + ')})`
       }));
 
     const language = await select({
