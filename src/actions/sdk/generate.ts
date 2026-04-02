@@ -7,8 +7,6 @@ import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { FileService } from "../../infrastructure/file-service.js";
 import { SpecContext } from "../../types/spec-context.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
@@ -40,8 +38,6 @@ export class GenerateAction {
     trackChanges: boolean,
     apiVersion?: string
   ): Promise<ActionResult> => {
-    const flags: Record<string, unknown> = { language, force, zip: zipSdk, "skip-changes": skipChanges, "track-changes": trackChanges, "api-version": apiVersion, "auth-key": this.authKey };
-
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
@@ -106,6 +102,8 @@ export class GenerateAction {
         await tempContext.save(response.value.sdk),
         await tempContext.save(response.value.sdkSourceTree)
       );
+
+      const flags: Record<string, unknown> = { language, force, zip: zipSdk, "skip-changes": skipChanges, "track-changes": trackChanges, "api-version": apiVersion, "auth-key": this.authKey };
 
       const mergeResult = await this.mergeSourceTree.execute(
         tempSdkDir, language, buildContext, skipChanges, trackChanges,
