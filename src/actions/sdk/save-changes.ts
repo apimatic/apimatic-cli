@@ -62,16 +62,17 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, language, version, false, true);
-    if (!sdkContext.exists()) {
-      this.prompts.invalidSdkDirectory(sdkContext.getSdkLanguageDirectory());
+    const sdkContext = new SdkContext(sdkDirectory, language, version);
+    const sdkInputDirectory = sdkContext.getSdkInputDirectory(workingDirectory);
+    if (!(await sdkContext.sdkInputExists(workingDirectory))) {
+      this.prompts.invalidSdkDirectory(sdkInputDirectory);
       return ActionResult.failed();
     }
 
     return withDirPath(async (tempDirectory) => {
       const sourceTreePath = await buildContext.getSdkSourceTree(language);
       const updatedStateDirectory = await this.changesSaver.prepareUpdatedSdkDirectory(
-        sdkContext.getSdkLanguageDirectory(),
+        sdkInputDirectory,
         sourceTreePath,
         tempDirectory
       );
