@@ -17,26 +17,27 @@ export class ReviewChangesAction {
     baseStateDirectory: DirectoryPath,
     fileStatuses: Array<GitFileStatus>
   ): Promise<ActionResult> {
-    // Classify each changed file as a diff pair, or a standalone file.
-    const diffPairs: Array<{ base: FilePath; working: FilePath }> = [];
-    const standaloneFiles: FilePath[] = [];
-    for (const { filePath, status } of fileStatuses) {
-      const originalFilePath = filePath.replaceDirectory(baseStateDirectory);
-      if (status === "deleted") {
-        const renamedFilePath = await this.fileService.postfixFileName(originalFilePath, " [deleted]");
-        standaloneFiles.push(renamedFilePath);
-        continue;
-      }
-      const workingFilePath = filePath.replaceDirectory(updatedStateDirectory);
-      if (status === "added") {
-        standaloneFiles.push(workingFilePath);
-      } else {
-        await this.fileService.normalizeFileLineEndings(workingFilePath);
-        diffPairs.push({ base: originalFilePath, working: workingFilePath });
-      }
-    }
-
     return await dirPath(updatedStateDirectory, async (reviewDir) => {
+      // Classify each changed file as a diff pair, or a standalone file.
+      const diffPairs: Array<{ base: FilePath; working: FilePath }> = [];
+      const standaloneFiles: FilePath[] = [];
+      
+      for (const { filePath, status } of fileStatuses) {
+        const originalFilePath = filePath.replaceDirectory(baseStateDirectory);
+        if (status === "deleted") {
+          const renamedFilePath = await this.fileService.postfixFileName(originalFilePath, " [deleted]");
+          standaloneFiles.push(renamedFilePath);
+          continue;
+        }
+        const workingFilePath = filePath.replaceDirectory(reviewDir);
+        if (status === "added") {
+          standaloneFiles.push(workingFilePath);
+        } else {
+          await this.fileService.normalizeFileLineEndings(workingFilePath);
+          diffPairs.push({ base: originalFilePath, working: workingFilePath });
+        }
+      }
+
       // Open diffs for review in the IDE, or fall back to manual review
       const opened = await this.launcherService.openDiffsInSourceControl(reviewDir, diffPairs, standaloneFiles);
       if (opened) {

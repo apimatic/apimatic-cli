@@ -70,7 +70,7 @@ export class MergeSourceTreeAction {
       if (opened) {
         this.prompts.waitingForVscodeClose(language);
         await this.launcherService.waitForVscodeToClose(sdkDir);
-      } else if (!(await this.prompts.waitForConflictsResolved(language, await dirPath(sdkDir, async (reviewDir) => reviewDir)))) {
+      } else if (await dirPath(sdkDir, async (reviewDir) => !(await this.prompts.waitForConflictsResolved(language, reviewDir)))) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }
