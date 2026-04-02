@@ -27,9 +27,7 @@ export class LauncherService {
     if (isInCi) return false;
     try {
       const commands = this.buildDiffCommands(directoryPath, diffPairs, standaloneFiles);
-      for (const args of commands) {
-        await execa("code", args);
-      }
+      await Promise.all(commands.map(args => execa("code", args)));
       return true;
     } catch {
       return false;
@@ -71,8 +69,8 @@ export class LauncherService {
     }
 
     const filesToOpen = firstDiff ? standaloneFiles : remainingFiles;
-    for (const file of filesToOpen) {
-      commands.push(["--reuse-window", file.toString()]);
+    if (filesToOpen.length > 0) {
+      commands.push(["--reuse-window", ...filesToOpen.map(f => f.toString())]);
     }
 
     return commands;
