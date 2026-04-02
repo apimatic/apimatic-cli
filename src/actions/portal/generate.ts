@@ -8,7 +8,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { TempContext } from "../../types/temp-context.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { ServiceError, ServiceErrorCode } from "../../infrastructure/service-error.js";
+import { ServiceError } from "../../infrastructure/service-error.js";
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
@@ -59,13 +59,8 @@ export class GenerateAction {
       if (response.isErr()) {
         const error = response.error;
         if (error instanceof ServiceError) {
-          if (error.code === ServiceErrorCode.SdkMergeError) {
-            this.prompts.portalGenerationSdkMergeError(error);
-          } else {
-            this.prompts.portalGenerationServiceError(error);
-          }
-        }
-        else if (typeof error === "string") {
+          this.prompts.portalGenerationServiceError(error);
+        } else if (typeof error === "string") {
           this.prompts.portalGenerationError(error);
         } else {
           const errorZipPath = await tempContext.save(error);

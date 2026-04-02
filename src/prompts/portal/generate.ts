@@ -3,7 +3,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
-import {ServiceError } from "../../infrastructure/service-error.js";
+import {ServiceError, ServiceErrorCode } from "../../infrastructure/service-error.js";
 import { withSpinner, noteWrapped } from "../prompt.js";
 
 export class PortalGeneratePrompts {
@@ -47,14 +47,12 @@ export class PortalGeneratePrompts {
 
   public portalGenerationServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
-  }
-
-  public portalGenerationSdkMergeError(serviceError: ServiceError) {
-    log.error(serviceError.errorMessage);
-    const message = `For each of the failed languages, run the command
-      ${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("input", "<input>")} ${f.flag("language", "<language>")}
-      to resolve SDK merge conflicts first, then re-run the same command.`;
-    noteWrapped(message, "Next Steps");
+    if (serviceError.code === ServiceErrorCode.SdkMergeError) {
+      const message =`For each of the failed languages, run the command
+${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("input", "<input>")} ${f.flag("language", "<language>")}
+to resolve SDK merge conflicts first, then re-run the same command.`;
+      noteWrapped(message, "Next Steps");
+    }
   }
 
   public portalGenerationErrorWithReport(reportPath: FilePath) {
