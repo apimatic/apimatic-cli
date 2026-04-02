@@ -93,7 +93,7 @@ export class FileService {
   public async copyDirectoryExcluding(
     source: DirectoryPath,
     destination: DirectoryPath,
-    excludeNames: string[] = []
+    excludeNames: string[]
   ): Promise<void> {
     await this.createDirectoryIfNotExists(destination);
 
@@ -117,16 +117,15 @@ export class FileService {
     );
   }
 
-  public async deleteDirectoryExcluding(dir: DirectoryPath, excludeNames: string[]): Promise<void> {
-    const entries = await fsExtra.readdir(dir.toString());
+  public async deleteAllExcluding(source: DirectoryPath, excludeNames: string[]): Promise<void> {
+    const entries = await fsExtra.readdir(source.toString());
     const excludeSet = new Set(excludeNames);
 
     await Promise.all(
       entries
         .filter((entry) => !excludeSet.has(entry))
         .map(async (entry) => {
-          const fullPath = path.join(dir.toString(), entry);
-          return fsExtra.remove(fullPath);
+          return fsExtra.remove(source.join(entry).toString());
         })
     );
   }

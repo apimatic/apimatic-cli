@@ -1,6 +1,6 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../../infrastructure/file-service.js";
-import { GitFileStatus, GitService } from "../../infrastructure/git-service.js";
+import { GitFileStatus } from "../../infrastructure/git-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
 import { ActionResult } from "../action-result.js";
@@ -10,7 +10,6 @@ import { FilePath } from "../../types/file/filePath.js";
 export class ReviewChangesAction {
   private readonly prompts = new SaveChangesPrompts();
   private readonly fileService = new FileService();
-  private readonly gitService = new GitService();
   private readonly launcherService = new LauncherService();
 
   public async execute(

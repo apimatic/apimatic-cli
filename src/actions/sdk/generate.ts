@@ -83,7 +83,7 @@ export class GenerateAction {
 
     const requireUncustomizedDir = skipChanges && await buildContext.hasSdkSourceTree(language);
     const sdkContext = new SdkContext(sdkDirectory, language, version, requireUncustomizedDir);
-    if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(sdkContext.sdkLanguageDirectory))) {
+    if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(sdkContext.getSdkLanguageDirectory()))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
     }
@@ -101,11 +101,11 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const tempSdkDir = tempDirectory.join("sdk");
-      const tempSdk = await tempContext.save(response.value.sdk);
-      const tempSdkSourceTree = await tempContext.save(response.value.sdkSourceTree);
-
-      await sdkContext.prepareTempSdkDirectory(tempSdkDir, tempSdk, tempSdkSourceTree);
+      const tempSdkDir = await sdkContext.prepareTempSdkDirectory(
+        tempDirectory,
+        await tempContext.save(response.value.sdk),
+        await tempContext.save(response.value.sdkSourceTree)
+      );
 
       const mergeResult = await this.mergeSourceTree.execute(
         tempSdkDir, language, buildContext, skipChanges, trackChanges,
