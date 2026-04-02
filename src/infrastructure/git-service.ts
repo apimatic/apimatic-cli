@@ -41,7 +41,7 @@ export class GitService {
     return statusMatrix
       .filter(([, headStatus, workdirStatus]) => headStatus !== workdirStatus)
       .map(([filepath, headStatus, workdirStatus]) => {
-        const filePath = FilePath.create(filepath)!;
+        const filePath = FilePath.createFromRelativePath(filepath)!;
         if (headStatus === 0) {
           return { filePath, status: "added" };
         }

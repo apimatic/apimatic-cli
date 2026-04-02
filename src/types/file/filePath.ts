@@ -12,29 +12,24 @@ export class FilePath {
   }
 
   public replaceDirectory(newDirectory: DirectoryPath): FilePath {
-    return new FilePath(newDirectory, this.fileName);
-  }
-
-  public addBaseDirectory(newDirectory: DirectoryPath): FilePath {
-    return new FilePath(newDirectory.join(this.directoryPath.toString()), this.fileName);
+    const directory = path.dirname(this.fileName.toString());
+    const filename = path.basename(this.fileName.toString());
+    return new FilePath(newDirectory.join(directory), new FileName(filename));
   }
 
   public toString(): string {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
   }
 
-  public static createFromRelativePath(filePath: string, baseDirectory: DirectoryPath): FilePath | undefined {
+  public static createFromRelativePath(filePath: string): FilePath | undefined {
     if (!filePath) {
       return undefined;
     }
 
     try {
       const normalizedPath = path.normalize(filePath);
-      const directory = path.dirname(normalizedPath);
-      const filename = path.basename(normalizedPath);
-      const directoryPath = baseDirectory.join(directory);
-      const fileName = new FileName(filename);
-      return new FilePath(directoryPath, fileName);
+      const fileName = new FileName(normalizedPath);
+      return new FilePath(DirectoryPath.default, fileName);
     } catch {
       return undefined;
     }

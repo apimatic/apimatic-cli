@@ -28,7 +28,7 @@ export class ReviewChangesAction {
         standaloneFiles.push(renamedFilePath);
         continue;
       }
-      const workingFilePath = filePath.addBaseDirectory(updatedStateDirectory);
+      const workingFilePath = filePath.replaceDirectory(updatedStateDirectory);
       if (status === "added") {
         standaloneFiles.push(workingFilePath);
       } else {
@@ -49,6 +49,7 @@ export class ReviewChangesAction {
       this.prompts.operationCancelled();
       return ActionResult.cancelled();
     }
+
 
     return ActionResult.success();
   }
