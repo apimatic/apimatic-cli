@@ -62,7 +62,7 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, language, version);
+    const sdkContext = new SdkContext(sdkDirectory, language, version, false, true);
     if (!sdkContext.exists()) {
       this.prompts.invalidSdkDirectory(sdkContext.getSdkLanguageDirectory());
       return ActionResult.failed();

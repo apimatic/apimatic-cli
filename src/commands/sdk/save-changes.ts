@@ -51,7 +51,7 @@ export default class SaveChanges extends Command {
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = workingDirectory.join("src");
-    const sdkDirectory = sdk ? new DirectoryPath(sdk) : workingDirectory.join("sdk");
+    const sdkDirectory = sdk ? new DirectoryPath(sdk) : DirectoryPath.default;
     
     intro("Save Changes");
     const action = new SaveChangesAction();

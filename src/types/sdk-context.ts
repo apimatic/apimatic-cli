@@ -2,21 +2,24 @@ import { FileService } from "../infrastructure/file-service.js";
 import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
-import { ZipService } from "../infrastructure/zip-service.js";
 import { Language } from "./sdk/generate.js";
 
 export class SdkContext {
   private readonly fileService = new FileService();
-  private readonly zipService = new ZipService();
 
   constructor(
     private readonly sdkDirectory: DirectoryPath,
     private readonly language: Language,
     private readonly version?: string,
-    private readonly requireUncustomizedDir: boolean = false
+    private readonly requireUncustomizedDir: boolean = false,
+    private readonly useSdkDirWhenNotDefault: boolean = false
   ) {  }
   
   public getSdkLanguageDirectory(): DirectoryPath {
+    if (this.useSdkDirWhenNotDefault && !this.sdkDirectory.isEqual(DirectoryPath.default)) {
+      return this.sdkDirectory;
+    }
+
     const baseDirectory = this.requireUncustomizedDir
       ? this.sdkDirectory.join("uncustomized")
       : this.sdkDirectory;
