@@ -11,11 +11,6 @@ export class SaveChangesPrompts {
     )}`;
     this.logSaveChangesError(message);
   }
-
-  public specDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logSaveChangesError(message);
-  }
   
   public srcDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;

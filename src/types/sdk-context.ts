@@ -3,9 +3,11 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { Language } from "./sdk/generate.js";
+import { ZipService } from "../infrastructure/zip-service.js";
 
 export class SdkContext {
   private readonly fileService = new FileService();
+  private readonly zipService = new ZipService();
 
   constructor(
     private readonly sdkDirectory: DirectoryPath,
@@ -33,10 +35,10 @@ export class SdkContext {
   public async prepareTempSdkDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath, tempSdkSourceTree: FilePath): Promise<DirectoryPath> {
     const tempSdkDirectory = tempDirectory.join("sdk");
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
-    await this.fileService.unzipFile(tempSdk, tempSdkDirectory);
+    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
     const gitSourceTreeDir = tempSdkDirectory.join(".git");
     await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
-    await this.fileService.unzipFile(tempSdkSourceTree, gitSourceTreeDir);
+    await this.zipService.unArchive(tempSdkSourceTree, gitSourceTreeDir);
     return tempSdkDirectory;
   }
 
@@ -50,7 +52,7 @@ export class SdkContext {
     }
 
     const zipPath = new FilePath(sdkLanguageDir, new FileName(`${this.language}.zip`));
-    await this.fileService.zipDirectory(tempSdkDirectory, zipPath);
+    await this.zipService.archive(tempSdkDirectory, zipPath);
 
     return sdkLanguageDir;
   }

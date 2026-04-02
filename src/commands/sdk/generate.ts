@@ -66,7 +66,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       commandName: SdkGenerate.id,
       shell: this.config.shell
     };
-    
+
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(

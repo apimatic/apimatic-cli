@@ -10,7 +10,6 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ActionResult } from "../action-result.js";
 import isInCi from "is-in-ci";
-
 import { BuildContext } from "../../types/build-context.js";
 import { ZipService } from "../../infrastructure/zip-service.js";
 import { dirPath } from "../../infrastructure/tmp-extensions.js";

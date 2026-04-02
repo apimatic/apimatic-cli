@@ -118,7 +118,7 @@ class SdkChangesSaver {
     await this.fileService.createDirectoryIfNotExists(sdkGitDir);
     await this.zipService.unArchive(sourceTreePath, sdkGitDir);
     await this.gitService.checkoutCustomBranch(updatedSdkDirectory);
-    await this.fileService.deleteAllExcluding(updatedSdkDirectory, [".git"]);
+    await this.fileService.cleanDirectoryExcluding(updatedSdkDirectory, [".git"]);
     await this.fileService.copyDirectoryExcluding(sdk, updatedSdkDirectory, [".git"]);
     return updatedSdkDirectory;
   }

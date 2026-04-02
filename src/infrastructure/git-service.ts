@@ -22,10 +22,6 @@ export class GitService {
     await git.checkout({ fs, dir, ref: CUSTOM_BRANCH});
   }
 
-  public async checkoutMainBranch(dirPath: DirectoryPath): Promise<void> {
-    await git.checkout({ fs, dir: dirPath.toString(), ref: MAIN_BRANCH });
-  }
-
   public async forceCheckoutMainBranch(dirPath: DirectoryPath): Promise<void> {
     this.cleanupMergeFiles(dirPath);
     await git.checkout({ fs, dir: dirPath.toString(), ref: MAIN_BRANCH, force: true });
@@ -86,10 +82,6 @@ export class GitService {
       }
     }
     return conflicted;
-  }
-
-  public async abortMergeAndCheckoutMain(dir: DirectoryPath): Promise<void> {
-    await git.checkout({ fs, dir: dir.toString(), ref: MAIN_BRANCH, force: true });
   }
 
   public async commitResolvedConflicts(dir: DirectoryPath): Promise<void> {

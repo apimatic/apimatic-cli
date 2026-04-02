@@ -7,10 +7,8 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { Directory } from "../types/file/directory.js";
 import { FileName } from "../types/file/fileName.js";
-import { ZipService } from "./zip-service.js";
 
 export class FileService {
-  private readonly zipService = new ZipService();
 
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
@@ -44,6 +42,20 @@ export class FileService {
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
+  public async cleanDirectoryExcluding(dir: DirectoryPath, excludeNames: string[]): Promise<void> {
+    await fsExtra.ensureDir(dir.toString());
+    const entries = await fsExtra.readdir(dir.toString());
+    const excludeSet = new Set(excludeNames);
+
+    await Promise.all(
+      entries
+        .filter((entry) => !excludeSet.has(entry))
+        .map(async (entry) => {
+          return fsExtra.remove(dir.join(entry).toString());
+        })
+    );
+  }
+
   public async createDirectoryIfNotExists(dir: DirectoryPath): Promise<void> {
     await fsExtra.ensureDir(dir.toString());
   }
@@ -66,7 +78,7 @@ export class FileService {
       const directories: DirectoryPath[] = [];
 
       for (const entry of entries) {
-        const fullPath = path.join(dir.toString(), entry);
+        const fullPath = dir.join(entry).toString();
         const stat = await fsExtra.stat(fullPath);
         if (stat.isDirectory()) {
           directories.push(new DirectoryPath(fullPath));
@@ -113,19 +125,6 @@ export class FileService {
           }
 
           return fsExtra.copyFile(sourcePath, destPath);
-        })
-    );
-  }
-
-  public async deleteAllExcluding(source: DirectoryPath, excludeNames: string[]): Promise<void> {
-    const entries = await fsExtra.readdir(source.toString());
-    const excludeSet = new Set(excludeNames);
-
-    await Promise.all(
-      entries
-        .filter((entry) => !excludeSet.has(entry))
-        .map(async (entry) => {
-          return fsExtra.remove(source.join(entry).toString());
         })
     );
   }
@@ -186,43 +185,8 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
   }
 
-  public async getFiles(directory: DirectoryPath, extension?: string): Promise<FilePath[]> {
-    const files: FilePath[] = [];
-
-    if (!(await this.directoryExists(directory))) {
-      return files;
-    }
-
-    const entries = await fsExtra.readdir(directory.toString());
-
-    for (const entry of entries) {
-      const fullPath = path.join(directory.toString(), entry);
-      const stat = await fsExtra.stat(fullPath);
-
-      if (stat.isFile()) {
-        if (!extension || entry.endsWith(extension)) {
-          const filePath = FilePath.create(fullPath);
-          if (filePath) {
-            files.push(filePath);
-          }
-        }
-      }
-    }
-
-    return files;
-  }
-
   public async readFile(filePath: FilePath): Promise<string> {
     return await fsExtra.readFile(filePath.toString(), "utf-8");
-  }
-
-  public async readJsonFile<T>(filePath: FilePath): Promise<T | null> {
-    try {
-      const content = await this.readFile(filePath);
-      return JSON.parse(content) as T;
-    } catch {
-      return null;
-    }
   }
 
   public async isZipFile(filePath: FilePath): Promise<boolean> {
@@ -253,14 +217,6 @@ export class FileService {
     const content = await this.readFile(filePath);
     const normalizedContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     await this.writeContents(filePath, normalizedContent);
-  }
-
-  public async unzipFile(zipFilePath: FilePath, destinationDir: DirectoryPath): Promise<void> {
-    await this.zipService.unArchive(zipFilePath, destinationDir);
-  }
-
-  public async zipDirectory(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
-    await this.zipService.archive(sourceDir, outputZipPath);
   }
 }
 

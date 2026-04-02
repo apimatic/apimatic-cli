@@ -36,10 +36,6 @@ export class MergeSourceTreePrompts {
     );
   }
 
-  public vscodeOpenError(sdkName: string) {
-    log.error(`Could not open ${sdkName} SDK in VS Code.`);
-  }
-
   public conflictsStillPresent(sdkName: string, conflictedFiles: string[]) {
     log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
     const tree = buildFilePathTree(sdkName, [
