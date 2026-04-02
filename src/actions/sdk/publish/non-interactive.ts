@@ -15,7 +15,8 @@ import {
 } from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { GenerateAction } from '../generate.js';
-import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
+import { createTempDir, withDirPath } from '../../../infrastructure/tmp-extensions.js';
+import { LauncherService } from '../../../infrastructure/launcher-service.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
 import { TempContext } from '../../../types/temp-context.js';
@@ -25,6 +26,7 @@ export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly fileService: FileService = new FileService();
+  private readonly launcherService: LauncherService = new LauncherService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -106,6 +108,8 @@ export class SdkPublishNonInteractiveAction {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 
+    const outputDirectory = dryRun ? await createTempDir() : sdkDirectory;
+
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
 
@@ -119,7 +123,7 @@ export class SdkPublishNonInteractiveAction {
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
         tempDirectory,
-        sdkDirectory,
+        outputDirectory,
         language,
         force,
         false,
@@ -133,8 +137,9 @@ export class SdkPublishNonInteractiveAction {
         return ActionResult.cancelled();
       }
 
+      const sdkLanguageDirectory = outputDirectory.join(language);
+
       if (!dryRun) {
-        const sdkLanguageDirectory = sdkDirectory.join(language);
         const tempContext = new TempContext(tempDirectory);
         const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
 
@@ -165,8 +170,11 @@ export class SdkPublishNonInteractiveAction {
         if (!publishingSucceeded) {
           return ActionResult.failed();
         }
+        
+        return ActionResult.success();
       }
 
+      await this.launcherService.openDirectory(sdkLanguageDirectory);
       return ActionResult.success();
     });
   };

@@ -33,8 +33,14 @@ export class LauncherService {
   }
 
   public async openFile(filePath: FilePath): Promise<void> {
-    const targetPath = filePath.toString();
+    await this.openPath(filePath.toString());
+  }
 
+  public async openDirectory(directoryPath: DirectoryPath): Promise<void> {
+    await this.openPath(directoryPath.toString());
+  }
+
+  private async openPath(targetPath: string): Promise<void> {
     // Determine the command and args without using the shell
     let command: string;
     let args: string[];
