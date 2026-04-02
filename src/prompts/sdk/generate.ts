@@ -25,6 +25,11 @@ export class SdkGeneratePrompts {
       directory
     )}`;    this.logGenerationError(message);
   }
+  
+  public srcDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
+  }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
@@ -51,6 +56,10 @@ export class SdkGeneratePrompts {
   public versionedBuildEmpty(directory: DirectoryPath) {
     const message = `The ${f.var(directory.leafName())} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
+  }
+
+  public versionNotSelected() {
+    this.logGenerationError(`No API version is selected.`);
   }
 
   public versionNotFound() {
