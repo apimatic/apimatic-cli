@@ -82,7 +82,7 @@ export class GenerateAction {
     }
 
     const requireUncustomizedDir = skipChanges && await buildContext.hasSdkSourceTree(language);
-    const sdkContext = new SdkContext(sdkDirectory, language, version, requireUncustomizedDir);
+    const sdkContext = new SdkContext(sdkDirectory, language, requireUncustomizedDir, version);
     if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(sdkContext.getSdkLanguageDirectory()))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();

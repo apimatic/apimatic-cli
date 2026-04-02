@@ -10,27 +10,24 @@ export class SdkContext {
   constructor(
     private readonly sdkDirectory: DirectoryPath,
     private readonly language: Language,
-    private readonly version?: string,
-    private readonly requireUncustomizedDir: boolean = false
+    private readonly requireUncustomizedDir: boolean,
+    private readonly version?: string
   ) {  }
   
   public getSdkLanguageDirectory(): DirectoryPath {
-    return this.resolveSdkDirectory(this.sdkDirectory);
+    const baseDirectory = this.requireUncustomizedDir
+      ? this.sdkDirectory.join("uncustomized")
+      : this.sdkDirectory;
+
+    if (this.version) {
+      return baseDirectory.join(this.version).join(this.language);
+    }
+
+    return baseDirectory.join(this.language);
   }
 
   public async exists() {
     return !(await this.fileService.directoryEmpty(this.getSdkLanguageDirectory()));
-  }
-
-  public getSdkInputDirectory(workingDirectory: DirectoryPath): DirectoryPath {
-    if (this.sdkDirectory.isEqual(DirectoryPath.default)) {
-      return this.resolveSdkDirectory(workingDirectory.join("sdk"));
-    }
-    return this.sdkDirectory;
-  }
-
-  public async sdkInputExists(workingDirectory: DirectoryPath) {
-    return !(await this.fileService.directoryEmpty(this.getSdkInputDirectory(workingDirectory)));
   }
 
   public async prepareTempSdkDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath, tempSdkSourceTree: FilePath): Promise<DirectoryPath> {
@@ -56,17 +53,5 @@ export class SdkContext {
     await this.fileService.zipDirectory(tempSdkDirectory, zipPath);
 
     return sdkLanguageDir;
-  }
-
-  private resolveSdkDirectory(sdkDirectory: DirectoryPath): DirectoryPath {
-    const baseDirectory = this.requireUncustomizedDir
-      ? sdkDirectory.join("uncustomized")
-      : sdkDirectory;
-
-    if (this.version) {
-      return baseDirectory.join(this.version).join(this.language);
-    }
-
-    return baseDirectory.join(this.language);
   }
 }

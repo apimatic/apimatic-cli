@@ -51,14 +51,13 @@ export default class SaveChanges extends Command {
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = workingDirectory.join("src");
-    const sdkDirectory = sdk ? new DirectoryPath(sdk) : DirectoryPath.default;
     
     intro("Save Changes");
     const action = new SaveChangesAction();
     const result = await action.execute(
       workingDirectory,
       buildDirectory,
-      sdkDirectory,
+      sdk,
       language as Language,
       apiVersion
     );

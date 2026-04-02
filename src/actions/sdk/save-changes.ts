@@ -8,7 +8,7 @@ import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
 import { GitFileStatus, GitService } from "../../infrastructure/git-service.js";
 import { ReviewChangesAction } from "./review-changes.js";
 import { VersionedBuildResolver } from "../../application/sdk/versioned-build-resolver.js";
-import { SdkContext } from "../../types/sdk-context.js";
+import { SdkInputContext } from "../../types/sdk-input-context.js";
 import { FilePath } from "../../types/file/filePath.js";
 
 export class SaveChangesAction {
@@ -20,15 +20,10 @@ export class SaveChangesAction {
   public async execute(
     workingDirectory: DirectoryPath,
     buildDirectory: DirectoryPath,
-    sdkDirectory: DirectoryPath,
+    sdkDirectoryInput: string | undefined,
     language: Language,
     apiVersion?: string
   ): Promise<ActionResult> {
-    if (buildDirectory.isEqual(sdkDirectory)) {
-      this.prompts.sameBuildAndSdkDir(buildDirectory);
-      return ActionResult.failed();
-    }
-
     const resolvedBuildResult = await this.versionedBuildResolver.resolve(
       buildDirectory,
       apiVersion,
@@ -62,10 +57,15 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, language, version);
-    const sdkInputDirectory = sdkContext.getSdkInputDirectory(workingDirectory);
-    if (!(await sdkContext.sdkInputExists(workingDirectory))) {
+    const sdkContext = new SdkInputContext(sdkDirectoryInput, workingDirectory, language, version);
+    const sdkInputDirectory = sdkContext.getSdkInputDirectory();
+    if (!(await sdkContext.exists())) {
       this.prompts.invalidSdkDirectory(sdkInputDirectory);
+      return ActionResult.failed();
+    }
+    
+    if (buildDirectory.isEqual(sdkInputDirectory)) {
+      this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
     }
 
