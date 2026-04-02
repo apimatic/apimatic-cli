@@ -44,8 +44,8 @@ export class MergeSourceTreeAction {
       if (await buildContext.hasSdkSourceTree(language) || trackChanges) {
         await this.fileService.createDirectoryIfNotExists(buildContext.getSdkSourceTreeDirectory());
         await this.zipService.archive(gitDir, await buildContext.getSdkSourceTree(language));
-        await this.fileService.deleteDirectory(gitDir);
       }
+      await this.fileService.deleteDirectory(gitDir);
       return ActionResult.success();
     }
 
