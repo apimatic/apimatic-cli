@@ -37,18 +37,18 @@ export class ReviewChangesAction {
       }
     }
 
-    // Open diffs for review in the IDE, or fall back to manual review
-    const opened = await this.launcherService.openDiffsInSourceControl(updatedStateDirectory, diffPairs, standaloneFiles);
-    if (opened) {
-      this.prompts.reviewInIdeAndClose();
-      await this.launcherService.waitForVscodeToClose(updatedStateDirectory);
-    } else if (!await this.prompts.reviewChangesManually(await dirPath(async (reviewDir) => {
+    await dirPath(async (reviewDir) => {
       await this.fileService.copyDirectoryContents(updatedStateDirectory, reviewDir);
-      return reviewDir;
-    }))) {
-      this.prompts.operationCancelled();
-      return ActionResult.cancelled();
-    }
+      // Open diffs for review in the IDE, or fall back to manual review
+      const opened = await this.launcherService.openDiffsInSourceControl(reviewDir, diffPairs, standaloneFiles);
+      if (opened) {
+        this.prompts.reviewInIdeAndClose();
+        await this.launcherService.waitForVscodeToClose(reviewDir);
+      } else if (!await this.prompts.reviewChangesManually(reviewDir)) {
+        this.prompts.operationCancelled();
+        return ActionResult.cancelled();
+      }
+    });
 
 
     return ActionResult.success();
