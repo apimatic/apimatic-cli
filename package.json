@@ -52,7 +52,6 @@
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",
-        "archiver": "^7.0.1",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
         "chokidar": "^3.6.0",
@@ -73,16 +72,16 @@
         "tmp-promise": "^3.0.3",
         "tslib": "^2.8.1",
         "uuid": "^11.1.0",
-        "yaml": "^2.8.0"
+        "yaml": "^2.8.0",
+        "yazl": "^3.3.1"
     },
     "devDependencies": {
-        "@commitlint/cli": "^15.0.0",
+        "@commitlint/cli": "^20.5.0",
         "@commitlint/config-conventional": "^15.0.0",
         "@eslint/js": "^9.34.0",
         "@oclif/test": "^4.1.13",
         "@semantic-release/changelog": "^6.0.3",
         "@semantic-release/git": "^10.0.1",
-        "@types/archiver": "^5.3.4",
         "@types/base-64": "^1.0.0",
         "@types/chai": "^4.3.20",
         "@types/connect-livereload": "^0.5.32",
@@ -97,6 +96,7 @@
         "@types/sinon": "^17.0.4",
         "@types/treeify": "^1.0.3",
         "@types/unzipper": "^0.10.4",
+        "@types/yazl": "^3.3.0",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
         "chai": "^4.5.0",
@@ -159,11 +159,12 @@
         "*.{js,ts}": "prettier --write"
     },
     "overrides": {
+        "diff": "^8.0.4",
         "inflight": "npm:lru-cache@^7.14.1",
         "lodash.get": "npm:lodash@^4.17.21",
         "@humanwhocodes/config-array": "npm:@eslint/config-array@latest",
         "rimraf": "^6.0.1",
-        "glob": "^10.4.5",
+        "glob": "^13.0.0",
         "q": "npm:promise@^8.3.0"
     }
 }
