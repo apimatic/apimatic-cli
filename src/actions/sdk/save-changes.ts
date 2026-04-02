@@ -36,17 +36,23 @@ export class SaveChangesAction {
       (versions) => this.prompts.selectVersion(versions)
     );
 
-    if (resolvedBuildResult.status === "versionedEmpty") {
+    if (resolvedBuildResult.status === "noVersionsFound") {
       this.prompts.versionedBuildEmpty(resolvedBuildResult.versionsDirectory);
       return ActionResult.failed();
     }
 
-    if (resolvedBuildResult.status === "cancelled") {
+    if (resolvedBuildResult.status === "cancelledVersionSelection") {
+      this.prompts.versionNotSelected();
       return ActionResult.cancelled();
     }
 
-    if (resolvedBuildResult.status === "versionNotFound") {
+    if (resolvedBuildResult.status === "invalidVersionSelected") {
       this.prompts.versionNotFound();
+      return ActionResult.failed();
+    }
+
+    if (resolvedBuildResult.status === "invalid") {
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
@@ -57,7 +63,7 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, language, version, false, true);
+    const sdkContext = new SdkContext(sdkDirectory, language, version);
     const sdk = sdkContext.sdkLanguageDirectory;
 
     if (!sdkContext.exists()) {
@@ -73,12 +79,10 @@ export class SaveChangesAction {
       const sdkGitDir = updatedStateDirectory.join(".git");
       await this.fileService.createDirectoryIfNotExists(sdkGitDir);
       await this.zipService.unArchive(sourceTreePath, sdkGitDir);
-      
-      // Copy user's sdk without .git
-      await this.fileService.copyDirectoryExcluding(sdk, updatedStateDirectory, [".git"]);
 
       // Checkout to a custom branch before copying user's SDK
       await this.gitService.checkoutCustomBranch(updatedStateDirectory);
+      await this.fileService.copyDirectoryExcluding(sdk, updatedStateDirectory, [".git"]);
 
       // Detect changes between the updated SDK and the source tree
       const fileStatuses = await this.gitService.getGitFileStatuses(updatedStateDirectory);
@@ -91,7 +95,7 @@ export class SaveChangesAction {
       const baseStateDirectory = tempDirectory.join("base");
       await this.fileService.createDirectoryIfNotExists(baseStateDirectory);
       await this.fileService.copyDirectoryContents(updatedStateDirectory, baseStateDirectory);
-      this.gitService.hardReset(baseStateDirectory);
+      await this.gitService.hardReset(baseStateDirectory);
 
       // Review changes
       const reviewResult = await this.reviewChanges.execute(
@@ -107,7 +111,7 @@ export class SaveChangesAction {
       }
 
       await this.fileService.copyDirectoryExcluding(sdk, updatedStateDirectory, [".git"]);
-      this.gitService.commitReviewedChanges(updatedStateDirectory);
+      await this.gitService.commitReviewedChanges(updatedStateDirectory);
       await this.zipService.archive(sdkGitDir, sourceTreePath);
 
       this.prompts.changesSaved();

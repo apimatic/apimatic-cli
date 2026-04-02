@@ -16,6 +16,11 @@ export class SaveChangesPrompts {
     const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logSaveChangesError(message);
   }
+  
+  public srcDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    this.logSaveChangesError(message);
+  }
 
   public invalidSdkDirectory(directory: DirectoryPath) {
     const message = `SDK directory does not exist: ${f.path(directory)}`;
@@ -29,6 +34,10 @@ export class SaveChangesPrompts {
 
   public versionNotFound() {
     this.logSaveChangesError(`The API version is invalid.`);
+  }
+
+  public versionNotSelected() {
+    this.logSaveChangesError(`No API version is selected.`);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {

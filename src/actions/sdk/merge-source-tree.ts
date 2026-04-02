@@ -25,14 +25,13 @@ export class MergeSourceTreeAction {
   public async execute(
     sdkDir: DirectoryPath,
     language: Language,
-    buildDirectory: DirectoryPath,
+    buildContext: BuildContext,
     skipChanges: boolean,
     trackChanges: boolean,
     flags: Record<string, unknown>,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata
   ): Promise<ActionResult> {
-    const buildContext = new BuildContext(buildDirectory);
     const gitDir = sdkDir.join(".git");
 
     if (skipChanges) {

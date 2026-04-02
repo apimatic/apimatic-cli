@@ -8,26 +8,20 @@ import { Language } from "./sdk/generate.js";
 export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
-  private readonly skipChanges: boolean;
-  private readonly hasSdkSourceTree: boolean;
 
   constructor(
     private readonly sdkDirectory: DirectoryPath,
     private readonly language: Language,
     private readonly version?: string,
-    skipChanges = false,
-    hasSdkSourceTree: boolean = false
-  ) {
-    this.skipChanges = skipChanges;
-    this.hasSdkSourceTree = hasSdkSourceTree;
-  }
+    private readonly requireUncustomizedDir: boolean = false
+  ) {  }
 
   private get zipPath(): FilePath {
     return new FilePath(this.sdkLanguageDirectory, new FileName(`${this.language}.zip`));
   }
   
   public get sdkLanguageDirectory(): DirectoryPath {
-    const baseDirectory = this.skipChanges && this.hasSdkSourceTree
+    const baseDirectory = this.requireUncustomizedDir
       ? this.sdkDirectory.join("uncustomized")
       : this.sdkDirectory;
 
@@ -42,12 +36,22 @@ export class SdkContext {
     return !(await this.fileService.directoryEmpty(this.sdkLanguageDirectory));
   }
 
-  public async save(tempPortalFilePath: FilePath, zipPortal: boolean) {
+  public async prepareTempSdkDirectory(tempSdkDirectory: DirectoryPath, tempSdk: FilePath, tempSdkSourceTree: FilePath): Promise<void> {
+    await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
+    await this.fileService.unzipFile(tempSdk, tempSdkDirectory);
+    const gitSourceTreeDir = tempSdkDirectory.join(".git");
+    await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
+    await this.fileService.unzipFile(tempSdkSourceTree, gitSourceTreeDir);
+  }
+
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean) : Promise<DirectoryPath> {
+    const sdkZip = FilePath.create(tempSdkDirectory.join("final-sdk.zip").toString())!;
+    await this.fileService.zipDirectory(tempSdkDirectory, sdkZip);
     await this.fileService.cleanDirectory(this.sdkLanguageDirectory);
-    if (zipPortal) {
-      await this.fileService.copy(tempPortalFilePath, this.zipPath);
+    if (zipSdk) {
+      await this.fileService.copy(sdkZip, this.zipPath);
     } else {
-      await this.zipService.unArchive(tempPortalFilePath, this.sdkLanguageDirectory);
+      await this.zipService.unArchive(sdkZip, this.sdkLanguageDirectory);
     }
     return this.sdkLanguageDirectory;
   }

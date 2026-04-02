@@ -4,20 +4,22 @@ import { FileService } from "../../infrastructure/file-service.js";
 
 export type ResolvedBuildResult =
   | {
-      readonly status: "resolved";
-      readonly buildDirectory: DirectoryPath;
+      readonly status: "valid";
       readonly buildContext: BuildContext;
       readonly version?: string;
     }
   | {
-      readonly status: "versionedEmpty";
+      readonly status: "invalid";
+    }
+  | {
+      readonly status: "noVersionsFound";
       readonly versionsDirectory: DirectoryPath;
     }
   | {
-      readonly status: "versionNotFound";
+      readonly status: "invalidVersionSelected";
     }
   | {
-      readonly status: "cancelled";
+      readonly status: "cancelledVersionSelection";
     };
 
 export class VersionedBuildResolver {
@@ -26,53 +28,48 @@ export class VersionedBuildResolver {
   public async resolve(
     buildDirectory: DirectoryPath,
     apiVersion: string | undefined,
-    selectVersion: (versions: string[]) => Promise<string | undefined>
+    selectVersion: ((versions: string[]) => Promise<string | undefined>) | undefined
   ): Promise<ResolvedBuildResult> {
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
       return {
-        status: "resolved",
-        buildDirectory: buildContext.getBuildDirectory(),
-        buildContext
+        status: "invalid"
       };
     }
 
     const config = await buildContext.getBuildFileContents();
-    if (!("generateVersionedPortal" in config)) {
+    if (!config.generateVersionedPortal || !selectVersion) {
       return {
-        status: "resolved",
-        buildDirectory: buildContext.getBuildDirectory(),
+        status: "valid",
         buildContext
       };
     }
 
-    const versionsPath = (config.versionsPath as string) ?? "versioned_docs";
-    const versionsDirectory = buildDirectory.join(versionsPath);
+    const versionsDirectory = buildDirectory.join(config.versionsPath ?? "versioned_docs");
 
     if (!(await this.fileService.directoryExists(versionsDirectory))) {
-      return { status: "versionedEmpty", versionsDirectory };
+      return { status: "noVersionsFound", versionsDirectory };
     }
 
     const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
     const versions = versionsDirs.map((dir) => dir.leafName());
 
     if (versions.length === 0) {
-      return { status: "versionedEmpty", versionsDirectory };
+      return { status: "noVersionsFound", versionsDirectory };
     }
 
     const selectedVersion = apiVersion ?? (await selectVersion(versions));
     if (!selectedVersion) {
-      return { status: "cancelled" };
+      return { status: "cancelledVersionSelection" };
     }
 
     if (!versions.includes(selectedVersion)) {
-      return { status: "versionNotFound" };
+      return { status: "invalidVersionSelected" };
     }
 
     const resolvedBuildDirectory = versionsDirectory.join(selectedVersion);
     return {
-      status: "resolved",
-      buildDirectory: resolvedBuildDirectory,
+      status: "valid",
       buildContext: new BuildContext(resolvedBuildDirectory),
       version: selectedVersion
     };
