@@ -2,8 +2,6 @@ import { PublishingApiService } from '../../../infrastructure/services/publishin
 import { SdkPublishNonInteractivePrompts } from '../../../prompts/sdk/publish/non-interactive.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
-import { FileName } from '../../../types/file/fileName.js';
-import { FilePath } from '../../../types/file/filePath.js';
 import {
   getLanguageConfigs,
   hasEnabledLanguage,
@@ -20,6 +18,7 @@ import { GenerateAction } from '../generate.js';
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
+import { TempContext } from '../../../types/temp-context.js';
 import { isValidSemVer } from '../../../utils/string-utils.js';
 
 export class SdkPublishNonInteractiveAction {
@@ -123,7 +122,7 @@ export class SdkPublishNonInteractiveAction {
         sdkDirectory,
         language,
         force,
-        true,
+        false,
         undefined,
         version
       );
@@ -136,7 +135,8 @@ export class SdkPublishNonInteractiveAction {
 
       if (!dryRun) {
         const sdkLanguageDirectory = sdkDirectory.join(language);
-        const sdkFilePath = new FilePath(sdkLanguageDirectory, new FileName(`${language}.zip`));
+        const tempContext = new TempContext(tempDirectory);
+        const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
 
         const publishSdkResponse = await this.prompts.publishSdk(
           this.publishingApiService.publishSdkPackage(

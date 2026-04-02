@@ -4,9 +4,8 @@ import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { SdkPublishInteractivePrompts } from '../../../prompts/sdk/publish/interactive.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
-import { FileName } from '../../../types/file/fileName.js';
-import { FilePath } from '../../../types/file/filePath.js';
 import { getLanguageConfigs, hasEnabledLanguage } from '../../../types/publish-api/publishing-profile.js';
+import { TempContext } from '../../../types/temp-context.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { getPackageConfigurationForLanguage, getPublishTypeForLanguage, PublishType } from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
@@ -85,7 +84,7 @@ export class SdkPublishInteractiveAction {
         sdkDirectory,
         language,
         force,
-        true,
+        false,
         undefined,
         version
       );
@@ -97,7 +96,8 @@ export class SdkPublishInteractiveAction {
       }
 
       const sdkLanguageDirectory = sdkDirectory.join(language);
-      const sdkFilePath = new FilePath(sdkLanguageDirectory, new FileName(`${language}.zip`));
+      const tempContext = new TempContext(tempDirectory);
+      const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
 
       const publishSdkResponse = await this.prompts.publishSdk(
         this.publishingApiService.publishSdkPackage(
