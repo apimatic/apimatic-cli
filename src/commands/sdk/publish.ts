@@ -12,7 +12,9 @@ import { SdkPublishValidationFailedEvent } from '../../types/events/sdk-publish-
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
 
-  static readonly description = `Generate and publish an SDK using your API spec and a publishing profile. Requires an input directory containing the API specification. Supports interactive mode for guided publishing and non-interactive mode for CI/CD automation.`;
+  static readonly description = `Generate and publish an SDK using your API spec and a publishing profile.
+Runs in interactive mode when no flags are provided, guiding you through the publishing process.
+Runs in non-interactive mode when --profile-id, --language, --version, and --publish-type flags are provided, suitable for CI/CD automation.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
