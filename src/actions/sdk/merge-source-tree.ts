@@ -42,8 +42,7 @@ export class MergeSourceTreeAction {
 
     if (!this.gitService.detectMergeConflicts(sdkDir)) {
       if (await buildContext.hasSdkSourceTree(language) || trackChanges) {
-        await this.gitService.checkoutMainBranch(sdkDir);
-        this.fileService.createDirectoryIfNotExists(buildContext.getSdkSourceTreeDirectory());
+        await this.fileService.createDirectoryIfNotExists(buildContext.getSdkSourceTreeDirectory());
         await this.zipService.archive(gitDir, await buildContext.getSdkSourceTree(language));
         await this.fileService.deleteDirectory(gitDir);
       }
@@ -71,10 +70,7 @@ export class MergeSourceTreeAction {
       if (opened) {
         this.prompts.waitingForVscodeClose(language);
         await this.launcherService.waitForVscodeToClose(sdkDir);
-      } else if (!(await this.prompts.waitForConflictsResolved(language, await dirPath(async (reviewDir) => {
-        await this.fileService.copyDirectoryContents(sdkDir, reviewDir);
-        return reviewDir;
-      })))) {
+      } else if (!(await this.prompts.waitForConflictsResolved(language, await dirPath(sdkDir, async (reviewDir) => reviewDir)))) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }

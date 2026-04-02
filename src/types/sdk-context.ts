@@ -51,14 +51,8 @@ export class SdkContext {
       return sdkLanguageDir;
     }
 
-    const finalSdkDir = tempSdkDirectory.join("final-sdk");
-    await this.fileService.createDirectoryIfNotExists(finalSdkDir);
-    await this.fileService.copyDirectoryContents(tempSdkDirectory, finalSdkDir);
-    const sdkZip = FilePath.create(tempSdkDirectory.join("final-sdk.zip").toString())!;
-    await this.fileService.zipDirectory(finalSdkDir, sdkZip);
-
     const zipPath = new FilePath(sdkLanguageDir, new FileName(`${this.language}.zip`));
-    await this.fileService.copy(sdkZip, zipPath);
+    await this.fileService.zipDirectory(tempSdkDirectory, zipPath);
 
     return sdkLanguageDir;
   }

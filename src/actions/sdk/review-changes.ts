@@ -36,20 +36,18 @@ export class ReviewChangesAction {
       }
     }
 
-    await dirPath(async (reviewDir) => {
-      await this.fileService.copyDirectoryContents(updatedStateDirectory, reviewDir);
+    return await dirPath(updatedStateDirectory, async (reviewDir) => {
       // Open diffs for review in the IDE, or fall back to manual review
       const opened = await this.launcherService.openDiffsInSourceControl(reviewDir, diffPairs, standaloneFiles);
       if (opened) {
         this.prompts.reviewInIdeAndClose();
         await this.launcherService.waitForVscodeToClose(reviewDir);
+        return ActionResult.success();
       } else if (!await this.prompts.reviewChangesManually(reviewDir)) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }
+      return ActionResult.success();
     });
-
-
-    return ActionResult.success();
   }
 }
