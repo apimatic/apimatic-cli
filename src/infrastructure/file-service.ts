@@ -117,6 +117,20 @@ export class FileService {
     );
   }
 
+  public async deleteDirectoryExcluding(dir: DirectoryPath, excludeNames: string[]): Promise<void> {
+    const entries = await fsExtra.readdir(dir.toString());
+    const excludeSet = new Set(excludeNames);
+
+    await Promise.all(
+      entries
+        .filter((entry) => !excludeSet.has(entry))
+        .map(async (entry) => {
+          const fullPath = path.join(dir.toString(), entry);
+          return fsExtra.remove(fullPath);
+        })
+    );
+  }
+
   public async deleteFile(filePath: FilePath): Promise<void> {
     const exists = await this.fileExists(filePath);
     if (exists) {

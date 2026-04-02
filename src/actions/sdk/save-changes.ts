@@ -82,6 +82,7 @@ export class SaveChangesAction {
 
       // Checkout to a custom branch before copying user's SDK
       await this.gitService.checkoutCustomBranch(updatedStateDirectory);
+      await this.fileService.deleteDirectoryExcluding(updatedStateDirectory, [".git"]);
       await this.fileService.copyDirectoryExcluding(sdk, updatedStateDirectory, [".git"]);
 
       // Detect changes between the updated SDK and the source tree
