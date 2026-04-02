@@ -52,7 +52,7 @@ export class SaveChangesAction {
 
     const { buildContext, version } = resolvedBuildResult;
 
-    if (!buildContext.hasSdkSourceTree(language)) {
+    if (!(await buildContext.hasSdkSourceTree(language))) {
       this.prompts.sdkSourceTreeNotFound(language, workingDirectory);
       return ActionResult.failed();
     }
