@@ -45,7 +45,7 @@ export class PublishingApiService {
     profileId: string,
     language: Language,
     languageVersion: string,
-    publishType: PublishType,
+    publishType: PublishType[],
     configDir: DirectoryPath,
     shell: string
   ): Promise<Result<PublishingInfo, ServiceError>> {
@@ -61,8 +61,8 @@ export class PublishingApiService {
       formData.append('file', sdkFileStream);
       formData.append('languageVersion', languageVersion);
 
-      if (publishType !== PublishType.Both) {
-        formData.append('publishType', publishType);
+      if (publishType.length === 1) {
+        formData.append('publishType', publishType[0]);
       }
 
       const response = await this.axiosInstance(shell, token).post(`/publish/${profileId}/${language}`, formData, {

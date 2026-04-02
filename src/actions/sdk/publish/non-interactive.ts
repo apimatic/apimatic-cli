@@ -34,7 +34,7 @@ export class SdkPublishNonInteractiveAction {
     buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     language: Language,
-    publishType: PublishType,
+    publishType: PublishType[],
     force: boolean,
     dryRun: boolean,
     profileId: string | undefined = undefined,
@@ -45,7 +45,7 @@ export class SdkPublishNonInteractiveAction {
     if (!profileId) missing.push('--profile');
     if (!language) missing.push('--language');
     if (!version) missing.push('--version');
-    if (!publishType) missing.push('--publish-type');
+    if (!publishType || publishType.length === 0) missing.push('--publish-type');
     if (missing.length > 0) {
       this.prompts.missingRequiredFlags(missing);
       return ActionResult.failed();
@@ -88,23 +88,24 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    if (languageConfig.packageConfig === null && (publishType === PublishType.PackagePublishing || publishType === PublishType.Both)) {
+    if (languageConfig.packageConfig === null && publishType.includes(PublishType.PackagePublishing)) {
       this.prompts.packageConfigurationNotFoundForLanguage(language);
       return ActionResult.failed();
     }
 
-    if (languageConfig.gitConfig === null && (publishType === PublishType.SourceCodePublishing || publishType === PublishType.Both)) {
+    if (languageConfig.gitConfig === null && publishType.includes(PublishType.SourceCodePublishing)) {
       this.prompts.gitConfigurationNotFoundForLanguage(language);
       return ActionResult.failed();
     }
 
-    const allowedPublishType = getPublishTypeForLanguage(languageConfig);
-    if (allowedPublishType !== PublishType.Both && publishType !== allowedPublishType) {
-      this.prompts.publishTypeNotAllowedForLanguage(publishType, language);
+    const allowedPublishTypes = getPublishTypeForLanguage(languageConfig);
+    const disallowedType = publishType.find((pt) => !allowedPublishTypes.includes(pt));
+    if (disallowedType) {
+      this.prompts.publishTypeNotAllowedForLanguage(disallowedType, language);
       return ActionResult.failed();
     }
 
-    if (publishType === PublishType.SourceCodePublishing) {
+    if (!publishType.includes(PublishType.PackagePublishing)) {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 

@@ -64,7 +64,7 @@ export class SdkPublishInteractiveAction {
     const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
     const publishType = getPublishTypeForLanguage(languageConfig);
 
-    if (publishType === PublishType.SourceCodePublishing) {
+    if (!publishType.includes(PublishType.PackagePublishing)) {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 

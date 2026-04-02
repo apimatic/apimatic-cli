@@ -29,28 +29,34 @@ export default class SdkPublish extends Command {
     language: Flags.string({
       char: 'l',
       description: 'Language to generate and publish the SDK for.',
-      options: Object.values(Language).filter((l) => l !== Language.GO).map((l) => l.valueOf())
+      options: Object.values(Language)
+        .filter((l) => l !== Language.GO)
+        .map((l) => l.valueOf())
     }),
     ...FlagsProvider.force,
     ...FlagsProvider.input,
     'publish-type': Flags.string({
       description:
-        "Publishing target: 'package' for a package registry, 'sourcecode' for a git repository, or 'both' for both publishing options.",
-      options: Object.values(PublishType).map((t) => t.valueOf())
+        "One or more publishing targets: 'package' for a package registry, 'sourcecode' for a git repository.",
+      options: [PublishType.PackagePublishing, PublishType.SourceCodePublishing],
+      multiple: true,
+      multipleNonGreedy: true
     }),
     'dry-run': Flags.boolean({
       default: false,
-      description:
-        'Generate the SDK without publishing. Useful for reviewing generated SDK before publishing.'
+      description: 'Generate the SDK without publishing. Useful for reviewing generated SDK before publishing.'
     })
   };
 
   static examples = [
     `${SdkPublish.cmdTxt}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag('language', 'typescript')} ${format.flag(
-      'version',
-      '1.0.0'
-    )} ${format.flag('publish-type', PublishType.Both)}`,
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag(
+      'language',
+      'typescript'
+    )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
+      'publish-type',
+      PublishType.SourceCodePublishing
+    )}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag('language', 'java')} ${format.flag(
       'version',
       '2.0.0'
@@ -75,7 +81,8 @@ export default class SdkPublish extends Command {
       }
     } = await this.parse(SdkPublish);
 
-    const interactive = !profileId && !language && !version && !publishType;
+    const publishTypes = [...new Set(publishType)] as PublishType[];
+    const interactive = !profileId && !language && !version && publishTypes.length === 0;
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
@@ -99,7 +106,7 @@ export default class SdkPublish extends Command {
               version,
               language,
               ...(force && { force }),
-              'publish-type': publishType
+              'publish-type': publishTypes
             }),
             commandMetadata.shell
           );
@@ -110,7 +117,7 @@ export default class SdkPublish extends Command {
       buildDirectory,
       sdkDirectory,
       language as Language,
-      publishType as PublishType,
+      publishTypes,
       interactive,
       force,
       dryRun,

@@ -17,7 +17,7 @@ export class PublishAction {
     buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     language: Language,
-    publishType: PublishType,
+    publishType: PublishType[],
     interactive: boolean,
     force: boolean,
     dryRun: boolean,
