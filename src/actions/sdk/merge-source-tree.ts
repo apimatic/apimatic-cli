@@ -1,7 +1,4 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FilePath } from "../../types/file/filePath.js";
-import { FileService } from "../../infrastructure/file-service.js";
-import { GitService } from "../../infrastructure/git-service.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { MergeSourceTreePrompts } from "../../prompts/sdk/merge-source-tree.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
@@ -11,14 +8,12 @@ import { Language } from "../../types/sdk/generate.js";
 import { ActionResult } from "../action-result.js";
 import isInCi from "is-in-ci";
 import { BuildContext } from "../../types/build-context.js";
-import { ZipService } from "../../infrastructure/zip-service.js";
 import { dirPath } from "../../infrastructure/tmp-extensions.js";
+import { MergeSourceTree } from "../../application/sdk/merge-source-tree.js";
 
 export class MergeSourceTreeAction {
   private readonly prompts = new MergeSourceTreePrompts();
-  private readonly fileService = new FileService();
-  private readonly zipService = new ZipService();
-  private readonly gitService = new GitService();
+  private readonly mergeSourceTree = new MergeSourceTree();
   private readonly launcherService = new LauncherService();
 
   public async execute(
@@ -31,24 +26,21 @@ export class MergeSourceTreeAction {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata
   ): Promise<ActionResult> {
-    const gitDir = sdkDir.join(".git");
-
     if (skipChanges) {
-      await this.gitService.forceCheckoutMainBranch(sdkDir);
-      await this.fileService.deleteDirectory(gitDir);
+      await this.mergeSourceTree.skipCustomizations(sdkDir);
       return ActionResult.success();
     }
 
-    if (!this.gitService.detectMergeConflicts(sdkDir)) {
-      if (await buildContext.hasSdkSourceTree(language) || trackChanges) {
-        await this.fileService.createDirectoryIfNotExists(buildContext.getSdkSourceTreeDirectory());
-        await this.zipService.archive(gitDir, await buildContext.getSdkSourceTree(language));
-      }
-      await this.fileService.deleteDirectory(gitDir);
+    if (await this.mergeSourceTree.saveNonConflictedSourceTree(
+      sdkDir,
+      await buildContext.getSdkSourceTree(language),
+      await buildContext.hasSdkSourceTree(language) || trackChanges
+    )) {
       return ActionResult.success();
     }
 
-    let conflictedFilePaths = await this.gitService.getConflictedFiles(sdkDir);
+    let conflictedFilePaths = await this.mergeSourceTree.getConflicts(sdkDir);
+
     this.prompts.displayFileTree(language, conflictedFilePaths);
     
     if (isInCi) {
@@ -56,15 +48,8 @@ export class MergeSourceTreeAction {
       return ActionResult.failed();
     }
 
-    // Resolve conflicts
-    while (conflictedFilePaths.length > 0) {
-      const conflictFilesToOpen = (
-        await Promise.all(
-          conflictedFilePaths.map(async (conflictPath) => FilePath.create(sdkDir.join(conflictPath).toString())!)
-        )
-      );
-
-      const opened = await this.launcherService.openFolderInIde(sdkDir, ...conflictFilesToOpen);
+    do {
+      const opened = await this.launcherService.openFolderInIde(sdkDir, ...conflictedFilePaths);
 
       if (opened) {
         this.prompts.waitingForVscodeClose(language);
@@ -74,11 +59,11 @@ export class MergeSourceTreeAction {
         return ActionResult.cancelled();
       }
 
-      conflictedFilePaths = await this.gitService.getConflictedFiles(sdkDir);
-      if (conflictedFilePaths.length > 0) {
-        this.prompts.conflictsStillPresent(language, conflictedFilePaths);
-      }
-    }
+      conflictedFilePaths = await this.mergeSourceTree.getConflicts(sdkDir);
+
+      if (conflictedFilePaths.length == 0) break;
+      this.prompts.conflictsStillPresent(language, conflictedFilePaths);
+    } while (true);
 
     this.prompts.conflictsResolved(language);
 
@@ -87,9 +72,8 @@ export class MergeSourceTreeAction {
       new SdkConflictsResolvedEvent(language, flags),
       commandMetadata.shell
     );
-    await this.gitService.commitResolvedConflicts(sdkDir);
-    await this.zipService.archive(gitDir, await buildContext.getSdkSourceTree(language));
-    await this.fileService.deleteDirectory(gitDir);
+
+    this.mergeSourceTree.commitConflictedSourceTree(sdkDir, await buildContext.getSdkSourceTree(language));
     return ActionResult.success();
   }
 }

@@ -22,14 +22,14 @@ export class ReviewChangesAction {
       const diffPairs: Array<{ base: FilePath; working: FilePath }> = [];
       const standaloneFiles: FilePath[] = [];
       
-      for (const { filePath, status } of fileStatuses) {
-        const originalFilePath = filePath.replaceDirectory(baseStateDirectory);
+      for (const { fileName, status } of fileStatuses) {
+        const originalFilePath = new FilePath(baseStateDirectory, fileName);
         if (status === "deleted") {
           const renamedFilePath = await this.fileService.postfixFileName(originalFilePath, " [deleted]");
           standaloneFiles.push(renamedFilePath);
           continue;
         }
-        const workingFilePath = filePath.replaceDirectory(reviewDir);
+        const workingFilePath = new FilePath(reviewDir, fileName);
         if (status === "added") {
           standaloneFiles.push(workingFilePath);
         } else {

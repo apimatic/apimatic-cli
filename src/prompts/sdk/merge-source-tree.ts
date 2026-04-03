@@ -1,6 +1,7 @@
 import { isCancel, log, text } from "@clack/prompts";
 import { buildFilePathTree, format as f } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FilePath } from "../../types/file/filePath.js";
 
 export class MergeSourceTreePrompts {
 
@@ -8,10 +9,10 @@ export class MergeSourceTreePrompts {
     log.error("Exiting without resolving conflicts.");
   }
 
-  public displayFileTree(sdkName: string, conflictedFiles: string[]) {
+  public displayFileTree(sdkName: string, conflictedFiles: FilePath[]) {
     log.message(`Conflicts found in ${f.var(sdkName)} SDK:`);
     const tree = buildFilePathTree(sdkName, [
-      ...conflictedFiles.map((path) => ({ path, description: "# Conflicted file" }))
+      ...conflictedFiles.map((filePath) => ({ path: filePath.getFileName(), description: "# Conflicted file" }))
     ]);
     log.message(tree);
   }
@@ -36,10 +37,10 @@ export class MergeSourceTreePrompts {
     );
   }
 
-  public conflictsStillPresent(sdkName: string, conflictedFiles: string[]) {
+  public conflictsStillPresent(sdkName: string, conflictedFiles: FilePath[]) {
     log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
     const tree = buildFilePathTree(sdkName, [
-      ...conflictedFiles.map((path) => ({ path, description: "# Conflicted file" }))
+      ...conflictedFiles.map((filePath) => ({ path: filePath.getFileName(), description: "# Conflicted file" }))
     ]);
     log.message(tree);
   }

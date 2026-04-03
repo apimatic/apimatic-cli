@@ -12,9 +12,7 @@ export class FilePath {
   }
 
   public replaceDirectory(newDirectory: DirectoryPath): FilePath {
-    const directory = path.dirname(this.fileName.toString());
-    const filename = path.basename(this.fileName.toString());
-    return new FilePath(newDirectory.join(directory), new FileName(filename));
+    return new FilePath(newDirectory, this.fileName);
   }
 
   public getFileName(): string {
@@ -23,20 +21,6 @@ export class FilePath {
 
   public toString(): string {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
-  }
-
-  public static createFromRelativePath(filePath: string): FilePath | undefined {
-    if (!filePath) {
-      return undefined;
-    }
-
-    try {
-      const normalizedPath = path.normalize(filePath);
-      const fileName = new FileName(normalizedPath);
-      return new FilePath(DirectoryPath.default, fileName);
-    } catch {
-      return undefined;
-    }
   }
 
   public static create(filePath: string): FilePath | undefined {

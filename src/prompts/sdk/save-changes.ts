@@ -76,8 +76,8 @@ export class SaveChangesPrompts {
     log.message(`Detected changes in ${fileStatuses.length} file(s):`);
     const tree = buildFilePathTree(
       language,
-      fileStatuses.map(({ filePath, status }) => ({
-        path: filePath.getFileName(),
+      fileStatuses.map(({ fileName, status }) => ({
+        path: fileName.toString(),
         description: status === "modified" ? "# Modified" : status === "added" ? "# Added" : "# Deleted"
       }))
     );

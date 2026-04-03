@@ -1,21 +1,18 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
-import { FileService } from "../../infrastructure/file-service.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { Language } from "../../types/sdk/generate.js";
-import { ZipService } from "../../infrastructure/zip-service.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
-import { GitFileStatus, GitService } from "../../infrastructure/git-service.js";
 import { ReviewChangesAction } from "./review-changes.js";
 import { VersionedBuildResolver } from "../../application/sdk/versioned-build-resolver.js";
 import { SdkInputContext } from "../../types/sdk-input-context.js";
-import { FilePath } from "../../types/file/filePath.js";
+import { SaveChanges } from "../../application/sdk/save-changes.js";
 
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
   private readonly reviewChanges = new ReviewChangesAction();
   private readonly versionedBuildResolver = new VersionedBuildResolver();
-  private readonly changesSaver = new SdkChangesSaver();
+  private readonly saveChanges = new SaveChanges();
 
   public async execute(
     workingDirectory: DirectoryPath,
@@ -71,13 +68,13 @@ export class SaveChangesAction {
 
     return withDirPath(async (tempDirectory) => {
       const sourceTreePath = await buildContext.getSdkSourceTree(language);
-      const updatedStateDirectory = await this.changesSaver.prepareUpdatedSdkDirectory(
+      const updatedStateDirectory = await this.saveChanges.prepareUpdatedSdkDirectory(
         sdkInputDirectory,
         sourceTreePath,
         tempDirectory
       );
 
-      const fileStatuses = await this.changesSaver.getChanges(updatedStateDirectory);
+      const fileStatuses = await this.saveChanges.getChanges(updatedStateDirectory);
       if (fileStatuses.length === 0) {
         this.prompts.noChangesDetected();
         return ActionResult.success();
@@ -86,7 +83,7 @@ export class SaveChangesAction {
 
       const reviewResult = await this.reviewChanges.execute(
         updatedStateDirectory,
-        await this.changesSaver.prepareBaseSdkDirectory(updatedStateDirectory, tempDirectory),
+        await this.saveChanges.prepareBaseSdkDirectory(updatedStateDirectory, tempDirectory),
         fileStatuses
       );
       if (reviewResult.isCancelled()) {
@@ -96,54 +93,9 @@ export class SaveChangesAction {
         return ActionResult.failed();
       }
 
-      await this.changesSaver.saveSourceTree(updatedStateDirectory, sourceTreePath);
+      await this.saveChanges.saveSourceTree(updatedStateDirectory, sourceTreePath);
       this.prompts.changesSaved();
       return ActionResult.success();
     });
-  }
-}
-
-class SdkChangesSaver {
-  private readonly fileService = new FileService();
-  private readonly zipService = new ZipService();
-  private readonly gitService = new GitService();
-
-  public async prepareUpdatedSdkDirectory(
-    sdk: DirectoryPath,
-    sourceTreePath: FilePath,
-    tempDirectory: DirectoryPath
-  ): Promise<DirectoryPath> {
-    const updatedSdkDirectory = tempDirectory.join("updated");
-    const sdkGitDir = updatedSdkDirectory.join(".git");
-    await this.fileService.createDirectoryIfNotExists(sdkGitDir);
-    await this.zipService.unArchive(sourceTreePath, sdkGitDir);
-    await this.gitService.checkoutCustomBranch(updatedSdkDirectory);
-    await this.fileService.cleanDirectoryExcluding(updatedSdkDirectory, [".git"]);
-    await this.fileService.copyDirectoryExcluding(sdk, updatedSdkDirectory, [".git"]);
-    return updatedSdkDirectory;
-  }
-
-  public async getChanges(updatedSdkDirectory: DirectoryPath): Promise<GitFileStatus[]> {
-    return this.gitService.getGitFileStatuses(updatedSdkDirectory);
-  }
-
-  public async prepareBaseSdkDirectory(
-    updatedSdkDirectory: DirectoryPath,
-    tempDirectory: DirectoryPath
-  ): Promise<DirectoryPath> {
-    const baseSdkDirectory = tempDirectory.join("base");
-    await this.fileService.createDirectoryIfNotExists(baseSdkDirectory);
-    await this.fileService.copyDirectoryContents(updatedSdkDirectory, baseSdkDirectory);
-    await this.gitService.hardReset(baseSdkDirectory);
-    return baseSdkDirectory;
-  }
-
-  public async saveSourceTree(
-    updatedSdkDirectory: DirectoryPath,
-    sourceTreePath: FilePath
-  ): Promise<void> {
-    const sdkGitDir = updatedSdkDirectory.join(".git");
-    await this.gitService.commitReviewedChanges(updatedSdkDirectory);
-    await this.zipService.archive(sdkGitDir, sourceTreePath);
   }
 }

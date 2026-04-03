@@ -218,6 +218,13 @@ export class FileService {
     const normalizedContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     await this.writeContents(filePath, normalizedContent);
   }
+
+  public async filterFilesWithConflictMarkers(updatedFiles: FilePath[]): Promise<FilePath[]> {
+    return await Promise.all(
+      updatedFiles.filter(async (file) =>
+        (await this.fileExists(file)) && (await this.readFile(file)).includes("<<<<<<< "))
+    );
+  }
 }
 
 const streamPipeline = promisify(pipeline);
