@@ -159,6 +159,8 @@ export interface TypeScriptConfigurationItem extends BaseConfigurationItem {
 export interface PublishingProfileItem {
   id: string;
   name: string;
+  apiGroupId: string;
+  apiGroupName: string;
   cSharpConfiguration: CSharpConfigurationItem | null;
   goConfiguration: GoConfigurationItem | null;
   javaConfiguration: JavaConfigurationItem | null;
@@ -181,6 +183,12 @@ export interface LanguagePublishingConfig {
   gitConfig: BaseConfigurationItem | null;
 }
 
+export interface ProfileGroup {
+  apiGroupId: string;
+  apiGroupName: string;
+  profiles: PublishingProfileItem[];
+}
+
 export function getLanguageConfigs(profile: PublishingProfileItem): LanguagePublishingConfig[] {
   return [
     { language: Language.CSHARP, packageConfig: profile.cSharpConfiguration, gitConfig: profile.cSharpGitConfiguration },
@@ -195,6 +203,18 @@ export function getLanguageConfigs(profile: PublishingProfileItem): LanguagePubl
       gitConfig: profile.typeScriptGitConfiguration
     }
   ];
+}
+
+export function groupProfilesByApiGroup(profiles: PublishingProfileItem[]): ProfileGroup[] {
+  return profiles.reduce<ProfileGroup[]>((groups, profile) => {
+    const group = groups.find((g) => g.apiGroupId === profile.apiGroupId);
+    if (group) {
+      group.profiles.push(profile);
+    } else {
+      groups.push({ apiGroupId: profile.apiGroupId, apiGroupName: profile.apiGroupName, profiles: [profile] });
+    }
+    return groups;
+  }, []);
 }
 
 export function hasEnabledLanguage(profile: PublishingProfileItem): boolean {

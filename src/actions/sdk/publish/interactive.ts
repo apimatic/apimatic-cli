@@ -4,7 +4,7 @@ import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { SdkPublishInteractivePrompts } from '../../../prompts/sdk/publish/interactive.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
-import { getLanguageConfigs, hasEnabledLanguage } from '../../../types/publish-api/publishing-profile.js';
+import { getLanguageConfigs, groupProfilesByApiGroup, hasEnabledLanguage } from '../../../types/publish-api/publishing-profile.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { getPackageConfigurationForLanguage, getPublishTypeForLanguage, PublishType } from '../../../types/sdk/publish.js';
@@ -43,7 +43,7 @@ export class SdkPublishInteractiveAction {
       return ActionResult.failed();
     }
 
-    const publishingProfile = await this.prompts.selectPublishingProfile(profilesWithEnabledLanguages);
+    const publishingProfile = await this.prompts.selectPublishingProfile(groupProfilesByApiGroup(profilesWithEnabledLanguages));
     if (!publishingProfile) {
       this.prompts.noPublishingProfileSelected();
       return ActionResult.cancelled();

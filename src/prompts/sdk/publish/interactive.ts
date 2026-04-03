@@ -4,7 +4,7 @@ import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
 import { noteWrapped } from '../../prompt.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { getLanguageConfigs, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
+import { getLanguageConfigs, ProfileGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { withSpinner } from '../../prompt.js';
 import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
@@ -34,24 +34,20 @@ export class SdkPublishInteractivePrompts {
   }
 
   public async selectPublishingProfile(
-    publishingProfiles: PublishingProfileItem[]
+    groups: ProfileGroup[]
   ): Promise<PublishingProfileItem | undefined> {
     const publishingProfile = await select({
       message: 'Select a publishing profile:',
-      options: publishingProfiles.map((profile: PublishingProfileItem) => ({
-        value: profile,
-        label: `${profile.name} (${[
-          (profile.cSharpConfiguration?.isEnabled || profile.cSharpGitConfiguration?.isEnabled) && 'C#',
-          (profile.javaConfiguration?.isEnabled || profile.javaGitConfiguration?.isEnabled) && 'Java',
-          (profile.goConfiguration?.isEnabled || profile.goGitConfiguration?.isEnabled) && 'Go',
-          (profile.phpConfiguration?.isEnabled || profile.phpGitConfiguration?.isEnabled) && 'PHP',
-          (profile.pythonConfiguration?.isEnabled || profile.pythonGitConfiguration?.isEnabled) && 'Python',
-          (profile.rubyConfiguration?.isEnabled || profile.rubyGitConfiguration?.isEnabled) && 'Ruby',
-          (profile.typeScriptConfiguration?.isEnabled || profile.typeScriptGitConfiguration?.isEnabled) && 'TypeScript'
-        ]
-          .filter(Boolean)
-          .join(', ')}) | ID: (${profile.id})`
-      }))
+      options: groups.flatMap((group) =>
+        group.profiles.map((profile) => ({
+          value: profile,
+          hint: group.apiGroupName,
+          label: `${profile.name} (${getLanguageConfigs(profile)
+            .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
+            .map(({ language }) => language)
+            .join(', ')}) | ID: ${profile.id}`
+        }))
+      )
     });
 
     if (isCancel(publishingProfile)) {

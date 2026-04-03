@@ -2,7 +2,7 @@ import pc from 'picocolors';
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { getLanguageConfigs, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
+import { getLanguageConfigs, ProfileGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
 import { withSpinner } from '../../prompt.js';
 import { stripAnsi } from '../../../utils/string-utils.js';
 
@@ -24,10 +24,13 @@ export class PublishingProfileListPrompts {
     log.info('No publishing profiles found. Please create a publishing profile to view it here.');
   }
 
-  public displayProfiles(profiles: PublishingProfileItem[]) {
-    const count = profiles.length;
+  public displayProfiles(groups: ProfileGroup[]) {
+    const count = groups.reduce((sum, group) => sum + group.profiles.length, 0);
     const label = count === 1 ? '1 profile' : `${count} profiles`;
-    log.info(`${pc.bold('Publishing Profiles')} ${pc.dim(`(${label})`)}\n\n${buildTable(profiles)}`);
+    const sections = groups
+      .map((group) => `${pc.bold(pc.white(group.apiGroupName))}\n${buildTable(group.profiles)}`)
+      .join('\n\n');
+    log.info(`${pc.bold('Publishing Profiles')} ${pc.dim(`(${label})`)}\n\n${sections}`);
   }
 }
 
@@ -70,11 +73,10 @@ function buildTable(profiles: PublishingProfileItem[]): string {
 
   const coloredHeaders = headers.map((h) => pc.bold(pc.white(h)));
 
-  return [
-    divider('┌', '┬', '┐'),
-    renderRow(coloredHeaders),
-    divider('├', '┼', '┤'),
-    ...coloredRows.map(renderRow),
-    divider('└', '┴', '┘')
-  ].join('\n');
+  const lines = [divider('┌', '┬', '┐'), renderRow(coloredHeaders), divider('├', '┼', '┤')];
+  coloredRows.forEach((row, i) => {
+    lines.push(renderRow(row));
+    lines.push(i < coloredRows.length - 1 ? divider('├', '┼', '┤') : divider('└', '┴', '┘'));
+  });
+  return lines.join('\n');
 }
