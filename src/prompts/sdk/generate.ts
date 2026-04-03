@@ -53,17 +53,17 @@ export class SdkGeneratePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public versionedBuildEmpty(directory: DirectoryPath) {
-    const message = `The directory is either empty or invalid: ${f.path(directory)}`;
+  public invalidVersionedDocsDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
 
-  public versionNotSelected() {
-    this.logGenerationError(`No API version is selected.`);
+  public apiVersionOnlyApplicableWithVersionedBuild() {
+    log.warn(`The ${f.flag("--api-version")} is only applicable with a versioned build.`);
   }
 
   public versionNotFound() {
-    this.logGenerationError(`The API version is invalid.`);
+    this.logGenerationError(`The selected API version is invalid.`);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
@@ -85,5 +85,9 @@ export class SdkGeneratePrompts {
 
   public changeTrackingEnabled() {
     log.info(`Change tracking is enabled.`);
+  }
+
+  public changeTrackingAlreadyEnabled() {
+    log.warn(`Change tracking is already enabled. No need to use the ${f.flag("--track-changes")} flag again.`);
   }
 }

@@ -27,17 +27,22 @@ export class SaveChangesPrompts {
     this.logSaveChangesError(message);
   }
 
-  public versionNotFound() {
-    this.logSaveChangesError(`The API version is invalid.`);
+  public invalidVersionedDocsDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
+    this.logSaveChangesError(message);
   }
 
-  public versionNotSelected() {
-    this.logSaveChangesError(`No API version is selected.`);
+  public apiVersionOnlyApplicableWithVersionedBuild() {
+    log.warn(`The api-version argument is only applicable with a versioned build.`);
+  }
+
+  public versionNotFound() {
+    this.logSaveChangesError(`The selected API version is invalid.`);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
     const version = await select({
-      message: "Select an API version:",
+      message: "Select an API version to save SDK changes into:",
       options: versions.map((v) => ({ label: v, value: v }))
     });
 

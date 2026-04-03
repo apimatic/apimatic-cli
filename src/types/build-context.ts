@@ -24,10 +24,6 @@ export class BuildContext {
     return await this.fileService.fileExists(this.buildFile);
   }
 
-  public async exists(): Promise<boolean> {
-    return !(await this.fileService.directoryEmpty(this.buildDirectory));
-  }
-
   public async getBuildFileContents(): Promise<BuildConfig> {
     const buildFileContent = await this.fileService.getContents(this.buildFile);
     return JSON.parse(buildFileContent) as BuildConfig;
@@ -50,7 +46,7 @@ export class BuildContext {
   }
 
   public async hasSdkSourceTree(language: string): Promise<boolean> {
-    const sourceTreePath = FilePath.create(this.getSdkSourceTreeDirectory().join(`.${language}`).toString());
+    const sourceTreePath = FilePath.create(this.buildDirectory.join("sdk-source-tree").join(`.${language}`).toString());
     if (!sourceTreePath) {
       return false;
     }
@@ -58,11 +54,59 @@ export class BuildContext {
   }
 
   public async getSdkSourceTree(language: string): Promise<FilePath> {
-    return FilePath.create(this.getSdkSourceTreeDirectory().join(`.${language}`).toString())!;
+    return FilePath.create(this.buildDirectory.join("sdk-source-tree").join(`.${language}`).toString())!;
   }
 
-  public getSdkSourceTreeDirectory(): DirectoryPath {
-    return this.buildDirectory.join("sdk-source-tree");
+  public async isVersionedBuild(): Promise<boolean> {
+    const buildConfig = await this.getBuildFileContents();
+    if (buildConfig.generateVersionedPortal) {
+      return true;
+    }
+    return false;
+  }
+
+  public async getVersionedBuildDirectory(): Promise<DirectoryPath | undefined> {
+    const buildConfig = await this.getBuildFileContents();
+    if (!buildConfig.generateVersionedPortal) {
+      return undefined;
+    }
+    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath ?? 'versioned_docs');
+    if (!await this.fileService.directoryExists(versionsDirectory)) {
+      return undefined;
+    }
+    const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
+    return versionsDirs.length > 0 ? versionsDirectory : undefined;
+  }
+
+  public async getSingleVersionedBuildDirectory(): Promise<DirectoryPath | undefined> {
+    const buildConfig = await this.getBuildFileContents();
+    if (!buildConfig.generateVersionedPortal) {
+      return undefined;
+    }
+    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath ?? 'versioned_docs');
+    if (!await this.fileService.directoryExists(versionsDirectory)) {
+      return undefined;
+    }
+    const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
+    return versionsDirs.length === 1 ? versionsDirs[0] : undefined;
+  }
+
+  public async getSelectedVersionedBuildDirectory(versionSelector: (versions: string[]) => Promise<string | undefined>): Promise<DirectoryPath | undefined> {
+    const buildConfig = await this.getBuildFileContents();
+    if (!buildConfig.generateVersionedPortal) {
+      return undefined;
+    }
+    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath ?? 'versioned_docs');
+    if (!await this.fileService.directoryExists(versionsDirectory)) {
+      return undefined;
+    }
+    const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
+    const selectedVersion = await versionSelector(versionsDirs.map(dir => dir.leafName()));
+    if (!selectedVersion) {
+      return undefined;
+    }
+    return versionsDirs.find(dir => dir.leafName() === selectedVersion);
+
   }
 }
 

@@ -11,20 +11,15 @@ import { SpecContext } from "../../types/spec-context.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
-import { VersionedBuildResolver } from "../../application/sdk/versioned-build-resolver.js";
 import { BuildContext } from '../../types/build-context.js';
-import { FileService } from '../../infrastructure/file-service.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
   private readonly mergeSourceTree: MergeSourceTreeAction = new MergeSourceTreeAction();
-  private readonly versionedBuildResolver: VersionedBuildResolver = new VersionedBuildResolver();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
-  // TODO: remove this
-  private readonly fileService = new FileService();
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
@@ -47,54 +42,52 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    // check if build is version or no
     const rootBuildContext = new BuildContext(buildDirectory);
     if (!(await rootBuildContext.validate())) {
       this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
-
-
-    let version: string | undefined;
-    let buildContext: BuildContext;
-
-
-    const config = await rootBuildContext.getBuildFileContents();
-    if (config.generateVersionedPortal) {
-      const versionsDirectory = buildDirectory.join(config.versionsPath ?? 'versioned_docs');
-      if (!await this.fileService.directoryExists(versionsDirectory)) {
-        this.prompts.versionedBuildEmpty(versionsDirectory);
-        return ActionResult.failed();
+    const versionedContextGetter = async () => {
+      if (!await rootBuildContext.isVersionedBuild()) {
+        if (apiVersion) this.prompts.apiVersionOnlyApplicableWithVersionedBuild();
+        return { version: undefined, buildContext: rootBuildContext };
       }
-      const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
-      const versions = versionsDirs.map((dir) => dir.leafName());
-      if (versions.length === 0) {
-        this.prompts.versionedBuildEmpty(versionsDirectory);
+
+      const versionedBuildDirectory = await rootBuildContext.getVersionedBuildDirectory();
+      if (!versionedBuildDirectory) {
+        this.prompts.invalidVersionedDocsDirectory(buildDirectory);
         return ActionResult.failed();
       }
 
-      const finalVersion = apiVersion ?? (await this.prompts.selectVersion(versions));
-      if (!finalVersion) {
-        this.prompts.versionNotSelected();
-        return ActionResult.cancelled();
+      const singleVersionedBuildDirectory = await rootBuildContext.getSingleVersionedBuildDirectory();
+      if (!apiVersion && singleVersionedBuildDirectory) {
+        return {
+          version: singleVersionedBuildDirectory.leafName(),
+          buildContext: new BuildContext(singleVersionedBuildDirectory)
+        };
       }
-      if (!versions.includes(finalVersion)) {
+
+      const selectedVersionedBuildDirectory = await rootBuildContext.getSelectedVersionedBuildDirectory(
+        apiVersion ? async () => apiVersion : this.prompts.selectVersion
+      );
+      if (!selectedVersionedBuildDirectory) {
         this.prompts.versionNotFound();
         return ActionResult.failed();
       }
 
-      version = finalVersion;
-
-
+      return {
+        version: selectedVersionedBuildDirectory.leafName(),
+        buildContext: new BuildContext(selectedVersionedBuildDirectory)
+      };
+    };
+    
+    const versionedContext = await versionedContextGetter();
+    if (versionedContext instanceof ActionResult) {
+      return versionedContext;
     }
-    else {
-      buildContext = rootBuildContext;
-      version = undefined;
-    }
-    cosnt buildContext = rootBuildContext.GEtOTherContex(version);
 
-    // success go with non-version build context (build-context1)
+    const { version, buildContext } = versionedContext;
 
     const specContext = new SpecContext(buildContext.getSpecDirectory());
     if (!(await specContext.validate())) {
@@ -102,8 +95,8 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const requireUncustomizedDir = skipChanges && await buildContext.hasSdkSourceTree(language);
-    const sdkContext = new SdkContext(sdkDirectory, language, requireUncustomizedDir, version);
+    const hasSdkSourceTree = await buildContext.hasSdkSourceTree(language);
+    const sdkContext = new SdkContext(sdkDirectory, language, skipChanges && hasSdkSourceTree, version);
     if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(sdkContext.getSdkLanguageDirectory()))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
@@ -145,7 +138,11 @@ export class GenerateAction {
 
       this.prompts.sdkGenerated(await sdkContext.save(tempSdkDir, zipSdk));
 
-      if (trackChanges) {
+      if (trackChanges && hasSdkSourceTree) {
+        this.prompts.changeTrackingAlreadyEnabled();
+      }
+
+      if (trackChanges && !hasSdkSourceTree) {
         this.prompts.changeTrackingEnabled();
         const trackChangesTelemetry = new TelemetryService(this.configDir);
         await trackChangesTelemetry.trackEvent(
