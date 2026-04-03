@@ -214,6 +214,7 @@ export class FileService {
   }
 
   public async normalizeFileLineEndings(filePath: FilePath): Promise<void> {
+    if (process.platform !== "win32") return;
     const content = await this.readFile(filePath);
     const normalizedContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     await this.writeContents(filePath, normalizedContent);
