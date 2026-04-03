@@ -15,7 +15,7 @@ export class SdkContext {
     private readonly requireUncustomizedDir: boolean,
     private readonly version?: string
   ) {  }
-  
+
   public getSdkLanguageDirectory(): DirectoryPath {
     const baseDirectory = this.requireUncustomizedDir
       ? this.sdkDirectory.join("uncustomized")
@@ -45,7 +45,7 @@ export class SdkContext {
   public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean) : Promise<DirectoryPath> {
     const sdkLanguageDir = this.getSdkLanguageDirectory();
     await this.fileService.cleanDirectory(sdkLanguageDir);
-    
+
     if (!zipSdk) {
       await this.fileService.copyDirectoryContents(tempSdkDirectory, sdkLanguageDir);
       return sdkLanguageDir;

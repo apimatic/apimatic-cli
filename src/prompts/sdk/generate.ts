@@ -25,7 +25,7 @@ export class SdkGeneratePrompts {
       directory
     )}`;    this.logGenerationError(message);
   }
-  
+
   public srcDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
@@ -54,7 +54,7 @@ export class SdkGeneratePrompts {
   }
 
   public versionedBuildEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var(directory.leafName())} directory is either empty or invalid: ${f.path(directory)}`;
+    const message = `The directory is either empty or invalid: ${f.path(directory)}`;
     this.logGenerationError(message);
   }
 

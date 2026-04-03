@@ -12,6 +12,8 @@ import { TelemetryService } from "../../infrastructure/services/telemetry-servic
 import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { VersionedBuildResolver } from "../../application/sdk/versioned-build-resolver.js";
+import { BuildContext } from '../../types/build-context.js';
+import { FileService } from '../../infrastructure/file-service.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -21,6 +23,8 @@ export class GenerateAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
+  // TODO: remove this
+  private readonly fileService = new FileService();
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null) {
     this.configDir = configDir;
@@ -43,33 +47,54 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const resolvedBuildResult = await this.versionedBuildResolver.resolve(
-      buildDirectory,
-      apiVersion,
-      (versions) => this.prompts.selectVersion(versions)
-    );
-
-    if (resolvedBuildResult.status === "noVersionsFound") {
-      this.prompts.versionedBuildEmpty(resolvedBuildResult.versionsDirectory);
-      return ActionResult.failed();
-    }
-
-    if (resolvedBuildResult.status === "cancelledVersionSelection") {
-      this.prompts.versionNotSelected();
-      return ActionResult.cancelled();
-    }
-
-    if (resolvedBuildResult.status === "invalidVersionSelected") {
-      this.prompts.versionNotFound();
-      return ActionResult.failed();
-    }
-
-    if (resolvedBuildResult.status === "invalid") {
+    // check if build is version or no
+    const rootBuildContext = new BuildContext(buildDirectory);
+    if (!(await rootBuildContext.validate())) {
       this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
-    const { buildContext, version } = resolvedBuildResult;
+
+
+    let version: string | undefined;
+    let buildContext: BuildContext;
+
+
+    const config = await rootBuildContext.getBuildFileContents();
+    if (config.generateVersionedPortal) {
+      const versionsDirectory = buildDirectory.join(config.versionsPath ?? 'versioned_docs');
+      if (!await this.fileService.directoryExists(versionsDirectory)) {
+        this.prompts.versionedBuildEmpty(versionsDirectory);
+        return ActionResult.failed();
+      }
+      const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
+      const versions = versionsDirs.map((dir) => dir.leafName());
+      if (versions.length === 0) {
+        this.prompts.versionedBuildEmpty(versionsDirectory);
+        return ActionResult.failed();
+      }
+
+      const finalVersion = apiVersion ?? (await this.prompts.selectVersion(versions));
+      if (!finalVersion) {
+        this.prompts.versionNotSelected();
+        return ActionResult.cancelled();
+      }
+      if (!versions.includes(finalVersion)) {
+        this.prompts.versionNotFound();
+        return ActionResult.failed();
+      }
+
+      version = finalVersion;
+
+
+    }
+    else {
+      buildContext = rootBuildContext;
+      version = undefined;
+    }
+    cosnt buildContext = rootBuildContext.GEtOTherContex(version);
+
+    // success go with non-version build context (build-context1)
 
     const specContext = new SpecContext(buildContext.getSpecDirectory());
     if (!(await specContext.validate())) {
