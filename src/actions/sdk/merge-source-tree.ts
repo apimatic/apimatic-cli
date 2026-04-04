@@ -7,41 +7,42 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ActionResult } from "../action-result.js";
 import isInCi from "is-in-ci";
-import { BuildContext } from "../../types/build-context.js";
 import { dirPath } from "../../infrastructure/tmp-extensions.js";
-import { MergeSourceTree } from "../../application/sdk/merge-source-tree.js";
+import { MergeSourceTreeContext } from "../../types/merge-source-tree-context.js";
 
 export class MergeSourceTreeAction {
   private readonly prompts = new MergeSourceTreePrompts();
-  private readonly mergeSourceTree = new MergeSourceTree();
   private readonly launcherService = new LauncherService();
 
   public async execute(
+    mergeSourceTreeContext: MergeSourceTreeContext,
     sdkDir: DirectoryPath,
     language: Language,
-    buildContext: BuildContext,
     skipChanges: boolean,
-    trackChanges: boolean,
     flags: Record<string, unknown>,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata
   ): Promise<ActionResult> {
     if (skipChanges) {
-      await this.mergeSourceTree.skipCustomizations(sdkDir);
+      await mergeSourceTreeContext.skipCustomizations();
+      if (await mergeSourceTreeContext.hasCustomizations()) {
+        this.prompts.successfullySkippedChanges(language);
+      }
+      await mergeSourceTreeContext.cleanUp();
       return ActionResult.success();
     }
 
-    if (await this.mergeSourceTree.saveNonConflictedSourceTree(
-      sdkDir,
-      await buildContext.getSdkSourceTree(language),
-      await buildContext.hasSdkSourceTree(language) || trackChanges
-    )) {
+    if (await mergeSourceTreeContext.saveNonConflictedSourceTree()) {
+      if (await mergeSourceTreeContext.hasCustomizations()) {
+        this.prompts.successfullyAppliedChanges(language);
+      }
+      await mergeSourceTreeContext.cleanUp();
       return ActionResult.success();
     }
 
-    let conflictedFilePaths = await this.mergeSourceTree.getConflicts(sdkDir);
+    let conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
 
-    this.prompts.displayFileTree(language, conflictedFilePaths);
+    this.prompts.conflictsDetected(language, conflictedFilePaths);
     
     if (isInCi) {
       this.prompts.warnUnresolvedConflicts(language);
@@ -59,7 +60,7 @@ export class MergeSourceTreeAction {
         return ActionResult.cancelled();
       }
 
-      conflictedFilePaths = await this.mergeSourceTree.getConflicts(sdkDir);
+      conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
 
       if (conflictedFilePaths.length == 0) break;
       this.prompts.conflictsStillPresent(language, conflictedFilePaths);
@@ -73,7 +74,8 @@ export class MergeSourceTreeAction {
       commandMetadata.shell
     );
 
-    this.mergeSourceTree.commitConflictedSourceTree(sdkDir, await buildContext.getSdkSourceTree(language));
+    await mergeSourceTreeContext.saveConflictedSourceTree();
+    await mergeSourceTreeContext.cleanUp();
     return ActionResult.success();
   }
 }

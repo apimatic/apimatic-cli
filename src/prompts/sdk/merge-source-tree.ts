@@ -2,50 +2,58 @@ import { isCancel, log, text } from "@clack/prompts";
 import { buildFilePathTree, format as f } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FilePath } from "../../types/file/filePath.js";
+import { Language } from "../../types/sdk/generate.js";
 
 export class MergeSourceTreePrompts {
-
-  public operationCancelled() {
-    log.error("Exiting without resolving conflicts.");
+  public successfullySkippedChanges(language: Language) {
+    log.info(`Skipped customizations for ${f.var(language)} SDK.`);
   }
 
-  public displayFileTree(sdkName: string, conflictedFiles: FilePath[]) {
-    log.message(`Conflicts found in ${f.var(sdkName)} SDK:`);
-    const tree = buildFilePathTree(sdkName, [
+  public successfullyAppliedChanges(language: Language) {
+    log.info(`Successfully applied customizations for ${f.var(language)} SDK.`);
+  }
+
+  public warnUnresolvedConflicts(language: Language) {
+    log.error(
+      `Merge conflicts detected in the generated ${f.var(language)} SDK. Manually run the same command to resolve the conflicts interactively.`
+    );
+  }
+
+  public conflictsDetected(language: Language, conflictedFiles: FilePath[]) {
+    log.message(`Conflicts found in ${f.var(language)} SDK:`);
+    const tree = buildFilePathTree(language, [
       ...conflictedFiles.map((filePath) => ({ path: filePath.getFileName(), description: "# Conflicted file" }))
     ]);
     log.message(tree);
   }
 
-  public async waitForConflictsResolved(sdkName: string, sdkDir?: DirectoryPath): Promise<boolean> {
+  public conflictsStillPresent(language: Language, conflictedFiles: FilePath[]) {
+    log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
+    const tree = buildFilePathTree(language, [
+      ...conflictedFiles.map((filePath) => ({ path: filePath.getFileName(), description: "# Conflicted file" }))
+    ]);
+    log.message(tree);
+  }
+
+  public async waitForConflictsResolved(language: Language, sdkDir?: DirectoryPath): Promise<boolean> {
     const atPath = sdkDir ? ` at ${f.path(sdkDir)}` : "";
     const result = await text({
-      message: `Resolve all conflicts in the ${f.var(sdkName)} SDK${atPath}, then press Enter.`,
+      message: `Resolve all conflicts in the ${f.var(language)} SDK${atPath}, then press Enter.`,
       defaultValue: ""
     });
 
     return !isCancel(result);
   }
 
-  public waitingForVscodeClose(sdkName: string) {
-    log.info(`Resolve all conflicts in the ${f.var(sdkName)} SDK in VS Code, then close the VS Code window to continue.`);
+  public waitingForVscodeClose(language: Language) {
+    log.info(`Resolve all conflicts in the ${f.var(language)} SDK in VS Code, then close the VS Code window to continue.`);
   }
 
-  public warnUnresolvedConflicts(sdkName: string) {
-    log.error(
-      `Merge conflicts detected in the generated ${f.var(sdkName)} SDK. Manually run the same command to resolve the conflicts interactively.`
-    );
+  public conflictsResolved(language: Language) {
+    log.info(`All conflicts resolved for ${f.var(language)} SDK.`);
   }
 
-  public conflictsStillPresent(sdkName: string, conflictedFiles: FilePath[]) {
-    log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
-    const tree = buildFilePathTree(sdkName, [
-      ...conflictedFiles.map((filePath) => ({ path: filePath.getFileName(), description: "# Conflicted file" }))
-    ]);
-    log.message(tree);
-  }
-
-  public conflictsResolved(sdkName: string) {
-    log.info(`All conflicts resolved for ${f.var(sdkName)} SDK.`);
+  public operationCancelled() {
+    log.error("Exiting without resolving conflicts.");
   }
 }

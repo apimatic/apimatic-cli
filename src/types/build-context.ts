@@ -53,7 +53,7 @@ export class BuildContext {
     return await this.fileService.fileExists(sourceTreePath);
   }
 
-  public async getSdkSourceTree(language: string): Promise<FilePath> {
+  public getSdkSourceTree(language: string): FilePath {
     return FilePath.create(this.buildDirectory.join("sdk-source-tree").join(`.${language}`).toString())!;
   }
 

@@ -83,7 +83,7 @@ export class SaveChangesAction {
     }
 
     return withDirPath(async (tempDirectory) => {
-      const sourceTreePath = await versionedContext.buildContext.getSdkSourceTree(language);
+      const sourceTreePath = versionedContext.buildContext.getSdkSourceTree(language);
       const updatedStateDirectory = await this.saveChanges.prepareUpdatedSdkDirectory(
         sdkInputDirectory,
         sourceTreePath,

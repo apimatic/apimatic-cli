@@ -12,6 +12,7 @@ import { TelemetryService } from "../../infrastructure/services/telemetry-servic
 import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { BuildContext } from '../../types/build-context.js';
+import { MergeSourceTreeContext } from "../../types/merge-source-tree-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -102,6 +103,10 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
 
+    if (trackChanges && hasSdkSourceTree) {
+      this.prompts.changeTrackingAlreadyEnabled(language);
+    }
+
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildContext.getBuildDirectory());
@@ -123,27 +128,19 @@ export class GenerateAction {
 
       const flags: Record<string, unknown> = { language, force, zip: zipSdk, "skip-changes": skipChanges, "track-changes": trackChanges, "api-version": apiVersion, "auth-key": this.authKey };
 
+      const mergeSourceTreeContext = new MergeSourceTreeContext(
+        tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, hasSdkSourceTree
+      );
       const mergeResult = await this.mergeSourceTree.execute(
-        tempSdkDir, language, buildContext, skipChanges, trackChanges,
-        flags, this.configDir, this.commandMetadata
+        mergeSourceTreeContext, tempSdkDir, language, skipChanges, flags, this.configDir, this.commandMetadata
       );
 
-      if (mergeResult.isFailed()) {
-        return ActionResult.failed();
-      }
-
-      if (mergeResult.isCancelled()) {
-        return ActionResult.cancelled();
-      }
-
-      this.prompts.sdkGenerated(await sdkContext.save(tempSdkDir, zipSdk));
-
-      if (trackChanges && hasSdkSourceTree) {
-        this.prompts.changeTrackingAlreadyEnabled();
+      if (!mergeResult.isSuccess()) {
+        return mergeResult;
       }
 
       if (trackChanges && !hasSdkSourceTree) {
-        this.prompts.changeTrackingEnabled();
+        this.prompts.changeTrackingEnabled(language);
         const trackChangesTelemetry = new TelemetryService(this.configDir);
         await trackChangesTelemetry.trackEvent(
           new SdkTrackChangesEvent(language, flags),
@@ -151,6 +148,7 @@ export class GenerateAction {
         );
       }
 
+      this.prompts.sdkGenerated(await sdkContext.save(tempSdkDir, zipSdk));
       return ActionResult.success();
     });
   };

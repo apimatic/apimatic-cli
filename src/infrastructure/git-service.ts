@@ -13,13 +13,16 @@ const MAIN_BRANCH = "main";
 export class GitService {
   public async checkoutCustomBranch(dirPath: DirectoryPath): Promise<void> {
     const dir = dirPath.toString();
+
+    return await this.hasCustomBranch(dirPath)
+      ? await git.checkout({ fs, dir, ref: CUSTOM_BRANCH})
+      : await git.branch({ fs, dir, ref: CUSTOM_BRANCH });
+  }
+
+  public async hasCustomBranch(dirPath: DirectoryPath): Promise<boolean> {
+    const dir = dirPath.toString();
     const branches = await git.listBranches({ fs, dir });
-
-    if (!branches.includes(CUSTOM_BRANCH)) {
-      await git.branch({ fs, dir, ref: CUSTOM_BRANCH });
-    }
-
-    await git.checkout({ fs, dir, ref: CUSTOM_BRANCH});
+    return branches.includes(CUSTOM_BRANCH);
   }
 
   public getMergeFiles(dirPath: DirectoryPath): FilePath[] {

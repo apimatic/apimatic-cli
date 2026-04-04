@@ -5,6 +5,7 @@ import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
 import { ServiceError } from "../../infrastructure/service-error.js";
 import { GeneratedSdkResult } from "../../infrastructure/services/portal-service.js";
+import { Language } from "../../types/sdk/generate.js";
 
 export class SdkGeneratePrompts {
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -83,11 +84,12 @@ export class SdkGeneratePrompts {
     log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }
 
-  public changeTrackingEnabled() {
-    log.info(`Change tracking is enabled.`);
+  public changeTrackingEnabled(language: Language) {
+    log.info(`Change tracking is enabled for ${f.var(language)}. Now you can save your customizations in ${f.var(language)} SDK using:
+${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
   }
 
-  public changeTrackingAlreadyEnabled() {
-    log.warn(`Change tracking is already enabled. No need to use the ${f.flag("--track-changes")} flag again.`);
+  public changeTrackingAlreadyEnabled(language: Language) {
+    log.warn(`Change tracking is already enabled for ${f.var(language)}. No need to use the ${f.flag("--track-changes")} flag again for ${f.var(language)} SDK.`);
   }
 }
