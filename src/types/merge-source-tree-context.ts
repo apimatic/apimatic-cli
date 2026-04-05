@@ -13,34 +13,33 @@ export class MergeSourceTreeContext {
     private readonly sdkDir: DirectoryPath,
     private readonly sourceTreePath: FilePath,
     private readonly trackChanges: boolean,
+    private readonly skipChanges: boolean,
     private readonly hasSdkSourceTree: boolean
   ) {  }
 
-  public async skipCustomizations(): Promise<void> {
+  public async skipCustomizations(): Promise<{ hasSkippedChangesEnabled: boolean, hasSkippedCustomizations: boolean }> {
+    if (!this.skipChanges || !await this.gitService.hasCustomBranch(this.sdkDir)) {
+      return { hasSkippedChangesEnabled: this.skipChanges, hasSkippedCustomizations: false };
+    }
     await Promise.all(this.gitService.getMergeFiles(this.sdkDir).map((filePath) => this.fileService.deleteFile(filePath)));
     await this.gitService.forceCheckoutMainBranch(this.sdkDir);
+    await this.fileService.deleteDirectory(this.sdkDir.join(".git"));
+    return { hasSkippedChangesEnabled: true, hasSkippedCustomizations: true };
   }
 
-  public async getConflicts(): Promise<FilePath[]> {
-    return await this.fileService.filterFilesWithConflictMarkers(
-      await this.gitService.getUpdatedFiles(this.sdkDir)
-    );
-  }
-
-  public async saveNonConflictedSourceTree(): Promise<boolean> {
+  public async saveNonConflictedSourceTree(): Promise<{ hasSourceTreeTracked: boolean, hasAppliedCustomizations: boolean }> {
     if (!(await this.fileService.fileExists(this.gitService.getMergeFiles(this.sdkDir).pop()!))) {
-      return false;
+      return { hasSourceTreeTracked: false, hasAppliedCustomizations: false };
     }
 
-    if (this.trackChanges || this.hasSdkSourceTree) {
+    const shouldTrackChanges = this.trackChanges || this.hasSdkSourceTree;
+    if (shouldTrackChanges) {
       await this.fileService.ensurePathExists(this.sourceTreePath);
       await this.zipService.archive(this.sdkDir.join(".git"), this.sourceTreePath);
     }
-    return true;
-  }
-
-  public async hasCustomizations(): Promise<boolean> {
-    return await this.gitService.hasCustomBranch(this.sdkDir);
+    const hasCustomizations = await this.gitService.hasCustomBranch(this.sdkDir);
+    await this.fileService.deleteDirectory(this.sdkDir.join(".git"));
+    return { hasSourceTreeTracked: shouldTrackChanges, hasAppliedCustomizations: hasCustomizations };
   }
 
   public async saveConflictedSourceTree(): Promise<void> {
@@ -48,9 +47,12 @@ export class MergeSourceTreeContext {
     await Promise.all(this.gitService.getMergeFiles(this.sdkDir)
       .map((filePath) => this.fileService.deleteFile(filePath)));
     await this.zipService.archive(this.sdkDir.join(".git"), this.sourceTreePath);
+    await this.fileService.deleteDirectory(this.sdkDir.join(".git"));
   }
 
-  public async cleanUp(): Promise<void> {
-    await this.fileService.deleteDirectory(this.sdkDir.join(".git"));
+  public async getConflicts(): Promise<FilePath[]> {
+    return await this.fileService.filterFilesWithConflictMarkers(
+      await this.gitService.getUpdatedFiles(this.sdkDir)
+    );
   }
 }

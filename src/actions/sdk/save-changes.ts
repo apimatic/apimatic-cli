@@ -18,6 +18,7 @@ export class SaveChangesAction {
     buildDirectory: DirectoryPath,
     sdkDirectoryInput: string | undefined,
     language: Language,
+    skipReview: boolean,
     apiVersion?: string
   ): Promise<ActionResult> {
     const rootBuildContext = new BuildContext(buildDirectory);
@@ -97,20 +98,28 @@ export class SaveChangesAction {
       }
       this.prompts.modifiedFilesDetected(language, fileStatuses);
 
+      if (skipReview) {
+        if (!await this.prompts.confirmChanges()) {
+          this.prompts.operationCancelled();
+          return ActionResult.cancelled();
+        }
+        await this.saveChanges.saveSourceTree(updatedStateDirectory, sourceTreePath);
+        this.prompts.changesSaved(sourceTreePath);
+        return ActionResult.success();
+      }
+
       const reviewResult = await this.reviewChanges.execute(
         updatedStateDirectory,
         await this.saveChanges.prepareBaseSdkDirectory(updatedStateDirectory, tempDirectory),
         fileStatuses
       );
-      if (reviewResult.isCancelled()) {
-        return ActionResult.cancelled();
-      }
-      if (reviewResult.isFailed()) {
-        return ActionResult.failed();
+      
+      if (!reviewResult.isSuccess()) {
+        return reviewResult;
       }
 
       await this.saveChanges.saveSourceTree(updatedStateDirectory, sourceTreePath);
-      this.prompts.changesSaved();
+      this.prompts.changesSaved(sourceTreePath);
       return ActionResult.success();
     });
   }

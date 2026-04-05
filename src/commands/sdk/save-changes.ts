@@ -25,21 +25,25 @@ export default class SaveChanges extends Command {
     }),
     ...FlagsProvider.input,
     "sdk": Flags.string({
-      description: "[default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing the updated SDK"
+      description: "[default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing the updated SDK."
     }),
     "api-version": Flags.string({
-      description: "Version of the API to use for saving changes (if multiple versions exist)"
+      description: "Version of the API where changes should be saved (if multiple versions exist)."
     }),
+    "skip-review": Flags.boolean({
+      description: "Skip the review in IDE before saving the changes."
+    })
   };
 
   static examples = [
-    `${SaveChanges.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("input", "./")}`,
-    `${SaveChanges.cmdTxt} ${format.flag("language", "java")} ${format.flag("sdk", "./sdk")}`
+    `${SaveChanges.cmdTxt} ${format.flag("language", "csharp")}`,
+    `${SaveChanges.cmdTxt} ${format.flag("language", "java")} ${format.flag("sdk", "./sdk")}`,
+    `${SaveChanges.cmdTxt} ${format.flag("language", "python")} ${format.flag("skip-review")}`
   ];
 
   async run() {
     const {
-      flags: { sdk, language, input, "api-version": apiVersion }
+      flags: { sdk, language, input, "api-version": apiVersion, "skip-review": skipReview }
     } = await this.parse(SaveChanges);
 
     const telemetryService = new TelemetryService(this.getConfigDir());
@@ -47,7 +51,7 @@ export default class SaveChanges extends Command {
       commandName: SaveChanges.id,
       shell: this.config.shell
     };
-    const parsedFlags: Record<string, unknown> = { sdk, language, input, "api-version": apiVersion };
+    const parsedFlags: Record<string, unknown> = { sdk, language, input, "api-version": apiVersion, "skip-review": skipReview };
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = workingDirectory.join("src");
@@ -59,6 +63,7 @@ export default class SaveChanges extends Command {
       buildDirectory,
       sdk,
       language as Language,
+      skipReview,
       apiVersion
     );
     outro(result);

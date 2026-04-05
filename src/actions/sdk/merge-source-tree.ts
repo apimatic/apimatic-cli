@@ -18,25 +18,25 @@ export class MergeSourceTreeAction {
     mergeSourceTreeContext: MergeSourceTreeContext,
     sdkDir: DirectoryPath,
     language: Language,
-    skipChanges: boolean,
     flags: Record<string, unknown>,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata
   ): Promise<ActionResult> {
-    if (skipChanges) {
-      await mergeSourceTreeContext.skipCustomizations();
-      if (await mergeSourceTreeContext.hasCustomizations()) {
-        this.prompts.successfullySkippedChanges(language);
-      }
-      await mergeSourceTreeContext.cleanUp();
+    const { hasSkippedChangesEnabled, hasSkippedCustomizations } = await mergeSourceTreeContext.skipCustomizations();
+    if (hasSkippedCustomizations) {
+      this.prompts.successfullySkippedChanges(language);
+      return ActionResult.success();
+    }
+    if (hasSkippedChangesEnabled) {
       return ActionResult.success();
     }
 
-    if (await mergeSourceTreeContext.saveNonConflictedSourceTree()) {
-      if (await mergeSourceTreeContext.hasCustomizations()) {
-        this.prompts.successfullyAppliedChanges(language);
-      }
-      await mergeSourceTreeContext.cleanUp();
+    const { hasSourceTreeTracked, hasAppliedCustomizations } = await mergeSourceTreeContext.saveNonConflictedSourceTree();
+    if (hasAppliedCustomizations) {
+      this.prompts.successfullyAppliedChanges(language);
+      return ActionResult.success();
+    }
+    if (hasSourceTreeTracked) {
       return ActionResult.success();
     }
 
@@ -75,7 +75,6 @@ export class MergeSourceTreeAction {
     );
 
     await mergeSourceTreeContext.saveConflictedSourceTree();
-    await mergeSourceTreeContext.cleanUp();
     return ActionResult.success();
   }
 }

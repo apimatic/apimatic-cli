@@ -129,10 +129,10 @@ export class GenerateAction {
       const flags: Record<string, unknown> = { language, force, zip: zipSdk, "skip-changes": skipChanges, "track-changes": trackChanges, "api-version": apiVersion, "auth-key": this.authKey };
 
       const mergeSourceTreeContext = new MergeSourceTreeContext(
-        tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, hasSdkSourceTree
+        tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, skipChanges, hasSdkSourceTree
       );
       const mergeResult = await this.mergeSourceTree.execute(
-        mergeSourceTreeContext, tempSdkDir, language, skipChanges, flags, this.configDir, this.commandMetadata
+        mergeSourceTreeContext, tempSdkDir, language, flags, this.configDir, this.commandMetadata
       );
 
       if (!mergeResult.isSuccess()) {

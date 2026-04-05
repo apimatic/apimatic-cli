@@ -1,8 +1,9 @@
-import { log, text, isCancel, select } from "@clack/prompts";
+import { log, text, isCancel, select, confirm } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { buildFilePathTree, format as f } from "../format.js";
 import { noteWrapped } from "../prompt.js";
 import { GitFileStatus } from "../../infrastructure/git-service.js";
+import { FilePath } from "../../types/file/filePath.js";
 
 export class SaveChangesPrompts {
   public sameBuildAndSdkDir(directory: DirectoryPath) {
@@ -98,15 +99,32 @@ export class SaveChangesPrompts {
   }
 
   public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
-    const result = await text({
-      message: `Review the changes at ${f.path(tempDirectory)} and press Enter to continue.`,
-      defaultValue: ""
+    const confirmed = await confirm({
+      message: `Review the changes at ${f.path(tempDirectory)}. Do you want to save these changes?`,
+      initialValue: false
     });
 
-    return !isCancel(result);
+    if (isCancel(confirmed)) {
+      return false;
+    }
+
+    return confirmed;
   }
 
-  public changesSaved() {
-    log.success("Changes saved successfully!");
+  public async confirmChanges(): Promise<boolean> {
+    const confirmed = await confirm({
+      message: `Do you want to save these changes?`,
+      initialValue: false
+    });
+
+    if (isCancel(confirmed)) {
+      return false;
+    }
+
+    return confirmed;
+  }
+
+  public changesSaved(sourceTreePath: FilePath) {
+    log.success(`Changes saved successfully at ${f.path(sourceTreePath)}!`);
   }
 }
