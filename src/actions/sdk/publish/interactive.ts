@@ -4,10 +4,18 @@ import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { SdkPublishInteractivePrompts } from '../../../prompts/sdk/publish/interactive.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
-import { getLanguageConfigs, groupProfilesByApiGroup, hasEnabledLanguage } from '../../../types/publish-api/publishing-profile.js';
+import {
+  getLanguageConfigs,
+  groupProfilesByApiGroup,
+  hasEnabledLanguage
+} from '../../../types/publish-api/publishing-profile.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
-import { getPackageConfigurationForLanguage, getPublishTypeForLanguage, PublishType } from '../../../types/sdk/publish.js';
+import {
+  getPackageConfigurationForLanguage,
+  getPublishTypeForLanguage,
+  PublishType
+} from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { GenerateAction } from '../generate.js';
 
@@ -43,7 +51,9 @@ export class SdkPublishInteractiveAction {
       return ActionResult.failed();
     }
 
-    const publishingProfile = await this.prompts.selectPublishingProfile(groupProfilesByApiGroup(profilesWithEnabledLanguages));
+    const publishingProfile = await this.prompts.selectPublishingProfile(
+      groupProfilesByApiGroup(profilesWithEnabledLanguages)
+    );
     if (!publishingProfile) {
       this.prompts.noPublishingProfileSelected();
       return ActionResult.cancelled();
@@ -64,7 +74,8 @@ export class SdkPublishInteractiveAction {
     const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
     const publishType = getPublishTypeForLanguage(languageConfig);
 
-    const confirmed = await this.prompts.confirmPublishing(publishingProfile, language, version, publishType);
+    this.prompts.publishingSummary(publishingProfile, language, version, publishType);
+    const confirmed = await this.prompts.confirmPublishing();
     if (!confirmed) {
       this.prompts.publishingCancelled();
       return ActionResult.cancelled();

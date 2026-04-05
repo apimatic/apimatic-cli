@@ -4,7 +4,11 @@ import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
 import { noteWrapped } from '../../prompt.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { getLanguageConfigs, ProfileGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
+import {
+  getLanguageConfigs,
+  ProfileGroup,
+  PublishingProfileItem
+} from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { PublishType } from '../../../types/sdk/publish.js';
 import { withSpinner } from '../../prompt.js';
@@ -13,8 +17,8 @@ import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
 export class SdkPublishInteractivePrompts {
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
     return withSpinner(
-      'Fetching publishing profiles',
-      'Publishing profiles fetched successfully.',
+      'Searching for publishing profiles',
+      'Profile search complete.',
       'Failed to fetch publishing profiles.',
       fn
     );
@@ -34,9 +38,7 @@ export class SdkPublishInteractivePrompts {
     );
   }
 
-  public async selectPublishingProfile(
-    groups: ProfileGroup[]
-  ): Promise<PublishingProfileItem | undefined> {
+  public async selectPublishingProfile(groups: ProfileGroup[]): Promise<PublishingProfileItem | undefined> {
     const publishingProfile = await select({
       message: 'Select a publishing profile:',
       options: groups.flatMap((group) =>
@@ -114,20 +116,22 @@ export class SdkPublishInteractivePrompts {
     log.error('No version was specified for publishing the SDK.');
   }
 
-  public async confirmPublishing(
+  public publishingSummary(
     profile: PublishingProfileItem,
     language: Language,
     version: string,
     publishType: PublishType[]
-  ): Promise<boolean> {
+  ) {
     const targets = publishType
       .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
       .join(' + ');
+    log.info(
+      `Ready to publish:\n\n  Profile:   ${profile.name}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
+    );
+  }
 
-    const result = await confirm({
-      message: `Ready to publish:\n\n  Profile:   ${profile.name}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}\n\n  Proceed?`
-    });
-
+  public async confirmPublishing(): Promise<boolean> {
+    const result = await confirm({ message: 'Do you want to proceed?' });
     if (isCancel(result)) return false;
     return result;
   }
@@ -137,7 +141,9 @@ export class SdkPublishInteractivePrompts {
   }
 
   public sourceCodeOnlyPublishingNotice() {
-    log.info('Version tags will not be created in your Git repository because you have opted to publish Source Code only.');
+    log.info(
+      'Version tags will not be created in your Git repository because you have opted to publish Source Code only.'
+    );
   }
 
   public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
