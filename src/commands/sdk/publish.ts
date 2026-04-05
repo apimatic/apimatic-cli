@@ -12,9 +12,7 @@ import { SdkPublishValidationFailedEvent } from '../../types/events/sdk-publish-
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
 
-  static readonly description = `Generate and publish an SDK using your API spec and a publishing profile.
-Runs in interactive mode when no flags are provided, guiding you through the publishing process.
-Runs in non-interactive mode when --profile-id, --language, --version, and --publish-type flags are provided, suitable for CI/CD automation.`;
+  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic app. Requires an input directory containing the API specification. Run without flags for a step-by-step guided experience, or pass all required flags for CI/CD automation. Credentials are managed in the APIMatic app, no secrets are needed in the CLI.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
@@ -25,12 +23,12 @@ Runs in non-interactive mode when --profile-id, --language, --version, and --pub
     }),
     version: Flags.string({
       char: 'v',
-      description: 'Semantic version of the SDK to be generated and published.'
+      description: 'Semantic version of the SDK to publish (e.g. 1.0.0).'
     }),
     ...FlagsProvider.destination('sdk', 'sdk'),
     language: Flags.string({
       char: 'l',
-      description: 'Language to generate and publish the SDK for.',
+      description: 'Language of the SDK to generate and publish.',
       options: Object.values(Language)
         .filter((l) => l !== Language.GO)
         .map((l) => l.valueOf())
@@ -46,7 +44,7 @@ Runs in non-interactive mode when --profile-id, --language, --version, and --pub
     }),
     'dry-run': Flags.boolean({
       default: false,
-      description: 'Generate the SDK without publishing. Useful for reviewing generated SDK before publishing.'
+      description: 'Generate the SDK locally for review without publishing.'
     })
   };
 
@@ -113,7 +111,7 @@ Runs in non-interactive mode when --profile-id, --language, --version, and --pub
             commandMetadata.shell
           );
 
-    intro('SDK Publish');
+    intro('Publish SDK');
     const action = new PublishAction(this.getConfigDir(), commandMetadata);
     const result = await action.execute(
       buildDirectory,

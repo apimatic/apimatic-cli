@@ -1,11 +1,12 @@
 import { log, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
+import { PublishType } from '../../../types/sdk/publish.js';
 import { format as f } from '../../../prompts/format.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
-import { PublishLogEventItem, PublishLogItem } from '../../../types/publish-api/publish-log.js';
+import { PublishLogItem } from '../../../types/publish-api/publish-log.js';
 
 export class SdkPublishNonInteractivePrompts {
   public missingRequiredFlags(options: string[]): void {
@@ -78,8 +79,31 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
+  public publishingRunningNotice(
+    profileName: string,
+    language: string,
+    version: string,
+    publishType: PublishType[]
+  ): void {
+    const targets = publishType
+      .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
+      .join(' + ');
+    log.info(
+      `Publishing is running for the following:\n\n  Profile:   ${profileName}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
+    );
+  }
+
+  public dryRunNotice(profileName: string, language: string, version: string, publishType: PublishType[]): void {
+    const targets = publishType
+      .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
+      .join(' + ');
+    log.info(
+      `You can publish this SDK by removing the --dry-run flag. It will be published for the following:\n\n  Profile:   ${profileName}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
+    );
+  }
+
   public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
-    return withSpinner('Publishing SDK', 'Publishing has been enqueued.', 'SDK Publishing failed.', fn);
+    return withSpinner('Publishing SDK', 'Publishing initiated.', 'SDK Publishing failed.', fn);
   }
 
   public sdkPublishingServiceError(serviceError: ServiceError) {
@@ -111,7 +135,20 @@ ${f.link(publishingLogUrl)}`;
 
       const { events } = publishingLogResult.value;
       const allEventsCompleted = events.every((event) => STATES.has(event.eventType));
-      const statusMessage = createStatusMessage(events);
+      const statusMessage = events
+        .map((event) => {
+          const target = event.publishType === 'Package' ? 'Package' : 'Source Code';
+          const label =
+            event.eventType === 'Queued'
+              ? 'Queued'
+              : event.eventType === 'InProgress'
+              ? 'In Progress'
+              : event.eventType === 'Succeeded'
+              ? 'Done'
+              : 'Failed';
+          return `${target}: [${label}]`;
+        })
+        .join(' | ');
 
       if (allEventsCompleted) {
         const allEventsSucceeded = events.every((event) => event.eventType === 'Succeeded');
@@ -123,23 +160,4 @@ ${f.link(publishingLogUrl)}`;
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
   }
-}
-
-function statusLabel(eventType: string): string {
-  switch (eventType) {
-    case 'Queued':
-      return 'Queued';
-    case 'InProgress':
-      return 'In Progress';
-    case 'Succeeded':
-      return 'Done';
-    default:
-      return 'Failed';
-  }
-}
-
-function createStatusMessage(events: PublishLogEventItem[]): string {
-  return events
-    .map((event) => `${event.publishType === 'Package' ? 'Package' : 'Source Code'}: [${statusLabel(event.eventType)}]`)
-    .join(' | ');
 }

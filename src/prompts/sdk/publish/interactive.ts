@@ -1,4 +1,4 @@
-import { isCancel, log, select, text } from '@clack/prompts';
+import { confirm, isCancel, log, select, text } from '@clack/prompts';
 import { isValidSemVer } from '../../../utils/string-utils.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
@@ -6,6 +6,7 @@ import { noteWrapped } from '../../prompt.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { getLanguageConfigs, ProfileGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
+import { PublishType } from '../../../types/sdk/publish.js';
 import { withSpinner } from '../../prompt.js';
 import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
 
@@ -72,7 +73,7 @@ export class SdkPublishInteractivePrompts {
       }));
 
     const language = await select({
-      message: 'Choose the language for publishing your SDK:',
+      message: 'Select a language to publish:',
       options
     });
 
@@ -95,7 +96,7 @@ export class SdkPublishInteractivePrompts {
 
   public async inputVersion(): Promise<string | undefined> {
     const version = await text({
-      message: 'Enter the version for the SDK you want to publish (e.g. 1.0.0):',
+      message: 'Enter version to publish (e.g. 1.0.0):',
       validate: (value) => {
         if (!value) return 'Version is required.';
         if (!isValidSemVer(value)) return 'Please enter a valid version in the format major.minor.patch (e.g., 1.0.0).';
@@ -113,12 +114,34 @@ export class SdkPublishInteractivePrompts {
     log.error('No version was specified for publishing the SDK.');
   }
 
+  public async confirmPublishing(
+    profile: PublishingProfileItem,
+    language: Language,
+    version: string,
+    publishType: PublishType[]
+  ): Promise<boolean> {
+    const targets = publishType
+      .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
+      .join(' + ');
+
+    const result = await confirm({
+      message: `Ready to publish:\n\n  Profile:   ${profile.name}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}\n\n  Proceed?`
+    });
+
+    if (isCancel(result)) return false;
+    return result;
+  }
+
+  public publishingCancelled() {
+    log.error('Publishing cancelled.');
+  }
+
   public sourceCodeOnlyPublishingNotice() {
     log.info('Version tags will not be created in your Git repository because you have opted to publish Source Code only.');
   }
 
   public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
-    return withSpinner('Publishing SDK', 'Publishing has been enqueued.', 'SDK Publishing failed.', fn);
+    return withSpinner('Publishing SDK', 'Publishing initiated.', 'SDK Publishing failed.', fn);
   }
 
   public sdkPublishingServiceError(serviceError: ServiceError) {

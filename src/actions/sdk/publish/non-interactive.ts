@@ -162,6 +162,8 @@ export class SdkPublishNonInteractiveAction {
           return ActionResult.failed();
         }
 
+        this.prompts.publishingRunningNotice(publishingProfile.name, language, version!, publishType);
+
         const publishingSucceeded = await this.prompts.pollPublishingStatus(
           () => this.publishingApiService.getSdkPublishingLog(publishSdkResponse.value.publishLogId, this.configDir, this.commandMetadata.shell)
         );
@@ -175,6 +177,7 @@ export class SdkPublishNonInteractiveAction {
         return ActionResult.success();
       }
 
+      this.prompts.dryRunNotice(publishingProfile.name, language, version!, publishType);
       await this.launcherService.openDirectory(sdkLanguageDirectory);
       return ActionResult.success();
     });

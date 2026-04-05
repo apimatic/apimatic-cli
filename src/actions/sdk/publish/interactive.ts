@@ -64,6 +64,12 @@ export class SdkPublishInteractiveAction {
     const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
     const publishType = getPublishTypeForLanguage(languageConfig);
 
+    const confirmed = await this.prompts.confirmPublishing(publishingProfile, language, version, publishType);
+    if (!confirmed) {
+      this.prompts.publishingCancelled();
+      return ActionResult.cancelled();
+    }
+
     if (!publishType.includes(PublishType.PackagePublishing)) {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
