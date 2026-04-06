@@ -120,7 +120,7 @@
         "commands": "./lib/commands",
         "dirname": "apimatic",
         "bin": "apimatic",
-        "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic portal:quickstart'.",
+        "description": "The official CLI for APIMatic. \nTo get started with APIMatic's CLI using a step by step wizard, run 'apimatic quickstart'.",
         "hooks": {
             "command_not_found": "./lib/hooks/not-found"
         },
@@ -139,7 +139,7 @@
                 "description": "Generate, download and serve an API Documentation portal for your APIs."
             },
             "sdk": {
-                "description": "Generate SDKs for your APIs in multiple languages."
+                "description": "Generate and publish SDKs for your APIs in multiple languages."
             },
             "publishing": {
                 "description": "Manage SDK publishing configurations."
