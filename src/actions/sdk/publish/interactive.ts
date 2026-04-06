@@ -121,7 +121,7 @@ export class SdkPublishInteractiveAction {
           sdkFilePath,
           publishingProfile.id,
           language,
-          version!,
+          version,
           publishType,
           this.configDir,
           this.commandMetadata.shell

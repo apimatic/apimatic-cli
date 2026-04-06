@@ -138,14 +138,8 @@ ${f.link(publishingLogUrl)}`;
       const statusMessage = events
         .map((event) => {
           const target = event.publishType === 'Package' ? 'Package' : 'Source Code';
-          const label =
-            event.eventType === 'Queued'
-              ? 'Queued'
-              : event.eventType === 'InProgress'
-              ? 'In Progress'
-              : event.eventType === 'Succeeded'
-              ? 'Done'
-              : 'Failed';
+          const eventLabels: Record<string, string> = { Queued: 'Queued', InProgress: 'In Progress', Succeeded: 'Done' };
+          const label = eventLabels[event.eventType] ?? 'Failed';
           return `${target}: [${label}]`;
         })
         .join(' | ');

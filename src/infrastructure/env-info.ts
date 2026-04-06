@@ -69,9 +69,9 @@ class EnvInfo {
     const envBaseUrls = process.env.APIMATIC_BASE_URL;
     if (envBaseUrls) {
       const baseUrls = envBaseUrls.split(';');
-      EnvInfo.cachedAuthBaseUrl = baseUrls.length === 3 ? baseUrls[2] : undefined;
+      EnvInfo.cachedPublishingBaseUrl = baseUrls.length === 3 ? baseUrls[2] : undefined;
     }
-    return EnvInfo.cachedAuthBaseUrl;
+    return EnvInfo.cachedPublishingBaseUrl;
   }
 }
 export const envInfo = new EnvInfo();

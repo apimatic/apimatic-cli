@@ -2,7 +2,7 @@ import { confirm, isCancel, log, select, text } from '@clack/prompts';
 import { isValidSemVer } from '../../../utils/string-utils.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
-import { noteWrapped } from '../../prompt.js';
+import { noteWrapped, withSpinner } from '../../prompt.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import {
   getLanguageConfigs,
@@ -11,7 +11,6 @@ import {
 } from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { PublishType } from '../../../types/sdk/publish.js';
-import { withSpinner } from '../../prompt.js';
 import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
 
 export class SdkPublishInteractivePrompts {
