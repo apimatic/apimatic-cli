@@ -7,13 +7,11 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ActionResult } from "../action-result.js";
 import isInCi from "is-in-ci";
-import { dirPath } from "../../infrastructure/tmp-extensions.js";
 import { MergeSourceTreeContext } from "../../types/merge-source-tree-context.js";
 
 export class MergeSourceTreeAction {
   private readonly prompts = new MergeSourceTreePrompts();
   private readonly launcherService = new LauncherService();
-
   public async execute(
     mergeSourceTreeContext: MergeSourceTreeContext,
     sdkDir: DirectoryPath,
@@ -55,16 +53,18 @@ export class MergeSourceTreeAction {
       if (opened) {
         this.prompts.waitingForVscodeClose(language);
         await this.launcherService.waitForVscodeToClose(sdkDir);
-      } else if (await dirPath(sdkDir, async (reviewDir) => !(await this.prompts.waitForConflictsResolved(language, reviewDir)))) {
+      } else if (!await this.prompts.waitForConflictsResolved(language, sdkDir)) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }
 
       conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
 
-      if (conflictedFilePaths.length == 0) break;
-      this.prompts.conflictsStillPresent(language, conflictedFilePaths);
-    } while (true);
+      if (conflictedFilePaths.length > 0) {
+        this.prompts.conflictsStillPresent(language, conflictedFilePaths);
+      }
+
+    } while (conflictedFilePaths.length > 0);
 
     this.prompts.conflictsResolved(language);
 

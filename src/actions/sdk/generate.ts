@@ -13,12 +13,14 @@ import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { BuildContext } from '../../types/build-context.js';
 import { MergeSourceTreeContext } from "../../types/merge-source-tree-context.js";
+import { FileService } from "../../infrastructure/file-service.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
   private readonly mergeSourceTree: MergeSourceTreeAction = new MergeSourceTreeAction();
   private readonly configDir: DirectoryPath;
+  private readonly fileService = new FileService();
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
@@ -149,6 +151,12 @@ export class GenerateAction {
       }
 
       this.prompts.sdkGenerated(await sdkContext.save(tempSdkDir, zipSdk));
+      while (await this.fileService.deleteDirectory(tempSdkDir).then(() => false).catch(() => true)) {
+        if (!(await this.prompts.directoryStillOpen(tempSdkDir))) {
+          this.prompts.operationCancelledMemoryLeak();
+          return ActionResult.cancelled();
+        }
+      }
       return ActionResult.success();
     });
   };

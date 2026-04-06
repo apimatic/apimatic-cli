@@ -70,6 +70,19 @@ export class SaveChangesPrompts {
     log.info("Exiting without saving any changes.");
   }
 
+  public operationCancelledMemoryLeak() {
+    log.info("Exiting without cleanup of temporary files.");
+  }
+
+  public async directoryStillOpen(directory: DirectoryPath): Promise<boolean> {
+    const result = await text({
+      message: `Please close all applications using the directory ${f.path(directory)} and press Enter to continue.`
+    });
+
+    return !isCancel(result);
+  }
+
+
   public modifiedFilesDetected(
     language: string,
     fileStatuses: Array<GitFileStatus>
@@ -120,6 +133,6 @@ export class SaveChangesPrompts {
   }
 
   public changesSaved(sourceTreePath: FilePath) {
-    log.success(`Changes saved successfully at ${f.path(sourceTreePath)}!`);
+    log.success(`Changes saved successfully at ${f.path(sourceTreePath)}.`);
   }
 }

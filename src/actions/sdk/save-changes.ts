@@ -83,7 +83,7 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    return withDirPath(async (tempDirectory) => {
+    return await withDirPath(async (tempDirectory) => {
       const sourceTreePath = versionedContext.buildContext.getSdkSourceTree(language);
       const updatedStateDirectory = await this.saveChanges.prepareUpdatedSdkDirectory(
         sdkInputDirectory,
@@ -108,19 +108,12 @@ export class SaveChangesAction {
         return ActionResult.success();
       }
 
-      const reviewResult = await this.reviewChanges.execute(
+      return await this.reviewChanges.execute(
         updatedStateDirectory,
         await this.saveChanges.prepareBaseSdkDirectory(updatedStateDirectory, tempDirectory),
-        fileStatuses
+        fileStatuses,
+        sourceTreePath
       );
-      
-      if (!reviewResult.isSuccess()) {
-        return reviewResult;
-      }
-
-      await this.saveChanges.saveSourceTree(updatedStateDirectory, sourceTreePath);
-      this.prompts.changesSaved(sourceTreePath);
-      return ActionResult.success();
     });
   }
 }

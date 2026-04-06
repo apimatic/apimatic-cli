@@ -221,10 +221,13 @@ export class FileService {
   }
 
   public async filterFilesWithConflictMarkers(updatedFiles: FilePath[]): Promise<FilePath[]> {
-    return await Promise.all(
-      updatedFiles.filter(async (file) =>
-        (await this.fileExists(file)) && (await this.readFile(file)).includes("<<<<<<< "))
-    );
+    const result: FilePath[] = [];
+    for (const file of updatedFiles) {
+      const exists = await this.fileExists(file);
+      const hasConflictMarkers = exists && (await this.readFile(file)).includes("<<<<<<< ");
+      if (hasConflictMarkers) result.push(file);
+    }
+    return result;
   }
 }
 
