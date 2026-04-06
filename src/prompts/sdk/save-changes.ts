@@ -23,18 +23,13 @@ export class SaveChangesPrompts {
     this.logSaveChangesError(message);
   }
 
-  public versionedBuildEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var(directory.leafName())} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logSaveChangesError(message);
-  }
-
   public invalidVersionedDocsDirectory(directory: DirectoryPath) {
     const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
     this.logSaveChangesError(message);
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The api-version argument is only applicable with a versioned build.`);
+    log.warn(`The ${f.flag("--api-version")} is only applicable with a versioned build.`);
   }
 
   public versionNotFound() {
