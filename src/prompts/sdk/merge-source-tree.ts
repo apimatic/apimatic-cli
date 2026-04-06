@@ -56,4 +56,19 @@ export class MergeSourceTreePrompts {
   public operationCancelled() {
     log.error("Exiting without resolving conflicts.");
   }
+
+  public sdkGenerated(sdk: DirectoryPath) {
+    log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
+  }
+
+  public async directoryStillOpen(directory: DirectoryPath): Promise<boolean> {
+    const result = await text({
+      message: `Please close all applications using the directory ${f.path(directory)} and press Enter to continue.`
+    });
+    return !isCancel(result);
+  }
+
+  public operationCancelledMemoryLeak() {
+    log.info("Exiting without cleanup of temporary files.");
+  }
 }

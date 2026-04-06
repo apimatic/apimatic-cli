@@ -5,6 +5,9 @@ import { GenerateAction } from "../../actions/sdk/generate.js";
 import { Language } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
+import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
 
 export default class SdkGenerate extends Command {
   static readonly summary = "Generate an SDK for your API";
@@ -58,6 +61,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-changes": skipChanges, "track-changes": trackChanges,"api-version": apiVersion }
     } = await this.parse(SdkGenerate);
 
+    const telemetryService = new TelemetryService(this.getConfigDir());
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
@@ -80,6 +84,18 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       apiVersion
     );
     outro(result);
+    result.mapAll(
+      async (res) => {
+        if (res?.sourceTreeTrackingInitiated) {
+          await telemetryService.trackEvent(new SdkTrackChangesEvent(language), commandMetadata.shell);
+        }
+        if (res?.conflictsResolved) {
+          await telemetryService.trackEvent(new SdkConflictsResolvedEvent(language), commandMetadata.shell);
+        }
+      },
+      () => new Promise(() => {}),
+      () => new Promise(() => {})
+    );
   }
 
   private readonly getConfigDir = () => {

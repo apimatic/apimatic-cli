@@ -6,8 +6,8 @@ export class SdkConflictsResolvedEvent extends DomainEvent {
   private static readonly commandName = "sdk:generate" as const;
   private readonly language: string;
 
-  constructor(language: string, flags: Record<string, unknown>) {
-    super(SdkConflictsResolvedEvent.message, SdkConflictsResolvedEvent.commandName, flags);
+  constructor(language: string) {
+    super(SdkConflictsResolvedEvent.message, SdkConflictsResolvedEvent.commandName, {});
     this.language = language;
   }
 }

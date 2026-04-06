@@ -6,8 +6,8 @@ export class SdkSaveChangesEvent extends DomainEvent {
   private static readonly commandName = "sdk:save-changes" as const;
   private readonly language: string;;
 
-  constructor(language: string, flags: Record<string, unknown>) {
-    super(SdkSaveChangesEvent.message, SdkSaveChangesEvent.commandName, flags);
+  constructor(language: string) {
+    super(SdkSaveChangesEvent.message, SdkSaveChangesEvent.commandName, {});
     this.language = language;
   }
 }

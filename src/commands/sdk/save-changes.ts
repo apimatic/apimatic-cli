@@ -51,8 +51,6 @@ export default class SaveChanges extends Command {
       commandName: SaveChanges.id,
       shell: this.config.shell
     };
-    const parsedFlags: Record<string, unknown> = { sdk, language, input, "api-version": apiVersion, "skip-review": skipReview };
-
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = workingDirectory.join("src");
     
@@ -69,10 +67,7 @@ export default class SaveChanges extends Command {
     outro(result);
 
     await result.mapAll(
-      async () => await telemetryService.trackEvent(
-        new SdkSaveChangesEvent(language, parsedFlags),
-        commandMetadata.shell
-      ),
+      async () => await telemetryService.trackEvent(new SdkSaveChangesEvent(language), commandMetadata.shell),
       () => new Promise(() => {}),
       () => new Promise(() => {})
     );

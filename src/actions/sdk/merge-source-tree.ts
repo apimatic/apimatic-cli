@@ -1,9 +1,7 @@
 import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { FilePath } from "../../types/file/filePath.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { MergeSourceTreePrompts } from "../../prompts/sdk/merge-source-tree.js";
-import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
-import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { Language } from "../../types/sdk/generate.js";
 import { ActionResult } from "../action-result.js";
 import isInCi from "is-in-ci";
@@ -12,15 +10,24 @@ import { MergeSourceTreeContext } from "../../types/merge-source-tree-context.js
 export class MergeSourceTreeAction {
   private readonly prompts = new MergeSourceTreePrompts();
   private readonly launcherService = new LauncherService();
+
   public async execute(
-    mergeSourceTreeContext: MergeSourceTreeContext,
     sdkDir: DirectoryPath,
+    sourceTreePath: FilePath,
+    trackChanges: boolean,
+    skipChanges: boolean,
+    hasSdkSourceTree: boolean,
     language: Language,
-    flags: Record<string, unknown>,
-    configDir: DirectoryPath,
-    commandMetadata: CommandMetadata
-  ): Promise<ActionResult> {
-    const { hasSkippedChangesEnabled, hasSkippedCustomizations } = await mergeSourceTreeContext.skipCustomizations();
+    outputSdkDirectory: DirectoryPath,
+    version: string | undefined,
+    zipSdk: boolean,
+  ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> {
+
+    const mergeSourceTreeContext = new MergeSourceTreeContext(sdkDir, sourceTreePath,
+      trackChanges, skipChanges, hasSdkSourceTree, zipSdk, this.prompts.sdkGenerated,
+      outputSdkDirectory, language, version);
+
+    const { hasSkippedChangesEnabled, hasSkippedCustomizations } = await mergeSourceTreeContext.saveSkippingChanges();
     if (hasSkippedCustomizations) {
       this.prompts.successfullySkippedChanges(language);
       return ActionResult.success();
@@ -29,17 +36,16 @@ export class MergeSourceTreeAction {
       return ActionResult.success();
     }
 
-    const { hasSourceTreeTracked, hasAppliedCustomizations } = await mergeSourceTreeContext.saveNonConflictedSourceTree();
+    const { hasSourceTreeTracked, hasAppliedCustomizations } = await mergeSourceTreeContext.saveWithoutConflicts();
     if (hasAppliedCustomizations) {
       this.prompts.successfullyAppliedChanges(language);
       return ActionResult.success();
     }
     if (hasSourceTreeTracked) {
-      return ActionResult.success();
+      return ActionResult.success({sourceTreeTrackingInitiated: true, conflictsResolved: false});
     }
 
     let conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
-
     this.prompts.conflictsDetected(language, conflictedFilePaths);
     
     if (isInCi) {
@@ -67,14 +73,12 @@ export class MergeSourceTreeAction {
     } while (conflictedFilePaths.length > 0);
 
     this.prompts.conflictsResolved(language);
+    await mergeSourceTreeContext.saveWithResolvedConflicts();
 
-    const telemetryService = new TelemetryService(configDir);
-    await telemetryService.trackEvent(
-      new SdkConflictsResolvedEvent(language, flags),
-      commandMetadata.shell
-    );
-
-    await mergeSourceTreeContext.saveConflictedSourceTree();
-    return ActionResult.success();
+    if (!await mergeSourceTreeContext.tryForceCleanUp(() => this.prompts.directoryStillOpen(sdkDir))) {
+      this.prompts.operationCancelledMemoryLeak();
+      return ActionResult.cancelled();
+    }
+    return ActionResult.success({sourceTreeTrackingInitiated: false, conflictsResolved: true});
   }
 }

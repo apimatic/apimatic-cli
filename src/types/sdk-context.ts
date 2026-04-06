@@ -32,14 +32,17 @@ export class SdkContext {
     return !(await this.fileService.directoryEmpty(this.getSdkLanguageDirectory()));
   }
 
-  public async prepareTempSdkDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath, tempSdkSourceTree: FilePath): Promise<DirectoryPath> {
+  public async prepareTempSdkDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
     const tempSdkDirectory = tempDirectory.join("sdk");
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
     await this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    return tempSdkDirectory;
+  }
+
+  public async appendSourceTree(tempSdkDirectory: DirectoryPath, tempSdkSourceTree: FilePath): Promise<void> {
     const gitSourceTreeDir = tempSdkDirectory.join(".git");
     await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
     await this.zipService.unArchive(tempSdkSourceTree, gitSourceTreeDir);
-    return tempSdkDirectory;
   }
 
   public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean) : Promise<DirectoryPath> {

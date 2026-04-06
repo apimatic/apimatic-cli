@@ -26,7 +26,8 @@ export class LauncherService {
   ): Promise<boolean> {
     if (isInCi) return false;
     try {
-      const commands = this.buildDiffCommands(directoryPath, diffPairs, standaloneFiles);
+      const commands = this.buildDiffCommands(diffPairs, standaloneFiles);
+      await execa("code", ["--new-window", directoryPath.toString()]);
       await Promise.all(commands.map(args => execa("code", args)));
       return true;
     } catch {
@@ -35,14 +36,10 @@ export class LauncherService {
   }
 
   private buildDiffCommands(
-    directoryPath: DirectoryPath,
     diffPairs: Array<{ base: FilePath; working: FilePath }>,
     standaloneFiles: FilePath[]
   ): string[][] {
-    const dir = directoryPath.toString();
-    const commands: string[][] = [
-      ["--new-window", dir]
-    ];
+    const commands: string[][] = [];
 
     for (const { base, working } of diffPairs) {
       commands.push(["--reuse-window", "--diff", base.toString(), working.toString()]);

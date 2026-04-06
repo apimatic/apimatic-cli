@@ -1,4 +1,4 @@
-import { isCancel, text, confirm, log, select } from "@clack/prompts";
+import { isCancel, confirm, log, select } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
 import { Result } from "neverthrow";
@@ -52,18 +52,6 @@ export class SdkGeneratePrompts {
 
   public sdkGenerationServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
-  }
-
-  public operationCancelledMemoryLeak() {
-    log.info("Exiting without cleanup of temporary files.");
-  }
-
-    public async directoryStillOpen(directory: DirectoryPath): Promise<boolean> {
-    const result = await text({
-      message: `Please close all applications using the directory ${f.path(directory)} and press Enter to continue.`
-    });
-
-    return !isCancel(result);
   }
 
   public invalidVersionedDocsDirectory(directory: DirectoryPath) {

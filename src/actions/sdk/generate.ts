@@ -8,19 +8,14 @@ import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
 import { SpecContext } from "../../types/spec-context.js";
-import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
-import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { BuildContext } from '../../types/build-context.js';
-import { MergeSourceTreeContext } from "../../types/merge-source-tree-context.js";
-import { FileService } from "../../infrastructure/file-service.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
   private readonly mergeSourceTree: MergeSourceTreeAction = new MergeSourceTreeAction();
   private readonly configDir: DirectoryPath;
-  private readonly fileService = new FileService();
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
 
@@ -39,7 +34,7 @@ export class GenerateAction {
     skipChanges: boolean,
     trackChanges: boolean,
     apiVersion?: string
-  ): Promise<ActionResult> => {
+  ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
@@ -124,40 +119,21 @@ export class GenerateAction {
 
       const tempSdkDir = await sdkContext.prepareTempSdkDirectory(
         tempDirectory,
-        await tempContext.save(response.value.sdk),
-        await tempContext.save(response.value.sdkSourceTree)
+        await tempContext.save(response.value.sdk)
       );
 
-      const flags: Record<string, unknown> = { language, force, zip: zipSdk, "skip-changes": skipChanges, "track-changes": trackChanges, "api-version": apiVersion, "auth-key": this.authKey };
+      if (!trackChanges && !hasSdkSourceTree) {
+        this.prompts.sdkGenerated(await sdkContext.save(tempSdkDir, zipSdk));
+        return ActionResult.success();
+      }
 
-      const mergeSourceTreeContext = new MergeSourceTreeContext(
-        tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, skipChanges, hasSdkSourceTree
+      await sdkContext.appendSourceTree(tempSdkDir, await tempContext.save(response.value.sdkSourceTree));
+
+      return await this.mergeSourceTree.execute(
+        tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, skipChanges, hasSdkSourceTree,
+        language, sdkDirectory, version,
+        zipSdk
       );
-      const mergeResult = await this.mergeSourceTree.execute(
-        mergeSourceTreeContext, tempSdkDir, language, flags, this.configDir, this.commandMetadata
-      );
-
-      if (!mergeResult.isSuccess()) {
-        return mergeResult;
-      }
-
-      if (trackChanges && !hasSdkSourceTree) {
-        this.prompts.changeTrackingEnabled(language);
-        const trackChangesTelemetry = new TelemetryService(this.configDir);
-        await trackChangesTelemetry.trackEvent(
-          new SdkTrackChangesEvent(language, flags),
-          this.commandMetadata.shell
-        );
-      }
-
-      this.prompts.sdkGenerated(await sdkContext.save(tempSdkDir, zipSdk));
-      while (await this.fileService.deleteDirectory(tempSdkDir).then(() => false).catch(() => true)) {
-        if (!(await this.prompts.directoryStillOpen(tempSdkDir))) {
-          this.prompts.operationCancelledMemoryLeak();
-          return ActionResult.cancelled();
-        }
-      }
-      return ActionResult.success();
     });
   };
 }

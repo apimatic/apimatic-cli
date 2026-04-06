@@ -6,8 +6,8 @@ export class SdkTrackChangesEvent extends DomainEvent {
   private static readonly commandName = "sdk:generate" as const;
   private readonly language: string;
 
-  constructor(language: string, flags: Record<string, unknown>) {
-    super(SdkTrackChangesEvent.message, SdkTrackChangesEvent.commandName, flags);
+  constructor(language: string) {
+    super(SdkTrackChangesEvent.message, SdkTrackChangesEvent.commandName, {});
     this.language = language;
   }
 }
