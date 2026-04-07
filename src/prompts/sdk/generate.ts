@@ -84,11 +84,6 @@ export class SdkGeneratePrompts {
     log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }
 
-  public changeTrackingEnabled(language: Language) {
-    log.info(`Change tracking is enabled for ${f.var(language)}. Now you can save your customizations in ${f.var(language)} SDK using:
-${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
-  }
-
   public changeTrackingAlreadyEnabled(language: Language) {
     log.warn(`Change tracking is already enabled for ${f.var(language)}. No need to use the ${f.flag("--track-changes")} flag again for ${f.var(language)} SDK.`);
   }

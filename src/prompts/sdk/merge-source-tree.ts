@@ -13,6 +13,11 @@ export class MergeSourceTreePrompts {
     log.info(`Successfully applied customizations for ${f.var(language)} SDK.`);
   }
 
+  public changeTrackingEnabled(language: Language) {
+    log.info(`Change tracking is enabled for ${f.var(language)}. Now you can save your customizations in ${f.var(language)} SDK using:
+${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
+  }
+
   public warnUnresolvedConflicts(language: Language) {
     log.error(
       `Merge conflicts detected in the generated ${f.var(language)} SDK. Manually run the same command to resolve the conflicts interactively.`
