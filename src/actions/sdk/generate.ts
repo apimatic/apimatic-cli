@@ -9,12 +9,11 @@ import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
 import { SpecContext } from "../../types/spec-context.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
-import { BuildContext } from '../../types/build-context.js';
+import { BuildContext } from "../../types/build-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
   private readonly portalService: PortalService = new PortalService();
-  private readonly mergeSourceTree: MergeSourceTreeAction = new MergeSourceTreeAction();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -129,7 +128,8 @@ export class GenerateAction {
 
       await sdkContext.appendSourceTree(tempSdkDir, await tempContext.save(response.value.sdkSourceTree));
 
-      return await this.mergeSourceTree.execute(
+      const mergeSourceTree = new MergeSourceTreeAction();
+      return await mergeSourceTree.execute(
         tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, skipChanges, hasSdkSourceTree,
         language, sdkDirectory, version,
         zipSdk

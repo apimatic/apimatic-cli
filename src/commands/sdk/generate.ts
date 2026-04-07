@@ -24,7 +24,6 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       description: "Programming language for SDK generation",
       options: Object.values(Language).map((p) => p.valueOf()),
     }),
-    ...FlagsProvider.input,
     destination: Flags.string({
       char: "d",
       description: "[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated"
@@ -36,16 +35,17 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     "api-version": Flags.string({
       description: "Version of the API to use for SDK generation (if multiple versions exist)"
     }),
-    ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
       description: "Download the generated SDK as a .zip archive"
     }),
-    ...FlagsProvider.authKey,
     "track-changes": Flags.boolean({
       default: false,
       description: "Generate SDK source tree in the src directory to enable tracking changes across generations"
-    })
+    }),
+    ...FlagsProvider.input,
+    ...FlagsProvider.force,
+    ...FlagsProvider.authKey,
   };
 
   static examples = [
@@ -61,7 +61,6 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-changes": skipChanges, "track-changes": trackChanges,"api-version": apiVersion }
     } = await this.parse(SdkGenerate);
 
-    const telemetryService = new TelemetryService(this.getConfigDir());
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
@@ -70,6 +69,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       commandName: SdkGenerate.id,
       shell: this.config.shell
     };
+    const telemetryService = new TelemetryService(this.getConfigDir());
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);

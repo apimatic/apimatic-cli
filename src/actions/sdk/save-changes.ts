@@ -3,25 +3,25 @@ import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { Language } from "../../types/sdk/generate.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
-import { ReviewChangesAction } from "./review-changes.js";
 import { SdkInputContext } from "../../types/sdk-input-context.js";
-import { SaveChanges } from "../../application/sdk/save-changes.js";
 import { BuildContext } from "../../types/build-context.js";
 import { FilePath } from "../../types/file/filePath.js";
+import { LauncherService } from "../../infrastructure/launcher-service.js";
+import { FileService } from "../../infrastructure/file-service.js";
 
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
-  private readonly reviewChanges = new ReviewChangesAction();
-  private readonly saveChanges = new SaveChanges();
+  private readonly launcherService = new LauncherService();
+  private readonly fileService = new FileService();
 
-  public async execute(
+  public readonly execute = async (
     workingDirectory: DirectoryPath,
     buildDirectory: DirectoryPath,
     sdkDirectoryInput: string | undefined,
     language: Language,
     skipReview: boolean,
     apiVersion?: string
-  ): Promise<ActionResult> {
+  ): Promise<ActionResult> => {
     const rootBuildContext = new BuildContext(buildDirectory);
     if (!(await rootBuildContext.validate())) {
       this.prompts.srcDirectoryEmpty(buildDirectory);
@@ -86,13 +86,12 @@ export class SaveChangesAction {
 
     return await withDirPath(async (tempDirectory) => {
       const sourceTreePath = versionedContext.buildContext.getSdkSourceTree(language);
-      const updatedStateDirectory = await this.saveChanges.prepareUpdatedSdkDirectory(
-        sdkInputDirectory,
+      const updatedStateDirectory = await sdkContext.prepareUpdatedSdkDirectory(
         sourceTreePath,
         tempDirectory
       );
 
-      const fileStatuses = await this.saveChanges.getChanges(updatedStateDirectory);
+      const fileStatuses = await sdkContext.getChanges(updatedStateDirectory);
       if (fileStatuses.length === 0) {
         this.prompts.noChangesDetected();
         return ActionResult.success();
@@ -109,17 +108,40 @@ export class SaveChangesAction {
           this.prompts.operationCancelled();
           return ActionResult.cancelled();
         }
-        await this.saveChanges.saveSourceTree(updatedStateDirectory, sourceTreePath);
+        await sdkContext.saveSourceTree(updatedStateDirectory, sourceTreePath);
         this.prompts.changesSaved(sourceTreePath);
         return ActionResult.success();
       }
 
-      return await this.reviewChanges.execute(
+      const { diffPairs, standaloneFiles } = await sdkContext.classifyChangedFiles(
         updatedStateDirectory,
-        await this.saveChanges.prepareBaseSdkDirectory(updatedStateDirectory, tempDirectory),
-        fileStatuses,
-        sourceTreePath
+        tempDirectory,
+        fileStatuses
       );
+
+      // Open diffs for review in the IDE, or fall back to manual review
+      const openedFiles = await this.launcherService.openFolderInIde(updatedStateDirectory, ...standaloneFiles);
+      const opened = openedFiles && (await Promise.all(diffPairs.map(({ base, working }) =>
+        this.launcherService.openDiffInIde(base, working)))).every(b => b);
+
+      if (opened) {
+        this.prompts.reviewInIdeAndClose();
+        await this.launcherService.waitForVscodeToClose(updatedStateDirectory);
+      } else if (!await this.prompts.reviewChangesManually(updatedStateDirectory)) {
+        this.prompts.operationCancelled();
+        return ActionResult.cancelled();
+      }
+
+      await sdkContext.saveSourceTree(updatedStateDirectory, sourceTreePath);
+      this.prompts.changesSaved(sourceTreePath);
+
+      while (await this.fileService.deleteDirectory(updatedStateDirectory).then(() => false).catch(() => true)) {
+        if (!(await this.prompts.directoryStillOpen(updatedStateDirectory))) {
+          this.prompts.operationCancelledMemoryLeak();
+          return ActionResult.cancelled();
+        }
+      }
+      return ActionResult.success();
     });
-  }
+  };
 }

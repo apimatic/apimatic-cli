@@ -23,7 +23,6 @@ export default class SaveChanges extends Command {
       description: "Programming language of the SDK",
       options: Object.values(Language).map((p) => p.valueOf())
     }),
-    ...FlagsProvider.input,
     "sdk": Flags.string({
       description: "[default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing the updated SDK."
     }),
@@ -31,8 +30,10 @@ export default class SaveChanges extends Command {
       description: "Version of the API where changes should be saved (if multiple versions exist)."
     }),
     "skip-review": Flags.boolean({
+      default: false,
       description: "Skip the review in IDE before saving the changes."
-    })
+    }),
+    ...FlagsProvider.input,
   };
 
   static examples = [
@@ -46,14 +47,15 @@ export default class SaveChanges extends Command {
       flags: { sdk, language, input, "api-version": apiVersion, "skip-review": skipReview }
     } = await this.parse(SaveChanges);
 
-    const telemetryService = new TelemetryService(this.getConfigDir());
+    const workingDirectory = DirectoryPath.createInput(input);
+    const buildDirectory = workingDirectory.join("src");
+
     const commandMetadata: CommandMetadata = {
       commandName: SaveChanges.id,
       shell: this.config.shell
     };
-    const workingDirectory = DirectoryPath.createInput(input);
-    const buildDirectory = workingDirectory.join("src");
-    
+    const telemetryService = new TelemetryService(this.getConfigDir());
+
     intro("Save Changes");
     const action = new SaveChangesAction();
     const result = await action.execute(

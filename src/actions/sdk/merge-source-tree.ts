@@ -11,7 +11,7 @@ export class MergeSourceTreeAction {
   private readonly prompts = new MergeSourceTreePrompts();
   private readonly launcherService = new LauncherService();
 
-  public async execute(
+  public readonly execute = async (
     sdkDir: DirectoryPath,
     sourceTreePath: FilePath,
     trackChanges: boolean,
@@ -21,7 +21,7 @@ export class MergeSourceTreeAction {
     outputSdkDirectory: DirectoryPath,
     version: string | undefined,
     zipSdk: boolean,
-  ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> {
+  ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
 
     const mergeSourceTreeContext = new MergeSourceTreeContext(sdkDir, sourceTreePath,
       trackChanges, skipChanges, hasSdkSourceTree, zipSdk, this.prompts.sdkGenerated,
@@ -86,5 +86,5 @@ export class MergeSourceTreeAction {
       return ActionResult.cancelled();
     }
     return ActionResult.success({sourceTreeTrackingInitiated: false, conflictsResolved: true});
-  }
+  };
 }
