@@ -8,6 +8,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 
 - **DO** expose only behavioral methods — `validate()`, `exists()`, `save()`, `resolveTo()`. Callers say *what* they want, not *how*.
 - **DO** return results from operations — `save()` returning `FilePath` (where it wrote) is fine. It's the *result* of work, not internal *state*.
+- **DO** chain method return values between context operations — it's valid for one method's return (`DirectoryPath`, `FilePath`) to be passed as input to the next method on the same context. This is coordinated workflow within the context's domain, not leakage.
 - **DO** keep derived paths as `private get` — all `FilePath`/`DirectoryPath` derivation is internal.
 - **DO** keep decision logic inside — if the context knows how to choose between zip/unzip, file/url, etc., that logic stays internal.
 - **DO** expose domain-specific read/write methods — instead of returning raw JSON/YAML config for callers to manipulate.
