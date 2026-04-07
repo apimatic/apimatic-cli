@@ -84,7 +84,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       apiVersion
     );
     outro(result);
-    result.mapAll(
+    await result.mapAll(
       async (res) => {
         if (res?.sourceTreeTrackingInitiated) {
           await telemetryService.trackEvent(new SdkTrackChangesEvent(language), commandMetadata.shell);
