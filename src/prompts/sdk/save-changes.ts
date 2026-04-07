@@ -75,7 +75,7 @@ export class SaveChangesPrompts {
 
   public async directoryStillOpen(directory: DirectoryPath): Promise<boolean> {
     const result = await text({
-      message: `Unable to cleanup: ${f.path(directory)} press Enter to try again.`
+      message: `Please close all applications using the directory ${f.path(directory)} and press Enter to continue.`
     });
 
     return !isCancel(result);
