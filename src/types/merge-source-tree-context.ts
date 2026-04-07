@@ -19,10 +19,11 @@ export class MergeSourceTreeContext {
     private readonly skipChanges: boolean,
     private readonly hasSdkSourceTree: boolean,
     private readonly zipSdk: boolean,
+    private readonly tempDirectory: DirectoryPath,
     private readonly completedTask: (dir: DirectoryPath) => void,
     outputSdkDirectory: DirectoryPath,
     language: Language,
-    version?: string
+    version?: string,
   ) {
     this.sdkContext = new SdkContext(outputSdkDirectory, language, skipChanges && hasSdkSourceTree, version);
   }
@@ -43,25 +44,30 @@ export class MergeSourceTreeContext {
       return { hasSourceTreeTracked: false, hasAppliedCustomizations: false };
     }
 
+    const sdkDirWithoutGit = this.tempDirectory.join("sdkWithoutGit");
+    await this.fileService.copyDirectoryExcluding(this.sdkDir, sdkDirWithoutGit, [".git"]);
     const shouldTrackChanges = this.trackChanges || this.hasSdkSourceTree;
     if (shouldTrackChanges) {
       await this.fileService.ensurePathExists(this.sourceTreePath);
+      await this.gitService.forceCheckoutMainBranch(this.sdkDir);
       await this.zipService.archive(this.sdkDir.join(".git"), this.sourceTreePath);
     }
     const hasCustomizations = await this.gitService.hasCustomBranch(this.sdkDir);
-    await this.fileService.deleteDirectory(this.sdkDir.join(".git"));
-    this.completedTask(await this.sdkContext.save(this.sdkDir, this.zipSdk));
+    this.completedTask(await this.sdkContext.save(sdkDirWithoutGit, this.zipSdk));
     return { hasSourceTreeTracked: shouldTrackChanges, hasAppliedCustomizations: hasCustomizations };
   }
 
   public async saveWithResolvedConflicts(): Promise<void> {
+    const sdkDirWithoutGit = this.tempDirectory.join("sdkWithoutGit");
+    await this.fileService.copyDirectoryExcluding(this.sdkDir, sdkDirWithoutGit, [".git"]);
     await this.gitService.commitResolvedConflicts(this.sdkDir);
     for (const filePath of this.gitService.getMergeFiles(this.sdkDir)) {
       await this.fileService.deleteFile(filePath);
     }
+    await this.gitService.forceCheckoutMainBranch(this.sdkDir);
     await this.zipService.archive(this.sdkDir.join(".git"), this.sourceTreePath);
     await this.fileService.deleteDirectory(this.sdkDir.join(".git"));
-    this.completedTask(await this.sdkContext.save(this.sdkDir, this.zipSdk));
+    this.completedTask(await this.sdkContext.save(sdkDirWithoutGit, this.zipSdk));
   }
 
   public async getConflicts(): Promise<FilePath[]> {

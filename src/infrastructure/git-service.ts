@@ -14,9 +14,11 @@ export class GitService {
   public async checkoutCustomBranch(dirPath: DirectoryPath): Promise<void> {
     const dir = dirPath.toString();
 
-    return await this.hasCustomBranch(dirPath)
-      ? await git.checkout({ fs, dir, ref: CUSTOM_BRANCH})
-      : await git.branch({ fs, dir, ref: CUSTOM_BRANCH });
+    if (!await this.hasCustomBranch(dirPath)) {
+      await git.branch({ fs, dir, ref: CUSTOM_BRANCH });
+    }
+
+    await git.checkout({ fs, dir, ref: CUSTOM_BRANCH});
   }
 
   public async hasCustomBranch(dirPath: DirectoryPath): Promise<boolean> {

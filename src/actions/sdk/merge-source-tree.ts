@@ -21,10 +21,11 @@ export class MergeSourceTreeAction {
     outputSdkDirectory: DirectoryPath,
     version: string | undefined,
     zipSdk: boolean,
+    temporaryDirectory: DirectoryPath
   ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
 
     const mergeSourceTreeContext = new MergeSourceTreeContext(sdkDir, sourceTreePath,
-      trackChanges, skipChanges, hasSdkSourceTree, zipSdk, this.prompts.sdkGenerated,
+      trackChanges, skipChanges, hasSdkSourceTree, zipSdk, temporaryDirectory, this.prompts.sdkGenerated,
       outputSdkDirectory, language, version);
 
     const { hasSkippedChangesEnabled, hasSkippedCustomizations } = await mergeSourceTreeContext.saveSkippingChanges();

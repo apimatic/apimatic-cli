@@ -132,7 +132,7 @@ export class GenerateAction {
       return await mergeSourceTree.execute(
         tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, skipChanges, hasSdkSourceTree,
         language, sdkDirectory, version,
-        zipSdk
+        zipSdk, tempDirectory
       );
     });
   };

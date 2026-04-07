@@ -71,6 +71,7 @@ export class SdkInputContext {
   ): Promise<void> {
     const sdkGitDir = updatedSdkDirectory.join(".git");
     await this.gitService.commitReviewedChanges(updatedSdkDirectory);
+    await this.gitService.forceCheckoutMainBranch(updatedSdkDirectory);
     await this.zipService.archive(sdkGitDir, sourceTreePath);
   }
 
