@@ -65,6 +65,8 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 
 Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by commitlint + husky. Pre-commit runs lint-staged (ESLint + Prettier).
 
+**Do not commit or push automatically.** Always wait for explicit instruction from the user before running `git commit` or `git push`.
+
 ## Testing
 
 - **Framework**: mocha + chai (expect style) + sinon + nock + mock-fs
