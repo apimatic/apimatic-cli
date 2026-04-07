@@ -76,7 +76,7 @@ Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by co
 
 Reference these files for scaffolding new code:
 
-- `.ai/skills/new-command.md` — scaffold a Command + Action + Prompts triple (3 files)
-- `.ai/skills/new-action.md` — scaffold a standalone Action class (standard / minimal / delegation variants)
-- `.ai/skills/new-context.md` — scaffold a Context object (output / input / temp / pure variants)
-- `.ai/skills/new-service.md` — scaffold an infrastructure Service (SDK controller / axios-auth / axios-stateless variants)
+- `.ai/skills/command.md` — Command + Action + Prompts conventions; scaffolding templates and checklists
+- `.ai/skills/action.md` — Action class conventions; standard / minimal / delegation variants
+- `.ai/skills/context.md` — Context object conventions; output / input / temp / pure variants
+- `.ai/skills/service.md` — Infrastructure Service conventions; SDK controller / axios-auth / axios-stateless variants

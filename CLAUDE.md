@@ -8,7 +8,7 @@ Read `.ai/instructions.md` for full project instructions (architecture, conventi
 
 Reference these files as needed for scaffolding:
 
-- `.ai/skills/new-command.md` — scaffold a Command + Action + Prompts triple
-- `.ai/skills/new-action.md` — scaffold a standalone Action class
-- `.ai/skills/new-context.md` — scaffold a Context object
-- `.ai/skills/new-service.md` — scaffold an infrastructure Service
+- `.ai/skills/command.md` — Command + Action + Prompts conventions and scaffolding
+- `.ai/skills/action.md` — Action class conventions and scaffolding
+- `.ai/skills/context.md` — Context object conventions and scaffolding
+- `.ai/skills/service.md` — Infrastructure Service conventions and scaffolding
