@@ -19,37 +19,29 @@ export class LauncherService {
     }
   }
 
-  public async openDiffsInSourceControl(
+  public async openDiffsInIde(
     directoryPath: DirectoryPath,
     diffPairs: Array<{ base: FilePath; working: FilePath }>,
     standaloneFiles: FilePath[] = []
   ): Promise<boolean> {
     if (isInCi) return false;
     try {
-      const commands = this.buildDiffCommands(diffPairs, standaloneFiles);
-      await execa("code", ["--new-window", directoryPath.toString()]);
+      const dir = directoryPath.toString();
+      const commands: string[][] = [["--new-window", dir]];
+
+      for (const { base, working } of diffPairs) {
+        commands.push(["--reuse-window", "--diff", base.toString(), working.toString()]);
+      }
+
+      if (standaloneFiles.length > 0) {
+        commands.push(["--reuse-window", ...standaloneFiles.map(f => f.toString())]);
+      }
+
       await Promise.all(commands.map(args => execa("code", args)));
       return true;
     } catch {
       return false;
     }
-  }
-
-  private buildDiffCommands(
-    diffPairs: Array<{ base: FilePath; working: FilePath }>,
-    standaloneFiles: FilePath[]
-  ): string[][] {
-    const commands: string[][] = [];
-
-    for (const { base, working } of diffPairs) {
-      commands.push(["--reuse-window", "--diff", base.toString(), working.toString()]);
-    }
-
-    if (standaloneFiles.length > 0) {
-      commands.push(["--reuse-window", ...standaloneFiles.map(f => f.toString())]);
-    }
-
-    return commands;
   }
 
   public async waitForVscodeToClose(directoryPath: DirectoryPath): Promise<boolean> {

@@ -46,7 +46,8 @@ export class MergeSourceTreeAction {
     }
 
     let conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
-    this.prompts.conflictsDetected(language, conflictedFilePaths);
+
+    this.prompts.conflictsDetected(language, sdkDir, conflictedFilePaths);
     
     if (isInCi) {
       this.prompts.warnUnresolvedConflicts(language);
@@ -67,7 +68,7 @@ export class MergeSourceTreeAction {
       conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
 
       if (conflictedFilePaths.length > 0) {
-        this.prompts.conflictsStillPresent(language, conflictedFilePaths);
+        this.prompts.conflictsStillPresent(sdkDir, conflictedFilePaths);
       }
 
     } while (conflictedFilePaths.length > 0);

@@ -96,7 +96,7 @@ export class SaveChangesAction {
         this.prompts.noChangesDetected();
         return ActionResult.success();
       }
-      this.prompts.modifiedFilesDetected(language, fileStatuses);
+      this.prompts.modifiedFilesDetected(sdkInputDirectory, fileStatuses);
 
       if (skipReview) {
         if (!await this.prompts.confirmChanges()) {

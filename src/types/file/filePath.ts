@@ -15,10 +15,6 @@ export class FilePath {
     return new FilePath(newDirectory, this.fileName);
   }
 
-  public getFileName(): string {
-    return this.fileName.toString();
-  }
-
   public toString(): string {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
   }
