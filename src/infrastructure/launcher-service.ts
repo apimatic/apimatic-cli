@@ -19,25 +19,10 @@ export class LauncherService {
     }
   }
 
-  public async openDiffsInIde(
-    directoryPath: DirectoryPath,
-    diffPairs: Array<{ base: FilePath; working: FilePath }>,
-    standaloneFiles: FilePath[] = []
-  ): Promise<boolean> {
+  public async openDiffInIde(originalFile: FilePath, updatedFile: FilePath): Promise<boolean> {
     if (isInCi) return false;
     try {
-      const dir = directoryPath.toString();
-      const commands: string[][] = [["--new-window", dir]];
-
-      for (const { base, working } of diffPairs) {
-        commands.push(["--reuse-window", "--diff", base.toString(), working.toString()]);
-      }
-
-      if (standaloneFiles.length > 0) {
-        commands.push(["--reuse-window", ...standaloneFiles.map(f => f.toString())]);
-      }
-
-      await Promise.all(commands.map(args => execa("code", args)));
+      await execa("code", ["--reuse-window", "--diff", originalFile.toString(), updatedFile.toString()]);
       return true;
     } catch {
       return false;
