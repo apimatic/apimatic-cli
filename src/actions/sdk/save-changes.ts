@@ -135,12 +135,11 @@ export class SaveChangesAction {
       await sdkContext.saveSourceTree(updatedStateDirectory, sourceTreePath);
       this.prompts.changesSaved(sourceTreePath);
 
-      while (await this.fileService.deleteDirectory(updatedStateDirectory).then(() => false).catch(() => true)) {
-        if (!(await this.prompts.directoryStillOpen(updatedStateDirectory))) {
-          this.prompts.operationCancelledMemoryLeak();
-          return ActionResult.cancelled();
-        }
+      if (!await sdkContext.tryForceCleanUp(updatedStateDirectory, (dir) => this.prompts.directoryStillOpen(dir))) {
+        this.prompts.operationCancelledMemoryLeak();
+        return ActionResult.cancelled();
       }
+      
       return ActionResult.success();
     });
   };
