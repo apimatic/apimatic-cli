@@ -1,5 +1,5 @@
 import { isCancel, log, text } from "@clack/prompts";
-import { format as f } from "../format.js";
+import { format as f, getTree, TreeNode } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { Language } from "../../types/sdk/generate.js";
@@ -24,20 +24,14 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
     );
   }
 
-  public conflictsDetected(language: Language, directoryPath: DirectoryPath, conflictedFiles: FilePath[]) {
+  public conflictsDetected(language: Language, changesTree: TreeNode) {
     log.message(`Conflicts found in ${f.var(language)} SDK:`);
-    const tree = directoryPath.buildFilePathTree([
-      ...conflictedFiles.map((filePath) => ({ path: filePath, description: "# Conflicted file" }))
-    ]);
-    log.message(tree);
+    log.message(getTree(changesTree));
   }
 
-  public conflictsStillPresent(directoryPath: DirectoryPath, conflictedFiles: FilePath[]) {
+  public conflictsStillPresent(changesTree: TreeNode) {
     log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
-    const tree = directoryPath.buildFilePathTree([
-      ...conflictedFiles.map((filePath) => ({ path: filePath, description: "# Conflicted file" }))
-    ]);
-    log.message(tree);
+    log.message(getTree(changesTree));
   }
 
   public async waitForConflictsResolved(language: Language, sdkDir?: DirectoryPath): Promise<boolean> {

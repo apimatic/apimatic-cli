@@ -1,8 +1,7 @@
 import { log, text, isCancel, select, confirm } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f } from "../format.js";
+import { format as f, getTree, TreeNode } from "../format.js";
 import { noteWrapped } from "../prompt.js";
-import { GitFileStatus } from "../../infrastructure/git-service.js";
 import { FilePath } from "../../types/file/filePath.js";
 
 export class SaveChangesPrompts {
@@ -82,19 +81,9 @@ export class SaveChangesPrompts {
     return !isCancel(result);
   }
 
-
-  public modifiedFilesDetected(
-    directoryPath: DirectoryPath,
-    fileStatuses: Array<GitFileStatus>
-  ) {
-    log.message(`Detected changes in ${fileStatuses.length} file(s):`);
-    const tree = directoryPath.buildFilePathTree(
-      fileStatuses.map(({ fileName, status }) => ({
-        path: new FilePath(directoryPath, fileName),
-        description: status === "modified" ? "# Modified" : status === "added" ? "# Added" : "# Deleted"
-      }))
-    );
-    log.message(tree);
+  public modifiedFilesDetected(changesCount: number, changesTree: TreeNode) {
+    log.message(`Detected changes in ${changesCount} file(s):`);
+    log.message(getTree(changesTree));
   }
 
   public noChangesDetected() {
