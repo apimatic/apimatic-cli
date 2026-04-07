@@ -39,7 +39,7 @@ export class MergeSourceTreeContext {
   }
 
   public async saveWithoutConflicts(): Promise<{ hasSourceTreeTracked: boolean, hasAppliedCustomizations: boolean }> {
-    if (!(await this.fileService.fileExists(this.gitService.getMergeFiles(this.sdkDir).pop()!))) {
+    if (await this.fileService.fileExists(this.gitService.getMergeFiles(this.sdkDir).pop()!)) {
       return { hasSourceTreeTracked: false, hasAppliedCustomizations: false };
     }
 

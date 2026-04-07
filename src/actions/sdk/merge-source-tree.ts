@@ -42,6 +42,7 @@ export class MergeSourceTreeAction {
       return ActionResult.success();
     }
     if (hasSourceTreeTracked) {
+      this.prompts.changeTrackingEnabled(language);
       return ActionResult.success({sourceTreeTrackingInitiated: true, conflictsResolved: false});
     }
 
