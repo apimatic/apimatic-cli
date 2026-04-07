@@ -26,7 +26,7 @@ export class GitService {
   }
 
   public getMergeFiles(dirPath: DirectoryPath): FilePath[] {
-    const gitDir = dirPath;
+    const gitDir = dirPath.join(".git");
     const mergeFiles = ["MERGE_HEAD", "MERGE_MODE", "MERGE_MSG"];
     return mergeFiles.map((filename) => new FilePath(gitDir, new FileName(filename)));
   }
@@ -43,7 +43,7 @@ export class GitService {
     const statusMatrix = await git.statusMatrix({ fs, dir: dirPath.toString() });
 
     return statusMatrix
-      .filter(([, headStatus, workdirStatus]) => headStatus !== workdirStatus)
+      .filter(([, headStatus, workdirStatus, stageStatus]) => headStatus !== workdirStatus || stageStatus === 3)
       .map(([relativeFilePath, headStatus, workdirStatus]) => {
         const fileName = new FileName(relativeFilePath);
         if (headStatus === 0) {
