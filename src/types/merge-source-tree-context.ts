@@ -39,7 +39,7 @@ export class MergeSourceTreeContext {
   }
 
   public async saveWithoutConflicts(): Promise<{ hasSourceTreeTracked: boolean, hasAppliedCustomizations: boolean }> {
-    if (await this.fileService.fileExists(this.gitService.getMergeFiles(this.sdkDir).pop()!)) {
+    if (await this.fileService.fileExists(this.gitService.getMergeFiles(this.sdkDir)[0])) {
       return { hasSourceTreeTracked: false, hasAppliedCustomizations: false };
     }
 
@@ -56,8 +56,9 @@ export class MergeSourceTreeContext {
 
   public async saveWithResolvedConflicts(): Promise<void> {
     await this.gitService.commitResolvedConflicts(this.sdkDir);
-    await Promise.all(this.gitService.getMergeFiles(this.sdkDir)
-      .map((filePath) => this.fileService.deleteFile(filePath)));
+    for (const filePath of this.gitService.getMergeFiles(this.sdkDir)) {
+      await this.fileService.deleteFile(filePath);
+    }
     await this.zipService.archive(this.sdkDir.join(".git"), this.sourceTreePath);
     await this.fileService.deleteDirectory(this.sdkDir.join(".git"));
     this.completedTask(await this.sdkContext.save(this.sdkDir, this.zipSdk));
@@ -70,11 +71,6 @@ export class MergeSourceTreeContext {
   }
 
   public async tryForceCleanUp(shouldRetry: () => Promise<boolean>): Promise<boolean> {
-    while (await this.fileService.deleteDirectory(this.sdkDir).then(() => false).catch(() => true)) {
-      if (!(await shouldRetry())) {
-        return false;
-      }
-    }
-    return true;
+    return this.fileService.forceDeleteDirectory(this.sdkDir, shouldRetry);
   }
 }
