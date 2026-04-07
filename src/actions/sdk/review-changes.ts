@@ -40,7 +40,10 @@ export class ReviewChangesAction {
     }
 
     // Open diffs for review in the IDE, or fall back to manual review
-    const opened = await this.launcherService.openDiffsInIde(updatedStateDirectory, diffPairs, standaloneFiles);
+    const openedFiles = await this.launcherService.openFolderInIde(updatedStateDirectory, ...standaloneFiles);
+    const opened = openedFiles && (await Promise.all(diffPairs.map(({ base, working }) =>
+      this.launcherService.openDiffInIde(base, working)))).every(b => b);
+
     if (opened) {
       this.prompts.reviewInIdeAndClose();
       await this.launcherService.waitForVscodeToClose(updatedStateDirectory);

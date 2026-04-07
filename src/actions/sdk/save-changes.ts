@@ -7,6 +7,7 @@ import { ReviewChangesAction } from "./review-changes.js";
 import { SdkInputContext } from "../../types/sdk-input-context.js";
 import { SaveChanges } from "../../application/sdk/save-changes.js";
 import { BuildContext } from "../../types/build-context.js";
+import { FilePath } from "../../types/file/filePath.js";
 
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
@@ -96,7 +97,12 @@ export class SaveChangesAction {
         this.prompts.noChangesDetected();
         return ActionResult.success();
       }
-      this.prompts.modifiedFilesDetected(sdkInputDirectory, fileStatuses);
+      this.prompts.modifiedFilesDetected(fileStatuses.length, sdkInputDirectory.toTreeNode(
+        fileStatuses.map(({ fileName, status }) => ({
+          path: new FilePath(sdkInputDirectory, fileName),
+          description: status === "modified" ? "# Modified" : status === "added" ? "# Added" : "# Deleted"
+        }))
+      ));
 
       if (skipReview) {
         if (!await this.prompts.confirmChanges()) {
