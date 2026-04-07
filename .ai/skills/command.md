@@ -1,38 +1,12 @@
-# /new-command
+# Command, Action & Prompts Conventions
 
-Scaffold a new CLI command with its corresponding Action and Prompts classes. This creates 3 coordinated files with mirrored paths following the project's 5-layer architecture.
+These three layers are always created together and mirror each other in path structure. Commands parse flags and orchestrate the flow. Actions contain the business logic. Prompts handle all terminal UI. Each has strict responsibilities — none bleeds into another's domain.
 
-## Files Created
-
-1. `src/commands/{topic}/{name}.ts` — oclif Command class (flag parsing, intro/outro)
-2. `src/actions/{topic}/{name}.ts` — Action class (business logic orchestration)
-3. `src/prompts/{topic}/{name}.ts` — Prompts class (all terminal UI)
-
-## Information to Gather
-
-Before generating, determine the following from the user or their description:
-
-1. **Topic** — command group (e.g., `api`, `sdk`, `portal`). Can be nested: `portal/toc`, `portal/recipe`
-2. **Command name** — subcommand (e.g., `validate`, `generate`, `new`)
-3. **Summary** — one-line description
-4. **Description** — multi-line description (template literal)
-5. **Input type** — one of:
-   - `ResourceInput` — adds `file` + `url` flags, uses `createResourceInput(file, url)`
-   - `DirectoryPath` — adds `FlagsProvider.input`, uses `DirectoryPath.createInput(input)`
-   - `None` — no input flags
-6. **Needs API auth** — adds `FlagsProvider.authKey`, passes `authKey` to Action constructor
-7. **Needs force flag** — adds `FlagsProvider.force` for overwrite confirmation
-8. **Needs destination flag** — adds `FlagsProvider.destination(artifact, artifactName)`
-9. **Custom flags** — any command-specific flags
-10. **Intro text** — text for `intro("...")` call (e.g., "Validate API", "Generate SDK")
-
----
-
-## DO's and DON'Ts
+## Conventions
 
 ### Commands — DO
 
-- **DO** use `export default class` for all commands.
+- **DO** use `export default class` for all commands — oclif requires default export.
 - **DO** use `static readonly` for `summary`, `description`, and `cmdTxt`.
 - **DO** use `format.cmd("apimatic", ...topicParts)` for `cmdTxt` — each topic level and the command name are separate arguments.
 - **DO** reference the class name (not `this`) in static `examples` array: `${ClassName.cmdTxt}`.
@@ -62,7 +36,7 @@ Before generating, determine the following from the user or their description:
 
 - **DO** use named export: `export class {PascalName}Action`.
 - **DO** use `public readonly execute = async (...): Promise<ActionResult> =>` (arrow function property).
-- **DO** initialize prompts as a field: `private readonly prompts: {Name}Prompts = new {Name}Prompts()` or `private readonly prompts = new {Name}Prompts()`.
+- **DO** initialize prompts as a field: `private readonly prompts = new {Name}Prompts()`.
 - **DO** initialize services as `private readonly` fields (inline with `new`, not in constructor body).
 - **DO** use the full constructor pattern when the command calls an API: `constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null)`.
 - **DO** use a simpler constructor when no API call is needed: just `(configDir: DirectoryPath, commandMetadata: CommandMetadata)` or even `(configDir: DirectoryPath)`.
@@ -120,7 +94,68 @@ Before generating, determine the following from the user or their description:
 
 ---
 
-## Command File Template
+## Review Checklist
+
+- [ ] All imports use `.js` extension (e.g., `../../types/file/directoryPath.js`)
+- [ ] File paths mirror across `commands/`, `actions/`, `prompts/` directories
+- [ ] Command uses `export default class`
+- [ ] Command has `static readonly` for summary, description, cmdTxt
+- [ ] Command uses `ClassName.cmdTxt` (not `this.cmdTxt`) in examples
+- [ ] Command `run()` follows: parse → type-convert → CommandMetadata → intro → execute → outro
+- [ ] Command has `getConfigDir()` helper (private readonly arrow function)
+- [ ] Action uses named export (not default)
+- [ ] Action constructor signature matches expected pattern for its complexity level
+- [ ] Action execute is arrow function: `public readonly execute = async (...) => { ... }`
+- [ ] Action uses `this.prompts.*` for all output (no direct `log.*` imports)
+- [ ] `authKey` typed as `string | null = null`, not `undefined`
+- [ ] Prompts spinner methods take `Promise<Result<T,E>>` and use `withSpinner()`
+- [ ] Interactive prompts guard with `isCancel()` returning `false`/`undefined`
+- [ ] `FlagsProvider.authKey` is the last spread in `static flags`
+- [ ] No `console.log` anywhere
+- [ ] Topic separator is space in examples and cmdTxt (not colon)
+- [ ] No raw string paths — use `DirectoryPath`, `FilePath`, `FileName`, `UrlPath`
+- [ ] Services initialized inline on property declaration (not in constructor body)
+
+## Reference Files
+
+| Pattern | File |
+|---|---|
+| Complex command (multiple flags, FlagsProvider) | `src/commands/sdk/generate.ts` |
+| Simple command (ResourceInput, file/url) | `src/commands/api/validate.ts` |
+| Minimal command (no flags) | `src/commands/auth/logout.ts` |
+| Command with nested topic (3-level) | `src/commands/portal/toc/new.ts` |
+| Action with withDirPath + Context objects | `src/actions/portal/generate.ts` |
+| Action with Result error handling | `src/actions/api/validate.ts` |
+| Action with simpler constructor (no authKey) | `src/actions/portal/toc/new-toc.ts` |
+| Action that delegates to sub-actions | `src/actions/quickstart.ts` |
+| Prompts with spinner + confirm + select | `src/prompts/sdk/generate.ts` |
+| Prompts with error display methods | `src/prompts/portal/generate.ts` |
+| Prompts with format helpers | `src/prompts/api/transform.ts` |
+| Prompts with noteWrapped + getTree | `src/prompts/quickstart.ts` |
+
+---
+
+## Scaffolding
+
+Use when creating a new command triple (Command + Action + Prompts).
+
+### What to determine
+
+1. **Topic** — command group (e.g., `api`, `sdk`, `portal`). Can be nested: `portal/toc`, `portal/recipe`
+2. **Command name** — subcommand (e.g., `validate`, `generate`, `new`)
+3. **Summary** — one-line description
+4. **Description** — multi-line description (template literal)
+5. **Input type** — one of:
+   - `ResourceInput` — adds `file` + `url` flags, uses `createResourceInput(file, url)`
+   - `DirectoryPath` — adds `FlagsProvider.input`, uses `DirectoryPath.createInput(input)`
+   - `None` — no input flags
+6. **Needs API auth** — adds `FlagsProvider.authKey`, passes `authKey` to Action constructor
+7. **Needs force flag** — adds `FlagsProvider.force` for overwrite confirmation
+8. **Needs destination flag** — adds `FlagsProvider.destination(artifact, artifactName)`
+9. **Custom flags** — any command-specific flags
+10. **Intro text** — text for `intro("...")` call (e.g., "Validate API", "Generate SDK")
+
+### Command File Template
 
 **Path:** `src/commands/{topic}/{name}.ts`
 
@@ -190,7 +225,7 @@ export default class {PascalName} extends Command {
 }
 ```
 
-## Action File Template
+### Action File Template
 
 **Path:** `src/actions/{topic}/{name}.ts`
 
@@ -256,7 +291,6 @@ export class {PascalName}Action {
     //        return ActionResult.failed();
     //      }
     //
-    //      // Process success...
     //      this.prompts.outputGenerated(outputDirectory);
     //      return ActionResult.success();
     //    });
@@ -266,7 +300,7 @@ export class {PascalName}Action {
 }
 ```
 
-## Prompts File Template
+### Prompts File Template
 
 **Path:** `src/prompts/{topic}/{name}.ts`
 
@@ -280,7 +314,7 @@ import { withSpinner } from "../prompt.js";
 import { ServiceError } from "../../infrastructure/service-error.js";
 
 export class {PascalName}Prompts {
-  // Spinner methods -- wrap async service calls
+  // Spinner methods — wrap async service calls
   // Takes Promise<Result<T, E>>, returns the same Result after spinner completes
   public async doSomething(fn: Promise<Result<SuccessType, ErrorType>>) {
     return withSpinner(
@@ -291,7 +325,7 @@ export class {PascalName}Prompts {
     );
   }
 
-  // Confirmation methods -- return boolean, guard with isCancel
+  // Confirmation methods — return boolean, guard with isCancel
   public async confirmOverwrite(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
       message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,
@@ -321,48 +355,3 @@ export class {PascalName}Prompts {
   }
 }
 ```
-
----
-
-## Conventions Checklist
-
-After generating, verify all of the following:
-
-- [ ] All imports use `.js` extension (e.g., `../../types/file/directoryPath.js`)
-- [ ] File paths mirror across `commands/`, `actions/`, `prompts/` directories
-- [ ] Command uses `export default class`
-- [ ] Command has `static readonly` for summary, description, cmdTxt
-- [ ] Command uses `ClassName.cmdTxt` (not `this.cmdTxt`) in examples
-- [ ] Command `run()` follows: parse -> type-convert -> CommandMetadata -> intro -> execute -> outro
-- [ ] Command has `getConfigDir()` helper (private readonly arrow function)
-- [ ] Action uses named export (not default)
-- [ ] Action constructor signature matches expected pattern for its complexity level
-- [ ] Action execute is arrow function: `public readonly execute = async (...) => { ... }`
-- [ ] Action uses `this.prompts.*` for all output (no direct `log.*` imports)
-- [ ] `authKey` typed as `string | null = null`, not `undefined`
-- [ ] Prompts spinner methods take `Promise<Result<T,E>>` and use `withSpinner()`
-- [ ] Interactive prompts guard with `isCancel()` returning `false`/`undefined`
-- [ ] `FlagsProvider.authKey` is the last spread in `static flags`
-- [ ] No `console.log` anywhere
-- [ ] Topic separator is space in examples and cmdTxt (not colon)
-- [ ] No raw string paths -- use `DirectoryPath`, `FilePath`, `FileName`, `UrlPath`
-- [ ] Services initialized inline on property declaration (not in constructor body)
-
-## Reference Files
-
-Study these before generating to match the exact patterns:
-
-| Pattern | File |
-|---|---|
-| Complex command (multiple flags, FlagsProvider) | `src/commands/sdk/generate.ts` |
-| Simple command (ResourceInput, file/url) | `src/commands/api/validate.ts` |
-| Minimal command (no flags) | `src/commands/auth/logout.ts` |
-| Command with nested topic (3-level) | `src/commands/portal/toc/new.ts` |
-| Action with withDirPath + Context objects | `src/actions/portal/generate.ts` |
-| Action with Result error handling | `src/actions/api/validate.ts` |
-| Action with simpler constructor (no authKey) | `src/actions/portal/toc/new-toc.ts` |
-| Action that delegates to sub-actions | `src/actions/quickstart.ts` |
-| Prompts with spinner + confirm + select | `src/prompts/sdk/generate.ts` |
-| Prompts with error display methods | `src/prompts/portal/generate.ts` |
-| Prompts with format helpers | `src/prompts/api/transform.ts` |
-| Prompts with noteWrapped + getTree | `src/prompts/quickstart.ts` |

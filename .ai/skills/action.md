@@ -1,38 +1,15 @@
-# /new-action
+# Action Conventions
 
-Scaffold a standalone Action class for the project's 5-layer architecture. This creates a single file — use `/new-command` when you also need the corresponding Command and Prompts files.
+Actions live at `src/actions/` and are the single use-case orchestrators for each command. They validate inputs via Context objects, coordinate Infrastructure services, delegate all UI to their paired Prompts class, and return an `ActionResult`. They never throw to the Command layer and never produce terminal output directly.
 
-## Files Created
+## Conventions
 
-1. `src/actions/{topic}/{name}.ts` — Action class (business logic orchestration)
-
-## Information to Gather
-
-Before generating, determine the following from the user or their description:
-
-1. **Topic** — action group folder (e.g., `api`, `sdk`, `portal`). Can be nested: `portal/toc`, `portal/recipe`
-2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `new-toc`)
-3. **Class name** — PascalCase with `Action` suffix (e.g., `ValidateAction`, `PortalNewTocAction`)
-4. **Variant** — one of:
-   - `standard` — full constructor with configDir, commandMetadata, authKey; services, withDirPath, prompts
-   - `minimal` — simpler constructor (subset of params); no services or temp dirs
-   - `delegation` — routes to sub-actions via switch on prompt result
-5. **Needs auth** — whether the action receives `authKey: string | null = null`
-6. **Needs services** — which infrastructure services are used (e.g., `PortalService`, `ValidationService`)
-7. **Needs temp directory** — whether to wrap logic in `withDirPath()`
-8. **Needs Context objects** — which contexts are used (e.g., `BuildContext`, `TempContext`, `ResourceContext`)
-9. **Prompts class** — the paired Prompts class name and import path (e.g., `ApiValidatePrompts` from `../../prompts/api/validate.js`). Some actions reuse another command's prompts.
-10. **Execute parameters** — typed parameters the execute method receives from the Command layer
-11. **Execute return type** — `ActionResult` or `ActionResult<T>` with a specific generic type
-
-## DO's and DON'Ts
-
-### Actions — DO
+### DO
 
 - **DO** use named export: `export class {PascalName}Action`.
 - **DO** use `public readonly execute = async (...): Promise<ActionResult> =>` (arrow function property).
-- **DO** initialize prompts as a field: `private readonly prompts: {Name}Prompts = new {Name}Prompts()` or `private readonly prompts = new {Name}Prompts()`.
-- **DO** initialize services as `private readonly` fields (inline with `new`, not in constructor body) when the service takes no constructor args. If a service needs `configDir`, assign it in the constructor body after `this.configDir` is set.
+- **DO** initialize prompts as a field: `private readonly prompts = new {Name}Prompts()`.
+- **DO** initialize services as `private readonly` fields (inline with `new`) when the service takes no constructor args. If a service needs `configDir`, declare without initializer and assign in the constructor body after `this.configDir` is set.
 - **DO** use the full constructor pattern when the action calls an API: `constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata, authKey: string | null = null)`.
 - **DO** use a simpler constructor when no API call is needed: just `(configDir: DirectoryPath, commandMetadata: CommandMetadata)` or even `(configDir: DirectoryPath)`.
 - **DO** use constructor shorthand (`private readonly` in parameter list) for minimal actions where no manual field assignment is needed.
@@ -47,7 +24,7 @@ Before generating, determine the following from the user or their description:
 - **DO** create sub-action instances inside switch cases (not as class fields) for delegation actions.
 - **DO** handle `undefined` (cancel) case explicitly in delegation actions — return `ActionResult.cancelled()`.
 
-### Actions — DON'T
+### DON'T
 
 - **DON'T** use `export default` — actions use named exports.
 - **DON'T** use regular `async execute()` method — use the arrow function property form. (Some existing actions use regular methods; new code should use arrow functions.)
@@ -60,24 +37,76 @@ Before generating, determine the following from the user or their description:
 - **DON'T** include `authKey` in the constructor if the action never calls an API — omit it entirely.
 - **DON'T** store sub-action instances as class fields — create them per-use in delegation switch cases.
 - **DON'T** use `process.exit()` — return an `ActionResult` and let the Command layer handle exit codes via `outro(result)`.
-
-### General — DO
-
-- **DO** use `.js` extension on all relative imports (even for `.ts` source files).
-- **DO** mirror file paths across `commands/`, `actions/`, `prompts/` directories.
-- **DO** use typed path objects (`DirectoryPath`, `FilePath`, `FileName`, `UrlPath`) instead of raw strings.
-- **DO** use `ActionResult.success(value?)`, `ActionResult.failed(message?)`, or `ActionResult.cancelled()` as return values.
-- **DO** use neverthrow `Result<T, E>` for service returns — check with `.isErr()` / `.isOk()`.
-
-### General — DON'T
-
-- **DON'T** use `console.log` anywhere in any layer.
-- **DON'T** use raw string paths — always wrap in the appropriate value object.
-- **DON'T** use `process.exit()` — use `outro(result)` in the Command layer.
+- **DON'T** use `console.log` anywhere.
+- **DON'T** use raw string paths — always wrap in `DirectoryPath`, `FilePath`, `FileName`, or `UrlPath`.
 
 ---
 
-## Standard Action Template
+## Review Checklist
+
+- [ ] All imports use `.js` extension (e.g., `../../types/file/directoryPath.js`)
+- [ ] File placed at `src/actions/{topic}/{name}.ts` mirroring the prompts path
+- [ ] Named export (not default): `export class {PascalName}Action`
+- [ ] Execute is arrow function: `public readonly execute = async (...): Promise<ActionResult> => { ... }`
+- [ ] Prompts initialized as field: `private readonly prompts = new {PromptsClassName}()`
+- [ ] Services initialized as `private readonly` fields (inline unless they need constructor args)
+- [ ] Constructor signature matches complexity: full form for API actions, shorthand for simple ones
+- [ ] `authKey` typed as `string | null = null` when present — never `undefined`
+- [ ] `authKey` omitted entirely when the action doesn't call an API
+- [ ] All terminal output goes through `this.prompts.*` — no direct `log.*` imports
+- [ ] Service results checked with `.isErr()`, errors displayed via `this.prompts.*`
+- [ ] `withDirPath()` used for temp directories — never raw `tmp-promise`
+- [ ] Returns `ActionResult.success()`, `ActionResult.failed()`, or `ActionResult.cancelled()` — never throws
+- [ ] Context objects used for validation (`validate()`) and output (`save()`, `exists()`)
+- [ ] Overwrite guard uses pattern: `if (!force && (await context.exists()) && !(await this.prompts.confirmOverwrite(dir)))`
+- [ ] No `console.log` anywhere
+- [ ] No raw string paths — use `DirectoryPath`, `FilePath`, `FileName`, `UrlPath`
+- [ ] Relative import depth matches nesting level (extra `../` per nesting level)
+- [ ] File streams closed in `finally` block when using `getStream()` or `FileWrapper`
+- [ ] Delegation actions handle `undefined` case with `ActionResult.cancelled()`
+
+## Reference Files
+
+| Pattern | File |
+|---|---|
+| Standard action (auth + services + withDirPath) | `src/actions/api/validate.ts` |
+| Standard action (multiple params + overwrite guard) | `src/actions/api/transform.ts` |
+| Standard action (Context + TempContext + service) | `src/actions/portal/generate.ts` |
+| Standard action (SDK generation + version selection) | `src/actions/sdk/generate.ts` |
+| Standard action (interactive prompts + neverthrow) | `src/actions/portal/copilot.ts` |
+| Minimal action (configDir only, no services) | `src/actions/auth/logout.ts` |
+| Minimal action (configDir + commandMetadata, no auth) | `src/actions/auth/status.ts` |
+| Minimal action (shorthand constructor) | `src/actions/portal/toc/new-toc.ts` |
+| Delegation action (routes to sub-actions) | `src/actions/quickstart.ts` |
+| Multi-step flow (withDirPath + multiple cancellation points) | `src/actions/sdk/quickstart.ts` |
+| Multi-step flow (interactive wizard + withDirPath) | `src/actions/portal/quickstart.ts` |
+| Long-running/stateful action (server + watcher) | `src/actions/portal/serve.ts` |
+| ActionResult API (success, failed, cancelled, stopped) | `src/actions/action-result.ts` |
+| withDirPath implementation | `src/infrastructure/tmp-extensions.ts` |
+
+---
+
+## Scaffolding
+
+Use when creating a new Action class. Choose the variant that matches the action's complexity.
+
+### What to determine
+
+1. **Topic** — action group folder (e.g., `api`, `sdk`, `portal`). Can be nested: `portal/toc`, `portal/recipe`
+2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `new-toc`)
+3. **Class name** — PascalCase with `Action` suffix (e.g., `ValidateAction`, `PortalNewTocAction`)
+4. **Variant** — one of:
+   - `standard` — full constructor with configDir, commandMetadata, authKey; services, withDirPath, prompts
+   - `minimal` — simpler constructor (subset of params); no services or temp dirs
+   - `delegation` — routes to sub-actions via switch on prompt result
+5. **Needs auth** — whether the action receives `authKey: string | null = null`
+6. **Needs services** — which infrastructure services are used (e.g., `PortalService`, `ValidationService`)
+7. **Needs temp directory** — whether to wrap logic in `withDirPath()`
+8. **Needs Context objects** — which contexts are used (e.g., `BuildContext`, `TempContext`, `ResourceContext`)
+9. **Prompts class** — the paired Prompts class name and import path
+10. **Execute parameters** — typed parameters the execute method receives from the Command layer
+
+### Standard Action Template
 
 **Use when:** the action calls API services, needs auth, uses temp directories, or has complex business logic.
 
@@ -174,15 +203,14 @@ export class {PascalName}Action {
 }
 ```
 
-**Standard action rules:**
+**Notes:**
 - Constructor assigns `configDir`, `commandMetadata`, and `authKey` explicitly because services or internal methods reference them via `this.*`.
-- Services needing `configDir` (e.g., `new ValidationService(configDir)`) must be assigned in the constructor body after `this.configDir` is set.
+- Services needing `configDir` must be assigned in the constructor body after `this.configDir` is set.
 - `withDirPath` returns the `ActionResult` — the entire flow inside the callback must return `ActionResult`.
-- When using `withDirPath<ActionResult>`, the generic type annotation is optional when TypeScript can infer it.
 - Multiple error-check points are normal — each service call or context operation gets its own `.isErr()` check.
 - Close file streams in `finally` blocks when working with `FileWrapper` or `getStream()`.
 
-## Minimal Action Template
+### Minimal Action Template
 
 **Use when:** the action has simple logic, no API services, no temp directories, and few constructor dependencies.
 
@@ -218,13 +246,12 @@ export class {PascalName}Action {
 }
 ```
 
-**Minimal action rules:**
-- Use TypeScript constructor shorthand (`private readonly` in parameter list) when no manual field assignment is needed.
-- Omit `authKey` entirely — don't include it with a default value if it's never used.
-- Omit `commandMetadata` if the action doesn't need it (e.g., `LogoutAction` only takes `configDir`).
-- Even minimal actions should use the arrow function `execute` form for consistency.
+**Notes:**
+- Use TypeScript constructor shorthand when no manual field assignment is needed.
+- Omit `authKey` entirely — don't include it if it's never used.
+- Omit `commandMetadata` if the action doesn't need it.
 
-## Delegation Action Template
+### Delegation Action Template
 
 **Use when:** the action routes to sub-actions based on user selection (e.g., quickstart flows, wizard-style branching).
 
@@ -267,57 +294,8 @@ export class {PascalName}Action {
 }
 ```
 
-**Delegation action rules:**
+**Notes:**
 - Create sub-action instances inside the switch case — don't store them as class fields.
 - Pass `configDir` and `commandMetadata` through to sub-actions.
-- Pass `authKey` through if the sub-actions need it: add `private readonly authKey: string | null` to constructor and forward it.
 - Handle `undefined` (cancel) case explicitly — return `ActionResult.cancelled()`.
 - Each case block is wrapped in braces `{ }` for proper scoping of the `action` variable.
-
----
-
-## Conventions Checklist
-
-After generating, verify all of the following:
-
-- [ ] All imports use `.js` extension (e.g., `../../types/file/directoryPath.js`)
-- [ ] File placed at `src/actions/{topic}/{name}.ts` matching the prompts path
-- [ ] Named export (not default): `export class {PascalName}Action`
-- [ ] Execute is arrow function: `public readonly execute = async (...): Promise<ActionResult> => { ... }`
-- [ ] Prompts initialized as field: `private readonly prompts = new {PromptsClassName}()`
-- [ ] Services initialized as `private readonly` fields (inline unless they need constructor args)
-- [ ] Constructor signature matches complexity: full form for API actions, shorthand for simple ones
-- [ ] `authKey` typed as `string | null = null` when present — never `undefined`
-- [ ] `authKey` omitted entirely when the action doesn't call an API
-- [ ] All terminal output goes through `this.prompts.*` — no direct `log.*` imports
-- [ ] Service results checked with `.isErr()`, errors displayed via `this.prompts.*`
-- [ ] `withDirPath()` used for temp directories — never raw `tmp-promise`
-- [ ] Returns `ActionResult.success()`, `ActionResult.failed()`, or `ActionResult.cancelled()` — never throws
-- [ ] Context objects used for validation (`validate()`) and output (`save()`, `exists()`)
-- [ ] Overwrite guard uses pattern: `if (!force && (await context.exists()) && !(await this.prompts.confirmOverwrite(dir)))`
-- [ ] No `console.log` anywhere
-- [ ] No raw string paths — use `DirectoryPath`, `FilePath`, `FileName`, `UrlPath`
-- [ ] Relative import depth matches nesting level (extra `../` per nesting level)
-- [ ] File streams closed in `finally` block when using `getStream()` or `FileWrapper`
-- [ ] Delegation actions handle `undefined` case with `ActionResult.cancelled()`
-
-## Reference Files
-
-Study these before generating to match the exact patterns:
-
-| Pattern | File |
-|---|---|
-| Standard action (auth + services + withDirPath) | `src/actions/api/validate.ts` |
-| Standard action (multiple params + overwrite guard) | `src/actions/api/transform.ts` |
-| Standard action (Context + TempContext + service) | `src/actions/portal/generate.ts` |
-| Standard action (SDK generation + version selection) | `src/actions/sdk/generate.ts` |
-| Standard action (interactive prompts + neverthrow) | `src/actions/portal/copilot.ts` |
-| Minimal action (configDir only, no services) | `src/actions/auth/logout.ts` |
-| Minimal action (configDir + commandMetadata, no auth) | `src/actions/auth/status.ts` |
-| Minimal action (shorthand constructor) | `src/actions/portal/toc/new-toc.ts` |
-| Delegation action (routes to sub-actions) | `src/actions/quickstart.ts` |
-| Multi-step flow (withDirPath + multiple cancellation points) | `src/actions/sdk/quickstart.ts` |
-| Multi-step flow (interactive wizard + withDirPath) | `src/actions/portal/quickstart.ts` |
-| Long-running/stateful action (server + watcher) | `src/actions/portal/serve.ts` |
-| ActionResult API (success, failed, cancelled, stopped) | `src/actions/action-result.ts` |
-| withDirPath implementation | `src/infrastructure/tmp-extensions.ts` |
