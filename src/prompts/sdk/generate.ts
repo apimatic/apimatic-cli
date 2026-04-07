@@ -22,14 +22,15 @@ export class SdkGeneratePrompts {
   }
 
   public sameBuildAndSdkDir(directory: DirectoryPath) {
-   const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
+    const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
       directory
-    )}`;    this.logGenerationError(message);
+    )}`;
+    this.logGenerationError(message);
   }
 
   public srcDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
-    log.error(message);
+    this.logGenerationError(message);
   }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
@@ -46,7 +47,7 @@ export class SdkGeneratePrompts {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
-  public logGenerationError(error: string): void {
+  private logGenerationError(error: string): void {
     log.error(error);
   }
 
@@ -60,7 +61,7 @@ export class SdkGeneratePrompts {
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The ${f.flag("--api-version")} is only applicable with a versioned build.`);
+    log.warn(`The ${f.flag("api-version")} is only applicable with a versioned build.`);
   }
 
   public versionNotFound() {
@@ -85,6 +86,6 @@ export class SdkGeneratePrompts {
   }
 
   public changeTrackingAlreadyEnabled(language: Language) {
-    log.warn(`Change tracking is already enabled for ${f.var(language)}. No need to use the ${f.flag("--track-changes")} flag again for ${f.var(language)} SDK.`);
+    log.warn(`Change tracking is already enabled for ${f.var(language)}. No need to use the ${f.flag("track-changes")} flag again for ${f.var(language)} SDK.`);
   }
 }

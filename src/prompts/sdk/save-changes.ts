@@ -28,7 +28,7 @@ export class SaveChangesPrompts {
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The ${f.flag("--api-version")} is only applicable with a versioned build.`);
+    log.warn(`The ${f.flag("api-version")} is only applicable with a versioned build.`);
   }
 
   public versionNotFound() {
@@ -48,7 +48,7 @@ export class SaveChangesPrompts {
     return version;
   }
 
-  public logSaveChangesError(error: string): void {
+  private logSaveChangesError(error: string): void {
     log.error(error);
   }
 
@@ -58,10 +58,8 @@ export class SaveChangesPrompts {
       ? `${f.flag("input", inputDirectory.toString())} `
       : "";
     const message = `Run the command
-      '${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag(
-      "track-changes"
-    )}'
-      to generate SDK with a source tree.`;
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag("track-changes")}'
+to generate SDK with a source tree.`;
     noteWrapped(message, "Next Steps");
   }
 
