@@ -53,7 +53,7 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
   }
 
   public operationCancelled() {
-    log.error("Exiting without resolving conflicts.");
+    log.info("Exiting without resolving conflicts.");
   }
 
   public sdkGenerated(sdk: DirectoryPath) {

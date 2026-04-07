@@ -19,7 +19,6 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 - **DO** use `log.error()` for errors, `log.info()` for success/info, `log.warning()` for warnings, `log.message()` for multi-line output, `log.step()` for step markers.
 - **DO** use `noteWrapped(message, title)` from `../prompt.js` for multi-line notes (e.g., next steps).
 - **DO** use `getTree()` from `../format.js` when displaying directory structures.
-- **DO** factor repeated `log.error()` calls into a private `logError(message: string)` helper when there are 3+ error methods.
 - **DO** name spinner methods after their operation, matching the paired service call (e.g., `generatePortal(fn)`, `validateApi(fn)`).
 
 ### DON'T
@@ -32,7 +31,12 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 - **DON'T** import `ActionResult`, services, or domain logic — those belong in the Action layer.
 - **DON'T** use `export default` — always use named exports.
 - **DON'T** use raw string paths — wrap in `DirectoryPath`, `FilePath`, or `UrlPath`.
-- **DON'T** chain complex format calls on a single line — build the message string on a separate line first.
+- **DON'T** chain complex format calls on a single line — build the message string on a separate line first. If the string is too long to fit on one line, split it using `+` across multiple template literals:
+  ```typescript
+  const message =
+    `First part ${f.var(name)}. ` +
+    `Second part ${f.flag("flag-name")}.`;
+  ```
 - **DON'T** use `format.*` directly — always alias as `f`: `import { format as f }`.
 
 ---
@@ -177,8 +181,6 @@ export class {PascalName}Prompts {
 **Notes:**
 - `confirm` returns `false` on cancel — never `undefined`.
 - Add `select` or `text` as additional interactive methods with the same `isCancel()` guard + `return undefined` pattern.
-- Extract a `private logError(message: string) { log.error(message); }` helper when there are 3+ error methods.
-
 ### Delegation Template
 
 **Use when:** the command is a top-level router that lets the user choose a sub-flow.

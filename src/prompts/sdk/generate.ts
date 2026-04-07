@@ -22,9 +22,10 @@ export class SdkGeneratePrompts {
   }
 
   public sameBuildAndSdkDir(directory: DirectoryPath) {
-   const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
-      directory
-    )}`;    this.logGenerationError(message);
+    const message =
+      `The ${f.var("src")} and ${f.var("sdk")} directories must be different. ` +
+      `Current value: ${f.path(directory)}`;
+    log.error(message);
   }
 
   public srcDirectoryEmpty(directory: DirectoryPath) {
@@ -33,21 +34,17 @@ export class SdkGeneratePrompts {
   }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logGenerationError(message);
+    const message = `The ${f.var('spec')} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
   }
 
   public destinationDirNotEmpty() {
     const message = `Please enter a different destination folder or remove the existing files and try again.`;
-    this.logGenerationError(message);
+    log.error(message);
   }
 
   public generateSDK(fn: Promise<Result<GeneratedSdkResult, ServiceError>>) {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
-  }
-
-  public logGenerationError(error: string): void {
-    log.error(error);
   }
 
   public sdkGenerationServiceError(serviceError: ServiceError) {
@@ -56,15 +53,16 @@ export class SdkGeneratePrompts {
 
   public invalidVersionedDocsDirectory(directory: DirectoryPath) {
     const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logGenerationError(message);
+    log.error(message);
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The ${f.flag("--api-version")} is only applicable with a versioned build.`);
+    log.warn(`The ${f.flag("api-version")} is only applicable with a versioned build.`);
   }
 
   public versionNotFound() {
-    this.logGenerationError(`The selected API version is invalid.`);
+    const message = `The selected API version is invalid.`;
+    log.error(message);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
@@ -85,6 +83,9 @@ export class SdkGeneratePrompts {
   }
 
   public changeTrackingAlreadyEnabled(language: Language) {
-    log.warn(`Change tracking is already enabled for ${f.var(language)}. No need to use the ${f.flag("--track-changes")} flag again for ${f.var(language)} SDK.`);
+    const message =
+      `Change tracking is already enabled for ${f.var(language)}. ` +
+      `No need to use the ${f.flag("track-changes")} flag again for ${f.var(language)} SDK.`;
+    log.warn(message);
   }
 }

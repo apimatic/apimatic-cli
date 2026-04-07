@@ -96,6 +96,7 @@ export class SaveChangesAction {
         this.prompts.noChangesDetected();
         return ActionResult.success();
       }
+
       this.prompts.modifiedFilesDetected(fileStatuses.length, sdkInputDirectory.toTreeNode(
         fileStatuses.map(({ fileName, status }) => ({
           path: new FilePath(sdkInputDirectory, fileName),
@@ -119,7 +120,6 @@ export class SaveChangesAction {
         fileStatuses
       );
 
-      // Open diffs for review in the IDE, or fall back to manual review
       const openedFiles = await this.launcherService.openFolderInIde(updatedStateDirectory, ...standaloneFiles);
       const opened = openedFiles && (await Promise.all(diffPairs.map(({ base, working }) =>
         this.launcherService.openDiffInIde(base, working)))).every(b => b);
@@ -139,7 +139,7 @@ export class SaveChangesAction {
         this.prompts.operationCancelledMemoryLeak();
         return ActionResult.cancelled();
       }
-      
+
       return ActionResult.success();
     });
   };
