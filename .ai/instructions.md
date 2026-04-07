@@ -81,4 +81,6 @@ Reference these files for scaffolding new code:
 - `.ai/skills/command.md` — Command + Action + Prompts conventions; scaffolding templates and checklists
 - `.ai/skills/action.md` — Action class conventions; standard / minimal / delegation variants
 - `.ai/skills/context.md` — Context object conventions; output / input / temp / pure variants
+- `.ai/skills/prompt.md` — Prompts class conventions; simple / standard / delegation / wizard variants
 - `.ai/skills/service.md` — Infrastructure Service conventions; SDK controller / axios-auth / axios-stateless variants
+- `.ai/skills/value-object.md` — Value object (rich class) conventions; encapsulation, boundary unwrapping, composition rules

@@ -11,4 +11,6 @@ Reference these files as needed for scaffolding:
 - `.ai/skills/command.md` — Command + Action + Prompts conventions and scaffolding
 - `.ai/skills/action.md` — Action class conventions and scaffolding
 - `.ai/skills/context.md` — Context object conventions and scaffolding
+- `.ai/skills/prompt.md` — Prompts class conventions and scaffolding
 - `.ai/skills/service.md` — Infrastructure Service conventions and scaffolding
+- `.ai/skills/value-object.md` — Value object (rich class) conventions: encapsulation, boundary unwrapping, composition
