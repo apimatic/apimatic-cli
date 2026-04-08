@@ -85,7 +85,7 @@ to generate SDK with a source tree.`;
   }
 
   public openingDirectoryToReviewChanges() {
-    log.info(`Opening the changed files in VS Code for review. Close VS Code when you're done to save the changes.`);
+    log.info(`Opening the changed files in VS Code for review.`);
   }
 
   public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
