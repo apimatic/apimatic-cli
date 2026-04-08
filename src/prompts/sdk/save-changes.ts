@@ -1,4 +1,4 @@
-import { log, text, isCancel, select, confirm } from "@clack/prompts";
+import { log, isCancel, select, confirm } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, getTree } from "../format.js";
 import { noteWrapped } from "../prompt.js";
@@ -72,12 +72,8 @@ to generate SDK with a source tree.`;
     log.info("Exiting without cleanup of temporary files.");
   }
 
-  public async directoryStillOpen(directory: DirectoryPath): Promise<boolean> {
-    const result = await text({
-      message: `Please close all applications using the directory ${f.path(directory)} and press Enter to continue.`
-    });
-
-    return !isCancel(result);
+  public async directoryStillOpen(directory: DirectoryPath) {
+    log.info(`Please close all applications using the directory ${f.path(directory)} to allow cleanup of temporary files.`);
   }
 
   public modifiedFilesDetected(directory: Directory) {
@@ -89,13 +85,15 @@ to generate SDK with a source tree.`;
     log.info("No changes detected in the SDK.");
   }
 
-  public reviewInIdeAndClose() {
-    log.info(`The changed files have been opened in VS Code. Close VS Code when you're done to save the changes.`);
+  public openingDirectoryToReviewChanges() {
+    log.info(`Opening the changed files in VS Code for review. Close VS Code when you're done to save the changes.`);
   }
 
   public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
+    
+    log.info(`Unable to open VS Code. Review the changes at ${f.path(tempDirectory)} to proceed.`);
     const confirmed = await confirm({
-      message: `Review the changes at ${f.path(tempDirectory)}. Do you want to save these changes?`,
+      message: `Do you want to save these changes?`,
       initialValue: false
     });
 
@@ -108,7 +106,7 @@ to generate SDK with a source tree.`;
 
   public async confirmChanges(): Promise<boolean> {
     const confirmed = await confirm({
-      message: `Do you want to save these changes?`,
+      message: `Do you want to review these changes?`,
       initialValue: false
     });
 

@@ -16,7 +16,6 @@ export class SaveChangesAction {
     buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath | undefined,
     language: Language,
-    skipReview: boolean,
     apiVersion?: string
   ): Promise<ActionResult> => {
     const rootBuildContext = new BuildContext(buildDirectory);
@@ -93,11 +92,7 @@ export class SaveChangesAction {
 
       this.prompts.modifiedFilesDetected(updatedFilesDirectory);
 
-      if (skipReview) {
-        if (!await this.prompts.confirmChanges()) {
-          this.prompts.operationCancelled();
-          return ActionResult.cancelled();
-        }
+      if (!await this.prompts.confirmChanges()) {
         await saveChangesContext.saveSourceTree();
         this.prompts.changesSaved(sdkSourceTree);
         return ActionResult.success();
@@ -110,12 +105,8 @@ export class SaveChangesAction {
         return Promise.resolve(fileItem);
       });
 
-      const openedFiles = await this.launcherService.openFolderInIde(sdkReviewDirectory, ...nonDeletedFilesDirectory.getAllFiles());
-
-      if (openedFiles) {
-        this.prompts.reviewInIdeAndClose();
-        await this.launcherService.waitForVscodeToClose(sdkReviewDirectory);
-      } else if (!await this.prompts.reviewChangesManually(sdkReviewDirectory)) {
+      if (!await this.launcherService.openFolderInIdeWithWait(sdkReviewDirectory, nonDeletedFilesDirectory.getAllFiles())
+        && !await this.prompts.reviewChangesManually(sdkReviewDirectory)) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }
@@ -123,10 +114,7 @@ export class SaveChangesAction {
       await saveChangesContext.saveSourceTree();
       this.prompts.changesSaved(sdkSourceTree);
 
-      if (!await saveChangesContext.disposeSdkReviewDirectory((dir) => this.prompts.directoryStillOpen(dir))) {
-        this.prompts.operationCancelledMemoryLeak();
-        return ActionResult.cancelled();
-      }
+      await saveChangesContext.disposeSdkReviewDirectory(() => this.prompts.directoryStillOpen(sdkReviewDirectory));
 
       return ActionResult.success();
     });

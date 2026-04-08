@@ -1,4 +1,4 @@
-import { isCancel, log, text } from "@clack/prompts";
+import { isCancel, log, confirm } from "@clack/prompts";
 import { format as f, getTree } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { Language } from "../../types/sdk/generate.js";
@@ -34,18 +34,22 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
     log.message(getTree(directory.toTreeNode()));
   }
 
-  public async waitForConflictsResolved(language: Language, sdkDir?: DirectoryPath): Promise<boolean> {
-    const atPath = sdkDir ? ` at ${f.path(sdkDir)}` : "";
-    const result = await text({
-      message: `Resolve all conflicts in the ${f.var(language)} SDK${atPath}, then press Enter.`,
-      defaultValue: ""
-    });
-
-    return !isCancel(result);
+  public openingDirectoryForConflictResolution(language: Language) {
+    log.info(`Opening ${f.var(language)} SDK in VS Code for conflicts resolution.`);
   }
 
-  public waitingForVscodeClose(language: Language) {
-    log.info(`Resolve all conflicts in the ${f.var(language)} SDK in VS Code, then close the VS Code window to continue.`);
+  public async waitForConflictsResolved(language: Language, sdkDir: DirectoryPath): Promise<boolean> {
+    log.info(`Unable to open VS Code. Please resolve all conflicts in the ${f.var(language)} SDK at ${f.path(sdkDir)} to proceed.`);
+    const confirmed = await confirm({
+      message: `Have you resolved all conflicts?`,
+      initialValue: false
+    });
+
+    if (isCancel(confirmed)) {
+      return false;
+    }
+
+    return confirmed;
   }
 
   public conflictsResolved(language: Language) {
@@ -60,11 +64,8 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
     log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }
 
-  public async directoryStillOpen(directory: DirectoryPath): Promise<boolean> {
-    const result = await text({
-      message: `Please close all applications using the directory ${f.path(directory)} and press Enter to continue.`
-    });
-    return !isCancel(result);
+  public async directoryStillOpen(directory: DirectoryPath) {
+    log.info(`Please close all applications using the directory ${f.path(directory)} to allow cleanup of temporary files.`);
   }
 
   public operationCancelledMemoryLeak() {
