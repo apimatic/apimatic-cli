@@ -214,22 +214,6 @@ export class FileService {
     }
   }
 
-  public async postfixFileName(filePath: FilePath, postfix: string): Promise<FilePath> {
-    const fullPath = filePath.toString();
-    const ext = path.extname(fullPath);
-    const base = path.basename(fullPath, ext);
-    const newPath = path.join(path.dirname(fullPath), `${base}${postfix}${ext}`);
-    await fsExtra.rename(fullPath, newPath);
-    return FilePath.create(newPath)!;
-  }
-
-  public async normalizeFileLineEndings(filePath: FilePath): Promise<void> {
-    if (process.platform !== "win32") return;
-    const content = await this.readFile(filePath);
-    const normalizedContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    await this.writeContents(filePath, normalizedContent);
-  }
-
   public async hasContent(file: FilePath, content: string): Promise<boolean> {
     return await this.fileExists(file) && (await this.readFile(file)).includes(content);;
   }

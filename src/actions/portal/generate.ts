@@ -59,10 +59,11 @@ export class GenerateAction {
       if (response.isErr()) {
         const error = response.error;
         if (error instanceof ServiceError) {
-          this.prompts.portalGenerationError(error.errorMessage);
           const sdkMergeFailedErrors = error.getError("sdkMergeFailed");
           if (sdkMergeFailedErrors) {
             this.prompts.portalGenerationSdkMergeFailed(sdkMergeFailedErrors);
+          } else {
+            this.prompts.portalGenerationError(error.errorMessage);
           }
         } else if (typeof error === "string") {
           this.prompts.portalGenerationError(error);

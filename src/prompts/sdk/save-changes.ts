@@ -6,26 +6,20 @@ import { FilePath } from "../../types/file/filePath.js";
 import { Directory } from "../../types/file/directory.js";
 
 export class SaveChangesPrompts {
-  public sameBuildAndSdkDir(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} and ${f.var("sdk")} directories must be different. Current value: ${f.path(
-      directory
-    )}`;
-    this.logSaveChangesError(message);
-  }
   
   public srcDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logSaveChangesError(message);
+    log.error(message);
   }
 
   public invalidSdkDirectory(directory: DirectoryPath) {
     const message = `SDK directory does not exist: ${f.path(directory)}`;
-    this.logSaveChangesError(message);
+    log.error(message);
   }
 
   public invalidVersionedDocsDirectory(directory: DirectoryPath) {
     const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
-    this.logSaveChangesError(message);
+    log.error(message);
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
@@ -33,7 +27,7 @@ export class SaveChangesPrompts {
   }
 
   public versionNotFound() {
-    this.logSaveChangesError(`The selected API version is invalid.`);
+    log.error(`The selected API version is invalid.`);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
@@ -49,12 +43,9 @@ export class SaveChangesPrompts {
     return version;
   }
 
-  private logSaveChangesError(error: string): void {
-    log.error(error);
-  }
 
   public sdkSourceTreeNotFound(language: string, inputDirectory: DirectoryPath) {
-    this.logSaveChangesError(`No existing sdk source tree found for ${f.var(language)}.`);
+    log.error(`No existing sdk source tree found for ${f.var(language)}.`);
     const inputDirectoryFlag = !inputDirectory.isEqual(DirectoryPath.default)
       ? `${f.flag("input", inputDirectory.toString())} `
       : "";
@@ -66,10 +57,6 @@ to generate SDK with a source tree.`;
 
   public operationCancelled() {
     log.info("Exiting without saving any changes.");
-  }
-
-  public operationCancelledMemoryLeak() {
-    log.info("Exiting without cleanup of temporary files.");
   }
 
   public async directoryStillOpen(directory: DirectoryPath) {

@@ -105,6 +105,7 @@ export class SaveChangesAction {
         return Promise.resolve(fileItem);
       });
 
+      this.prompts.openingDirectoryToReviewChanges();
       if (!await this.launcherService.openFolderInIdeWithWait(sdkReviewDirectory, nonDeletedFilesDirectory.getAllFiles())
         && !await this.prompts.reviewChangesManually(sdkReviewDirectory)) {
         this.prompts.operationCancelled();
