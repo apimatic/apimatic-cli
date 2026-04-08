@@ -48,10 +48,10 @@ export class GitService {
       .filter(([, headStatus, workdirStatus, stageStatus]) => headStatus !== workdirStatus || stageStatus === 3)
       .map(([relativePath, workdirStatus, headStatus]) => {
         if (headStatus === 0) {
-          return { relativePath, description: "# Added" };
+          return { relativePath, description: "# Deleted" };
         }
         if (workdirStatus === 0) {
-          return { relativePath, description: "# Deleted" };
+          return { relativePath, description: "# Added" };
         }
         return { relativePath, description: "# Modified" };
       });
@@ -64,7 +64,7 @@ export class GitService {
       pending.items.map((item) => ("pendingDirPath" in item ? buildDirectory(item) : item))
     );
 
-    const root: PendingDir = { pendingDirPath: new DirectoryPath(this.toString()), items: [] };
+    const root: PendingDir = { pendingDirPath: dirPath, items: [] };
     for (const file of relativeUncommitedFiles) {
       const parts = file.relativePath.split(/[\\/]/);
       let currentDir = root;
@@ -99,7 +99,7 @@ export class GitService {
       statusMatrix
         // include updated and resolved conflict files
         .filter(([, headStatus, workdirStatus, stageStatus]) => headStatus !== workdirStatus || stageStatus === 3)
-        .map(([relativePath, workdirStatus]) => {
+        .map(([relativePath, , workdirStatus]) => {
           if (workdirStatus === 0) {
             return git.remove({ fs, dir: dir.toString(), filepath: relativePath });
           }

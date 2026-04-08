@@ -143,7 +143,7 @@ export class FileService {
 
   public async pollDeleteDirectory(dirPath: DirectoryPath, showPrompt: () => void): Promise<void> {
     let prompted = false;
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
     while (await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
       if (!prompted) {
         showPrompt();

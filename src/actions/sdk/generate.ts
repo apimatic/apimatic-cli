@@ -116,9 +116,10 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
+      const responseSdk = await tempContext.save(response.value.sdk);
       const tempSdk = await sdkContext.loadSdkInTempDirectory(
         tempDirectory,
-        await tempContext.save(response.value.sdk)
+        responseSdk
       );
       if (!trackChanges && !hasSdkSourceTree) {
         this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
@@ -127,7 +128,7 @@ export class GenerateAction {
 
       const tempSdkWithSourceTree = await sdkContext.loadSdkWithSourceTreeInTempDirectory(
         tempDirectory,
-        await tempContext.save(response.value.sdk),
+        responseSdk,
         await tempContext.save(response.value.sdkSourceTree)
       );
       const destinationSourceTreePath = buildContext.getSdkSourceTree(language);
