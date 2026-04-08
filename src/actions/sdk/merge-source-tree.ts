@@ -54,11 +54,9 @@ export class MergeSourceTreeAction {
       return ActionResult.success({sourceTreeTrackingInitiated: true, conflictsResolved: false});
     }
 
-    let conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
+    let conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
 
-    this.prompts.conflictsDetected(language, sdkWithSourceTree.toTreeNode([
-      ...conflictedFilePaths.map((filePath) => ({ path: filePath, description: "# Conflicted file" }))
-    ]));
+    this.prompts.conflictsDetected(language, conflictedFilesDirectory);
 
     if (isInCi) {
       this.prompts.warnUnresolvedConflicts(language);
@@ -66,7 +64,7 @@ export class MergeSourceTreeAction {
     }
 
     do {
-      const opened = await this.launcherService.openFolderInIde(sdkWithSourceTree, ...conflictedFilePaths);
+      const opened = await this.launcherService.openFolderInIde(sdkWithSourceTree, ...conflictedFilesDirectory.getAllFiles());
 
       if (opened) {
         this.prompts.waitingForVscodeClose(language);
@@ -76,15 +74,13 @@ export class MergeSourceTreeAction {
         return ActionResult.cancelled();
       }
 
-      conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
+      conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
 
-      if (conflictedFilePaths.length > 0) {
-        this.prompts.conflictsStillPresent(sdkWithSourceTree.toTreeNode([
-          ...conflictedFilePaths.map((filePath) => ({ path: filePath, description: "# Conflicted file" }))
-        ]));
+      if (!conflictedFilesDirectory.isEmpty()) {
+        this.prompts.conflictsStillPresent(conflictedFilesDirectory);
       }
 
-    } while (conflictedFilePaths.length > 0);
+    } while (!conflictedFilesDirectory.isEmpty());
 
     await mergeSourceTreeContext.saveWithResolvedConflicts();
     this.prompts.conflictsResolved(language);

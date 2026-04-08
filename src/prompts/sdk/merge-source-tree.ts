@@ -1,8 +1,8 @@
 import { isCancel, log, text } from "@clack/prompts";
-import { format as f, getTree, TreeNode } from "../format.js";
+import { format as f, getTree } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FilePath } from "../../types/file/filePath.js";
 import { Language } from "../../types/sdk/generate.js";
+import { Directory } from "../../types/file/directory.js";
 
 export class MergeSourceTreePrompts {
   public successfullySkippedChanges(language: Language) {
@@ -24,14 +24,14 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
     );
   }
 
-  public conflictsDetected(language: Language, changesTree: TreeNode) {
+  public conflictsDetected(language: Language, directory: Directory) {
     log.message(`Conflicts found in ${f.var(language)} SDK:`);
-    log.message(getTree(changesTree));
+    log.message(getTree(directory.toTreeNode()));
   }
 
-  public conflictsStillPresent(changesTree: TreeNode) {
+  public conflictsStillPresent(directory: Directory) {
     log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
-    log.message(getTree(changesTree));
+    log.message(getTree(directory.toTreeNode()));
   }
 
   public async waitForConflictsResolved(language: Language, sdkDir?: DirectoryPath): Promise<boolean> {

@@ -3,9 +3,8 @@ import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { Language } from "../../types/sdk/generate.js";
 import { SaveChangesPrompts } from "../../prompts/sdk/save-changes.js";
-import { SdkInputContext } from "../../types/sdk-input-context.js";
+import { SaveChangesContext } from "../../types/save-changes-context.js";
 import { BuildContext } from "../../types/build-context.js";
-import { FilePath } from "../../types/file/filePath.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 
 export class SaveChangesAction {
@@ -70,70 +69,61 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkInputContext(sdkDirectory, workingDirectory, language, versionedContext.version);
-    const sdkInputDirectory = sdkContext.getSdkInputDirectory();
-    if (!(await sdkContext.exists())) {
-      this.prompts.invalidSdkDirectory(sdkInputDirectory);
-      return ActionResult.failed();
-    }
-    
-    if (buildDirectory.isEqual(sdkInputDirectory)) {
-      this.prompts.sameBuildAndSdkDir(buildDirectory);
-      return ActionResult.failed();
-    }
-
     return await withDirPath(async (tempDirectory) => {
-      const sourceTreePath = versionedContext.buildContext.getSdkSourceTree(language);
-      const updatedStateDirectory = await sdkContext.prepareUpdatedSdkDirectory(
-        sourceTreePath,
-        tempDirectory
+      const sdkReviewDirectory = tempDirectory.join(language);
+      const sdkSourceTree = versionedContext.buildContext.getSdkSourceTree(language);
+      const saveChangesContext = new SaveChangesContext(
+        sdkSourceTree,
+        sdkReviewDirectory,
+        sdkDirectory,
+        workingDirectory,
+        language,
+        versionedContext.version
       );
 
-      const fileStatuses = await sdkContext.getChanges(updatedStateDirectory);
-      if (fileStatuses.length === 0) {
+      if (await saveChangesContext.isSdkInputDirectoryMissing(this.prompts.invalidSdkDirectory)) {
+        return ActionResult.failed();
+      }
+
+      const updatedFilesDirectory = await saveChangesContext.getChangesForReviewDirectory();
+      if (updatedFilesDirectory.isEmpty()) {
         this.prompts.noChangesDetected();
         return ActionResult.success();
       }
 
-      this.prompts.modifiedFilesDetected(fileStatuses.length, sdkInputDirectory.toTreeNode(
-        fileStatuses.map(({ fileName, status }) => ({
-          path: new FilePath(sdkInputDirectory, fileName),
-          description: status === "modified" ? "# Modified" : status === "added" ? "# Added" : "# Deleted"
-        }))
-      ));
+      this.prompts.modifiedFilesDetected(updatedFilesDirectory);
 
       if (skipReview) {
         if (!await this.prompts.confirmChanges()) {
           this.prompts.operationCancelled();
           return ActionResult.cancelled();
         }
-        await sdkContext.saveSourceTree(updatedStateDirectory, sourceTreePath);
-        this.prompts.changesSaved(sourceTreePath);
+        await saveChangesContext.saveSourceTree();
+        this.prompts.changesSaved(sdkSourceTree);
         return ActionResult.success();
       }
 
-      const { diffPairs, standaloneFiles } = await sdkContext.classifyChangedFiles(
-        updatedStateDirectory,
-        tempDirectory,
-        fileStatuses
-      );
+      const nonDeletedFilesDirectory = await updatedFilesDirectory.mapFilesInDirectory((_, fileItem) => {
+        if (fileItem.description === "# Deleted") {
+          return Promise.resolve(undefined);
+        }
+        return Promise.resolve(fileItem);
+      });
 
-      const openedFiles = await this.launcherService.openFolderInIde(updatedStateDirectory, ...standaloneFiles);
-      const opened = openedFiles && (await Promise.all(diffPairs.map(({ base, working }) =>
-        this.launcherService.openDiffInIde(base, working)))).every(b => b);
+      const openedFiles = await this.launcherService.openFolderInIde(sdkReviewDirectory, ...nonDeletedFilesDirectory.getAllFiles());
 
-      if (opened) {
+      if (openedFiles) {
         this.prompts.reviewInIdeAndClose();
-        await this.launcherService.waitForVscodeToClose(updatedStateDirectory);
-      } else if (!await this.prompts.reviewChangesManually(updatedStateDirectory)) {
+        await this.launcherService.waitForVscodeToClose(sdkReviewDirectory);
+      } else if (!await this.prompts.reviewChangesManually(sdkReviewDirectory)) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }
 
-      await sdkContext.saveSourceTree(updatedStateDirectory, sourceTreePath);
-      this.prompts.changesSaved(sourceTreePath);
+      await saveChangesContext.saveSourceTree();
+      this.prompts.changesSaved(sdkSourceTree);
 
-      if (!await sdkContext.tryForceCleanUp(updatedStateDirectory, (dir) => this.prompts.directoryStillOpen(dir))) {
+      if (!await saveChangesContext.disposeSdkReviewDirectory((dir) => this.prompts.directoryStillOpen(dir))) {
         this.prompts.operationCancelledMemoryLeak();
         return ActionResult.cancelled();
       }
