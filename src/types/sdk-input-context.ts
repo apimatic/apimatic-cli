@@ -76,34 +76,6 @@ export class SdkInputContext {
     await this.zipService.archive(sdkGitDir, sourceTreePath);
   }
 
-  public async classifyChangedFiles(
-    updatedSdkDirectory: DirectoryPath,
-    tempDirectory: DirectoryPath,
-    fileStatuses: Array<GitFileStatus>
-  ): Promise<{ diffPairs: Array<{ base: FilePath; working: FilePath }>; standaloneFiles: FilePath[] }> {
-    const diffPairs: Array<{ base: FilePath; working: FilePath }> = [];
-    const standaloneFiles: FilePath[] = [];
-    const baseStateDirectory = await this.prepareBaseSdkDirectory(updatedSdkDirectory, tempDirectory);
-
-    for (const { fileName, status } of fileStatuses) {
-      const originalFilePath = new FilePath(baseStateDirectory, fileName);
-      if (status === "deleted") {
-        const renamedFilePath = await this.fileService.postfixFileName(originalFilePath, " [deleted]");
-        standaloneFiles.push(renamedFilePath);
-        continue;
-      }
-      const workingFilePath = new FilePath(updatedSdkDirectory, fileName);
-      if (status === "added") {
-        standaloneFiles.push(workingFilePath);
-      } else {
-        await this.fileService.normalizeFileLineEndings(workingFilePath);
-        diffPairs.push({ base: originalFilePath, working: workingFilePath });
-      }
-    }
-
-    return { diffPairs, standaloneFiles };
-  }
-
   public async tryForceCleanUp(updatedSdkDirectory: DirectoryPath, showPrompt: () => Promise<void>): Promise<void> {
     await this.fileService.pollDeleteDirectory(updatedSdkDirectory, showPrompt);
   }

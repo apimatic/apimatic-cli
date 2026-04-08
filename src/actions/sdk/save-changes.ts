@@ -17,7 +17,6 @@ export class SaveChangesAction {
     buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath | undefined,
     language: Language,
-    skipReview: boolean,
     apiVersion?: string
   ): Promise<ActionResult> => {
     const rootBuildContext = new BuildContext(buildDirectory);
@@ -102,30 +101,17 @@ export class SaveChangesAction {
         }))
       ));
 
-      if (skipReview) {
-        if (!await this.prompts.confirmChanges()) {
-          this.prompts.operationCancelled();
-          return ActionResult.cancelled();
-        }
+      if (!await this.prompts.confirmChanges()) {
         await sdkContext.saveSourceTree(updatedStateDirectory, sourceTreePath);
         this.prompts.changesSaved(sourceTreePath);
         return ActionResult.success();
       }
 
-      const { diffPairs, standaloneFiles } = await sdkContext.classifyChangedFiles(
-        updatedStateDirectory,
-        tempDirectory,
-        fileStatuses
-      );
+      this.prompts.openingDirectoryToReviewChanges();
 
-      const openedFiles = await this.launcherService.openFolderInIde(updatedStateDirectory, ...standaloneFiles);
-      const opened = openedFiles && (await Promise.all(diffPairs.map(({ base, working }) =>
-        this.launcherService.openDiffInIde(base, working)))).every(b => b);
-
-      if (opened) {
-        this.prompts.reviewInIdeAndClose();
-        await this.launcherService.waitForVscodeToClose(updatedStateDirectory);
-      } else if (!await this.prompts.reviewChangesManually(updatedStateDirectory)) {
+      const filesToOpen = fileStatuses.filter(({ status }) => status !== "deleted").map(({ fileName }) => new FilePath(updatedStateDirectory, fileName));
+      if (!await this.launcherService.openFolderInIdeWithWait(updatedStateDirectory, filesToOpen)
+        && !await this.prompts.reviewChangesManually(updatedStateDirectory)) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }

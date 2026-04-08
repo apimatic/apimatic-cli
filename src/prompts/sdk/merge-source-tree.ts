@@ -33,8 +33,12 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
     log.message(getTree(changesTree));
   }
 
+  public openingDirectoryForConflictResolution(language: Language) {
+    log.info(`Opening ${f.var(language)} SDK in VS Code for conflicts resolution.`);
+  }
+
   public async waitForConflictsResolved(language: Language, sdkDir: DirectoryPath): Promise<boolean> {
-    log.info(`Unable to open IDE. Please resolve all conflicts in the ${f.var(language)} SDK at ${f.path(sdkDir)} to proceed.`);
+    log.info(`Unable to open VS Code. Please resolve all conflicts in the ${f.var(language)} SDK at ${f.path(sdkDir)} to proceed.`);
     const confirmed = await confirm({
       message: `Have you resolved all conflicts?`,
       initialValue: false
@@ -45,10 +49,6 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
     }
 
     return confirmed;
-  }
-
-  public openingDirectoryForConflictResolution(language: Language) {
-    log.info(`Opening ${f.var(language)} SDK for conflicts resolution.`);
   }
 
   public conflictsResolved(language: Language) {

@@ -29,22 +29,17 @@ export default class SaveChanges extends Command {
     "api-version": Flags.string({
       description: "Version of the API where changes should be saved (if multiple versions exist)."
     }),
-    "skip-review": Flags.boolean({
-      default: false,
-      description: "Skip the review in IDE before saving the changes."
-    }),
     ...FlagsProvider.input,
   };
 
   static examples = [
     `${SaveChanges.cmdTxt} ${format.flag("language", "csharp")}`,
-    `${SaveChanges.cmdTxt} ${format.flag("language", "java")} ${format.flag("sdk", "./sdk")}`,
-    `${SaveChanges.cmdTxt} ${format.flag("language", "python")} ${format.flag("skip-review")}`
+    `${SaveChanges.cmdTxt} ${format.flag("language", "java")} ${format.flag("sdk", "./sdk")}`
   ];
 
   async run() {
     const {
-      flags: { sdk, language, input, "api-version": apiVersion, "skip-review": skipReview }
+      flags: { sdk, language, input, "api-version": apiVersion }
     } = await this.parse(SaveChanges);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -64,7 +59,6 @@ export default class SaveChanges extends Command {
       buildDirectory,
       sdkDirectoryInput,
       language as Language,
-      skipReview,
       apiVersion
     );
     outro(result);

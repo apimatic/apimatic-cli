@@ -84,13 +84,15 @@ to generate SDK with a source tree.`;
     log.info("No changes detected in the SDK.");
   }
 
-  public reviewInIdeAndClose() {
-    log.info(`The changed files have been opened in VS Code. Close VS Code when you're done to save the changes.`);
+  public openingDirectoryToReviewChanges() {
+    log.info(`Opening the changed files in VS Code for review. Close VS Code when you're done to save the changes.`);
   }
 
   public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
+    
+    log.info(`Unable to open VS Code. Review the changes at ${f.path(tempDirectory)} to proceed.`);
     const confirmed = await confirm({
-      message: `Review the changes at ${f.path(tempDirectory)}. Do you want to save these changes?`,
+      message: `Do you want to save these changes?`,
       initialValue: false
     });
 
@@ -103,7 +105,7 @@ to generate SDK with a source tree.`;
 
   public async confirmChanges(): Promise<boolean> {
     const confirmed = await confirm({
-      message: `Do you want to save these changes?`,
+      message: `Do you want to review these changes?`,
       initialValue: false
     });
 
