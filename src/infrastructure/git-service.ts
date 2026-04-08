@@ -5,8 +5,6 @@ import { FileName } from "../types/file/fileName.js";
 import { FilePath } from "../types/file/filePath.js";
 import { Directory, FileItem } from "../types/file/directory.js";
 
-export type GitFileStatus = { fileName: FileName; status: "modified" | "added" | "deleted" };
-
 const GIT_AUTHOR = { name: "APIMatic-bot", email: "developer@apimatic.io" } as const;
 const CUSTOM_BRANCH = "custom-code";
 const MAIN_BRANCH = "main";

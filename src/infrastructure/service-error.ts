@@ -8,8 +8,7 @@ export enum ServiceErrorCode {
   InvalidResponse = "INVALID_RESPONSE",
   UnAuthorized = "UNAUTHORIZED",
   BadRequest = "BAD_REQUEST",
-  Forbidden = "FORBIDDEN",
-  SdkMergeError = "SDK_MERGE_ERROR"
+  Forbidden = "FORBIDDEN"
 }
 
 export class ServiceError {
@@ -17,19 +16,16 @@ export class ServiceError {
     "support@apimatic.io"
   )}`;
 
-  static readonly NotFound = new ServiceError(ServiceErrorCode.NotFound, "Resource not found.");
-  static readonly ServerError = new ServiceError(ServiceErrorCode.ServerError, this.defaultErrorMessage);
-  static readonly NetworkError = new ServiceError(ServiceErrorCode.NetworkError, "Unable to connect to the server.");
-  static readonly InvalidResponse = new ServiceError(ServiceErrorCode.InvalidResponse, this.defaultErrorMessage);
-  static readonly UnAuthorized = new ServiceError(ServiceErrorCode.UnAuthorized, "Unauthorized access.");
-  static badRequest(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.BadRequest, customMessage);
+  static readonly NotFound = new ServiceError(ServiceErrorCode.NotFound, "Resource not found.", {});
+  static readonly ServerError = new ServiceError(ServiceErrorCode.ServerError, this.defaultErrorMessage, {});
+  static readonly NetworkError = new ServiceError(ServiceErrorCode.NetworkError, "Unable to connect to the server.", {});
+  static readonly InvalidResponse = new ServiceError(ServiceErrorCode.InvalidResponse, this.defaultErrorMessage, {});
+  static readonly UnAuthorized = new ServiceError(ServiceErrorCode.UnAuthorized, "Unauthorized access.", {});
+  static badRequest(customMessage: string, errors: Record<string, string[]>): ServiceError {
+    return new ServiceError(ServiceErrorCode.BadRequest, customMessage, errors);
   }
   static forbidden(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.Forbidden, customMessage);
-  }
-  static sdkMergeError(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.SdkMergeError, customMessage);
+    return new ServiceError(ServiceErrorCode.Forbidden, customMessage, {});
   }
 
   static readonly values: ServiceError[] = [
@@ -40,10 +36,18 @@ export class ServiceError {
     ServiceError.UnAuthorized
   ];
 
-  private constructor(public readonly code: ServiceErrorCode, private readonly defaultMessage: string) {}
+  private constructor(
+    public readonly code: ServiceErrorCode,
+    private readonly defaultMessage: string,
+    private readonly errors: Record<string, string[]>
+  ) {}
 
   public get errorMessage(): string {
     return this.defaultMessage;
+  }
+
+  public getError(key: string): string[] | undefined {
+    return this.errors[key];
   }
 }
 
