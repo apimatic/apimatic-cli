@@ -64,7 +64,7 @@ export class SaveChangesAction {
     }
 
     if (!(await versionedContext.buildContext.hasSdkSourceTree(language))) {
-      this.prompts.sdkSourceTreeNotFound(language, workingDirectory);
+      this.prompts.sdkSourceTreeNotFound(language);
       return ActionResult.failed();
     }
 

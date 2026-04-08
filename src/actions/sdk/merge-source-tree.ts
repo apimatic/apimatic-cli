@@ -59,7 +59,7 @@ export class MergeSourceTreeAction {
     this.prompts.conflictsDetected(language, conflictedFilesDirectory);
 
     if (isInCi) {
-      this.prompts.warnUnresolvedConflicts(language);
+      this.prompts.errorMergeConflicts(language);
       return ActionResult.failed();
     }
 

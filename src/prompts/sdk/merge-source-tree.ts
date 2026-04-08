@@ -3,6 +3,7 @@ import { format as f, getTree } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { Language } from "../../types/sdk/generate.js";
 import { Directory } from "../../types/file/directory.js";
+import { noteWrapped } from "../prompt.js";
 
 export class MergeSourceTreePrompts {
   public successfullySkippedChanges(language: Language) {
@@ -14,14 +15,21 @@ export class MergeSourceTreePrompts {
   }
 
   public changeTrackingEnabled(language: Language) {
-    log.info(`Change tracking is enabled for ${f.var(language)}. Now you can save your customizations in ${f.var(language)} SDK using:
-${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
+    log.info(`Change tracking is enabled for ${f.var(language)}.`);
+    
+    const message = `Customize your SDK and run the command
+'${f.cmdAlt("apimatic", "sdk", "save-changes", f.flag("language", language))}'
+to save and persist your changes for the future SDK generations.`;
+    noteWrapped(message, "Next Steps");
   }
 
-  public warnUnresolvedConflicts(language: Language) {
-    log.error(
-      `Merge conflicts detected in the generated ${f.var(language)} SDK. Manually run the same command to resolve the conflicts interactively.`
-    );
+  public errorMergeConflicts(language: Language) {
+    log.error(`Merge conflicts detected in the generated ${f.var(language)} SDK.`);
+    
+    const message = `Run the command
+'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language))}'
+interactively to review and resolve the conflicts with SDK generation.`;
+    noteWrapped(message, "Next Steps");
   }
 
   public conflictsDetected(language: Language, directory: Directory) {
@@ -68,7 +76,4 @@ ${f.cmd("apimatic", "sdk", "save-changes", `--language=${language}`)}`);
     log.info(`Please close all applications using the directory ${f.path(directory)} to allow cleanup of temporary files.`);
   }
 
-  public operationCancelledMemoryLeak() {
-    log.info("Exiting without cleanup of temporary files.");
-  }
 }

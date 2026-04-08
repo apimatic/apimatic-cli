@@ -43,14 +43,10 @@ export class SaveChangesPrompts {
     return version;
   }
 
-
-  public sdkSourceTreeNotFound(language: string, inputDirectory: DirectoryPath) {
+  public sdkSourceTreeNotFound(language: string) {
     log.error(`No existing sdk source tree found for ${f.var(language)}.`);
-    const inputDirectoryFlag = !inputDirectory.isEqual(DirectoryPath.default)
-      ? `${f.flag("input", inputDirectory.toString())} `
-      : "";
     const message = `Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)} ${f.flag("track-changes")}'
+'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language), f.flag("track-changes"))}'
 to generate SDK with a source tree.`;
     noteWrapped(message, "Next Steps");
   }
