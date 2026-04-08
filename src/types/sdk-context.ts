@@ -8,55 +8,54 @@ import { ZipService } from "../infrastructure/zip-service.js";
 export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
+  private readonly sdkDirectory: DirectoryPath;
 
   constructor(
-    private readonly sdkDirectory: DirectoryPath,
     private readonly language: Language,
-    private readonly requireUncustomizedDir: boolean,
-    private readonly version?: string
-  ) {  }
+    sdkDirectory: DirectoryPath,
+    requireUncustomizedDir: boolean,
+    version?: string
+  ) {
+    const baseDirectory = requireUncustomizedDir
+      ? sdkDirectory.join("uncustomized")
+      : sdkDirectory;
 
-  public getSdkLanguageDirectory(): DirectoryPath {
-    const baseDirectory = this.requireUncustomizedDir
-      ? this.sdkDirectory.join("uncustomized")
-      : this.sdkDirectory;
-
-    if (this.version) {
-      return baseDirectory.join(this.version).join(this.language);
-    }
-
-    return baseDirectory.join(this.language);
+    this.sdkDirectory = version
+      ? baseDirectory.join(version).join(language)
+      : baseDirectory.join(language);
   }
 
   public async exists() {
-    return !(await this.fileService.directoryEmpty(this.getSdkLanguageDirectory()));
+    return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  public async prepareTempSdkDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
-    const tempSdkDirectory = tempDirectory.join("sdk");
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean) : Promise<DirectoryPath> {
+    await this.fileService.cleanDirectory(this.sdkDirectory);
+
+    if (!zipSdk) {
+      await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
+      return this.sdkDirectory;
+    }
+
+    const zipPath = new FilePath(this.sdkDirectory, new FileName(`${this.language}.zip`));
+    await this.zipService.archive(tempSdkDirectory, zipPath);
+    return this.sdkDirectory;
+  }
+
+  public async loadSdkInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
+    const tempSdkDirectory = tempDirectory.join("sdk-original");
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
     await this.zipService.unArchive(tempSdk, tempSdkDirectory);
     return tempSdkDirectory;
   }
 
-  public async appendSourceTree(tempSdkDirectory: DirectoryPath, tempSdkSourceTree: FilePath): Promise<void> {
+  public async loadSdkWithSourceTreeInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath, tempSdkSourceTree: FilePath): Promise<DirectoryPath> {
+    const tempSdkDirectory = tempDirectory.join("sdk");
+    await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
+    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
     const gitSourceTreeDir = tempSdkDirectory.join(".git");
     await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
     await this.zipService.unArchive(tempSdkSourceTree, gitSourceTreeDir);
-  }
-
-  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean) : Promise<DirectoryPath> {
-    const sdkLanguageDir = this.getSdkLanguageDirectory();
-    await this.fileService.cleanDirectory(sdkLanguageDir);
-
-    if (!zipSdk) {
-      await this.fileService.copyDirectoryContents(tempSdkDirectory, sdkLanguageDir);
-      return sdkLanguageDir;
-    }
-
-    const zipPath = new FilePath(sdkLanguageDir, new FileName(`${this.language}.zip`));
-    await this.zipService.archive(tempSdkDirectory, zipPath);
-
-    return sdkLanguageDir;
+    return tempSdkDirectory;
   }
 }

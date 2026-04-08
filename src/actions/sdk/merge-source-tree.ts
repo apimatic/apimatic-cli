@@ -6,65 +6,72 @@ import { Language } from "../../types/sdk/generate.js";
 import { ActionResult } from "../action-result.js";
 import isInCi from "is-in-ci";
 import { MergeSourceTreeContext } from "../../types/merge-source-tree-context.js";
+import { SdkContext } from "../../types/sdk-context.js";
 
 export class MergeSourceTreeAction {
   private readonly prompts = new MergeSourceTreePrompts();
   private readonly launcherService = new LauncherService();
 
   public readonly execute = async (
-    sdkDir: DirectoryPath,
-    sourceTreePath: FilePath,
+    sdkWithSourceTree: DirectoryPath,
+    sdkWithoutSourceTree: DirectoryPath,
+    destinationSourceTreePath: FilePath,
     trackChanges: boolean,
     skipChanges: boolean,
     hasSdkSourceTree: boolean,
     language: Language,
     outputSdkDirectory: DirectoryPath,
     version: string | undefined,
-    zipSdk: boolean,
-    temporaryDirectory: DirectoryPath
+    zipSdk: boolean
   ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
-
-    const mergeSourceTreeContext = new MergeSourceTreeContext(sdkDir, sourceTreePath,
-      trackChanges, skipChanges, hasSdkSourceTree, zipSdk, temporaryDirectory, this.prompts.sdkGenerated,
-      outputSdkDirectory, language, version);
+    const mergeSourceTreeContext = new MergeSourceTreeContext(
+      sdkWithSourceTree, sdkWithoutSourceTree, destinationSourceTreePath,
+      trackChanges, skipChanges, hasSdkSourceTree
+    );
+    const sdkContext = new SdkContext(language, outputSdkDirectory, skipChanges && hasSdkSourceTree, version);
+    const saveSdk = async () => await sdkContext.save(sdkWithoutSourceTree, zipSdk);
 
     const { hasSkippedChangesEnabled, hasSkippedCustomizations } = await mergeSourceTreeContext.saveSkippingChanges();
     if (hasSkippedCustomizations) {
       this.prompts.successfullySkippedChanges(language);
+      this.prompts.sdkGenerated(await saveSdk());
       return ActionResult.success();
     }
     if (hasSkippedChangesEnabled) {
+      this.prompts.sdkGenerated(await saveSdk());
       return ActionResult.success();
     }
 
     const { hasSourceTreeTracked, hasAppliedCustomizations } = await mergeSourceTreeContext.saveWithoutConflicts();
     if (hasAppliedCustomizations) {
       this.prompts.successfullyAppliedChanges(language);
+      this.prompts.sdkGenerated(await saveSdk());
       return ActionResult.success();
     }
     if (hasSourceTreeTracked) {
       this.prompts.changeTrackingEnabled(language);
+      this.prompts.sdkGenerated(await saveSdk());
       return ActionResult.success({sourceTreeTrackingInitiated: true, conflictsResolved: false});
     }
 
     let conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
 
-    this.prompts.conflictsDetected(language, sdkDir.toTreeNode([
+    this.prompts.conflictsDetected(language, sdkWithSourceTree.toTreeNode([
       ...conflictedFilePaths.map((filePath) => ({ path: filePath, description: "# Conflicted file" }))
     ]));
-    
+
     if (isInCi) {
       this.prompts.warnUnresolvedConflicts(language);
       return ActionResult.failed();
     }
 
     do {
-      const opened = await this.launcherService.openFolderInIde(sdkDir, ...conflictedFilePaths);
+      const opened = await this.launcherService.openFolderInIde(sdkWithSourceTree, ...conflictedFilePaths);
 
       if (opened) {
         this.prompts.waitingForVscodeClose(language);
-        await this.launcherService.waitForVscodeToClose(sdkDir);
-      } else if (!await this.prompts.waitForConflictsResolved(language, sdkDir)) {
+        await this.launcherService.waitForVscodeToClose(sdkWithSourceTree);
+      } else if (!await this.prompts.waitForConflictsResolved(language, sdkWithSourceTree)) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }
@@ -72,17 +79,18 @@ export class MergeSourceTreeAction {
       conflictedFilePaths = await mergeSourceTreeContext.getConflicts();
 
       if (conflictedFilePaths.length > 0) {
-        this.prompts.conflictsStillPresent(sdkDir.toTreeNode([
+        this.prompts.conflictsStillPresent(sdkWithSourceTree.toTreeNode([
           ...conflictedFilePaths.map((filePath) => ({ path: filePath, description: "# Conflicted file" }))
         ]));
       }
 
     } while (conflictedFilePaths.length > 0);
 
-    this.prompts.conflictsResolved(language);
     await mergeSourceTreeContext.saveWithResolvedConflicts();
+    this.prompts.conflictsResolved(language);
+    this.prompts.sdkGenerated(await saveSdk());
 
-    if (!await mergeSourceTreeContext.tryForceCleanUp(() => this.prompts.directoryStillOpen(sdkDir))) {
+    if (!await mergeSourceTreeContext.tryForceCleanUp(() => this.prompts.directoryStillOpen(sdkWithSourceTree))) {
       this.prompts.operationCancelledMemoryLeak();
       return ActionResult.cancelled();
     }

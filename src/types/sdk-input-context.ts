@@ -2,6 +2,7 @@ import { FileService } from "../infrastructure/file-service.js";
 import { GitFileStatus, GitService } from "../infrastructure/git-service.js";
 import { ZipService } from "../infrastructure/zip-service.js";
 import { DirectoryPath } from "./file/directoryPath.js";
+import { FileName } from "./file/fileName.js";
 import { FilePath } from "./file/filePath.js";
 import { Language } from "./sdk/generate.js";
 
@@ -11,15 +12,15 @@ export class SdkInputContext {
   private readonly gitService = new GitService();
 
   constructor(
-    private readonly sdkDirectoryInput: string | undefined,
+    private readonly sdkDirectory: DirectoryPath | undefined,
     private readonly workingDirectory: DirectoryPath,
     private readonly language: Language,
     private readonly version?: string
   ) {  }
   
   public getSdkInputDirectory(): DirectoryPath {
-    if (this.sdkDirectoryInput){
-      return new DirectoryPath(this.sdkDirectoryInput);
+    if (this.sdkDirectory){
+      return this.sdkDirectory;
     }
 
     const sdkDirectory = this.workingDirectory.join("sdk");
@@ -45,8 +46,8 @@ export class SdkInputContext {
     await this.fileService.createDirectoryIfNotExists(sdkGitDir);
     await this.zipService.unArchive(sourceTreePath, sdkGitDir);
     await this.gitService.checkoutCustomBranch(updatedSdkDirectory);
-    await this.fileService.cleanDirectoryExcluding(updatedSdkDirectory, [".git"]);
-    await this.fileService.copyDirectoryExcluding(sdk, updatedSdkDirectory, [".git"]);
+    await this.fileService.cleanDirectoryExcluding(updatedSdkDirectory, [new FileName(".git")]);
+    await this.fileService.copyDirectoryExcluding(sdk, updatedSdkDirectory, [new FileName(".git")]);
     return updatedSdkDirectory;
   }
 

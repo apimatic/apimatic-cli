@@ -76,6 +76,10 @@ export class GitService {
       .map(({ fileName }) => new FilePath(dir, fileName));
   }
 
+  public getConflictMarker(): string {
+    return "<<<<<<< ";
+  }
+
   public async commitResolvedConflicts(dir: DirectoryPath): Promise<void> {
     await this.stageAll(dir);
     await git.commit({ fs, dir: dir.toString(), message: "feat: resolve merge conflicts", author: GIT_AUTHOR });
