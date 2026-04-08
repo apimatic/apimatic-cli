@@ -8,10 +8,10 @@ import isInCi from "is-in-ci";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 
 export class LauncherService {
-  public async openFolderInIde(directoryPath: DirectoryPath, filesToOpen: FilePath): Promise<boolean> {
+  public async openFolderInIde(directoryPath: DirectoryPath, fileToOpen: FilePath): Promise<boolean> {
     if (isInCi) return false;
     try {
-      const args = [directoryPath.toString(), filesToOpen.toString()];
+      const args = [directoryPath.toString(), fileToOpen.toString()];
       await execa("code", args);
       return true;
     } catch {
