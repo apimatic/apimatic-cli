@@ -1,8 +1,9 @@
 import { log, isCancel, select, confirm } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f, getTree, TreeNode } from "../format.js";
+import { format as f, getTree } from "../format.js";
 import { noteWrapped } from "../prompt.js";
 import { FilePath } from "../../types/file/filePath.js";
+import { Directory } from "../../types/file/directory.js";
 
 export class SaveChangesPrompts {
   public sameBuildAndSdkDir(directory: DirectoryPath) {
@@ -75,9 +76,9 @@ to generate SDK with a source tree.`;
     log.info(`Please close all applications using the directory ${f.path(directory)} to allow cleanup of temporary files.`);
   }
 
-  public modifiedFilesDetected(changesCount: number, changesTree: TreeNode) {
-    log.message(`Detected changes in ${changesCount} file(s):`);
-    log.message(getTree(changesTree));
+  public modifiedFilesDetected(directory: Directory) {
+    log.message(`Detected changes in the following file(s):`);
+    log.message(getTree(directory.toTreeNode()));
   }
 
   public noChangesDetected() {

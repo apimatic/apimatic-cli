@@ -65,7 +65,7 @@ export class FileService {
       entries.map(async (entry) => {
         const fullPath = path.join(directoryPath.toString(), entry);
         const stat = await fsExtra.stat(fullPath);
-        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : new FileName(entry);
+        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : { fileName: new FileName(entry) };
       })
     );
     return new Directory(directoryPath, results);
@@ -141,12 +141,12 @@ export class FileService {
     }
   }
 
-  public async pollDeleteDirectory(dirPath: DirectoryPath, showPrompt: () => Promise<void>): Promise<void> {
+  public async pollDeleteDirectory(dirPath: DirectoryPath, showPrompt: () => void): Promise<void> {
     let prompted = false;
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     while (await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
       if (!prompted) {
-        await showPrompt();
+        showPrompt();
         prompted = true;
       }
       await new Promise<void>((resolve) => setTimeout(resolve, 500));
@@ -230,14 +230,8 @@ export class FileService {
     await this.writeContents(filePath, normalizedContent);
   }
 
-  public async filterFilesWithContent(allFiles: FilePath[], content: string): Promise<FilePath[]> {
-    const result: FilePath[] = [];
-    for (const file of allFiles) {
-      const exists = await this.fileExists(file);
-      const hasContent = exists && (await this.readFile(file)).includes(content);
-      if (hasContent) result.push(file);
-    }
-    return result;
+  public async hasContent(file: FilePath, content: string): Promise<boolean> {
+    return await this.fileExists(file) && (await this.readFile(file)).includes(content);;
   }
 }
 

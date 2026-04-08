@@ -3,8 +3,7 @@ import fs from "fs";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FileName } from "../types/file/fileName.js";
 import { FilePath } from "../types/file/filePath.js";
-
-export type GitFileStatus = { fileName: FileName; status: "modified" | "added" | "deleted" };
+import { Directory, FileItem } from "../types/file/directory.js";
 
 const GIT_AUTHOR = { name: "APIMatic-bot", email: "developer@apimatic.io" } as const;
 const CUSTOM_BRANCH = "custom-code";
@@ -41,39 +40,72 @@ export class GitService {
     await git.checkout({ fs, dir: dir.toString(), force: true });
   }
 
-  public async getGitFileStatuses(dirPath: DirectoryPath): Promise<GitFileStatus[]> {
+  public async getDirectoryWithUpdatedFiles(dirPath: DirectoryPath): Promise<Directory> {
     const statusMatrix = await git.statusMatrix({ fs, dir: dirPath.toString() });
 
-    return statusMatrix
+    const relativeUncommitedFiles = statusMatrix
+      // include updated and resolved conflict files
       .filter(([, headStatus, workdirStatus, stageStatus]) => headStatus !== workdirStatus || stageStatus === 3)
-      .map(([relativeFilePath, headStatus, workdirStatus]) => {
-        const fileName = new FileName(relativeFilePath);
+      .map(([relativePath, workdirStatus, headStatus]) => {
         if (headStatus === 0) {
-          return { fileName, status: "added" };
+          return { relativePath, description: "# Added" };
         }
         if (workdirStatus === 0) {
-          return { fileName, status: "deleted" };
+          return { relativePath, description: "# Deleted" };
         }
-        return { fileName, status: "modified" };
+        return { relativePath, description: "# Modified" };
       });
+
+    type PendingDirectoryItem = FileItem | PendingDir;
+    type PendingDir = { pendingDirPath: DirectoryPath; items: PendingDirectoryItem[] };
+
+    const buildDirectory = (pending: PendingDir): Directory => new Directory(
+      pending.pendingDirPath,
+      pending.items.map((item) => ("pendingDirPath" in item ? buildDirectory(item) : item))
+    );
+
+    const root: PendingDir = { pendingDirPath: new DirectoryPath(this.toString()), items: [] };
+    for (const file of relativeUncommitedFiles) {
+      const parts = file.relativePath.split(/[\\/]/);
+      let currentDir = root;
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isLastPart = i === parts.length - 1;
+
+        if (isLastPart) {
+          currentDir.items.push({ fileName: new FileName(part), description: file.description });
+        } else {
+          let existingDir = currentDir.items.find(
+            (item) => "pendingDirPath" in item && item.pendingDirPath.leafName() === part
+          ) as PendingDir | undefined;
+
+          if (!existingDir) {
+            existingDir = { pendingDirPath: currentDir.pendingDirPath.join(part), items: [] };
+            currentDir.items.push(existingDir);
+          }
+
+          currentDir = existingDir;
+        }
+      }
+    }
+
+    return buildDirectory(root);
   }
 
   private async stageAll(dir: DirectoryPath): Promise<void> {
-    const statuses = await this.getGitFileStatuses(dir);
+    const statusMatrix = await git.statusMatrix({ fs, dir: dir.toString() });
     await Promise.all(
-      statuses.map(({ fileName, status }) => {
-        if (status === "deleted") {
-          return git.remove({ fs, dir: dir.toString(), filepath: fileName.toString() });
-        }
-        return git.add({ fs, dir: dir.toString(), filepath: fileName.toString() });
-      })
+      statusMatrix
+        // include updated and resolved conflict files
+        .filter(([, headStatus, workdirStatus, stageStatus]) => headStatus !== workdirStatus || stageStatus === 3)
+        .map(([relativePath, workdirStatus]) => {
+          if (workdirStatus === 0) {
+            return git.remove({ fs, dir: dir.toString(), filepath: relativePath });
+          }
+          return git.add({ fs, dir: dir.toString(), filepath: relativePath });
+        })
     );
-  }
-
-  public async getUpdatedFiles(dir: DirectoryPath): Promise<FilePath[]> {
-    const statuses = await this.getGitFileStatuses(dir);
-    return statuses.filter(({status}) => status === "modified")
-      .map(({ fileName }) => new FilePath(dir, fileName));
   }
 
   public getConflictMarker(): string {

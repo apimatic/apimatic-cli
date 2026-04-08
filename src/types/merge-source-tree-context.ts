@@ -1,6 +1,7 @@
 import { FileService } from "../infrastructure/file-service.js";
 import { GitService } from "../infrastructure/git-service.js";
 import { ZipService } from "../infrastructure/zip-service.js";
+import { Directory } from "./file/directory.js";
 import { DirectoryPath } from "./file/directoryPath.js";
 import { FileName } from "./file/fileName.js";
 import { FilePath } from "./file/filePath.js";
@@ -60,11 +61,15 @@ export class MergeSourceTreeContext {
     await this.zipService.archive(this.sdkWithSourceTree.join(".git"), this.sourceTreePath);
   }
 
-  public async getConflicts(): Promise<FilePath[]> {
-    return await this.fileService.filterFilesWithContent(
-      await this.gitService.getUpdatedFiles(this.sdkWithSourceTree),
-      this.gitService.getConflictMarker()
-    );
+  public async getConflictedFilesDirectory(): Promise<Directory> {
+    const updatedFilesDirectory = await this.gitService.getDirectoryWithUpdatedFiles(this.sdkWithSourceTree);
+    const conflictMarker = this.gitService.getConflictMarker();
+    return updatedFilesDirectory.mapFilesInDirectory(async (directoryPath, fileItem) => {
+      if (await this.fileService.hasContent(new FilePath(directoryPath, fileItem.fileName), conflictMarker)) {
+        return { fileName: fileItem.fileName, description: "# Conflicted file" };
+      }
+      return undefined;
+    });
   }
 
   public async cleanUpWhenReady(showPrompt: () => Promise<void>): Promise<void> {
