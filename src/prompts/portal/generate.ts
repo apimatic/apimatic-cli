@@ -3,8 +3,8 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
-import {ServiceError, ServiceErrorCode } from "../../infrastructure/service-error.js";
-import { withSpinner, noteWrapped } from "../prompt.js";
+import {ServiceError } from "../../infrastructure/service-error.js";
+import { withSpinner } from "../prompt.js";
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
