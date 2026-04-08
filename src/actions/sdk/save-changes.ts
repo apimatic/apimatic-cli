@@ -7,17 +7,15 @@ import { SdkInputContext } from "../../types/sdk-input-context.js";
 import { BuildContext } from "../../types/build-context.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { FileService } from "../../infrastructure/file-service.js";
 
 export class SaveChangesAction {
   private readonly prompts = new SaveChangesPrompts();
   private readonly launcherService = new LauncherService();
-  private readonly fileService = new FileService();
 
   public readonly execute = async (
     workingDirectory: DirectoryPath,
     buildDirectory: DirectoryPath,
-    sdkDirectoryInput: string | undefined,
+    sdkDirectory: DirectoryPath | undefined,
     language: Language,
     skipReview: boolean,
     apiVersion?: string
@@ -72,7 +70,7 @@ export class SaveChangesAction {
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkInputContext(sdkDirectoryInput, workingDirectory, language, versionedContext.version);
+    const sdkContext = new SdkInputContext(sdkDirectory, workingDirectory, language, versionedContext.version);
     const sdkInputDirectory = sdkContext.getSdkInputDirectory();
     if (!(await sdkContext.exists())) {
       this.prompts.invalidSdkDirectory(sdkInputDirectory);

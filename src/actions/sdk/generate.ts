@@ -26,7 +26,7 @@ export class GenerateAction {
 
   public readonly execute = async (
     buildDirectory: DirectoryPath,
-    sdkDirectory: DirectoryPath,
+    destinationSdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
     zipSdk: boolean,
@@ -34,7 +34,7 @@ export class GenerateAction {
     trackChanges: boolean,
     apiVersion?: string
   ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
-    if (buildDirectory.isEqual(sdkDirectory)) {
+    if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
     }
@@ -93,8 +93,8 @@ export class GenerateAction {
     }
 
     const hasSdkSourceTree = await buildContext.hasSdkSourceTree(language);
-    const sdkContext = new SdkContext(sdkDirectory, language, skipChanges && hasSdkSourceTree, version);
-    if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(sdkContext.getSdkLanguageDirectory()))) {
+    const sdkContext = new SdkContext(language, destinationSdkDirectory, skipChanges && hasSdkSourceTree, version);
+    if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(destinationSdkDirectory))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
     }
@@ -116,23 +116,26 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const tempSdkDir = await sdkContext.prepareTempSdkDirectory(
+      const tempSdk = await sdkContext.loadSdkInTempDirectory(
         tempDirectory,
         await tempContext.save(response.value.sdk)
       );
-
       if (!trackChanges && !hasSdkSourceTree) {
-        this.prompts.sdkGenerated(await sdkContext.save(tempSdkDir, zipSdk));
+        this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
         return ActionResult.success();
       }
 
-      await sdkContext.appendSourceTree(tempSdkDir, await tempContext.save(response.value.sdkSourceTree));
+      const tempSdkWithSourceTree = await sdkContext.loadSdkWithSourceTreeInTempDirectory(
+        tempDirectory,
+        await tempContext.save(response.value.sdk),
+        await tempContext.save(response.value.sdkSourceTree)
+      );
+      const destinationSourceTreePath = buildContext.getSdkSourceTree(language);
 
       const mergeSourceTree = new MergeSourceTreeAction();
       return await mergeSourceTree.execute(
-        tempSdkDir, buildContext.getSdkSourceTree(language), trackChanges, skipChanges, hasSdkSourceTree,
-        language, sdkDirectory, version,
-        zipSdk, tempDirectory
+        tempSdkWithSourceTree, tempSdk, destinationSourceTreePath, trackChanges, skipChanges, hasSdkSourceTree,
+        language, destinationSdkDirectory, version, zipSdk
       );
     });
   };

@@ -49,6 +49,7 @@ export default class SaveChanges extends Command {
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = workingDirectory.join("src");
+    const sdkDirectoryInput = sdk ? new DirectoryPath(sdk) : undefined;
 
     const commandMetadata: CommandMetadata = {
       commandName: SaveChanges.id,
@@ -61,7 +62,7 @@ export default class SaveChanges extends Command {
     const result = await action.execute(
       workingDirectory,
       buildDirectory,
-      sdk,
+      sdkDirectoryInput,
       language as Language,
       skipReview,
       apiVersion

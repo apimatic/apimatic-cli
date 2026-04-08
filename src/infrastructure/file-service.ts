@@ -42,14 +42,13 @@ export class FileService {
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
-  public async cleanDirectoryExcluding(dir: DirectoryPath, excludeNames: string[]): Promise<void> {
+  public async cleanDirectoryExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<void> {
     await fsExtra.ensureDir(dir.toString());
     const entries = await fsExtra.readdir(dir.toString());
-    const excludeSet = new Set(excludeNames);
 
     await Promise.all(
       entries
-        .filter((entry) => !excludeSet.has(entry))
+        .filter((entry) => !excludeNames.find((exclude) => exclude.toString() === entry))
         .map(async (entry) => {
           return fsExtra.remove(dir.join(entry).toString());
         })
@@ -105,16 +104,15 @@ export class FileService {
   public async copyDirectoryExcluding(
     source: DirectoryPath,
     destination: DirectoryPath,
-    excludeNames: string[]
+    excludeNames: FileName[]
   ): Promise<void> {
     await this.createDirectoryIfNotExists(destination);
 
     const entries = await fsExtra.readdir(source.toString());
-    const excludeSet = new Set(excludeNames);
 
     await Promise.all(
       entries
-        .filter((entry) => !excludeSet.has(entry))
+        .filter((entry) => !excludeNames.find((exclude) => exclude.toString() === entry))
         .map(async (entry) => {
           const sourcePath = path.join(source.toString(), entry);
           const destPath = path.join(destination.toString(), entry);
@@ -231,12 +229,12 @@ export class FileService {
     await this.writeContents(filePath, normalizedContent);
   }
 
-  public async filterFilesWithConflictMarkers(updatedFiles: FilePath[]): Promise<FilePath[]> {
+  public async filterFilesWithContent(allFiles: FilePath[], content: string): Promise<FilePath[]> {
     const result: FilePath[] = [];
-    for (const file of updatedFiles) {
+    for (const file of allFiles) {
       const exists = await this.fileExists(file);
-      const hasConflictMarkers = exists && (await this.readFile(file)).includes("<<<<<<< ");
-      if (hasConflictMarkers) result.push(file);
+      const hasContent = exists && (await this.readFile(file)).includes(content);
+      if (hasContent) result.push(file);
     }
     return result;
   }
