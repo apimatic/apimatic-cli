@@ -86,9 +86,8 @@ export class GenerateAction {
 
     const { version, buildContext } = versionedContext;
 
-    const specContext = new SpecContext(buildContext.getSpecDirectory());
-    if (!(await specContext.validate())) {
-      this.prompts.specDirectoryEmpty(buildContext.getSpecDirectory());
+    if (!(await buildContext.getSpecContext().validate())) {
+      this.prompts.specDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 

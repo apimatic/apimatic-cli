@@ -3,6 +3,7 @@ import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { BuildConfig } from "./build/build.js";
+import { SpecContext } from "./spec-context.js";
 
 export class BuildContext {
   private readonly fileService = new FileService();
@@ -41,8 +42,8 @@ export class BuildContext {
     return this.buildDirectory;
   }
 
-  public getSpecDirectory(): DirectoryPath {
-    return this.buildDirectory.join("spec");
+  public getSpecContext(): SpecContext {
+    return new SpecContext(this.buildDirectory.join("spec"));
   }
 
   public async hasSdkSourceTree(language: string): Promise<boolean> {
