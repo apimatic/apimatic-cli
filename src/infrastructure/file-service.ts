@@ -143,16 +143,15 @@ export class FileService {
     }
   }
 
-  public async forceDeleteDirectory(dirPath: DirectoryPath, shouldRetry: () => Promise<boolean>): Promise<boolean> {
-    const deadline = Date.now() + 2000;
+  public async pollDeleteDirectory(dirPath: DirectoryPath, showPrompt: () => Promise<void>): Promise<void> {
+    let prompted = false;
     while (await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
-      if (Date.now() < deadline) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 50));
-      } else if (!(await shouldRetry())) {
-        return false;
+      if (!prompted) {
+        await showPrompt();
+        prompted = true;
       }
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
     }
-    return true;
   }
 
   public getRelativePath(filePath: FilePath, basePath: DirectoryPath): string {

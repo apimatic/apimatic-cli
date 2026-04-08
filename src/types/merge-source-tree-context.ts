@@ -76,7 +76,7 @@ export class MergeSourceTreeContext {
     );
   }
 
-  public async tryForceCleanUp(shouldRetry: () => Promise<boolean>): Promise<boolean> {
-    return this.fileService.forceDeleteDirectory(this.sdkDir, shouldRetry);
+  public async cleanUpWhenReady(showPrompt: () => Promise<void>): Promise<void> {
+    await this.fileService.pollDeleteDirectory(this.sdkDir, showPrompt);
   }
 }

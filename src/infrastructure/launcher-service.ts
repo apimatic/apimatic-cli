@@ -19,6 +19,19 @@ export class LauncherService {
     }
   }
 
+  public async openFolderInIdeWithWait(
+    directoryPath: DirectoryPath,
+    filesToOpen: FilePath[]
+  ): Promise<boolean> {
+    try {
+      const args = [directoryPath.toString(), ...filesToOpen.map(f => f.toString())];
+      await execa("code2", ["--new-window", "--wait", ...args]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public async openDiffInIde(originalFile: FilePath, updatedFile: FilePath): Promise<boolean> {
     if (isInCi) return false;
     try {

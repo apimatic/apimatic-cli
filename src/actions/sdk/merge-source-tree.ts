@@ -59,12 +59,10 @@ export class MergeSourceTreeAction {
     }
 
     do {
-      const opened = await this.launcherService.openFolderInIde(sdkDir, ...conflictedFilePaths);
+      this.prompts.openingDirectoryForConflictResolution(language);
 
-      if (opened) {
-        this.prompts.waitingForVscodeClose(language);
-        await this.launcherService.waitForVscodeToClose(sdkDir);
-      } else if (!await this.prompts.waitForConflictsResolved(language, sdkDir)) {
+      if (!await this.launcherService.openFolderInIdeWithWait(sdkDir, conflictedFilePaths) 
+        && !await this.prompts.waitForConflictsResolved(language, sdkDir)) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
       }
@@ -82,10 +80,7 @@ export class MergeSourceTreeAction {
     this.prompts.conflictsResolved(language);
     await mergeSourceTreeContext.saveWithResolvedConflicts();
 
-    if (!await mergeSourceTreeContext.tryForceCleanUp(() => this.prompts.directoryStillOpen(sdkDir))) {
-      this.prompts.operationCancelledMemoryLeak();
-      return ActionResult.cancelled();
-    }
+    await mergeSourceTreeContext.cleanUpWhenReady(() => this.prompts.directoryStillOpen(sdkDir));
     return ActionResult.success({sourceTreeTrackingInitiated: false, conflictsResolved: true});
   };
 }

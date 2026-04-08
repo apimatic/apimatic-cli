@@ -1,4 +1,4 @@
-import { log, text, isCancel, select, confirm } from "@clack/prompts";
+import { log, isCancel, select, confirm } from "@clack/prompts";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { format as f, getTree, TreeNode } from "../format.js";
 import { noteWrapped } from "../prompt.js";
@@ -71,12 +71,8 @@ to generate SDK with a source tree.`;
     log.info("Exiting without cleanup of temporary files.");
   }
 
-  public async directoryStillOpen(directory: DirectoryPath): Promise<boolean> {
-    const result = await text({
-      message: `Please close all applications using the directory ${f.path(directory)} and press Enter to continue.`
-    });
-
-    return !isCancel(result);
+  public async directoryStillOpen(directory: DirectoryPath) {
+    log.info(`Please close all applications using the directory ${f.path(directory)} to allow cleanup of temporary files.`);
   }
 
   public modifiedFilesDetected(changesCount: number, changesTree: TreeNode) {

@@ -103,7 +103,7 @@ export class SdkInputContext {
     return { diffPairs, standaloneFiles };
   }
 
-  public async tryForceCleanUp(updatedSdkDirectory: DirectoryPath, shouldRetry: (dir: DirectoryPath) => Promise<boolean>): Promise<boolean> {
-    return this.fileService.forceDeleteDirectory(updatedSdkDirectory, () => shouldRetry(updatedSdkDirectory));
+  public async tryForceCleanUp(updatedSdkDirectory: DirectoryPath, showPrompt: () => Promise<void>): Promise<void> {
+    await this.fileService.pollDeleteDirectory(updatedSdkDirectory, showPrompt);
   }
 }
