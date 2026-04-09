@@ -93,8 +93,8 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
           await telemetryService.trackEvent(new SdkConflictsResolvedEvent(language), commandMetadata.shell);
         }
       },
-      () => new Promise(() => {}),
-      () => new Promise(() => {})
+      async () => {},
+      async () => {}
     );
   }
 

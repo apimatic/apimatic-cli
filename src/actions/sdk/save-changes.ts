@@ -98,11 +98,11 @@ export class SaveChangesAction {
         return ActionResult.success();
       }
 
-      const nonDeletedFilesDirectory = await updatedFilesDirectory.mapFilesInDirectory((_, fileItem) => {
+      const nonDeletedFilesDirectory = await updatedFilesDirectory.mapFilesInDirectory(async (_, fileItem) => {
         if (fileItem.description === "# Deleted") {
-          return Promise.resolve(undefined);
+          return undefined;
         }
-        return Promise.resolve(fileItem);
+        return fileItem;
       });
 
       this.prompts.openingDirectoryToReviewChanges();

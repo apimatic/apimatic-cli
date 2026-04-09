@@ -65,8 +65,8 @@ export default class SaveChanges extends Command {
 
     await result.mapAll(
       async () => await telemetryService.trackEvent(new SdkSaveChangesEvent(language), commandMetadata.shell),
-      () => new Promise(() => {}),
-      () => new Promise(() => {})
+      async () => {},
+      async () => {}
     );
   }
 
