@@ -1,13 +1,13 @@
 import { DomainEvent } from "./domain-event.js";
 
-export class SdkTrackChangesEvent extends DomainEvent {
-  protected readonly eventName = SdkTrackChangesEvent.name;
+export class SdkChangesTrackedEvent extends DomainEvent {
+  protected readonly eventName = SdkChangesTrackedEvent.name;
   private static readonly message = "SDK generated with track changes enabled." as const;
   private static readonly commandName = "sdk:generate" as const;
   private readonly language: string;
 
   constructor(language: string) {
-    super(SdkTrackChangesEvent.message, SdkTrackChangesEvent.commandName, {});
+    super(SdkChangesTrackedEvent.message, SdkChangesTrackedEvent.commandName, {});
     this.language = language;
   }
 }

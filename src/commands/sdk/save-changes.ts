@@ -6,7 +6,7 @@ import { Language } from "../../types/sdk/generate.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { SdkSaveChangesEvent } from "../../types/events/sdk-save-changes.js";
+import { SdkChangesSavedEvent } from "../../types/events/sdk-changes-saved.js";
 
 export default class SaveChanges extends Command {
   static readonly summary = "Save customizations made to an auto-generated SDK";
@@ -64,7 +64,7 @@ export default class SaveChanges extends Command {
     outro(result);
 
     await result.mapAll(
-      async () => await telemetryService.trackEvent(new SdkSaveChangesEvent(language), commandMetadata.shell),
+      async () => await telemetryService.trackEvent(new SdkChangesSavedEvent(language), commandMetadata.shell),
       async () => {},
       async () => {}
     );

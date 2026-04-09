@@ -5,7 +5,7 @@ import { GenerateAction } from "../../actions/sdk/generate.js";
 import { Language } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
-import { SdkTrackChangesEvent } from "../../types/events/sdk-track-changes.js";
+import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
 
@@ -87,7 +87,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     await result.mapAll(
       async (res) => {
         if (res?.sourceTreeTrackingInitiated) {
-          await telemetryService.trackEvent(new SdkTrackChangesEvent(language), commandMetadata.shell);
+          await telemetryService.trackEvent(new SdkChangesTrackedEvent(language), commandMetadata.shell);
         }
         if (res?.conflictsResolved) {
           await telemetryService.trackEvent(new SdkConflictsResolvedEvent(language), commandMetadata.shell);
