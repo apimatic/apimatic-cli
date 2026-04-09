@@ -78,9 +78,10 @@ export class PublishingApiService {
       if (error instanceof AxiosError) {
         const data = error.response?.data;
         if (error.status === 400) {
-          const detail = data.errors ? Object.values(data.errors as Record<string, string[]>)[0]?.[0] : data.detail;
+          const errors = data.errors as Record<string, string[]> | undefined;
+          const detail = errors ? Object.values(errors)[0]?.[0] : data.detail;
           const errorMessage = data.title + '\n- ' + detail;
-          return err(ServiceError.badRequest(errorMessage));
+          return err(ServiceError.badRequest(errorMessage, errors ?? {}));
         }
         if (error.status === 403) {
           const errorMessage = data.title + '\n- ' + data.detail;
@@ -88,7 +89,7 @@ export class PublishingApiService {
         }
         if (error.status === 404) {
           const errorMessage = data.title + '\n- ' + data.detail;
-          return err(ServiceError.badRequest(errorMessage));
+          return err(ServiceError.notFound(errorMessage));
         }
       }
       return err(handleServiceError(error));

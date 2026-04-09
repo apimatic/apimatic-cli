@@ -128,6 +128,8 @@ export class SdkPublishNonInteractiveAction {
         language,
         force,
         false,
+        false,
+        false,
         undefined,
         version
       );

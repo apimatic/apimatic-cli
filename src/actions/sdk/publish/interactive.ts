@@ -102,6 +102,8 @@ export class SdkPublishInteractiveAction {
         language,
         force,
         false,
+        false,
+        false,
         undefined,
         version
       );
