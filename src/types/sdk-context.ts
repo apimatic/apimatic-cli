@@ -16,44 +16,45 @@ export class SdkContext {
     requireUncustomizedDir: boolean,
     version?: string
   ) {
-    const baseDirectory = requireUncustomizedDir
-      ? sdkDirectory.join("uncustomized")
-      : sdkDirectory;
+    const baseDirectory = requireUncustomizedDir ? sdkDirectory.join('uncustomized') : sdkDirectory;
 
-    this.sdkDirectory = version
-      ? baseDirectory.join(version).join(language)
-      : baseDirectory.join(language);
+    this.sdkDirectory = version ? baseDirectory.join(version).join(language) : baseDirectory.join(language);
+  }
+
+  private get zipPath(): FilePath {
+    return new FilePath(this.sdkDirectory, new FileName(`${this.language}.zip`));
   }
 
   public async exists() {
     return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean) : Promise<DirectoryPath> {
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<DirectoryPath> {
     await this.fileService.cleanDirectory(this.sdkDirectory);
-
     if (!zipSdk) {
       await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
-      return this.sdkDirectory;
+    } else {
+      await this.zipService.archive(tempSdkDirectory, this.zipPath);
     }
-
-    const zipPath = new FilePath(this.sdkDirectory, new FileName(`${this.language}.zip`));
-    await this.zipService.archive(tempSdkDirectory, zipPath);
     return this.sdkDirectory;
   }
 
   public async loadSdkInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
-    const tempSdkDirectory = tempDirectory.join("sdk-original");
+    const tempSdkDirectory = tempDirectory.join('sdk-original');
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
     await this.zipService.unArchive(tempSdk, tempSdkDirectory);
     return tempSdkDirectory;
   }
 
-  public async loadSdkWithSourceTreeInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath, tempSdkSourceTree: FilePath): Promise<DirectoryPath> {
-    const tempSdkDirectory = tempDirectory.join("sdk");
+  public async  fil(
+    tempDirectory: DirectoryPath,
+    tempSdk: FilePath,
+    tempSdkSourceTree: FilePath
+  ): Promise<DirectoryPath> {
+    const tempSdkDirectory = tempDirectory.join('sdk');
     await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
     await this.zipService.unArchive(tempSdk, tempSdkDirectory);
-    const gitSourceTreeDir = tempSdkDirectory.join(".git");
+    const gitSourceTreeDir = tempSdkDirectory.join('.git');
     await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
     await this.zipService.unArchive(tempSdkSourceTree, gitSourceTreeDir);
     return tempSdkDirectory;

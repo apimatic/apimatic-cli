@@ -26,6 +26,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - **DON'T** use `console.log` or any prompt output — contexts are silent.
 - **DON'T** use `Result<T, E>` unless the context does network I/O (rare).
 - **DON'T** use raw string paths — always wrap in `DirectoryPath`, `FilePath`, `FileName`.
+- **DON'T** add methods that only use infrastructure services (`fileService`, `zipService`) without touching domain-specific private fields — these are stateless utilities, not context behavior. Every public method must use at least one constructor-derived private field (e.g., `sdkDirectory`, `language`). If a method takes all its inputs as parameters and never reads context state, it belongs in a service or a different context.
 
 ### Variant-specific rules
 
@@ -65,6 +66,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - [ ] `directory.join("subdir")` for subdirectory derivation
 - [ ] No `console.log`, no prompt output — contexts are silent
 - [ ] No `Result` unless context does network I/O (rare)
+- [ ] Every public method uses at least one domain-specific private field — methods using only infrastructure services don't belong here
 - [ ] No public properties that expose constructor parameters
 
 ## Reference Files
@@ -77,7 +79,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 | Temp context (zip + save stream) | `src/types/temp-context.ts` | Good — UUID naming internal |
 | Temp context (download + resolve) | `src/types/resource-context.ts` | Good — URL/file decision internal |
 | Composite (delegates to BuildContext) | `src/types/versioned-build-context.ts` | Good — typed result object |
-| Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory` |
+| Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory`, has methods that only use infrastructure services without touching domain state |
 | Input context (leaky — avoid pattern) | `src/types/toc-context.ts` | Avoid — exposes `tocPath` |
 
 ---

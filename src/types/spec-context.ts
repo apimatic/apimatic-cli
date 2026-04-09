@@ -9,6 +9,7 @@ export class SpecContext {
   private readonly zipService = new ZipService();
   private readonly specDirectory: DirectoryPath;
 
+
   constructor(specDirectory: DirectoryPath) {
     this.specDirectory = specDirectory;
   }

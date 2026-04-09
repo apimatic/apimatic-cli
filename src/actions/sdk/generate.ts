@@ -110,20 +110,20 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const responseSdk = await tempContext.save(response.value.sdk);
-      const tempSdk = await sdkContext.loadSdkInTempDirectory(
-        tempDirectory,
-        responseSdk
-      );
+      const responseSdkZipPath = await tempContext.save(response.value.sdk);
+      const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
+
       if (!trackChanges && !hasSdkSourceTree) {
         this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
         return ActionResult.success();
       }
 
+      const sdkSourceTreeTempFilePath = await tempContext.save(response.value.sdkSourceTree);
+
       const tempSdkWithSourceTree = await sdkContext.loadSdkWithSourceTreeInTempDirectory(
         tempDirectory,
-        responseSdk,
-        await tempContext.save(response.value.sdkSourceTree)
+        responseSdkZipPath,
+        sdkSourceTreeTempFilePath
       );
       const destinationSourceTreePath = buildContext.getSdkSourceTree(language);
 
