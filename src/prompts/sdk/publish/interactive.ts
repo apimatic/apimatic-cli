@@ -10,7 +10,6 @@ import {
 } from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { PublishType } from '../../../types/sdk/publish.js';
-import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
 import { SemVersion } from '../../../types/publish/version.js';
 
 export class SdkPublishInteractivePrompts {
@@ -37,7 +36,9 @@ export class SdkPublishInteractivePrompts {
     );
   }
 
-  public async selectPublishingProfile(groups: PublishingProfileWithLanguagesGroup[]): Promise<PublishingProfileItem | undefined> {
+  public async selectPublishingProfile(
+    groups: PublishingProfileWithLanguagesGroup[]
+  ): Promise<PublishingProfileItem | undefined> {
     const publishingProfile = await select({
       message: 'Select a publishing profile:',
       options: groups.flatMap((group) =>
@@ -97,7 +98,8 @@ export class SdkPublishInteractivePrompts {
       message: 'Enter version to publish (e.g. 1.0.0):',
       validate: (value) => {
         if (!value) return 'Version is required.';
-        if (!SemVersion.create(value)) return 'Please enter a valid version in the format major.minor.patch (e.g., 1.0.0).';
+        if (!SemVersion.create(value))
+          return 'Please enter a valid version in the format major.minor.patch (e.g., 1.0.0).';
       }
     });
 
@@ -140,14 +142,6 @@ export class SdkPublishInteractivePrompts {
     log.info(
       'Version tags will not be created in your Git repository because you have opted to publish Source Code only.'
     );
-  }
-
-  public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
-    return withSpinner('Publishing SDK', 'Publishing initiated.', 'SDK Publishing failed.', fn);
-  }
-
-  public sdkPublishingServiceError(serviceError: ServiceError) {
-    log.error(serviceError.errorMessage);
   }
 
   public sdkPublishingInProgress(publishingLogUrl: string) {

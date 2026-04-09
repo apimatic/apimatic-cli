@@ -1,6 +1,10 @@
-import { isCancel, log, confirm } from '@clack/prompts';
+import { log } from '@clack/prompts';
+import { Result } from 'neverthrow';
 import { format as f } from '../../prompts/format.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
+import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
+import { withSpinner } from '../prompt.js';
 
 export class SdkPublishPrompts {
   public directoryCannotBeSame(directory: DirectoryPath) {
@@ -15,21 +19,11 @@ export class SdkPublishPrompts {
     log.error(message);
   }
 
-  public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
-    const overwrite = await confirm({
-      message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,
-      initialValue: false
-    });
-
-    if (isCancel(overwrite)) {
-      return false;
-    }
-
-    return overwrite;
+  public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
+    return withSpinner('Publishing SDK', 'Publishing initiated.', 'SDK Publishing failed.', fn);
   }
 
-  public sdkDirectoryNotEmpty() {
-    const message = `Please enter a different destination folder or remove the existing files and try again.`;
-    log.error(message);
+  public sdkPublishingServiceError(serviceError: ServiceError) {
+    log.error(serviceError.errorMessage);
   }
 }

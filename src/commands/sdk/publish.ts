@@ -1,13 +1,14 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { PublishAction } from '../../actions/sdk/publish.js';
 import { Language } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/sdk/publish.js';
 import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
 import { SdkPublishValidationFailedEvent } from '../../types/events/sdk-publish-validation-failed.js';
+import { SdkPublishInteractiveAction } from '../../actions/sdk/publish/interactive.js';
+import { SdkPublishNonInteractiveAction } from '../../actions/sdk/publish/non-interactive.js';
 
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
@@ -92,7 +93,8 @@ export default class SdkPublish extends Command {
     const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
 
-    const telemetryService = new TelemetryService(this.getConfigDir());
+    const configDir = this.getConfigDir();
+    const telemetryService = new TelemetryService(configDir);
     const onPublishSdkError = interactive
       ? (errorMessage: string) =>
           telemetryService.trackEvent(
@@ -112,19 +114,24 @@ export default class SdkPublish extends Command {
           );
 
     intro('Publish SDK');
-    const action = new PublishAction(this.getConfigDir(), commandMetadata);
-    const result = await action.execute(
-      buildDirectory,
-      sdkDirectory,
-      language as Language,
-      publishTypes,
-      interactive,
-      force,
-      dryRun,
-      profileId,
-      version,
-      onPublishSdkError
-    );
+    const result = interactive
+      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
+          buildDirectory,
+          sdkDirectory,
+          force,
+          onPublishSdkError
+        )
+      : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
+          buildDirectory,
+          sdkDirectory,
+          language as Language,
+          publishTypes,
+          force,
+          dryRun,
+          profileId,
+          version,
+          onPublishSdkError
+        );
     outro(result);
   }
 

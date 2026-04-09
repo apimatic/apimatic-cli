@@ -4,7 +4,6 @@ import { PublishType } from '../../../types/sdk/publish.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { format as f } from '../../../prompts/format.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
 import { PublishLogItem } from '../../../types/publish-api/publish-log.js';
@@ -103,14 +102,6 @@ export class SdkPublishNonInteractivePrompts {
     log.info(
       `You can publish this SDK by removing the --dry-run flag. It will be published for the following:\n\n  Profile:   ${profileName}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
     );
-  }
-
-  public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
-    return withSpinner('Publishing SDK', 'Publishing initiated.', 'SDK Publishing failed.', fn);
-  }
-
-  public sdkPublishingServiceError(serviceError: ServiceError) {
-    log.error(serviceError.errorMessage);
   }
 
   public postPublishingMessage(publishingLogUrl: string) {

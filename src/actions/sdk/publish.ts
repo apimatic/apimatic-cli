@@ -1,57 +1,90 @@
-import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { ActionResult } from '../action-result.js';
-import { CommandMetadata } from '../../types/common/command-metadata.js';
-import { Language } from '../../types/sdk/generate.js';
-import { PublishType } from '../../types/sdk/publish.js';
-import { SdkPublishInteractiveAction } from './publish/interactive.js';
-import { SdkPublishNonInteractiveAction } from './publish/non-interactive.js';
-import { BuildContext } from '../../types/build-context.js';
+import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { SdkPublishPrompts } from '../../prompts/sdk/publish.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { PublishingProfileItem } from '../../types/publish-api/publishing-profile.js';
+import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
+import { ProfileId } from '../../types/publish/profile-id.js';
+import { SemVersion } from '../../types/publish/version.js';
+import { Language } from '../../types/sdk/generate.js';
+import { getPackageConfigurationForLanguage, PublishType } from '../../types/sdk/publish.js';
+import { PackageSettingsContext } from '../../types/package-settings-context.js';
+import { TempContext } from '../../types/temp-context.js';
+import { FileService } from '../../infrastructure/file-service.js';
+import { ActionResult } from '../action-result.js';
+import { GenerateAction } from './generate.js';
 
-export class PublishAction {
+export class SdkPublishAction {
   private readonly prompts: SdkPublishPrompts = new SdkPublishPrompts();
+  private readonly publishingApiService: PublishingApiService = new PublishingApiService();
+  private readonly fileService: FileService = new FileService();
 
-  constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
+  public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
     buildDirectory: DirectoryPath,
-    sdkDirectory: DirectoryPath,
+    outputDirectory: DirectoryPath,
     language: Language,
     publishType: PublishType[],
-    interactive: boolean,
     force: boolean,
-    dryRun: boolean,
-    profileId: string | undefined = undefined,
-    version: string | undefined = undefined,
+    profileId: ProfileId,
+    semVersion: SemVersion,
+    publishingProfile: PublishingProfileItem,
     onPublishSdkError?: (errorMessage: string) => void
-  ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(sdkDirectory)) {
-      this.prompts.directoryCannotBeSame(sdkDirectory);
-      return ActionResult.failed();
-    }
+  ): Promise<ActionResult<PublishingInfo>> => {
+    return await withDirPath(async (tempDirectory) => {
+      await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.validate())) {
-      this.prompts.srcDirectoryEmpty(buildDirectory);
-      return ActionResult.failed();
-    }
+      const packageConfiguration = getPackageConfigurationForLanguage(language, publishingProfile);
+      if (packageConfiguration !== null) {
+        const packageSettingsDirectory = tempDirectory.join('package-settings');
+        const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
+        await packageSettingsContext.writeConfiguration(packageConfiguration, language);
+      }
 
-    if (interactive) {
-      const action = new SdkPublishInteractiveAction(this.configDir, this.commandMetadata);
-      return await action.execute(buildDirectory, sdkDirectory, force, onPublishSdkError);
-    }
+      const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
+      const sdkGenerationResult = await sdkGenerateAction.execute(
+        tempDirectory,
+        outputDirectory,
+        language,
+        force,
+        false,
+        false,
+        false,
+        undefined,
+        semVersion
+      );
+      if (sdkGenerationResult.isFailed()) {
+        return ActionResult.failed();
+      }
+      if (sdkGenerationResult.isCancelled()) {
+        return ActionResult.cancelled();
+      }
 
-    const action = new SdkPublishNonInteractiveAction(this.configDir, this.commandMetadata);
-    return await action.execute(
-      buildDirectory,
-      sdkDirectory,
-      language,
-      publishType,
-      force,
-      dryRun,
-      profileId,
-      version,
-      onPublishSdkError
-    );
+      const sdkLanguageDirectory = outputDirectory.join(language);
+      const tempContext = new TempContext(tempDirectory);
+      const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
+
+      const publishSdkResponse = await this.prompts.publishSdk(
+        this.publishingApiService.publishSdkPackage(
+          sdkFilePath,
+          profileId,
+          language,
+          semVersion,
+          publishType,
+          this.configDir,
+          this.commandMetadata.shell
+        )
+      );
+
+      if (publishSdkResponse.isErr()) {
+        this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
+        onPublishSdkError?.(publishSdkResponse.error.errorMessage);
+        return ActionResult.failed();
+      }
+
+      return ActionResult.success(publishSdkResponse.value);
+    });
   };
 }

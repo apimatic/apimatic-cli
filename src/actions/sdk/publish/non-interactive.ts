@@ -1,5 +1,6 @@
 import { PublishingApiService } from '../../../infrastructure/services/publishing-api-service.js';
 import { SdkPublishNonInteractivePrompts } from '../../../prompts/sdk/publish/non-interactive.js';
+import { SdkPublishPrompts } from '../../../prompts/sdk/publish.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import {
@@ -19,12 +20,14 @@ import { createTempDir, withDirPath } from '../../../infrastructure/tmp-extensio
 import { LauncherService } from '../../../infrastructure/launcher-service.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
-import { TempContext } from '../../../types/temp-context.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
+import { BuildContext } from '../../../types/build-context.js';
+import { SdkPublishAction } from '../publish.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
+  private readonly publishPrompts: SdkPublishPrompts = new SdkPublishPrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly fileService: FileService = new FileService();
   private readonly launcherService: LauncherService = new LauncherService();
@@ -42,6 +45,17 @@ export class SdkPublishNonInteractiveAction {
     version: string | undefined = undefined,
     onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult> => {
+    if (buildDirectory.isEqual(sdkDirectory)) {
+      this.publishPrompts.directoryCannotBeSame(sdkDirectory);
+      return ActionResult.failed();
+    }
+
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.validate())) {
+      this.publishPrompts.srcDirectoryEmpty(buildDirectory);
+      return ActionResult.failed();
+    }
+
     const missing = [];
     if (!profileId) missing.push('--profile');
     if (!language) missing.push('--language');
@@ -72,8 +86,8 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const publishingProfileId = ProfileId.create(profileId!)!;
-    const publishingProfile = publishingProfilesResponse.value.find(
-      (profile: PublishingProfileItem) => publishingProfileId.isEqual(ProfileId.create(profile.id)!)
+    const publishingProfile = publishingProfilesResponse.value.find((profile: PublishingProfileItem) =>
+      publishingProfileId.isEqual(ProfileId.create(profile.id)!)
     );
     if (!publishingProfile) {
       this.prompts.publishingProfileNotFound(publishingProfileId);
@@ -112,7 +126,57 @@ export class SdkPublishNonInteractiveAction {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 
-    const outputDirectory = dryRun ? await createTempDir() : sdkDirectory;
+    if (dryRun) {
+      return await this.executeDryRun(buildDirectory, language, publishType, force, semVersion, publishingProfile);
+    }
+
+    const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
+      buildDirectory,
+      sdkDirectory,
+      language,
+      publishType,
+      force,
+      publishingProfileId,
+      semVersion,
+      publishingProfile,
+      onPublishSdkError
+    );
+    if (publishResult.isFailed()) {
+      return ActionResult.failed();
+    }
+    if (publishResult.isCancelled()) {
+      return ActionResult.cancelled();
+    }
+
+    const publishingInfo = publishResult.getValue();
+    this.prompts.publishingRunningNotice(publishingProfile.name, language, semVersion, publishType);
+
+    const publishingSucceeded = await this.prompts.pollPublishingStatus(() =>
+      this.publishingApiService.getSdkPublishingLog(
+        publishingInfo.publishLogId,
+        this.configDir,
+        this.commandMetadata.shell
+      )
+    );
+
+    this.prompts.postPublishingMessage(publishingInfo.publishingLogUrl);
+
+    if (!publishingSucceeded) {
+      return ActionResult.failed();
+    }
+
+    return ActionResult.success();
+  };
+
+  private readonly executeDryRun = async (
+    buildDirectory: DirectoryPath,
+    language: Language,
+    publishType: PublishType[],
+    force: boolean,
+    semVersion: SemVersion,
+    publishingProfile: PublishingProfileItem
+  ): Promise<ActionResult> => {
+    const tempOutputDirectory = await createTempDir();
 
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
@@ -127,7 +191,7 @@ export class SdkPublishNonInteractiveAction {
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
         tempDirectory,
-        outputDirectory,
+        tempOutputDirectory,
         language,
         force,
         false,
@@ -143,46 +207,8 @@ export class SdkPublishNonInteractiveAction {
         return ActionResult.cancelled();
       }
 
-      const sdkLanguageDirectory = outputDirectory.join(language);
-
-      if (!dryRun) {
-        const tempContext = new TempContext(tempDirectory);
-        const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
-
-        const publishSdkResponse = await this.prompts.publishSdk(
-          this.publishingApiService.publishSdkPackage(
-            sdkFilePath,
-            publishingProfileId,
-            language,
-            semVersion!,
-            publishType,
-            this.configDir,
-            this.commandMetadata.shell
-          )
-        );
-
-        if (publishSdkResponse.isErr()) {
-          this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
-          onPublishSdkError?.(publishSdkResponse.error.errorMessage);
-          return ActionResult.failed();
-        }
-
-        this.prompts.publishingRunningNotice(publishingProfile.name, language, semVersion!, publishType);
-
-        const publishingSucceeded = await this.prompts.pollPublishingStatus(
-          () => this.publishingApiService.getSdkPublishingLog(publishSdkResponse.value.publishLogId, this.configDir, this.commandMetadata.shell)
-        );
-
-        this.prompts.postPublishingMessage(publishSdkResponse.value.publishingLogUrl);
-
-        if (!publishingSucceeded) {
-          return ActionResult.failed();
-        }
-        
-        return ActionResult.success();
-      }
-
-      this.prompts.dryRunNotice(publishingProfile.name, language, semVersion!, publishType);
+      const sdkLanguageDirectory = tempOutputDirectory.join(language);
+      this.prompts.dryRunNotice(publishingProfile.name, language, semVersion, publishType);
       await this.launcherService.openDirectory(sdkLanguageDirectory);
       return ActionResult.success();
     });
