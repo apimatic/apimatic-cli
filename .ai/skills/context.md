@@ -27,6 +27,8 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - **DON'T** use `Result<T, E>` unless the context does network I/O (rare).
 - **DON'T** use raw string paths — always wrap in `DirectoryPath`, `FilePath`, `FileName`.
 - **DON'T** add methods that only use infrastructure services (`fileService`, `zipService`) without touching domain-specific private fields — these are stateless utilities, not context behavior. Every public method must use at least one constructor-derived private field (e.g., `sdkDirectory`, `language`). If a method takes all its inputs as parameters and never reads context state, it belongs in a service or a different context.
+- **DON'T** embed the context's own domain subject in method names — if the class is `SdkContext`, a method named `cleanUpSdkDirectory()` is redundant. Prefer concise behavioral verbs: `cleanUp()`, `getChanges()`, `save()`.
+- **DON'T** pass internal paths through callback parameters — `onSomething: (path: DirectoryPath) => void` is the same leakage as a public getter. If the caller needs the path, return it as the result of the operation (`Promise<DirectoryPath | undefined>` etc.).
 
 ### Variant-specific rules
 
@@ -68,6 +70,8 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - [ ] No `Result` unless context does network I/O (rare)
 - [ ] Every public method uses at least one domain-specific private field — methods using only infrastructure services don't belong here
 - [ ] No public properties that expose constructor parameters
+- [ ] Method names do not embed the context's own domain subject — names are concise behavioral verbs (`cleanUp()` not `cleanUpSdkReviewDirectory()`)
+- [ ] No internal paths passed through callback parameters — paths are returned as operation results, not injected into callbacks
 
 ## Reference Files
 
