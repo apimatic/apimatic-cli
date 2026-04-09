@@ -46,7 +46,7 @@ export class SdkContext {
     return tempSdkDirectory;
   }
 
-  public async  fil(
+  public async loadSdkWithSourceTreeInTempDirectory(
     tempDirectory: DirectoryPath,
     tempSdk: FilePath,
     tempSdkSourceTree: FilePath
