@@ -46,8 +46,8 @@ export class SaveChangesContext {
     return this.gitService.getDirectoryWithUpdatedFiles(this.sdkReviewDirectory);
   }
 
-  public async disposeSdkReviewDirectory(showPrompt: () => void): Promise<void> {
-    await this.fileService.pollDeleteDirectory(this.sdkReviewDirectory, showPrompt);
+  public async cleanUpSdkReviewDirectory(onCleanUpFailure: () => void): Promise<void> {
+    await this.fileService.pollDeleteDirectory(this.sdkReviewDirectory, onCleanUpFailure);
   }
 
   public async saveSourceTree(): Promise<void> {

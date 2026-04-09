@@ -141,16 +141,15 @@ export class FileService {
     }
   }
 
-  public async pollDeleteDirectory(dirPath: DirectoryPath, showPrompt: () => void): Promise<void> {
+  public async pollDeleteDirectory(dirPath: DirectoryPath, onDeleteFailurePersists: () => void): Promise<void> {
     const timeoutMs = 5 * 60 * 1000;
     const deadline = Date.now() + timeoutMs;
-    let prompted = false;
-    await this.cleanDirectory(dirPath);
-    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+    const deleteFailurePersistsMaxDelay = Date.now() + 5 * 1000;
+    let actionPerformed = false;
     while (Date.now() < deadline && await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
-      if (!prompted) {
-        showPrompt();
-        prompted = true;
+      if (!actionPerformed && Date.now() > deleteFailurePersistsMaxDelay) {
+        onDeleteFailurePersists();
+        actionPerformed = true;
       }
       await new Promise<void>((resolve) => setTimeout(resolve, 500));
     }

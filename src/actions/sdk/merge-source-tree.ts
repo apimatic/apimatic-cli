@@ -89,7 +89,7 @@ export class MergeSourceTreeAction {
     this.prompts.conflictsResolved(language);
     this.prompts.sdkGeneratedWithSourceTree(await saveSdk(), destinationSourceTreePath);
 
-    await mergeSourceTreeContext.cleanUpWhenReady(() => this.prompts.directoryStillOpen(sdkWithSourceTree));
+    await mergeSourceTreeContext.cleanUp(() => this.prompts.directoryStillOpen(sdkWithSourceTree));
     return ActionResult.success({sourceTreeTrackingInitiated: false, conflictsResolved: true});
   };
 }

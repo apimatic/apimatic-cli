@@ -115,7 +115,7 @@ export class SaveChangesAction {
       await saveChangesContext.saveSourceTree();
       this.prompts.changesSaved(sdkSourceTree);
 
-      await saveChangesContext.disposeSdkReviewDirectory(() => this.prompts.directoryStillOpen(sdkReviewDirectory));
+      await saveChangesContext.cleanUpSdkReviewDirectory(() => this.prompts.directoryStillOpen(sdkReviewDirectory));
 
       return ActionResult.success();
     });
