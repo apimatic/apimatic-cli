@@ -7,7 +7,6 @@ import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
-import { SpecContext } from "../../types/spec-context.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { BuildContext } from "../../types/build-context.js";
 
@@ -78,7 +77,7 @@ export class GenerateAction {
         buildContext: new BuildContext(selectedVersionedBuildDirectory)
       };
     };
-    
+
     const versionedContext = await versionedContextGetter();
     if (versionedContext instanceof ActionResult) {
       return versionedContext;

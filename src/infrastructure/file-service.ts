@@ -217,7 +217,7 @@ export class FileService {
   }
 
   public async hasContent(file: FilePath, content: string): Promise<boolean> {
-    return await this.fileExists(file) && (await this.readFile(file)).includes(content);;
+    return await this.fileExists(file) && (await this.readFile(file)).includes(content);
   }
 }
 
