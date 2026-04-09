@@ -4,7 +4,7 @@ import { format as f } from "../format.js";
 import { Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import {ServiceError } from "../../infrastructure/service-error.js";
-import { withSpinner } from "../prompt.js";
+import { noteWrapped, withSpinner } from "../prompt.js";
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
@@ -45,8 +45,12 @@ export class PortalGeneratePrompts {
     log.error(error);
   }
 
-  public portalGenerationServiceError(serviceError: ServiceError) {
-    log.error(serviceError.errorMessage);
+  public portalGenerationSdkMergeFailed(sdkMergeFailedErrors: string[]) {
+    log.error(`While generating portal, there were merge conflicts in the following SDKs:\n- ${sdkMergeFailedErrors.join("\n- ")}`);
+    const message = `Run the command
+'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", "<language>"))}'
+interactively to review and resolve the conflicts with SDK generation.`;
+    noteWrapped(message, "Next Steps");
   }
 
   public portalGenerationErrorWithReport(reportPath: FilePath) {

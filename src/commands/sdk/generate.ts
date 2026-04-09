@@ -5,6 +5,9 @@ import { GenerateAction } from "../../actions/sdk/generate.js";
 import { Language } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
+import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
+import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
+import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
 
 export default class SdkGenerate extends Command {
   static readonly summary = "Generate an SDK for your API";
@@ -21,20 +24,28 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       description: "Programming language for SDK generation",
       options: Object.values(Language).map((p) => p.valueOf()),
     }),
-    ...FlagsProvider.input,
     destination: Flags.string({
       char: "d",
-      description: "Directory where the SDK will be generated"
+      description: "[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated"
+    }),
+    "skip-changes": Flags.boolean({
+      default: false,
+      description: "Do not apply the saved changes to the generated SDK"
     }),
     "api-version": Flags.string({
       description: "Version of the API to use for SDK generation (if multiple versions exist)"
     }),
-    ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
       description: "Download the generated SDK as a .zip archive"
     }),
-    ...FlagsProvider.authKey
+    "track-changes": Flags.boolean({
+      default: false,
+      description: "Generate SDK source tree in the src directory to enable tracking changes across generations"
+    }),
+    ...FlagsProvider.input,
+    ...FlagsProvider.force,
+    ...FlagsProvider.authKey,
   };
 
   static examples = [
@@ -47,22 +58,44 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "api-version": apiVersion }
+      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-changes": skipChanges, "track-changes": trackChanges,"api-version": apiVersion }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const sdkDirectory = destination ? new DirectoryPath(destination) : DirectoryPath.default.join("sdk");
+    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
       shell: this.config.shell
     };
+    const telemetryService = new TelemetryService(this.getConfigDir());
 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, apiVersion);
+    const result = await action.execute(
+      buildDirectory,
+      sdkDirectory,
+      language as Language,
+      force,
+      zipSdk,
+      skipChanges,
+      trackChanges,
+      apiVersion
+    );
     outro(result);
+    await result.mapAll(
+      async (res) => {
+        if (res?.sourceTreeTrackingInitiated) {
+          await telemetryService.trackEvent(new SdkChangesTrackedEvent(language), commandMetadata.shell);
+        }
+        if (res?.conflictsResolved) {
+          await telemetryService.trackEvent(new SdkConflictsResolvedEvent(language), commandMetadata.shell);
+        }
+      },
+      async () => {},
+      async () => {}
+    );
   }
 
   private readonly getConfigDir = () => {

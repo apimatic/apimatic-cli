@@ -46,7 +46,7 @@ const hook: Hook.CommandNotFound = async function (opts) {
 
   if (response) {
     const confirmedSuggestion = suggestion!;
-    let argv = opts.argv?.length ? opts.argv : opts.id.split(":").slice(confirmedSuggestion.split(":").length);
+    let argv = opts.argv ?? [];
 
     if (confirmedSuggestion.startsWith("help:")) {
       argv = confirmedSuggestion.split(":").slice(1);
