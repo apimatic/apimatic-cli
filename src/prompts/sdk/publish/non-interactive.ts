@@ -8,6 +8,8 @@ import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
 import { PublishLogItem } from '../../../types/publish-api/publish-log.js';
+import { ProfileId } from '../../../types/publish/profile-id.js';
+import { Language } from '../../../types/sdk/generate.js';
 
 export class SdkPublishNonInteractivePrompts {
   public missingRequiredFlags(options: string[]): void {
@@ -44,31 +46,31 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
-  public publishingProfileNotFound(profileId: string) {
+  public publishingProfileNotFound(profileId: ProfileId) {
     log.error(
       `Publishing profile with id '${profileId}' not found. Please check the provided profile id and try again.`
     );
   }
 
-  public languageNotConfiguredForProfile(language: string) {
+  public languageNotConfiguredForProfile(language: Language) {
     log.error(
       `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile and try again.`
     );
   }
 
-  public packageConfigurationNotFoundForLanguage(language: string) {
+  public packageConfigurationNotFoundForLanguage(language: Language) {
     log.error(
       `Package configuration for '${language}' not found in the publishing profile. Please check the provided profile and try again.`
     );
   }
 
-  public gitConfigurationNotFoundForLanguage(language: string) {
+  public gitConfigurationNotFoundForLanguage(language: Language) {
     log.error(
       `No source code configuration found for '${language}' in the selected publishing profile. Please check the provided profile and try again.`
     );
   }
 
-  public publishTypeNotAllowedForLanguage(publishType: string, language: string) {
+  public publishTypeNotAllowedForLanguage(publishType: PublishType, language: Language) {
     log.error(
       `Publish type '${publishType}' is not enabled for '${language}' in the selected publishing profile. Please check your profile configuration and try again.`
     );
@@ -82,7 +84,7 @@ export class SdkPublishNonInteractivePrompts {
 
   public publishingRunningNotice(
     profileName: string,
-    language: string,
+    language: Language,
     version: SemVersion,
     publishType: PublishType[]
   ): void {
@@ -94,7 +96,7 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
-  public dryRunNotice(profileName: string, language: string, version: SemVersion, publishType: PublishType[]): void {
+  public dryRunNotice(profileName: string, language: Language, version: SemVersion, publishType: PublishType[]): void {
     const targets = publishType
       .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
       .join(' + ');

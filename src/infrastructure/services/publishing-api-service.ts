@@ -13,6 +13,7 @@ import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/sdk/publish.js';
 import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { SemVersion } from '../../types/publish/version.js';
+import { ProfileId } from '../../types/publish/profile-id.js';
 
 export class PublishingApiService {
   // TODO: Replace with prod base url
@@ -43,7 +44,7 @@ export class PublishingApiService {
 
   public async publishSdkPackage(
     sdkFilePath: FilePath,
-    profileId: string,
+    profileId: ProfileId,
     language: Language,
     languageVersion: SemVersion,
     publishType: PublishType[],

@@ -21,6 +21,7 @@ import { PackageSettingsContext } from '../../../types/package-settings-context.
 import { FileService } from '../../../infrastructure/file-service.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { SemVersion } from '../../../types/publish/version.js';
+import { ProfileId } from '../../../types/publish/profile-id.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
@@ -70,11 +71,12 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
+    const publishingProfileId = ProfileId.create(profileId!)!;
     const publishingProfile = publishingProfilesResponse.value.find(
-      (profile: PublishingProfileItem) => profile.id === profileId
+      (profile: PublishingProfileItem) => publishingProfileId.isEqual(ProfileId.create(profile.id)!)
     );
     if (!publishingProfile) {
-      this.prompts.publishingProfileNotFound(profileId!);
+      this.prompts.publishingProfileNotFound(publishingProfileId);
       return ActionResult.failed();
     }
 
@@ -150,7 +152,7 @@ export class SdkPublishNonInteractiveAction {
         const publishSdkResponse = await this.prompts.publishSdk(
           this.publishingApiService.publishSdkPackage(
             sdkFilePath,
-            profileId!,
+            publishingProfileId,
             language,
             semVersion!,
             publishType,

@@ -18,6 +18,7 @@ import {
 } from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { GenerateAction } from '../generate.js';
+import { ProfileId } from '../../../types/publish/profile-id.js';
 
 export class SdkPublishInteractiveAction {
   private readonly prompts: SdkPublishInteractivePrompts = new SdkPublishInteractivePrompts();
@@ -118,10 +119,11 @@ export class SdkPublishInteractiveAction {
       const tempContext = new TempContext(tempDirectory);
       const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
 
+      const publishingProfileId = ProfileId.create(publishingProfile.id)!;
       const publishSdkResponse = await this.prompts.publishSdk(
         this.publishingApiService.publishSdkPackage(
           sdkFilePath,
-          publishingProfile.id,
+          publishingProfileId,
           language,
           version,
           publishType,
