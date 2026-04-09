@@ -20,7 +20,7 @@ import { LauncherService } from '../../../infrastructure/launcher-service.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
 import { TempContext } from '../../../types/temp-context.js';
-import { isValidSemVer } from '../../../utils/string-utils.js';
+import { SemVersion } from '../../../types/publish/version.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
@@ -51,8 +51,9 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    if (version && !isValidSemVer(version)) {
-      this.prompts.invalidVersion(version);
+    const semVersion = SemVersion.create(version!);
+    if (!semVersion) {
+      this.prompts.invalidVersion(version!);
       return ActionResult.failed();
     }
 
@@ -131,7 +132,7 @@ export class SdkPublishNonInteractiveAction {
         false,
         false,
         undefined,
-        version
+        semVersion
       );
       if (sdkGenerationResult.isFailed()) {
         return ActionResult.failed();
@@ -151,7 +152,7 @@ export class SdkPublishNonInteractiveAction {
             sdkFilePath,
             profileId!,
             language,
-            version!,
+            semVersion!,
             publishType,
             this.configDir,
             this.commandMetadata.shell
@@ -164,7 +165,7 @@ export class SdkPublishNonInteractiveAction {
           return ActionResult.failed();
         }
 
-        this.prompts.publishingRunningNotice(publishingProfile.name, language, version!, publishType);
+        this.prompts.publishingRunningNotice(publishingProfile.name, language, semVersion!, publishType);
 
         const publishingSucceeded = await this.prompts.pollPublishingStatus(
           () => this.publishingApiService.getSdkPublishingLog(publishSdkResponse.value.publishLogId, this.configDir, this.commandMetadata.shell)
@@ -179,7 +180,7 @@ export class SdkPublishNonInteractiveAction {
         return ActionResult.success();
       }
 
-      this.prompts.dryRunNotice(publishingProfile.name, language, version!, publishType);
+      this.prompts.dryRunNotice(publishingProfile.name, language, semVersion!, publishType);
       await this.launcherService.openDirectory(sdkLanguageDirectory);
       return ActionResult.success();
     });

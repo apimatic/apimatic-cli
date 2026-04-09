@@ -27,6 +27,7 @@ import { err, ok, Result } from "neverthrow";
 import { Language } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
+import { SemVersion } from "../../types/publish/version.js";
 
 export interface GeneratedSdkResult {
   sdk: NodeJS.ReadableStream;
@@ -129,7 +130,7 @@ export class PortalService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null,
-    version: string | undefined = undefined
+    version?: SemVersion
   ): Promise<Result<GeneratedSdkResult, ServiceError>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
@@ -146,7 +147,7 @@ export class PortalService {
         file,
         this.languageSdk[language],
         undefined,
-        version
+        version?.toString()
       );
       generationId = response.result.id;
     } catch (error) {

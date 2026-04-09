@@ -1,6 +1,7 @@
 import { log, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { PublishType } from '../../../types/sdk/publish.js';
+import { SemVersion } from '../../../types/publish/version.js';
 import { format as f } from '../../../prompts/format.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
@@ -82,7 +83,7 @@ export class SdkPublishNonInteractivePrompts {
   public publishingRunningNotice(
     profileName: string,
     language: string,
-    version: string,
+    version: SemVersion,
     publishType: PublishType[]
   ): void {
     const targets = publishType
@@ -93,7 +94,7 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
-  public dryRunNotice(profileName: string, language: string, version: string, publishType: PublishType[]): void {
+  public dryRunNotice(profileName: string, language: string, version: SemVersion, publishType: PublishType[]): void {
     const targets = publishType
       .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
       .join(' + ');

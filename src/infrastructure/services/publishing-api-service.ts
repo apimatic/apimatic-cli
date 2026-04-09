@@ -12,6 +12,7 @@ import { FileService } from '../file-service.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/sdk/publish.js';
 import { PublishLogItem } from '../../types/publish-api/publish-log.js';
+import { SemVersion } from '../../types/publish/version.js';
 
 export class PublishingApiService {
   // TODO: Replace with prod base url
@@ -44,7 +45,7 @@ export class PublishingApiService {
     sdkFilePath: FilePath,
     profileId: string,
     language: Language,
-    languageVersion: string,
+    languageVersion: SemVersion,
     publishType: PublishType[],
     configDir: DirectoryPath,
     shell: string
@@ -59,7 +60,7 @@ export class PublishingApiService {
       const token = authInfo?.authKey;
       const formData = new FormData();
       formData.append('file', sdkFileStream);
-      formData.append('languageVersion', languageVersion);
+      formData.append('languageVersion', languageVersion.toString());
 
       if (publishType.length === 1) {
         formData.append('publishType', publishType[0]);

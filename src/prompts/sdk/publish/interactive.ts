@@ -1,5 +1,4 @@
 import { confirm, isCancel, log, select, text } from '@clack/prompts';
-import { isValidSemVer } from '../../../utils/string-utils.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
@@ -12,6 +11,7 @@ import {
 import { Language } from '../../../types/sdk/generate.js';
 import { PublishType } from '../../../types/sdk/publish.js';
 import { PublishingInfo } from '../../../types/publish-api/publishing-info.js';
+import { SemVersion } from '../../../types/publish/version.js';
 
 export class SdkPublishInteractivePrompts {
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
@@ -95,12 +95,12 @@ export class SdkPublishInteractivePrompts {
     );
   }
 
-  public async inputVersion(): Promise<string | undefined> {
+  public async inputVersion(): Promise<SemVersion | undefined> {
     const version = await text({
       message: 'Enter version to publish (e.g. 1.0.0):',
       validate: (value) => {
         if (!value) return 'Version is required.';
-        if (!isValidSemVer(value)) return 'Please enter a valid version in the format major.minor.patch (e.g., 1.0.0).';
+        if (!SemVersion.create(value)) return 'Please enter a valid version in the format major.minor.patch (e.g., 1.0.0).';
       }
     });
 
@@ -108,7 +108,7 @@ export class SdkPublishInteractivePrompts {
       return undefined;
     }
 
-    return version;
+    return SemVersion.create(version)!;
   }
 
   public noVersionSpecified() {
@@ -118,7 +118,7 @@ export class SdkPublishInteractivePrompts {
   public publishingSummary(
     profile: PublishingProfileItem,
     language: Language,
-    version: string,
+    version: SemVersion,
     publishType: PublishType[]
   ) {
     const targets = publishType

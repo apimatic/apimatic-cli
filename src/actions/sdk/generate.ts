@@ -9,6 +9,7 @@ import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { BuildContext } from "../../types/build-context.js";
+import { SemVersion } from "../../types/publish/version.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -32,7 +33,7 @@ export class GenerateAction {
     skipChanges: boolean,
     trackChanges: boolean,
     apiVersion?: string,
-    packageVersion: string | undefined = undefined,
+    packageVersion?: SemVersion,
   ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
     if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
