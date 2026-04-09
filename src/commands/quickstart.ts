@@ -33,8 +33,8 @@ export default class Quickstart extends Command {
     // TODO: Remove this, find a solution for tracking.
     await result.mapAll(
       async () => await telemetryService.trackEvent(new QuickstartCompletedEvent(), commandMetadata.shell),
-      () => new Promise(() => {}),
-      () => new Promise(() => {})
+      async () => {},
+      async () => {}
     );
   }
 

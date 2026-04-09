@@ -5,7 +5,8 @@ import { FilePath } from "./filePath.js";
 import { TreeNode } from "../../prompts/format.js";
 import { FileService } from "../../infrastructure/file-service.js";
 
-export type DirectoryItem = FileName | Directory;
+export type FileItem = { fileName: FileName, description?: string };
+export type DirectoryItem = FileItem | Directory;
 
 export class Directory {
   public readonly directoryPath: DirectoryPath;
@@ -43,14 +44,51 @@ export class Directory {
         }
 
         // file case
-        const fileName = item.toString();
-        const fileDescription = Directory.fileDescriptions[fileName];
+        const fileName = item.fileName.toString();
+        const fileDescription = item.description ?? Directory.fileDescriptions[fileName];
         return {
           name: fileName,
           description: fileDescription
         };
       })
     };
+  }
+
+  public async mapFilesInDirectory(map: (rootDir: DirectoryPath, fileItem: FileItem) => Promise<FileItem | undefined>): Promise<Directory> {
+    const mappedItems: DirectoryItem[] = [];
+
+    for (const item of this.items) {
+      if (item instanceof Directory) {
+        const mappedSubDir = await item.mapFilesInDirectory(map);
+        if (!mappedSubDir.isEmpty()) {
+          mappedItems.push(mappedSubDir);
+        }
+        continue;
+      }
+
+      const mappedItem = await map(this.directoryPath, item);
+      if (mappedItem) {
+        mappedItems.push(mappedItem);
+      }
+    }
+
+    return new Directory(this.directoryPath, mappedItems);
+  }
+
+  public isEmpty(): boolean {
+    return this.items.length === 0;
+  }
+
+  public getAllFiles(): FilePath[] {
+    const files: FilePath[] = [];
+    for (const item of this.items) {
+      if (item instanceof Directory) {
+        files.push(...item.getAllFiles());
+      } else {
+        files.push(new FilePath(this.directoryPath, item.fileName));
+      }
+    }
+    return files;
   }
 
   public async parseContentFolder(baseContentPath: DirectoryPath): Promise<TocGroup[]> {
@@ -69,12 +107,12 @@ export class Directory {
           });
         }
       } else {
-        if (item.isMarkDown()) {
-          const currentFilePath = new FilePath(this.directoryPath, item);
+        if (item.fileName.toString().endsWith(".md")) {
+          const currentFilePath = new FilePath(this.directoryPath, item.fileName);
           const relativeFilePath = this.fileService.getRelativePath(currentFilePath, baseContentPath);
 
           pages.push({
-            page: this.getPageName(item),
+            page: this.getPageName(item.fileName),
             file: relativeFilePath
           });
         }

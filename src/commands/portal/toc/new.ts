@@ -92,8 +92,8 @@ ${format.link(
     );
     outro(result);
 
-    result.mapAll(
-      () => {},
+    await result.mapAll(
+      async () => {},
       async () => {
         const telemetryService = new TelemetryService(new DirectoryPath(this.config.configDir));
         await telemetryService.trackEvent(
@@ -110,7 +110,7 @@ ${format.link(
           commandMetadata.shell
         );
       },
-      () => {}
+      async () => {}
     );
   }
 }

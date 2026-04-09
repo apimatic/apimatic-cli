@@ -2,6 +2,8 @@ import { DirectoryPath } from "../file/directoryPath.js";
 
 export interface BuildConfig {
   generatePortal?: PortalConfig;
+  generateVersionedPortal?: object;
+  versionsPath?: string;
   apiCopilotConfig?: CopilotConfig;
   [key: string]: unknown;
 }

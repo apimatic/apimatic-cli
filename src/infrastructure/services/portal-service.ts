@@ -5,6 +5,7 @@ import {
   SdkGenerationAsyncController,
   ContentType,
   DocsPortalGenerationAsyncController,
+  SdkSourceTreeGenerationAsyncController,
   ProblemDetailsError,
   FileWrapper,
   TransformationController,
@@ -26,6 +27,11 @@ import { err, ok, Result } from "neverthrow";
 import { Language } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
+
+export interface GeneratedSdkResult {
+  sdk: NodeJS.ReadableStream;
+  sdkSourceTree: NodeJS.ReadableStream;
+}
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -56,11 +62,12 @@ export class PortalService {
       generationId = portalInstance.result.id;
     } catch (error) {
       if (error instanceof ProblemDetailsError) {
+        const errors = error.result!.errors as Record<string, string[]>;
         // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const message = Object.values(errors)[0]?.[0] ?? null;
         const errorMessage = error.result!.title + "\n- " + message;
         if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage));
+          return err(ServiceError.badRequest(errorMessage, errors));
         }
         if (error.statusCode === 403) {
           return err(ServiceError.forbidden(errorMessage));
@@ -88,14 +95,17 @@ export class PortalService {
         return err(ServiceError.ServerError);
       }
       if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
-        const errorMessage = "One or more validation errors occurred." + "\n- " + message;
-        return err(ServiceError.badRequest(errorMessage));
+        const errors = statusResult.value.errors as Record<string, string[]>;
+        const message = Object.values(errors)[0]?.[0] ?? null;
+        const errorMessage =
+          "One or more validation errors occurred." +
+           "\n- " + message;
+        return err(ServiceError.badRequest(errorMessage, errors));
       }
       if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
+        const errors = statusResult.value.errors as Record<string, string[]>;
         // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const message = Object.values(errors)[0]?.[0] ?? null;
         const errorMessage = "Access denied to resource." + "\n- " + message;
         return err(ServiceError.forbidden(errorMessage));
       }
@@ -120,7 +130,7 @@ export class PortalService {
     commandMetadata: CommandMetadata,
     authKey: string | null,
     version: string | undefined = undefined
-  ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
+  ): Promise<Result<GeneratedSdkResult, ServiceError>> {
     const buildFileStream = await this.fileService.getStream(buildPath);
     const file = new FileWrapper(buildFileStream);
 
@@ -142,10 +152,11 @@ export class PortalService {
     } catch (error) {
       if (error instanceof ProblemDetailsError) {
         // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(error.result!.errors as Record<string, string[]>)[0]?.[0] ?? null;
+        const errors = error.result!.errors as Record<string, string[]>;
+        const message = Object.values(errors)[0]?.[0] ?? null;
         const errorMessage = error.result!.title + "\n- " + message;
         if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage));
+          return err(ServiceError.badRequest(errorMessage, errors));
         }
         if (error.statusCode === 403) {
           return err(ServiceError.forbidden(errorMessage));
@@ -174,12 +185,25 @@ export class PortalService {
         return err(ServiceError.ServerError);
       }
       if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>).flat()[0] ?? null;
-        const errorMessage = "One or more validation errors occurred." + "\n- " + message;
-        return err(ServiceError.badRequest(errorMessage));
+        const errors = statusResult.value.errors as Record<string, string[]>;
+        const sdkMergeFailedLanguages = errors.sdkMergeFailed;
+        if (sdkMergeFailedLanguages?.length) {
+          const errorMessage =
+            "SDK generation failed for these languages due to merge conflict." +
+            "\n- " +
+            sdkMergeFailedLanguages.join("\n- ");
+          return err(ServiceError.badRequest(errorMessage, errors));
+        }
+
+        const messages = Object.values(errors).flat();
+        const errorMessage =
+          "One or more validation errors occurred." +
+          (messages.length ? "\n- " + messages.join("\n- ") : "");
+        return err(ServiceError.badRequest(errorMessage, errors));
       }
       if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const message = Object.values(statusResult.value.errors as Record<string, string[]>).flat()[0] ?? null;
+        const errors = statusResult.value.errors as Record<string, string[]>;
+        const message = Object.values(errors).flat()[0] ?? null;
         const errorMessage = "Access denied to resource." + "\n- " + message;
         return err(ServiceError.forbidden(errorMessage));
       }
@@ -187,7 +211,12 @@ export class PortalService {
 
     try {
       const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
-      return ok(sdkResponse.result as NodeJS.ReadableStream);
+      const sdkSourceTreeController = new SdkSourceTreeGenerationAsyncController(client);
+      const sdkSourceTreeResponse = await sdkSourceTreeController.downloadGeneratedSdkSourceTree(generationId);
+      return ok({
+        sdk: sdkResponse.result as NodeJS.ReadableStream,
+        sdkSourceTree: sdkSourceTreeResponse.result as NodeJS.ReadableStream
+      });
     } catch (error) {
       return err(handleServiceError(error));
     }

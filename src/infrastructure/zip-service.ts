@@ -1,8 +1,8 @@
-import fs from "fs";
-import yazl from "yazl";
-import extract from "extract-zip";
-import { DirectoryPath } from "../types/file/directoryPath.js";
-import { FilePath } from "../types/file/filePath.js";
+import fs from 'fs';
+import yazl from 'yazl';
+import extract from 'extract-zip';
+import { DirectoryPath } from '../types/file/directoryPath.js';
+import { FilePath } from '../types/file/filePath.js';
 
 export class ZipService {
   public async archive(sourceDir: DirectoryPath, outputZipPath: FilePath): Promise<void> {
@@ -22,16 +22,19 @@ export class ZipService {
         }
       };
 
-      try { addDirectory(sourceDir, ""); } catch (err) { return reject(err); }
+      try {
+        addDirectory(sourceDir, '');
+      } catch (err) {
+        return reject(err);
+      }
 
       zipfile.end();
       const output = fs.createWriteStream(outputZipPath.toString());
       zipfile.outputStream.pipe(output);
-      output.on("close", resolve);
-      output.on("error", reject);
+      output.on('close', resolve);
+      output.on('error', reject);
     });
   }
-
 
   public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
     const MAX_FILES = 100_000;
@@ -44,14 +47,14 @@ export class ZipService {
       onEntry: function (entry) {
         fileCount++;
         if (fileCount > MAX_FILES) {
-          throw new Error("Reached max. file count");
+          throw new Error('Reached max. file count');
         }
         // The uncompressedSize comes from the zip headers, so it might not be trustworthy.
         // Alternatively, calculate the size from the readStream.
         let entrySize = entry.uncompressedSize;
         totalSize += entrySize;
         if (totalSize > MAX_SIZE) {
-          throw new Error("Reached max. size");
+          throw new Error('Reached max. size');
         }
       }
     });
