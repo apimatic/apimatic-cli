@@ -6,8 +6,8 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import {
   getLanguageConfigs,
-  groupProfilesByApiGroup,
-  hasEnabledLanguage
+  hasEnabledLanguage,
+  toPublishingProfilesWithLanguagesGroups
 } from '../../../types/publish-api/publishing-profile.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PackageSettingsContext } from '../../../types/package-settings-context.js';
@@ -53,7 +53,7 @@ export class SdkPublishInteractiveAction {
     }
 
     const publishingProfile = await this.prompts.selectPublishingProfile(
-      groupProfilesByApiGroup(profilesWithEnabledLanguages)
+      toPublishingProfilesWithLanguagesGroups(profilesWithEnabledLanguages)
     );
     if (!publishingProfile) {
       this.prompts.noPublishingProfileSelected();

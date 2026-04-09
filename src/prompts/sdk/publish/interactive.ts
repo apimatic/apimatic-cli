@@ -5,7 +5,7 @@ import { noteWrapped, withSpinner } from '../../prompt.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import {
   getLanguageConfigs,
-  ProfileGroup,
+  PublishingProfileWithLanguagesGroup,
   PublishingProfileItem
 } from '../../../types/publish-api/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
@@ -37,17 +37,14 @@ export class SdkPublishInteractivePrompts {
     );
   }
 
-  public async selectPublishingProfile(groups: ProfileGroup[]): Promise<PublishingProfileItem | undefined> {
+  public async selectPublishingProfile(groups: PublishingProfileWithLanguagesGroup[]): Promise<PublishingProfileItem | undefined> {
     const publishingProfile = await select({
       message: 'Select a publishing profile:',
       options: groups.flatMap((group) =>
-        group.profiles.map((profile) => ({
+        group.profiles.map(({ profile, enabledLanguages }) => ({
           value: profile,
           hint: group.apiGroupName,
-          label: `${profile.name} (${getLanguageConfigs(profile)
-            .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
-            .map(({ language }) => language)
-            .join(', ')}) | ID: ${profile.id}`
+          label: `${profile.name} (${enabledLanguages.join(', ')}) | ID: ${profile.id}`
         }))
       )
     });

@@ -183,10 +183,14 @@ export interface LanguagePublishingConfig {
   gitConfig: BaseConfigurationItem | null;
 }
 
-export interface ProfileGroup {
-  apiGroupId: string;
+export interface PublishingProfileWithLanguages {
+  profile: PublishingProfileItem;
+  enabledLanguages: Language[];
+}
+
+export interface PublishingProfileWithLanguagesGroup {
   apiGroupName: string;
-  profiles: PublishingProfileItem[];
+  profiles: PublishingProfileWithLanguages[];
 }
 
 export function getLanguageConfigs(profile: PublishingProfileItem): LanguagePublishingConfig[] {
@@ -219,4 +223,46 @@ export function groupProfilesByApiGroup(profiles: PublishingProfileItem[]): Prof
 
 export function hasEnabledLanguage(profile: PublishingProfileItem): boolean {
   return getLanguageConfigs(profile).some(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled);
+}
+
+export interface PublishingProfileSummary {
+  name: string;
+  id: string;
+  enabledLanguages: Language[];
+}
+
+export interface PublishingProfileSummaryGroup {
+  apiGroupName: string;
+  profiles: PublishingProfileSummary[];
+}
+
+interface ProfileGroup {
+  apiGroupId: string;
+  apiGroupName: string;
+  profiles: PublishingProfileItem[];
+}
+
+export function toPublishingProfilesWithLanguagesGroups(profiles: PublishingProfileItem[]): PublishingProfileWithLanguagesGroup[] {
+  return groupProfilesByApiGroup(profiles).map((group) => ({
+    apiGroupName: group.apiGroupName,
+    profiles: group.profiles.map((profile) => ({
+      profile,
+      enabledLanguages: getLanguageConfigs(profile)
+        .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
+        .map(({ language }) => language)
+    }))
+  }));
+}
+
+export function toPublishingProfileSummaryGroups(profiles: PublishingProfileItem[]): PublishingProfileSummaryGroup[] {
+  return groupProfilesByApiGroup(profiles).map((group) => ({
+    apiGroupName: group.apiGroupName,
+    profiles: group.profiles.map((profile) => ({
+      name: profile.name,
+      id: profile.id,
+      enabledLanguages: getLanguageConfigs(profile)
+        .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
+        .map(({ language }) => language)
+    }))
+  }));
 }

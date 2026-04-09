@@ -82,7 +82,7 @@ export default class SdkPublish extends Command {
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
-    const interactive = !profileId && !language && !version && publishTypes.length === 0;
+    const interactive = !profileId && !language && !version && !dryRun && publishTypes.length === 0;
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
