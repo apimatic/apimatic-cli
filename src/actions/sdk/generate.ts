@@ -98,10 +98,6 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
 
-    if (trackChanges && hasSdkSourceTree) {
-      this.prompts.changeTrackingAlreadyEnabled(language);
-    }
-
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildContext.getBuildDirectory());

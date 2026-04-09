@@ -51,7 +51,6 @@ export class PortalGeneratePrompts {
 '${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", "<language>"))}'
 interactively to review and resolve the conflicts with SDK generation.`;
     noteWrapped(message, "Next Steps");
-    log.error(`Generate the SDK using command "${f.cmd("apimatic", "sdk", "generate", `--language=<language>`)}" to review and resolve the conflicts interactively.`);
   }
 
   public portalGenerationErrorWithReport(reportPath: FilePath) {

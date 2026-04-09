@@ -145,6 +145,7 @@ export class FileService {
     const timeoutMs = 5 * 60 * 1000;
     const deadline = Date.now() + timeoutMs;
     let prompted = false;
+    await this.cleanDirectory(dirPath);
     await new Promise<void>((resolve) => setTimeout(resolve, 1000));
     while (Date.now() < deadline && await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
       if (!prompted) {

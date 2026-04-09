@@ -4,6 +4,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { Language } from "../../types/sdk/generate.js";
 import { Directory } from "../../types/file/directory.js";
 import { noteWrapped } from "../prompt.js";
+import { FilePath } from "../../types/file/filePath.js";
 
 export class MergeSourceTreePrompts {
   public successfullySkippedChanges(language: Language) {
@@ -14,13 +15,28 @@ export class MergeSourceTreePrompts {
     log.info(`Successfully applied customizations for ${f.var(language)} SDK.`);
   }
 
-  public changeTrackingEnabled(language: Language) {
-    log.info(`Change tracking is enabled for ${f.var(language)}.`);
+  public changeTrackingEnabled(language: Language, destinationSourceTreePath: FilePath) {
+    log.info(`Change tracking is enabled for ${f.var(language)}. The 'sdk-source-tree' has been saved to ${f.path(destinationSourceTreePath)}.`);
     
     const message = `Customize your SDK and run the command
 '${f.cmdAlt("apimatic", "sdk", "save-changes", f.flag("language", language))}'
 to save and persist your changes for the future SDK generations.`;
     noteWrapped(message, "Next Steps");
+  }
+
+  public changeTrackingAlreadyEnabled(language: Language) {
+    const message =
+      `Change tracking is already enabled for ${f.var(language)}. ` +
+      `No need to use the ${f.flag("track-changes")} flag again for ${f.var(language)} SDK.`;
+    log.warn(message);
+  }
+
+  public sdkGenerated(sdk: DirectoryPath) {
+    log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
+  }
+
+  public sdkGeneratedWithSourceTree(sdk: DirectoryPath, sourceTree: FilePath) {
+    log.info(`Generated SDK can be found at ${f.path(sdk)},\n and the updated 'sdk-source-tree' can be found at ${f.path(sourceTree)}.`);
   }
 
   public errorMergeConflicts(language: Language) {
@@ -66,10 +82,6 @@ interactively to review and resolve the conflicts with SDK generation.`;
 
   public operationCancelled() {
     log.info("Exiting without resolving conflicts.");
-  }
-
-  public sdkGenerated(sdk: DirectoryPath) {
-    log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }
 
   public async directoryStillOpen(directory: DirectoryPath) {

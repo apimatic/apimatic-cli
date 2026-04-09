@@ -81,11 +81,4 @@ export class SdkGeneratePrompts {
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
   }
-
-  public changeTrackingAlreadyEnabled(language: Language) {
-    const message =
-      `Change tracking is already enabled for ${f.var(language)}. ` +
-      `No need to use the ${f.flag("track-changes")} flag again for ${f.var(language)} SDK.`;
-    log.warn(message);
-  }
 }

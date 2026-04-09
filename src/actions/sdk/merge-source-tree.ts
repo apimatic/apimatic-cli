@@ -42,15 +42,20 @@ export class MergeSourceTreeAction {
       return ActionResult.success();
     }
 
-    const { hasSourceTreeTracked, hasAppliedCustomizations } = await mergeSourceTreeContext.saveWithoutConflicts();
+    const { hasSourceTreeTracked, hasSourceTreeAlreadyTracked, hasAppliedCustomizations } = await mergeSourceTreeContext.saveWithoutConflicts();
     if (hasAppliedCustomizations) {
       this.prompts.successfullyAppliedChanges(language);
-      this.prompts.sdkGenerated(await saveSdk());
+      this.prompts.sdkGeneratedWithSourceTree(await saveSdk(), destinationSourceTreePath);
+      return ActionResult.success();
+    }
+    if (hasSourceTreeAlreadyTracked) {
+      this.prompts.changeTrackingAlreadyEnabled(language);
+      this.prompts.sdkGeneratedWithSourceTree(await saveSdk(), destinationSourceTreePath);
       return ActionResult.success();
     }
     if (hasSourceTreeTracked) {
-      this.prompts.changeTrackingEnabled(language);
       this.prompts.sdkGenerated(await saveSdk());
+      this.prompts.changeTrackingEnabled(language, destinationSourceTreePath);
       return ActionResult.success({sourceTreeTrackingInitiated: true, conflictsResolved: false});
     }
 
@@ -82,7 +87,7 @@ export class MergeSourceTreeAction {
 
     await mergeSourceTreeContext.saveWithResolvedConflicts();
     this.prompts.conflictsResolved(language);
-    this.prompts.sdkGenerated(await saveSdk());
+    this.prompts.sdkGeneratedWithSourceTree(await saveSdk(), destinationSourceTreePath);
 
     await mergeSourceTreeContext.cleanUpWhenReady(() => this.prompts.directoryStillOpen(sdkWithSourceTree));
     return ActionResult.success({sourceTreeTrackingInitiated: false, conflictsResolved: true});

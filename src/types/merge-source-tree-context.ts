@@ -30,17 +30,20 @@ export class MergeSourceTreeContext {
     return { hasSkippedChangesEnabled: true, hasSkippedCustomizations: true };
   }
 
-  public async saveWithoutConflicts(): Promise<{ hasSourceTreeTracked: boolean, hasAppliedCustomizations: boolean }> {
+  public async saveWithoutConflicts(): Promise<{ hasSourceTreeTracked: boolean, hasSourceTreeAlreadyTracked: boolean, hasAppliedCustomizations: boolean }> {
     if (await this.fileService.fileExists(this.gitService.getMergeFiles(this.sdkWithSourceTree)[0])) {
-      return { hasSourceTreeTracked: false, hasAppliedCustomizations: false };
+      return { hasSourceTreeTracked: false, hasSourceTreeAlreadyTracked: false, hasAppliedCustomizations: false };
     }
 
-    const shouldTrackChanges = this.trackChanges || this.hasSdkSourceTree;
-    if (shouldTrackChanges) {
+    if (this.trackChanges || this.hasSdkSourceTree) {
       await this.saveSourceTree();
     }
-    const hasCustomizations = await this.gitService.hasCustomBranch(this.sdkWithSourceTree);
-    return { hasSourceTreeTracked: shouldTrackChanges, hasAppliedCustomizations: hasCustomizations };
+
+    return {
+      hasSourceTreeTracked: this.trackChanges || this.hasSdkSourceTree,
+      hasSourceTreeAlreadyTracked: this.trackChanges && this.hasSdkSourceTree,
+      hasAppliedCustomizations: await this.gitService.hasCustomBranch(this.sdkWithSourceTree)
+    };
   }
 
   public async saveWithResolvedConflicts(): Promise<void> {
