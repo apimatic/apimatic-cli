@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-beta.10-test",
+    "version": "1.1.0-beta.10",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -20,8 +20,7 @@
         "./bin",
         "./lib",
         "/npm-shrinkwrap.json",
-        "/oclif.manifest.json",
-        "/apimatic-sdk-0.2.0-alpha.8-test.tgz"
+        "/oclif.manifest.json"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
     "homepage": "https://docs.apimatic.io/apimatic-cli/intro-and-install/",
@@ -48,7 +47,7 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
-        "@apimatic/sdk": "file:./apimatic-sdk-0.2.0-alpha.8-test.tgz",
+        "@apimatic/sdk": "0.2.0-alpha.8",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
