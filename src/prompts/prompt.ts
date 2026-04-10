@@ -41,13 +41,28 @@ export const noteWrapped = (message: string, title: string) => {
   }
 };
 
-export function buildTable(headers: string[], rows: string[][], rowSeparators = false): string {
+export function buildTableWithHeading(
+  groups: { heading: string; rows: string[][] }[],
+  headers: string[],
+  columnStyles?: ColumnStyle[]
+): string {
+  return groups
+    .map((group) => `${pc.bold(pc.white(group.heading))}\n${buildTable(headers, group.rows, true, columnStyles)}`)
+    .join('\n\n');
+}
+
+function buildTable(
+  headers: string[],
+  rows: string[][],
+  rowSeparators = false,
+  columnStyles?: ColumnStyle[]
+): string {
   const COL_PAD = 2;
   const MIN_COL_WIDTH = 4;
   const coloredHeaders = headers.map((h) => pc.bold(pc.white(h)));
 
-  let widths = headers.map((h, i) =>
-    Math.max(stripAnsi(h).length, ...rows.map((r) => stripAnsi(r[i]).length)) + COL_PAD
+  let widths = headers.map(
+    (h, i) => Math.max(stripAnsi(h).length, ...rows.map((r) => stripAnsi(r[i]).length)) + COL_PAD
   );
 
   const terminalColumns = getColumns(process.stdout) || 80;
@@ -57,14 +72,25 @@ export function buildTable(headers: string[], rows: string[][], rowSeparators = 
     const naturalTotal = widths.reduce((a, b) => a + b, 0);
     widths = widths.map((w) => Math.max(MIN_COL_WIDTH, Math.floor((w / naturalTotal) * availableWidth)));
   }
-  const divider = (l: string, m: string, r: string) =>
-    pc.gray(l + widths.map((w) => '─'.repeat(w + 2)).join(m) + r);
-  const renderRow = (cells: string[]) =>
-    pc.gray('│') + cells.map((cell, i) => ` ${pad(cell, widths[i])} ` + pc.gray('│')).join('');
+
+  const columnStyleMap: Record<ColumnStyle, (text: string) => string> = {
+    primary: (text) => pc.magenta(text),
+    secondary: (text) => pc.dim(text),
+    item: (text) => pc.cyan(text)
+  };
+  const divider = (l: string, m: string, r: string) => pc.gray(l + widths.map((w) => '─'.repeat(w + 2)).join(m) + r);
+  const renderRow = (cells: string[], applyStyles = false) =>
+    pc.gray('│') +
+    cells
+      .map((cell, i) => {
+        const styled = applyStyles && columnStyles?.[i] ? columnStyleMap[columnStyles[i]](cell) : cell;
+        return ` ${pad(styled, widths[i])} ` + pc.gray('│');
+      })
+      .join('');
 
   const lines = [divider('┌', '┬', '┐'), renderRow(coloredHeaders), divider('├', '┼', '┤')];
   rows.forEach((row, i) => {
-    lines.push(renderRow(row));
+    lines.push(renderRow(row, true));
     if (rowSeparators) {
       lines.push(i < rows.length - 1 ? divider('├', '┼', '┤') : divider('└', '┴', '┘'));
     }
@@ -77,3 +103,5 @@ export function buildTable(headers: string[], rows: string[][], rowSeparators = 
 function pad(text: string, width: number): string {
   return text + ' '.repeat(Math.max(0, width - stripAnsi(text).length));
 }
+
+type ColumnStyle = 'primary' | 'secondary' | 'item';
