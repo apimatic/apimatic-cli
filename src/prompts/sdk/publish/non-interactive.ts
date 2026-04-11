@@ -1,14 +1,15 @@
 import { log, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
-import { PublishType } from '../../../types/sdk/publish.js';
+import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { format as f } from '../../../prompts/format.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
-import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
+import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishLogItem } from '../../../types/publish-api/publish-log.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
+import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 
 export class SdkPublishNonInteractivePrompts {
@@ -35,9 +36,7 @@ export class SdkPublishNonInteractivePrompts {
   }
 
   public invalidProfileId(profileId: string): void {
-    log.error(
-      `Invalid profile id '${profileId}' provided. Please provide a valid profile id.`
-    );
+    log.error(`Invalid profile id '${profileId}' provided. Please provide a valid profile id.`);
   }
 
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
@@ -49,23 +48,13 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
-  public fetchPublishingProfilesServiceError(serviceError: ServiceError) {
+  public getPublishingProfilesServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
-  }
-
-  public noPublishingProfilesFound() {
-    log.error('No publishing profiles found. Please create a publishing profile before publishing an SDK.');
-  }
-
-  public profileHasNoEnabledLanguages() {
-    log.error(
-      'The selected publishing profile has no languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in the profile before publishing an SDK.'
-    );
   }
 
   public publishingProfileNotFound(profileId: ProfileId) {
     log.error(
-      `Publishing profile with id '${profileId}' not found. Please check the provided profile id and try again.`
+      `Publishing profile with id '${profileId}' not found. Please check the provided profile id and try again or create a new publishing profile on the APIMatic App.`
     );
   }
 
@@ -75,21 +64,11 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
-  public packageConfigurationNotFoundForLanguage(language: Language) {
+  public publishTypesNotAvailableForLanguage(publishTypes: PublishType[], language: Language) {
+    const types = publishTypes.join(' + ');
+    const noun = publishTypes.length === 1 ? 'type' : 'types';
     log.error(
-      `Package configuration for '${language}' not found in the publishing profile. Please check the provided profile and try again.`
-    );
-  }
-
-  public gitConfigurationNotFoundForLanguage(language: Language) {
-    log.error(
-      `No source code configuration found for '${language}' in the selected publishing profile. Please check the provided profile and try again.`
-    );
-  }
-
-  public publishTypeNotAllowedForLanguage(publishType: PublishType, language: Language) {
-    log.error(
-      `Publish type '${publishType}' is not enabled for '${language}' in the selected publishing profile. Please check your profile configuration and try again.`
+      `Publish ${noun} '${types}' not found or not enabled for '${language}' in the selected publishing profile. Please check your profile configuration on the APIMatic App and try again.`
     );
   }
 
@@ -100,7 +79,7 @@ export class SdkPublishNonInteractivePrompts {
   }
 
   public publishingRunningNotice(
-    profileName: string,
+    profile: PublishingProfile,
     language: Language,
     version: SemVersion,
     publishType: PublishType[]
@@ -109,16 +88,7 @@ export class SdkPublishNonInteractivePrompts {
       .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
       .join(' + ');
     log.info(
-      `Publishing is running for the following:\n\n  Profile:   ${profileName}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
-    );
-  }
-
-  public dryRunNotice(profileName: string, language: Language, version: SemVersion, publishType: PublishType[]): void {
-    const targets = publishType
-      .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
-      .join(' + ');
-    log.info(
-      `You can publish this SDK by removing the --dry-run flag. It will be published for the following:\n\n  Profile:   ${profileName}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
+      `Publishing is running for the following:\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
     );
   }
 

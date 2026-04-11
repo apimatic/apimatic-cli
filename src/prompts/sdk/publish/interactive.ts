@@ -4,13 +4,9 @@ import { format as f } from '../../../prompts/format.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import {
-  getLanguageConfigs,
-  PublishingProfileWithLanguagesGroup,
-  PublishingProfileItem
-} from '../../../types/publish-api/publishing-profile.js';
+import { PublishingProfileWithLanguagesGroup, PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
+import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
-import { PublishType } from '../../../types/sdk/publish.js';
 import { SemVersion } from '../../../types/publish/version.js';
 
 export class SdkPublishInteractivePrompts {
@@ -73,15 +69,13 @@ export class SdkPublishInteractivePrompts {
     log.error('No publishing profile was selected.');
   }
 
-  public async selectLanguage(publishingProfile: PublishingProfileItem): Promise<Language | undefined> {
-    const options = getLanguageConfigs(publishingProfile)
-      .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
-      .map(({ language, packageConfig, gitConfig }) => ({
-        value: language,
-        label: `${language} (${[gitConfig?.isEnabled && 'Source Code', packageConfig?.isEnabled && 'Package']
-          .filter(Boolean)
-          .join(' + ')})`
-      }));
+  public async selectLanguage(publishingProfile: PublishingProfile): Promise<Language | undefined> {
+    const options = publishingProfile.getEnabledLanguages().map((language) => ({
+      value: language,
+      label: `${language} (${publishingProfile.getPublishTypesForLanguage(language)
+        .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
+        .join(' + ')})`
+    }));
 
     const language = await select({
       message: 'Select a language to publish:',
@@ -97,12 +91,6 @@ export class SdkPublishInteractivePrompts {
 
   public noLanguageSelected() {
     log.error('No language was selected for publishing.');
-  }
-
-  public packageConfigurationNotFoundForLanguage(language: string) {
-    log.error(
-      `Package configuration for '${language}' not found in the publishing profile. Please check the provided profile and try again.`
-    );
   }
 
   public async inputVersion(): Promise<SemVersion | undefined> {
@@ -129,7 +117,7 @@ export class SdkPublishInteractivePrompts {
   }
 
   public publishingSummary(
-    profile: PublishingProfileItem,
+    profile: PublishingProfile,
     language: Language,
     version: SemVersion,
     publishType: PublishType[]
@@ -138,7 +126,7 @@ export class SdkPublishInteractivePrompts {
       .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
       .join(' + ');
     log.info(
-      `Ready to publish:\n\n  Profile:   ${profile.name}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
+      `Ready to publish:\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
     );
   }
 

@@ -1,7 +1,7 @@
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { PublishingProfileSummaryGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
+import { PublishingProfileSummaryGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile-item.js';
 import { buildTableWithHeading, withSpinner } from '../../prompt.js';
 
 export class PublishingProfileListPrompts {

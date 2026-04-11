@@ -54,6 +54,15 @@ export class LauncherService {
     await this.openPath(directoryPath.toString());
   }
 
+  public async openDirectoryInEditorOrFileExplorer(directoryPath: DirectoryPath): Promise<void> {
+    if (isInCi) return;
+    try {
+      await execa('code', [directoryPath.toString()]);
+    } catch {
+      await this.openDirectory(directoryPath);
+    }
+  }
+
   private async openPath(targetPath: string): Promise<void> {
     // Determine the command and args without using the shell
     let command: string;

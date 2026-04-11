@@ -2,23 +2,11 @@ import { PublishingApiService } from '../../../infrastructure/services/publishin
 import { SdkPublishNonInteractivePrompts } from '../../../prompts/sdk/publish/non-interactive.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
-import {
-  getLanguageConfigs,
-  hasEnabledLanguage,
-  PublishingProfileItem
-} from '../../../types/publish-api/publishing-profile.js';
+import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
+import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
-import {
-  getPackageConfigurationForLanguage,
-  getPublishTypeForLanguage,
-  PublishType
-} from '../../../types/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
-import { GenerateAction } from '../generate.js';
-import { createTempDir, withDirPath } from '../../../infrastructure/tmp-extensions.js';
-import { LauncherService } from '../../../infrastructure/launcher-service.js';
-import { PackageSettingsContext } from '../../../types/package-settings-context.js';
-import { FileService } from '../../../infrastructure/file-service.js';
+import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { BuildContext } from '../../../types/build-context.js';
@@ -27,8 +15,6 @@ import { SdkPublishAction } from '../publish.js';
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
-  private readonly fileService: FileService = new FileService();
-  private readonly launcherService: LauncherService = new LauncherService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -70,59 +56,42 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
-      this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
-    );
-    if (publishingProfilesResponse.isErr()) {
-      this.prompts.fetchPublishingProfilesServiceError(publishingProfilesResponse.error);
-      return ActionResult.failed();
-    }
-
-    if (publishingProfilesResponse.value.length === 0) {
-      this.prompts.noPublishingProfilesFound();
-      return ActionResult.failed();
-    }
-
     const profileIdResult = ProfileId.tryCreate(profileId!);
     if (profileIdResult.isErr()) {
       this.prompts.invalidProfileId(profileId!);
       return ActionResult.failed();
     }
-    
-    const publishingProfileId = profileIdResult.value;
-    const publishingProfile = publishingProfilesResponse.value.find((profile: PublishingProfileItem) =>
-      ProfileId.tryCreate(profile.id).match((id) => publishingProfileId.isEqual(id), () => false)
+
+    const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
+      this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
     );
-    if (!publishingProfile) {
+    if (publishingProfilesResponse.isErr()) {
+      this.prompts.getPublishingProfilesServiceError(publishingProfilesResponse.error);
+      return ActionResult.failed();
+    }
+
+    const publishingProfileId = profileIdResult.value;
+    const publishingProfileItem = publishingProfilesResponse.value.find((profile: PublishingProfileItem) =>
+      ProfileId.tryCreate(profile.id).match(
+        (id) => publishingProfileId.isEqual(id),
+        () => false
+      )
+    );
+    if (!publishingProfileItem) {
       this.prompts.publishingProfileNotFound(publishingProfileId);
       return ActionResult.failed();
     }
 
-    if (!hasEnabledLanguage(publishingProfile)) {
-      this.prompts.profileHasNoEnabledLanguages();
-      return ActionResult.failed();
-    }
-
-    const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
-    if (!languageConfig.packageConfig?.isEnabled && !languageConfig.gitConfig?.isEnabled) {
+    const publishingProfile = PublishingProfile.create(publishingProfileItem);
+    if (!publishingProfile.isLanguageEnabled(language)) {
       this.prompts.languageNotConfiguredForProfile(language);
       return ActionResult.failed();
     }
 
-    if (languageConfig.packageConfig === null && publishType.includes(PublishType.PackagePublishing)) {
-      this.prompts.packageConfigurationNotFoundForLanguage(language);
-      return ActionResult.failed();
-    }
-
-    if (languageConfig.gitConfig === null && publishType.includes(PublishType.SourceCodePublishing)) {
-      this.prompts.gitConfigurationNotFoundForLanguage(language);
-      return ActionResult.failed();
-    }
-
-    const allowedPublishTypes = getPublishTypeForLanguage(languageConfig);
-    const disallowedType = publishType.find((pt) => !allowedPublishTypes.includes(pt));
-    if (disallowedType) {
-      this.prompts.publishTypeNotAllowedForLanguage(disallowedType, language);
+    const allowedPublishTypes = publishingProfile.getPublishTypesForLanguage(language);
+    const unavailablePublishTypes = publishType.filter((pt) => !allowedPublishTypes.includes(pt));
+    if (unavailablePublishTypes.length > 0) {
+      this.prompts.publishTypesNotAvailableForLanguage(unavailablePublishTypes, language);
       return ActionResult.failed();
     }
 
@@ -131,19 +100,17 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const semVersion = semVersionResult.value;
-    if (dryRun) {
-      return await this.executeDryRun(buildDirectory, language, publishType, force, semVersion, publishingProfile);
-    }
-
+    const outputDir = dryRun ? getDownloadsDirectory() : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
-      sdkDirectory,
+      outputDir,
       language,
       publishType,
       force,
       publishingProfileId,
       semVersion,
       publishingProfile,
+      dryRun,
       onPublishSdkError
     );
     if (publishResult.isFailed()) {
@@ -153,8 +120,12 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.cancelled();
     }
 
+    if (dryRun) {
+      return ActionResult.success();
+    }
+
     const publishingInfo = publishResult.getValue();
-    this.prompts.publishingRunningNotice(publishingProfile.name, language, semVersion, publishType);
+    this.prompts.publishingRunningNotice(publishingProfile, language, semVersion, publishType);
 
     const publishingSucceeded = await this.prompts.pollPublishingStatus(() =>
       this.publishingApiService.getSdkPublishingLog(
@@ -171,51 +142,5 @@ export class SdkPublishNonInteractiveAction {
     }
 
     return ActionResult.success();
-  };
-
-  private readonly executeDryRun = async (
-    buildDirectory: DirectoryPath,
-    language: Language,
-    publishType: PublishType[],
-    force: boolean,
-    semVersion: SemVersion,
-    publishingProfile: PublishingProfileItem
-  ): Promise<ActionResult> => {
-    const tempOutputDirectory = await createTempDir();
-
-    return await withDirPath(async (tempDirectory) => {
-      await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
-
-      const packageConfiguration = getPackageConfigurationForLanguage(language, publishingProfile);
-      if (packageConfiguration !== null) {
-        const packageSettingsDirectory = tempDirectory.join('package-settings');
-        const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
-        await packageSettingsContext.writeConfiguration(packageConfiguration, language);
-      }
-
-      const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
-      const sdkGenerationResult = await sdkGenerateAction.execute(
-        tempDirectory,
-        tempOutputDirectory,
-        language,
-        force,
-        false,
-        false,
-        false,
-        undefined,
-        semVersion
-      );
-      if (sdkGenerationResult.isFailed()) {
-        return ActionResult.failed();
-      }
-      if (sdkGenerationResult.isCancelled()) {
-        return ActionResult.cancelled();
-      }
-
-      const sdkLanguageDirectory = tempOutputDirectory.join(language);
-      this.prompts.dryRunNotice(publishingProfile.name, language, semVersion, publishType);
-      await this.launcherService.openDirectory(sdkLanguageDirectory);
-      return ActionResult.success();
-    });
   };
 }

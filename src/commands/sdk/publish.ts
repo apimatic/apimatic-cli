@@ -4,7 +4,7 @@ import { FlagsProvider } from '../../types/flags-provider.js';
 import { Language } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
-import { PublishType } from '../../types/sdk/publish.js';
+import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
 import { SdkPublishValidationFailedEvent } from '../../types/events/sdk-publish-validation-failed.js';
 import { SdkPublishInteractiveAction } from '../../actions/sdk/publish/interactive.js';

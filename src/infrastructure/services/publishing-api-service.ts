@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { err, ok, Result } from 'neverthrow';
 import FormData from 'form-data';
-import { PublishingProfileItem } from '../../types/publish-api/publishing-profile.js';
+import { PublishingProfileItem } from '../../types/publish-api/publishing-profile-item.js';
 import { handleServiceError, ServiceError } from '../service-error.js';
 import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -10,7 +10,7 @@ import { Language } from '../../types/sdk/generate.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { FileService } from '../file-service.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
-import { PublishType } from '../../types/sdk/publish.js';
+import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { ProfileId } from '../../types/publish/profile-id.js';

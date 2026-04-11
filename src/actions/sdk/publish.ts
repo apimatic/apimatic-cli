@@ -1,14 +1,16 @@
 import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { SdkPublishPrompts } from '../../prompts/sdk/publish.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PublishingProfileItem } from '../../types/publish-api/publishing-profile.js';
+import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { Language } from '../../types/sdk/generate.js';
-import { getPackageConfigurationForLanguage, PublishType } from '../../types/sdk/publish.js';
+import { PublishingProfile } from '../../types/publish/publishing-profile.js';
+import { PackageSettingsConfiguration } from '../../types/publish/package-settings-configuration.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { FileService } from '../../infrastructure/file-service.js';
@@ -19,6 +21,7 @@ export class SdkPublishAction {
   private readonly prompts: SdkPublishPrompts = new SdkPublishPrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly fileService: FileService = new FileService();
+  private readonly launcherService: LauncherService = new LauncherService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -30,17 +33,19 @@ export class SdkPublishAction {
     force: boolean,
     profileId: ProfileId,
     semVersion: SemVersion,
-    publishingProfile: PublishingProfileItem,
+    publishingProfile: PublishingProfile,
+    dryRun: boolean,
     onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult<PublishingInfo>> => {
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
 
-      const packageConfiguration = getPackageConfigurationForLanguage(language, publishingProfile);
-      if (packageConfiguration !== null) {
+      const packageConfiguration = publishingProfile.getPackageConfigurationForLanguage(language);
+      if (packageConfiguration !== null && packageConfiguration.isEnabled) {
+        const packageSettingsConfiguration = PackageSettingsConfiguration.create(language, packageConfiguration);
         const packageSettingsDirectory = tempDirectory.join('package-settings');
         const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
-        await packageSettingsContext.writeConfiguration(packageConfiguration, language);
+        await packageSettingsContext.writeConfiguration(packageSettingsConfiguration, language);
       }
 
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
@@ -63,6 +68,13 @@ export class SdkPublishAction {
       }
 
       const sdkLanguageDirectory = outputDirectory.join(language);
+
+      if (dryRun) {
+        this.prompts.dryRunNotice(publishingProfile, language, semVersion, publishType);
+        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory);
+        return ActionResult.success();
+      }
+
       const tempContext = new TempContext(tempDirectory);
       const sdkFilePath = await tempContext.zip(sdkLanguageDirectory);
 

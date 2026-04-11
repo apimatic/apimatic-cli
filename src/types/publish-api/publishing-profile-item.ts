@@ -1,5 +1,10 @@
 import { Language } from '../sdk/generate.js';
 
+export enum PublishType {
+  PackagePublishing = 'package',
+  SourceCodePublishing = 'sourcecode'
+}
+
 export interface KeyValueItem {
   key: string;
   value: string;
@@ -193,38 +198,6 @@ export interface PublishingProfileWithLanguagesGroup {
   profiles: PublishingProfileWithLanguages[];
 }
 
-export function getLanguageConfigs(profile: PublishingProfileItem): LanguagePublishingConfig[] {
-  return [
-    { language: Language.CSHARP, packageConfig: profile.cSharpConfiguration, gitConfig: profile.cSharpGitConfiguration },
-    { language: Language.JAVA, packageConfig: profile.javaConfiguration, gitConfig: profile.javaGitConfiguration },
-    { language: Language.GO, packageConfig: profile.goConfiguration, gitConfig: profile.goGitConfiguration },
-    { language: Language.PHP, packageConfig: profile.phpConfiguration, gitConfig: profile.phpGitConfiguration },
-    { language: Language.PYTHON, packageConfig: profile.pythonConfiguration, gitConfig: profile.pythonGitConfiguration },
-    { language: Language.RUBY, packageConfig: profile.rubyConfiguration, gitConfig: profile.rubyGitConfiguration },
-    {
-      language: Language.TYPESCRIPT,
-      packageConfig: profile.typeScriptConfiguration,
-      gitConfig: profile.typeScriptGitConfiguration
-    }
-  ];
-}
-
-export function groupProfilesByApiGroup(profiles: PublishingProfileItem[]): ProfileGroup[] {
-  return profiles.reduce<ProfileGroup[]>((groups, profile) => {
-    const group = groups.find((g) => g.apiGroupId === profile.apiGroupId);
-    if (group) {
-      group.profiles.push(profile);
-    } else {
-      groups.push({ apiGroupId: profile.apiGroupId, apiGroupName: profile.apiGroupName, profiles: [profile] });
-    }
-    return groups;
-  }, []);
-}
-
-export function hasEnabledLanguage(profile: PublishingProfileItem): boolean {
-  return getLanguageConfigs(profile).some(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled);
-}
-
 export interface PublishingProfileSummary {
   name: string;
   id: string;
@@ -234,35 +207,4 @@ export interface PublishingProfileSummary {
 export interface PublishingProfileSummaryGroup {
   apiGroupName: string;
   profiles: PublishingProfileSummary[];
-}
-
-interface ProfileGroup {
-  apiGroupId: string;
-  apiGroupName: string;
-  profiles: PublishingProfileItem[];
-}
-
-export function toPublishingProfilesWithLanguagesGroups(profiles: PublishingProfileItem[]): PublishingProfileWithLanguagesGroup[] {
-  return groupProfilesByApiGroup(profiles).map((group) => ({
-    apiGroupName: group.apiGroupName,
-    profiles: group.profiles.map((profile) => ({
-      profile,
-      enabledLanguages: getLanguageConfigs(profile)
-        .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
-        .map(({ language }) => language)
-    }))
-  }));
-}
-
-export function toPublishingProfileSummaryGroups(profiles: PublishingProfileItem[]): PublishingProfileSummaryGroup[] {
-  return groupProfilesByApiGroup(profiles).map((group) => ({
-    apiGroupName: group.apiGroupName,
-    profiles: group.profiles.map((profile) => ({
-      name: profile.name,
-      id: profile.id,
-      enabledLanguages: getLanguageConfigs(profile)
-        .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
-        .map(({ language }) => language)
-    }))
-  }));
 }

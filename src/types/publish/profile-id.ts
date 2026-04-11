@@ -1,5 +1,5 @@
 import { Result, ok, err } from 'neverthrow';
-import { PublishingProfileItem } from '../publish-api/publishing-profile.js';
+import { PublishingProfileItem } from '../publish-api/publishing-profile-item.js';
 
 export class ProfileId {
   private readonly value: string;

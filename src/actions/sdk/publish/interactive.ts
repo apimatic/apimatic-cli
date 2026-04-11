@@ -2,12 +2,9 @@ import { PublishingApiService } from '../../../infrastructure/services/publishin
 import { SdkPublishInteractivePrompts } from '../../../prompts/sdk/publish/interactive.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
-import {
-  getLanguageConfigs,
-  hasEnabledLanguage,
-  toPublishingProfilesWithLanguagesGroups
-} from '../../../types/publish-api/publishing-profile.js';
-import { getPublishTypeForLanguage, PublishType } from '../../../types/sdk/publish.js';
+import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
+import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
+import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
 import { ActionResult } from '../../action-result.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
@@ -44,24 +41,27 @@ export class SdkPublishInteractiveAction {
       return ActionResult.failed();
     }
 
-    if (publishingProfilesResponse.value.length === 0) {
+    const profiles = PublishingProfiles.create(publishingProfilesResponse.value);
+    if (profiles.isEmpty()) {
       this.prompts.noPublishingProfilesFound();
       return ActionResult.failed();
     }
 
-    const profilesWithEnabledLanguages = publishingProfilesResponse.value.filter(hasEnabledLanguage);
-    if (profilesWithEnabledLanguages.length === 0) {
+    const profilesWithEnabledLanguages = profiles.getProfilesWithEnabledLanguages();
+    if (profilesWithEnabledLanguages.isEmpty()) {
       this.prompts.noProfileWithEnabledLanguagesFound();
       return ActionResult.failed();
     }
 
-    const publishingProfile = await this.prompts.selectPublishingProfile(
-      toPublishingProfilesWithLanguagesGroups(profilesWithEnabledLanguages)
+    const publishingProfileItem = await this.prompts.selectPublishingProfile(
+      profilesWithEnabledLanguages.toProfilesWithEnabledLanguagesByApiGroup()
     );
-    if (!publishingProfile) {
+    if (!publishingProfileItem) {
       this.prompts.noPublishingProfileSelected();
       return ActionResult.cancelled();
     }
+
+    const publishingProfile = PublishingProfile.create(publishingProfileItem);
 
     const language = await this.prompts.selectLanguage(publishingProfile);
     if (!language) {
@@ -75,10 +75,10 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    const languageConfig = getLanguageConfigs(publishingProfile).find((lc) => lc.language === language)!;
-    const publishType = getPublishTypeForLanguage(languageConfig);
+    const publishType = publishingProfile.getPublishTypesForLanguage(language);
 
     this.prompts.publishingSummary(publishingProfile, language, version, publishType);
+    
     const confirmed = await this.prompts.confirmPublishing();
     if (!confirmed) {
       this.prompts.publishingCancelled();
@@ -89,7 +89,7 @@ export class SdkPublishInteractiveAction {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 
-    const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfile);
+    const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfileItem);
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
       sdkDirectory,
@@ -99,6 +99,7 @@ export class SdkPublishInteractiveAction {
       publishingProfileId,
       version,
       publishingProfile,
+      false,
       onPublishSdkError
     );
     if (publishResult.isFailed()) {
