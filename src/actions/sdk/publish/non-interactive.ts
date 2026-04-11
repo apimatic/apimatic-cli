@@ -39,8 +39,8 @@ export class SdkPublishNonInteractiveAction {
     publishType: PublishType[],
     force: boolean,
     dryRun: boolean,
-    profileId: string | undefined = undefined,
-    version: string | undefined = undefined,
+    profileId?: string,
+    version?: string,
     onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
@@ -64,8 +64,8 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    const semVersion = SemVersion.create(version!);
-    if (!semVersion) {
+    const semVersionResult = SemVersion.tryCreate(version!);
+    if (semVersionResult.isErr()) {
       this.prompts.invalidVersion(version!);
       return ActionResult.failed();
     }
@@ -83,9 +83,15 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    const publishingProfileId = ProfileId.create(profileId!)!;
+    const profileIdResult = ProfileId.tryCreate(profileId!);
+    if (profileIdResult.isErr()) {
+      this.prompts.invalidProfileId(profileId!);
+      return ActionResult.failed();
+    }
+    
+    const publishingProfileId = profileIdResult.value;
     const publishingProfile = publishingProfilesResponse.value.find((profile: PublishingProfileItem) =>
-      publishingProfileId.isEqual(ProfileId.create(profile.id)!)
+      ProfileId.tryCreate(profile.id).match((id) => publishingProfileId.isEqual(id), () => false)
     );
     if (!publishingProfile) {
       this.prompts.publishingProfileNotFound(publishingProfileId);
@@ -124,6 +130,7 @@ export class SdkPublishNonInteractiveAction {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 
+    const semVersion = semVersionResult.value;
     if (dryRun) {
       return await this.executeDryRun(buildDirectory, language, publishType, force, semVersion, publishingProfile);
     }

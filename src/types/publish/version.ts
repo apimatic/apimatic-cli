@@ -1,3 +1,5 @@
+import { Result, ok, err } from 'neverthrow';
+
 export class SemVersion {
   private readonly value: string;
 
@@ -5,12 +7,12 @@ export class SemVersion {
     this.value = value;
   }
 
-  public static create(value: string): SemVersion | undefined {   
+  public static tryCreate(value: string): Result<SemVersion, string> {
     const parts = value.split('.');
     if (parts.length !== 3 || !parts.every((p) => p !== '' && !isNaN(Number(p)) && Number(p) >= 0)) {
-      return undefined;
+      return err('Invalid version format. Expected major.minor.patch (e.g., 1.0.0).');
     }
-    return new SemVersion(value);
+    return ok(new SemVersion(value));
   }
 
   public toString(): string {

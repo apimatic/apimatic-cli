@@ -1,3 +1,6 @@
+import { Result, ok, err } from 'neverthrow';
+import { PublishingProfileItem } from '../publish-api/publishing-profile.js';
+
 export class ProfileId {
   private readonly value: string;
 
@@ -5,11 +8,15 @@ export class ProfileId {
     this.value = value;
   }
 
-  public static create(value: string): ProfileId | undefined {
+  public static createFromPublishingProfileItem(profile: PublishingProfileItem): ProfileId {
+    return new ProfileId(profile.id);
+  }
+
+  public static tryCreate(value: string): Result<ProfileId, string> {
     if (!value || value.trim() === '') {
-      return undefined;
+      return err('Profile ID cannot be empty.');
     }
-    return new ProfileId(value);
+    return ok(new ProfileId(value));
   }
 
   public isEqual(other: ProfileId): boolean {

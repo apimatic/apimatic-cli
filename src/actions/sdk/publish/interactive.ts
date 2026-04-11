@@ -89,7 +89,7 @@ export class SdkPublishInteractiveAction {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 
-    const publishingProfileId = ProfileId.create(publishingProfile.id)!;
+    const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfile);
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
       sdkDirectory,

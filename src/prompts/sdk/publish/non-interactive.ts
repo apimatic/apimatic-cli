@@ -34,6 +34,12 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
+  public invalidProfileId(profileId: string): void {
+    log.error(
+      `Invalid profile id '${profileId}' provided. Please provide a valid profile id.`
+    );
+  }
+
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
     return withSpinner(
       'Searching for publishing profile',

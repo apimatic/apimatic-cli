@@ -110,7 +110,7 @@ export class SdkPublishInteractivePrompts {
       message: 'Enter version to publish (e.g. 1.0.0):',
       validate: (value) => {
         if (!value) return 'Version is required.';
-        if (!SemVersion.create(value))
+        if (SemVersion.tryCreate(value).isErr())
           return 'Please enter a valid version in the format major.minor.patch (e.g., 1.0.0).';
       }
     });
@@ -119,7 +119,9 @@ export class SdkPublishInteractivePrompts {
       return undefined;
     }
 
-    return SemVersion.create(version)!;
+    const versionResult = SemVersion.tryCreate(version);
+    if (versionResult.isErr()) return undefined;
+    return versionResult.value;
   }
 
   public noVersionSpecified() {
