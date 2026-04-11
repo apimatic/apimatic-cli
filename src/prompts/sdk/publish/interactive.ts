@@ -2,6 +2,7 @@ import { confirm, isCancel, log, select, text } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
+import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import {
   getLanguageConfigs,
@@ -13,6 +14,17 @@ import { PublishType } from '../../../types/sdk/publish.js';
 import { SemVersion } from '../../../types/publish/version.js';
 
 export class SdkPublishInteractivePrompts {
+  public directoryCannotBeSame(directory: DirectoryPath) {
+    const message = `The ${f.var('src')} and ${f.var('sdk')} directories must be different. Current value: ${f.path(
+      directory
+    )}`;
+    log.error(message);
+  }
+
+  public srcDirectoryEmpty(directory: DirectoryPath) {
+    log.error(`The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`);
+  }
+
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
     return withSpinner(
       'Searching for publishing profiles',

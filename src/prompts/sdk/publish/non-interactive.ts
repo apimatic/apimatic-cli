@@ -3,6 +3,7 @@ import { Result } from 'neverthrow';
 import { PublishType } from '../../../types/sdk/publish.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { format as f } from '../../../prompts/format.js';
+import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile.js';
@@ -11,6 +12,17 @@ import { ProfileId } from '../../../types/publish/profile-id.js';
 import { Language } from '../../../types/sdk/generate.js';
 
 export class SdkPublishNonInteractivePrompts {
+  public directoryCannotBeSame(directory: DirectoryPath) {
+    const message = `The ${f.var('src')} and ${f.var('sdk')} directories must be different. Current value: ${f.path(
+      directory
+    )}`;
+    log.error(message);
+  }
+
+  public srcDirectoryEmpty(directory: DirectoryPath) {
+    log.error(`The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`);
+  }
+
   public missingRequiredFlags(options: string[]): void {
     const message = `Missing required flag(s): ${options.join(', ')}`;
     log.error(message);
@@ -132,7 +144,11 @@ ${f.link(publishingLogUrl)}`;
       const statusMessage = events
         .map((event) => {
           const target = event.publishType === 'Package' ? 'Package' : 'Source Code';
-          const eventLabels: Record<string, string> = { Queued: 'Queued', InProgress: 'In Progress', Succeeded: 'Done' };
+          const eventLabels: Record<string, string> = {
+            Queued: 'Queued',
+            InProgress: 'In Progress',
+            Succeeded: 'Done'
+          };
           const label = eventLabels[event.eventType] ?? 'Failed';
           return `${target}: [${label}]`;
         })

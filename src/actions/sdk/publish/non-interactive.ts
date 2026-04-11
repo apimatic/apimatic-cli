@@ -1,6 +1,5 @@
 import { PublishingApiService } from '../../../infrastructure/services/publishing-api-service.js';
 import { SdkPublishNonInteractivePrompts } from '../../../prompts/sdk/publish/non-interactive.js';
-import { SdkPublishPrompts } from '../../../prompts/sdk/publish.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import {
@@ -27,7 +26,6 @@ import { SdkPublishAction } from '../publish.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
-  private readonly publishPrompts: SdkPublishPrompts = new SdkPublishPrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly fileService: FileService = new FileService();
   private readonly launcherService: LauncherService = new LauncherService();
@@ -46,13 +44,13 @@ export class SdkPublishNonInteractiveAction {
     onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
-      this.publishPrompts.directoryCannotBeSame(sdkDirectory);
+      this.prompts.directoryCannotBeSame(sdkDirectory);
       return ActionResult.failed();
     }
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
-      this.publishPrompts.srcDirectoryEmpty(buildDirectory);
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 

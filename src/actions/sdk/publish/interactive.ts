@@ -1,6 +1,5 @@
 import { PublishingApiService } from '../../../infrastructure/services/publishing-api-service.js';
 import { SdkPublishInteractivePrompts } from '../../../prompts/sdk/publish/interactive.js';
-import { SdkPublishPrompts } from '../../../prompts/sdk/publish.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import {
@@ -16,7 +15,6 @@ import { ProfileId } from '../../../types/publish/profile-id.js';
 
 export class SdkPublishInteractiveAction {
   private readonly prompts: SdkPublishInteractivePrompts = new SdkPublishInteractivePrompts();
-  private readonly publishPrompts: SdkPublishPrompts = new SdkPublishPrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
@@ -28,13 +26,13 @@ export class SdkPublishInteractiveAction {
     onPublishSdkError?: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
-      this.publishPrompts.directoryCannotBeSame(sdkDirectory);
+      this.prompts.directoryCannotBeSame(sdkDirectory);
       return ActionResult.failed();
     }
 
     const buildContext = new BuildContext(buildDirectory);
     if (!(await buildContext.validate())) {
-      this.publishPrompts.srcDirectoryEmpty(buildDirectory);
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
