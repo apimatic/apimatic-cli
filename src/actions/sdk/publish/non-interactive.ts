@@ -100,7 +100,7 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const semVersion = semVersionResult.value;
-    const outputDir = dryRun ? getDownloadsDirectory() : sdkDirectory;
+    const outputDir = dryRun ? getDownloadsDirectory('apimatic-sdk') : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
       outputDir,
