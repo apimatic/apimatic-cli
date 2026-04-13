@@ -40,11 +40,17 @@ export class SdkPublishInteractiveAction {
 
     let sdkDirectory: DirectoryPath;
     while (true) {
-      const inputSdkDirectory = await this.prompts.inputSdkDirectory(defaultSdkDirectory, buildDirectory);
+      const inputSdkDirectory = await this.prompts.inputSdkDirectory(defaultSdkDirectory);
       if (!inputSdkDirectory) {
         await this.prompts.noSdkDirectoryProvided();
         return ActionResult.cancelled();
       }
+      
+      if (inputSdkDirectory.isEqual(buildDirectory)) {
+        this.prompts.sdkDirectoryCannotBeSameAsBuildDirectory();
+        continue;
+      }
+      
       sdkDirectory = inputSdkDirectory;
       break;
     }

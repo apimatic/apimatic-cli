@@ -17,20 +17,16 @@ import { removeQuotes } from '../../../utils/string-utils.js';
 export class SdkPublishInteractivePrompts {
   public async inputBuildDirectory(defaultDirectory: DirectoryPath): Promise<DirectoryPath | undefined> {
     const value = await text({
-      message: `Enter the path to your ${f.var('src')} directory (must contain APIMATIC-BUILD.json):`,
+      message: `Enter the path to the directory containing the ${f.var('src')} folder:`,
       placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
       defaultValue: defaultDirectory.toString(),
-      validate: (value) => {
-        if (!value) return 'Path is required.';
-        if (!value.trim()) return 'Path cannot be empty.';
-      }
     });
 
     if (isCancel(value)) {
       return undefined;
     }
 
-    return new DirectoryPath(removeQuotes((value as string).trim()));
+    return new DirectoryPath(removeQuotes((value as string).trim())).join('src');
   }
 
   public async noInputDirectoryProvided() {
@@ -43,20 +39,11 @@ export class SdkPublishInteractivePrompts {
     );
   }
 
-  public async inputSdkDirectory(
-    defaultDirectory: DirectoryPath,
-    buildDirectory: DirectoryPath
-  ): Promise<DirectoryPath | undefined> {
+  public async inputSdkDirectory(defaultDirectory: DirectoryPath): Promise<DirectoryPath | undefined> {
     const value = await text({
       message: 'Enter the destination path for the generated SDK:',
       placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
-      defaultValue: defaultDirectory.toString(),
-      validate: (value) => {
-        if (!value) return 'Path is required.';
-        if (!value.trim()) return 'Path cannot be empty.';
-        const dir = new DirectoryPath(removeQuotes(value.trim()));
-        if (dir.isEqual(buildDirectory)) return `SDK directory must be different from the ${f.var('src')} directory.`;
-      }
+      defaultValue: defaultDirectory.toString()
     });
 
     if (isCancel(value)) {
@@ -64,6 +51,10 @@ export class SdkPublishInteractivePrompts {
     }
 
     return new DirectoryPath(removeQuotes((value as string).trim()));
+  }
+
+  public sdkDirectoryCannotBeSameAsBuildDirectory() {
+    log.error(`SDK directory must be different from the ${f.var('src')} directory.`);
   }
 
   public async noSdkDirectoryProvided() {
