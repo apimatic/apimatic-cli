@@ -83,7 +83,7 @@ export default class SdkPublish extends Command {
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
-    const interactive = !profileId && !language && !version && !dryRun && publishTypes.length === 0;
+    const interactive = this.argv.length === 0;
     const commandMetadata: CommandMetadata = {
       commandName: SdkPublish.id,
       shell: this.config.shell
@@ -117,8 +117,6 @@ export default class SdkPublish extends Command {
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
           buildDirectory,
-          sdkDirectory,
-          force,
           onPublishSdkError
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(

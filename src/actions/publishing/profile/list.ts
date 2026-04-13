@@ -3,7 +3,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { PublishingProfileListPrompts } from '../../../prompts/publishing/profile/list.js';
 import { ActionResult } from '../../action-result.js';
-import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
+import { PublishingProfileSummaries } from '../../../types/publish/publishing-profile-summaries.js';
 
 export class PublishingProfileListAction {
   private readonly prompts = new PublishingProfileListPrompts();
@@ -27,9 +27,9 @@ export class PublishingProfileListAction {
       return ActionResult.success();
     }
 
-    const publishingProfiles = PublishingProfiles.create(profiles);
-    const publishingProfileSummaryGroups = publishingProfiles.toSummaryGroups();
-    this.prompts.displayProfiles(publishingProfileSummaryGroups);
+    const publishingProfileSummaries = PublishingProfileSummaries.create(profiles);
+    const publishingProfileSummariesApiGroups = publishingProfileSummaries.toPublishingProfileSummariesByApiGroups();
+    this.prompts.displayProfiles(publishingProfileSummariesApiGroups);
     return ActionResult.success();
   }
 }

@@ -4,21 +4,70 @@ import { format as f } from '../../../prompts/format.js';
 import { noteWrapped, withSpinner } from '../../prompt.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { PublishingProfileWithLanguagesGroup, PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
+import {
+  PublishingProfileWithLanguagesGroup,
+  PublishingProfileItem,
+  PublishType
+} from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
+import { removeQuotes } from '../../../utils/string-utils.js';
 
 export class SdkPublishInteractivePrompts {
-  public directoryCannotBeSame(directory: DirectoryPath) {
-    const message = `The ${f.var('src')} and ${f.var('sdk')} directories must be different. Current value: ${f.path(
-      directory
-    )}`;
-    log.error(message);
+  public async inputBuildDirectory(defaultDirectory: DirectoryPath): Promise<DirectoryPath | undefined> {
+    const value = await text({
+      message: `Enter the path to your ${f.var('src')} directory (must contain APIMATIC-BUILD.json):`,
+      placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
+      defaultValue: defaultDirectory.toString(),
+      validate: (value) => {
+        if (!value) return 'Path is required.';
+        if (!value.trim()) return 'Path cannot be empty.';
+      }
+    });
+
+    if (isCancel(value)) {
+      return undefined;
+    }
+
+    return new DirectoryPath(removeQuotes((value as string).trim()));
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
-    log.error(`The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`);
+  public async noInputDirectoryProvided() {
+    log.error('No input directory was provided.');
+  }
+
+  public srcDirectoryInvalid(directory: DirectoryPath) {
+    log.error(
+      `${f.path(directory)} does not contain a valid ${f.var('APIMATIC-BUILD.json')}. Please check the path and try again.`
+    );
+  }
+
+  public async inputSdkDirectory(
+    defaultDirectory: DirectoryPath,
+    buildDirectory: DirectoryPath
+  ): Promise<DirectoryPath | undefined> {
+    const value = await text({
+      message: 'Enter the destination path for the generated SDK:',
+      placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
+      defaultValue: defaultDirectory.toString(),
+      validate: (value) => {
+        if (!value) return 'Path is required.';
+        if (!value.trim()) return 'Path cannot be empty.';
+        const dir = new DirectoryPath(removeQuotes(value.trim()));
+        if (dir.isEqual(buildDirectory)) return `SDK directory must be different from the ${f.var('src')} directory.`;
+      }
+    });
+
+    if (isCancel(value)) {
+      return undefined;
+    }
+
+    return new DirectoryPath(removeQuotes((value as string).trim()));
+  }
+
+  public async noSdkDirectoryProvided() {
+    log.error('No SDK directory was provided.');
   }
 
   public async getPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
@@ -30,12 +79,12 @@ export class SdkPublishInteractivePrompts {
     );
   }
 
-  public fetchPublishingProfilesServiceError(serviceError: ServiceError) {
+  public getPublishingProfilesServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
   }
 
-  public noPublishingProfilesFound() {
-    log.error('No publishing profiles found. Please create a publishing profile before publishing an SDK.');
+  public noPublishingProfilesFound(errorMessage: string) {
+    log.error(errorMessage);
   }
 
   public noProfileWithEnabledLanguagesFound() {
@@ -72,7 +121,8 @@ export class SdkPublishInteractivePrompts {
   public async selectLanguage(publishingProfile: PublishingProfile): Promise<Language | undefined> {
     const options = publishingProfile.getEnabledLanguages().map((language) => ({
       value: language,
-      label: `${language} (${publishingProfile.getPublishTypesForLanguage(language)
+      label: `${language} (${publishingProfile
+        .getPublishTypesForLanguage(language)
         .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
         .join(' + ')})`
     }));

@@ -11,10 +11,12 @@ import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { BuildContext } from '../../../types/build-context.js';
 import { SdkPublishAction } from '../publish.js';
+import { FileService } from '../../../infrastructure/file-service.js';
 
 export class SdkPublishNonInteractiveAction {
   private readonly prompts: SdkPublishNonInteractivePrompts = new SdkPublishNonInteractivePrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
+  private readonly fileService: FileService = new FileService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
@@ -99,7 +101,7 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const semVersion = semVersionResult.value;
-    const outputDir = dryRun ? getDownloadsDirectory('apimatic-sdk') : sdkDirectory;
+    const outputDir = dryRun ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk')) : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
       outputDir,
@@ -120,7 +122,7 @@ export class SdkPublishNonInteractiveAction {
     }
 
     // Since publishing was not initiated, skip the next steps for polling.
-    if (dryRun) { 
+    if (dryRun) {
       return ActionResult.success();
     }
 

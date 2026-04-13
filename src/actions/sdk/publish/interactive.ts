@@ -5,6 +5,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
+import { PublishingProfileGroups } from '../../../types/publish/publishing-profile-groups.js';
 import { ActionResult } from '../../action-result.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
@@ -17,44 +18,61 @@ export class SdkPublishInteractiveAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
-    sdkDirectory: DirectoryPath,
-    force: boolean,
+    defaultBuildDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(sdkDirectory)) {
-      this.prompts.directoryCannotBeSame(sdkDirectory);
-      return ActionResult.failed();
+    let buildDirectory: DirectoryPath;
+    while (true) {
+      const inputBuildDirectory = await this.prompts.inputBuildDirectory(defaultBuildDirectory);
+      if (!inputBuildDirectory) {
+        await this.prompts.noInputDirectoryProvided();
+        return ActionResult.cancelled();
+      }
+      if (!(await new BuildContext(inputBuildDirectory).validate())) {
+        this.prompts.srcDirectoryInvalid(inputBuildDirectory);
+        continue;
+      }
+      buildDirectory = inputBuildDirectory;
+      break;
     }
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.validate())) {
-      this.prompts.srcDirectoryEmpty(buildDirectory);
-      return ActionResult.failed();
+    const defaultSdkDirectory = buildDirectory.join('../sdk');
+
+    let sdkDirectory: DirectoryPath;
+    while (true) {
+      const inputSdkDirectory = await this.prompts.inputSdkDirectory(defaultSdkDirectory, buildDirectory);
+      if (!inputSdkDirectory) {
+        await this.prompts.noSdkDirectoryProvided();
+        return ActionResult.cancelled();
+      }
+      sdkDirectory = inputSdkDirectory;
+      break;
     }
 
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
       this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
     );
     if (publishingProfilesResponse.isErr()) {
-      this.prompts.fetchPublishingProfilesServiceError(publishingProfilesResponse.error);
+      this.prompts.getPublishingProfilesServiceError(publishingProfilesResponse.error);
       return ActionResult.failed();
     }
 
-    const profiles = PublishingProfiles.create(publishingProfilesResponse.value);
-    if (profiles.isEmpty()) {
-      this.prompts.noPublishingProfilesFound();
+    const publishingProfileItems = publishingProfilesResponse.value;
+    const publishingProfilesResult = PublishingProfiles.create(publishingProfileItems);
+    if (publishingProfilesResult.isErr()) {
+      this.prompts.noPublishingProfilesFound(publishingProfilesResult.error);
       return ActionResult.failed();
     }
 
-    const profilesWithEnabledLanguages = profiles.getProfilesWithEnabledLanguages();
-    if (profilesWithEnabledLanguages.isEmpty()) {
+    const activePublishingProfiles = publishingProfilesResult.value.getActiveProfiles();
+    if (activePublishingProfiles.length === 0) {
       this.prompts.noProfileWithEnabledLanguagesFound();
       return ActionResult.failed();
     }
 
+    const publishingProfileGroups = PublishingProfileGroups.create(publishingProfileItems);
     const publishingProfileItem = await this.prompts.selectPublishingProfile(
-      profilesWithEnabledLanguages.toProfilesWithEnabledLanguagesByApiGroup()
+      publishingProfileGroups.toActiveProfilesGroups()
     );
     if (!publishingProfileItem) {
       this.prompts.noPublishingProfileSelected();
@@ -95,7 +113,7 @@ export class SdkPublishInteractiveAction {
       sdkDirectory,
       language,
       publishTypes,
-      force,
+      false,
       publishingProfileId,
       version,
       publishingProfile,
