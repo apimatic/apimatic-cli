@@ -18,25 +18,25 @@ export class MergeSourceTreePrompts {
   public changeTrackingEnabled(language: Language, destinationSourceTreePath: FilePath) {
     log.info(`Change tracking is enabled for ${f.var(language)}. The 'sdk-source-tree' has been saved to ${f.path(destinationSourceTreePath)}.`);
     
-    const message = `Customize your SDK and run the command
-'${f.cmdAlt("apimatic", "sdk", "save-changes", f.flag("language", language))}'
-to save and persist your changes for the future SDK generations.`;
+    const message = `Customize your SDK, then run:
+'${f.cmdAlt("apimatic", "sdk", "save-changes")} ${f.flag("language", language)}'
+This persists your changes so they reapply on every future generation.`;
     noteWrapped(message, "Next Steps");
   }
 
   public changeTrackingAlreadyEnabled(language: Language) {
     const message =
       `Change tracking is already enabled for ${f.var(language)}. ` +
-      `No need to use the ${f.flag("track-changes")} flag again for ${f.var(language)} SDK.`;
+      `The ${f.flag("track-changes")} flag will be ignored.`;
     log.warn(message);
   }
 
   public sdkGenerated(sdk: DirectoryPath) {
-    log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
+    log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
   }
 
   public sdkGeneratedWithSourceTree(sdk: DirectoryPath, sourceTree: FilePath) {
-    log.info(`Generated SDK can be found at ${f.path(sdk)},\n and the updated 'sdk-source-tree' can be found at ${f.path(sourceTree)}.`);
+    log.info(`The generated SDK can be found at ${f.path(sdk)}.\n The 'sdk-source-tree' can be found at ${f.path(sourceTree)}.`);
   }
 
   public errorMergeConflicts(language: Language) {

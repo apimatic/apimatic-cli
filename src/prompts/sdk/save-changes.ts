@@ -44,10 +44,10 @@ export class SaveChangesPrompts {
   }
 
   public sdkSourceTreeNotFound(language: string) {
-    log.error(`No 'sdk-source-tree' found for ${f.var(language)}.`);
-    const message = `Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language), f.flag("track-changes"))}'
-to generate the SDK with 'sdk-source-tree'.`;
+    log.error(`No 'sdk-source-tree' found for ${f.var(language)}. You need to generate the SDK with change tracking enabled before you can save changes.`);
+    const message = `Generate the SDK with change tracking by running:
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)} ${f.flag("track-changes")}'
+Then customize your SDK and run ${f.cmdAlt("save-changes")}again.`;
     noteWrapped(message, "Next Steps");
   }
 
@@ -102,5 +102,6 @@ to generate the SDK with 'sdk-source-tree'.`;
 
   public changesSaved(sourceTreePath: FilePath) {
     log.success(`Changes saved successfully at ${f.path(sourceTreePath)}.`);
+    log.info(`Your saved changes will reapply automatically the next time you generate this SDK.`);
   }
 }
