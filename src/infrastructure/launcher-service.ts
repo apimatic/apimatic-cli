@@ -54,11 +54,9 @@ export class LauncherService {
     await this.openPath(directoryPath.toString());
   }
 
-  public async openDirectoryInEditorOrFileExplorer(directoryPath: DirectoryPath): Promise<void> {
+  public async openDirectoryInEditorOrFileExplorer(directoryPath: DirectoryPath, fileToOpen: FilePath): Promise<void> {
     if (isInCi) return;
-    try {
-      await execa('code', [directoryPath.toString()]);
-    } catch {
+    if (!(await this.openFolderInIde(directoryPath, fileToOpen))) {
       await this.openDirectory(directoryPath);
     }
   }

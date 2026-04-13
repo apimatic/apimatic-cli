@@ -20,7 +20,7 @@ export class SdkPublishInteractiveAction {
     buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     force: boolean,
-    onPublishSdkError?: (errorMessage: string) => void
+    onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.directoryCannotBeSame(sdkDirectory);
@@ -75,9 +75,9 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    const publishType = publishingProfile.getPublishTypesForLanguage(language);
+    const publishTypes = publishingProfile.getPublishTypesForLanguage(language);
 
-    this.prompts.publishingSummary(publishingProfile, language, version, publishType);
+    this.prompts.publishingSummary(publishingProfile, language, version, publishTypes);
     
     const confirmed = await this.prompts.confirmPublishing();
     if (!confirmed) {
@@ -85,7 +85,7 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    if (!publishType.includes(PublishType.PackagePublishing)) {
+    if (!publishTypes.includes(PublishType.PackagePublishing)) {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 
@@ -94,7 +94,7 @@ export class SdkPublishInteractiveAction {
       buildDirectory,
       sdkDirectory,
       language,
-      publishType,
+      publishTypes,
       force,
       publishingProfileId,
       version,

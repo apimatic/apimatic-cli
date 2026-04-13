@@ -30,7 +30,7 @@ export class PublishingApiService {
     }
 
     try {
-      const token = authInfo?.authKey;
+      const token = authInfo.authKey;
       const response = await this.axiosInstance(shell, token).get(`/publishing-profile/user`);
 
       if (response.status === 200) {
@@ -46,7 +46,7 @@ export class PublishingApiService {
     sdkFilePath: FilePath,
     profileId: ProfileId,
     language: Language,
-    languageVersion: SemVersion,
+    packageVersion: SemVersion,
     publishType: PublishType[],
     configDir: DirectoryPath,
     shell: string
@@ -58,12 +58,14 @@ export class PublishingApiService {
     const sdkFileStream = await this.fileService.getStream(sdkFilePath);
 
     try {
-      const token = authInfo?.authKey;
+      const token = authInfo.authKey;
       const formData = new FormData();
       formData.append('file', sdkFileStream);
-      formData.append('languageVersion', languageVersion.toString());
+      formData.append('packageVersion', packageVersion.toString());
 
-      if (publishType.length === 1) {
+      // If both package and source code publishing are not selected, publishType array will contain only one of them, so we need to specify which one to the API. 
+      // If both are selected, we will omit this field as API defaults to both types being selected.
+      if (publishType.length !== 2) { 
         formData.append('publishType', publishType[0]);
       }
 
@@ -111,7 +113,7 @@ export class PublishingApiService {
     }
 
     try {
-      const token = authInfo?.authKey;
+      const token = authInfo.authKey;
       const response = await this.axiosInstance(shell, token).get(`/publish-logs/${publishingLogId}`);
 
       if (response.status === 200) {

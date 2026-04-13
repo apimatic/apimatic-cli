@@ -46,6 +46,11 @@ export class PublishingProfile {
     return types;
   }
 
+  public getUnallowedPublishTypes(language: Language, requestedTypes: PublishType[]): PublishType[] {
+    const allowedTypes = this.getPublishTypesForLanguage(language);
+    return requestedTypes.filter((pt) => !allowedTypes.includes(pt));
+  }
+
   public getPackageConfigurationForLanguage(language: Language): BaseConfigurationItem | null {
     switch (language) {
       case Language.CSHARP:

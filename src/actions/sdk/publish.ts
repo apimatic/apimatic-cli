@@ -16,6 +16,8 @@ import { TempContext } from '../../types/temp-context.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
+import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
 
 export class SdkPublishAction {
   private readonly prompts: SdkPublishPrompts = new SdkPublishPrompts();
@@ -35,7 +37,7 @@ export class SdkPublishAction {
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
-    onPublishSdkError?: (errorMessage: string) => void
+    onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult<PublishingInfo>> => {
     return await withDirPath(async (tempDirectory) => {
       await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
@@ -71,7 +73,8 @@ export class SdkPublishAction {
 
       if (dryRun) {
         this.prompts.dryRunNotice(publishingProfile, language, semVersion, publishType);
-        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory);
+        const readmeFilePath = new FilePath(sdkLanguageDirectory, new FileName('README.md'));
+        await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory, readmeFilePath);
         return ActionResult.success();
       }
 
@@ -92,7 +95,7 @@ export class SdkPublishAction {
 
       if (publishSdkResponse.isErr()) {
         this.prompts.sdkPublishingServiceError(publishSdkResponse.error);
-        onPublishSdkError?.(publishSdkResponse.error.errorMessage);
+        onPublishSdkError(publishSdkResponse.error.errorMessage);
         return ActionResult.failed();
       }
 

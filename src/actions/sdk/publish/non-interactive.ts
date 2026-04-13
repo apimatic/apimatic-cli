@@ -25,9 +25,9 @@ export class SdkPublishNonInteractiveAction {
     publishType: PublishType[],
     force: boolean,
     dryRun: boolean,
+    onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
-    version?: string,
-    onPublishSdkError?: (errorMessage: string) => void
+    version?: string
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.directoryCannotBeSame(sdkDirectory);
@@ -88,10 +88,9 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    const allowedPublishTypes = publishingProfile.getPublishTypesForLanguage(language);
-    const unavailablePublishTypes = publishType.filter((pt) => !allowedPublishTypes.includes(pt));
-    if (unavailablePublishTypes.length > 0) {
-      this.prompts.publishTypesNotAvailableForLanguage(unavailablePublishTypes, language);
+    const unallowedPublishTypes = publishingProfile.getUnallowedPublishTypes(language, publishType);
+    if (unallowedPublishTypes.length > 0) {
+      this.prompts.publishTypesNotAvailableForLanguage(unallowedPublishTypes, language);
       return ActionResult.failed();
     }
 
@@ -120,7 +119,8 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    if (dryRun) {
+    // Since publishing was not initiated, skip the next steps for polling.
+    if (dryRun) { 
       return ActionResult.success();
     }
 

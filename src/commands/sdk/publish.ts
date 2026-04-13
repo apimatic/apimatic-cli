@@ -128,9 +128,9 @@ export default class SdkPublish extends Command {
           publishTypes,
           force,
           dryRun,
+          onPublishSdkError,
           profileId,
           version,
-          onPublishSdkError
         );
     outro(result);
   }

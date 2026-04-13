@@ -101,7 +101,7 @@ ${f.link(publishingLogUrl)}`;
   public async pollPublishingStatus(
     getSdkPublishingLogFn: () => Promise<Result<PublishLogItem, ServiceError>>
   ): Promise<boolean> {
-    const STATES = new Set(['Succeeded', 'Failed', 'Exception', 'InternalError']);
+    const TERMINAL_STATES = new Set(['Succeeded', 'Failed', 'Exception', 'InternalError']);
     const POLL_INTERVAL_MS = 10000; // poll after every 10 seconds.
     const spin = spinner();
 
@@ -116,10 +116,10 @@ ${f.link(publishingLogUrl)}`;
       }
 
       const { events } = publishingLogResult.value;
-      const allEventsCompleted = events.every((event) => STATES.has(event.eventType));
+      const executionCompleted = events.every((event) => TERMINAL_STATES.has(event.eventType));
       const statusMessage = events
         .map((event) => {
-          const target = event.publishType === 'Package' ? 'Package' : 'Source Code';
+          const target = event.publishType === 'SourceCode' ? 'Source Code' : 'Package';
           const eventLabels: Record<string, string> = {
             Queued: 'Queued',
             InProgress: 'In Progress',
@@ -130,10 +130,10 @@ ${f.link(publishingLogUrl)}`;
         })
         .join(' | ');
 
-      if (allEventsCompleted) {
-        const allEventsSucceeded = events.every((event) => event.eventType === 'Succeeded');
-        spin.stop(statusMessage, allEventsSucceeded ? 0 : 1);
-        return allEventsSucceeded;
+      if (executionCompleted) {
+        const isExecutionSuccessful = events.every((event) => event.eventType === 'Succeeded');
+        spin.stop(statusMessage, isExecutionSuccessful ? 0 : 1);
+        return isExecutionSuccessful;
       }
 
       spin.message(statusMessage);
