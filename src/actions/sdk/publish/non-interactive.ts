@@ -41,7 +41,7 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const missing = [];
-    if (!profileId) missing.push('--profile');
+    if (!profileId) missing.push('--profile-id');
     if (!language) missing.push('--language');
     if (!version) missing.push('--version');
     if (!publishType || publishType.length === 0) missing.push('--publish-type');
