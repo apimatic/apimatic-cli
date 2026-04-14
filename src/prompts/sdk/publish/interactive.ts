@@ -17,13 +17,13 @@ import { removeQuotes } from '../../../utils/string-utils.js';
 export class SdkPublishInteractivePrompts {
   public async inputWorkingDirectory(
     defaultDirectory: DirectoryPath,
-    validate: (value: string | undefined) => string | Error | undefined
+    validator: (value: string | undefined) => string | Error | undefined
   ): Promise<DirectoryPath | undefined> {
     const value = await text({
       message: `Enter the path to the directory containing the ${f.var('src')} folder:`,
       placeholder: 'Provide an absolute path to the directory or press Enter to use the current directory.',
       defaultValue: defaultDirectory.toString(),
-      validate
+      validate: validator
     });
 
     if (isCancel(value)) {
@@ -45,13 +45,13 @@ export class SdkPublishInteractivePrompts {
 
   public async inputSdkDirectory(
     defaultDirectory: DirectoryPath,
-    validate: (value: string | undefined) => string | Error | undefined
+    validator: (value: string | undefined) => string | Error | undefined
   ): Promise<DirectoryPath | undefined> {
     const value = await text({
       message: 'Enter the destination path for the generated SDK:',
-      placeholder: 'Provide an absolute path to the directory or press Enter to use the current directory.',
+      placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
       defaultValue: defaultDirectory.toString(),
-      validate
+      validate: validator
     });
 
     if (isCancel(value)) {

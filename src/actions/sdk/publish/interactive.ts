@@ -21,15 +21,10 @@ export class SdkPublishInteractiveAction {
     defaultBuildDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
-    const workingDirectory = await this.prompts.inputWorkingDirectory(defaultBuildDirectory, (value) => {
-      if (!value) {
-        if (!new BuildContext(defaultBuildDirectory).validateSync())
-          return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
-        return;
-      }
-      if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).validateSync())
-        return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
-    });
+    const workingDirectory = await this.prompts.inputWorkingDirectory(
+      defaultBuildDirectory,
+      SdkPublishInteractiveAction.workingDirectoryValidator(defaultBuildDirectory)
+    );
     if (!workingDirectory) {
       await this.prompts.noInputDirectoryProvided();
       return ActionResult.cancelled();
@@ -37,11 +32,10 @@ export class SdkPublishInteractiveAction {
     const buildDirectory = workingDirectory.join('src');
 
     const defaultSdkDirectory = workingDirectory.join('sdk');
-    const sdkDirectory = await this.prompts.inputSdkDirectory(defaultSdkDirectory, (value) => {
-      if (!value) return;
-      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(buildDirectory))
-        return 'SDK directory must be different from the src directory.';
-    });
+    const sdkDirectory = await this.prompts.inputSdkDirectory(
+      defaultSdkDirectory,
+      SdkPublishInteractiveAction.sdkDirectoryValidator(buildDirectory)
+    );
     if (!sdkDirectory) {
       await this.prompts.noSdkDirectoryProvided();
       return ActionResult.cancelled();
@@ -127,4 +121,28 @@ export class SdkPublishInteractiveAction {
     this.prompts.sdkPublishingInProgress(publishResult.getValue().publishingLogUrl);
     return ActionResult.success();
   };
+
+  public static workingDirectoryValidator(
+    defaultBuildDirectory: DirectoryPath
+  ): (value: string | undefined) => string | undefined {
+    return (value) => {
+      if (!value) {
+        if (!new BuildContext(defaultBuildDirectory).validateSync())
+          return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
+        return;
+      }
+      if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).validateSync())
+        return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
+    };
+  }
+
+  public static sdkDirectoryValidator(
+    buildDirectory: DirectoryPath
+  ): (value: string | undefined) => string | undefined {
+    return (value) => {
+      if (!value) return;
+      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(buildDirectory))
+        return 'SDK directory must be different from the src directory.';
+    };
+  }
 }
