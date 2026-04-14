@@ -30,7 +30,7 @@ export class SdkPublishNonInteractivePrompts {
   }
 
   public interactiveModeNotice(): void {
-    log.info('Run the command in interactive mode by removing all flags.');
+    log.info('You can run the command in interactive mode by removing all flags.');
   }
 
   public invalidVersion(version: string): void {
