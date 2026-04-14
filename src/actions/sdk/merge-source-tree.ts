@@ -59,41 +59,40 @@ export class MergeSourceTreeAction {
       return ActionResult.success({sourceTreeTrackingInitiated: true, conflictsResolved: false});
     }
 
+    this.prompts.startApplyingConflictedChanges(language);
+
     let conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
 
-    this.prompts.conflictsDetected(language, conflictedFilesDirectory);
-
     if (isInCi) {
-      this.prompts.errorMergeConflicts(language);
+      this.prompts.conflictsDetectedInCi(language, conflictedFilesDirectory);
       return ActionResult.failed();
     }
 
     do {
-      if (!await this.prompts.confirmContinueResolvingConflicts()) {
-        this.prompts.operationCancelled();
-        return ActionResult.cancelled();
-      }
-      this.prompts.openingDirectoryForConflictResolution(language);
+      this.prompts.conflictsDetected(conflictedFilesDirectory);
 
-      const ideOpened = await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles());
-      const result = ideOpened
+      if (!await this.prompts.resolveNowOrAbandon()) {
+        this.prompts.mergeAbandoned(language);
+        return ActionResult.failed();
+      }
+
+      this.prompts.openingVsCodeForConflictResolution(language);
+
+      const ideOpenedAndClosed = await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles());
+      const conflictsResolved = ideOpenedAndClosed
         ? await this.prompts.confirmConflictsResolved()
-        : await this.prompts.waitForConflictsResolved(language, sdkWithSourceTree);
+        : await this.prompts.waitForConflictResolutionWithoutVsCode(sdkWithSourceTree);
 
-      if (result === undefined) {
-        this.prompts.operationCancelled();
-        return ActionResult.cancelled();
+      if (conflictsResolved === undefined) {
+        this.prompts.mergeAbandoned(language);
+        return ActionResult.failed();
       }
-      if (result) {
+
+      if (conflictsResolved) {
         break;
       }
 
       conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
-
-      if (!conflictedFilesDirectory.isEmpty()) {
-        this.prompts.conflictsStillPresent(conflictedFilesDirectory);
-      }
-
     } while (!conflictedFilesDirectory.isEmpty());
 
     await mergeSourceTreeContext.saveWithResolvedConflicts();

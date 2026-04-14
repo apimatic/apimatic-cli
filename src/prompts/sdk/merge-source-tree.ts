@@ -8,11 +8,11 @@ import { FilePath } from "../../types/file/filePath.js";
 
 export class MergeSourceTreePrompts {
   public successfullySkippedChanges(language: Language) {
-    log.info(`Skipped customizations for ${f.var(language)} SDK.`);
+    log.info(`Skipped saved changes for ${f.var(language)} SDK.`);
   }
 
   public successfullyAppliedChanges(language: Language) {
-    log.info(`Successfully applied customizations for ${f.var(language)} SDK.`);
+    log.info(`Successfully applied saved changes for ${f.var(language)} SDK.`);
   }
 
   public changeTrackingEnabled(language: Language, destinationSourceTreePath: FilePath) {
@@ -36,40 +36,44 @@ This persists your changes so they reapply on every future generation.`;
   }
 
   public sdkGeneratedWithSourceTree(sdk: DirectoryPath, sourceTree: FilePath) {
-    log.info(`The generated SDK can be found at ${f.path(sdk)}.\n The 'sdk-source-tree' can be found at ${f.path(sourceTree)}.`);
+    log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
+    log.info(`The 'sdk-source-tree' can be found at ${f.path(sourceTree)}.`);
   }
 
-  public errorMergeConflicts(language: Language) {
-    log.error(`Merge conflicts detected in the generated ${f.var(language)} SDK.`);
-    
-    const message = `Run the command
+  public startApplyingConflictedChanges(language: Language) {
+    log.info(`Applying saved changes for '${f.var(language)}'...`);
+  }
+
+  public conflictsDetectedInCi(language: Language, directory: Directory) {
+    log.error(`Merge conflicts found while applying saved changes:`);
+    log.error(getTree(directory.toTreeNode()));
+
+    noteWrapped(`Run the command
 '${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language))}'
-interactively to review and resolve the conflicts with SDK generation.`;
-    noteWrapped(message, "Next Steps");
+interactively to review and resolve the conflicts with SDK generation.`, "Next Steps");
   }
 
-  public conflictsDetected(language: Language, directory: Directory) {
-    log.message(`Conflicts found in ${f.var(language)} SDK:`);
+  public conflictsDetected(directory: Directory) {
+    log.warn(`Merge conflicts found while applying saved changes:`);
     log.message(getTree(directory.toTreeNode()));
+    log.warn(`Your SDK may not work until all issues are resolved. Conflict markers have been added to the affected files. Resolve each conflict and remove the markers.`);
   }
 
-  public conflictsStillPresent(directory: Directory) {
-    log.warn("Conflicts are still present. Please mark all conflicts as resolved to proceed.");
-    log.message(getTree(directory.toTreeNode()));
+  public openingVsCodeForConflictResolution(language: Language) {
+    log.info(`Opening ${f.var(language)} SDK in VS Code for conflicts resolution.
+  1. Resolve each conflict block.
+  2. Save the files.
+  3. Close the editor.`);
   }
 
-  public openingDirectoryForConflictResolution(language: Language) {
-    log.info(`Opening ${f.var(language)} SDK in VS Code for conflicts resolution.`);
-  }
-
-  public async waitForConflictsResolved(language: Language, sdkDir: DirectoryPath): Promise<boolean | undefined> {
-    log.info(`Unable to open VS Code. Please resolve all conflicts in the ${f.var(language)} SDK at ${f.path(sdkDir)} to proceed.`);
+  public async waitForConflictResolutionWithoutVsCode(sdkDir: DirectoryPath): Promise<boolean | undefined> {
+    log.info(`Unable to open VS Code. Try opening the conflicted files at ${f.path(sdkDir)} in your editor.`);
     return await this.confirmConflictsResolved();
   }
 
   public async confirmConflictsResolved(): Promise<boolean | undefined> {
     const conflictsResolved = await confirm({
-      message: `Have you resolved all conflicts?`,
+      message: `Have you finished resolving all conflicts?`,
       initialValue: false
     });
 
@@ -80,10 +84,12 @@ interactively to review and resolve the conflicts with SDK generation.`;
     return conflictsResolved;
   }
 
-  public async confirmContinueResolvingConflicts() : Promise<boolean> {
+  public async resolveNowOrAbandon() : Promise<boolean> {
     const continueResolving = await confirm({
-      message: `Do you want to resolve the conflicts right now?`,
-      initialValue: false
+      message: `Resolve now, or abandon SDK generation?`,
+      active: "Resolve now",
+      inactive: "Abandon",
+      initialValue: true
     });
 
     if (isCancel(continueResolving)) {
@@ -98,8 +104,11 @@ interactively to review and resolve the conflicts with SDK generation.`;
     log.info(`Saved the current state of ${f.var(language)} SDK as resolved.`);
   }
 
-  public operationCancelled() {
-    log.info("Exiting without resolving conflicts.");
+  public mergeAbandoned(language: Language) {
+    log.error(`SDK generation has been abandoned. The generated SDK will be discarded.`);
+    noteWrapped(`Run the command
+'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language))}'
+to regenerate the SDK and resolve merge conflicts.`, "Next Steps");
   }
 
   public async directoryStillOpen(directory: DirectoryPath) {
