@@ -29,6 +29,10 @@ export class SdkPublishNonInteractivePrompts {
     log.error(message);
   }
 
+  public interactiveModeNotice(): void {
+    log.info('Run the command in interactive mode by removing all flags.');
+  }
+
   public invalidVersion(version: string): void {
     log.error(
       `Invalid version '${version}'. Please provide a valid version in the format major.minor.patch (e.g., 1.0.0).`

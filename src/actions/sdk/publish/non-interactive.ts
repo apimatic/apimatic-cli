@@ -49,6 +49,7 @@ export class SdkPublishNonInteractiveAction {
     if (!publishType || publishType.length === 0) missing.push('--publish-type');
     if (missing.length > 0) {
       this.prompts.missingRequiredFlags(missing);
+      this.prompts.interactiveModeNotice();
       return ActionResult.failed();
     }
 

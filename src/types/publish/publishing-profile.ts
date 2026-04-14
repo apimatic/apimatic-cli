@@ -3,6 +3,8 @@ import {
   BaseConfigurationItem,
   LanguagePublishingConfig,
   PublishingProfileItem,
+  PublishingProfileSummaryGroup,
+  PublishingProfileWithLanguagesGroup,
   PublishType
 } from '../publish-api/publishing-profile-item.js';
 
@@ -49,6 +51,20 @@ export class PublishingProfile {
   public getUnallowedPublishTypes(language: Language, requestedTypes: PublishType[]): PublishType[] {
     const allowedTypes = this.getPublishTypesForLanguage(language);
     return requestedTypes.filter((pt) => !allowedTypes.includes(pt));
+  }
+
+  public toPublishingProfileSummaryGroup(): PublishingProfileSummaryGroup {
+    return {
+      apiGroupName: this.item.apiGroupName,
+      profiles: [{ name: this.item.name, id: this.item.id, enabledLanguages: this.getEnabledLanguages() }]
+    };
+  }
+
+  public toPublishingProfileWithLanguagesGroup(): PublishingProfileWithLanguagesGroup {
+    return {
+      apiGroupName: this.item.apiGroupName,
+      profiles: [{ profile: this.item, enabledLanguages: this.getEnabledLanguages() }]
+    };
   }
 
   public getPackageConfigurationForLanguage(language: Language): BaseConfigurationItem | null {

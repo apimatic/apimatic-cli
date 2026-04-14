@@ -5,7 +5,6 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { PublishingProfileGroups } from '../../../types/publish/publishing-profile-groups.js';
 import { ActionResult } from '../../action-result.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
@@ -21,6 +20,7 @@ export class SdkPublishInteractiveAction {
     defaultBuildDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
+    // TODO: Figure out a better way to handle repititive input and validation loops instead of having multiple while(true) loops.
     let buildDirectory: DirectoryPath;
     while (true) {
       const inputBuildDirectory = await this.prompts.inputBuildDirectory(defaultBuildDirectory);
@@ -76,9 +76,8 @@ export class SdkPublishInteractiveAction {
       return ActionResult.failed();
     }
 
-    const publishingProfileGroups = PublishingProfileGroups.create(publishingProfileItems);
     const publishingProfileItem = await this.prompts.selectPublishingProfile(
-      publishingProfileGroups.toActiveProfilesGroups()
+      publishingProfilesResult.value.toActiveProfilesGroups()
     );
     if (!publishingProfileItem) {
       this.prompts.noPublishingProfileSelected();

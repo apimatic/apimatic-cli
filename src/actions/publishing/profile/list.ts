@@ -3,7 +3,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { PublishingProfileListPrompts } from '../../../prompts/publishing/profile/list.js';
 import { ActionResult } from '../../action-result.js';
-import { PublishingProfileSummaries } from '../../../types/publish/publishing-profile-summaries.js';
+import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
 
 export class PublishingProfileListAction {
   private readonly prompts = new PublishingProfileListPrompts();
@@ -21,15 +21,15 @@ export class PublishingProfileListAction {
       return ActionResult.failed();
     }
 
-    const profiles = profilesResult.value;
-    if (profiles.length === 0) {
+    const publishingProfilesResult = PublishingProfiles.create(profilesResult.value);
+    if (publishingProfilesResult.isErr()) {
       this.prompts.noProfilesFound();
       return ActionResult.success();
     }
 
-    const publishingProfileSummaries = PublishingProfileSummaries.create(profiles);
-    const publishingProfileSummariesApiGroups = publishingProfileSummaries.toPublishingProfileSummariesByApiGroups();
-    this.prompts.displayProfiles(publishingProfileSummariesApiGroups);
+    const publishingProfiles = publishingProfilesResult.value;
+    const publishingProfileSummariesByApiGroups = publishingProfiles.toPublishingProfileSummariesByApiGroups();
+    this.prompts.displayProfiles(publishingProfileSummariesByApiGroups);
     return ActionResult.success();
   }
 }
