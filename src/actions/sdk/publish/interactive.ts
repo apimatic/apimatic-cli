@@ -21,7 +21,7 @@ export class SdkPublishInteractiveAction {
     defaultBuildDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
-    const buildDirectory = await this.prompts.inputBuildDirectory(defaultBuildDirectory, (value) => {
+    const workingDirectory = await this.prompts.inputWorkingDirectory(defaultBuildDirectory, (value) => {
       if (!value) {
         if (!new BuildContext(defaultBuildDirectory).validateSync())
           return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
@@ -30,12 +30,13 @@ export class SdkPublishInteractiveAction {
       if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).validateSync())
         return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
     });
-    if (!buildDirectory) {
+    if (!workingDirectory) {
       await this.prompts.noInputDirectoryProvided();
       return ActionResult.cancelled();
     }
+    const buildDirectory = workingDirectory.join('src');
 
-    const defaultSdkDirectory = buildDirectory.join('../sdk');
+    const defaultSdkDirectory = workingDirectory.join('sdk');
     const sdkDirectory = await this.prompts.inputSdkDirectory(defaultSdkDirectory, (value) => {
       if (!value) return;
       if (new DirectoryPath(removeQuotes(value.trim())).isEqual(buildDirectory))

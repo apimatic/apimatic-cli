@@ -116,7 +116,7 @@ export default class SdkPublish extends Command {
     intro('Publish SDK');
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
-          buildDirectory,
+          workingDirectory,
           onPublishSdkError
         )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(

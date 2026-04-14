@@ -15,7 +15,7 @@ import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
 
 export class SdkPublishInteractivePrompts {
-  public async inputBuildDirectory(
+  public async inputWorkingDirectory(
     defaultDirectory: DirectoryPath,
     validate: (value: string | undefined) => string | Error | undefined
   ): Promise<DirectoryPath | undefined> {
@@ -30,7 +30,7 @@ export class SdkPublishInteractivePrompts {
       return undefined;
     }
 
-    return new DirectoryPath(removeQuotes((value as string).trim())).join('src');
+    return new DirectoryPath(removeQuotes((value as string).trim()));
   }
 
   public async noInputDirectoryProvided() {
