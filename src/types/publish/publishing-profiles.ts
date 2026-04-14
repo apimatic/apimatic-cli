@@ -22,31 +22,23 @@ export class PublishingProfiles {
   }
 
   public toActiveProfilesGroups(): PublishingProfileWithLanguagesGroup[] {
-    return this.items
-      .filter((p) => p.hasEnabledLanguages())
-      .map((p) => p.toPublishingProfileWithLanguagesGroup())
-      .reduce<PublishingProfileWithLanguagesGroup[]>((acc, entry) => {
-        const existing = acc.find((g) => g.apiGroupName === entry.apiGroupName);
-        if (existing) {
-          existing.profiles.push(...entry.profiles);
-        } else {
-          acc.push({ ...entry, profiles: [...entry.profiles] });
-        }
-        return acc;
-      }, []);
+    return this.groupByApiGroup(this.getActiveProfiles().map((p) => p.toPublishingProfileWithLanguagesGroup()));
   }
 
   public toPublishingProfileSummariesByApiGroups(): PublishingProfileSummaryGroup[] {
-    return this.items
-      .map((p) => p.toPublishingProfileSummaryGroup())
-      .reduce<PublishingProfileSummaryGroup[]>((acc, entry) => {
-        const existing = acc.find((g) => g.apiGroupName === entry.apiGroupName);
-        if (existing) {
-          existing.profiles.push(...entry.profiles);
-        } else {
-          acc.push({ ...entry, profiles: [...entry.profiles] });
-        }
-        return acc;
-      }, []);
+    return this.groupByApiGroup(this.items.map((p) => p.toPublishingProfileSummaryGroup()));
+  }
+
+  private groupByApiGroup<T extends { apiGroupName: string; profiles: unknown[] }>(entries: T[]): T[] {
+    const map = new Map<string, T>();
+    for (const entry of entries) {
+      const existing = map.get(entry.apiGroupName);
+      if (existing) {
+        (existing.profiles as unknown[]).push(...entry.profiles);
+      } else {
+        map.set(entry.apiGroupName, { ...entry, profiles: [...entry.profiles] });
+      }
+    }
+    return [...map.values()];
   }
 }

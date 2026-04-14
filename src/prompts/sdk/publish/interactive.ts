@@ -15,11 +15,15 @@ import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
 
 export class SdkPublishInteractivePrompts {
-  public async inputBuildDirectory(defaultDirectory: DirectoryPath): Promise<DirectoryPath | undefined> {
+  public async inputBuildDirectory(
+    defaultDirectory: DirectoryPath,
+    validate: (value: string | undefined) => string | Error | undefined
+  ): Promise<DirectoryPath | undefined> {
     const value = await text({
       message: `Enter the path to the directory containing the ${f.var('src')} folder:`,
       placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
       defaultValue: defaultDirectory.toString(),
+      validate
     });
 
     if (isCancel(value)) {
@@ -39,11 +43,15 @@ export class SdkPublishInteractivePrompts {
     );
   }
 
-  public async inputSdkDirectory(defaultDirectory: DirectoryPath): Promise<DirectoryPath | undefined> {
+  public async inputSdkDirectory(
+    defaultDirectory: DirectoryPath,
+    validate: (value: string | undefined) => string | Error | undefined
+  ): Promise<DirectoryPath | undefined> {
     const value = await text({
       message: 'Enter the destination path for the generated SDK:',
       placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
-      defaultValue: defaultDirectory.toString()
+      defaultValue: defaultDirectory.toString(),
+      validate
     });
 
     if (isCancel(value)) {

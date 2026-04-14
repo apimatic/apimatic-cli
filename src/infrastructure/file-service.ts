@@ -19,9 +19,27 @@ export class FileService {
     }
   }
 
+  public fileExistsSync(file: FilePath): boolean {
+    try {
+      const stat = fsExtra.statSync(file.toString());
+      return stat.isFile();
+    } catch {
+      return false;
+    }
+  }
+
   public async directoryExists(dir: DirectoryPath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(dir.toString());
+      return stat.isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  public directoryExistsSync(dir: DirectoryPath): boolean {
+    try {
+      const stat = fsExtra.statSync(dir.toString());
       return stat.isDirectory();
     } catch {
       return false;

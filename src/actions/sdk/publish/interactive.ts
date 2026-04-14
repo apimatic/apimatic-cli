@@ -9,6 +9,7 @@ import { ActionResult } from '../../action-result.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
+import { removeQuotes } from '../../../utils/string-utils.js';
 
 export class SdkPublishInteractiveAction {
   private readonly prompts: SdkPublishInteractivePrompts = new SdkPublishInteractivePrompts();
@@ -20,39 +21,29 @@ export class SdkPublishInteractiveAction {
     defaultBuildDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
-    // TODO: Figure out a better way to handle repititive input and validation loops instead of having multiple while(true) loops.
-    let buildDirectory: DirectoryPath;
-    while (true) {
-      const inputBuildDirectory = await this.prompts.inputBuildDirectory(defaultBuildDirectory);
-      if (!inputBuildDirectory) {
-        await this.prompts.noInputDirectoryProvided();
-        return ActionResult.cancelled();
+    const buildDirectory = await this.prompts.inputBuildDirectory(defaultBuildDirectory, (value) => {
+      if (!value) {
+        if (!new BuildContext(defaultBuildDirectory).validateSync())
+          return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
+        return;
       }
-      if (!(await new BuildContext(inputBuildDirectory).validate())) {
-        this.prompts.srcDirectoryInvalid(inputBuildDirectory);
-        continue;
-      }
-      buildDirectory = inputBuildDirectory;
-      break;
+      if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).validateSync())
+        return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
+    });
+    if (!buildDirectory) {
+      await this.prompts.noInputDirectoryProvided();
+      return ActionResult.cancelled();
     }
 
     const defaultSdkDirectory = buildDirectory.join('../sdk');
-
-    let sdkDirectory: DirectoryPath;
-    while (true) {
-      const inputSdkDirectory = await this.prompts.inputSdkDirectory(defaultSdkDirectory);
-      if (!inputSdkDirectory) {
-        await this.prompts.noSdkDirectoryProvided();
-        return ActionResult.cancelled();
-      }
-      
-      if (inputSdkDirectory.isEqual(buildDirectory)) {
-        this.prompts.sdkDirectoryCannotBeSameAsBuildDirectory();
-        continue;
-      }
-      
-      sdkDirectory = inputSdkDirectory;
-      break;
+    const sdkDirectory = await this.prompts.inputSdkDirectory(defaultSdkDirectory, (value) => {
+      if (!value) return;
+      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(buildDirectory))
+        return 'SDK directory must be different from the src directory.';
+    });
+    if (!sdkDirectory) {
+      await this.prompts.noSdkDirectoryProvided();
+      return ActionResult.cancelled();
     }
 
     const publishingProfilesResponse = await this.prompts.getPublishingProfiles(
@@ -101,7 +92,7 @@ export class SdkPublishInteractiveAction {
     const publishTypes = publishingProfile.getPublishTypesForLanguage(language);
 
     this.prompts.publishingSummary(publishingProfile, language, version, publishTypes);
-    
+
     const confirmed = await this.prompts.confirmPublishing();
     if (!confirmed) {
       this.prompts.publishingCancelled();
