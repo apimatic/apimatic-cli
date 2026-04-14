@@ -25,7 +25,7 @@ export class LauncherService {
   ): Promise<boolean> {
     try {
       const args = [directoryPath.toString(), ...filesToOpen.map(f => f.toString())];
-      await execa("code", ["--new-window", "--wait", ...args]);
+      await execa("code2", ["--new-window", "--wait", ...args]);
       return true;
     } catch {
       return false;

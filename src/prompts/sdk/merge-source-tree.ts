@@ -62,22 +62,40 @@ interactively to review and resolve the conflicts with SDK generation.`;
     log.info(`Opening ${f.var(language)} SDK in VS Code for conflicts resolution.`);
   }
 
-  public async waitForConflictsResolved(language: Language, sdkDir: DirectoryPath): Promise<boolean> {
+  public async waitForConflictsResolved(language: Language, sdkDir: DirectoryPath): Promise<boolean | undefined> {
     log.info(`Unable to open VS Code. Please resolve all conflicts in the ${f.var(language)} SDK at ${f.path(sdkDir)} to proceed.`);
-    const confirmed = await confirm({
+    return await this.confirmConflictsResolved();
+  }
+
+  public async confirmConflictsResolved(): Promise<boolean | undefined> {
+    const conflictsResolved = await confirm({
       message: `Have you resolved all conflicts?`,
       initialValue: false
     });
 
-    if (isCancel(confirmed)) {
+    if (isCancel(conflictsResolved)) {
+      return undefined;
+    }
+
+    return conflictsResolved;
+  }
+
+  public async confirmContinueResolvingConflicts() : Promise<boolean> {
+    const continueResolving = await confirm({
+      message: `Do you want to resolve the conflicts right now?`,
+      initialValue: false
+    });
+
+    if (isCancel(continueResolving)) {
       return false;
     }
 
-    return confirmed;
+    return continueResolving;
+
   }
 
   public conflictsResolved(language: Language) {
-    log.info(`All conflicts resolved for ${f.var(language)} SDK.`);
+    log.info(`Saved the current state of ${f.var(language)} SDK as resolved.`);
   }
 
   public operationCancelled() {

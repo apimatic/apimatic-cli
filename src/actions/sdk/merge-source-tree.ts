@@ -69,12 +69,23 @@ export class MergeSourceTreeAction {
     }
 
     do {
-      this.prompts.openingDirectoryForConflictResolution(language);
-
-      if (!await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles()) 
-        && !await this.prompts.waitForConflictsResolved(language, sdkWithSourceTree)) {
+      if (!await this.prompts.confirmContinueResolvingConflicts()) {
         this.prompts.operationCancelled();
         return ActionResult.cancelled();
+      }
+      this.prompts.openingDirectoryForConflictResolution(language);
+
+      const ideOpened = await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles());
+      const result = ideOpened
+        ? await this.prompts.confirmConflictsResolved()
+        : await this.prompts.waitForConflictsResolved(language, sdkWithSourceTree);
+
+      if (result === undefined) {
+        this.prompts.operationCancelled();
+        return ActionResult.cancelled();
+      }
+      if (result) {
+        break;
       }
 
       conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
