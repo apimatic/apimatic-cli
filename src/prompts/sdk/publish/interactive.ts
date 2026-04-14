@@ -21,7 +21,7 @@ export class SdkPublishInteractivePrompts {
   ): Promise<DirectoryPath | undefined> {
     const value = await text({
       message: `Enter the path to the directory containing the ${f.var('src')} folder:`,
-      placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
+      placeholder: 'Provide an absolute path to the directory or press Enter to use the current directory.',
       defaultValue: defaultDirectory.toString(),
       validate
     });
@@ -49,7 +49,7 @@ export class SdkPublishInteractivePrompts {
   ): Promise<DirectoryPath | undefined> {
     const value = await text({
       message: 'Enter the destination path for the generated SDK:',
-      placeholder: 'Provide an absolute path to the directory or press Enter to use the default.',
+      placeholder: 'Provide an absolute path to the directory or press Enter to use the current directory.',
       defaultValue: defaultDirectory.toString(),
       validate
     });
