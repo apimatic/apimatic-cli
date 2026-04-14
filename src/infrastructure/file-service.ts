@@ -215,10 +215,6 @@ export class FileService {
       return false;
     }
   }
-
-  public async hasContent(file: FilePath, content: string): Promise<boolean> {
-    return await this.fileExists(file) && (await this.readFile(file)).includes(content);
-  }
 }
 
 const streamPipeline = promisify(pipeline);

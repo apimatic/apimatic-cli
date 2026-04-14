@@ -54,7 +54,7 @@ interactively to review and resolve the conflicts with SDK generation.`;
   }
 
   public conflictsStillPresent(directory: Directory) {
-    log.warn("Conflicts are still present. Please resolve all conflicts and try again.");
+    log.warn("Conflicts are still present. Please mark all conflicts as resolved to proceed.");
     log.message(getTree(directory.toTreeNode()));
   }
 
