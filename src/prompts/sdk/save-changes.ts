@@ -44,15 +44,15 @@ export class SaveChangesPrompts {
   }
 
   public sdkSourceTreeNotFound(language: string) {
-    log.error(`No 'sdk-source-tree' found for ${f.var(language)}.`);
-    const message = `Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language), f.flag("track-changes"))}'
-to generate the SDK with 'sdk-source-tree'.`;
+    log.error(`No 'sdk-source-tree' found for ${f.var(language)}. You need to generate the SDK with change tracking enabled before you can save changes.`);
+    const message = `Generate the SDK with change tracking by running:
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)} ${f.flag("track-changes")}'
+Then customize your SDK and run ${f.cmdAlt("apimatic", "sdk", "save-changes")} again.`;
     noteWrapped(message, "Next Steps");
   }
 
   public operationCancelled() {
-    log.info("Exiting without saving any changes.");
+    log.warn("Exiting without saving any changes.");
   }
 
   public async directoryStillOpen(directory: DirectoryPath) {
@@ -60,34 +60,11 @@ to generate the SDK with 'sdk-source-tree'.`;
   }
 
   public modifiedFilesDetected(directory: Directory) {
-    log.message(`Detected changes in the following file(s):`);
-    log.message(getTree(directory.toTreeNode()));
+    log.info(`Detected changes in the following file(s):
+  ${getTree(directory.toTreeNode())}`);
   }
 
-  public noChangesDetected() {
-    log.info("No changes detected in the SDK.");
-  }
-
-  public openingDirectoryToReviewChanges() {
-    log.info(`Opening the changed files in VS Code for review.`);
-  }
-
-  public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
-    
-    log.info(`Unable to open VS Code. Review the changes at ${f.path(tempDirectory)} to proceed.`);
-    const confirmed = await confirm({
-      message: `Do you want to save these changes?`,
-      initialValue: false
-    });
-
-    if (isCancel(confirmed)) {
-      return false;
-    }
-
-    return confirmed;
-  }
-
-  public async confirmChanges(): Promise<boolean> {
+  public async confirmReviewChanges(): Promise<boolean> {
     const confirmed = await confirm({
       message: `Do you want to review these changes?`,
       initialValue: false
@@ -100,7 +77,33 @@ to generate the SDK with 'sdk-source-tree'.`;
     return confirmed;
   }
 
+  public noChangesDetected() {
+    log.info("No changes detected in the SDK.");
+  }
+
+  public openingDirectoryToReviewChanges() {
+    log.info(`Opening the changed files in VS Code for review. Close the editor to proceed.`);
+  }
+
+  public async reviewChangesManually(tempDirectory: DirectoryPath) {
+    log.info(`Review the changes at ${f.path(tempDirectory)} to proceed.`);
+  }
+
+  public async confirmSaveChanges(): Promise<boolean> {
+    const confirmed = await confirm({
+      message: `Do you want to save these changes?`,
+      initialValue: true
+    });
+
+    if (isCancel(confirmed)) {
+      return false;
+    }
+
+    return confirmed;
+  }
+
   public changesSaved(sourceTreePath: FilePath) {
     log.success(`Changes saved successfully at ${f.path(sourceTreePath)}.`);
+    log.info(`Your saved changes will reapply automatically the next time you generate this SDK.`);
   }
 }

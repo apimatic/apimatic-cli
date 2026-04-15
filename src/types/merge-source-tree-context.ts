@@ -31,7 +31,11 @@ export class MergeSourceTreeContext {
   }
 
   public async saveWithoutConflicts(): Promise<{ hasSourceTreeTracked: boolean, hasSourceTreeAlreadyTracked: boolean, hasAppliedCustomizations: boolean }> {
-    if (await this.fileService.fileExists(this.gitService.getMergeFiles(this.sdkWithSourceTree)[0])) {
+    const mergeFiles = this.gitService.getMergeFiles(this.sdkWithSourceTree);
+    if (await this.fileService.fileExists(mergeFiles[0])) {
+      for (const filePath of mergeFiles) {
+        await this.fileService.deleteFile(filePath);
+      }
       return { hasSourceTreeTracked: false, hasSourceTreeAlreadyTracked: false, hasAppliedCustomizations: false };
     }
 
@@ -48,14 +52,11 @@ export class MergeSourceTreeContext {
 
   public async saveWithResolvedConflicts(): Promise<void> {
     await this.gitService.commitResolvedConflicts(this.sdkWithSourceTree);
-    for (const filePath of this.gitService.getMergeFiles(this.sdkWithSourceTree)) {
-      await this.fileService.deleteFile(filePath);
-    }
-    await this.saveSourceTree();
 
     // Re create the sdkWithoutSourceTree using the updated resolved state of the sdkWithSourceTree
     await this.fileService.cleanDirectory(this.sdkWithoutSourceTree);
     await this.fileService.copyDirectoryExcluding(this.sdkWithSourceTree, this.sdkWithoutSourceTree, [new FileName(".git")]);
+    await this.saveSourceTree();
   }
 
   private async saveSourceTree(): Promise<void> {
@@ -65,14 +66,7 @@ export class MergeSourceTreeContext {
   }
 
   public async getConflictedFilesDirectory(): Promise<Directory> {
-    const updatedFilesDirectory = await this.gitService.getDirectoryWithUpdatedFiles(this.sdkWithSourceTree);
-    const conflictMarker = this.gitService.getConflictMarker();
-    return updatedFilesDirectory.mapFilesInDirectory(async (directoryPath, fileItem) => {
-      if (await this.fileService.hasContent(new FilePath(directoryPath, fileItem.fileName), conflictMarker)) {
-        return { fileName: fileItem.fileName, description: "# Conflicted file" };
-      }
-      return undefined;
-    });
+    return await this.gitService.getDirectoryWithUnmergedFiles(this.sdkWithSourceTree);
   }
 
   public async cleanUp(onCleanUpFailure: () => Promise<void>): Promise<void> {

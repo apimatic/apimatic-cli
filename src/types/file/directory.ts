@@ -146,4 +146,42 @@ export class Directory {
   private isRootContentDirectory(baseContentPath: DirectoryPath): boolean {
     return this.directoryPath.toString() === baseContentPath.toString();
   }
+
+  public static createFromRelativePaths(rootDir: DirectoryPath, fileItems: FileItem[]): Directory {
+    type PendingDirectoryItem = FileItem | PendingDir;
+    type PendingDir = { pendingDirPath: DirectoryPath; items: PendingDirectoryItem[] };
+
+    const buildDirectory = (pending: PendingDir): Directory => new Directory(
+      pending.pendingDirPath,
+      pending.items.map((item) => ("pendingDirPath" in item ? buildDirectory(item) : item))
+    );
+
+    const root: PendingDir = { pendingDirPath: rootDir, items: [] };
+    for (const file of fileItems) {
+      const parts = file.fileName.toString().split(/[\\/]/);
+      let currentDir = root;
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const isLastPart = i === parts.length - 1;
+
+        if (isLastPart) {
+          currentDir.items.push({ fileName: new FileName(part), description: file.description });
+        } else {
+          let existingDir = currentDir.items.find(
+            (item) => "pendingDirPath" in item && item.pendingDirPath.leafName() === part
+          ) as PendingDir | undefined;
+
+          if (!existingDir) {
+            existingDir = { pendingDirPath: currentDir.pendingDirPath.join(part), items: [] };
+            currentDir.items.push(existingDir);
+          }
+
+          currentDir = existingDir;
+        }
+      }
+    }
+
+    return buildDirectory(root);
+  }
 }

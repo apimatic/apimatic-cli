@@ -46,10 +46,12 @@ export class PortalGeneratePrompts {
   }
 
   public portalGenerationSdkMergeFailed(sdkMergeFailedErrors: string[]) {
-    log.error(`While generating portal, there were merge conflicts in the following SDKs:\n- ${sdkMergeFailedErrors.join("\n- ")}`);
-    const message = `Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", "<language>"))}'
-interactively to review and resolve the conflicts with SDK generation.`;
+    log.error(`Saved changes couldn't be applied to one or more SDKs.`);
+    const language = sdkMergeFailedErrors.length === 1 ? sdkMergeFailedErrors[0] : "<language>";
+    log.error(`Merge conflicts found in:\n- ${sdkMergeFailedErrors.join("\n- ")}`);
+    const message = `Review and resolve the conflicts first by running:
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)}'
+After resolving merge conflicts, retry ${f.cmdAlt("apimatic", "portal", "generate")}.`;
     noteWrapped(message, "Next Steps");
   }
 

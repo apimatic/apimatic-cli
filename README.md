@@ -48,6 +48,7 @@ USAGE
 * [`apimatic portal toc new`](#apimatic-portal-toc-new)
 * [`apimatic quickstart`](#apimatic-quickstart)
 * [`apimatic sdk generate`](#apimatic-sdk-generate)
+* [`apimatic sdk save-changes`](#apimatic-sdk-save-changes)
 
 ## `apimatic api transform`
 
@@ -411,18 +412,21 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-i <value>] [-d <value>] [--api-version
-    <value>] [-f] [--zip] [-k <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--skip-changes]
+    [--api-version <value>] [--zip] [--track-changes] [-i <value>] [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  directory where the SDK will be generated
+  -d, --destination=<value>  [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK
+                             will be generated
   -f, --force                overwrite changes without asking for user consent.
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-  -l, --language=<option>    (required) programming language for SDK generation
+  -l, --language=<option>    (required) Programming language for SDK generation
                              <options: csharp|java|php|python|ruby|typescript|go>
       --api-version=<value>  Version of the API to use for SDK generation (if multiple versions exist)
+      --skip-changes         Do not apply the saved changes to the generated SDK
+      --track-changes        Enable change tracking for SDK generation (only required for initial setup)
       --zip                  Download the generated SDK as a .zip archive
 
 DESCRIPTION
@@ -440,4 +444,36 @@ EXAMPLES
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/generate.ts)_
+
+## `apimatic sdk save-changes`
+
+Save customizations made to an auto-generated SDK
+
+```
+USAGE
+  $ apimatic sdk save-changes -l csharp|java|php|python|ruby|typescript|go [--sdk <value>] [--api-version <value>] [-i
+    <value>]
+
+FLAGS
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -l, --language=<option>    (required) Programming language of the SDK
+                             <options: csharp|java|php|python|ruby|typescript|go>
+      --api-version=<value>  Version of the API where changes should be saved (if multiple versions exist).
+      --sdk=<value>          [default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing
+                             the updated SDK.
+
+DESCRIPTION
+  Save customizations made to an auto-generated SDK
+
+  Requires an input directory with API specifications, a path to the updated SDK directory, and the programming
+  language.
+
+EXAMPLES
+  apimatic sdk save-changes --language=csharp
+
+  apimatic sdk save-changes --language=java --sdk=./sdk
+```
+
+_See code: [src/commands/sdk/save-changes.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/save-changes.ts)_
 <!-- commandsstop -->

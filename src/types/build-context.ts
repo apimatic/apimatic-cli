@@ -25,6 +25,10 @@ export class BuildContext {
     return await this.fileService.fileExists(this.buildFile);
   }
 
+  public async exists(): Promise<boolean> {
+    return await this.fileService.directoryExists(this.buildDirectory);
+  }
+
   public async getBuildFileContents(): Promise<BuildConfig> {
     const buildFileContent = await this.fileService.getContents(this.buildFile);
     return JSON.parse(buildFileContent) as BuildConfig;
@@ -59,6 +63,9 @@ export class BuildContext {
   }
 
   public async isVersionedBuild(): Promise<boolean> {
+    if (!await this.validate()) {
+      return false;
+    }
     const buildConfig = await this.getBuildFileContents();
     if (buildConfig.generateVersionedPortal) {
       return true;

@@ -5,7 +5,6 @@ import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
 import { ServiceError } from "../../infrastructure/service-error.js";
 import { GeneratedSdkResult } from "../../infrastructure/services/portal-service.js";
-import { Language } from "../../types/sdk/generate.js";
 
 export class SdkGeneratePrompts {
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -79,6 +78,6 @@ export class SdkGeneratePrompts {
   }
 
   public sdkGenerated(sdk: DirectoryPath) {
-    log.info(`Generated SDK can be found at ${f.path(sdk)}.`);
+    log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
   }
 }

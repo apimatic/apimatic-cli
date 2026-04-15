@@ -3,7 +3,7 @@ import fs from "fs";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FileName } from "../types/file/fileName.js";
 import { FilePath } from "../types/file/filePath.js";
-import { Directory, FileItem } from "../types/file/directory.js";
+import { Directory } from "../types/file/directory.js";
 
 const GIT_AUTHOR = { name: "APIMatic-bot", email: "developer@apimatic.io" } as const;
 const CUSTOM_BRANCH = "custom-code";
@@ -48,49 +48,15 @@ export class GitService {
       .filter(([, headStatus, workdirStatus, stageStatus]) => headStatus !== workdirStatus || stageStatus === 3)
       .map(([relativePath, workdirStatus, headStatus]) => {
         if (headStatus === 0) {
-          return { relativePath, description: "# Deleted" };
+          return { fileName: new FileName(relativePath), description: "# Deleted" };
         }
         if (workdirStatus === 0) {
-          return { relativePath, description: "# Added" };
+          return { fileName: new FileName(relativePath), description: "# Added" };
         }
-        return { relativePath, description: "# Modified" };
+        return { fileName: new FileName(relativePath), description: "# Modified" };
       });
 
-    type PendingDirectoryItem = FileItem | PendingDir;
-    type PendingDir = { pendingDirPath: DirectoryPath; items: PendingDirectoryItem[] };
-
-    const buildDirectory = (pending: PendingDir): Directory => new Directory(
-      pending.pendingDirPath,
-      pending.items.map((item) => ("pendingDirPath" in item ? buildDirectory(item) : item))
-    );
-
-    const root: PendingDir = { pendingDirPath: dirPath, items: [] };
-    for (const file of relativeUncommitedFiles) {
-      const parts = file.relativePath.split(/[\\/]/);
-      let currentDir = root;
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        const isLastPart = i === parts.length - 1;
-
-        if (isLastPart) {
-          currentDir.items.push({ fileName: new FileName(part), description: file.description });
-        } else {
-          let existingDir = currentDir.items.find(
-            (item) => "pendingDirPath" in item && item.pendingDirPath.leafName() === part
-          ) as PendingDir | undefined;
-
-          if (!existingDir) {
-            existingDir = { pendingDirPath: currentDir.pendingDirPath.join(part), items: [] };
-            currentDir.items.push(existingDir);
-          }
-
-          currentDir = existingDir;
-        }
-      }
-    }
-
-    return buildDirectory(root);
+    return Directory.createFromRelativePaths(dirPath, relativeUncommitedFiles);
   }
 
   private async stageAll(dir: DirectoryPath): Promise<void> {
@@ -108,17 +74,32 @@ export class GitService {
     );
   }
 
-  public getConflictMarker(): string {
-    return "<<<<<<< ";
+  public async getDirectoryWithUnmergedFiles(dir: DirectoryPath): Promise<Directory> {
+    try {
+      await git.merge({ fs, dir: dir.toString(), ours: CUSTOM_BRANCH, theirs: MAIN_BRANCH, author: GIT_AUTHOR });
+      return new Directory(dir, []);
+    } catch (error) {
+      if (error instanceof git.Errors.UnmergedPathsError) {
+        return Directory.createFromRelativePaths(dir, error.data.filepaths.map((filePath) => ({ fileName: new FileName(filePath), description: "# Conflicted file" })));
+      }
+      if (error instanceof git.Errors.MergeConflictError) {
+        return new Directory(dir, []);
+      }
+      throw error;
+    }
   }
 
   public async commitResolvedConflicts(dir: DirectoryPath): Promise<void> {
     await this.stageAll(dir);
-    await git.commit({ fs, dir: dir.toString(), message: "feat: resolve merge conflicts", author: GIT_AUTHOR });
-
     const headOid = await git.resolveRef({ fs, dir: dir.toString(), ref: "HEAD" });
-    await git.writeRef({ fs, dir: dir.toString(), ref: `refs/heads/${MAIN_BRANCH}`, value: headOid, force: true });
-    await git.writeRef({ fs, dir: dir.toString(), ref: `refs/heads/${CUSTOM_BRANCH}`, value: headOid, force: true });
+    const mainOid = await git.resolveRef({ fs, dir: dir.toString(), ref: MAIN_BRANCH });
+    await git.commit({
+      fs,
+      dir: dir.toString(),
+      message: `Merge branch '${MAIN_BRANCH}' into ${CUSTOM_BRANCH}`,
+      author: GIT_AUTHOR,
+      parent: [headOid, mainOid],
+    });
   }
 
   public async commitReviewedChanges(dir: DirectoryPath): Promise<void> {

@@ -59,31 +59,43 @@ export class MergeSourceTreeAction {
       return ActionResult.success({sourceTreeTrackingInitiated: true, conflictsResolved: false});
     }
 
+    this.prompts.startApplyingConflictedChanges(language);
+    
     let conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
 
-    this.prompts.conflictsDetected(language, conflictedFilesDirectory);
-
     if (isInCi) {
-      this.prompts.errorMergeConflicts(language);
+      this.prompts.conflictsDetectedInCi(language, conflictedFilesDirectory);
       return ActionResult.failed();
     }
 
-    do {
-      this.prompts.openingDirectoryForConflictResolution(language);
+    while (!conflictedFilesDirectory.isEmpty()) {
+      this.prompts.conflictsDetected(conflictedFilesDirectory);
 
-      if (!await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles()) 
-        && !await this.prompts.waitForConflictsResolved(language, sdkWithSourceTree)) {
-        this.prompts.operationCancelled();
-        return ActionResult.cancelled();
+      if (!await this.prompts.resolveNowOrAbandon()) {
+        this.prompts.mergeAbandoned(language);
+        return ActionResult.failed();
+      }
+
+      if (await this.launcherService.isIdeAvailable()) {
+        this.prompts.openingVsCodeForConflictResolution(language);
+        await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles())
+      } else {
+        this.prompts.openFilesForConflictResolution(language, sdkWithSourceTree);
+      }
+
+      const response = await this.prompts.confirmConflictsResolved();
+
+      if (response === "cancelled") {
+        this.prompts.mergeAbandoned(language);
+        return ActionResult.failed();
+      }
+
+      if (response === "resolved") {
+        break;
       }
 
       conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
-
-      if (!conflictedFilesDirectory.isEmpty()) {
-        this.prompts.conflictsStillPresent(conflictedFilesDirectory);
-      }
-
-    } while (!conflictedFilesDirectory.isEmpty());
+    }
 
     await mergeSourceTreeContext.saveWithResolvedConflicts();
     this.prompts.conflictsResolved(language);
