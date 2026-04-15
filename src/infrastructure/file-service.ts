@@ -9,6 +9,7 @@ import { Directory } from "../types/file/directory.js";
 import { FileName } from "../types/file/fileName.js";
 
 export class FileService {
+
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(file.toString());
@@ -41,6 +42,19 @@ export class FileService {
     await fsExtra.emptyDir(dir.toString()); // removes everything inside, keeps the dir
   }
 
+  public async cleanDirectoryExcluding(dir: DirectoryPath, excludeNames: FileName[]): Promise<void> {
+    await fsExtra.ensureDir(dir.toString());
+    const entries = await fsExtra.readdir(dir.toString());
+
+    await Promise.all(
+      entries
+        .filter((entry) => !excludeNames.find((exclude) => exclude.toString() === entry))
+        .map(async (entry) => {
+          return fsExtra.remove(dir.join(entry).toString());
+        })
+    );
+  }
+
   public async createDirectoryIfNotExists(dir: DirectoryPath): Promise<void> {
     await fsExtra.ensureDir(dir.toString());
   }
@@ -51,22 +65,30 @@ export class FileService {
       entries.map(async (entry) => {
         const fullPath = path.join(directoryPath.toString(), entry);
         const stat = await fsExtra.stat(fullPath);
-        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : new FileName(entry);
+        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : { fileName: new FileName(entry) };
       })
     );
     return new Directory(directoryPath, results);
   }
 
   public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
-  try {
-    const entries = await fsExtra.readdir(dir.toString(), { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => dir.join(entry.name));
-  } catch {
-    return [];
+    try {
+      const entries = await fsExtra.readdir(dir.toString());
+      const directories: DirectoryPath[] = [];
+
+      for (const entry of entries) {
+        const fullPath = dir.join(entry).toString();
+        const stat = await fsExtra.stat(fullPath);
+        if (stat.isDirectory()) {
+          directories.push(new DirectoryPath(fullPath));
+        }
+      }
+
+      return directories;
+    } catch {
+      return [];
+    }
   }
-}
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
     const entries = await fsExtra.readdir(source.toString());
@@ -76,6 +98,32 @@ export class FileService {
         const destEntry = path.join(destination.toString(), entry);
         await fsExtra.copy(srcEntry, destEntry);
       })
+    );
+  }
+
+  public async copyDirectoryExcluding(
+    source: DirectoryPath,
+    destination: DirectoryPath,
+    excludeNames: FileName[]
+  ): Promise<void> {
+    await this.createDirectoryIfNotExists(destination);
+
+    const entries = await fsExtra.readdir(source.toString());
+
+    await Promise.all(
+      entries
+        .filter((entry) => !excludeNames.find((exclude) => exclude.toString() === entry))
+        .map(async (entry) => {
+          const sourcePath = path.join(source.toString(), entry);
+          const destPath = path.join(destination.toString(), entry);
+          const stat = await fsExtra.stat(sourcePath);
+
+          if (stat.isDirectory()) {
+            return this.copyDirectoryExcluding(new DirectoryPath(sourcePath), new DirectoryPath(destPath), excludeNames);
+          }
+
+          return fsExtra.copyFile(sourcePath, destPath);
+        })
     );
   }
 
@@ -90,6 +138,20 @@ export class FileService {
     const exists = await this.directoryExists(dirPath);
     if (exists) {
       await fsExtra.remove(dirPath.toString());
+    }
+  }
+
+  public async pollDeleteDirectory(dirPath: DirectoryPath, onDeleteFailurePersists: () => void): Promise<void> {
+    const timeoutMs = 5 * 60 * 1000;
+    const deadline = Date.now() + timeoutMs;
+    const deleteFailurePersistsMaxDelay = Date.now() + 5 * 1000;
+    let actionPerformed = false;
+    while (Date.now() < deadline && await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
+      if (!actionPerformed && Date.now() > deleteFailurePersistsMaxDelay) {
+        onDeleteFailurePersists();
+        actionPerformed = true;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
     }
   }
 
@@ -133,6 +195,10 @@ export class FileService {
 
   public async copyToDir(source: FilePath, destination: DirectoryPath) {
     await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
+  }
+
+  public async readFile(filePath: FilePath): Promise<string> {
+    return await fsExtra.readFile(filePath.toString(), "utf-8");
   }
 
   public async isZipFile(filePath: FilePath): Promise<boolean> {

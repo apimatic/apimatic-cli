@@ -2,35 +2,61 @@ import { FileService } from "../infrastructure/file-service.js";
 import { DirectoryPath } from "./file/directoryPath.js";
 import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
-import { ZipService } from "../infrastructure/zip-service.js";
 import { Language } from "./sdk/generate.js";
+import { ZipService } from "../infrastructure/zip-service.js";
 
 export class SdkContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
+  private readonly sdkDirectory: DirectoryPath;
 
-  constructor(private readonly sdkDirectory: DirectoryPath, private readonly language: Language) {
+  constructor(
+    private readonly language: Language,
+    sdkDirectory: DirectoryPath,
+    requireUncustomizedDir: boolean,
+    version?: string
+  ) {
+    const baseDirectory = requireUncustomizedDir ? sdkDirectory.join('uncustomized') : sdkDirectory;
+
+    this.sdkDirectory = version ? baseDirectory.join(version).join(language) : baseDirectory.join(language);
   }
 
   private get zipPath(): FilePath {
-    return new FilePath(this.sdkLanguageDirectory, new FileName(`${this.language}.zip`));
-  }
-  
-  public get sdkLanguageDirectory(): DirectoryPath {
-    return this.sdkDirectory.join(this.language);
+    return new FilePath(this.sdkDirectory, new FileName(`${this.language}.zip`));
   }
 
   public async exists() {
-    return !(await this.fileService.directoryEmpty(this.sdkLanguageDirectory));
+    return !(await this.fileService.directoryEmpty(this.sdkDirectory));
   }
 
-  public async save(tempPortalFilePath: FilePath, zipPortal: boolean) {
-    await this.fileService.cleanDirectory(this.sdkLanguageDirectory);
-    if (zipPortal) {
-      await this.fileService.copy(tempPortalFilePath, this.zipPath);
+  public async save(tempSdkDirectory: DirectoryPath, zipSdk: boolean): Promise<DirectoryPath> {
+    await this.fileService.cleanDirectory(this.sdkDirectory);
+    if (!zipSdk) {
+      await this.fileService.copyDirectoryContents(tempSdkDirectory, this.sdkDirectory);
     } else {
-      await this.zipService.unArchive(tempPortalFilePath, this.sdkLanguageDirectory);
+      await this.zipService.archive(tempSdkDirectory, this.zipPath);
     }
-    return this.sdkLanguageDirectory;
+    return this.sdkDirectory;
+  }
+
+  public async loadSdkInTempDirectory(tempDirectory: DirectoryPath, tempSdk: FilePath): Promise<DirectoryPath> {
+    const tempSdkDirectory = tempDirectory.join('sdk-original');
+    await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
+    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    return tempSdkDirectory;
+  }
+
+  public async loadSdkWithSourceTreeInTempDirectory(
+    tempDirectory: DirectoryPath,
+    tempSdk: FilePath,
+    tempSdkSourceTree: FilePath
+  ): Promise<DirectoryPath> {
+    const tempSdkDirectory = tempDirectory.join('sdk');
+    await this.fileService.createDirectoryIfNotExists(tempSdkDirectory);
+    await this.zipService.unArchive(tempSdk, tempSdkDirectory);
+    const gitSourceTreeDir = tempSdkDirectory.join('.git');
+    await this.fileService.createDirectoryIfNotExists(gitSourceTreeDir);
+    await this.zipService.unArchive(tempSdkSourceTree, gitSourceTreeDir);
+    return tempSdkDirectory;
   }
 }

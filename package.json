@@ -47,7 +47,7 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
-        "@apimatic/sdk": "^0.2.0-alpha.7",
+        "@apimatic/sdk": "0.2.0-alpha.8",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
@@ -65,6 +65,7 @@
         "fs-extra": "^11.3.0",
         "get-port": "^7.1.0",
         "is-in-ci": "^2.0.0",
+        "isomorphic-git": "^1.37.2",
         "livereload": "^0.9.3",
         "neverthrow": "^8.2.0",
         "open": "^8.4.0",

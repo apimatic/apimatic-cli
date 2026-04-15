@@ -95,7 +95,6 @@ export interface TreeNode extends LeafNode {
   items: Array<TreeNode | LeafNode>;
 }
 
-
 export function getTree(
   dir: TreeNode,
   prefix: string = "",
@@ -125,5 +124,3 @@ export function getTree(
 
   return output;
 }
-
-

@@ -1,0 +1,109 @@
+import { log, isCancel, select, confirm } from "@clack/prompts";
+import { DirectoryPath } from "../../types/file/directoryPath.js";
+import { format as f, getTree } from "../format.js";
+import { noteWrapped } from "../prompt.js";
+import { FilePath } from "../../types/file/filePath.js";
+import { Directory } from "../../types/file/directory.js";
+
+export class SaveChangesPrompts {
+  
+  public srcDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
+  }
+
+  public invalidSdkDirectory(directory: DirectoryPath) {
+    const message = `SDK directory does not exist: ${f.path(directory)}`;
+    log.error(message);
+  }
+
+  public invalidVersionedDocsDirectory(directory: DirectoryPath) {
+    const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
+  }
+
+  public apiVersionOnlyApplicableWithVersionedBuild() {
+    log.warn(`The ${f.flag("api-version")} is only applicable with a versioned build.`);
+  }
+
+  public versionNotFound() {
+    log.error(`The selected API version is invalid.`);
+  }
+
+  public async selectVersion(versions: string[]): Promise<string | undefined> {
+    const version = await select({
+      message: "Select an API version to save SDK changes into:",
+      options: versions.map((v) => ({ label: v, value: v }))
+    });
+
+    if (isCancel(version)) {
+      return undefined;
+    }
+
+    return version;
+  }
+
+  public sdkSourceTreeNotFound(language: string) {
+    log.error(`No 'sdk-source-tree' found for ${f.var(language)}. You need to generate the SDK with change tracking enabled before you can save changes.`);
+    const message = `Generate the SDK with change tracking by running:
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)} ${f.flag("track-changes")}'
+Then customize your SDK and run ${f.cmdAlt("apimatic", "sdk", "save-changes")} again.`;
+    noteWrapped(message, "Next Steps");
+  }
+
+  public operationCancelled() {
+    log.warn("Exiting without saving any changes.");
+  }
+
+  public async directoryStillOpen(directory: DirectoryPath) {
+    log.info(`Please close all applications using the directory ${f.path(directory)} to allow cleanup of temporary files.`);
+  }
+
+  public modifiedFilesDetected(directory: Directory) {
+    log.info(`Detected changes in the following file(s):
+  ${getTree(directory.toTreeNode())}`);
+  }
+
+  public async confirmReviewChanges(): Promise<boolean> {
+    const confirmed = await confirm({
+      message: `Do you want to review these changes?`,
+      initialValue: false
+    });
+
+    if (isCancel(confirmed)) {
+      return false;
+    }
+
+    return confirmed;
+  }
+
+  public noChangesDetected() {
+    log.info("No changes detected in the SDK.");
+  }
+
+  public openingDirectoryToReviewChanges() {
+    log.info(`Opening the changed files in VS Code for review. Close the editor to proceed.`);
+  }
+
+  public async reviewChangesManually(tempDirectory: DirectoryPath) {
+    log.info(`Review the changes at ${f.path(tempDirectory)} to proceed.`);
+  }
+
+  public async confirmSaveChanges(): Promise<boolean> {
+    const confirmed = await confirm({
+      message: `Do you want to save these changes?`,
+      initialValue: true
+    });
+
+    if (isCancel(confirmed)) {
+      return false;
+    }
+
+    return confirmed;
+  }
+
+  public changesSaved(sourceTreePath: FilePath) {
+    log.success(`Changes saved successfully at ${f.path(sourceTreePath)}.`);
+    log.info(`Your saved changes will reapply automatically the next time you generate this SDK.`);
+  }
+}

@@ -14,7 +14,7 @@ export class ZipService {
       archive.on("error", (err) => reject(err));
 
       archive.pipe(output);
-      archive.directory(sourceDir.toString(), false); // false: don't nest under folder
+      archive.directory(sourceDir.toString(), false);
       archive.finalize();
     });
   }

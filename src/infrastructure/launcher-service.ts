@@ -11,7 +11,31 @@ export class LauncherService {
   public async openFolderInIde(directoryPath: DirectoryPath, fileToOpen: FilePath): Promise<boolean> {
     if (isInCi) return false;
     try {
-      await execa("code", [directoryPath.toString(), fileToOpen.toString()]);
+      const args = [directoryPath.toString(), fileToOpen.toString()];
+      await execa("code", args);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public async isIdeAvailable(): Promise<boolean> {
+    try {
+      const command = process.platform === "win32" ? "where" : "which";
+      await execa(command, ["code"]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public async openFolderInIdeWithWait(
+    directoryPath: DirectoryPath,
+    filesToOpen: FilePath[]
+  ): Promise<boolean> {
+    try {
+      const args = [directoryPath.toString(), ...filesToOpen.map(f => f.toString())];
+      await execa("code", ["--new-window", "--wait", ...args]);
       return true;
     } catch {
       return false;

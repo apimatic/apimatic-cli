@@ -3,12 +3,12 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { ActionResult } from "../action-result.js";
 import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 import { SdkContext } from "../../types/sdk-context.js";
-import { VersionedBuildContext } from "../../types/versioned-build-context.js";
 import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
-import { SpecContext } from "../../types/spec-context.js";
+import { MergeSourceTreeAction } from "./merge-source-tree.js";
+import { BuildContext } from "../../types/build-context.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -25,79 +25,113 @@ export class GenerateAction {
 
   public readonly execute = async (
     buildDirectory: DirectoryPath,
-    sdkDirectory: DirectoryPath,
+    destinationSdkDirectory: DirectoryPath,
     language: Language,
     force: boolean,
     zipSdk: boolean,
+    skipChanges: boolean,
+    trackChanges: boolean,
     apiVersion?: string
-  ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(sdkDirectory)) {
+  ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
+    if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
     }
 
-    const versionedBuildContext = new VersionedBuildContext(buildDirectory);
-    const versionedBuildResult = await versionedBuildContext.validate();
-    if (versionedBuildResult.isValid) {
-      if (versionedBuildResult.versions.length === 0) {
-        this.prompts.versionedBuildEmpty(versionedBuildResult.versionsDirectory);
-        return ActionResult.failed();
-      }
-
-      let version: string;
-      if (apiVersion) {
-        if (!versionedBuildResult.versions.includes(apiVersion)) {
-          this.prompts.versionNotFound();
-          return ActionResult.failed();
-        }
-        version = apiVersion;
-      } else if (versionedBuildResult.versions.length === 1) {
-        version = versionedBuildResult.versions[0];
-      } else {
-        const selectedVersion = await this.prompts.selectVersion(versionedBuildResult.versions);
-        if (!selectedVersion) {
-          return ActionResult.cancelled();
-        }
-        version = selectedVersion;
-      }
-
-      buildDirectory = versionedBuildResult.versionsDirectory.join(version);
-      sdkDirectory = sdkDirectory.join(version);
-    }
-
-    const specDirectory = buildDirectory.join("spec");
-    const specContext = new SpecContext(specDirectory);
-    if (!(await specContext.validate())) {
-      this.prompts.specDirectoryEmpty(specDirectory);
+    const rootBuildContext = new BuildContext(buildDirectory);
+    if (!(await rootBuildContext.exists())) {
+      this.prompts.srcDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
-    const sdkContext = new SdkContext(sdkDirectory, language);
-    if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(sdkContext.sdkLanguageDirectory))) {
+    const versionedContextGetter = async () => {
+      if (!await rootBuildContext.isVersionedBuild()) {
+        if (apiVersion) this.prompts.apiVersionOnlyApplicableWithVersionedBuild();
+        return { version: undefined, buildContext: rootBuildContext };
+      }
+
+      const versionedBuildDirectory = await rootBuildContext.getVersionedBuildDirectory();
+      if (!versionedBuildDirectory) {
+        this.prompts.invalidVersionedDocsDirectory(buildDirectory);
+        return ActionResult.failed();
+      }
+
+      const singleVersionedBuildDirectory = await rootBuildContext.getSingleVersionedBuildDirectory();
+      if (!apiVersion && singleVersionedBuildDirectory) {
+        return {
+          version: singleVersionedBuildDirectory.leafName(),
+          buildContext: new BuildContext(singleVersionedBuildDirectory)
+        };
+      }
+
+      const selectedVersionedBuildDirectory = await rootBuildContext.getSelectedVersionedBuildDirectory(
+        apiVersion ? async () => apiVersion : this.prompts.selectVersion
+      );
+      if (!selectedVersionedBuildDirectory) {
+        this.prompts.versionNotFound();
+        return ActionResult.failed();
+      }
+
+      return {
+        version: selectedVersionedBuildDirectory.leafName(),
+        buildContext: new BuildContext(selectedVersionedBuildDirectory)
+      };
+    };
+
+    const versionedContext = await versionedContextGetter();
+    if (versionedContext instanceof ActionResult) {
+      return versionedContext;
+    }
+
+    const { version, buildContext } = versionedContext;
+
+    if (!(await buildContext.getSpecContext().validate())) {
+      this.prompts.specDirectoryEmpty(buildDirectory);
+      return ActionResult.failed();
+    }
+
+    const hasSdkSourceTree = await buildContext.hasSdkSourceTree(language);
+    const sdkContext = new SdkContext(language, destinationSdkDirectory, skipChanges && hasSdkSourceTree, version);
+    if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(destinationSdkDirectory))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
     }
 
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const buildZipPath = await tempContext.zip(buildDirectory);
+      const buildZipPath = await tempContext.zip(buildContext.getBuildDirectory());
 
       const response = await this.prompts.generateSDK(
         this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey)
       );
 
-      // TODO: this should be service error
       if (response.isErr()) {
         this.prompts.sdkGenerationServiceError(response.error);
         return ActionResult.failed();
       }
 
-      const tempSdkFilePath = await tempContext.save(response.value);
-      const sdkLanguageDirectory = await sdkContext.save(tempSdkFilePath, zipSdk);
+      const responseSdkZipPath = await tempContext.save(response.value.sdk);
+      const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
 
-      this.prompts.sdkGenerated(sdkLanguageDirectory);
+      if (!trackChanges && !hasSdkSourceTree) {
+        this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
+        return ActionResult.success();
+      }
 
-      return ActionResult.success();
+      const sdkSourceTreeTempFilePath = await tempContext.save(response.value.sdkSourceTree);
+
+      const tempSdkWithSourceTree = await sdkContext.loadSdkWithSourceTreeInTempDirectory(
+        tempDirectory,
+        responseSdkZipPath,
+        sdkSourceTreeTempFilePath
+      );
+      const destinationSourceTreePath = buildContext.getSdkSourceTree(language);
+
+      const mergeSourceTree = new MergeSourceTreeAction();
+      return await mergeSourceTree.execute(
+        tempSdkWithSourceTree, tempSdk, destinationSourceTreePath, trackChanges, skipChanges, hasSdkSourceTree,
+        language, destinationSdkDirectory, version, zipSdk
+      );
     });
   };
 }

@@ -1,6 +1,5 @@
 import * as path from "path";
 
-
 export class DirectoryPath {
   private readonly directoryPath: string;
 
@@ -28,6 +27,7 @@ export class DirectoryPath {
   public isEqual(other: DirectoryPath) {
     return this.directoryPath === other.directoryPath;
   }
+
   public leafName() {
     return path.basename(this.directoryPath);
   }
