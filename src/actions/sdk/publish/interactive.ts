@@ -127,7 +127,7 @@ export class SdkPublishInteractiveAction {
   ): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) {
-        if (!new BuildContext(defaultBuildDirectory).validateSync())
+        if (!new BuildContext(defaultBuildDirectory.join('src')).validateSync())
           return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
         return;
       }
