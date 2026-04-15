@@ -49,7 +49,7 @@ USAGE
 * [`apimatic publishing profile list`](#apimatic-publishing-profile-list)
 * [`apimatic quickstart`](#apimatic-quickstart)
 * [`apimatic sdk generate`](#apimatic-sdk-generate)
-* [`apimatic sdk publish`](#apimatic-sdk-publish)
+* [`apimatic sdk save-changes`](#apimatic-sdk-save-changes)
 
 ## `apimatic api transform`
 
@@ -432,18 +432,21 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-i <value>] [-d <value>] [--api-version
-    <value>] [-f] [--zip] [-k <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--skip-changes]
+    [--api-version <value>] [--zip] [--track-changes] [-i <value>] [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  directory where the SDK will be generated
+  -d, --destination=<value>  [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK
+                             will be generated
   -f, --force                overwrite changes without asking for user consent.
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-  -l, --language=<option>    (required) programming language for SDK generation
+  -l, --language=<option>    (required) Programming language for SDK generation
                              <options: csharp|java|php|python|ruby|typescript|go>
       --api-version=<value>  Version of the API to use for SDK generation (if multiple versions exist)
+      --skip-changes         Do not apply the saved changes to the generated SDK
+      --track-changes        Enable change tracking for SDK generation (only required for initial setup)
       --zip                  Download the generated SDK as a .zip archive
 
 DESCRIPTION
@@ -462,45 +465,35 @@ EXAMPLES
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/generate.ts)_
 
-## `apimatic sdk publish`
+## `apimatic sdk save-changes`
 
-Generate and publish an SDK to a package registry or source repository
+Save customizations made to an auto-generated SDK
 
 ```
 USAGE
-  $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript] [-f]
-    [-i <value>] [--publish-type package|sourcecode...] [--dry-run]
+  $ apimatic sdk save-changes -l csharp|java|php|python|ruby|typescript|go [--sdk <value>] [--api-version <value>] [-i
+    <value>]
 
 FLAGS
-  -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
-  -f, --force                     overwrite changes without asking for user consent.
-  -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
-                                  includes API specifications and configuration files.
-  -l, --language=<option>         Language of the SDK to generate and publish.
-                                  <options: csharp|java|php|python|ruby|typescript>
-  -p, --profile-id=<value>        Id of the publishing profile to use.
-  -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
-      --dry-run                   Generate the SDK locally for review without publishing.
-      --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
-                                  git repository.
-                                  <options: package|sourcecode>
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -l, --language=<option>    (required) Programming language of the SDK
+                             <options: csharp|java|php|python|ruby|typescript|go>
+      --api-version=<value>  Version of the API where changes should be saved (if multiple versions exist).
+      --sdk=<value>          [default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing
+                             the updated SDK.
 
 DESCRIPTION
-  Generate and publish an SDK to a package registry or source repository
+  Save customizations made to an auto-generated SDK
 
-  Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory
-  containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required
-  flags for CI/CD automation.
+  Requires an input directory with API specifications, a path to the updated SDK directory, and the programming
+  language.
 
 EXAMPLES
-  apimatic sdk publish
+  apimatic sdk save-changes --language=csharp
 
-  apimatic sdk publish --profile-id=a1b2c3d4e5f6a1b2c3d4e5f6 --language=typescript --version=1.0.0 --publish-type=package --publish-type=sourcecode
-
-  apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=java --version=2.0.0 --publish-type=sourcecode
-
-  apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
+  apimatic sdk save-changes --language=java --sdk=./sdk
 ```
 
-_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_
+_See code: [src/commands/sdk/save-changes.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/save-changes.ts)_
 <!-- commandsstop -->

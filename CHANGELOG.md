@@ -1,3 +1,10 @@
+# [1.1.0-beta.11](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.10...v1.1.0-beta.11) (2026-04-15)
+
+
+### Features
+
+* add sdk save-changes command for applying sdk customizations ([#270](https://github.com/apimatic/apimatic-cli/issues/270)) ([e170f61](https://github.com/apimatic/apimatic-cli/commit/e170f613ea2a1b95bad6c8a6c6d26a238c2cf062))
+
 # [1.1.0-beta.10](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.9...v1.1.0-beta.10) (2026-03-25)
 
 

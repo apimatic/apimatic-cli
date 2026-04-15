@@ -19,6 +19,16 @@ export class LauncherService {
     }
   }
 
+  public async isIdeAvailable(): Promise<boolean> {
+    try {
+      const command = process.platform === "win32" ? "where" : "which";
+      await execa(command, ["code"]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public async openFolderInIdeWithWait(
     directoryPath: DirectoryPath,
     filesToOpen: FilePath[]

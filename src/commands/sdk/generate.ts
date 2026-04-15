@@ -41,7 +41,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     }),
     "track-changes": Flags.boolean({
       default: false,
-      description: "Generate SDK source tree in the src directory to enable tracking changes across generations"
+      description: "Enable change tracking for SDK generation (only required for initial setup)"
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
