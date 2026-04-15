@@ -46,7 +46,7 @@ This persists your changes so they reapply on every future generation.`;
   ${getTree(directory.toTreeNode())}`);
 
     noteWrapped(`Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language))}'
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)}'
 interactively to review and resolve the conflicts with SDK generation.`, "Next Steps");
   }
 
@@ -105,7 +105,7 @@ Your SDK may not work until all issues are resolved. Conflict markers have been 
   public mergeAbandoned(language: Language) {
     log.error(`SDK generation has been abandoned. The generated SDK will be discarded.`);
     noteWrapped(`Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language))}'
+'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)}'
 to regenerate the SDK and resolve merge conflicts.`, "Next Steps");
   }
 
