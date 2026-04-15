@@ -13,7 +13,7 @@ import { SdkPublishNonInteractiveAction } from '../../actions/sdk/publish/non-in
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
 
-  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic app. Requires an input directory containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required flags for CI/CD automation.`;
+  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required flags for CI/CD automation.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 

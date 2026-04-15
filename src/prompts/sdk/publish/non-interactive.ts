@@ -58,13 +58,13 @@ export class SdkPublishNonInteractivePrompts {
 
   public publishingProfileNotFound(profileId: ProfileId) {
     log.error(
-      `Publishing profile with id '${profileId}' not found. Please check if the provided profile id is correct or create a new publishing profile on the APIMatic app.`
+      `Publishing profile with id '${profileId}' not found. Please check if the provided profile id is correct or create a new publishing profile on the APIMatic App.`
     );
   }
 
   public languageNotConfiguredForProfile(language: Language) {
     log.error(
-      `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile's configuration on the APIMatic app and try again.`
+      `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile's configuration on the APIMatic App and try again.`
     );
   }
 
@@ -74,7 +74,7 @@ export class SdkPublishNonInteractivePrompts {
       .join(' + ');
     const noun = publishTypes.length === 1 ? 'type' : 'types';
     log.error(
-      `Publish ${noun} '${types}' not found or not enabled for '${language}' in the selected publishing profile. Please check your profile configuration on the APIMatic app and try again.`
+      `Publish ${noun} '${types}' not found or not enabled for '${language}' in the selected publishing profile. Please check your profile configuration on the APIMatic App and try again.`
     );
   }
 

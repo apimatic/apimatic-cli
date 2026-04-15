@@ -11,7 +11,7 @@ export class PublishingProfiles {
 
   public static create(items: PublishingProfileItem[]): Result<PublishingProfiles, string> {
     if (items.length === 0) {
-      return err('No publishing profiles found. Please create a publishing profile on the APIMatic app before publishing an SDK.');
+      return err('No publishing profiles found. Please create a publishing profile on the APIMatic App before publishing an SDK.');
     }
 
     return ok(new PublishingProfiles(items.map((item) => PublishingProfile.create(item))));
