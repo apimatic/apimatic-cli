@@ -24,7 +24,7 @@ export class SdkPublishNonInteractiveAction {
     buildDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     language: Language,
-    publishType: PublishType[],
+    publishTypes: PublishType[],
     force: boolean,
     dryRun: boolean,
     onPublishSdkError: (errorMessage: string) => void,
@@ -46,7 +46,7 @@ export class SdkPublishNonInteractiveAction {
     if (!profileId) missing.push('--profile-id');
     if (!language) missing.push('--language');
     if (!version) missing.push('--version');
-    if (!publishType || publishType.length === 0) missing.push('--publish-type');
+    if (!publishTypes || publishTypes.length === 0) missing.push('--publish-type');
     if (missing.length > 0) {
       this.prompts.missingRequiredFlags(missing);
       this.prompts.interactiveModeNotice();
@@ -91,13 +91,13 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.failed();
     }
 
-    const unallowedPublishTypes = publishingProfile.getUnallowedPublishTypes(language, publishType);
+    const unallowedPublishTypes = publishingProfile.getUnallowedPublishTypes(language, publishTypes);
     if (unallowedPublishTypes.length > 0) {
       this.prompts.publishTypesNotAvailableForLanguage(unallowedPublishTypes, language);
       return ActionResult.failed();
     }
 
-    if (!publishType.includes(PublishType.PackagePublishing)) {
+    if (!publishTypes.includes(PublishType.PackagePublishing)) {
       this.prompts.sourceCodeOnlyPublishingNotice();
     }
 
@@ -107,7 +107,7 @@ export class SdkPublishNonInteractiveAction {
       buildDirectory,
       outputDir,
       language,
-      publishType,
+      publishTypes,
       force,
       publishingProfileId,
       semVersion,
@@ -128,7 +128,7 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const publishingInfo = publishResult.getValue();
-    this.prompts.publishingRunningNotice(publishingProfile, language, semVersion, publishType);
+    this.prompts.publishingRunningNotice(publishingProfile, language, semVersion, publishTypes);
 
     const publishingSucceeded = await this.prompts.pollPublishingStatus(() =>
       this.publishingApiService.getSdkPublishingLog(

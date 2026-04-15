@@ -19,7 +19,7 @@ export class PublishingProfileListPrompts {
   }
 
   public noProfilesFound() {
-    log.info('No publishing profiles found. Please create a publishing profile to view it here.');
+    log.info('No publishing profiles found. Please create a publishing profile on the APIMatic app to view it here.');
   }
 
   public displayProfiles(groups: PublishingProfileSummaryGroup[]) {

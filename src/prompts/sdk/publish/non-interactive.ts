@@ -30,7 +30,7 @@ export class SdkPublishNonInteractivePrompts {
   }
 
   public interactiveModeNotice(): void {
-    log.info('You can run the command in interactive mode by removing all flags.');
+    log.info('You can run the command in interactive mode by not passing any flags.');
   }
 
   public invalidVersion(version: string): void {
@@ -58,21 +58,23 @@ export class SdkPublishNonInteractivePrompts {
 
   public publishingProfileNotFound(profileId: ProfileId) {
     log.error(
-      `Publishing profile with id '${profileId}' not found. Please check the provided profile id and try again or create a new publishing profile on the APIMatic App.`
+      `Publishing profile with id '${profileId}' not found. Please check if the provided profile id is correct or create a new publishing profile on the APIMatic app.`
     );
   }
 
   public languageNotConfiguredForProfile(language: Language) {
     log.error(
-      `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile and try again.`
+      `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile's configuration on the APIMatic app and try again.`
     );
   }
 
   public publishTypesNotAvailableForLanguage(publishTypes: PublishType[], language: Language) {
-    const types = publishTypes.join(' + ');
+    const types = [...publishTypes]
+      .sort((a, b) => (a === PublishType.SourceCodePublishing ? -1 : b === PublishType.SourceCodePublishing ? 1 : 0))
+      .join(' + ');
     const noun = publishTypes.length === 1 ? 'type' : 'types';
     log.error(
-      `Publish ${noun} '${types}' not found or not enabled for '${language}' in the selected publishing profile. Please check your profile configuration on the APIMatic App and try again.`
+      `Publish ${noun} '${types}' not found or not enabled for '${language}' in the selected publishing profile. Please check your profile configuration on the APIMatic app and try again.`
     );
   }
 
@@ -88,7 +90,8 @@ export class SdkPublishNonInteractivePrompts {
     version: SemVersion,
     publishType: PublishType[]
   ): void {
-    const targets = publishType
+    const targets = [...publishType]
+      .sort((a, b) => (a === PublishType.SourceCodePublishing ? -1 : b === PublishType.SourceCodePublishing ? 1 : 0))
       .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
       .join(' + ');
     log.info(
@@ -121,7 +124,8 @@ ${f.link(publishingLogUrl)}`;
 
       const { events } = publishingLogResult.value;
       const executionCompleted = events.every((event) => TERMINAL_STATES.has(event.eventType));
-      const statusMessage = events
+      const statusMessage = [...events]
+        .sort((a, b) => (a.publishType === 'SourceCode' ? -1 : b.publishType === 'SourceCode' ? 1 : 0))
         .map((event) => {
           const target = event.publishType === 'SourceCode' ? 'Source Code' : 'Package';
           const eventLabels: Record<string, string> = {

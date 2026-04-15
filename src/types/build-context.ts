@@ -25,11 +25,8 @@ export class BuildContext {
     return await this.fileService.fileExists(this.buildFile);
   }
 
-  public validateSync(): boolean {
-    // TODO: add more checks here
-    if (!(this.fileService.directoryExistsSync(this.buildDirectory))) return false;
-
-    return this.fileService.fileExistsSync(this.buildFile);
+  public existsSync(): boolean {
+    return this.fileService.directoryExistsSync(this.buildDirectory);
   }
 
   public async getBuildFileContents(): Promise<BuildConfig> {

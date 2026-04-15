@@ -13,7 +13,7 @@ import { SdkPublishNonInteractiveAction } from '../../actions/sdk/publish/non-in
 export default class SdkPublish extends Command {
   static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
 
-  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic app. Requires an input directory containing the API specification. Run without flags for a step-by-step guided experience, or pass all required flags for CI/CD automation. Credentials are managed in the APIMatic app, no secrets are needed in the CLI.`;
+  static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic app. Requires an input directory containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required flags for CI/CD automation.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'publish');
 
@@ -51,18 +51,18 @@ export default class SdkPublish extends Command {
 
   static examples = [
     `${SdkPublish.cmdTxt}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag(
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'a1b2c3d4e5f6a1b2c3d4e5f6')} ${format.flag(
       'language',
       'typescript'
     )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
       'publish-type',
       PublishType.SourceCodePublishing
     )}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag('language', 'java')} ${format.flag(
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'b2c3d4e5f6a1b2c3d4e5f6a1')} ${format.flag('language', 'java')} ${format.flag(
       'version',
       '2.0.0'
     )} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'prof-123')} ${format.flag('language', 'python')} ${format.flag(
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'c3d4e5f6a1b2c3d4e5f6a1b2')} ${format.flag('language', 'python')} ${format.flag(
       'version',
       '1.0.0'
     )} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag('dry-run')}`

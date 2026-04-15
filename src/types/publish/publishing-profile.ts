@@ -43,8 +43,8 @@ export class PublishingProfile {
   public getPublishTypesForLanguage(language: Language): PublishType[] {
     const { packageConfig, gitConfig } = this.getLanguageConfig(language);
     const types: PublishType[] = [];
-    if (packageConfig?.isEnabled === true) types.push(PublishType.PackagePublishing);
     if (gitConfig?.isEnabled === true) types.push(PublishType.SourceCodePublishing);
+    if (packageConfig?.isEnabled === true) types.push(PublishType.PackagePublishing);
     return types;
   }
 

@@ -127,12 +127,12 @@ export class SdkPublishInteractiveAction {
   ): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) {
-        if (!new BuildContext(defaultBuildDirectory.join('src')).validateSync())
-          return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
+        if (!new BuildContext(defaultBuildDirectory.join('src')).existsSync())
+          return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
         return;
       }
-      if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).validateSync())
-        return 'Directory does not contain a valid APIMATIC-BUILD.json. Please check the path and try again.';
+      if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).existsSync())
+        return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
     };
   }
 
