@@ -60,7 +60,7 @@ export class MergeSourceTreeAction {
     }
 
     this.prompts.startApplyingConflictedChanges(language);
-
+    
     let conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
 
     if (isInCi) {
@@ -68,7 +68,7 @@ export class MergeSourceTreeAction {
       return ActionResult.failed();
     }
 
-    do {
+    while (!conflictedFilesDirectory.isEmpty()) {
       this.prompts.conflictsDetected(conflictedFilesDirectory);
 
       if (!await this.prompts.resolveNowOrAbandon()) {
@@ -76,24 +76,26 @@ export class MergeSourceTreeAction {
         return ActionResult.failed();
       }
 
-      this.prompts.openingVsCodeForConflictResolution(language);
+      if (await this.launcherService.isIdeAvailable()) {
+        this.prompts.openingVsCodeForConflictResolution(language);
+        await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles())
+      } else {
+        this.prompts.openFilesForConflictResolution(language, sdkWithSourceTree);
+      }
 
-      const ideOpenedAndClosed = await this.launcherService.openFolderInIdeWithWait(sdkWithSourceTree, conflictedFilesDirectory.getAllFiles());
-      const conflictsResolved = ideOpenedAndClosed
-        ? await this.prompts.confirmConflictsResolved()
-        : await this.prompts.waitForConflictResolutionWithoutVsCode(sdkWithSourceTree);
+      const response = await this.prompts.confirmConflictsResolved();
 
-      if (conflictsResolved === undefined) {
+      if (response === "cancelled") {
         this.prompts.mergeAbandoned(language);
         return ActionResult.failed();
       }
 
-      if (conflictsResolved) {
+      if (response === "resolved") {
         break;
       }
 
       conflictedFilesDirectory = await mergeSourceTreeContext.getConflictedFilesDirectory();
-    } while (!conflictedFilesDirectory.isEmpty());
+    }
 
     await mergeSourceTreeContext.saveWithResolvedConflicts();
     this.prompts.conflictsResolved(language);

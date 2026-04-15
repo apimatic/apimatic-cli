@@ -25,10 +25,7 @@ This persists your changes so they reapply on every future generation.`;
   }
 
   public changeTrackingAlreadyEnabled(language: Language) {
-    const message =
-      `Change tracking is already enabled for ${f.var(language)}. ` +
-      `The ${f.flag("track-changes")} flag will be ignored.`;
-    log.warn(message);
+    log.warn(`Change tracking is already enabled for ${f.var(language)}. The ${f.flag("track-changes")} flag will be ignored.`);
   }
 
   public sdkGenerated(sdk: DirectoryPath) {
@@ -36,8 +33,8 @@ This persists your changes so they reapply on every future generation.`;
   }
 
   public sdkGeneratedWithSourceTree(sdk: DirectoryPath, sourceTree: FilePath) {
-    log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
-    log.info(`The 'sdk-source-tree' can be found at ${f.path(sourceTree)}.`);
+    log.info(`The generated SDK can be found at ${f.path(sdk)}
+  and the 'sdk-source-tree' can be found at ${f.path(sourceTree)}.`);
   }
 
   public startApplyingConflictedChanges(language: Language) {
@@ -45,8 +42,8 @@ This persists your changes so they reapply on every future generation.`;
   }
 
   public conflictsDetectedInCi(language: Language, directory: Directory) {
-    log.error(`Merge conflicts found while applying saved changes:`);
-    log.error(getTree(directory.toTreeNode()));
+    log.error(`Merge conflicts found while applying saved changes:
+  ${getTree(directory.toTreeNode())}`);
 
     noteWrapped(`Run the command
 '${f.cmdAlt("apimatic", "sdk", "generate", f.flag("language", language))}'
@@ -54,34 +51,9 @@ interactively to review and resolve the conflicts with SDK generation.`, "Next S
   }
 
   public conflictsDetected(directory: Directory) {
-    log.warn(`Merge conflicts found while applying saved changes:`);
-    log.message(getTree(directory.toTreeNode()));
-    log.warn(`Your SDK may not work until all issues are resolved. Conflict markers have been added to the affected files. Resolve each conflict and remove the markers.`);
-  }
-
-  public openingVsCodeForConflictResolution(language: Language) {
-    log.info(`Opening ${f.var(language)} SDK in VS Code for conflicts resolution.
-  1. Resolve each conflict block.
-  2. Save the files.
-  3. Close the editor.`);
-  }
-
-  public async waitForConflictResolutionWithoutVsCode(sdkDir: DirectoryPath): Promise<boolean | undefined> {
-    log.info(`Unable to open VS Code. Try opening the conflicted files at ${f.path(sdkDir)} in your editor.`);
-    return await this.confirmConflictsResolved();
-  }
-
-  public async confirmConflictsResolved(): Promise<boolean | undefined> {
-    const conflictsResolved = await confirm({
-      message: `Have you finished resolving all conflicts?`,
-      initialValue: false
-    });
-
-    if (isCancel(conflictsResolved)) {
-      return undefined;
-    }
-
-    return conflictsResolved;
+    log.warn(`Merge conflicts found while applying saved changes:
+  ${getTree(directory.toTreeNode())}
+Your SDK may not work until all issues are resolved. Conflict markers have been added to the affected files. Resolve each conflict and remove the markers.`);
   }
 
   public async resolveNowOrAbandon() : Promise<boolean> {
@@ -97,7 +69,33 @@ interactively to review and resolve the conflicts with SDK generation.`, "Next S
     }
 
     return continueResolving;
+  }
 
+  public openingVsCodeForConflictResolution(language: Language) {
+    log.info(`Opening ${f.var(language)} SDK in VS Code for conflicts resolution.
+  1. Resolve each conflict block.
+  2. Save the files.
+  3. Close the editor.`);
+  }
+
+  public openFilesForConflictResolution(language: Language, sdkDir: DirectoryPath) {
+    log.info(`Open ${f.var(language)} SDK at ${f.path(sdkDir)} in your editor for conflicts resolution.
+  1. Resolve each conflict block.
+  2. Save the files.
+  3. Close the editor.`);
+  }
+
+  public async confirmConflictsResolved(): Promise<"resolved" | "unresolved" | "cancelled"> {
+    const conflictsResolved = await confirm({
+      message: `Have you finished resolving all conflicts?`,
+      initialValue: false
+    });
+
+    if (isCancel(conflictsResolved)) {
+      return "cancelled";
+    }
+
+    return conflictsResolved ? "resolved" : "unresolved";
   }
 
   public conflictsResolved(language: Language) {

@@ -87,37 +87,36 @@ export class SaveChangesAction {
       const updatedFilesDirectory = await saveChangesContext.getChangesForReviewDirectory();
       if (updatedFilesDirectory.isEmpty()) {
         this.prompts.noChangesDetected();
-        return ActionResult.success();
+        return ActionResult.cancelled();
       }
 
       this.prompts.modifiedFilesDetected(updatedFilesDirectory);
 
-      if (!await this.prompts.confirmChanges()) {
+      if (!await this.prompts.confirmReviewChanges()) {
         await saveChangesContext.saveSourceTree();
         this.prompts.changesSaved(sdkSourceTree);
         return ActionResult.success();
       }
 
-      const nonDeletedFilesDirectory = await updatedFilesDirectory.mapFilesInDirectory(async (_, fileItem) => {
-        if (fileItem.description === "# Deleted") {
-          return undefined;
-        }
-        return fileItem;
-      });
-
-      this.prompts.openingDirectoryToReviewChanges();
-      if (!await this.launcherService.openFolderInIdeWithWait(sdkReviewDirectory, nonDeletedFilesDirectory.getAllFiles())
-        && !await this.prompts.reviewChangesManually(sdkReviewDirectory)) {
-        this.prompts.operationCancelled();
-        return ActionResult.cancelled();
+      if (await this.launcherService.isIdeAvailable()) {
+        this.prompts.openingDirectoryToReviewChanges();
+        const nonDeletedFilesDirectory = await updatedFilesDirectory.mapFilesInDirectory(async (_, fileItem) => {
+          return fileItem.description === "# Deleted" ? undefined : fileItem;
+        });
+        await this.launcherService.openFolderInIdeWithWait(sdkReviewDirectory, nonDeletedFilesDirectory.getAllFiles());
+      } else {
+        this.prompts.reviewChangesManually(sdkReviewDirectory);
       }
 
-      await saveChangesContext.saveSourceTree();
-      this.prompts.changesSaved(sdkSourceTree);
-
-      await saveChangesContext.cleanUpSdkReviewDirectory(() => this.prompts.directoryStillOpen(sdkReviewDirectory));
-
-      return ActionResult.success();
+      if (await this.prompts.confirmSaveChanges()) {
+        await saveChangesContext.saveSourceTree();
+        this.prompts.changesSaved(sdkSourceTree);
+        await saveChangesContext.cleanUpSdkReviewDirectory(() => this.prompts.directoryStillOpen(sdkReviewDirectory));
+        return ActionResult.success();
+      }
+      
+      this.prompts.operationCancelled();
+      return ActionResult.cancelled();
     });
   };
 }

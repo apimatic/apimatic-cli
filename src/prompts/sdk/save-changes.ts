@@ -52,7 +52,7 @@ Then customize your SDK and run ${f.cmdAlt("apimatic", "sdk", "save-changes")} a
   }
 
   public operationCancelled() {
-    log.info("Exiting without saving any changes.");
+    log.warn("Exiting without saving any changes.");
   }
 
   public async directoryStillOpen(directory: DirectoryPath) {
@@ -60,23 +60,13 @@ Then customize your SDK and run ${f.cmdAlt("apimatic", "sdk", "save-changes")} a
   }
 
   public modifiedFilesDetected(directory: Directory) {
-    log.message(`Detected changes in the following file(s):`);
-    log.message(getTree(directory.toTreeNode()));
+    log.info(`Detected changes in the following file(s):
+  ${getTree(directory.toTreeNode())}`);
   }
 
-  public noChangesDetected() {
-    log.info("No changes detected in the SDK.");
-  }
-
-  public openingDirectoryToReviewChanges() {
-    log.info(`Opening the changed files in VS Code for review.`);
-  }
-
-  public async reviewChangesManually(tempDirectory: DirectoryPath): Promise<boolean> {
-    
-    log.info(`Unable to open VS Code. Review the changes at ${f.path(tempDirectory)} to proceed.`);
+  public async confirmReviewChanges(): Promise<boolean> {
     const confirmed = await confirm({
-      message: `Do you want to save these changes?`,
+      message: `Do you want to review these changes?`,
       initialValue: false
     });
 
@@ -87,10 +77,22 @@ Then customize your SDK and run ${f.cmdAlt("apimatic", "sdk", "save-changes")} a
     return confirmed;
   }
 
-  public async confirmChanges(): Promise<boolean> {
+  public noChangesDetected() {
+    log.info("No changes detected in the SDK.");
+  }
+
+  public openingDirectoryToReviewChanges() {
+    log.info(`Opening the changed files in VS Code for review. Close the editor to proceed.`);
+  }
+
+  public async reviewChangesManually(tempDirectory: DirectoryPath) {
+    log.info(`Review the changes at ${f.path(tempDirectory)} to proceed.`);
+  }
+
+  public async confirmSaveChanges(): Promise<boolean> {
     const confirmed = await confirm({
-      message: `Do you want to review these changes?`,
-      initialValue: false
+      message: `Do you want to save these changes?`,
+      initialValue: true
     });
 
     if (isCancel(confirmed)) {
