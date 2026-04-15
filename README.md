@@ -426,7 +426,7 @@ FLAGS
                              <options: csharp|java|php|python|ruby|typescript|go>
       --api-version=<value>  Version of the API to use for SDK generation (if multiple versions exist)
       --skip-changes         Do not apply the saved changes to the generated SDK
-      --track-changes        Generate SDK source tree in the src directory to enable tracking changes across generations
+      --track-changes        Enable change tracking for SDK generation (only required for initial setup)
       --zip                  Download the generated SDK as a .zip archive
 
 DESCRIPTION
