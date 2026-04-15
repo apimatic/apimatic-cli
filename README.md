@@ -49,6 +49,7 @@ USAGE
 * [`apimatic publishing profile list`](#apimatic-publishing-profile-list)
 * [`apimatic quickstart`](#apimatic-quickstart)
 * [`apimatic sdk generate`](#apimatic-sdk-generate)
+* [`apimatic sdk publish`](#apimatic-sdk-publish)
 * [`apimatic sdk save-changes`](#apimatic-sdk-save-changes)
 
 ## `apimatic api transform`
@@ -464,6 +465,48 @@ EXAMPLES
 ```
 
 _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/generate.ts)_
+
+## `apimatic sdk publish`
+
+Generate and publish an SDK to a package registry or source repository
+
+```
+USAGE
+  $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript] [-f]
+    [-i <value>] [--publish-type package|sourcecode...] [--dry-run]
+
+FLAGS
+  -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
+  -f, --force                     overwrite changes without asking for user consent.
+  -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
+                                  includes API specifications and configuration files.
+  -l, --language=<option>         Language of the SDK to generate and publish.
+                                  <options: csharp|java|php|python|ruby|typescript>
+  -p, --profile-id=<value>        Id of the publishing profile to use.
+  -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
+      --dry-run                   Generate the SDK locally for review without publishing.
+      --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
+                                  git repository.
+                                  <options: package|sourcecode>
+
+DESCRIPTION
+  Generate and publish an SDK to a package registry or source repository
+
+  Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory
+  containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required
+  flags for CI/CD automation.
+
+EXAMPLES
+  apimatic sdk publish
+
+  apimatic sdk publish --profile-id=a1b2c3d4e5f6a1b2c3d4e5f6 --language=typescript --version=1.0.0 --publish-type=package --publish-type=sourcecode
+
+  apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=java --version=2.0.0 --publish-type=sourcecode
+
+  apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
+```
+
+_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_
 
 ## `apimatic sdk save-changes`
 
