@@ -14,7 +14,7 @@ import { UnallowedFeaturesResponse } from "../../infrastructure/services/validat
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
-const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/customize-sdks/codegen-settings/codegen-settings-overview/";
+const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/";
 
 export class SdkQuickstartPrompts {
   public importSpecStep() {
