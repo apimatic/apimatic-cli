@@ -20,8 +20,8 @@ export class SdkPublishNonInteractivePrompts {
     log.error(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
-    log.error(`The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`);
+  public srcDirectoryDoesNotExist(directory: DirectoryPath) {
+    log.error(`The ${f.var('src')} does not exist at the provided location: ${f.path(directory)}`);
   }
 
   public missingRequiredFlags(options: string[]): void {
@@ -131,7 +131,7 @@ ${f.link(publishingLogUrl)}`;
           const eventLabels: Record<string, string> = {
             Queued: 'Queued',
             InProgress: 'In Progress',
-            Succeeded: 'Done'
+            Succeeded: 'Published'
           };
           const label = eventLabels[event.eventType] ?? 'Failed';
           return `${target}: [${label}]`;

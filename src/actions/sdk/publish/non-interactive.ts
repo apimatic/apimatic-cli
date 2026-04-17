@@ -37,8 +37,8 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.validate())) {
-      this.prompts.srcDirectoryEmpty(buildDirectory);
+    if (!(await buildContext.exists())) {
+      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
       return ActionResult.failed();
     }
 

@@ -468,7 +468,7 @@ _See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-c
 
 ## `apimatic sdk publish`
 
-Generate and publish an SDK to a package registry or source repository
+Generate and publish an SDK to a package registry and/or source repository
 
 ```
 USAGE
@@ -490,7 +490,7 @@ FLAGS
                                   <options: package|sourcecode>
 
 DESCRIPTION
-  Generate and publish an SDK to a package registry or source repository
+  Generate and publish an SDK to a package registry and/or source repository
 
   Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory
   containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required

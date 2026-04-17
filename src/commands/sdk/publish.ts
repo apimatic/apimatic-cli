@@ -11,7 +11,7 @@ import { SdkPublishInteractiveAction } from '../../actions/sdk/publish/interacti
 import { SdkPublishNonInteractiveAction } from '../../actions/sdk/publish/non-interactive.js';
 
 export default class SdkPublish extends Command {
-  static readonly summary = 'Generate and publish an SDK to a package registry or source repository';
+  static readonly summary = 'Generate and publish an SDK to a package registry and/or source repository';
 
   static readonly description = `Generate and publish an SDK using a publishing profile configured in the APIMatic App. Requires an input directory containing the API specification. Run without flags for a step-by-step interactive experience, or pass all required flags for CI/CD automation.`;
 
