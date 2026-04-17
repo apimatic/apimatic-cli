@@ -47,12 +47,12 @@ export class BuildContext {
     await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
   }
 
-  public async getBuildZipPath(tempDir: DirectoryPath, packageSettings?: DirectoryPath): Promise<FilePath> {
+  public async getBuildZipPath(tempDir: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {
     const tempContext = new TempContext(tempDir);
     const tempBuildDir = tempDir.join("build");
     await this.fileService.copyDirectoryContents(this.buildDirectory, tempBuildDir);
-    if (packageSettings) {
-      await this.fileService.copyDirectoryContents(packageSettings, tempBuildDir.join(packageSettings.leafName()));
+    if (packageSettingsDirectory) {
+      await this.fileService.copyDirectoryContents(packageSettingsDirectory.join('package-settings'), tempBuildDir.join('package-settings'));
     }
     return await tempContext.zip(tempBuildDir);
   }

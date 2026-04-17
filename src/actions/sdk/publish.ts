@@ -13,7 +13,6 @@ import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsConfiguration } from '../../types/publish/package-settings-configuration.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { TempContext } from '../../types/temp-context.js';
-import { FileService } from '../../infrastructure/file-service.js';
 import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -22,7 +21,6 @@ import { FilePath } from '../../types/file/filePath.js';
 export class SdkPublishAction {
   private readonly prompts: SdkPublishPrompts = new SdkPublishPrompts();
   private readonly publishingApiService: PublishingApiService = new PublishingApiService();
-  private readonly fileService: FileService = new FileService();
   private readonly launcherService: LauncherService = new LauncherService();
 
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
@@ -40,8 +38,6 @@ export class SdkPublishAction {
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult<PublishingInfo>> => {
     return await withDirPath(async (tempDirectory) => {
-      await this.fileService.copyDirectoryContents(buildDirectory, tempDirectory);
-
       const packageConfiguration = publishingProfile.getPackageConfigurationForLanguage(language);
       if (packageConfiguration !== null && packageConfiguration.isEnabled) {
         const packageSettingsConfiguration = PackageSettingsConfiguration.create(language, packageConfiguration);
@@ -52,7 +48,7 @@ export class SdkPublishAction {
 
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
-        tempDirectory,
+        buildDirectory,
         outputDirectory,
         language,
         force,
@@ -60,7 +56,8 @@ export class SdkPublishAction {
         false,
         false,
         undefined,
-        semVersion
+        semVersion,
+        tempDirectory
       );
       if (sdkGenerationResult.isFailed()) {
         return ActionResult.failed();
