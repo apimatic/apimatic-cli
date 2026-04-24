@@ -34,11 +34,6 @@ export interface GeneratedSdkResult {
   sdkSourceTree: NodeJS.ReadableStream;
 }
 
-export interface GeneratedSdkResult {
-  sdk: NodeJS.ReadableStream;
-  sdkSourceTree: NodeJS.ReadableStream;
-}
-
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly fileService = new FileService();
