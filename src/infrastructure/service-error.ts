@@ -27,6 +27,9 @@ export class ServiceError {
   static forbidden(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.Forbidden, customMessage, {});
   }
+  static notFound(customMessage: string): ServiceError {
+    return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
+  }
 
   static readonly values: ServiceError[] = [
     ServiceError.NotFound,

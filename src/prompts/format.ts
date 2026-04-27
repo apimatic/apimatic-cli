@@ -1,7 +1,6 @@
 import pc from "picocolors";
 import { intro as i, outro as o } from '@clack/prompts';
 import { ActionResult } from "../actions/action-result.js";
-import { Directory } from "../types/file/directory.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { FilePath } from "../types/file/filePath.js";
 
@@ -48,43 +47,6 @@ export function outro<T>(result: ActionResult<T>) {
   o(outroMessage);
   process.exitCode = exitCode;
 }
-
-export function getDirectoryTree(dir: Directory, prefix: string = "", isLast: boolean = true): string {
-  const folderDescription: Record<string, string> = {
-    spec: "# Contains all API definition files",
-    content: "# Includes custom documentation pages in Markdown",
-    static: "# Includes all static files, such as images, GIFs, and PDFs"
-  };
-
-  const fileDescriptions: Record<string, string> = {
-    "toc.yml": "# Controls the structure of the side navigation bar in the API portal",
-    "APIMATIC-BUILD.json": "# Defines all configurations for the API portal, including programming languages and themes"
-  };
-
-  const pointer = isLast ? "└─ " : "├─ ";
-  const folderName = dir.directoryPath.leafName();
-  const description = folderDescription[folderName] ? format.description(folderDescription[folderName]) : "";
-  let output = `${prefix}${pointer}${folderName}${description ? " " + description : ""}\n`;
-
-  const items = dir.items;
-  const newPrefix = prefix + (isLast ? "   " : "|  ");
-
-  items.forEach((item, index) => {
-    const last = index === items.length - 1;
-
-    if (item instanceof Directory) {
-      output += getDirectoryTree(item, newPrefix, last);
-    } else {
-      const filePointer = last ? "└─ " : "├─ ";
-      const fileName = item.toString();
-      const fileDescription = fileDescriptions[fileName] ? format.description(fileDescriptions[fileName]) : "";
-      output += `${newPrefix}${filePointer}${fileName}${fileDescription ? " " + fileDescription : ""}\n`;
-    }
-  });
-
-  return output;
-}
-
 
 export interface LeafNode {
   name: string;
