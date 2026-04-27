@@ -16,8 +16,7 @@ import { SemVersion } from '../../types/publish/version.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 
 export class PublishingApiService {
-  // TODO: Replace with prod base url
-  private readonly apiBaseUrl = 'https://api.package-publishing.dev.apimatic.io/api' as const;
+  private readonly apiBaseUrl = 'https://api.package-publishing.apimatic.io/api' as const;
   private readonly fileService = new FileService();
 
   public async getPublishingProfiles(
