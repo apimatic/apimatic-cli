@@ -1,3 +1,10 @@
+# [1.1.0-beta.13](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.12...v1.1.0-beta.13) (2026-04-27)
+
+
+### Bug Fixes
+
+* resolve package-publishing api url ([#273](https://github.com/apimatic/apimatic-cli/issues/273)) ([99badc4](https://github.com/apimatic/apimatic-cli/commit/99badc4fb5b68eb118c8ba7c26a612e366e79039))
+
 # [1.1.0-beta.12](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.11...v1.1.0-beta.12) (2026-04-27)
 
 
