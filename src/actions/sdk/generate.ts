@@ -9,6 +9,7 @@ import { TempContext } from "../../types/temp-context.js";
 import { Language } from "../../types/sdk/generate.js";
 import { MergeSourceTreeAction } from "./merge-source-tree.js";
 import { BuildContext } from "../../types/build-context.js";
+import { SemVersion } from "../../types/publish/version.js";
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -31,7 +32,9 @@ export class GenerateAction {
     zipSdk: boolean,
     skipChanges: boolean,
     trackChanges: boolean,
-    apiVersion?: string
+    apiVersion?: string,
+    packageVersion?: SemVersion,
+    packageSettingsDirectory?: DirectoryPath
   ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
     if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
@@ -99,10 +102,10 @@ export class GenerateAction {
 
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
-      const buildZipPath = await tempContext.zip(buildContext.getBuildDirectory());
+      const buildZipPath = await buildContext.getBuildZipPath(tempDirectory, packageSettingsDirectory);
 
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey)
+        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey, packageVersion)
       );
 
       if (response.isErr()) {

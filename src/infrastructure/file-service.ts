@@ -19,9 +19,27 @@ export class FileService {
     }
   }
 
+  public fileExistsSync(file: FilePath): boolean {
+    try {
+      const stat = fsExtra.statSync(file.toString());
+      return stat.isFile();
+    } catch {
+      return false;
+    }
+  }
+
   public async directoryExists(dir: DirectoryPath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(dir.toString());
+      return stat.isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  public directoryExistsSync(dir: DirectoryPath): boolean {
+    try {
+      const stat = fsExtra.statSync(dir.toString());
       return stat.isDirectory();
     } catch {
       return false;
@@ -214,6 +232,37 @@ export class FileService {
     } catch {
       return false;
     }
+  }
+
+  public async hasContent(file: FilePath, content: string): Promise<boolean> {
+    return (await this.fileExists(file)) && (await this.readFile(file)).includes(content);
+  }
+
+  public async getAvailableDirectoryPath(currentPath: DirectoryPath): Promise<DirectoryPath> {
+    if (!(await this.directoryExists(currentPath))) return currentPath;
+
+    const dir = path.dirname(currentPath.toString());
+    let baseName = path.basename(currentPath.toString());
+
+    // Strip existing " (n)" suffix using string methods
+    if (baseName.endsWith(')')) {
+      const open = baseName.lastIndexOf('(');
+      if (open !== -1 && baseName[open - 1] === ' ') {
+        const inner = baseName.slice(open + 1, -1);
+        if (inner.length > 0 && !isNaN(Number(inner))) {
+          baseName = baseName.slice(0, open - 1);
+        }
+      }
+    }
+
+    let counter = 1;
+    let newPath: string;
+
+    do {
+      newPath = path.join(dir, `${baseName} (${counter++})`);
+    } while (await this.directoryExists(new DirectoryPath(newPath)));
+
+    return new DirectoryPath(newPath);
   }
 }
 

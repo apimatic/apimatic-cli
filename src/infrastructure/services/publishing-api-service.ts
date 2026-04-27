@@ -1,0 +1,142 @@
+import axios, { AxiosError } from 'axios';
+import { err, ok, Result } from 'neverthrow';
+import FormData from 'form-data';
+import { PublishingProfileItem } from '../../types/publish-api/publishing-profile-item.js';
+import { handleServiceError, ServiceError } from '../service-error.js';
+import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { envInfo } from '../env-info.js';
+import { Language } from '../../types/sdk/generate.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { FileService } from '../file-service.js';
+import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
+import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
+import { PublishLogItem } from '../../types/publish-api/publish-log.js';
+import { SemVersion } from '../../types/publish/version.js';
+import { ProfileId } from '../../types/publish/profile-id.js';
+
+export class PublishingApiService {
+  // TODO: Replace with prod base url
+  private readonly apiBaseUrl = 'https://api.package-publishing.dev.apimatic.io/api' as const;
+  private readonly fileService = new FileService();
+
+  public async getPublishingProfiles(
+    configDir: DirectoryPath,
+    shell: string
+  ): Promise<Result<PublishingProfileItem[], ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    if (authInfo === null) {
+      return err(ServiceError.UnAuthorized);
+    }
+
+    try {
+      const token = authInfo.authKey;
+      const response = await this.axiosInstance(shell, token).get(`/publishing-profile/user`);
+
+      if (response.status === 200) {
+        return ok(response.data as PublishingProfileItem[]);
+      }
+      return err(ServiceError.InvalidResponse);
+    } catch (error) {
+      return err(handleServiceError(error));
+    }
+  }
+
+  public async publishSdkPackage(
+    sdkFilePath: FilePath,
+    profileId: ProfileId,
+    language: Language,
+    packageVersion: SemVersion,
+    publishType: PublishType[],
+    configDir: DirectoryPath,
+    shell: string
+  ): Promise<Result<PublishingInfo, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    if (authInfo === null) {
+      return err(ServiceError.UnAuthorized);
+    }
+    const sdkFileStream = await this.fileService.getStream(sdkFilePath);
+
+    try {
+      const token = authInfo.authKey;
+      const formData = new FormData();
+      formData.append('file', sdkFileStream);
+      formData.append('packageVersion', packageVersion.toString());
+
+      // If both package and source code publishing are not selected, publishType array will contain only one of them, so we need to specify which one to the API. 
+      // If both are selected, we will omit this field as API defaults to both types being selected.
+      if (publishType.length !== 2) { 
+        formData.append('publishType', publishType[0]);
+      }
+
+      const response = await this.axiosInstance(shell, token).post(`/publish/${profileId}/${language}`, formData, {
+        headers: formData.getHeaders(),
+        responseType: 'json'
+      });
+
+      if (response.status === 200) {
+        return ok(response.data as PublishingInfo);
+      }
+      return err(ServiceError.InvalidResponse);
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const data = error.response?.data;
+        if (error.status === 400) {
+          const errors = data.errors as Record<string, string[]> | undefined;
+          const detail = errors ? Object.values(errors)[0]?.[0] : data.detail;
+          const errorMessage = data.title + '\n- ' + detail;
+          return err(ServiceError.badRequest(errorMessage, errors ?? {}));
+        }
+        if (error.status === 403) {
+          const errorMessage = data.title + '\n- ' + data.detail;
+          return err(ServiceError.forbidden(errorMessage));
+        }
+        if (error.status === 404) {
+          const errorMessage = data.title + '\n- ' + data.detail;
+          return err(ServiceError.notFound(errorMessage));
+        }
+      }
+      return err(handleServiceError(error));
+    } finally {
+      sdkFileStream.close();
+    }
+  }
+
+  public async getSdkPublishingLog(
+    publishingLogId: string,
+    configDir: DirectoryPath,
+    shell: string
+  ): Promise<Result<PublishLogItem, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    if (authInfo === null) {
+      return err(ServiceError.UnAuthorized);
+    }
+
+    try {
+      const token = authInfo.authKey;
+      const response = await this.axiosInstance(shell, token).get(`/publish-logs/${publishingLogId}`);
+
+      if (response.status === 200) {
+        return ok(response.data as PublishLogItem);
+      }
+      return err(ServiceError.InvalidResponse);
+    } catch (error) {
+      return err(handleServiceError(error));
+    }
+  }
+
+  private axiosInstance(shell: string, apiKey: string | undefined) {
+    const headers: Record<string, string> = {
+      'User-Agent': envInfo.getUserAgent(shell)
+    };
+
+    if (apiKey) {
+      headers.Authorization = `X-Auth-Key ${apiKey}`;
+    }
+
+    return axios.create({
+      baseURL: envInfo.getPublishingBaseUrl() ?? this.apiBaseUrl,
+      headers
+    });
+  }
+}

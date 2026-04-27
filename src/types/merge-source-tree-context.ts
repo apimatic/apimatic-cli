@@ -26,7 +26,8 @@ export class MergeSourceTreeContext {
     }
     await Promise.all(this.gitService.getMergeFiles(this.sdkWithSourceTree).map((filePath) => this.fileService.deleteFile(filePath)));
     await this.gitService.forceCheckoutMainBranch(this.sdkWithSourceTree);
-    await this.fileService.deleteDirectory(this.sdkWithSourceTree.join(".git"));
+    await this.fileService.cleanDirectory(this.sdkWithoutSourceTree);
+    await this.fileService.copyDirectoryExcluding(this.sdkWithSourceTree, this.sdkWithoutSourceTree, [new FileName(".git")]);
     return { hasSkippedChangesEnabled: true, hasSkippedCustomizations: true };
   }
 

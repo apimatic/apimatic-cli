@@ -57,8 +57,21 @@ export class LauncherService {
   }
 
   public async openFile(filePath: FilePath): Promise<void> {
-    const targetPath = filePath.toString();
+    await this.openPath(filePath.toString());
+  }
 
+  public async openDirectory(directoryPath: DirectoryPath): Promise<void> {
+    await this.openPath(directoryPath.toString());
+  }
+
+  public async openDirectoryInEditorOrFileExplorer(directoryPath: DirectoryPath, fileToOpen: FilePath): Promise<void> {
+    if (isInCi) return;
+    if (!(await this.openFolderInIde(directoryPath, fileToOpen))) {
+      await this.openDirectory(directoryPath);
+    }
+  }
+
+  private async openPath(targetPath: string): Promise<void> {
     // Determine the command and args without using the shell
     let command: string;
     let args: string[];

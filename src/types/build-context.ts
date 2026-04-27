@@ -4,6 +4,7 @@ import { FilePath } from "./file/filePath.js";
 import { FileName } from "./file/fileName.js";
 import { BuildConfig } from "./build/build.js";
 import { SpecContext } from "./spec-context.js";
+import { TempContext } from "./temp-context.js";
 
 export class BuildContext {
   private readonly fileService = new FileService();
@@ -29,6 +30,10 @@ export class BuildContext {
     return await this.fileService.directoryExists(this.buildDirectory);
   }
 
+  public existsSync(): boolean {
+    return this.fileService.directoryExistsSync(this.buildDirectory);
+  }
+
   public async getBuildFileContents(): Promise<BuildConfig> {
     const buildFileContent = await this.fileService.getContents(this.buildFile);
     return JSON.parse(buildFileContent) as BuildConfig;
@@ -42,8 +47,14 @@ export class BuildContext {
     await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
   }
 
-  public getBuildDirectory(): DirectoryPath {
-    return this.buildDirectory;
+  public async getBuildZipPath(tempDir: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {
+    const tempContext = new TempContext(tempDir);
+    const tempBuildDir = tempDir.join("build");
+    await this.fileService.copyDirectoryContents(this.buildDirectory, tempBuildDir);
+    if (packageSettingsDirectory) {
+      await this.fileService.copyDirectoryContents(packageSettingsDirectory.join('package-settings'), tempBuildDir.join('package-settings'));
+    }
+    return await tempContext.zip(tempBuildDir);
   }
 
   public getSpecContext(): SpecContext {

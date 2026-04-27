@@ -36,10 +36,6 @@ export class GitService {
     await git.checkout({ fs, dir: dirPath.toString(), ref: MAIN_BRANCH, force: true });
   }
 
-  public async hardReset(dir: DirectoryPath): Promise<void> {
-    await git.checkout({ fs, dir: dir.toString(), force: true });
-  }
-
   public async getDirectoryWithUpdatedFiles(dirPath: DirectoryPath): Promise<Directory> {
     const statusMatrix = await git.statusMatrix({ fs, dir: dirPath.toString() });
 
