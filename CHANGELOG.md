@@ -1,3 +1,10 @@
+# [1.1.0-beta.12](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.11...v1.1.0-beta.12) (2026-04-27)
+
+
+### Features
+
+* add sdk publish and publishing profile list commands ([#271](https://github.com/apimatic/apimatic-cli/issues/271)) ([71d0d75](https://github.com/apimatic/apimatic-cli/commit/71d0d75e16ee071b0dbd064a18cf95a11ad58c1a))
+
 # [1.1.0-beta.11](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.10...v1.1.0-beta.11) (2026-04-15)
 
 
