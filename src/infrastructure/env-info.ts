@@ -57,7 +57,7 @@ class EnvInfo {
     const envBaseUrls = process.env.APIMATIC_BASE_URL;
     if (envBaseUrls) {
       const baseUrls = envBaseUrls.split(';');
-      EnvInfo.cachedAuthBaseUrl = baseUrls.length === 2 ? baseUrls[1] : undefined;
+      EnvInfo.cachedAuthBaseUrl = baseUrls.length === 3 ? baseUrls[1] : undefined;
     }
     return EnvInfo.cachedAuthBaseUrl;
   }
