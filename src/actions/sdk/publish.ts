@@ -39,9 +39,11 @@ export class SdkPublishAction {
   ): Promise<ActionResult<PublishingInfo>> => {
     return await withDirPath(async (tempDirectory) => {
       const packageConfiguration = publishingProfile.getPackageConfigurationForLanguage(language);
+      let packageSettingsDirectory: DirectoryPath | undefined;
+
       if (packageConfiguration !== null && packageConfiguration.isEnabled) {
         const packageSettingsConfiguration = PackageSettingsConfiguration.create(language, packageConfiguration);
-        const packageSettingsDirectory = tempDirectory.join('package-settings');
+        packageSettingsDirectory = tempDirectory.join('package-settings');
         const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
         await packageSettingsContext.writeConfiguration(packageSettingsConfiguration, language);
       }
@@ -57,7 +59,7 @@ export class SdkPublishAction {
         false,
         undefined,
         semVersion,
-        tempDirectory
+        packageSettingsDirectory
       );
       if (sdkGenerationResult.isFailed()) {
         return ActionResult.failed();
