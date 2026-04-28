@@ -1,3 +1,10 @@
+# [1.1.0-beta.14](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.13...v1.1.0-beta.14) (2026-04-28)
+
+
+### Bug Fixes
+
+* pass package settings directory only when package settings applied ([#274](https://github.com/apimatic/apimatic-cli/issues/274)) ([f178c20](https://github.com/apimatic/apimatic-cli/commit/f178c204bd2f1fbf5913af832549ce45aaaae6ee))
+
 # [1.1.0-beta.13](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.12...v1.1.0-beta.13) (2026-04-27)
 
 
