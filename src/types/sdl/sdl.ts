@@ -1,4 +1,4 @@
-import { TocEndpoint, TocModelPage, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage } from '../toc/toc.js';
+import { TocEndpoint, TocModelPage, TocCallback, TocWebhook, TocWebhookPage, TocCallbackPage, TocContainerModelPage, TocInputModelPage } from '../toc/toc.js';
 import { toTitleCase } from '../../utils/string-utils.js';
 
 export type EndpointGroup = Map<string, TocEndpoint[]>;
@@ -8,6 +8,8 @@ export type CallbackGroup = Map<string, TocCallbackPage[]>;
 export type SdlTocComponents = {
   endpointGroups: EndpointGroup;
   models: TocModelPage[];
+  containerModels: TocContainerModelPage[];
+  inputModels : TocInputModelPage[];
   webhookGroups: WebhookGroup;
   callbackGroups: CallbackGroup;
 };
@@ -16,6 +18,12 @@ export interface Sdl {
   readonly Endpoints: SdlEndpoint[];
   readonly CustomTypes: SdlModel[];
   readonly Webhooks: SdlWebhook[];
+  readonly CodeGenSettings : SdlCodeGenSettings;
+  readonly GlobalTypeCombinators: Map<string, any>;
+}
+
+export interface SdlCodeGenSettings {
+  readonly CollapseParamsToArray: boolean;
 }
 
 export interface SdlEndpoint {
@@ -23,6 +31,12 @@ export interface SdlEndpoint {
   readonly Description: string;
   readonly Group: string;
   readonly Callbacks: SdlCallback[];
+  readonly Parameters: SdlParameter[];
+  readonly CollectParameters: boolean;
+}
+
+export interface SdlParameter {
+  readonly Constant: boolean;
 }
 
 export interface SdlModel {
@@ -58,7 +72,9 @@ export function getEndpointGroupsFromSdl(sdl: Sdl): Map<string, SdlEndpoint[]> {
       Name: endpoint.Name,
       Description: endpoint.Description,
       Group: endpoint.Group,
-      Callbacks: endpoint.Callbacks
+      Callbacks: endpoint.Callbacks,
+      Parameters: endpoint.Parameters,
+      CollectParameters: endpoint.CollectParameters
     });
   }
   return endpointGroups;
@@ -95,6 +111,26 @@ export function extractModelsForToc(sdl: Sdl): TocModelPage[] {
       modelName: e.Name
     })
   );
+}
+
+export function extractContainerModelsForToc(sdl: Sdl): TocContainerModelPage[] {
+  return Array.from(sdl.GlobalTypeCombinators.keys()).map(key => ({
+    generate: null,
+    from: 'container-model',
+    containerName: key
+  }));
+}
+
+export function extractInputModelsForToc(sdl: Sdl): TocInputModelPage[] {
+  const collapseParamsToArray = sdl.CodeGenSettings.CollapseParamsToArray;
+  return sdl.Endpoints.filter(x => (collapseParamsToArray || x.CollectParameters) && x.Parameters.filter(p => !p.Constant).length > 1).map(
+    (e: SdlEndpoint): TocInputModelPage => ({
+      generate: null,
+      from: 'input-model',
+      endpointName: e.Name,
+      endpointGroup: e.Group
+    })
+  );    
 }
 
 export function extractWebhooksForToc(sdl: Sdl): Map<string, TocWebhookPage[]> {

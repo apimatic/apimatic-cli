@@ -37,6 +37,19 @@ export interface TocModelPage {
   readonly modelName: string;
 }
 
+export interface TocContainerModelPage {
+  readonly generate: null;
+  readonly from: 'container-model';
+  readonly containerName: string;
+}
+
+export interface TocInputModelPage {
+  readonly generate: null;
+  readonly from: 'input-model';
+  readonly endpointName: string;
+  readonly endpointGroup: string;
+}
+
 export interface TocWebhookOverview {
   readonly generate: null;
   readonly from: 'webhook-group-overview';

@@ -9,7 +9,9 @@ import { FileService } from '../../../infrastructure/file-service.js';
 import { BuildContext } from '../../../types/build-context.js';
 import {
   extractCallbacksForToc,
+  extractContainerModelsForToc,
   extractEndpointGroupsForToc,
+  extractInputModelsForToc,
   extractModelsForToc,
   extractWebhooksForToc,
   SdlTocComponents
@@ -71,6 +73,8 @@ export class PortalNewTocAction {
       const defaultComponents = {
         endpointGroups: new Map(),
         models: [],
+        containerModels: [],
+        inputModels : [],
         webhookGroups: new Map(),
         callbackGroups: new Map()
       };
@@ -102,6 +106,8 @@ export class PortalNewTocAction {
         return {
           endpointGroups: extractEndpointGroupsForToc(result.value),
           models: extractModelsForToc(result.value),
+          containerModels : extractContainerModelsForToc(result.value),
+          inputModels : extractInputModelsForToc(result.value),
           webhookGroups: extractWebhooksForToc(result.value),
           callbackGroups: extractCallbacksForToc(result.value)
         };
@@ -120,7 +126,10 @@ export class PortalNewTocAction {
 
     const toc = this.tocGenerator.createTocStructure(
       { data: sdlTocComponents.endpointGroups, expand: expandEndpoints },
-      { data: sdlTocComponents.models, expand: expandModels },
+      { modelsData: sdlTocComponents.models,
+         containerModelsData: sdlTocComponents.containerModels,
+          inputModelsData: sdlTocComponents.inputModels, expand: expandModels 
+      },
       { data: sdlTocComponents.webhookGroups, expand: expandWebhooks },
       { data: sdlTocComponents.callbackGroups, expand: expandCallbacks },
       contentGroups

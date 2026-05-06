@@ -7,7 +7,9 @@ import {
   TocGenerated,
   TocCallbackPage,
   TocWebhookPage,
-  TocEndpoint
+  TocEndpoint,
+  TocInputModelPage,
+  TocContainerModelPage
 } from '../../../types/toc/toc.js';
 
 // TODO: Refactor
@@ -28,7 +30,9 @@ type Callbacks = {
 };
 
 type Models = {
-  data: TocModelPage[];
+  modelsData: TocModelPage[];
+  containerModelsData: TocContainerModelPage[];
+  inputModelsData : TocInputModelPage[];
   expand: boolean;
 };
 
@@ -166,7 +170,7 @@ export class TocStructureGenerator {
   }
 
   private getModelsSection(models: Models): (TocGroup | TocGenerated)[] {
-    if (models.data.length === 0) {
+    if (models.modelsData.length === 0 && models.containerModelsData.length === 0 && models.inputModelsData.length === 0) {
       return [];
     }
     if (!models.expand) {
@@ -180,7 +184,11 @@ export class TocStructureGenerator {
     return [
       {
         group: 'Models',
-        items: models.data
+        items: [
+          ...models.modelsData,
+          ...models.containerModelsData,
+          ...models.inputModelsData
+        ]
       }
     ];
   }
