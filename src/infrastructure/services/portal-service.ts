@@ -13,6 +13,7 @@ import {
   ExportFormats,
   SdkLanguages,
   Status,
+  TableOfContentsController,
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { parseStreamBodyToJson } from "../../utils/utils.js";
@@ -268,10 +269,10 @@ export class PortalService {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
-    const transformationController = new TransformationController(client);
+    const tableOfContentsController = new TableOfContentsController(client);
 
     try {
-      const response = await transformationController.transformToApiMaticFormat(
+      const response = await tableOfContentsController.generateTocData(
         ContentType.EnumMultipartformdata,
         file,
         this.createOriginQueryParameter(commandMetadata.commandName)

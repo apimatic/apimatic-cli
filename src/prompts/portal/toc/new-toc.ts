@@ -58,7 +58,7 @@ export class PortalNewTocPrompts {
       .filter(Boolean)
       .join(" and ");
 
-    return withSpinner(`Extracting ${components}`, `${components} extracted`, `${components} extraction failed`, fn);
+    return withSpinner(`Extracting ${components}`, `${components} Extracted`, `${components} Extraction Failed`, fn);
   }
 
   public tocCreated(tocPath: FilePath) {
