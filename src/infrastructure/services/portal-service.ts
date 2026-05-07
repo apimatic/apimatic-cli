@@ -29,7 +29,7 @@ import { Language } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
 import { SemVersion } from "../../types/publish/version.js";
-import { TocData } from "../../types/toc/toc-data.js";
+import { TocData } from "../../types/toc/toc-components.js";
 
 export interface GeneratedSdkResult {
   sdk: NodeJS.ReadableStream;

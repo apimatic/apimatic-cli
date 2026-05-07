@@ -2,51 +2,31 @@ import { stringify } from 'yaml';
 import {
   Toc,
   TocGroup,
-  TocEndpointGroupOverview,
-  TocModelPage,
   TocGenerated,
-  TocCallbackPage,
-  TocWebhookPage,
-  TocEndpoint,
+  TocModelPage,
+  TocContainerModelPage,
   TocInputModelPage,
-  TocContainerModelPage
 } from '../../../types/toc/toc.js';
-
-// TODO: Refactor
-
-type Endpoints = {
-  data: Map<string, TocEndpoint[]>;
-  expand: boolean;
-};
-
-type Webhooks = {
-  data: Map<string, TocWebhookPage[]>;
-  expand: boolean;
-};
-
-type Callbacks = {
-  data: Map<string, TocCallbackPage[]>;
-  expand: boolean;
-};
-
-type Models = {
-  modelsData: TocModelPage[];
-  containerModelsData: TocContainerModelPage[];
-  enumsData: TocModelPage[];
-  errorsData: TocModelPage[];
-  inputModelsData: TocInputModelPage[];
-  expand: boolean;
-};
+import { 
+  TocComponents,
+  EndpointGroups,
+  WebhookGroups,
+  CallbackGroups 
+} from '../../../types/toc/toc-components.js';
 
 export class TocStructureGenerator {
   createTocStructure(
-    endpoints: Endpoints,
-    models: Models,
-    webhooks: Webhooks,
-    callbacks: Callbacks,
+    tocComponents: TocComponents,
+    expandEndpoints: boolean,
+    expandModels: boolean,
+    expandWebhooks: boolean,
+    expandCallbacks: boolean,
     contentGroups: TocGroup[] = []
   ): Toc {
-    const events = [...this.getCallbacksSection(callbacks), ...this.getWebhooksSection(webhooks)];
+    const events = [
+      ...this.getCallbacksSection(tocComponents.callbackGroups, expandCallbacks),
+      ...this.getWebhooksSection(tocComponents.webhookGroups, expandWebhooks)
+    ];
 
     return {
       toc: [
@@ -60,7 +40,7 @@ export class TocStructureGenerator {
           ]
         },
         ...contentGroups,
-        this.getEndpointsSection(endpoints),
+        this.getEndpointsSection(tocComponents.endpointGroups, expandEndpoints),
         ...(events.length > 0
           ? [
               {
@@ -69,7 +49,14 @@ export class TocStructureGenerator {
               }
             ]
           : []),
-        ...this.getModelsSection(models),
+        ...this.getModelsSection(
+          tocComponents.models,
+          tocComponents.enums,
+          tocComponents.errors,
+          tocComponents.containerModels,
+          tocComponents.inputModels,
+          expandModels
+        ),
         {
           generate: 'SDK Infrastructure',
           from: 'sdk-infra'
@@ -86,8 +73,8 @@ export class TocStructureGenerator {
     });
   }
 
-  private getEndpointsSection(endpoints: Endpoints): TocGroup | TocGenerated {
-    if (!endpoints.expand || endpoints.data.size === 0) {
+  private getEndpointsSection(data: EndpointGroups, expand: boolean): TocGroup | TocGenerated {
+    if (!expand || data.size === 0) {
       return {
         generate: 'API Endpoints',
         from: 'endpoints'
@@ -95,37 +82,30 @@ export class TocStructureGenerator {
     }
     return {
       group: 'API Endpoints',
-      items: Array.from(endpoints.data).map(([groupName, endpoints]) => ({
+      items: Array.from(data).map(([groupName, pages]) => ({
         group: groupName,
-        items: [
-          {
-            generate: null,
-            from: 'endpoint-group-overview',
-            endpointGroup: groupName
-          } as TocEndpointGroupOverview,
-          ...endpoints
-        ]
+        items: pages
       }))
     };
   }
 
-  private getCallbacksSection(callbacks: Callbacks): (TocGroup | TocGenerated)[] {
-    if (callbacks.data.size === 0) {
+  private getCallbacksSection(data: CallbackGroups, expand: boolean): (TocGroup | TocGenerated)[] {
+    if (data.size === 0) {
       return [];
     }
-    if (callbacks.expand === true) {
-      if (callbacks.data.size === 1) {
+    if (expand === true) {
+      if (data.size === 1) {
         return [
           {
-            group: Array.from(callbacks.data.keys())[0],
-            items: Array.from(callbacks.data.values())[0]
+            group: Array.from(data.keys())[0],
+            items: Array.from(data.values())[0]
           }
         ];
       }
       return [
         {
           group: 'Callbacks',
-          items: Array.from(callbacks.data).map(([groupName, eventList]) => ({
+          items: Array.from(data).map(([groupName, eventList]) => ({
             group: groupName,
             items: eventList
           }))
@@ -140,23 +120,23 @@ export class TocStructureGenerator {
     ];
   }
 
-  private getWebhooksSection(webhooks: Webhooks): (TocGroup | TocGenerated)[] {
-    if (webhooks.data.size === 0) {
+  private getWebhooksSection(data: WebhookGroups, expand: boolean): (TocGroup | TocGenerated)[] {
+    if (data.size === 0) {
       return [];
     }
-    if (webhooks.expand === true) {
-      if (webhooks.data.size === 1) {
+    if (expand === true) {
+      if (data.size === 1) {
         return [
           {
-            group: Array.from(webhooks.data.keys())[0],
-            items: Array.from(webhooks.data.values())[0]
+            group: Array.from(data.keys())[0],
+            items: Array.from(data.values())[0]
           }
         ];
       }
       return [
         {
           group: 'Webhooks',
-          items: Array.from(webhooks.data).map(([groupName, eventList]) => ({
+          items: Array.from(data).map(([groupName, eventList]) => ({
             group: groupName,
             items: eventList
           }))
@@ -171,17 +151,24 @@ export class TocStructureGenerator {
     ];
   }
 
-  private getModelsSection(models: Models): (TocGroup | TocGenerated)[] {
+  private getModelsSection(
+    modelsData: TocModelPage[],
+    enumsData: TocModelPage[],
+    errorsData: TocModelPage[],
+    containerModelsData: TocContainerModelPage[],
+    inputModelsData: TocInputModelPage[],
+    expand: boolean
+  ): (TocGroup | TocGenerated)[] {
     if (
-      models.modelsData.length === 0 &&
-      models.enumsData.length === 0 &&
-      models.errorsData.length === 0 &&
-      models.containerModelsData.length === 0 &&
-      models.inputModelsData.length === 0
+      modelsData.length === 0 &&
+      enumsData.length === 0 &&
+      errorsData.length === 0 &&
+      containerModelsData.length === 0 &&
+      inputModelsData.length === 0
     ) {
       return [];
     }
-    if (!models.expand) {
+    if (!expand) {
       return [
         {
           generate: 'Models',
@@ -190,13 +177,13 @@ export class TocStructureGenerator {
       ];
     }
     const subGroups: TocGroup[] = [
-      ...(models.modelsData.length > 0 || models.inputModelsData.length > 0
-        ? [{ group: 'Structures', items: [...models.modelsData, ...models.inputModelsData] }]
+      ...(modelsData.length > 0 || inputModelsData.length > 0
+        ? [{ group: 'Structures', items: [...modelsData, ...inputModelsData] }]
         : []),
-      ...(models.enumsData.length > 0 ? [{ group: 'Enumerations', items: models.enumsData }] : []),
-      ...(models.errorsData.length > 0 ? [{ group: 'Exceptions', items: models.errorsData }] : []),
-      ...(models.containerModelsData.length > 0
-        ? [{ group: 'OneOf/AnyOf Definitions', items: models.containerModelsData }]
+      ...(enumsData.length > 0 ? [{ group: 'Enumerations', items: enumsData }] : []),
+      ...(errorsData.length > 0 ? [{ group: 'Exceptions', items: errorsData }] : []),
+      ...(containerModelsData.length > 0
+        ? [{ group: 'OneOf/AnyOf Definitions', items: containerModelsData }]
         : [])
     ];
     return [
@@ -207,7 +194,7 @@ export class TocStructureGenerator {
     ];
   }
 
-  private transformKeys(obj: any): any {
+  private transformKeys(obj: unknown): unknown {
     if (Array.isArray(obj)) {
       return obj.map((item) => this.transformKeys(item));
     }

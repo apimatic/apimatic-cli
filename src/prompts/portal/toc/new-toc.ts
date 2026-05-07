@@ -5,7 +5,7 @@ import { format as f } from "../../format.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ServiceError } from "../../../infrastructure/service-error.js";
 import { withSpinner } from "../../prompt.js";
-import { TocData } from "../../../types/toc/toc-data.js";
+import { TocData } from "../../../types/toc/toc-components.js";
 
 export class PortalNewTocPrompts {
   public async overwriteToc(tocPath: FilePath): Promise<boolean> {
