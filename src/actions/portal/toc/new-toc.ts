@@ -14,8 +14,8 @@ import {
   extractInputModelsForToc,
   extractModelsForToc,
   extractWebhooksForToc,
-  SdlTocComponents
-} from '../../../types/sdl/sdl.js';
+  TocComponents
+} from '../../../types/toc/toc-data.js';
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PortalService } from '../../../infrastructure/services/portal-service.js';
@@ -69,12 +69,12 @@ export class PortalNewTocAction {
       return ActionResult.cancelled();
     }
 
-    const sdlTocComponents: SdlTocComponents = await (async () => {
+    const tocComponents: TocComponents = await (async () => {
       const defaultComponents = {
         endpointGroups: new Map(),
         models: [],
         containerModels: [],
-        inputModels : [],
+        inputModels: [],
         webhookGroups: new Map(),
         callbackGroups: new Map()
       };
@@ -90,8 +90,8 @@ export class PortalNewTocAction {
         const tempContext = new TempContext(tempDirectory);
         const specZipPath = await tempContext.zip(specDirectory);
         const specFileStream = await this.fileService.getStream(specZipPath);
-        const result = await this.prompts.extractComponents(
-          this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata),
+        const result = await this.prompts.extractTocData(
+          this.portalService.generateTocData(specFileStream, this.configDirectory, this.commandMetadata),
           expandEndpoints,
           expandModels,
           expandWebhooks,
@@ -106,8 +106,8 @@ export class PortalNewTocAction {
         return {
           endpointGroups: extractEndpointGroupsForToc(result.value),
           models: extractModelsForToc(result.value),
-          containerModels : extractContainerModelsForToc(result.value),
-          inputModels : extractInputModelsForToc(result.value),
+          containerModels: extractContainerModelsForToc(result.value),
+          inputModels: extractInputModelsForToc(result.value),
           webhookGroups: extractWebhooksForToc(result.value),
           callbackGroups: extractCallbacksForToc(result.value)
         };
@@ -125,13 +125,15 @@ export class PortalNewTocAction {
     }
 
     const toc = this.tocGenerator.createTocStructure(
-      { data: sdlTocComponents.endpointGroups, expand: expandEndpoints },
-      { modelsData: sdlTocComponents.models,
-         containerModelsData: sdlTocComponents.containerModels,
-          inputModelsData: sdlTocComponents.inputModels, expand: expandModels 
+      { data: tocComponents.endpointGroups, expand: expandEndpoints },
+      {
+        modelsData: tocComponents.models,
+        containerModelsData: tocComponents.containerModels,
+        inputModelsData: tocComponents.inputModels,
+        expand: expandModels
       },
-      { data: sdlTocComponents.webhookGroups, expand: expandWebhooks },
-      { data: sdlTocComponents.callbackGroups, expand: expandCallbacks },
+      { data: tocComponents.webhookGroups, expand: expandWebhooks },
+      { data: tocComponents.callbackGroups, expand: expandCallbacks },
       contentGroups
     );
     const yamlString = this.tocGenerator.transformToYaml(toc);

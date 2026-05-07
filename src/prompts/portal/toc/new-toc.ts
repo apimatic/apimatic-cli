@@ -4,8 +4,8 @@ import { Result } from "neverthrow";
 import { format as f } from "../../format.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { ServiceError } from "../../../infrastructure/service-error.js";
-import { Sdl } from "../../../types/sdl/sdl.js";
 import { withSpinner } from "../../prompt.js";
+import { TocData } from "../../../types/toc/toc-data.js";
 
 export class PortalNewTocPrompts {
   public async overwriteToc(tocPath: FilePath): Promise<boolean> {
@@ -42,13 +42,13 @@ export class PortalNewTocPrompts {
     log.error(message);
   }
 
-  public extractComponents(
-    fn: Promise<Result<Sdl, ServiceError>>,
+  public extractTocData(
+    fn: Promise<Result<TocData, ServiceError>>,
     expandEndpoints: boolean,
     expandModels: boolean,
     expandWebhooks: boolean,
     expandCallbacks: boolean
-  ): Promise<Result<Sdl, ServiceError>> {
+  ): Promise<Result<TocData, ServiceError>> {
     const components = [
       expandEndpoints && "Endpoint groups",
       expandModels && "Models",

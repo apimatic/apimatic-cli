@@ -28,6 +28,7 @@ import { Language } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
 import { SemVersion } from "../../types/publish/version.js";
+import { TocData } from "../../types/toc/toc-data.js";
 
 export interface GeneratedSdkResult {
   sdk: NodeJS.ReadableStream;
@@ -250,6 +251,34 @@ export class PortalService {
       const { result }: TransformationData = await transformationController.downloadTransformedFile(transformationId);
       if ((result as NodeJS.ReadableStream).readable) {
         return ok((await parseStreamBodyToJson(result as NodeJS.ReadableStream)) as Sdl);
+      } else {
+        return err(ServiceError.InvalidResponse);
+      }
+    } catch (error) {
+      return err(handleServiceError(error));
+    }
+  }
+
+  public async generateTocData(
+    specFileStream: ReadStream,
+    configDir: DirectoryPath,
+    commandMetadata: CommandMetadata
+  ): Promise<Result<TocData, ServiceError>> {
+    const file = new FileWrapper(specFileStream);
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, null);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
+    const transformationController = new TransformationController(client);
+
+    try {
+      const response = await transformationController.transformToApiMaticFormat(
+        ContentType.EnumMultipartformdata,
+        file,
+        this.createOriginQueryParameter(commandMetadata.commandName)
+      );
+
+      if ((response.result as NodeJS.ReadableStream).readable) {
+        return ok((await parseStreamBodyToJson(response.result as NodeJS.ReadableStream)) as TocData);
       } else {
         return err(ServiceError.InvalidResponse);
       }
