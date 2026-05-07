@@ -1,28 +1,11 @@
 export interface Sdl {
   readonly Endpoints: SdlEndpoint[];
-  readonly CustomTypes: SdlModel[];
-  readonly Webhooks: SdlWebhook[];
 }
 
 export interface SdlEndpoint {
   readonly Name: string;
   readonly Description: string;
   readonly Group: string;
-  readonly Callbacks: SdlCallback[];
-}
-
-export interface SdlModel {
-  readonly Name: string;
-}
-
-export interface SdlCallback {
-  readonly Id: string;
-  readonly CallbackGroupName?: string;
-}
-
-export interface SdlWebhook {
-  readonly Id: string;
-  readonly WebhookGroupName?: string;
 }
 
 export function getEndpointDescription(
@@ -43,8 +26,7 @@ export function getEndpointGroupsFromSdl(sdl: Sdl): Map<string, SdlEndpoint[]> {
     endpointGroups.get(endpoint.Group)!.push({
       Name: endpoint.Name,
       Description: endpoint.Description,
-      Group: endpoint.Group,
-      Callbacks: endpoint.Callbacks
+      Group: endpoint.Group
     });
   }
   return endpointGroups;
