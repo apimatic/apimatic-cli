@@ -11,6 +11,8 @@ import {
   extractCallbacksForToc,
   extractContainerModelsForToc,
   extractEndpointGroupsForToc,
+  extractEnumsForToc,
+  extractErrorsForToc,
   extractInputModelsForToc,
   extractModelsForToc,
   extractWebhooksForToc,
@@ -73,6 +75,8 @@ export class PortalNewTocAction {
       const defaultComponents = {
         endpointGroups: new Map(),
         models: [],
+        enums: [],
+        errors: [],
         containerModels: [],
         inputModels: [],
         webhookGroups: new Map(),
@@ -106,6 +110,8 @@ export class PortalNewTocAction {
         return {
           endpointGroups: extractEndpointGroupsForToc(result.value),
           models: extractModelsForToc(result.value),
+          enums: extractEnumsForToc(result.value),
+          errors: extractErrorsForToc(result.value),
           containerModels: extractContainerModelsForToc(result.value),
           inputModels: extractInputModelsForToc(result.value),
           webhookGroups: extractWebhooksForToc(result.value),
@@ -128,6 +134,8 @@ export class PortalNewTocAction {
       { data: tocComponents.endpointGroups, expand: expandEndpoints },
       {
         modelsData: tocComponents.models,
+        enumsData: tocComponents.enums,
+        errorsData: tocComponents.errors,
         containerModelsData: tocComponents.containerModels,
         inputModelsData: tocComponents.inputModels,
         expand: expandModels

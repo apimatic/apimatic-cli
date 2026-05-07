@@ -33,6 +33,8 @@ export type CallbackGroup = Map<string, TocCallbackPage[]>;
 export type TocComponents = {
   endpointGroups: EndpointGroup;
   models: TocModelPage[];
+  enums: TocModelPage[];
+  errors: TocModelPage[];
   containerModels: TocContainerModelPage[];
   inputModels: TocInputModelPage[];
   webhookGroups: WebhookGroup;
@@ -67,11 +69,31 @@ export function extractModelsForToc(tocData: TocData): TocModelPage[] {
   );
 }
 
+export function extractEnumsForToc(tocData: TocData): TocModelPage[] {
+  return tocData.enums.map(
+    (name: string): TocModelPage => ({
+      generate: null,
+      from: 'model',
+      modelName: name
+    })
+  );
+}
+
+export function extractErrorsForToc(tocData: TocData): TocModelPage[] {
+  return tocData.errors.map(
+    (name: string): TocModelPage => ({
+      generate: null,
+      from: 'model',
+      modelName: name
+    })
+  );
+}
+
 export function extractContainerModelsForToc(tocData: TocData): TocContainerModelPage[] {
   return tocData.containers.map(
     (name: string): TocContainerModelPage => ({
       generate: null,
-      from: 'container-model',
+      from: 'container',
       containerName: name
     })
   );

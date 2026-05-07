@@ -39,7 +39,7 @@ export interface TocModelPage {
 
 export interface TocContainerModelPage {
   readonly generate: null;
-  readonly from: 'container-model';
+  readonly from: 'container';
   readonly containerName: string;
 }
 

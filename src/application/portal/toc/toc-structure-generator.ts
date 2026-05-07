@@ -32,7 +32,9 @@ type Callbacks = {
 type Models = {
   modelsData: TocModelPage[];
   containerModelsData: TocContainerModelPage[];
-  inputModelsData : TocInputModelPage[];
+  enumsData: TocModelPage[];
+  errorsData: TocModelPage[];
+  inputModelsData: TocInputModelPage[];
   expand: boolean;
 };
 
@@ -170,7 +172,13 @@ export class TocStructureGenerator {
   }
 
   private getModelsSection(models: Models): (TocGroup | TocGenerated)[] {
-    if (models.modelsData.length === 0 && models.containerModelsData.length === 0 && models.inputModelsData.length === 0) {
+    if (
+      models.modelsData.length === 0 &&
+      models.enumsData.length === 0 &&
+      models.errorsData.length === 0 &&
+      models.containerModelsData.length === 0 &&
+      models.inputModelsData.length === 0
+    ) {
       return [];
     }
     if (!models.expand) {
@@ -181,14 +189,20 @@ export class TocStructureGenerator {
         }
       ];
     }
+    const subGroups: TocGroup[] = [
+      ...(models.modelsData.length > 0 || models.inputModelsData.length > 0
+        ? [{ group: 'Structures', items: [...models.modelsData, ...models.inputModelsData] }]
+        : []),
+      ...(models.enumsData.length > 0 ? [{ group: 'Enumerations', items: models.enumsData }] : []),
+      ...(models.errorsData.length > 0 ? [{ group: 'Exceptions', items: models.errorsData }] : []),
+      ...(models.containerModelsData.length > 0
+        ? [{ group: 'OneOf/AnyOf Definitions', items: models.containerModelsData }]
+        : [])
+    ];
     return [
       {
         group: 'Models',
-        items: [
-          ...models.modelsData,
-          ...models.containerModelsData,
-          ...models.inputModelsData
-        ]
+        items: subGroups
       }
     ];
   }
