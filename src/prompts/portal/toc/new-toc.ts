@@ -56,9 +56,9 @@ export class PortalNewTocPrompts {
       expandCallbacks && "Callbacks"
     ]
       .filter(Boolean)
-      .join(" and ");
+      .join(" and ") || "TOC data";
 
-    return withSpinner(`Extracting ${components}`, `${components} Extracted`, `${components} Extraction Failed`, fn);
+    return withSpinner(`Extracting ${components}`, `${components} extracted`, `${components} extraction Failed`, fn);
   }
 
   public tocCreated(tocPath: FilePath) {

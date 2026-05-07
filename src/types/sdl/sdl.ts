@@ -2,12 +2,6 @@ export interface Sdl {
   readonly Endpoints: SdlEndpoint[];
   readonly CustomTypes: SdlModel[];
   readonly Webhooks: SdlWebhook[];
-  readonly CodeGenSettings: SdlCodeGenSettings;
-  readonly GlobalTypeCombinators: Map<string, any>;
-}
-
-export interface SdlCodeGenSettings {
-  readonly CollapseParamsToArray: boolean;
 }
 
 export interface SdlEndpoint {
@@ -15,17 +9,10 @@ export interface SdlEndpoint {
   readonly Description: string;
   readonly Group: string;
   readonly Callbacks: SdlCallback[];
-  readonly Parameters: SdlParameter[];
-  readonly CollectParameters: boolean;
-}
-
-export interface SdlParameter {
-  readonly Constant: boolean;
 }
 
 export interface SdlModel {
   readonly Name: string;
-  readonly ImplementationType: string;
 }
 
 export interface SdlCallback {
@@ -57,9 +44,7 @@ export function getEndpointGroupsFromSdl(sdl: Sdl): Map<string, SdlEndpoint[]> {
       Name: endpoint.Name,
       Description: endpoint.Description,
       Group: endpoint.Group,
-      Callbacks: endpoint.Callbacks,
-      Parameters: endpoint.Parameters,
-      CollectParameters: endpoint.CollectParameters
+      Callbacks: endpoint.Callbacks
     });
   }
   return endpointGroups;

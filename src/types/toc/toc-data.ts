@@ -44,8 +44,8 @@ export type TocComponents = {
 export function extractEndpointGroupsForToc(tocData: TocData): Map<string, TocEndpoint[]> {
   const endpointGroups = new Map<string, TocEndpoint[]>();
 
-  for (const group in tocData.endpoints) {
-    const endpoints = tocData.endpoints[group].map(
+  for (const [group, names] of Object.entries(tocData.endpoints)) {
+    const endpoints = names.map(
       (name: string): TocEndpoint => ({
         generate: null,
         from: 'endpoint',
@@ -113,7 +113,7 @@ export function extractInputModelsForToc(tocData: TocData): TocInputModelPage[] 
 export function extractWebhooksForToc(tocData: TocData): Map<string, TocWebhookPage[]> {
   const groupedWebhooks = new Map<string, TocWebhookPage[]>();
 
-  for (const group in tocData.webhooks) {
+  for (const [group, names] of Object.entries(tocData.webhooks)) {
     const groupTitle = toTitleCase(group);
     groupedWebhooks.set(groupTitle, [
       {
@@ -121,7 +121,7 @@ export function extractWebhooksForToc(tocData: TocData): Map<string, TocWebhookP
         from: 'webhook-group-overview',
         webhookGroup: group
       },
-      ...tocData.webhooks[group].map(
+      ...names.map(
         (name: string): TocWebhook => ({
           generate: null,
           from: 'webhook',
@@ -138,7 +138,7 @@ export function extractWebhooksForToc(tocData: TocData): Map<string, TocWebhookP
 export function extractCallbacksForToc(tocData: TocData): Map<string, TocCallbackPage[]> {
   const groupedCallbacks = new Map<string, TocCallbackPage[]>();
 
-  for (const group in tocData.callbacks) {
+  for (const [group, names] of Object.entries(tocData.callbacks)) {
     const groupTitle = toTitleCase(group);
     groupedCallbacks.set(groupTitle, [
       {
@@ -146,7 +146,7 @@ export function extractCallbacksForToc(tocData: TocData): Map<string, TocCallbac
         from: 'callback-group-overview',
         callbackGroup: group
       },
-      ...tocData.callbacks[group].map(
+      ...names.map(
         (name: string): TocCallback => ({
           generate: null,
           from: 'callback',
