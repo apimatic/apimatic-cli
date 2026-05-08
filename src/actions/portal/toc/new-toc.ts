@@ -8,12 +8,8 @@ import { TocContext } from '../../../types/toc-context.js';
 import { FileService } from '../../../infrastructure/file-service.js';
 import { BuildContext } from '../../../types/build-context.js';
 import {
-  extractCallbacksForToc,
-  extractEndpointGroupsForToc,
-  extractModelsForToc,
-  extractWebhooksForToc,
-  SdlTocComponents
-} from '../../../types/sdl/sdl.js';
+  TocComponents
+} from '../../../types/toc/toc-components.js';
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PortalService } from '../../../infrastructure/services/portal-service.js';
@@ -67,27 +63,20 @@ export class PortalNewTocAction {
       return ActionResult.cancelled();
     }
 
-    const sdlTocComponents: SdlTocComponents = await (async () => {
-      const defaultComponents = {
-        endpointGroups: new Map(),
-        models: [],
-        webhookGroups: new Map(),
-        callbackGroups: new Map()
-      };
-
+    const tocComponents: TocComponents = await (async () => {
       const specDirectory = buildDirectory.join('spec');
 
       if (!(await this.fileService.directoryExists(specDirectory))) {
         this.prompts.fallingBackToDefault();
-        return defaultComponents;
+        return TocComponents.empty();
       }
 
       return await withDirPath(async (tempDirectory) => {
         const tempContext = new TempContext(tempDirectory);
         const specZipPath = await tempContext.zip(specDirectory);
         const specFileStream = await this.fileService.getStream(specZipPath);
-        const result = await this.prompts.extractComponents(
-          this.portalService.generateSdl(specFileStream, this.configDirectory, this.commandMetadata),
+        const result = await this.prompts.extractTocData(
+          this.portalService.generateTocData(specFileStream, this.configDirectory, this.commandMetadata),
           expandEndpoints,
           expandModels,
           expandWebhooks,
@@ -96,15 +85,10 @@ export class PortalNewTocAction {
         specFileStream.close();
         if (result.isErr()) {
           this.prompts.fallingBackToDefault();
-          return defaultComponents;
+          return TocComponents.empty();
         }
 
-        return {
-          endpointGroups: extractEndpointGroupsForToc(result.value),
-          models: extractModelsForToc(result.value),
-          webhookGroups: extractWebhooksForToc(result.value),
-          callbackGroups: extractCallbacksForToc(result.value)
-        };
+        return TocComponents.fromTocData(result.value);
       });
     })();
     const contentContext = new ContentContext(contentDirectory);
@@ -119,10 +103,11 @@ export class PortalNewTocAction {
     }
 
     const toc = this.tocGenerator.createTocStructure(
-      { data: sdlTocComponents.endpointGroups, expand: expandEndpoints },
-      { data: sdlTocComponents.models, expand: expandModels },
-      { data: sdlTocComponents.webhookGroups, expand: expandWebhooks },
-      { data: sdlTocComponents.callbackGroups, expand: expandCallbacks },
+      tocComponents,
+      expandEndpoints,
+      expandModels,
+      expandWebhooks,
+      expandCallbacks,
       contentGroups
     );
     const yamlString = this.tocGenerator.transformToYaml(toc);
