@@ -4,57 +4,50 @@ import {
   GitConfigurationItem,
   GoConfigurationItem,
   JavaConfigurationItem,
-  LanguagePublishingConfig,
   PhpConfigurationItem,
   PublishingProfileItem,
   PublishingProfileSummaryGroup,
   PublishingProfileWithLanguagesGroup,
-  PublishType,
   PythonConfigurationItem,
   RubyConfigurationItem,
-  TypeScriptConfigurationItem
+  TypeScriptConfigurationItem,
+  PublishType,
 } from '../publish-api/publishing-profile-item.js';
 import { PackageConfigurationData } from './package-settings-configuration.js';
 
 export class PublishingProfile {
-  private readonly id: string;
-  private readonly name: string;
-  private readonly apiGroupId: string;
-  private readonly apiGroupName: string;
-  private readonly cSharpConfiguration: CSharpConfigurationItem | null;
-  private readonly goConfiguration: GoConfigurationItem | null;
-  private readonly javaConfiguration: JavaConfigurationItem | null;
-  private readonly phpConfiguration: PhpConfigurationItem | null;
-  private readonly pythonConfiguration: PythonConfigurationItem | null;
-  private readonly rubyConfiguration: RubyConfigurationItem | null;
-  private readonly typeScriptConfiguration: TypeScriptConfigurationItem | null;
-  private readonly cSharpGitConfiguration: GitConfigurationItem | null;
-  private readonly goGitConfiguration: GitConfigurationItem | null;
-  private readonly javaGitConfiguration: GitConfigurationItem | null;
-  private readonly phpGitConfiguration: GitConfigurationItem | null;
-  private readonly pythonGitConfiguration: GitConfigurationItem | null;
-  private readonly rubyGitConfiguration: GitConfigurationItem | null;
-  private readonly typeScriptGitConfiguration: GitConfigurationItem | null;
+  private readonly profile: PublishingProfileItem;
+  private readonly languageConfigs: Partial<Record<Language, PackageConfigurationData>>;
+  private readonly gitConfigs: Partial<Record<Language, GitConfigurationItem>>;
 
-  private constructor(item: PublishingProfileItem) {
-    this.id = item.id;
-    this.name = item.name;
-    this.apiGroupId = item.apiGroupId;
-    this.apiGroupName = item.apiGroupName;
-    this.cSharpConfiguration = item.cSharpConfiguration;
-    this.goConfiguration = item.goConfiguration;
-    this.javaConfiguration = item.javaConfiguration;
-    this.phpConfiguration = item.phpConfiguration;
-    this.pythonConfiguration = item.pythonConfiguration;
-    this.rubyConfiguration = item.rubyConfiguration;
-    this.typeScriptConfiguration = item.typeScriptConfiguration;
-    this.cSharpGitConfiguration = item.cSharpGitConfiguration;
-    this.goGitConfiguration = item.goGitConfiguration;
-    this.javaGitConfiguration = item.javaGitConfiguration;
-    this.phpGitConfiguration = item.phpGitConfiguration;
-    this.pythonGitConfiguration = item.pythonGitConfiguration;
-    this.rubyGitConfiguration = item.rubyGitConfiguration;
-    this.typeScriptGitConfiguration = item.typeScriptGitConfiguration;
+  private constructor(profile: PublishingProfileItem) {
+    this.profile = profile;
+    this.languageConfigs = Object.fromEntries(
+      (
+        [
+          [Language.CSHARP, PublishingProfile.createCSharpConfiguration(profile.cSharpConfiguration)],
+          [Language.GO, PublishingProfile.createGoConfiguration(profile.goConfiguration)],
+          [Language.JAVA, PublishingProfile.createJavaConfiguration(profile.javaConfiguration)],
+          [Language.PHP, PublishingProfile.createPhpConfiguration(profile.phpConfiguration)],
+          [Language.PYTHON, PublishingProfile.createPythonConfiguration(profile.pythonConfiguration)],
+          [Language.RUBY, PublishingProfile.createRubyConfiguration(profile.rubyConfiguration)],
+          [Language.TYPESCRIPT, PublishingProfile.createTypeScriptConfiguration(profile.typeScriptConfiguration)]
+        ] as [Language, PackageConfigurationData | undefined][]
+      ).filter(([, config]) => config !== undefined)
+    );
+    this.gitConfigs = Object.fromEntries(
+      (
+        [
+          [Language.CSHARP, profile.cSharpGitConfiguration],
+          [Language.GO, profile.goGitConfiguration],
+          [Language.JAVA, profile.javaGitConfiguration],
+          [Language.PHP, profile.phpGitConfiguration],
+          [Language.PYTHON, profile.pythonGitConfiguration],
+          [Language.RUBY, profile.rubyGitConfiguration],
+          [Language.TYPESCRIPT, profile.typeScriptGitConfiguration]
+        ] as [Language, GitConfigurationItem | null][]
+      ).filter(([, config]) => config?.isEnabled)
+    );
   }
 
   public static create(item: PublishingProfileItem): PublishingProfile {
@@ -62,31 +55,25 @@ export class PublishingProfile {
   }
 
   public toString(): string {
-    return this.name;
+    return this.profile.name;
   }
 
   public hasEnabledLanguages(): boolean {
-    const languageConfigs = this.getLanguageConfigs();
-    return languageConfigs.some(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled);
+    return Object.keys(this.languageConfigs).length > 0 || Object.keys(this.gitConfigs).length > 0;
   }
 
   public isLanguageEnabled(language: Language): boolean {
-    const { packageConfig, gitConfig } = this.getLanguageConfig(language);
-    return packageConfig?.isEnabled === true || gitConfig?.isEnabled === true;
+    return language in this.languageConfigs || language in this.gitConfigs;
   }
 
   public getEnabledLanguages(): Language[] {
-    const languageConfigs = this.getLanguageConfigs();
-    return languageConfigs
-      .filter(({ packageConfig, gitConfig }) => packageConfig?.isEnabled || gitConfig?.isEnabled)
-      .map(({ language }) => language);
-  }
+  return [...new Set([...Object.keys(this.languageConfigs), ...Object.keys(this.gitConfigs)])] as Language[];
+}
 
   public getPublishTypesForLanguage(language: Language): PublishType[] {
-    const { packageConfig, gitConfig } = this.getLanguageConfig(language);
     const types: PublishType[] = [];
-    if (gitConfig?.isEnabled === true) types.push(PublishType.SourceCodePublishing);
-    if (packageConfig?.isEnabled === true) types.push(PublishType.PackagePublishing);
+    if (language in this.gitConfigs) types.push(PublishType.SourceCodePublishing);
+    if (language in this.languageConfigs) types.push(PublishType.PackagePublishing);
     return types;
   }
 
@@ -97,36 +84,17 @@ export class PublishingProfile {
 
   public toPublishingProfileSummaryGroup(): PublishingProfileSummaryGroup {
     return {
-      apiGroupName: this.apiGroupName,
-      profiles: [{ name: this.name, id: this.id, enabledLanguages: this.getEnabledLanguages() }]
+      apiGroupName: this.profile.apiGroupName,
+      profiles: [{ name: this.profile.name, id: this.profile.id, enabledLanguages: this.getEnabledLanguages() }]
     };
   }
 
   public toPublishingProfileWithLanguagesGroup(): PublishingProfileWithLanguagesGroup {
     return {
-      apiGroupName: this.apiGroupName,
+      apiGroupName: this.profile.apiGroupName,
       profiles: [
         {
-          profile: {
-            id: this.id,
-            name: this.name,
-            apiGroupId: this.apiGroupId,
-            apiGroupName: this.apiGroupName,
-            cSharpConfiguration: this.cSharpConfiguration,
-            goConfiguration: this.goConfiguration,
-            javaConfiguration: this.javaConfiguration,
-            phpConfiguration: this.phpConfiguration,
-            pythonConfiguration: this.pythonConfiguration,
-            rubyConfiguration: this.rubyConfiguration,
-            typeScriptConfiguration: this.typeScriptConfiguration,
-            cSharpGitConfiguration: this.cSharpGitConfiguration,
-            goGitConfiguration: this.goGitConfiguration,
-            javaGitConfiguration: this.javaGitConfiguration,
-            phpGitConfiguration: this.phpGitConfiguration,
-            pythonGitConfiguration: this.pythonGitConfiguration,
-            rubyGitConfiguration: this.rubyGitConfiguration,
-            typeScriptGitConfiguration: this.typeScriptGitConfiguration
-          },
+          profile: this.profile,
           enabledLanguages: this.getEnabledLanguages()
         }
       ]
@@ -134,114 +102,108 @@ export class PublishingProfile {
   }
 
   public getPackageConfigurationDataForLanguage(language: Language): PackageConfigurationData | undefined {
-    switch (language) {
-      case Language.CSHARP:
-        return this.cSharpConfiguration && this.cSharpConfiguration.isEnabled
-        ? {
-            packageId: this.cSharpConfiguration.packageId,
-            authors: this.cSharpConfiguration.authors,
-            description: this.cSharpConfiguration.description,
-            title: this.cSharpConfiguration.title,
-            packageTags: this.cSharpConfiguration.packageTags,
-            repositoryUrl: this.cSharpConfiguration.repositoryUrl,
-            repositoryType: this.cSharpConfiguration.repositoryType,
-            packageProjectUrl: this.cSharpConfiguration.packageProjectUrl,
-            packageIcon: this.cSharpConfiguration.packageIcon,
-            packageReleaseNotes: this.cSharpConfiguration.packageReleaseNotes,
-            copyright: this.cSharpConfiguration.copyright
-        }
-        : undefined;
-      case Language.JAVA:
-        return this.javaConfiguration && this.javaConfiguration.isEnabled
-        ? {
-            groupId: this.javaConfiguration.groupId,
-            artifactId: this.javaConfiguration.artifactId,
-            name: this.javaConfiguration.name,
-            description: this.javaConfiguration.description,
-            url: this.javaConfiguration.url,
-            developers: this.javaConfiguration.developers,
-            distributionManagement: this.javaConfiguration.distributionManagement,
-            scm: this.javaConfiguration.scm
-          }
-        : undefined;
-      case Language.PHP:
-        return this.phpConfiguration && this.phpConfiguration.isEnabled
-        ? {
-            vendorName: this.phpConfiguration.vendorName,
-            projectName: this.phpConfiguration.projectName,
-            description: this.phpConfiguration.description,
-            type: this.phpConfiguration.type,
-            keywords: this.phpConfiguration.keywords,
-            homepage: this.phpConfiguration.homepage,
-            authors: this.phpConfiguration.authors,
-            support: this.phpConfiguration.support
-         }
-        : undefined;
-      case Language.PYTHON:
-        return this.pythonConfiguration && this.pythonConfiguration.isEnabled
-        ? {
-            name: this.pythonConfiguration.name,
-            description: this.pythonConfiguration.description,
-            authors: this.pythonConfiguration.authors,
-            maintainers: this.pythonConfiguration.maintainers,
-            keywords: this.pythonConfiguration.keywords,
-            classifiers: this.pythonConfiguration.classifiers,
-            urls: Object.fromEntries(this.pythonConfiguration.urls.map(({ key, value }) => [key, value]))
-        }
-        : undefined;
-      case Language.RUBY:
-        return this.rubyConfiguration && this.rubyConfiguration.isEnabled
-        ? {
-            name: this.rubyConfiguration.name,
-            authors: this.rubyConfiguration.authors,
-            summary: this.rubyConfiguration.summary,
-            description: this.rubyConfiguration.description,
-            email: this.rubyConfiguration.email,
-            homepage: this.rubyConfiguration.homepage,
-            metadata: Object.fromEntries(this.rubyConfiguration.metadata.map(({ key, value }) => [key, value])),
-            postInstallMessage: this.rubyConfiguration.postInstallMessage,
-            requirements: this.rubyConfiguration.requirements
-        }
-        : undefined;
-      case Language.TYPESCRIPT:
-        return this.typeScriptConfiguration && this.typeScriptConfiguration.isEnabled
-        ? {
-            name: this.typeScriptConfiguration.name,
-            author: this.typeScriptConfiguration.author,
-            description: this.typeScriptConfiguration.description,
-            contributors: this.typeScriptConfiguration.contributors,
-            bugs: this.typeScriptConfiguration.bugs,
-            homepage: this.typeScriptConfiguration.homepage,
-            repository: this.typeScriptConfiguration.repository,
-            keywords: this.typeScriptConfiguration.keywords
-        }
-        : undefined;
-      case Language.GO:
-        return this.goConfiguration && this.goConfiguration.isEnabled
-        ? {
-            packageName: this.goConfiguration.packageName
-        }
-        : undefined;
-    }
+    return this.languageConfigs[language];
   }
 
-  private getLanguageConfigs(): LanguagePublishingConfig[] {
-    return [
-      { language: Language.CSHARP, packageConfig: this.cSharpConfiguration, gitConfig: this.cSharpGitConfiguration },
-      { language: Language.JAVA, packageConfig: this.javaConfiguration, gitConfig: this.javaGitConfiguration },
-      { language: Language.GO, packageConfig: this.goConfiguration, gitConfig: this.goGitConfiguration },
-      { language: Language.PHP, packageConfig: this.phpConfiguration, gitConfig: this.phpGitConfiguration },
-      { language: Language.PYTHON, packageConfig: this.pythonConfiguration, gitConfig: this.pythonGitConfiguration },
-      { language: Language.RUBY, packageConfig: this.rubyConfiguration, gitConfig: this.rubyGitConfiguration },
-      {
-        language: Language.TYPESCRIPT,
-        packageConfig: this.typeScriptConfiguration,
-        gitConfig: this.typeScriptGitConfiguration
-      }
-    ];
+  private static createCSharpConfiguration(config: CSharpConfigurationItem | null): PackageConfigurationData | undefined {
+    return config?.isEnabled
+      ? {
+          packageId: config.packageId,
+          authors: config.authors,
+          description: config.description,
+          title: config.title,
+          packageTags: config.packageTags,
+          repositoryUrl: config.repositoryUrl,
+          repositoryType: config.repositoryType,
+          packageProjectUrl: config.packageProjectUrl,
+          packageIcon: config.packageIcon,
+          packageReleaseNotes: config.packageReleaseNotes,
+          copyright: config.copyright
+        }
+      : undefined;
   }
 
-  private getLanguageConfig(language: Language): LanguagePublishingConfig {
-    return this.getLanguageConfigs().find((lc) => lc.language === language)!;
+  private static createJavaConfiguration(config: JavaConfigurationItem | null): PackageConfigurationData | undefined {
+    return config?.isEnabled
+      ? {
+          groupId: config.groupId,
+          artifactId: config.artifactId,
+          name: config.name,
+          description: config.description,
+          url: config.url,
+          developers: config.developers,
+          distributionManagement: config.distributionManagement,
+          scm: config.scm
+        }
+      : undefined;
   }
+
+  private static createPhpConfiguration(config: PhpConfigurationItem | null): PackageConfigurationData | undefined {
+    return config?.isEnabled
+      ? {
+          vendorName: config.vendorName,
+          projectName: config.projectName,
+          description: config.description,
+          type: config.type,
+          keywords: config.keywords,
+          homepage: config.homepage,
+          authors: config.authors,
+          support: config.support
+        }
+      : undefined;
+  }
+
+  private static createPythonConfiguration(config: PythonConfigurationItem | null): PackageConfigurationData | undefined {
+    return config?.isEnabled
+      ? {
+          name: config.name,
+          description: config.description,
+          authors: config.authors,
+          maintainers: config.maintainers,
+          keywords: config.keywords,
+          classifiers: config.classifiers,
+          urls: Object.fromEntries(config.urls.map(({ key, value }) => [key, value]))
+        }
+      : undefined;
+  }
+
+  private static createRubyConfiguration(config: RubyConfigurationItem | null): PackageConfigurationData | undefined {
+    return config?.isEnabled
+      ? {
+          name: config.name,
+          authors: config.authors,
+          summary: config.summary,
+          description: config.description,
+          email: config.email,
+          homepage: config.homepage,
+          metadata: Object.fromEntries(config.metadata.map(({ key, value }) => [key, value])),
+          postInstallMessage: config.postInstallMessage,
+          requirements: config.requirements
+        }
+      : undefined;
+  }
+
+  private static createTypeScriptConfiguration(config: TypeScriptConfigurationItem | null): PackageConfigurationData | undefined {
+    return config?.isEnabled
+      ? {
+          name: config.name,
+          author: config.author,
+          description: config.description,
+          contributors: config.contributors,
+          bugs: config.bugs,
+          homepage: config.homepage,
+          keywords: config.keywords,
+          repository: config.repository,
+        }
+      : undefined;
+  }
+
+  private static createGoConfiguration(config: GoConfigurationItem | null): PackageConfigurationData | undefined {
+    return config?.isEnabled
+      ? {
+          packageName: config.packageName
+        }
+      : undefined;
+  }
+
 }
