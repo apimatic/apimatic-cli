@@ -1,25 +1,23 @@
-import { Language } from '../sdk/generate.js';
 import {
-  BaseConfigurationItem,
-  CSharpConfigurationItem,
-  JavaConfigurationItem,
   JavaDeveloper,
   JavaDistributionManagement,
   JavaScm,
-  KeyValueItem,
   PhpAuthor,
-  PhpConfigurationItem,
   PhpSupport,
-  PythonConfigurationItem,
   PythonPerson,
-  RubyConfigurationItem,
   TsBugs,
   TsPerson,
-  TsRepository,
-  TypeScriptConfigurationItem
+  TsRepository
 } from '../publish-api/publishing-profile-item.js';
 
-interface CSharpPackageConfiguration {
+export interface GitConfiguration {
+  isEnabled: boolean;
+  credentialsId: string;
+  repositoryName: string;
+  branch: string;
+}
+
+export interface CSharpPackageConfiguration {
   packageId: string;
   authors: string | null;
   description: string | null;
@@ -33,7 +31,7 @@ interface CSharpPackageConfiguration {
   copyright: string | null;
 }
 
-interface JavaPackageConfiguration {
+export interface JavaPackageConfiguration {
   groupId: string;
   artifactId: string;
   name: string;
@@ -44,7 +42,7 @@ interface JavaPackageConfiguration {
   scm: JavaScm;
 }
 
-interface PhpPackageConfiguration {
+export interface PhpPackageConfiguration {
   vendorName: string;
   projectName: string;
   description: string;
@@ -55,29 +53,29 @@ interface PhpPackageConfiguration {
   support: PhpSupport;
 }
 
-interface PythonPackageConfiguration {
+export interface PythonPackageConfiguration {
   name: string;
   description: string | null;
   authors: PythonPerson[];
   maintainers: PythonPerson[];
   keywords: string[];
   classifiers: string[];
-  urls: KeyValueItem[];
+  urls: Record<string, string>;
 }
 
-interface RubyPackageConfiguration {
+export interface RubyPackageConfiguration {
   name: string;
   authors: string[];
   summary: string;
   description: string | null;
   email: string[];
   homepage: string | null;
-  metadata: KeyValueItem[];
+  metadata: Record<string, string>;
   postInstallMessage: string | null;
   requirements: string[];
 }
 
-interface TypeScriptPackageConfiguration {
+export interface TypeScriptPackageConfiguration {
   name: string;
   author: TsPerson;
   description: string | null;
@@ -88,72 +86,15 @@ interface TypeScriptPackageConfiguration {
   repository: TsRepository;
 }
 
+export interface GoPackageConfiguration {
+  packageName: string;
+}
+
 export type PackageConfigurationData =
   | CSharpPackageConfiguration
   | JavaPackageConfiguration
   | PhpPackageConfiguration
   | PythonPackageConfiguration
   | RubyPackageConfiguration
-  | TypeScriptPackageConfiguration;
-
-export class PackageSettingsConfiguration {
-  public static create(language: Language, config: BaseConfigurationItem): PackageConfigurationData {
-    switch (language) {
-      case Language.CSHARP: {
-        const {
-          packageId,
-          authors,
-          description,
-          title,
-          packageTags,
-          repositoryUrl,
-          repositoryType,
-          packageProjectUrl,
-          packageIcon,
-          packageReleaseNotes,
-          copyright
-        } = config as CSharpConfigurationItem;
-        return {
-          packageId,
-          authors,
-          description,
-          title,
-          packageTags,
-          repositoryUrl,
-          repositoryType,
-          packageProjectUrl,
-          packageIcon,
-          packageReleaseNotes,
-          copyright
-        };
-      }
-      case Language.JAVA: {
-        const { groupId, artifactId, name, description, url, developers, distributionManagement, scm } =
-          config as JavaConfigurationItem;
-        return { groupId, artifactId, name, description, url, developers, distributionManagement, scm };
-      }
-      case Language.PHP: {
-        const { vendorName, projectName, description, type, keywords, homepage, authors, support } =
-          config as PhpConfigurationItem;
-        return { vendorName, projectName, description, type, keywords, homepage, authors, support };
-      }
-      case Language.PYTHON: {
-        const { name, description, authors, maintainers, keywords, classifiers, urls } =
-          config as PythonConfigurationItem;
-        return { name, description, authors, maintainers, keywords, classifiers, urls };
-      }
-      case Language.RUBY: {
-        const { name, authors, summary, description, email, homepage, metadata, postInstallMessage, requirements } =
-          config as RubyConfigurationItem;
-        return { name, authors, summary, description, email, homepage, metadata, postInstallMessage, requirements };
-      }
-      case Language.TYPESCRIPT: {
-        const { name, author, description, contributors, bugs, keywords, homepage, repository } =
-          config as TypeScriptConfigurationItem;
-        return { name, author, description, contributors, bugs, keywords, homepage, repository };
-      }
-      case Language.GO:
-        return {} as PackageConfigurationData;
-    }
-  }
-}
+  | TypeScriptPackageConfiguration
+  | GoPackageConfiguration;
