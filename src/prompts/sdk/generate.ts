@@ -5,6 +5,8 @@ import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
 import { ServiceError } from "../../infrastructure/service-error.js";
 import { GeneratedSdkResult } from "../../infrastructure/services/portal-service.js";
+import { StabilityLevelTag } from "@apimatic/sdk";
+import { CodeGenerationVersion } from "../../types/sdk/generate.js";
 
 export class SdkGeneratePrompts {
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
@@ -46,6 +48,10 @@ export class SdkGeneratePrompts {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
+  public generateV2SDK(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
+  }
+
   public sdkGenerationServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
   }
@@ -79,5 +85,13 @@ export class SdkGeneratePrompts {
 
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
+  }
+
+  public v4LanguageNotSupported(language: string) {
+    log.error(`The language ${f.var(language)} is not supported for ${f.var("v4")} code generation.`);
+  }
+
+  public v4OnlyBetaSupported(language: string, stability: StabilityLevelTag, codeGenVersion: CodeGenerationVersion) {
+    log.error(`Only ${f.var(stability)} stability tag is supported for language ${f.var(language)} with ${f.var(codeGenVersion)} code generation.`);
   }
 }

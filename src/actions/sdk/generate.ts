@@ -1,15 +1,16 @@
-import { PortalService } from "../../infrastructure/services/portal-service.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../action-result.js";
-import { withDirPath } from "../../infrastructure/tmp-extensions.js";
-import { SdkContext } from "../../types/sdk-context.js";
-import { SdkGeneratePrompts } from "../../prompts/sdk/generate.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { TempContext } from "../../types/temp-context.js";
-import { Language } from "../../types/sdk/generate.js";
-import { MergeSourceTreeAction } from "./merge-source-tree.js";
-import { BuildContext } from "../../types/build-context.js";
-import { SemVersion } from "../../types/publish/version.js";
+import { PortalService } from '../../infrastructure/services/portal-service.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ActionResult } from '../action-result.js';
+import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { SdkContext } from '../../types/sdk-context.js';
+import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { TempContext } from '../../types/temp-context.js';
+import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
+import { MergeSourceTreeAction } from './merge-source-tree.js';
+import { BuildContext } from '../../types/build-context.js';
+import { SemVersion } from '../../types/publish/version.js';
+import { StabilityLevelTag } from '@apimatic/sdk';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -32,13 +33,26 @@ export class GenerateAction {
     zipSdk: boolean,
     skipChanges: boolean,
     trackChanges: boolean,
+    codeGenVersion: CodeGenerationVersion,
+    stability: StabilityLevelTag | undefined,
     apiVersion?: string,
     packageVersion?: SemVersion,
     packageSettingsDirectory?: DirectoryPath
-  ): Promise<ActionResult<{sourceTreeTrackingInitiated: boolean, conflictsResolved: boolean}>> => {
+  ): Promise<ActionResult<{ sourceTreeTrackingInitiated: boolean; conflictsResolved: boolean }>> => {
     if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
+    }
+
+    if (codeGenVersion === CodeGenerationVersion.V4) {
+      if (language !== Language.CSHARP) {
+        this.prompts.v4LanguageNotSupported(language);
+        return ActionResult.failed();
+      }
+      if (stability !== undefined && stability !== StabilityLevelTag.Beta) {
+        this.prompts.v4OnlyBetaSupported(language, stability, codeGenVersion);
+        return ActionResult.failed();
+      }
     }
 
     const rootBuildContext = new BuildContext(buildDirectory);
@@ -48,7 +62,7 @@ export class GenerateAction {
     }
 
     const versionedContextGetter = async () => {
-      if (!await rootBuildContext.isVersionedBuild()) {
+      if (!(await rootBuildContext.isVersionedBuild())) {
         if (apiVersion) this.prompts.apiVersionOnlyApplicableWithVersionedBuild();
         return { version: undefined, buildContext: rootBuildContext };
       }
@@ -95,7 +109,7 @@ export class GenerateAction {
 
     const hasSdkSourceTree = await buildContext.hasSdkSourceTree(language);
     const sdkContext = new SdkContext(language, destinationSdkDirectory, skipChanges && hasSdkSourceTree, version);
-    if (!force && await sdkContext.exists() && !(await this.prompts.overwriteSdk(destinationSdkDirectory))) {
+    if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(destinationSdkDirectory))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
     }
@@ -104,8 +118,38 @@ export class GenerateAction {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await buildContext.getBuildZipPath(tempDirectory, packageSettingsDirectory);
 
+      if (codeGenVersion === CodeGenerationVersion.V4) {
+        const response = await this.prompts.generateV2SDK(
+          this.portalService.generateV2Sdk(
+            buildZipPath,
+            language,
+            stability ?? StabilityLevelTag.Beta,
+            this.configDir,
+            this.commandMetadata,
+            this.authKey
+          )
+        );
+        
+        if (response.isErr()) {
+          this.prompts.sdkGenerationServiceError(response.error);
+          return ActionResult.failed();
+        }
+
+        const responseSdkZipPath = await tempContext.save(response.value);
+        const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
+        this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
+        return ActionResult.success();
+      }
+
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(buildZipPath, language, this.configDir, this.commandMetadata, this.authKey, packageVersion)
+        this.portalService.generateSdk(
+          buildZipPath,
+          language,
+          this.configDir,
+          this.commandMetadata,
+          this.authKey,
+          packageVersion
+        )
       );
 
       if (response.isErr()) {
@@ -132,8 +176,16 @@ export class GenerateAction {
 
       const mergeSourceTree = new MergeSourceTreeAction();
       return await mergeSourceTree.execute(
-        tempSdkWithSourceTree, tempSdk, destinationSourceTreePath, trackChanges, skipChanges, hasSdkSourceTree,
-        language, destinationSdkDirectory, version, zipSdk
+        tempSdkWithSourceTree,
+        tempSdk,
+        destinationSourceTreePath,
+        trackChanges,
+        skipChanges,
+        hasSdkSourceTree,
+        language,
+        destinationSdkDirectory,
+        version,
+        zipSdk
       );
     });
   };

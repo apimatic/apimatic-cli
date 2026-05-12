@@ -8,6 +8,11 @@ export enum Language {
   GO = "go"
 }
 
+export enum CodeGenerationVersion {
+  V3 = "v3",
+  V4 = "v4"
+}
+
 const languageMap: { [key: number]: Language } = {
   1: Language.CSHARP,
   2: Language.GO,
