@@ -10,6 +10,13 @@ import {
   TsRepository
 } from '../publish-api/publishing-profile-item.js';
 
+export interface GitConfiguration {
+  isEnabled: boolean;
+  credentialsId: string;
+  repositoryName: string;
+  branch: string;
+}
+
 export interface CSharpPackageConfiguration {
   packageId: string;
   authors: string | null;

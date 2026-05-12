@@ -1,7 +1,6 @@
 import { Language } from '../sdk/generate.js';
 import {
   CSharpConfigurationItem,
-  GitConfigurationItem,
   GoConfigurationItem,
   JavaConfigurationItem,
   PhpConfigurationItem,
@@ -15,6 +14,7 @@ import {
 } from '../publish-api/publishing-profile-item.js';
 import { 
   CSharpPackageConfiguration,
+  GitConfiguration,
   GoPackageConfiguration,
   JavaPackageConfiguration,
   PackageConfigurationData,
@@ -27,7 +27,7 @@ import {
 export class PublishingProfile {
   private readonly profile: PublishingProfileItem;
   private readonly languageConfigs: Partial<Record<Language, PackageConfigurationData>>;
-  private readonly gitConfigs: Partial<Record<Language, GitConfigurationItem>>;
+  private readonly gitConfigs: Partial<Record<Language, GitConfiguration>>;
 
   private constructor(profile: PublishingProfileItem) {
     this.profile = profile;
@@ -47,15 +47,15 @@ export class PublishingProfile {
     this.gitConfigs = Object.fromEntries(
       (
         [
-          [Language.CSHARP, profile.cSharpGitConfiguration],
-          [Language.GO, profile.goGitConfiguration],
-          [Language.JAVA, profile.javaGitConfiguration],
-          [Language.PHP, profile.phpGitConfiguration],
-          [Language.PYTHON, profile.pythonGitConfiguration],
-          [Language.RUBY, profile.rubyGitConfiguration],
-          [Language.TYPESCRIPT, profile.typeScriptGitConfiguration]
-        ] as [Language, GitConfigurationItem | null][]
-      ).filter(([, config]) => config?.isEnabled)
+          [Language.CSHARP, profile.cSharpGitConfiguration?.isEnabled ? profile.cSharpGitConfiguration : undefined],
+          [Language.GO, profile.goGitConfiguration?.isEnabled ? profile.goGitConfiguration : undefined],
+          [Language.JAVA, profile.javaGitConfiguration?.isEnabled ? profile.javaGitConfiguration : undefined],
+          [Language.PHP, profile.phpGitConfiguration?.isEnabled ? profile.phpGitConfiguration : undefined],
+          [Language.PYTHON, profile.pythonGitConfiguration?.isEnabled ? profile.pythonGitConfiguration : undefined],
+          [Language.RUBY, profile.rubyGitConfiguration?.isEnabled ? profile.rubyGitConfiguration : undefined],
+          [Language.TYPESCRIPT, profile.typeScriptGitConfiguration?.isEnabled ? profile.typeScriptGitConfiguration : undefined]
+        ] as [Language, GitConfiguration | undefined][]
+      ).filter(([, config]) => config !== undefined)
     );
   }
 
@@ -200,5 +200,4 @@ export class PublishingProfile {
           packageName: config.packageName
         };
   }
-
 }
