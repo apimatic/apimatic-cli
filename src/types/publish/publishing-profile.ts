@@ -1,18 +1,64 @@
 import { Language } from '../sdk/generate.js';
 import {
-  BaseConfigurationItem,
+  CSharpConfigurationItem,
+  GitConfigurationItem,
+  GoConfigurationItem,
+  JavaConfigurationItem,
   LanguagePublishingConfig,
+  PhpConfigurationItem,
   PublishingProfileItem,
   PublishingProfileSummaryGroup,
   PublishingProfileWithLanguagesGroup,
-  PublishType
+  PublishType,
+  PythonConfigurationItem,
+  RubyConfigurationItem,
+  TypeScriptConfigurationItem
 } from '../publish-api/publishing-profile-item.js';
+import { 
+  PackageConfigurationData,
+  createPythonConfiguration,
+  createRubyConfiguration 
+  } from './package-settings-configuration.js';
 
 export class PublishingProfile {
-  private readonly item: PublishingProfileItem;
+  private readonly id: string;
+  private readonly name: string;
+  private readonly apiGroupId: string;
+  private readonly apiGroupName: string;
+  private readonly cSharpConfiguration: CSharpConfigurationItem | null;
+  private readonly goConfiguration: GoConfigurationItem | null;
+  private readonly javaConfiguration: JavaConfigurationItem | null;
+  private readonly phpConfiguration: PhpConfigurationItem | null;
+  private readonly pythonConfiguration: PythonConfigurationItem | null;
+  private readonly rubyConfiguration: RubyConfigurationItem | null;
+  private readonly typeScriptConfiguration: TypeScriptConfigurationItem | null;
+  private readonly cSharpGitConfiguration: GitConfigurationItem | null;
+  private readonly goGitConfiguration: GitConfigurationItem | null;
+  private readonly javaGitConfiguration: GitConfigurationItem | null;
+  private readonly phpGitConfiguration: GitConfigurationItem | null;
+  private readonly pythonGitConfiguration: GitConfigurationItem | null;
+  private readonly rubyGitConfiguration: GitConfigurationItem | null;
+  private readonly typeScriptGitConfiguration: GitConfigurationItem | null;
 
   private constructor(item: PublishingProfileItem) {
-    this.item = item;
+    this.id = item.id;
+    this.name = item.name;
+    this.apiGroupId = item.apiGroupId;
+    this.apiGroupName = item.apiGroupName;
+    this.cSharpConfiguration = item.cSharpConfiguration;
+    this.goConfiguration = item.goConfiguration;
+    this.javaConfiguration = item.javaConfiguration;
+    this.phpConfiguration = item.phpConfiguration;
+    this.pythonConfiguration = item.pythonConfiguration;
+    this.rubyConfiguration = item.rubyConfiguration;
+    this.typeScriptConfiguration = item.typeScriptConfiguration;
+    this.cSharpGitConfiguration = item.cSharpGitConfiguration;
+    this.goGitConfiguration = item.goGitConfiguration;
+    this.javaGitConfiguration = item.javaGitConfiguration;
+    this.phpGitConfiguration = item.phpGitConfiguration;
+    this.pythonGitConfiguration = item.pythonGitConfiguration;
+    this.rubyGitConfiguration = item.rubyGitConfiguration;
+    this.typeScriptGitConfiguration = item.typeScriptGitConfiguration;
   }
 
   public static create(item: PublishingProfileItem): PublishingProfile {
@@ -20,7 +66,7 @@ export class PublishingProfile {
   }
 
   public toString(): string {
-    return this.item.name;
+    return this.name;
   }
 
   public hasEnabledLanguages(): boolean {
@@ -55,65 +101,87 @@ export class PublishingProfile {
 
   public toPublishingProfileSummaryGroup(): PublishingProfileSummaryGroup {
     return {
-      apiGroupName: this.item.apiGroupName,
-      profiles: [{ name: this.item.name, id: this.item.id, enabledLanguages: this.getEnabledLanguages() }]
+      apiGroupName: this.apiGroupName,
+      profiles: [{ name: this.name, id: this.id, enabledLanguages: this.getEnabledLanguages() }]
     };
   }
 
   public toPublishingProfileWithLanguagesGroup(): PublishingProfileWithLanguagesGroup {
     return {
-      apiGroupName: this.item.apiGroupName,
-      profiles: [{ profile: this.item, enabledLanguages: this.getEnabledLanguages() }]
+      apiGroupName: this.apiGroupName,
+      profiles: [
+        {
+          profile: {
+            id: this.id,
+            name: this.name,
+            apiGroupId: this.apiGroupId,
+            apiGroupName: this.apiGroupName,
+            cSharpConfiguration: this.cSharpConfiguration,
+            goConfiguration: this.goConfiguration,
+            javaConfiguration: this.javaConfiguration,
+            phpConfiguration: this.phpConfiguration,
+            pythonConfiguration: this.pythonConfiguration,
+            rubyConfiguration: this.rubyConfiguration,
+            typeScriptConfiguration: this.typeScriptConfiguration,
+            cSharpGitConfiguration: this.cSharpGitConfiguration,
+            goGitConfiguration: this.goGitConfiguration,
+            javaGitConfiguration: this.javaGitConfiguration,
+            phpGitConfiguration: this.phpGitConfiguration,
+            pythonGitConfiguration: this.pythonGitConfiguration,
+            rubyGitConfiguration: this.rubyGitConfiguration,
+            typeScriptGitConfiguration: this.typeScriptGitConfiguration
+          },
+          enabledLanguages: this.getEnabledLanguages()
+        }
+      ]
     };
   }
 
-  public getPackageConfigurationForLanguage(language: Language): BaseConfigurationItem | null {
+  public getPackageConfigurationDataForLanguage(language: Language): PackageConfigurationData | undefined {
     switch (language) {
       case Language.CSHARP:
-        return this.item.cSharpConfiguration;
+        return this.cSharpConfiguration && this.cSharpConfiguration.isEnabled
+        ? this.cSharpConfiguration
+        : undefined;
       case Language.JAVA:
-        return this.item.javaConfiguration;
-      case Language.GO:
-        return this.item.goConfiguration;
-      case Language.RUBY:
-        return this.item.rubyConfiguration;
+        return this.javaConfiguration && this.javaConfiguration.isEnabled
+        ? this.javaConfiguration
+        : undefined;
       case Language.PHP:
-        return this.item.phpConfiguration;
+        return this.phpConfiguration && this.phpConfiguration.isEnabled
+        ? this.phpConfiguration
+        : undefined;
       case Language.PYTHON:
-        return this.item.pythonConfiguration;
+        return this.pythonConfiguration?.isEnabled
+          ? createPythonConfiguration(this.pythonConfiguration)
+          : undefined;
+      case Language.RUBY:
+        return this.rubyConfiguration?.isEnabled
+          ? createRubyConfiguration(this.rubyConfiguration)
+          : undefined;
       case Language.TYPESCRIPT:
-        return this.item.typeScriptConfiguration;
+        return this.typeScriptConfiguration && this.typeScriptConfiguration.isEnabled
+        ? this.typeScriptConfiguration
+        : undefined;
+      case Language.GO:
+        return this.goConfiguration && this.goConfiguration.isEnabled
+        ? this.goConfiguration
+        : undefined;
     }
   }
 
   private getLanguageConfigs(): LanguagePublishingConfig[] {
     return [
-      {
-        language: Language.CSHARP,
-        packageConfig: this.item.cSharpConfiguration,
-        gitConfig: this.item.cSharpGitConfiguration
-      },
-      {
-        language: Language.JAVA,
-        packageConfig: this.item.javaConfiguration,
-        gitConfig: this.item.javaGitConfiguration
-      },
-      { language: Language.GO, packageConfig: this.item.goConfiguration, gitConfig: this.item.goGitConfiguration },
-      { language: Language.PHP, packageConfig: this.item.phpConfiguration, gitConfig: this.item.phpGitConfiguration },
-      {
-        language: Language.PYTHON,
-        packageConfig: this.item.pythonConfiguration,
-        gitConfig: this.item.pythonGitConfiguration
-      },
-      {
-        language: Language.RUBY,
-        packageConfig: this.item.rubyConfiguration,
-        gitConfig: this.item.rubyGitConfiguration
-      },
+      { language: Language.CSHARP, packageConfig: this.cSharpConfiguration, gitConfig: this.cSharpGitConfiguration },
+      { language: Language.JAVA, packageConfig: this.javaConfiguration, gitConfig: this.javaGitConfiguration },
+      { language: Language.GO, packageConfig: this.goConfiguration, gitConfig: this.goGitConfiguration },
+      { language: Language.PHP, packageConfig: this.phpConfiguration, gitConfig: this.phpGitConfiguration },
+      { language: Language.PYTHON, packageConfig: this.pythonConfiguration, gitConfig: this.pythonGitConfiguration },
+      { language: Language.RUBY, packageConfig: this.rubyConfiguration, gitConfig: this.rubyGitConfiguration },
       {
         language: Language.TYPESCRIPT,
-        packageConfig: this.item.typeScriptConfiguration,
-        gitConfig: this.item.typeScriptGitConfiguration
+        packageConfig: this.typeScriptConfiguration,
+        gitConfig: this.typeScriptGitConfiguration
       }
     ];
   }
