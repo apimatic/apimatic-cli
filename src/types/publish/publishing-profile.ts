@@ -34,13 +34,13 @@ export class PublishingProfile {
     this.languageConfigs = Object.fromEntries(
       (
         [
-          [Language.CSHARP, PublishingProfile.createCSharpConfiguration(profile.cSharpConfiguration)],
-          [Language.GO, PublishingProfile.createGoConfiguration(profile.goConfiguration)],
-          [Language.JAVA, PublishingProfile.createJavaConfiguration(profile.javaConfiguration)],
-          [Language.PHP, PublishingProfile.createPhpConfiguration(profile.phpConfiguration)],
-          [Language.PYTHON, PublishingProfile.createPythonConfiguration(profile.pythonConfiguration)],
-          [Language.RUBY, PublishingProfile.createRubyConfiguration(profile.rubyConfiguration)],
-          [Language.TYPESCRIPT, PublishingProfile.createTypeScriptConfiguration(profile.typeScriptConfiguration)]
+          [Language.CSHARP, profile.cSharpConfiguration?.isEnabled ? PublishingProfile.createCSharpConfiguration(profile.cSharpConfiguration) : undefined],
+          [Language.GO, profile.goConfiguration?.isEnabled ? PublishingProfile.createGoConfiguration(profile.goConfiguration) : undefined],
+          [Language.JAVA, profile.javaConfiguration?.isEnabled ? PublishingProfile.createJavaConfiguration(profile.javaConfiguration) : undefined],
+          [Language.PHP, profile.phpConfiguration?.isEnabled ? PublishingProfile.createPhpConfiguration(profile.phpConfiguration) : undefined],
+          [Language.PYTHON, profile.pythonConfiguration?.isEnabled ? PublishingProfile.createPythonConfiguration(profile.pythonConfiguration) : undefined],
+          [Language.RUBY, profile.rubyConfiguration?.isEnabled ? PublishingProfile.createRubyConfiguration(profile.rubyConfiguration) : undefined],
+          [Language.TYPESCRIPT, profile.typeScriptConfiguration?.isEnabled ? PublishingProfile.createTypeScriptConfiguration(profile.typeScriptConfiguration) : undefined]
         ] as [Language, PackageConfigurationData | undefined][]
       ).filter(([, data]) => data !== undefined)
     );
@@ -114,9 +114,8 @@ export class PublishingProfile {
     return this.languageConfigs[language];
   }
 
-  private static createCSharpConfiguration(config: CSharpConfigurationItem | null): CSharpPackageConfiguration | undefined {
-    return config?.isEnabled
-      ? {
+  private static createCSharpConfiguration(config: CSharpConfigurationItem): CSharpPackageConfiguration {
+    return  {
           packageId: config.packageId,
           authors: config.authors,
           description: config.description,
@@ -128,13 +127,11 @@ export class PublishingProfile {
           packageIcon: config.packageIcon,
           packageReleaseNotes: config.packageReleaseNotes,
           copyright: config.copyright
-        }
-      : undefined;
+        };
   }
 
-  private static createJavaConfiguration(config: JavaConfigurationItem | null): JavaPackageConfiguration | undefined {
-    return config?.isEnabled
-      ? {
+  private static createJavaConfiguration(config: JavaConfigurationItem): JavaPackageConfiguration {
+    return {
           groupId: config.groupId,
           artifactId: config.artifactId,
           name: config.name,
@@ -143,13 +140,11 @@ export class PublishingProfile {
           developers: config.developers,
           distributionManagement: config.distributionManagement,
           scm: config.scm
-        }
-      : undefined;
+        };
   }
 
-  private static createPhpConfiguration(config: PhpConfigurationItem | null): PhpPackageConfiguration | undefined {
-    return config?.isEnabled
-      ? {
+  private static createPhpConfiguration(config: PhpConfigurationItem): PhpPackageConfiguration {
+    return {
           vendorName: config.vendorName,
           projectName: config.projectName,
           description: config.description,
@@ -158,13 +153,11 @@ export class PublishingProfile {
           homepage: config.homepage,
           authors: config.authors,
           support: config.support
-        }
-      : undefined;
+        };
   }
 
-  private static createPythonConfiguration(config: PythonConfigurationItem | null): PythonPackageConfiguration | undefined {
-    return config?.isEnabled
-      ? {
+  private static createPythonConfiguration(config: PythonConfigurationItem): PythonPackageConfiguration {
+    return {
           name: config.name,
           description: config.description,
           authors: config.authors,
@@ -172,13 +165,11 @@ export class PublishingProfile {
           keywords: config.keywords,
           classifiers: config.classifiers,
           urls: Object.fromEntries(config.urls.map(({ key, value }) => [key, value]))
-        }
-      : undefined;
+        };
   }
 
-  private static createRubyConfiguration(config: RubyConfigurationItem | null): RubyPackageConfiguration | undefined {
-    return config?.isEnabled
-      ? {
+  private static createRubyConfiguration(config: RubyConfigurationItem) : RubyPackageConfiguration {
+    return  {
           name: config.name,
           authors: config.authors,
           summary: config.summary,
@@ -188,13 +179,11 @@ export class PublishingProfile {
           metadata: Object.fromEntries(config.metadata.map(({ key, value }) => [key, value])),
           postInstallMessage: config.postInstallMessage,
           requirements: config.requirements
-        }
-      : undefined;
+        };
   }
 
-  private static createTypeScriptConfiguration(config: TypeScriptConfigurationItem | null): TypeScriptPackageConfiguration | undefined {
-    return config?.isEnabled
-      ? {
+  private static createTypeScriptConfiguration(config: TypeScriptConfigurationItem): TypeScriptPackageConfiguration {
+    return  {
           name: config.name,
           author: config.author,
           description: config.description,
@@ -203,16 +192,13 @@ export class PublishingProfile {
           homepage: config.homepage,
           keywords: config.keywords,
           repository: config.repository,
-        }
-      : undefined;
+        };
   }
 
-  private static createGoConfiguration(config: GoConfigurationItem | null): GoPackageConfiguration | undefined {
-    return config?.isEnabled
-      ? {
+  private static createGoConfiguration(config: GoConfigurationItem): GoPackageConfiguration {
+    return {
           packageName: config.packageName
-        }
-      : undefined;
+        };
   }
 
 }
