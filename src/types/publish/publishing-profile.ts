@@ -13,7 +13,16 @@ import {
   TypeScriptConfigurationItem,
   PublishType,
 } from '../publish-api/publishing-profile-item.js';
-import { PackageConfigurationData } from './package-settings-configuration.js';
+import { 
+  CSharpPackageConfiguration,
+  GoPackageConfiguration,
+  JavaPackageConfiguration,
+  PackageConfigurationData,
+  PhpPackageConfiguration,
+  PythonPackageConfiguration,
+  RubyPackageConfiguration,
+  TypeScriptPackageConfiguration 
+} from './package-settings-configuration.js';
 
 export class PublishingProfile {
   private readonly profile: PublishingProfileItem;
@@ -33,7 +42,7 @@ export class PublishingProfile {
           [Language.RUBY, PublishingProfile.createRubyConfiguration(profile.rubyConfiguration)],
           [Language.TYPESCRIPT, PublishingProfile.createTypeScriptConfiguration(profile.typeScriptConfiguration)]
         ] as [Language, PackageConfigurationData | undefined][]
-      ).filter(([, config]) => config !== undefined)
+      ).filter(([, data]) => data !== undefined)
     );
     this.gitConfigs = Object.fromEntries(
       (
@@ -105,7 +114,7 @@ export class PublishingProfile {
     return this.languageConfigs[language];
   }
 
-  private static createCSharpConfiguration(config: CSharpConfigurationItem | null): PackageConfigurationData | undefined {
+  private static createCSharpConfiguration(config: CSharpConfigurationItem | null): CSharpPackageConfiguration | undefined {
     return config?.isEnabled
       ? {
           packageId: config.packageId,
@@ -123,7 +132,7 @@ export class PublishingProfile {
       : undefined;
   }
 
-  private static createJavaConfiguration(config: JavaConfigurationItem | null): PackageConfigurationData | undefined {
+  private static createJavaConfiguration(config: JavaConfigurationItem | null): JavaPackageConfiguration | undefined {
     return config?.isEnabled
       ? {
           groupId: config.groupId,
@@ -138,7 +147,7 @@ export class PublishingProfile {
       : undefined;
   }
 
-  private static createPhpConfiguration(config: PhpConfigurationItem | null): PackageConfigurationData | undefined {
+  private static createPhpConfiguration(config: PhpConfigurationItem | null): PhpPackageConfiguration | undefined {
     return config?.isEnabled
       ? {
           vendorName: config.vendorName,
@@ -153,7 +162,7 @@ export class PublishingProfile {
       : undefined;
   }
 
-  private static createPythonConfiguration(config: PythonConfigurationItem | null): PackageConfigurationData | undefined {
+  private static createPythonConfiguration(config: PythonConfigurationItem | null): PythonPackageConfiguration | undefined {
     return config?.isEnabled
       ? {
           name: config.name,
@@ -167,7 +176,7 @@ export class PublishingProfile {
       : undefined;
   }
 
-  private static createRubyConfiguration(config: RubyConfigurationItem | null): PackageConfigurationData | undefined {
+  private static createRubyConfiguration(config: RubyConfigurationItem | null): RubyPackageConfiguration | undefined {
     return config?.isEnabled
       ? {
           name: config.name,
@@ -183,7 +192,7 @@ export class PublishingProfile {
       : undefined;
   }
 
-  private static createTypeScriptConfiguration(config: TypeScriptConfigurationItem | null): PackageConfigurationData | undefined {
+  private static createTypeScriptConfiguration(config: TypeScriptConfigurationItem | null): TypeScriptPackageConfiguration | undefined {
     return config?.isEnabled
       ? {
           name: config.name,
@@ -198,7 +207,7 @@ export class PublishingProfile {
       : undefined;
   }
 
-  private static createGoConfiguration(config: GoConfigurationItem | null): PackageConfigurationData | undefined {
+  private static createGoConfiguration(config: GoConfigurationItem | null): GoPackageConfiguration | undefined {
     return config?.isEnabled
       ? {
           packageName: config.packageName

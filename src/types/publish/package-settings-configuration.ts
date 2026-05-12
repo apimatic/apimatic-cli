@@ -10,7 +10,7 @@ import {
   TsRepository
 } from '../publish-api/publishing-profile-item.js';
 
-interface CSharpPackageConfiguration {
+export interface CSharpPackageConfiguration {
   packageId: string;
   authors: string | null;
   description: string | null;
@@ -24,7 +24,7 @@ interface CSharpPackageConfiguration {
   copyright: string | null;
 }
 
-interface JavaPackageConfiguration {
+export interface JavaPackageConfiguration {
   groupId: string;
   artifactId: string;
   name: string;
@@ -35,7 +35,7 @@ interface JavaPackageConfiguration {
   scm: JavaScm;
 }
 
-interface PhpPackageConfiguration {
+export interface PhpPackageConfiguration {
   vendorName: string;
   projectName: string;
   description: string;
@@ -46,7 +46,7 @@ interface PhpPackageConfiguration {
   support: PhpSupport;
 }
 
-interface PythonPackageConfiguration {
+export interface PythonPackageConfiguration {
   name: string;
   description: string | null;
   authors: PythonPerson[];
@@ -56,7 +56,7 @@ interface PythonPackageConfiguration {
   urls: Record<string, string>;
 }
 
-interface RubyPackageConfiguration {
+export interface RubyPackageConfiguration {
   name: string;
   authors: string[];
   summary: string;
@@ -68,7 +68,7 @@ interface RubyPackageConfiguration {
   requirements: string[];
 }
 
-interface TypeScriptPackageConfiguration {
+export interface TypeScriptPackageConfiguration {
   name: string;
   author: TsPerson;
   description: string | null;
@@ -79,7 +79,7 @@ interface TypeScriptPackageConfiguration {
   repository: TsRepository;
 }
 
-interface GoPackageConfiguration {
+export interface GoPackageConfiguration {
   packageName: string;
 }
 
