@@ -14,11 +14,7 @@ import {
   RubyConfigurationItem,
   TypeScriptConfigurationItem
 } from '../publish-api/publishing-profile-item.js';
-import { 
-  PackageConfigurationData,
-  createPythonConfiguration,
-  createRubyConfiguration 
-  } from './package-settings-configuration.js';
+import { PackageConfigurationData } from './package-settings-configuration.js';
 
 export class PublishingProfile {
   private readonly id: string;
@@ -141,31 +137,90 @@ export class PublishingProfile {
     switch (language) {
       case Language.CSHARP:
         return this.cSharpConfiguration && this.cSharpConfiguration.isEnabled
-        ? this.cSharpConfiguration
+        ? {
+            packageId: this.cSharpConfiguration.packageId,
+            authors: this.cSharpConfiguration.authors,
+            description: this.cSharpConfiguration.description,
+            title: this.cSharpConfiguration.title,
+            packageTags: this.cSharpConfiguration.packageTags,
+            repositoryUrl: this.cSharpConfiguration.repositoryUrl,
+            repositoryType: this.cSharpConfiguration.repositoryType,
+            packageProjectUrl: this.cSharpConfiguration.packageProjectUrl,
+            packageIcon: this.cSharpConfiguration.packageIcon,
+            packageReleaseNotes: this.cSharpConfiguration.packageReleaseNotes,
+            copyright: this.cSharpConfiguration.copyright
+        }
         : undefined;
       case Language.JAVA:
         return this.javaConfiguration && this.javaConfiguration.isEnabled
-        ? this.javaConfiguration
+        ? {
+            groupId: this.javaConfiguration.groupId,
+            artifactId: this.javaConfiguration.artifactId,
+            name: this.javaConfiguration.name,
+            description: this.javaConfiguration.description,
+            url: this.javaConfiguration.url,
+            developers: this.javaConfiguration.developers,
+            distributionManagement: this.javaConfiguration.distributionManagement,
+            scm: this.javaConfiguration.scm
+          }
         : undefined;
       case Language.PHP:
         return this.phpConfiguration && this.phpConfiguration.isEnabled
-        ? this.phpConfiguration
+        ? {
+            vendorName: this.phpConfiguration.vendorName,
+            projectName: this.phpConfiguration.projectName,
+            description: this.phpConfiguration.description,
+            type: this.phpConfiguration.type,
+            keywords: this.phpConfiguration.keywords,
+            homepage: this.phpConfiguration.homepage,
+            authors: this.phpConfiguration.authors,
+            support: this.phpConfiguration.support
+         }
         : undefined;
       case Language.PYTHON:
-        return this.pythonConfiguration?.isEnabled
-          ? createPythonConfiguration(this.pythonConfiguration)
-          : undefined;
+        return this.pythonConfiguration && this.pythonConfiguration.isEnabled
+        ? {
+            name: this.pythonConfiguration.name,
+            description: this.pythonConfiguration.description,
+            authors: this.pythonConfiguration.authors,
+            maintainers: this.pythonConfiguration.maintainers,
+            keywords: this.pythonConfiguration.keywords,
+            classifiers: this.pythonConfiguration.classifiers,
+            urls: Object.fromEntries(this.pythonConfiguration.urls.map(({ key, value }) => [key, value]))
+        }
+        : undefined;
       case Language.RUBY:
-        return this.rubyConfiguration?.isEnabled
-          ? createRubyConfiguration(this.rubyConfiguration)
-          : undefined;
+        return this.rubyConfiguration && this.rubyConfiguration.isEnabled
+        ? {
+            name: this.rubyConfiguration.name,
+            authors: this.rubyConfiguration.authors,
+            summary: this.rubyConfiguration.summary,
+            description: this.rubyConfiguration.description,
+            email: this.rubyConfiguration.email,
+            homepage: this.rubyConfiguration.homepage,
+            metadata: Object.fromEntries(this.rubyConfiguration.metadata.map(({ key, value }) => [key, value])),
+            postInstallMessage: this.rubyConfiguration.postInstallMessage,
+            requirements: this.rubyConfiguration.requirements
+        }
+        : undefined;
       case Language.TYPESCRIPT:
         return this.typeScriptConfiguration && this.typeScriptConfiguration.isEnabled
-        ? this.typeScriptConfiguration
+        ? {
+            name: this.typeScriptConfiguration.name,
+            author: this.typeScriptConfiguration.author,
+            description: this.typeScriptConfiguration.description,
+            contributors: this.typeScriptConfiguration.contributors,
+            bugs: this.typeScriptConfiguration.bugs,
+            homepage: this.typeScriptConfiguration.homepage,
+            repository: this.typeScriptConfiguration.repository,
+            keywords: this.typeScriptConfiguration.keywords
+        }
         : undefined;
       case Language.GO:
         return this.goConfiguration && this.goConfiguration.isEnabled
-        ? this.goConfiguration
+        ? {
+            packageName: this.goConfiguration.packageName
+        }
         : undefined;
     }
   }

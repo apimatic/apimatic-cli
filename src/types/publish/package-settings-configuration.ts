@@ -4,9 +4,7 @@ import {
   JavaScm,
   PhpAuthor,
   PhpSupport,
-  PythonConfigurationItem,
   PythonPerson,
-  RubyConfigurationItem,
   TsBugs,
   TsPerson,
   TsRepository
@@ -58,11 +56,6 @@ interface PythonPackageConfiguration {
   urls: Record<string, string>;
 }
 
-export function createPythonConfiguration(item: PythonConfigurationItem): PythonPackageConfiguration {
-  const { name, description, authors, maintainers, keywords, classifiers, urls } = item;
-  return { name, description, authors, maintainers, keywords, classifiers, urls: Object.fromEntries(urls.map(({ key, value }) => [key, value])) };
-}
-
 interface RubyPackageConfiguration {
   name: string;
   authors: string[];
@@ -73,11 +66,6 @@ interface RubyPackageConfiguration {
   metadata: Record<string, string>;
   postInstallMessage: string | null;
   requirements: string[];
-}
-
-export function createRubyConfiguration(item: RubyConfigurationItem): RubyPackageConfiguration {
-  const { name, authors, summary, description, email, homepage, metadata, postInstallMessage, requirements } = item;
-  return { name, authors, summary, description, email, homepage, metadata: Object.fromEntries(metadata.map(({ key, value }) => [key, value])), postInstallMessage, requirements };
 }
 
 interface TypeScriptPackageConfiguration {
