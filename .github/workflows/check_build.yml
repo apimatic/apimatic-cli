@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ '18', '20', '22', '24' ]
+        node: [ '20', '22', '24' ]
     name: Node ${{ matrix.node }} sample
     steps:
       - name: checkout cli
@@ -29,12 +29,24 @@ jobs:
           path: cli
 
       - name: setup node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: enable corepack
+        run: corepack enable
+
+      - name: configure pnpm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
+          cache-dependency-path: cli/pnpm-lock.yaml
 
       - name: Install dependencies
         working-directory: cli
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Check Build
         working-directory: 'cli'
-        run: npm run build
+        run: pnpm build
