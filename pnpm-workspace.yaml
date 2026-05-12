@@ -1,6 +1,10 @@
 allowBuilds:
   esbuild: true
 enablePrePostScripts: true
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@apimatic/*'
+blockExoticSubdeps: true
 overrides:
   diff: ^8.0.4
   inflight: npm:lru-cache@^7.14.1
