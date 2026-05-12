@@ -1,3 +1,10 @@
+# [1.1.0-beta.15](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.14...v1.1.0-beta.15) (2026-05-08)
+
+
+### Features
+
+* add container and input models in toc using new toc command ([#276](https://github.com/apimatic/apimatic-cli/issues/276)) ([3ae4374](https://github.com/apimatic/apimatic-cli/commit/3ae43743585c2c843bebdec936698e72c44c94a7))
+
 # [1.1.0-beta.14](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.13...v1.1.0-beta.14) (2026-04-28)
 
 
