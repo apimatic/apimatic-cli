@@ -10,17 +10,16 @@ export interface KeyValueItem {
   value: string;
 }
 
-export interface BaseConfigurationItem {
+export interface GitConfigurationItem {
   isEnabled: boolean;
   credentialsId: string;
-}
-
-export interface GitConfigurationItem extends BaseConfigurationItem {
   repositoryName: string;
   branch: string;
 }
 
-export interface CSharpConfigurationItem extends BaseConfigurationItem {
+export interface CSharpConfigurationItem {
+  isEnabled: boolean;
+  credentialsId: string;
   packageId: string;
   authors: string | null;
   description: string | null;
@@ -34,7 +33,9 @@ export interface CSharpConfigurationItem extends BaseConfigurationItem {
   copyright: string | null;
 }
 
-export interface GoConfigurationItem extends BaseConfigurationItem {
+export interface GoConfigurationItem {
+  isEnabled: boolean;
+  credentialsId: string;
   packageName: string;
 }
 
@@ -61,7 +62,9 @@ export interface JavaScm {
   url: string;
 }
 
-export interface JavaConfigurationItem extends BaseConfigurationItem {
+export interface JavaConfigurationItem {
+  isEnabled: boolean;
+  credentialsId: string;
   groupId: string;
   artifactId: string;
   name: string;
@@ -91,7 +94,9 @@ export interface PhpSupport {
   rss: string | null;
 }
 
-export interface PhpConfigurationItem extends BaseConfigurationItem {
+export interface PhpConfigurationItem {
+  isEnabled: boolean;
+  credentialsId: string;
   gitCredentialsId: string;
   repositoryName: string;
   branchName: string;
@@ -111,7 +116,9 @@ export interface PythonPerson {
   name: string | null;
 }
 
-export interface PythonConfigurationItem extends BaseConfigurationItem {
+export interface PythonConfigurationItem {
+  isEnabled: boolean;
+  credentialsId: string;
   name: string;
   description: string | null;
   authors: PythonPerson[];
@@ -121,7 +128,9 @@ export interface PythonConfigurationItem extends BaseConfigurationItem {
   urls: KeyValueItem[];
 }
 
-export interface RubyConfigurationItem extends BaseConfigurationItem {
+export interface RubyConfigurationItem {
+  isEnabled: boolean;
+  credentialsId: string;
   name: string;
   authors: string[];
   summary: string;
@@ -150,7 +159,9 @@ export interface TsRepository {
   directory: string | null;
 }
 
-export interface TypeScriptConfigurationItem extends BaseConfigurationItem {
+export interface TypeScriptConfigurationItem {
+  isEnabled: boolean;
+  credentialsId: string;
   name: string;
   author: TsPerson;
   description: string | null;
@@ -180,12 +191,6 @@ export interface PublishingProfileItem {
   pythonGitConfiguration: GitConfigurationItem | null;
   rubyGitConfiguration: GitConfigurationItem | null;
   typeScriptGitConfiguration: GitConfigurationItem | null;
-}
-
-export interface LanguagePublishingConfig {
-  language: Language;
-  packageConfig: BaseConfigurationItem | null;
-  gitConfig: BaseConfigurationItem | null;
 }
 
 export interface PublishingProfileWithLanguages {

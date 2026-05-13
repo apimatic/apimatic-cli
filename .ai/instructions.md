@@ -10,24 +10,30 @@ APIMatic CLI (`@apimatic/cli`) — the official CLI for APIMatic, built on oclif
 
 ```bash
 # Build
-npm run build          # tsc -b → outputs to lib/
+pnpm build             # tsc -b → outputs to lib/
 
 # Lint
-npm run lint           # ESLint on src/**/*.{js,ts}
-npm run lint:fix       # ESLint with --fix --quiet
+pnpm lint              # ESLint on src/**/*.{js,ts}
+pnpm lint:fix          # ESLint with --fix --quiet
 
 # Format
-npm run format         # Prettier write on src/**/*.{js,ts}
+pnpm format            # Prettier write on src/**/*.{js,ts}
 
 # Test (all)
-npm test               # tsx + mocha, runs test/**/*.test.ts
+pnpm test              # tsx + mocha, runs test/**/*.test.ts
 
 # Test (single file)
-npx tsx node_modules/mocha/bin/_mocha "test/actions/portal/serve.test.ts" --timeout 99999
+pnpm exec tsx node_modules/mocha/bin/_mocha "test/actions/portal/serve.test.ts" --timeout 99999
 
 # Run CLI locally
 node bin/run.js <command>
 ```
+
+## Adding / upgrading dependencies
+
+`pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) as a supply-chain defense. Brand-new package versions are blocked from install until they've been on the registry for at least a week. `@apimatic/*` is exempt via `minimumReleaseAgeExclude`.
+
+If you hit `ERR_PNPM_PACKAGE_RECENTLY_PUBLISHED` adding a fresh release, either wait it out or run a one-off install with `pnpm install --ignore-minimum-release-age` (CI uses `--frozen-lockfile`, which bypasses the check entirely, so this only blocks manual `pnpm add` / `pnpm update`).
 
 ## Architecture — 5-Layer Stack
 

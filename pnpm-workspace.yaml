@@ -1,0 +1,15 @@
+allowBuilds:
+  esbuild: true
+enablePrePostScripts: true
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@apimatic/*'
+blockExoticSubdeps: true
+overrides:
+  diff: ^8.0.4
+  inflight: npm:lru-cache@^7.14.1
+  lodash.get: npm:lodash@^4.17.21
+  '@humanwhocodes/config-array': npm:@eslint/config-array@latest
+  rimraf: ^6.0.1
+  glob: ^13.0.0
+  q: npm:promise@^8.3.0
