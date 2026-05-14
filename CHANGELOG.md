@@ -1,3 +1,10 @@
+# [1.1.0-beta.16](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.15...v1.1.0-beta.16) (2026-05-13)
+
+
+### Bug Fixes
+
+* resolve sdk publishing for ruby and python ([#279](https://github.com/apimatic/apimatic-cli/issues/279)) ([21ad18a](https://github.com/apimatic/apimatic-cli/commit/21ad18a6cf13431fbb01cafabef2242b5407edae))
+
 # [1.1.0-beta.15](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.14...v1.1.0-beta.15) (2026-05-08)
 
 

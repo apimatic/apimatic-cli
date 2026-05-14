@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.1.0-beta.15",
+    "version": "1.1.0-beta.16",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -16,10 +16,10 @@
     "engines": {
         "node": ">=20.0.0"
     },
+    "packageManager": "pnpm@11.0.8",
     "files": [
         "./bin",
         "./lib",
-        "/npm-shrinkwrap.json",
         "/oclif.manifest.json"
     ],
     "repository": "git://github.com/apimatic/apimatic-cli.git",
@@ -48,10 +48,12 @@
     },
     "dependencies": {
         "@apimatic/sdk": "0.2.0-alpha.9",
+        "@clack/core": "1.0.0-alpha.1",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",
+        "ansis": "^3.17.0",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
         "chokidar": "^3.6.0",
@@ -68,6 +70,7 @@
         "livereload": "^0.9.3",
         "neverthrow": "^8.2.0",
         "open": "^8.4.0",
+        "picocolors": "^1.1.1",
         "prettier": "^2.8.8",
         "striptags": "^3.2.0",
         "tmp-promise": "^3.0.3",
@@ -113,7 +116,9 @@
         "oclif": "^4.17.34",
         "rimraf": "^6.0.1",
         "semantic-release": "^23.1.1",
+        "simple-git": "^3.36.0",
         "sinon": "^21.0.0",
+        "string-argv": "^0.3.1",
         "ts-node": "^10.9.2",
         "tsx": "^4.20.3",
         "typescript": "^5.2.2"
@@ -159,14 +164,5 @@
     "lint-staged": {
         "*.js": "eslint --cache --fix",
         "*.{js,ts}": "prettier --write"
-    },
-    "overrides": {
-        "diff": "^8.0.4",
-        "inflight": "npm:lru-cache@^7.14.1",
-        "lodash.get": "npm:lodash@^4.17.21",
-        "@humanwhocodes/config-array": "npm:@eslint/config-array@latest",
-        "rimraf": "^6.0.1",
-        "glob": "^13.0.0",
-        "q": "npm:promise@^8.3.0"
     }
 }

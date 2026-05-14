@@ -10,7 +10,6 @@ import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
-import { PackageSettingsConfiguration } from '../../types/publish/package-settings-configuration.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
@@ -39,14 +38,13 @@ export class SdkPublishAction {
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult<PublishingInfo>> => {
     return await withDirPath(async (tempDirectory) => {
-      const packageConfiguration = publishingProfile.getPackageConfigurationForLanguage(language);
+      const packageConfigurationData = publishingProfile.getPackageConfigurationDataForLanguage(language);
       let packageSettingsDirectory: DirectoryPath | undefined;
 
-      if (packageConfiguration !== null && packageConfiguration.isEnabled) {
-        const packageSettingsConfiguration = PackageSettingsConfiguration.create(language, packageConfiguration);
+      if (packageConfigurationData) {
         packageSettingsDirectory = tempDirectory.join('package-settings');
         const packageSettingsContext = new PackageSettingsContext(packageSettingsDirectory);
-        await packageSettingsContext.writeConfiguration(packageSettingsConfiguration, language);
+        await packageSettingsContext.writeConfiguration(packageConfigurationData, language);
       }
 
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
