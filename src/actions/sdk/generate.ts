@@ -50,7 +50,7 @@ export class GenerateAction {
         return ActionResult.failed();
       }
       if (stability !== undefined && stability !== StabilityLevelTag.Beta) {
-        this.prompts.v4OnlyBetaSupported(language, stability, codeGenVersion);
+        this.prompts.v4OnlyBetaSupported(language, StabilityLevelTag.Beta, codeGenVersion);
         return ActionResult.failed();
       }
     }

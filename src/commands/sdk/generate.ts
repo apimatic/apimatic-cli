@@ -78,7 +78,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
         "track-changes": trackChanges,
         "api-version": apiVersion, 
         "codegen-version": codegenVersion,
-        "stability": stability
+        stability
       }
     } = await this.parse(SdkGenerate);
 
