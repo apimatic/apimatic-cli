@@ -13,3 +13,5 @@ overrides:
   rimraf: ^6.0.1
   glob: ^13.0.0
   q: npm:promise@^8.3.0
+  semver: "^7.7.0"
+  '@oclif/core': "4.11.0"
