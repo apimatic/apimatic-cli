@@ -99,7 +99,7 @@ export class ApiService {
     }
   }
 
-  public async getV2SdkGenerationStatus(
+  public async getV4SdkGenerationStatus(
     requestId: string,
     configDir: DirectoryPath,
     shell: string,

@@ -27,7 +27,7 @@ import { FileService } from "../file-service.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result } from "neverthrow";
-import { Language } from "../../types/sdk/generate.js";
+import { Language, Stability } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
 import { SemVersion } from "../../types/publish/version.js";
@@ -227,10 +227,10 @@ export class PortalService {
     }
   }
 
-  public async generateV2Sdk(
+  public async generateV4Sdk(
     buildPath: FilePath,
     language: Language,
-    stability: StabilityLevelTag,
+    stability: Stability,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
@@ -249,7 +249,7 @@ export class PortalService {
         this.CONTENT_TYPE,
         file,
         this.languageSdk[language],
-        stability
+        this.stabilityTag[stability]
       );
       generationId = response.result.id;
     } catch (error) {
@@ -274,7 +274,7 @@ export class PortalService {
     let statusResult;
     do {
       await new Promise((resolve) => setTimeout(resolve, 3000));
-      statusResult = await this.apiService.getV2SdkGenerationStatus(
+      statusResult = await this.apiService.getV4SdkGenerationStatus(
         generationId,
         configDir,
         commandMetadata.shell,
@@ -392,5 +392,10 @@ export class PortalService {
     [Language.RUBY]: SdkLanguages.Ruby,
     [Language.TYPESCRIPT]: SdkLanguages.Typescript,
     [Language.GO]: SdkLanguages.Go
+  };
+
+  private readonly stabilityTag: Record<Stability, StabilityLevelTag> = {
+    [Stability.STABLE]: StabilityLevelTag.Stable,
+    [Stability.BETA]: StabilityLevelTag.Beta
   };
 }

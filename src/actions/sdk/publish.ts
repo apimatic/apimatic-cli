@@ -8,7 +8,7 @@ import { PublishType } from '../../types/publish-api/publishing-profile-item.js'
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { TempContext } from '../../types/temp-context.js';
@@ -16,7 +16,6 @@ import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { StabilityLevelTag } from '@apimatic/sdk';
 
 export class SdkPublishAction {
   private readonly prompts: SdkPublishPrompts = new SdkPublishPrompts();
@@ -57,7 +56,7 @@ export class SdkPublishAction {
         false,
         false,
         CodeGenerationVersion.V3,
-        StabilityLevelTag.Stable,
+        Stability.STABLE,
         undefined,
         semVersion,
         packageSettingsDirectory

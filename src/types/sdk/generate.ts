@@ -13,6 +13,11 @@ export enum CodeGenerationVersion {
   V4 = "v4"
 }
 
+export enum Stability {
+  STABLE = "stable",
+  BETA = "beta"
+}
+
 const languageMap: { [key: number]: Language } = {
   1: Language.CSHARP,
   2: Language.GO,

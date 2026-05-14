@@ -6,11 +6,10 @@ import { SdkContext } from '../../types/sdk-context.js';
 import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
-import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { MergeSourceTreeAction } from './merge-source-tree.js';
 import { BuildContext } from '../../types/build-context.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { StabilityLevelTag } from '@apimatic/sdk';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -34,7 +33,7 @@ export class GenerateAction {
     skipChanges: boolean,
     trackChanges: boolean,
     codeGenVersion: CodeGenerationVersion,
-    stability: StabilityLevelTag | undefined,
+    stability: Stability,
     apiVersion?: string,
     packageVersion?: SemVersion,
     packageSettingsDirectory?: DirectoryPath
@@ -42,17 +41,6 @@ export class GenerateAction {
     if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
-    }
-
-    if (codeGenVersion === CodeGenerationVersion.V4) {
-      if (language !== Language.CSHARP) {
-        this.prompts.v4LanguageNotSupported(language);
-        return ActionResult.failed();
-      }
-      if (stability !== undefined && stability !== StabilityLevelTag.Beta) {
-        this.prompts.v4OnlyBetaSupported(language, StabilityLevelTag.Beta, codeGenVersion);
-        return ActionResult.failed();
-      }
     }
 
     const rootBuildContext = new BuildContext(buildDirectory);
@@ -119,11 +107,13 @@ export class GenerateAction {
       const buildZipPath = await buildContext.getBuildZipPath(tempDirectory, packageSettingsDirectory);
 
       if (codeGenVersion === CodeGenerationVersion.V4) {
-        const response = await this.prompts.generateV2SDK(
-          this.portalService.generateV2Sdk(
+        this.prompts.sdkCustomizationsNotSupportedForV4();
+
+        const response = await this.prompts.generateV4SDK(
+          this.portalService.generateV4Sdk(
             buildZipPath,
             language,
-            stability ?? StabilityLevelTag.Beta,
+            stability,
             this.configDir,
             this.commandMetadata,
             this.authKey

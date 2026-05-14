@@ -12,12 +12,11 @@ import { ValidateAction } from '../api/validate.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GenerateAction } from './generate.js';
-import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { ZipService } from '../../infrastructure/zip-service.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
-import { StabilityLevelTag } from '@apimatic/sdk';
 
 export class SdkQuickstartAction {
   private readonly prompts = new SdkQuickstartPrompts();
@@ -188,7 +187,7 @@ export class SdkQuickstartAction {
         false, 
         false, 
         CodeGenerationVersion.V3, 
-        StabilityLevelTag.Stable);
+        Stability.STABLE);
       if (result.isFailed()) {
         return ActionResult.failed();
       }

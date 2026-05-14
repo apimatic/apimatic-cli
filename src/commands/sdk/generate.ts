@@ -2,13 +2,12 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
-import { CodeGenerationVersion, Language } from "../../types/sdk/generate.js";
+import { CodeGenerationVersion, Language, Stability } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
-import { StabilityLevelTag } from "@apimatic/sdk";
 
 export default class SdkGenerate extends Command {
   static readonly summary = "Generate an SDK for your API";
@@ -45,13 +44,14 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       description: "Enable change tracking for SDK generation (only required for initial setup)"
     }),
     "codegen-version": Flags.string({
-      description: "Version of the code generation engine to use",
+      description: "Version of the code generator to use",
       options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
       default: CodeGenerationVersion.V3
     }),
     "stability": Flags.string({
       description: "Stability level of the generated SDK",
-      options: Object.values(StabilityLevelTag).map((s) => s.valueOf()),
+      options: Object.values(Stability).map((s) => s.valueOf()),
+      default: Stability.STABLE
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
@@ -103,7 +103,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       skipChanges,
       trackChanges,
       codegenVersion as CodeGenerationVersion,
-      stability as StabilityLevelTag,
+      stability as Stability,
       apiVersion
     );
     outro(result);
