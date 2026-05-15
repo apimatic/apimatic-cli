@@ -1,3 +1,10 @@
+# [1.1.0-beta.17](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.16...v1.1.0-beta.17) (2026-05-15)
+
+
+### Features
+
+* add support for generation of v4 sdks ([#282](https://github.com/apimatic/apimatic-cli/issues/282)) ([8ad0138](https://github.com/apimatic/apimatic-cli/commit/8ad013806642ec3807dcd740a16d40b2f3b3e418))
+
 # [1.1.0-beta.16](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.15...v1.1.0-beta.16) (2026-05-13)
 
 
