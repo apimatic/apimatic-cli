@@ -24,7 +24,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-beta.11 win32-x64 node-v23.4.0
+@apimatic/cli/1.1.0-beta.16 win32-x64 node-v23.4.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -434,21 +434,26 @@ Generate an SDK for your API
 ```
 USAGE
   $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--skip-changes]
-    [--api-version <value>] [--zip] [--track-changes] [-i <value>] [-f] [-k <value>]
+    [--api-version <value>] [--zip] [--track-changes] [--codegen-version v3|v4] [--stability stable|beta] [-i <value>]
+    [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK
-                             will be generated
-  -f, --force                overwrite changes without asking for user consent.
-  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
-                             API specifications and configuration files.
-  -k, --auth-key=<value>     override current authentication state with an authentication key.
-  -l, --language=<option>    (required) Programming language for SDK generation
-                             <options: csharp|java|php|python|ruby|typescript|go>
-      --api-version=<value>  Version of the API to use for SDK generation (if multiple versions exist)
-      --skip-changes         Do not apply the saved changes to the generated SDK
-      --track-changes        Enable change tracking for SDK generation (only required for initial setup)
-      --zip                  Download the generated SDK as a .zip archive
+  -d, --destination=<value>       [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where
+                                  the SDK will be generated
+  -f, --force                     overwrite changes without asking for user consent.
+  -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
+                                  includes API specifications and configuration files.
+  -k, --auth-key=<value>          override current authentication state with an authentication key.
+  -l, --language=<option>         (required) Programming language for SDK generation
+                                  <options: csharp|java|php|python|ruby|typescript|go>
+      --api-version=<value>       Version of the API to use for SDK generation (if multiple versions exist)
+      --codegen-version=<option>  [default: v3] Version of the code generator to use
+                                  <options: v3|v4>
+      --skip-changes              Do not apply the saved changes to the generated SDK
+      --stability=<option>        [default: stable] Stability level of the generated SDK
+                                  <options: stable|beta>
+      --track-changes             Enable change tracking for SDK generation (only required for initial setup)
+      --zip                       Download the generated SDK as a .zip archive
 
 DESCRIPTION
   Generate an SDK for your API

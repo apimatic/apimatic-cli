@@ -80,7 +80,7 @@ export class ApiService {
     try {
       const token = authKey || authInfo?.authKey;
       const response = await this.axiosInstance(shell, token).get(`/sdk/${requestId}/status`, {
-        headers: { Accept: "application/json" },
+        headers: { Accept: 'application/json' },
         maxRedirects: 0,
         validateStatus: () => true
       });
@@ -90,7 +90,40 @@ export class ApiService {
       }
 
       if (response.status === 302) {
-        return ok({ status: "Completed" } as SdkGenerationStatusResponse);
+        return ok({ status: 'Completed' } as SdkGenerationStatusResponse);
+      }
+
+      return err(ServiceError.InvalidResponse);
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
+    }
+  }
+
+  public async getV4SdkGenerationStatus(
+    requestId: string,
+    configDir: DirectoryPath,
+    shell: string,
+    authKey: string | null
+  ): Promise<Result<SdkGenerationStatusResponse, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    if (authInfo === null && !authKey) {
+      return err(ServiceError.UnAuthorized);
+    }
+
+    try {
+      const token = authKey || authInfo?.authKey;
+      const response = await this.axiosInstance(shell, token).get(`/sdk/v2/${requestId}/status`, {
+        headers: { Accept: 'application/json' },
+        maxRedirects: 0,
+        validateStatus: () => true
+      });
+
+      if (response.status === 200) {
+        return ok(response.data as SdkGenerationStatusResponse);
+      }
+
+      if (response.status === 302) {
+        return ok({ status: 'Completed' } as SdkGenerationStatusResponse);
       }
 
       return err(ServiceError.InvalidResponse);

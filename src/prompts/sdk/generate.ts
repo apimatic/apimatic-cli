@@ -46,6 +46,10 @@ export class SdkGeneratePrompts {
     return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
   }
 
+  public generateV4SDK(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
+  }
+
   public sdkGenerationServiceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
   }
@@ -79,5 +83,9 @@ export class SdkGeneratePrompts {
 
   public sdkGenerated(sdk: DirectoryPath) {
     log.info(`The generated SDK can be found at ${f.path(sdk)}.`);
+  }
+
+  public sdkCustomizationsNotSupportedForV4() {
+    log.warn(`The V4 Code Generator does not currently support SDK customizations.`);
   }
 }
