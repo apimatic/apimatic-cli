@@ -47,7 +47,7 @@
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
-        "@apimatic/sdk": "0.2.0-alpha.9",
+        "@apimatic/sdk": "0.2.0-alpha.10",
         "@clack/core": "1.0.0-alpha.1",
         "@clack/prompts": "1.0.0-alpha.1",
         "@oclif/core": "^4.2.8",

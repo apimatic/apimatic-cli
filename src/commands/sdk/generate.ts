@@ -2,7 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
-import { Language } from "../../types/sdk/generate.js";
+import { CodeGenerationVersion, Language, Stability } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
@@ -43,6 +43,16 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       default: false,
       description: "Enable change tracking for SDK generation (only required for initial setup)"
     }),
+    "codegen-version": Flags.string({
+      description: "Version of the code generator to use",
+      options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
+      default: CodeGenerationVersion.V3
+    }),
+    "stability": Flags.string({
+      description: "Stability level of the generated SDK",
+      options: Object.values(Stability).map((s) => s.valueOf()),
+      default: Stability.STABLE
+    }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
     ...FlagsProvider.authKey,
@@ -58,7 +68,18 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, input, destination, force, zip: zipSdk, "auth-key": authKey, "skip-changes": skipChanges, "track-changes": trackChanges,"api-version": apiVersion }
+      flags: { language, 
+        input, 
+        destination, 
+        force, 
+        zip: zipSdk, 
+        "auth-key": authKey, 
+        "skip-changes": skipChanges, 
+        "track-changes": trackChanges,
+        "api-version": apiVersion, 
+        "codegen-version": codegenVersion,
+        stability
+      }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -81,6 +102,8 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       zipSdk,
       skipChanges,
       trackChanges,
+      codegenVersion as CodeGenerationVersion,
+      stability as Stability,
       apiVersion
     );
     outro(result);

@@ -14,6 +14,8 @@ import {
   SdkLanguages,
   Status,
   TableOfContentsController,
+  StabilityLevelTag,
+  V2SdkGenerationController,
 } from "@apimatic/sdk";
 import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { parseStreamBodyToJson } from "../../utils/utils.js";
@@ -25,7 +27,7 @@ import { FileService } from "../file-service.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result } from "neverthrow";
-import { Language } from "../../types/sdk/generate.js";
+import { Language, Stability } from "../../types/sdk/generate.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
 import { SemVersion } from "../../types/publish/version.js";
@@ -225,6 +227,89 @@ export class PortalService {
     }
   }
 
+  public async generateV4Sdk(
+    buildPath: FilePath,
+    language: Language,
+    stability: Stability,
+    configDir: DirectoryPath,
+    commandMetadata: CommandMetadata,
+    authKey: string | null
+  ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
+    const buildFileStream = await this.fileService.getStream(buildPath);
+    const file = new FileWrapper(buildFileStream);
+
+    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey);
+    const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
+    const v2sdkGenerationController = new V2SdkGenerationController(client);
+
+    let generationId: string;
+    try {
+      const response = await v2sdkGenerationController.generateV2SdkViaBuildInputAsync(
+        this.CONTENT_TYPE,
+        file,
+        this.languageSdk[language],
+        this.stabilityTag[stability]
+      );
+      generationId = response.result.id;
+    } catch (error) {
+      if (error instanceof ProblemDetailsError) {
+        // TODO: This only picks the first error message, improve it to show all errors.
+        const errors = error.result!.errors as Record<string, string[]>;
+        const message = Object.values(errors)[0]?.[0] ?? null;
+        const errorMessage = error.result!.title + '\n- ' + message;
+        if (error.statusCode === 400) {
+          return err(ServiceError.badRequest(errorMessage, errors));
+        }
+        if (error.statusCode === 403) {
+          return err(ServiceError.forbidden(errorMessage));
+        }
+      }
+      const serviceError = handleServiceError(error);
+      return err(serviceError);
+    } finally {
+      buildFileStream.close();
+    }
+
+    let statusResult;
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      statusResult = await this.apiService.getV4SdkGenerationStatus(
+        generationId,
+        configDir,
+        commandMetadata.shell,
+        authKey
+      );
+
+      if (statusResult.isErr()) {
+        return err(statusResult.error);
+      }
+      if (statusResult.value.status === Status.Failed) {
+        return err(ServiceError.ServerError);
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
+        const errors = statusResult.value.errors as Record<string, string[]>;
+        const messages = Object.values(errors).flat();
+        const errorMessage =
+          'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
+        return err(ServiceError.badRequest(errorMessage, errors));
+      }
+      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
+        const errors = statusResult.value.errors as Record<string, string[]>;
+        const message = Object.values(errors).flat()[0] ?? null;
+        const errorMessage = 'Access denied to resource.' + '\n- ' + message;
+        return err(ServiceError.forbidden(errorMessage));
+      }
+    } while (statusResult.value.status !== Status.Completed);
+
+    try {
+      const sdkResponse = await v2sdkGenerationController.downloadGeneratedV2Sdk(generationId);
+      return ok(sdkResponse.result as NodeJS.ReadableStream);
+    } catch (error) {
+      return err(handleServiceError(error));
+    }
+  }
+
   public async generateSdl(
     specFileStream: ReadStream,
     configDir: DirectoryPath,
@@ -307,5 +392,10 @@ export class PortalService {
     [Language.RUBY]: SdkLanguages.Ruby,
     [Language.TYPESCRIPT]: SdkLanguages.Typescript,
     [Language.GO]: SdkLanguages.Go
+  };
+
+  private readonly stabilityTag: Record<Stability, StabilityLevelTag> = {
+    [Stability.STABLE]: StabilityLevelTag.Stable,
+    [Stability.BETA]: StabilityLevelTag.Beta
   };
 }
