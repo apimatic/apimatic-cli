@@ -1,6 +1,6 @@
 import fs from 'fs';
 import yazl from 'yazl';
-import extract from 'extract-zip';
+import AdmZip from 'adm-zip';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
 
@@ -39,24 +39,29 @@ export class ZipService {
   public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
     const MAX_FILES = 100_000;
     const MAX_SIZE = 1_000_000_000; // 1 GB
-    let fileCount = 0;
-    let totalSize = 0;
 
-    await extract(sourceFile.toString(), {
-      dir: destinationDirectory.toString(),
-      onEntry: function (entry) {
-        fileCount++;
-        if (fileCount > MAX_FILES) {
-          throw new Error('Reached max. file count');
-        }
-        // The uncompressedSize comes from the zip headers, so it might not be trustworthy.
-        // Alternatively, calculate the size from the readStream.
-        let entrySize = entry.uncompressedSize;
-        totalSize += entrySize;
-        if (totalSize > MAX_SIZE) {
-          throw new Error('Reached max. size');
-        }
+    // adm-zip extracts synchronously, with no per-entry read streams. This
+    // avoids a hang on Node 22+ where yauzl/fd-slicer (used by extract-zip)
+    // builds STORED-entry read streams that deliver every byte but never emit
+    // `end`, leaving the extraction promise pending forever — even though all
+    // files have already been written to disk — which crashes the CLI with
+    // "unsettled top-level await" / exit code 13.
+    const zip = new AdmZip(sourceFile.toString());
+    const entries = zip.getEntries();
+
+    if (entries.length > MAX_FILES) {
+      throw new Error('Reached max. file count');
+    }
+    // header.size is the uncompressed size declared in the zip headers, so it
+    // might not be trustworthy — kept as a cheap guard against zip bombs.
+    let totalSize = 0;
+    for (const entry of entries) {
+      totalSize += entry.header.size;
+      if (totalSize > MAX_SIZE) {
+        throw new Error('Reached max. size');
       }
-    });
+    }
+
+    zip.extractAllTo(destinationDirectory.toString(), /* overwrite */ true);
   }
 }
