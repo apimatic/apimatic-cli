@@ -1,3 +1,10 @@
+# [1.1.0-beta.18](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.17...v1.1.0-beta.18) (2026-06-11)
+
+
+### Bug Fixes
+
+* prevent portal generate hang on Node 22+ by extracting with adm-zip ([#283](https://github.com/apimatic/apimatic-cli/issues/283)) ([#284](https://github.com/apimatic/apimatic-cli/issues/284)) ([e3bac3e](https://github.com/apimatic/apimatic-cli/commit/e3bac3e6589f6580dd4fc74240c675b7c9550490))
+
 # [1.1.0-beta.17](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.16...v1.1.0-beta.17) (2026-05-15)
 
 
