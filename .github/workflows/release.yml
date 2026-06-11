@@ -50,6 +50,11 @@ jobs:
         working-directory: 'cli'
         run: pnpm build
 
+      # npm trusted publishing (OIDC) requires npm >= 11.5.1; the runner's bundled
+      # npm (shipped with Node 22) is older, so upgrade it before publishing.
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
       - name: Release
         working-directory: cli
         env:
