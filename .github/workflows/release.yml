@@ -6,7 +6,9 @@ on:
 
 permissions:
   id-token: write  # Required for OIDC
-  contents: read
+  contents: write       # needed by @semantic-release/github to needed to push tags/version commits
+  issues: write         # needed by @semantic-release/github
+  pull-requests: write  # needed if semantic-release comments on PRs
 
 jobs:
   release:
