@@ -8,7 +8,14 @@ module.exports = {
     },
     {
       name: "beta",
-      prerelease: true
+      prerelease: true,
+      // Publish beta releases to the npm `latest` dist-tag (the default channel)
+      // rather than a `beta` dist-tag, so `npm install @apimatic/cli` resolves to
+      // the current beta. The dist-tag is applied during `npm publish`, so this
+      // works with OIDC trusted publishing (no NPM_TOKEN needed).
+      // NOTE: existing beta tags' git notes were migrated to include the default
+      // channel so version continuity is preserved (beta.N keeps incrementing).
+      channel: false
     }
   ],
   plugins: [
