@@ -24,8 +24,8 @@ export class ServiceError {
   static badRequest(customMessage: string, errors: Record<string, string[]>): ServiceError {
     return new ServiceError(ServiceErrorCode.BadRequest, customMessage, errors);
   }
-  static forbidden(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.Forbidden, customMessage, {});
+  static forbidden(customMessage: string, errors: Record<string, string[]> = {}): ServiceError {
+    return new ServiceError(ServiceErrorCode.Forbidden, customMessage, errors);
   }
   static notFound(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
@@ -51,6 +51,15 @@ export class ServiceError {
 
   public getError(key: string): string[] | undefined {
     return this.errors[key];
+  }
+
+  /**
+   * The keys of the structured errors map. For subscription failures the
+   * backend uses these as stable machine codes (e.g. "EndpointLimitExceeded",
+   * "FeatureNotAllowed"), letting consumers classify without parsing the message.
+   */
+  public get errorCodes(): string[] {
+    return Object.keys(this.errors);
   }
 }
 

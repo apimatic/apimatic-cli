@@ -75,7 +75,7 @@ export class PortalService {
           return err(ServiceError.badRequest(errorMessage, errors));
         }
         if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
+          return err(ServiceError.forbidden(errorMessage, errors));
         }
       }
       const serviceError = handleServiceError(error);
@@ -112,7 +112,7 @@ export class PortalService {
         // TODO: This only picks the first error message, improve it to show all errors.
         const message = Object.values(errors)[0]?.[0] ?? null;
         const errorMessage = "Access denied to resource." + "\n- " + message;
-        return err(ServiceError.forbidden(errorMessage));
+        return err(ServiceError.forbidden(errorMessage, errors));
       }
     } while (statusResult.value.status !== Status.Completed);
 
@@ -164,7 +164,7 @@ export class PortalService {
           return err(ServiceError.badRequest(errorMessage, errors));
         }
         if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
+          return err(ServiceError.forbidden(errorMessage, errors));
         }
       }
       const serviceError = handleServiceError(error);
@@ -210,7 +210,7 @@ export class PortalService {
         const errors = statusResult.value.errors as Record<string, string[]>;
         const message = Object.values(errors).flat()[0] ?? null;
         const errorMessage = "Access denied to resource." + "\n- " + message;
-        return err(ServiceError.forbidden(errorMessage));
+        return err(ServiceError.forbidden(errorMessage, errors));
       }
     } while (statusResult.value.status !== Status.Completed);
 
@@ -262,7 +262,7 @@ export class PortalService {
           return err(ServiceError.badRequest(errorMessage, errors));
         }
         if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
+          return err(ServiceError.forbidden(errorMessage, errors));
         }
       }
       const serviceError = handleServiceError(error);
@@ -298,7 +298,7 @@ export class PortalService {
         const errors = statusResult.value.errors as Record<string, string[]>;
         const message = Object.values(errors).flat()[0] ?? null;
         const errorMessage = 'Access denied to resource.' + '\n- ' + message;
-        return err(ServiceError.forbidden(errorMessage));
+        return err(ServiceError.forbidden(errorMessage, errors));
       }
     } while (statusResult.value.status !== Status.Completed);
 
