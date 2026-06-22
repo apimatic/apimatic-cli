@@ -18,8 +18,18 @@ import { FilePath } from '../../types/file/filePath.js';
 import { SpecContext } from '../../types/spec-context.js';
 import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
 import { FileName } from '../../types/file/fileName.js';
+import { ApiService } from '../../infrastructure/services/api-service.js';
+import { BuildConfig } from '../../types/build/build.js';
 
-const defaultPort: number = 3000 as const;
+const defaultPort: number = 23513 as const;
+const copilotBaseUrl: string = `http://localhost:${defaultPort}` as const;
+const defaultCopilotWelcomeMessage: string =
+  "Hi there! I'm your API Integration Assistant, here to help you learn and integrate with this API.\n" +
+  "\n" +
+  "Ask me anything about this API or try one of these example prompts:\n" +
+  "\n" +
+  "- `What authentication methods does this API support?`\n" +
+  "- `[Enter another prompt here]`";
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -28,6 +38,7 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
+  private readonly apiService = new ApiService();
   private readonly buildFileUrl = new UrlPath(
     `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
   );
@@ -174,6 +185,7 @@ export class PortalQuickstartAction {
 
       const buildFile = await tempBuildContext.getBuildFileContents();
       buildFile.generatePortal!.languageConfig = getLanguagesConfig(languages);
+      await this.configureApiCopilot(buildFile);
       await tempBuildContext.updateBuildFileContents(buildFile);
 
       const sourceDirectory = inputDirectory.join('src');
@@ -199,4 +211,56 @@ export class PortalQuickstartAction {
       return ActionResult.success();
     });
   };
+
+  // When the account has an API Copilot key, wires Copilot into the build config:
+  // points the portal base URL at the local serve port, adds the apiCopilotConfig
+  // block, and enables AI editor integrations for every configured language.
+  // Copilot is optional, so any failure here is logged and skipped, never fatal.
+  private async configureApiCopilot(buildFile: BuildConfig): Promise<void> {
+    // Copilot is opt-in based on account access. When the user has no Copilot key
+    // (or the check fails), skip silently without surfacing any output.
+    const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+    if (accountInfo.isErr()) {
+      return;
+    }
+
+    const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
+    if (copilotKeys.length === 0) {
+      return;
+    }
+
+    const copilotKey = copilotKeys.length === 1 ? copilotKeys[0] : await this.prompts.selectCopilotKey(copilotKeys);
+    if (!copilotKey) {
+      return;
+    }
+
+    buildFile.generatePortal!.baseUrl = copilotBaseUrl;
+    buildFile.apiCopilotConfig = {
+      isEnabled: true,
+      key: copilotKey,
+      welcomeMessage: defaultCopilotWelcomeMessage
+    };
+    this.enableAiIntegrations(buildFile);
+
+    this.prompts.copilotEnabled(copilotKey);
+  }
+
+  // Enables Cursor, Claude Code and VS Code integrations for every language in
+  // the portal's languageConfig, preserving any existing per-language settings.
+  private enableAiIntegrations(buildFile: BuildConfig): void {
+    const portalSettings = (buildFile.generatePortal!.portalSettings ??= {});
+    const languageSettings = (portalSettings.languageSettings ??= {});
+
+    for (const language of Object.keys(buildFile.generatePortal!.languageConfig)) {
+      const existing = languageSettings[language] ?? {};
+      languageSettings[language] = {
+        ...existing,
+        aiIntegration: {
+          cursor: { isEnabled: true },
+          claudeCode: { isEnabled: true },
+          vscode: { isEnabled: true }
+        }
+      };
+    }
+  }
 }

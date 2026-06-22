@@ -212,6 +212,24 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error(serviceError.errorMessage);
   }
 
+  public async selectCopilotKey(keys: string[]): Promise<string | null> {
+    const selectedKey = await select({
+      message: "Select the API Copilot key you would like to enable for this Portal:",
+      maxItems: 10,
+      options: keys.map((key) => ({ value: key, label: key }))
+    });
+
+    if (isCancel(selectedKey)) {
+      return null;
+    }
+
+    return selectedKey;
+  }
+
+  public copilotEnabled(key: string) {
+    log.info(`API Copilot enabled with key ${f.var(key)} and AI integrations turned on for all selected languages.`);
+  }
+
   public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
     const heading = `${f.var("src")} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());
