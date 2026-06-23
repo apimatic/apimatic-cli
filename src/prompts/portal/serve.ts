@@ -7,7 +7,7 @@ import { noteWrapped } from "../prompt.js";
 
 export class PortalServePrompts {
   public usingFallbackPort(currentPort: number, availablePort: number) {
-    const message = `Port ${f.var(currentPort.toString())} is already in use. The generated portal would use the available port ${f.var(
+    const message = `Port ${f.var(currentPort.toString())} is already in use. The portal will use port ${f.var(
       availablePort.toString()
     )} instead.`;
     log.step(message);
@@ -28,7 +28,7 @@ export class PortalServePrompts {
   }
 
   public baseUrlPortUpdated(updatedUrl: UrlPath) {
-    const message = `Updated the configured base URL in ${f.var("APIMATIC-BUILD.json")} to ${f.var(updatedUrl.toString())} to match the serve port.`;
+    const message = `Updated the base URL in ${f.var("APIMATIC-BUILD.json")} to ${f.var(updatedUrl.toString())} to match the serve port.`;
     log.info(message);
   }
 
