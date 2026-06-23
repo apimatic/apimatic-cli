@@ -177,7 +177,7 @@ export class PortalQuickstartAction {
         break;
       }
 
-      const copilotKeyResult = await this.resolveCopilotKey();
+      const copilotKeyResult = await this.getCopilotKey();
       if (copilotKeyResult.cancelled) {
         this.prompts.noCopilotKeySelected();
         return ActionResult.cancelled();
@@ -195,18 +195,25 @@ export class PortalQuickstartAction {
       await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
       const extractedFolder = tempDirectory.join(this.repositoryFolderName);
 
+      // Clean up the workflow dir from the template before copying
       const tempBuildContext = new BuildContext(extractedFolder);
       await tempBuildContext.deleteWorkflowDir();
 
-      const buildFile = await tempBuildContext.getBuildFileContents();
-      buildFile.generatePortal!.languageConfig = getLanguagesConfig(languages);
-      if (copilotKeyResult.key) {
-        this.applyCopilotConfig(buildFile, copilotKeyResult.key);
-      }
-      await tempBuildContext.updateBuildFileContents(buildFile);
-
+      // Copy the template into the final destination
       const sourceDirectory = inputDirectory.join('src');
       await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
+
+      // Update the build file in its final location via BuildContext,
+      // mirroring exactly how CopilotAction reads and writes the build file
+      const buildContext = new BuildContext(sourceDirectory);
+      const buildConfig = await buildContext.getBuildFileContents();
+      buildConfig.generatePortal!.languageConfig = getLanguagesConfig(languages);
+      if (copilotKeyResult.key) {
+        this.applyCopilotConfig(buildConfig, copilotKeyResult.key);
+      } else {
+        this.enableAiIntegrations(buildConfig);
+      }
+      await buildContext.updateBuildFileContents(buildConfig);
 
       const specDirectory = sourceDirectory.join('spec');
       const specContext = new SpecContext(specDirectory);
@@ -234,7 +241,7 @@ export class PortalQuickstartAction {
   // access: when the user has no Copilot key (or the lookup fails) it is skipped
   // silently ({ cancelled: false } with no key). When multiple keys exist and the user
   // cancels selection, returns { cancelled: true } so quickstart aborts.
-  private async resolveCopilotKey(): Promise<{ cancelled: boolean; key?: string }> {
+  private async getCopilotKey(): Promise<{ cancelled: boolean; key?: string }> {
     const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
     if (accountInfo.isErr()) {
       return { cancelled: false };
@@ -263,29 +270,29 @@ export class PortalQuickstartAction {
   // Wires the resolved Copilot key into the build config: points the portal base URL
   // at the local serve port, adds the apiCopilotConfig block, and enables AI editor
   // integrations for every configured SDK language.
-  private applyCopilotConfig(buildFile: BuildConfig, copilotKey: string): void {
+  private applyCopilotConfig(buildConfig: BuildConfig, copilotKey: string): void {
     const apiCopilotConfig: CopilotConfig = {
       isEnabled: true,
       key: copilotKey,
       welcomeMessage: DEFAULT_COPILOT_WELCOME_MESSAGE
     };
-    buildFile.generatePortal!.baseUrl = defaultBaseUrl;
-    buildFile.apiCopilotConfig = apiCopilotConfig;
-    this.enableAiIntegrations(buildFile);
+    buildConfig.generatePortal!.baseUrl = defaultBaseUrl;
+    buildConfig.apiCopilotConfig = apiCopilotConfig;
+    this.enableAiIntegrations(buildConfig);
   }
 
   // Enables Cursor/Claude Code/VS Code integrations for the selected SDK languages.
   // Supplying languageSettings suppresses codegen's own per-language auto-population,
   // so we also add the http entry (no AI integration) the portal needs to render —
   // initialPlatform defaults to http, and a missing entry leaves the widget unrendered.
-  private enableAiIntegrations(buildFile: BuildConfig): void {
-    const portalSettings = (buildFile.generatePortal!.portalSettings ??= {});
+  private enableAiIntegrations(buildConfig: BuildConfig): void {
+    const portalSettings = (buildConfig.generatePortal!.portalSettings ??= {});
     const languageSettings = (portalSettings.languageSettings ??= {});
 
     languageSettings[httpTemplateId] ??= {};
 
     let firstSdkTemplateId: string | undefined;
-    for (const language of Object.keys(buildFile.generatePortal!.languageConfig)) {
+    for (const language of Object.keys(buildConfig.generatePortal!.languageConfig)) {
       const templateId = codegenTemplateIdByLanguage[language];
       if (!templateId) {
         continue;
