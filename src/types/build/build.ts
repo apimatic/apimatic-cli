@@ -169,8 +169,8 @@ export class BuildConfig {
     return new BuildConfig(JSON.parse(json) as BuildConfigData);
   }
 
-  // Used implicitly by JSON.stringify when the config is written back to disk.
-  public toBuildConfigDData(): BuildConfigData {
+  // Called implicitly by JSON.stringify when the config is written back to disk.
+  public toJSON(): BuildConfigData {
     return this.data;
   }
 
