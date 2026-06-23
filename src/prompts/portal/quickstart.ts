@@ -214,7 +214,7 @@ ${f.link(referenceDocumentationUrl)}`;
 
   public async selectCopilotKey(keys: string[]): Promise<string | undefined> {
     const selectedKey = await select({
-      message: "Select the API Copilot key you would like to enable for this Portal:",
+      message: "Select the API Copilot key you would like to use for this Portal:",
       maxItems: 10,
       options: keys.map((key) => ({ value: key, label: key }))
     });

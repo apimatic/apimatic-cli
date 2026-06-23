@@ -111,7 +111,7 @@ export class LanguageSetting {
     });
   }
 
-  public toJSON(): LanguageSettingData {
+  public toLanguageSettingData(): LanguageSettingData {
     return this.data;
   }
 }
@@ -144,7 +144,7 @@ export class PortalSettings {
         continue;
       }
       firstSdkTemplateId ??= templateId;
-      languageSettings[templateId] = LanguageSetting.from(languageSettings[templateId]).withAiIntegrationsEnabled().toJSON();
+      languageSettings[templateId] = LanguageSetting.from(languageSettings[templateId]).withAiIntegrationsEnabled().toLanguageSettingData();
     }
 
     return new PortalSettings({
@@ -154,7 +154,7 @@ export class PortalSettings {
     });
   }
 
-  public toJSON(): PortalSettingsData {
+  public toPortalSettingsData(): PortalSettingsData {
     return this.data;
   }
 }
@@ -171,7 +171,7 @@ export class BuildConfig {
   }
 
   // Used implicitly by JSON.stringify when the config is written back to disk.
-  public toJSON(): BuildConfigData {
+  public toBuildConfigDData(): BuildConfigData {
     return this.data;
   }
 
@@ -222,7 +222,7 @@ export class BuildConfig {
         baseUrl,
         portalSettings: PortalSettings.from(portal.portalSettings)
           .withAiIntegrations(Object.keys(portal.languageConfig))
-          .toJSON()
+          .toPortalSettingsData()
       }
     });
   }
@@ -243,7 +243,7 @@ export class BuildConfig {
 
     const portal = this.data.generatePortal!;
     const updatedPortal: PortalConfig = portal.portalSettings?.baseUrl
-      ? { ...portal, portalSettings: PortalSettings.from(portal.portalSettings).withBaseUrl(serveUrl).toJSON() }
+      ? { ...portal, portalSettings: PortalSettings.from(portal.portalSettings).withBaseUrl(serveUrl).toPortalSettingsData() }
       : { ...portal, baseUrl: serveUrl.toString() };
     return ok(new BuildConfig({ ...this.data, generatePortal: updatedPortal }));
   }
