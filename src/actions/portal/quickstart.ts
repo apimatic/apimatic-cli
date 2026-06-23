@@ -195,7 +195,10 @@ export class PortalQuickstartAction {
 
       const buildFile = await tempBuildContext.getBuildFileContents();
       buildFile.generatePortal!.languageConfig = getLanguagesConfig(languages);
-      await this.configureApiCopilot(buildFile);
+      if (await this.configureApiCopilot(buildFile)) {
+        this.prompts.noCopilotKeySelected();
+        return ActionResult.cancelled();
+      }
       await tempBuildContext.updateBuildFileContents(buildFile);
 
       const sourceDirectory = inputDirectory.join('src');
@@ -227,20 +230,29 @@ export class PortalQuickstartAction {
   // block, and enables AI editor integrations for every configured SDK language.
   // Copilot is opt-in based on account access: when the user has no Copilot key
   // (or the lookup fails) it is skipped silently, never fatal.
-  private async configureApiCopilot(buildFile: BuildConfig): Promise<void> {
+  // Returns true if the user cancelled Copilot key selection — quickstart should
+  // abort. When the account has no Copilot key (or the lookup fails), Copilot is
+  // skipped silently and this returns false so quickstart continues without it.
+  private async configureApiCopilot(buildFile: BuildConfig): Promise<boolean> {
     const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
     if (accountInfo.isErr()) {
-      return;
+      return false;
     }
 
     const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
     if (copilotKeys.length === 0) {
-      return;
+      return false;
     }
 
-    const copilotKey = copilotKeys.length === 1 ? copilotKeys[0] : await this.prompts.selectCopilotKey(copilotKeys);
-    if (!copilotKey) {
-      return;
+    let copilotKey: string;
+    if (copilotKeys.length === 1) {
+      copilotKey = copilotKeys[0];
+    } else {
+      const selectedKey = await this.prompts.selectCopilotKey(copilotKeys);
+      if (!selectedKey) {
+        return true;
+      }
+      copilotKey = selectedKey;
     }
 
     const apiCopilotConfig: CopilotConfig = {
@@ -251,6 +263,7 @@ export class PortalQuickstartAction {
     buildFile.generatePortal!.baseUrl = defaultBaseUrl;
     buildFile.apiCopilotConfig = apiCopilotConfig;
     this.enableAiIntegrations(buildFile);
+    return false;
   }
 
   // Enables Cursor/Claude Code/VS Code integrations for the selected SDK languages.

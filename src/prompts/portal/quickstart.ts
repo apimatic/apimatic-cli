@@ -226,6 +226,10 @@ ${f.link(referenceDocumentationUrl)}`;
     return selectedKey;
   }
 
+  public noCopilotKeySelected() {
+    log.error("No API Copilot key was selected.");
+  }
+
   public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
     const heading = `${f.var("src")} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());
