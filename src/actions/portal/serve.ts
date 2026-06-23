@@ -47,7 +47,11 @@ export class PortalServeAction {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    await this.warnOnBaseUrlPortMismatch(buildDirectory, servePort);
+    // The serve port is chosen by the CLI during quickstart (onAfterServe set), so
+    // a mismatch warning there would be noise about a port the user did not pick.
+    if (!onAfterServe) {
+      await this.warnOnBaseUrlPortMismatch(buildDirectory, servePort);
+    }
 
     const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
     const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
@@ -128,12 +132,15 @@ export class PortalServeAction {
   // Warns when the portal's configured base URL points at localhost on a port
   // that differs from the port the portal is actually being served on.
   private async warnOnBaseUrlPortMismatch(buildDirectory: DirectoryPath, servePort: number): Promise<void> {
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.validate())) {
+    // The build file was already validated by the GenerateAction above, so read it
+    // directly; guard only against an unreadable/malformed file.
+    let buildConfig;
+    try {
+      buildConfig = await new BuildContext(buildDirectory).getBuildFileContents();
+    } catch {
       return;
     }
 
-    const buildConfig = await buildContext.getBuildFileContents();
     // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall
     // back to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
     const baseUrl = buildConfig.generatePortal?.portalSettings?.baseUrl ?? buildConfig.generatePortal?.baseUrl;
