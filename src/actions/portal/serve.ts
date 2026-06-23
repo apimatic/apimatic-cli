@@ -70,14 +70,22 @@ export class PortalServeAction {
 
     const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
     const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
+
+    // get-port only checks availability; a port can be taken between that check and the
+    // actual bind, so wait for each server to bind and fail cleanly instead of letting an
+    // unhandled "error" event crash the CLI. livereload surfaces its bind error only on
+    // its internal HTTP server (config.server), which isn't part of its public type.
+    const liveReloadHttpServer = (liveReloadServer as unknown as { config: { server: Server } }).config.server;
+    if ((await this.waitForServerListening(liveReloadHttpServer)).isErr()) {
+      this.prompts.serverStartFailed(liveReloadPort);
+      return ActionResult.failed();
+    }
+
     const server = this.application
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
 
-    // get-port only checks availability; the port can be taken between that check and
-    // now, so handle a failed bind gracefully instead of letting an unhandled "error"
-    // event crash the CLI.
     const listenResult = await this.waitForServerListening(server);
     if (listenResult.isErr()) {
       liveReloadServer.close();
