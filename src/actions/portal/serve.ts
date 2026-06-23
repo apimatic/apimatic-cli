@@ -44,10 +44,12 @@ export class PortalServeAction {
     }
     const serveUrl = new UrlPath(`http://localhost:${servePort}`);
 
-    // Align the configured localhost base URL with the actual serve URL BEFORE
+    // Update the configured localhost base URL to the actual serve URL BEFORE
     // generation bakes it into the portal artifacts; otherwise the portal would load
     // its content from the wrong port and fail to render.
-    await this.reconcileBaseUrl(buildDirectory, serveUrl);
+    if (!(await this.updateBaseUrl(buildDirectory, serveUrl))) {
+      return ActionResult.failed();
+    }
 
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
     const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
@@ -140,24 +142,27 @@ export class PortalServeAction {
     return ActionResult.success();
   }
 
-  // Aligns the portal's configured localhost base URL with the actual serve URL and
+  // Updates the portal's configured localhost base URL to the actual serve URL and
   // persists the change, informing the user. Delegates the config logic to BuildConfig.
-  private async reconcileBaseUrl(buildDirectory: DirectoryPath, serveUrl: UrlPath): Promise<void> {
+  // Returns false when the build file can't be read (missing/invalid) so the caller can
+  // fail with a clear message instead of crashing on the unread file.
+  private async updateBaseUrl(buildDirectory: DirectoryPath, serveUrl: UrlPath): Promise<boolean> {
     const buildContext = new BuildContext(buildDirectory);
     let buildConfig;
     try {
       buildConfig = await buildContext.getBuildFileContents();
     } catch {
-      return;
+      this.prompts.invalidBuildConfig(buildDirectory);
+      return false;
     }
 
-    const reconciliation = buildConfig.reconcileLocalhostBaseUrl(serveUrl);
-    if (reconciliation.isErr()) {
-      return;
+    const change = buildConfig.updateBuildConfigBaseUrl(serveUrl);
+    if (change.isOk()) {
+      await buildContext.updateBuildFileContents(change.value.config);
+      this.prompts.baseUrlPortUpdated(change.value.previous, change.value.updated);
     }
 
-    await buildContext.updateBuildFileContents(reconciliation.value.config);
-    this.prompts.baseUrlPortUpdated(reconciliation.value.previous, reconciliation.value.updated);
+    return true;
   }
 
   // Resolves ok once the server is bound, or err with the bind error (e.g. EADDRINUSE)

@@ -7,9 +7,9 @@ import { noteWrapped } from "../prompt.js";
 
 export class PortalServePrompts {
   public usingFallbackPort(currentPort: number, availablePort: number) {
-    const message = `Port ${f.var(currentPort.toString())} is already in use. Available port ${f.var(
+    const message = `Port ${f.var(currentPort.toString())} is already in use. The generated portal would use the available port ${f.var(
       availablePort.toString()
-    )} will be used.`;
+    )} instead.`;
     log.step(message);
   }
 
@@ -17,6 +17,13 @@ export class PortalServePrompts {
     const message =
       `Could not start the portal server on port ${f.var(port.toString())}; ` +
       `it may have just been taken by another process. Please try again.`;
+    log.error(message);
+  }
+
+  public invalidBuildConfig(buildDirectory: DirectoryPath) {
+    const message =
+      `Could not read the build configuration in ${f.path(buildDirectory)}. ` +
+      `Ensure ${f.var("APIMATIC-BUILD.json")} exists and is valid JSON.`;
     log.error(message);
   }
 

@@ -65,9 +65,9 @@ export interface RecipeWorkflow {
   scriptPath: string;
 }
 
-// Outcome of a successful base-URL reconciliation: the updated config plus the
-// before/after URLs (for user messaging).
-export interface BaseUrlReconciliation {
+// Outcome of a successful base-URL update: the new config plus the before/after URLs
+// (for user messaging).
+export interface BaseUrlChange {
   config: BuildConfig;
   previous: string;
   updated: string;
@@ -180,7 +180,7 @@ export class PortalSettings {
 }
 
 // Immutable wrapper around the parsed APIMATIC-BUILD.json. All build-config reads go
-// through accessor methods and all changes go through with*/reconcile methods that
+// through accessor methods and all changes go through with*/update methods that
 // return a NEW BuildConfig — the wrapped data is never mutated after construction.
 // Construct via `BuildConfig.parse`; persist via `BuildContext`.
 export class BuildConfig {
@@ -243,11 +243,11 @@ export class BuildConfig {
     return new BuildConfig(data);
   }
 
-  // Aligns a configured localhost base URL with where the portal is actually served:
-  // when the effective base URL is localhost and differs from `serveUrl`, it is replaced
-  // wholesale with `serveUrl`. Returns ok(reconciliation) when a change was made, or
-  // err when nothing changed (no base URL, non-localhost URL, or already aligned).
-  public reconcileLocalhostBaseUrl(serveUrl: UrlPath): Result<BaseUrlReconciliation, "unchanged"> {
+  // Updates a configured localhost base URL to match where the portal is actually
+  // served: when the effective base URL is localhost and differs from `serveUrl`, it is
+  // replaced wholesale with `serveUrl`. Returns ok(change) when updated, or err when
+  // nothing changed (no base URL, non-localhost URL, or already matching).
+  public updateBuildConfigBaseUrl(serveUrl: UrlPath): Result<BaseUrlChange, "unchanged"> {
     // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall back
     // to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
     const portalSettings = this.data.generatePortal?.portalSettings;
