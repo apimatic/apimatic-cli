@@ -175,10 +175,10 @@ export class BuildConfig {
     const permalink = `page:recipes/${functionName}`;
     const workflow: RecipeWorkflow = { name, permalink, functionName, scriptPath };
     const existingIndex = workflows.findIndex((w) => w.permalink === permalink);
-    if (existingIndex !== -1) {
-      workflows[existingIndex] = workflow;
-    } else {
+    if (existingIndex === -1) {
       workflows.push(workflow);
+    } else {
+      workflows[existingIndex] = workflow;
     }
   }
 

@@ -1,3 +1,4 @@
+import { Server } from "http";
 import { createServer as createLiveReloadServer } from "livereload";
 import connectLiveReload from "connect-livereload";
 import express, { Express } from "express";
@@ -58,6 +59,16 @@ export class PortalServeAction {
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
+
+    // get-port only checks availability; the port can be taken between that check and
+    // now, so handle a failed bind gracefully instead of letting an unhandled "error"
+    // event crash the CLI.
+    const listenError = await this.waitForServerListening(server);
+    if (listenError) {
+      liveReloadServer.close();
+      this.prompts.serverStartFailed(servePort);
+      return ActionResult.failed();
+    }
 
     const portalUrl = new UrlPath(`http://localhost:${servePort}`);
     this.prompts.portalServed(portalUrl);
@@ -146,6 +157,23 @@ export class PortalServeAction {
 
     await buildContext.updateBuildFileContents(buildConfig);
     this.prompts.baseUrlPortUpdated(change.previous, change.updated);
+  }
+
+  // Resolves once the server is bound, or with the bind error (e.g. EADDRINUSE) so a
+  // failed listen is reported cleanly instead of crashing via an unhandled "error" event.
+  private waitForServerListening(server: Server): Promise<Error | undefined> {
+    return new Promise((resolve) => {
+      const onListening = () => {
+        server.removeListener("error", onError);
+        resolve(undefined);
+      };
+      const onError = (error: Error) => {
+        server.removeListener("listening", onListening);
+        resolve(error);
+      };
+      server.once("listening", onListening);
+      server.once("error", onError);
+    });
   }
 
   // This clears the standard input to allow interrupts like CTRL+C to work properly.

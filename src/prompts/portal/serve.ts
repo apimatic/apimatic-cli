@@ -13,6 +13,13 @@ export class PortalServePrompts {
     log.step(message);
   }
 
+  public serverStartFailed(port: number) {
+    const message =
+      `Could not start the portal server on port ${f.var(port.toString())}; ` +
+      `it may have just been taken by another process. Please try again.`;
+    log.error(message);
+  }
+
   public baseUrlPortUpdated(previousUrl: string, updatedUrl: string) {
     const message =
       `The configured base URL ${f.var(previousUrl)} did not match the serve port. ` +
