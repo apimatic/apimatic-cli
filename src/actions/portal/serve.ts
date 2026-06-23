@@ -1,4 +1,4 @@
-import { Server } from "http";
+import { Server } from "node:http";
 import { createServer as createLiveReloadServer } from "livereload";
 import connectLiveReload from "connect-livereload";
 import express, { Express } from "express";

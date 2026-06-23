@@ -160,10 +160,26 @@ export class PortalQuickstartAction {
         break;
       }
 
-      const copilotKeyResult = await this.getCopilotKey();
-      if (copilotKeyResult.cancelled) {
-        this.prompts.noCopilotKeySelected();
-        return ActionResult.cancelled();
+      // Resolve the API Copilot key to enable, if any, before setting up the source
+      // directory so the user decides on Copilot up front. Copilot is opt-in: when the
+      // account has no key (or the lookup fails) it is skipped silently; cancelling the
+      // multi-key selection aborts quickstart.
+      let copilotKey: string | undefined;
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isOk()) {
+        const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
+        if (copilotKeys.length === 1) {
+          copilotKey = copilotKeys[0];
+        } else if (copilotKeys.length > 1) {
+          copilotKey = await this.prompts.selectCopilotKey(copilotKeys);
+          if (!copilotKey) {
+            this.prompts.noCopilotKeySelected();
+            return ActionResult.cancelled();
+          }
+        }
+        if (copilotKey) {
+          this.prompts.copilotEnabled(copilotKey);
+        }
       }
 
       const masterBuildFile = await this.prompts.downloadBuildDirectory(
@@ -190,8 +206,8 @@ export class PortalQuickstartAction {
       // mirroring exactly how CopilotAction reads and writes the build file
       const buildContext = new BuildContext(sourceDirectory);
       const baseConfig = (await buildContext.getBuildFileContents()).withPortalLanguages(languages);
-      const buildConfig = copilotKeyResult.key
-        ? baseConfig.withApiCopilotForPortal(copilotKeyResult.key, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl)
+      const buildConfig = copilotKey
+        ? baseConfig.withApiCopilotForPortal(copilotKey, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl)
         : baseConfig;
       await buildContext.updateBuildFileContents(buildConfig);
 
@@ -215,35 +231,4 @@ export class PortalQuickstartAction {
       return ActionResult.success();
     });
   };
-
-  // Resolves the API Copilot key to enable, if any, BEFORE the source directory is set
-  // up so the user decides on Copilot up front. Copilot is opt-in based on account
-  // access: when the user has no Copilot key (or the lookup fails) it is skipped
-  // silently ({ cancelled: false } with no key). When multiple keys exist and the user
-  // cancels selection, returns { cancelled: true } so quickstart aborts.
-  private async getCopilotKey(): Promise<{ cancelled: boolean; key?: string }> {
-    const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-    if (accountInfo.isErr()) {
-      return { cancelled: false };
-    }
-
-    const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
-    if (copilotKeys.length === 0) {
-      return { cancelled: false };
-    }
-
-    let copilotKey: string;
-    if (copilotKeys.length === 1) {
-      copilotKey = copilotKeys[0];
-    } else {
-      const selectedKey = await this.prompts.selectCopilotKey(copilotKeys);
-      if (!selectedKey) {
-        return { cancelled: true };
-      }
-      copilotKey = selectedKey;
-    }
-
-    this.prompts.copilotEnabled(copilotKey);
-    return { cancelled: false, key: copilotKey };
-  }
 }
