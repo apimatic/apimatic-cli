@@ -1,4 +1,3 @@
-import { err, ok, Result } from "neverthrow";
 import { DirectoryPath } from "../file/directoryPath.js";
 import { UrlPath } from "../file/urlPath.js";
 
@@ -227,25 +226,28 @@ export class BuildConfig {
     });
   }
 
-  public updateBuildConfigBaseUrl(serveUrl: UrlPath): Result<BuildConfig, "unchanged"> {
+  // Returns a copy with the portal base URL repointed at the serve URL, or `this`
+  // unchanged when there's no localhost base URL to rewrite (or it already matches the
+  // serve URL). Callers detect a change via reference identity: `result !== original`.
+  public updateBuildConfigBaseUrl(serveUrl: UrlPath): BuildConfig {
     // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall back
     // to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
     const portalSettings = this.data.generatePortal?.portalSettings;
     const baseUrl = portalSettings?.baseUrl ?? this.data.generatePortal?.baseUrl;
     if (!baseUrl) {
-      return err("unchanged");
+      return this;
     }
 
     const parsedUrl = UrlPath.create(baseUrl);
     if (!parsedUrl?.isLocalhost() || parsedUrl.isEqual(serveUrl)) {
-      return err("unchanged");
+      return this;
     }
 
     const portal = this.data.generatePortal!;
     const updatedPortal: PortalConfig = portal.portalSettings?.baseUrl
       ? { ...portal, portalSettings: PortalSettings.from(portal.portalSettings).withBaseUrl(serveUrl).toPortalSettingsData() }
       : { ...portal, baseUrl: serveUrl.toString() };
-    return ok(new BuildConfig({ ...this.data, generatePortal: updatedPortal }));
+    return new BuildConfig({ ...this.data, generatePortal: updatedPortal });
   }
 
   // Returns a copy with a recipe workflow added (or replaced, matched by permalink).

@@ -57,8 +57,8 @@ export class PortalServeAction {
       return ActionResult.failed();
     }
     const updatedBuildConfig = buildConfig.updateBuildConfigBaseUrl(serveUrl);
-    if (updatedBuildConfig.isOk()) {
-      await buildContext.updateBuildFileContents(updatedBuildConfig.value);
+    if (updatedBuildConfig !== buildConfig) {
+      await buildContext.updateBuildFileContents(updatedBuildConfig);
       this.prompts.baseUrlPortUpdated(serveUrl);
     }
 
