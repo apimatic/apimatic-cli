@@ -1,3 +1,4 @@
+import { err, ok, Result } from "neverthrow";
 import { DirectoryPath } from "../file/directoryPath.js";
 import { UrlPath } from "../file/urlPath.js";
 
@@ -62,6 +63,14 @@ export interface RecipeWorkflow {
   permalink: string;
   functionName: string;
   scriptPath: string;
+}
+
+// Outcome of a successful base-URL reconciliation: the updated config plus the
+// before/after URLs (for user messaging).
+export interface BaseUrlReconciliation {
+  config: BuildConfig;
+  previous: string;
+  updated: string;
 }
 
 export function getLanguagesConfig(selectedLanguages: string[]) {
@@ -234,26 +243,25 @@ export class BuildConfig {
     return new BuildConfig(data);
   }
 
-  // Aligns a localhost base URL's port with the actual serve port. Returns the new
-  // config plus the before/after URLs when a change was made, or undefined when nothing
-  // changed (no base URL, non-localhost URL, or the port already matches).
-  public reconcileLocalhostBaseUrlPort(
-    servePort: number
-  ): { config: BuildConfig; previous: string; updated: string } | undefined {
+  // Aligns a configured localhost base URL with where the portal is actually served:
+  // when the effective base URL is localhost and differs from `serveUrl`, it is replaced
+  // wholesale with `serveUrl`. Returns ok(reconciliation) when a change was made, or
+  // err when nothing changed (no base URL, non-localhost URL, or already aligned).
+  public reconcileLocalhostBaseUrl(serveUrl: UrlPath): Result<BaseUrlReconciliation, "unchanged"> {
     // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall back
     // to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
     const portalSettings = this.data.generatePortal?.portalSettings;
     const baseUrl = portalSettings?.baseUrl ?? this.data.generatePortal?.baseUrl;
     if (!baseUrl) {
-      return undefined;
+      return err("unchanged");
     }
 
     const parsedUrl = UrlPath.create(baseUrl);
-    if (!parsedUrl?.isLocalhost() || parsedUrl.port() === servePort) {
-      return undefined;
+    if (!parsedUrl?.isLocalhost() || parsedUrl.isEqual(serveUrl)) {
+      return err("unchanged");
     }
 
-    const updated = parsedUrl.withPort(servePort).toString();
+    const updated = serveUrl.toString();
     const data = clone(this.data);
     const portal = portalConfigOf(data);
     if (portal.portalSettings?.baseUrl) {
@@ -261,7 +269,7 @@ export class BuildConfig {
     } else {
       portal.baseUrl = updated;
     }
-    return { config: new BuildConfig(data), previous: baseUrl, updated };
+    return ok({ config: new BuildConfig(data), previous: baseUrl, updated });
   }
 
   // Returns a copy with a recipe workflow added (or replaced, matched by permalink).

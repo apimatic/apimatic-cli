@@ -1,4 +1,5 @@
 import { Server } from "node:http";
+import { err, ok, Result } from "neverthrow";
 import { createServer as createLiveReloadServer } from "livereload";
 import connectLiveReload from "connect-livereload";
 import express, { Express } from "express";
@@ -41,11 +42,12 @@ export class PortalServeAction {
     if (servePort != port) {
       this.prompts.usingFallbackPort(port, servePort);
     }
+    const serveUrl = new UrlPath(`http://localhost:${servePort}`);
 
-    // Align the configured localhost base URL with the actual serve port BEFORE
+    // Align the configured localhost base URL with the actual serve URL BEFORE
     // generation bakes it into the portal artifacts; otherwise the portal would load
     // its content from the wrong port and fail to render.
-    await this.reconcileBaseUrlPort(buildDirectory, servePort);
+    await this.reconcileBaseUrl(buildDirectory, serveUrl);
 
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
     const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
@@ -63,17 +65,16 @@ export class PortalServeAction {
     // get-port only checks availability; the port can be taken between that check and
     // now, so handle a failed bind gracefully instead of letting an unhandled "error"
     // event crash the CLI.
-    const listenError = await this.waitForServerListening(server);
-    if (listenError) {
+    const listenResult = await this.waitForServerListening(server);
+    if (listenResult.isErr()) {
       liveReloadServer.close();
       this.prompts.serverStartFailed(servePort);
       return ActionResult.failed();
     }
 
-    const portalUrl = new UrlPath(`http://localhost:${servePort}`);
-    this.prompts.portalServed(portalUrl);
+    this.prompts.portalServed(serveUrl);
     if (openInBrowser) {
-      await this.launcherService.openUrlInBrowser(portalUrl);
+      await this.launcherService.openUrlInBrowser(serveUrl);
     }
     this.prompts.promptForExit();
 
@@ -139,9 +140,9 @@ export class PortalServeAction {
     return ActionResult.success();
   }
 
-  // Aligns the portal's configured localhost base URL with the actual serve port and
+  // Aligns the portal's configured localhost base URL with the actual serve URL and
   // persists the change, informing the user. Delegates the config logic to BuildConfig.
-  private async reconcileBaseUrlPort(buildDirectory: DirectoryPath, servePort: number): Promise<void> {
+  private async reconcileBaseUrl(buildDirectory: DirectoryPath, serveUrl: UrlPath): Promise<void> {
     const buildContext = new BuildContext(buildDirectory);
     let buildConfig;
     try {
@@ -150,26 +151,26 @@ export class PortalServeAction {
       return;
     }
 
-    const change = buildConfig.reconcileLocalhostBaseUrlPort(servePort);
-    if (!change) {
+    const reconciliation = buildConfig.reconcileLocalhostBaseUrl(serveUrl);
+    if (reconciliation.isErr()) {
       return;
     }
 
-    await buildContext.updateBuildFileContents(change.config);
-    this.prompts.baseUrlPortUpdated(change.previous, change.updated);
+    await buildContext.updateBuildFileContents(reconciliation.value.config);
+    this.prompts.baseUrlPortUpdated(reconciliation.value.previous, reconciliation.value.updated);
   }
 
-  // Resolves once the server is bound, or with the bind error (e.g. EADDRINUSE) so a
-  // failed listen is reported cleanly instead of crashing via an unhandled "error" event.
-  private waitForServerListening(server: Server): Promise<Error | undefined> {
+  // Resolves ok once the server is bound, or err with the bind error (e.g. EADDRINUSE)
+  // so a failed listen is reported cleanly instead of crashing via an unhandled "error".
+  private waitForServerListening(server: Server): Promise<Result<void, Error>> {
     return new Promise((resolve) => {
       const onListening = () => {
         server.removeListener("error", onError);
-        resolve(undefined);
+        resolve(ok(undefined));
       };
       const onError = (error: Error) => {
         server.removeListener("listening", onListening);
-        resolve(error);
+        resolve(err(error));
       };
       server.once("listening", onListening);
       server.once("error", onError);
