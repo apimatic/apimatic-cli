@@ -77,33 +77,11 @@ export class PortalRecipeGenerator {
     recipeScriptFileName: FileName
   ): Promise<void> {
     const buildConfig = await buildContext.getBuildFileContents();
-    if (!buildConfig.recipes) {
-      buildConfig.recipes = {};
-    }
-    const recipesConfig = buildConfig.recipes as any;
-
-    if (!recipesConfig.workflows) {
-      recipesConfig.workflows = [];
-    }
-    const existingIndex = recipesConfig.workflows.findIndex(
-      (workflow: any) => workflow.permalink === `page:recipes/${this.toPascalCase(recipeName)}`
+    buildConfig.addRecipeWorkflow(
+      recipeName,
+      this.toPascalCase(recipeName),
+      `./static/scripts/recipes/${recipeScriptFileName}`
     );
-
-    const newWorkflow = {
-      name: recipeName,
-      permalink: `page:recipes/${this.toPascalCase(recipeName)}`,
-      functionName: this.toPascalCase(recipeName),
-      scriptPath: `./static/scripts/recipes/${recipeScriptFileName}`
-    };
-
-    if (existingIndex !== -1) {
-      // Replace the existing workflow
-      recipesConfig.workflows[existingIndex] = newWorkflow;
-    } else {
-      // Add as new workflow
-      recipesConfig.workflows.push(newWorkflow);
-    }
-
     await buildContext.updateBuildFileContents(buildConfig);
   }
 

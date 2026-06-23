@@ -13,7 +13,6 @@ import { ValidateAction } from '../api/validate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
-import { getLanguagesConfig, BuildConfig, CopilotConfig } from '../../types/build/build.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { SpecContext } from '../../types/spec-context.js';
 import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
@@ -23,22 +22,6 @@ import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
 
 const defaultPort: number = 23513 as const;
 const defaultBaseUrl: string = `http://localhost:${defaultPort}` as const;
-// `portalSettings.languageSettings` must be keyed by codegen's SupportedTemplates id
-// (codegen resolves the key via `SdkLanguage.FromSupportedTemplate`), NOT by the
-// friendly `languageConfig` key. These ids are version-specific in codegen
-// (e.g. `php_generic_lib_v2`) — keep in sync with `APIMatic.CodeGen.Common.SdkLanguage`.
-const codegenTemplateIdByLanguage: Readonly<Record<string, string>> = {
-  typescript: 'ts_generic_lib',
-  csharp: 'cs_net_standard_lib',
-  java: 'java_eclipse_jre_lib',
-  php: 'php_generic_lib_v2',
-  python: 'python_generic_lib',
-  ruby: 'ruby_generic_lib',
-  go: 'go_generic_lib'
-};
-// codegen derives initialPlatform from languageConfig (http is always first), so a
-// languageSettings entry for http must exist or the portal widget fails to render.
-const httpTemplateId = 'http_curl_v1' as const;
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -207,11 +190,11 @@ export class PortalQuickstartAction {
       // mirroring exactly how CopilotAction reads and writes the build file
       const buildContext = new BuildContext(sourceDirectory);
       const buildConfig = await buildContext.getBuildFileContents();
-      buildConfig.generatePortal!.languageConfig = getLanguagesConfig(languages);
+      buildConfig.setPortalLanguages(languages);
       if (copilotKeyResult.key) {
-        this.applyCopilotConfig(buildConfig, copilotKeyResult.key);
+        buildConfig.enableApiCopilotForPortal(copilotKeyResult.key, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl);
       } else {
-        this.enableAiIntegrations(buildConfig);
+        buildConfig.enableAiIntegrations();
       }
       await buildContext.updateBuildFileContents(buildConfig);
 
@@ -265,52 +248,5 @@ export class PortalQuickstartAction {
 
     this.prompts.copilotEnabled(copilotKey);
     return { cancelled: false, key: copilotKey };
-  }
-
-  // Wires the resolved Copilot key into the build config: points the portal base URL
-  // at the local serve port, adds the apiCopilotConfig block, and enables AI editor
-  // integrations for every configured SDK language.
-  private applyCopilotConfig(buildConfig: BuildConfig, copilotKey: string): void {
-    const apiCopilotConfig: CopilotConfig = {
-      isEnabled: true,
-      key: copilotKey,
-      welcomeMessage: DEFAULT_COPILOT_WELCOME_MESSAGE
-    };
-    buildConfig.generatePortal!.baseUrl = defaultBaseUrl;
-    buildConfig.apiCopilotConfig = apiCopilotConfig;
-    this.enableAiIntegrations(buildConfig);
-  }
-
-  // Enables Cursor/Claude Code/VS Code integrations for the selected SDK languages.
-  // Supplying languageSettings suppresses codegen's own per-language auto-population,
-  // so we also add the http entry (no AI integration) the portal needs to render —
-  // initialPlatform defaults to http, and a missing entry leaves the widget unrendered.
-  private enableAiIntegrations(buildConfig: BuildConfig): void {
-    const portalSettings = (buildConfig.generatePortal!.portalSettings ??= {});
-    const languageSettings = (portalSettings.languageSettings ??= {});
-
-    languageSettings[httpTemplateId] ??= {};
-
-    let firstSdkTemplateId: string | undefined;
-    for (const language of Object.keys(buildConfig.generatePortal!.languageConfig)) {
-      const templateId = codegenTemplateIdByLanguage[language];
-      if (!templateId) {
-        continue;
-      }
-      firstSdkTemplateId ??= templateId;
-      languageSettings[templateId] = {
-        ...languageSettings[templateId],
-        aiIntegration: {
-          cursor: { isEnabled: true },
-          claudeCode: { isEnabled: true },
-          vscode: { isEnabled: true }
-        }
-      };
-    }
-
-    // Open the portal on the first SDK language (the entry after http) rather than http.
-    if (firstSdkTemplateId) {
-      portalSettings.initialPlatform = firstSdkTemplateId;
-    }
   }
 }

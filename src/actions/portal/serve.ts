@@ -128,10 +128,8 @@ export class PortalServeAction {
     return ActionResult.success();
   }
 
-  // Rewrites the portal's configured localhost base URL so its port matches the port
-  // the portal is actually served on, then persists it to the build file and informs
-  // the user. Only localhost base URLs are touched; non-localhost URLs and matching
-  // ports are left as-is.
+  // Aligns the portal's configured localhost base URL with the actual serve port and
+  // persists the change, informing the user. Delegates the config logic to BuildConfig.
   private async reconcileBaseUrlPort(buildDirectory: DirectoryPath, servePort: number): Promise<void> {
     const buildContext = new BuildContext(buildDirectory);
     let buildConfig;
@@ -141,28 +139,13 @@ export class PortalServeAction {
       return;
     }
 
-    // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall
-    // back to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
-    const portalSettings = buildConfig.generatePortal?.portalSettings;
-    const baseUrl = portalSettings?.baseUrl ?? buildConfig.generatePortal?.baseUrl;
-    if (!baseUrl) {
+    const change = buildConfig.reconcileLocalhostBaseUrlPort(servePort);
+    if (!change) {
       return;
     }
 
-    const parsedUrl = UrlPath.create(baseUrl);
-    if (!parsedUrl?.isLocalhost() || parsedUrl.port() === servePort) {
-      return;
-    }
-
-    const updatedUrl = parsedUrl.withPort(servePort).toString();
-    if (portalSettings?.baseUrl) {
-      portalSettings.baseUrl = updatedUrl;
-    } else {
-      buildConfig.generatePortal!.baseUrl = updatedUrl;
-    }
     await buildContext.updateBuildFileContents(buildConfig);
-
-    this.prompts.baseUrlPortUpdated(baseUrl, updatedUrl);
+    this.prompts.baseUrlPortUpdated(change.previous, change.updated);
   }
 
   // This clears the standard input to allow interrupts like CTRL+C to work properly.
