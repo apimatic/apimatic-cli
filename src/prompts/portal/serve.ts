@@ -27,10 +27,8 @@ export class PortalServePrompts {
     log.error(message);
   }
 
-  public baseUrlPortUpdated(previousUrl: UrlPath, updatedUrl: UrlPath) {
-    const message =
-      `The configured base URL ${f.var(previousUrl.toString())} did not match the serve port. ` +
-      `Updated it to ${f.var(updatedUrl.toString())}.`;
+  public baseUrlPortUpdated(updatedUrl: UrlPath) {
+    const message = `Updated the configured base URL to ${f.var(updatedUrl.toString())} to match the serve port.`;
     log.info(message);
   }
 

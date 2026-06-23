@@ -56,10 +56,10 @@ export class PortalServeAction {
       this.prompts.invalidBuildConfig(buildDirectory);
       return ActionResult.failed();
     }
-    const baseUrlChange = buildConfig.updateBuildConfigBaseUrl(serveUrl);
-    if (baseUrlChange.isOk()) {
-      await buildContext.updateBuildFileContents(baseUrlChange.value.config);
-      this.prompts.baseUrlPortUpdated(baseUrlChange.value.previous, baseUrlChange.value.updated);
+    const updatedBuildConfig = buildConfig.updateBuildConfigBaseUrl(serveUrl);
+    if (updatedBuildConfig.isOk()) {
+      await buildContext.updateBuildFileContents(updatedBuildConfig.value);
+      this.prompts.baseUrlPortUpdated(serveUrl);
     }
 
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);

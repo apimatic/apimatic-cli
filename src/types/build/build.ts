@@ -65,14 +65,6 @@ export interface RecipeWorkflow {
   scriptPath: string;
 }
 
-// Outcome of a successful base-URL update: the new config plus the before/after URLs
-// (for user messaging).
-export interface BaseUrlChange {
-  config: BuildConfig;
-  previous: UrlPath;
-  updated: UrlPath;
-}
-
 export function getLanguagesConfig(selectedLanguages: string[]) {
   return selectedLanguages.reduce((config, lang) => {
     config[lang] = {};
@@ -239,11 +231,7 @@ export class BuildConfig {
     return new BuildConfig(data);
   }
 
-  // Updates a configured localhost base URL to match where the portal is actually
-  // served: when the effective base URL is localhost and differs from `serveUrl`, it is
-  // replaced wholesale with `serveUrl`. Returns ok(change) when updated, or err when
-  // nothing changed (no base URL, non-localhost URL, or already matching).
-  public updateBuildConfigBaseUrl(serveUrl: UrlPath): Result<BaseUrlChange, "unchanged"> {
+  public updateBuildConfigBaseUrl(serveUrl: UrlPath): Result<BuildConfig, "unchanged"> {
     // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall back
     // to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
     const portalSettings = this.data.generatePortal?.portalSettings;
@@ -264,7 +252,7 @@ export class BuildConfig {
     } else {
       portal.baseUrl = serveUrl.toString();
     }
-    return ok({ config: new BuildConfig(data), previous: parsedUrl, updated: serveUrl });
+    return ok(new BuildConfig(data));
   }
 
   // Returns a copy with a recipe workflow added (or replaced, matched by permalink).
