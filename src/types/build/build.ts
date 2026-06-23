@@ -69,8 +69,8 @@ export interface RecipeWorkflow {
 // (for user messaging).
 export interface BaseUrlChange {
   config: BuildConfig;
-  previous: string;
-  updated: string;
+  previous: UrlPath;
+  updated: UrlPath;
 }
 
 export function getLanguagesConfig(selectedLanguages: string[]) {
@@ -138,14 +138,10 @@ export class PortalSettings {
     return new PortalSettings(clone(data));
   }
 
-  public baseUrl(): string | undefined {
-    return this.data.baseUrl;
-  }
-
   /** Returns a copy with the API-call base URL set. */
-  public withBaseUrl(baseUrl: string): PortalSettings {
+  public withBaseUrl(baseUrl: UrlPath): PortalSettings {
     const data = clone(this.data);
-    data.baseUrl = baseUrl;
+    data.baseUrl = baseUrl.toString();
     return new PortalSettings(data);
   }
 
@@ -261,15 +257,14 @@ export class BuildConfig {
       return err("unchanged");
     }
 
-    const updated = serveUrl.toString();
     const data = clone(this.data);
     const portal = portalConfigOf(data);
     if (portal.portalSettings?.baseUrl) {
-      portal.portalSettings = PortalSettings.from(portal.portalSettings).withBaseUrl(updated).toJSON();
+      portal.portalSettings = PortalSettings.from(portal.portalSettings).withBaseUrl(serveUrl).toJSON();
     } else {
-      portal.baseUrl = updated;
+      portal.baseUrl = serveUrl.toString();
     }
-    return ok({ config: new BuildConfig(data), previous: baseUrl, updated });
+    return ok({ config: new BuildConfig(data), previous: parsedUrl, updated: serveUrl });
   }
 
   // Returns a copy with a recipe workflow added (or replaced, matched by permalink).
