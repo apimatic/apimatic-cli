@@ -37,4 +37,13 @@ export class UrlPath {
     }
     return parsed.protocol === "https:" ? 443 : 80;
   }
+
+  /** Returns a copy of this URL with its port replaced, preserving the rest of the URL. */
+  public withPort(port: number): UrlPath {
+    const parsed = new URL(this.url);
+    parsed.port = String(port);
+    const updated = parsed.toString();
+    // URL.toString() appends a trailing slash to origin-only URLs; keep the original's form.
+    return new UrlPath(this.url.endsWith("/") ? updated : updated.replace(/\/+$/, ""));
+  }
 }

@@ -36,21 +36,21 @@ export class PortalServeAction {
     hotReload: boolean,
     onAfterServe?: () => void
   ): Promise<ActionResult> {
-    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-    if (result.isFailed()) {
-      return ActionResult.failed();
-    }
-
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort != port && !onAfterServe) {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    // The serve port is chosen by the CLI during quickstart (onAfterServe set), so
-    // a mismatch warning there would be noise about a port the user did not pick.
-    if (!onAfterServe) {
-      await this.warnOnBaseUrlPortMismatch(buildDirectory, servePort);
+    // Align the configured localhost base URL with the actual serve port BEFORE
+    // generation bakes it into the portal artifacts; otherwise the portal would load
+    // its content from the wrong port and fail to render. Reconciliation runs in both
+    // flows; the message is suppressed during quickstart (the CLI chose the port).
+    await this.reconcileBaseUrlPort(buildDirectory, servePort, !onAfterServe);
+
+    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
+    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
+    if (result.isFailed()) {
+      return ActionResult.failed();
     }
 
     const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
@@ -129,33 +129,46 @@ export class PortalServeAction {
     return ActionResult.success();
   }
 
-  // Warns when the portal's configured base URL points at localhost on a port
-  // that differs from the port the portal is actually being served on.
-  private async warnOnBaseUrlPortMismatch(buildDirectory: DirectoryPath, servePort: number): Promise<void> {
-    // The build file was already validated by the GenerateAction above, so read it
-    // directly; guard only against an unreadable/malformed file.
+  // Rewrites the portal's configured localhost base URL so its port matches the port
+  // the portal is actually served on, then persists it to the build file. Only
+  // localhost base URLs are touched; non-localhost URLs and matching ports are left
+  // as-is. `informUser` is false during quickstart, where the CLI chose the port.
+  private async reconcileBaseUrlPort(
+    buildDirectory: DirectoryPath,
+    servePort: number,
+    informUser: boolean
+  ): Promise<void> {
+    const buildContext = new BuildContext(buildDirectory);
     let buildConfig;
     try {
-      buildConfig = await new BuildContext(buildDirectory).getBuildFileContents();
+      buildConfig = await buildContext.getBuildFileContents();
     } catch {
       return;
     }
 
     // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall
     // back to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
-    const baseUrl = buildConfig.generatePortal?.portalSettings?.baseUrl ?? buildConfig.generatePortal?.baseUrl;
+    const portalSettings = buildConfig.generatePortal?.portalSettings;
+    const baseUrl = portalSettings?.baseUrl ?? buildConfig.generatePortal?.baseUrl;
     if (!baseUrl) {
       return;
     }
 
     const parsedUrl = UrlPath.create(baseUrl);
-    if (!parsedUrl?.isLocalhost()) {
+    if (!parsedUrl?.isLocalhost() || parsedUrl.port() === servePort) {
       return;
     }
 
-    const baseUrlPort = parsedUrl.port();
-    if (baseUrlPort !== servePort) {
-      this.prompts.baseUrlPortMismatch(baseUrl, baseUrlPort, servePort);
+    const updatedUrl = parsedUrl.withPort(servePort).toString();
+    if (portalSettings?.baseUrl) {
+      portalSettings.baseUrl = updatedUrl;
+    } else {
+      buildConfig.generatePortal!.baseUrl = updatedUrl;
+    }
+    await buildContext.updateBuildFileContents(buildConfig);
+
+    if (informUser) {
+      this.prompts.baseUrlPortUpdated(baseUrl, updatedUrl);
     }
   }
 

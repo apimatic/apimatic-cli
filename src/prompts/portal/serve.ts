@@ -13,15 +13,11 @@ export class PortalServePrompts {
     log.step(message);
   }
 
-  public baseUrlPortMismatch(baseUrl: string, baseUrlPort: number, servePort: number) {
-    const message = `The configured base URL ${f.var(baseUrl)} uses port ${f.var(
-      baseUrlPort.toString()
-    )}, but the portal is being served on port ${f.var(
-      servePort.toString()
-    )}. This mismatch may cause unexpected behavior. Update the base URL in your configuration or serve on port ${f.var(
-      baseUrlPort.toString()
-    )} to keep them aligned.`;
-    log.warn(message);
+  public baseUrlPortUpdated(previousUrl: string, updatedUrl: string) {
+    const message =
+      `The configured base URL ${f.var(previousUrl)} did not match the serve port. ` +
+      `Updated it to ${f.var(updatedUrl)} so the portal loads correctly.`;
+    log.info(message);
   }
 
   public portalServed(urlPath: UrlPath) {
