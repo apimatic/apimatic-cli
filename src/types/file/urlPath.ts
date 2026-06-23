@@ -43,7 +43,8 @@ export class UrlPath {
     const parsed = new URL(this.url);
     parsed.port = String(port);
     const updated = parsed.toString();
-    // URL.toString() appends a trailing slash to origin-only URLs; keep the original's form.
-    return new UrlPath(this.url.endsWith("/") ? updated : updated.replace(/\/+$/, ""));
+    // URL.toString() appends a single trailing slash to origin-only URLs; keep the original's form.
+    const trimmed = updated.endsWith("/") ? updated.slice(0, -1) : updated;
+    return new UrlPath(this.url.endsWith("/") ? updated : trimmed);
   }
 }
