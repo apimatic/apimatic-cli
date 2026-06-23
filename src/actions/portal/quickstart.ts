@@ -28,9 +28,8 @@ const defaultBaseUrl: string = `http://localhost:${defaultPort}` as const;
 // (codegen resolves the key via `SdkLanguage.FromSupportedTemplate`), NOT by the
 // friendly `languageConfig` key. These ids are version-specific in codegen
 // (e.g. `php_generic_lib_v2`) — keep in sync with `APIMatic.CodeGen.Common.SdkLanguage`.
-// Languages without an entry here (e.g. the synthetic `http`) are skipped: they have
-// no SDK template, so codegen cannot resolve them and would throw.
 const codegenTemplateIdByLanguage: Readonly<Record<string, string>> = {
+  http: 'http_curl_v1',
   typescript: 'ts_generic_lib',
   csharp: 'cs_net_standard_lib',
   java: 'java_eclipse_jre_lib',
@@ -39,6 +38,9 @@ const codegenTemplateIdByLanguage: Readonly<Record<string, string>> = {
   ruby: 'ruby_generic_lib',
   go: 'go_generic_lib'
 };
+// `http` has no SDK, so it gets a languageSettings entry (so the portal's
+// initialPlatform always resolves) but no AI editor integration.
+const nonSdkLanguage = 'http' as const;
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -252,10 +254,14 @@ export class PortalQuickstartAction {
     this.enableAiIntegrations(buildFile);
   }
 
-  // Enables Cursor, Claude Code and VS Code integrations for every SDK language in
-  // the portal's languageConfig, preserving any existing per-language settings.
-  // languageSettings is keyed by codegen's SupportedTemplates id (see
-  // codegenTemplateIdByLanguage); languages without a known template id are skipped.
+  // Writes a portalSettings.languageSettings entry for every language in
+  // languageConfig, keyed by its codegen SupportedTemplates id. Real SDK languages
+  // get the Cursor/Claude Code/VS Code integrations; `http` gets an empty entry.
+  // Every language must be present: codegen derives initialPlatform from
+  // languageConfig, and the portal widget fails to render (only the header shows,
+  // docs are never fetched) if that platform has no languageSettings entry. By
+  // supplying languageSettings we also suppress codegen's own auto-population, so we
+  // must mirror it for all languages, not just the ones getting AI integration.
   private enableAiIntegrations(buildFile: BuildConfig): void {
     const portalSettings = (buildFile.generatePortal!.portalSettings ??= {});
     const languageSettings = (portalSettings.languageSettings ??= {});
@@ -265,14 +271,18 @@ export class PortalQuickstartAction {
       if (!templateId) {
         continue;
       }
-      languageSettings[templateId] = {
-        ...languageSettings[templateId],
-        aiIntegration: {
-          cursor: { isEnabled: true },
-          claudeCode: { isEnabled: true },
-          vscode: { isEnabled: true }
-        }
-      };
+      const existing = languageSettings[templateId] ?? {};
+      languageSettings[templateId] =
+        language === nonSdkLanguage
+          ? existing
+          : {
+              ...existing,
+              aiIntegration: {
+                cursor: { isEnabled: true },
+                claudeCode: { isEnabled: true },
+                vscode: { isEnabled: true }
+              }
+            };
     }
   }
 }
