@@ -206,7 +206,7 @@ export class BuildConfig {
   /** Returns a copy with the portal's languageConfig set from the selected friendly language ids. */
   public withPortalLanguages(languages: string[]): BuildConfig {
     const data = clone(this.data);
-    portalConfigOf(data).languageConfig = getLanguagesConfig(languages);
+    data.generatePortal!.languageConfig = getLanguagesConfig(languages);
     return new BuildConfig(data);
   }
 
@@ -222,7 +222,7 @@ export class BuildConfig {
   // editor integrations for the configured SDK languages.
   public withApiCopilotForPortal(key: string, welcomeMessage: string, baseUrl: string): BuildConfig {
     const data = clone(this.data);
-    const portal = portalConfigOf(data);
+    const portal = data.generatePortal!;
     data.apiCopilotConfig = { isEnabled: true, key, welcomeMessage };
     portal.baseUrl = baseUrl;
     portal.portalSettings = PortalSettings.from(portal.portalSettings)
@@ -246,7 +246,7 @@ export class BuildConfig {
     }
 
     const data = clone(this.data);
-    const portal = portalConfigOf(data);
+    const portal = data.generatePortal!;
     if (portal.portalSettings?.baseUrl) {
       portal.portalSettings = PortalSettings.from(portal.portalSettings).withBaseUrl(serveUrl).toJSON();
     } else {
@@ -270,9 +270,4 @@ export class BuildConfig {
     }
     return new BuildConfig(data);
   }
-}
-
-// Portal-config accessor for transforms. Assumes a single (non-versioned) portal build.
-function portalConfigOf(data: BuildConfigData): PortalConfig {
-  return data.generatePortal!;
 }
