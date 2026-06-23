@@ -77,12 +77,12 @@ export class PortalRecipeGenerator {
     recipeScriptFileName: FileName
   ): Promise<void> {
     const buildConfig = await buildContext.getBuildFileContents();
-    const updatedBuild = buildConfig.withRecipeWorkflow(
+    const updatedBuildConfig = buildConfig.withRecipeWorkflow(
       recipeName,
       this.toPascalCase(recipeName),
       `./static/scripts/recipes/${recipeScriptFileName}`
     );
-    await buildContext.updateBuildFileContents(updatedBuild);
+    await buildContext.updateBuildFileContents(updatedBuildConfig);
   }
 
   private async createMarkdownFile(recipeMarkdownFileName: FileName, contentFolder: DirectoryPath): Promise<void> {

@@ -50,9 +50,9 @@ export class CopilotAction {
       return ActionResult.failed();
     }
 
-    const buildJson = await buildContext.getBuildFileContents();
+    const buildConfig = await buildContext.getBuildFileContents();
 
-    if (!force && buildJson.hasApiCopilot() && !(await this.prompts.confirmOverwrite())) {
+    if (!force && buildConfig.hasApiCopilot() && !(await this.prompts.confirmOverwrite())) {
       this.prompts.cancelled();
       return ActionResult.cancelled();
     }
@@ -74,13 +74,13 @@ export class CopilotAction {
 
     const welcomeMessage = await this.prepareWelcomeMessage();
 
-    const updatedBuild = buildJson.withApiCopilotConfig({
+    const updatedBuildConfig = buildConfig.withApiCopilotConfig({
       isEnabled: enable,
       key: apiCopilotKeyResult.value,
       welcomeMessage: welcomeMessage
     });
 
-    await buildContext.updateBuildFileContents(updatedBuild);
+    await buildContext.updateBuildFileContents(updatedBuildConfig);
 
     this.prompts.copilotConfigured(enable, apiCopilotKeyResult.value);
 
