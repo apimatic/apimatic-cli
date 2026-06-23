@@ -46,9 +46,20 @@ export class PortalServeAction {
 
     // Update the configured localhost base URL to the actual serve URL BEFORE
     // generation bakes it into the portal artifacts; otherwise the portal would load
-    // its content from the wrong port and fail to render.
-    if (!(await this.updateBaseUrl(buildDirectory, serveUrl))) {
+    // its content from the wrong port and fail to render. The build file is read here,
+    // before GenerateAction validates it, so a missing/invalid file is reported cleanly.
+    const buildContext = new BuildContext(buildDirectory);
+    let buildConfig;
+    try {
+      buildConfig = await buildContext.getBuildFileContents();
+    } catch {
+      this.prompts.invalidBuildConfig(buildDirectory);
       return ActionResult.failed();
+    }
+    const baseUrlChange = buildConfig.updateBuildConfigBaseUrl(serveUrl);
+    if (baseUrlChange.isOk()) {
+      await buildContext.updateBuildFileContents(baseUrlChange.value.config);
+      this.prompts.baseUrlPortUpdated(baseUrlChange.value.previous, baseUrlChange.value.updated);
     }
 
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
@@ -140,29 +151,6 @@ export class PortalServeAction {
     liveReloadServer.close();
     server.close();
     return ActionResult.success();
-  }
-
-  // Updates the portal's configured localhost base URL to the actual serve URL and
-  // persists the change, informing the user. Delegates the config logic to BuildConfig.
-  // Returns false when the build file can't be read (missing/invalid) so the caller can
-  // fail with a clear message instead of crashing on the unread file.
-  private async updateBaseUrl(buildDirectory: DirectoryPath, serveUrl: UrlPath): Promise<boolean> {
-    const buildContext = new BuildContext(buildDirectory);
-    let buildConfig;
-    try {
-      buildConfig = await buildContext.getBuildFileContents();
-    } catch {
-      this.prompts.invalidBuildConfig(buildDirectory);
-      return false;
-    }
-
-    const change = buildConfig.updateBuildConfigBaseUrl(serveUrl);
-    if (change.isOk()) {
-      await buildContext.updateBuildFileContents(change.value.config);
-      this.prompts.baseUrlPortUpdated(change.value.previous, change.value.updated);
-    }
-
-    return true;
   }
 
   // Resolves ok once the server is bound, or err with the bind error (e.g. EADDRINUSE)
