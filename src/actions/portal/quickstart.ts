@@ -166,7 +166,7 @@ export class PortalQuickstartAction {
       // selection aborts quickstart.
       const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
       if (accountInfo.isErr()) {
-        this.prompts.copilotKeyFetchFailed(accountInfo.error);
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
         return ActionResult.failed();
       }
 

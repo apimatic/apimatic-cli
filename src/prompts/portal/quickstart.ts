@@ -230,14 +230,14 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error("No API Copilot key was selected.");
   }
 
-  public copilotKeyFetchFailed(serviceError: ServiceError) {
-    log.error(`Failed to fetch your API Copilot key. ${serviceError.errorMessage}`);
+  public accountInfoFetchFailed(serviceError: ServiceError) {
+    log.error(`Failed to fetch your account information. ${serviceError.errorMessage}`);
   }
 
   public copilotEnabled(key: string) {
     const message =
       `API Copilot is enabled with key ${f.var(key)}. ` +
-      `Any existing training data associated with this key will be overwritten when the portal is generated.`;
+      `Any existing AI context associated with this key will be overwritten when the portal is generated.`;
     log.warn(message);
   }
 
