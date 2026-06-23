@@ -230,6 +230,10 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error("No API Copilot key was selected.");
   }
 
+  public copilotKeyFetchFailed(serviceError: ServiceError) {
+    log.error(`Failed to fetch your API Copilot key. ${serviceError.errorMessage}`);
+  }
+
   public copilotEnabled(key: string) {
     const message =
       `API Copilot is enabled with key ${f.var(key)}. ` +

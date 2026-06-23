@@ -161,25 +161,28 @@ export class PortalQuickstartAction {
       }
 
       // Resolve the API Copilot key to enable, if any, before setting up the source
-      // directory so the user decides on Copilot up front. Copilot is opt-in: when the
-      // account has no key (or the lookup fails) it is skipped silently; cancelling the
-      // multi-key selection aborts quickstart.
-      let copilotKey: string | undefined;
+      // directory so the user decides on Copilot up front. The lookup failing is fatal;
+      // an account with no key continues silently (no Copilot); cancelling the multi-key
+      // selection aborts quickstart.
       const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-      if (accountInfo.isOk()) {
-        const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
-        if (copilotKeys.length === 1) {
-          copilotKey = copilotKeys[0];
-        } else if (copilotKeys.length > 1) {
-          copilotKey = await this.prompts.selectCopilotKey(copilotKeys);
-          if (!copilotKey) {
-            this.prompts.noCopilotKeySelected();
-            return ActionResult.cancelled();
-          }
+      if (accountInfo.isErr()) {
+        this.prompts.copilotKeyFetchFailed(accountInfo.error);
+        return ActionResult.failed();
+      }
+
+      let copilotKey: string | undefined;
+      const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
+      if (copilotKeys.length === 1) {
+        copilotKey = copilotKeys[0];
+      } else if (copilotKeys.length > 1) {
+        copilotKey = await this.prompts.selectCopilotKey(copilotKeys);
+        if (!copilotKey) {
+          this.prompts.noCopilotKeySelected();
+          return ActionResult.cancelled();
         }
-        if (copilotKey) {
-          this.prompts.copilotEnabled(copilotKey);
-        }
+      }
+      if (copilotKey) {
+        this.prompts.copilotEnabled(copilotKey);
       }
 
       const masterBuildFile = await this.prompts.downloadBuildDirectory(
