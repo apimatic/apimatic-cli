@@ -28,7 +28,7 @@ export class PortalServePrompts {
   }
 
   public baseUrlPortUpdated(updatedUrl: UrlPath) {
-    const message = `Updated the configured base URL to ${f.var(updatedUrl.toString())} to match the serve port.`;
+    const message = `Updated the configured base URL in ${f.var("APIMATIC-BUILD.json")} to ${f.var(updatedUrl.toString())} to match the serve port.`;
     log.info(message);
   }
 
