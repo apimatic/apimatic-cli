@@ -75,6 +75,17 @@ export class PortalServeAction {
     const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
     const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
 
+    // livereload attaches its "error" handler to the inner WebSocket server, not to the
+    // HTTP server it binds the port on, so a failed bind (e.g. the port was taken in the
+    // gap since getServerPort) emits an unhandled "error" that would crash the process.
+    // Guard the HTTP server the same way as the main server below.
+    const liveReloadHttpServer = (liveReloadServer as unknown as { config: { server: Server } }).config.server;
+    if ((await this.waitForServerListening(liveReloadHttpServer)).isErr()) {
+      liveReloadServer.close();
+      this.prompts.serverStartFailed(liveReloadPort);
+      return ActionResult.failed();
+    }
+
     const server = this.application
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))

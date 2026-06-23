@@ -21,7 +21,7 @@ import { ApiService } from '../../infrastructure/services/api-service.js';
 import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
 
 const defaultPort: number = 23513 as const;
-const defaultBaseUrl: string = `http://localhost:${defaultPort}` as const;
+const defaultBaseUrl = new UrlPath(`http://localhost:${defaultPort}`);
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();

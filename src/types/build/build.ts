@@ -211,14 +211,14 @@ export class BuildConfig {
   // Returns a copy with API Copilot enabled for a locally-served portal: stores the
   // Copilot config, points the portal base URL at the local serve URL, and turns on AI
   // editor integrations for the configured SDK languages.
-  public withApiCopilotForPortal(key: string, welcomeMessage: string, baseUrl: string): BuildConfig {
+  public withApiCopilotForPortal(key: string, welcomeMessage: string, baseUrl: UrlPath): BuildConfig {
     const portal = this.data.generatePortal!;
     return new BuildConfig({
       ...this.data,
       apiCopilotConfig: { isEnabled: true, key, welcomeMessage },
       generatePortal: {
         ...portal,
-        baseUrl,
+        baseUrl: baseUrl.toString(),
         portalSettings: PortalSettings.from(portal.portalSettings)
           .withAiIntegrations(Object.keys(portal.languageConfig))
           .toPortalSettingsData()
