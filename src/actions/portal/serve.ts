@@ -38,6 +38,19 @@ export class PortalServeAction {
     hotReload: boolean,
     onAfterServe?: () => void
   ): Promise<ActionResult> {
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.exists())) {
+      this.prompts.noPortalSource(buildDirectory);
+      return ActionResult.failed();
+    }
+    let buildConfig;
+    try {
+      buildConfig = await buildContext.getBuildFileContents();
+    } catch {
+      this.prompts.invalidBuildConfig(buildDirectory);
+      return ActionResult.failed();
+    }
+
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort != port) {
       this.prompts.usingFallbackPort(port, servePort);
@@ -46,16 +59,7 @@ export class PortalServeAction {
 
     // Update the configured localhost base URL to the actual serve URL BEFORE
     // generation bakes it into the portal artifacts; otherwise the portal would load
-    // its content from the wrong port and fail to render. The build file is read here,
-    // before GenerateAction validates it, so a missing/invalid file is reported cleanly.
-    const buildContext = new BuildContext(buildDirectory);
-    let buildConfig;
-    try {
-      buildConfig = await buildContext.getBuildFileContents();
-    } catch {
-      this.prompts.invalidBuildConfig(buildDirectory);
-      return ActionResult.failed();
-    }
+    // its content from the wrong port and fail to render.
     const updatedBuildConfig = buildConfig.updateBuildConfigBaseUrl(serveUrl);
     if (updatedBuildConfig !== buildConfig) {
       await buildContext.updateBuildFileContents(updatedBuildConfig);
@@ -130,6 +134,22 @@ export class PortalServeAction {
 
         await debounceService.batchSingleRequest(async () => {
           this.prompts.changesDetected();
+          // Re-reconcile on every hot-reload cycle: portalSettings.baseUrl takes
+          // precedence over generatePortal.baseUrl and may have been added or changed
+          // since serve started. If a mismatch is found the file is rewritten, which
+          // triggers a second watcher event — the debounce queues it, and the second
+          // cycle sees no mismatch and generates cleanly.
+          try {
+            const latestConfig = await buildContext.getBuildFileContents();
+            const reconciledConfig = latestConfig.updateBuildConfigBaseUrl(serveUrl);
+            if (reconciledConfig !== latestConfig) {
+              await buildContext.updateBuildFileContents(reconciledConfig);
+              this.prompts.baseUrlPortUpdated(serveUrl);
+            }
+          } catch {
+            // Build file temporarily unreadable (e.g. mid-save); skip reconciliation
+            // this cycle. GenerateAction will surface the error if the file is broken.
+          }
           await generatePortalAction.execute(buildDirectory, portalDirectory, true, false, false);
           liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();

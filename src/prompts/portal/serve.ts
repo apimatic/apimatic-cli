@@ -20,6 +20,13 @@ export class PortalServePrompts {
     log.error(message);
   }
 
+  public noPortalSource(buildDirectory: DirectoryPath) {
+    const message =
+      `No portal source found at ${f.path(buildDirectory)}. ` +
+      `Run ${f.cmdAlt("apimatic", "portal", "quickstart")} to set one up.`;
+    log.error(message);
+  }
+
   public invalidBuildConfig(buildDirectory: DirectoryPath) {
     const message =
       `Could not read the build configuration in ${f.path(buildDirectory)}. ` +
