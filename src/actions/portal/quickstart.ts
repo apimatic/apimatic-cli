@@ -24,9 +24,21 @@ import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
 
 const defaultPort: number = 23513 as const;
 const copilotBaseUrl: string = `http://localhost:${defaultPort}` as const;
-// `languageConfig` always contains the synthetic "http" entry, which has no SDK
-// and therefore no editor integration to enable.
-const nonSdkLanguages: ReadonlySet<string> = new Set(['http']);
+// `portalSettings.languageSettings` must be keyed by codegen's SupportedTemplates id
+// (codegen resolves the key via `SdkLanguage.FromSupportedTemplate`), NOT by the
+// friendly `languageConfig` key. These ids are version-specific in codegen
+// (e.g. `php_generic_lib_v2`) — keep in sync with `APIMatic.CodeGen.Common.SdkLanguage`.
+// Languages without an entry here (e.g. the synthetic `http`) are skipped: they have
+// no SDK template, so codegen cannot resolve them and would throw.
+const codegenTemplateIdByLanguage: Readonly<Record<string, string>> = {
+  typescript: 'ts_generic_lib',
+  csharp: 'cs_net_standard_lib',
+  java: 'java_eclipse_jre_lib',
+  php: 'php_generic_lib_v2',
+  python: 'python_generic_lib',
+  ruby: 'ruby_generic_lib',
+  go: 'go_generic_lib'
+};
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -244,16 +256,19 @@ export class PortalQuickstartAction {
 
   // Enables Cursor, Claude Code and VS Code integrations for every SDK language in
   // the portal's languageConfig, preserving any existing per-language settings.
+  // languageSettings is keyed by codegen's SupportedTemplates id (see
+  // codegenTemplateIdByLanguage); languages without a known template id are skipped.
   private enableAiIntegrations(buildFile: BuildConfig): void {
     const portalSettings = (buildFile.generatePortal!.portalSettings ??= {});
     const languageSettings = (portalSettings.languageSettings ??= {});
 
     for (const language of Object.keys(buildFile.generatePortal!.languageConfig)) {
-      if (nonSdkLanguages.has(language)) {
+      const templateId = codegenTemplateIdByLanguage[language];
+      if (!templateId) {
         continue;
       }
-      languageSettings[language] = {
-        ...languageSettings[language],
+      languageSettings[templateId] = {
+        ...languageSettings[templateId],
         aiIntegration: {
           cursor: { isEnabled: true },
           claudeCode: { isEnabled: true },
