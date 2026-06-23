@@ -82,8 +82,7 @@ export class PortalServeAction {
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
 
-    const listenResult = await this.waitForServerListening(server);
-    if (listenResult.isErr()) {
+    if ((await this.waitForServerListening(server)).isErr()) {
       liveReloadServer.close();
       this.prompts.serverStartFailed(servePort);
       return ActionResult.failed();
