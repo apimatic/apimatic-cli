@@ -263,11 +263,13 @@ export class PortalQuickstartAction {
 
     languageSettings[httpTemplateId] ??= {};
 
+    let firstSdkTemplateId: string | undefined;
     for (const language of Object.keys(buildFile.generatePortal!.languageConfig)) {
       const templateId = codegenTemplateIdByLanguage[language];
       if (!templateId) {
         continue;
       }
+      firstSdkTemplateId ??= templateId;
       languageSettings[templateId] = {
         ...languageSettings[templateId],
         aiIntegration: {
@@ -276,6 +278,11 @@ export class PortalQuickstartAction {
           vscode: { isEnabled: true }
         }
       };
+    }
+
+    // Open the portal on the first SDK language (the entry after http) rather than http.
+    if (firstSdkTemplateId) {
+      portalSettings.initialPlatform = firstSdkTemplateId;
     }
   }
 }

@@ -22,6 +22,8 @@ export interface PortalConfig {
 export interface PortalSettings {
   /** Base URL for the API calls made by the portal. Preferred over `generatePortal.baseUrl` for portal artifacts. */
   baseUrl?: string;
+  /** Language/template id the portal opens on first load. */
+  initialPlatform?: string;
   /** Per-language portal settings, keyed by language/template id. */
   languageSettings?: { [language: string]: LanguageSetting };
   [key: string]: unknown;
