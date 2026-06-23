@@ -43,9 +43,8 @@ export class PortalServeAction {
 
     // Align the configured localhost base URL with the actual serve port BEFORE
     // generation bakes it into the portal artifacts; otherwise the portal would load
-    // its content from the wrong port and fail to render. Reconciliation runs in both
-    // flows; the message is suppressed during quickstart (the CLI chose the port).
-    await this.reconcileBaseUrlPort(buildDirectory, servePort, !onAfterServe);
+    // its content from the wrong port and fail to render.
+    await this.reconcileBaseUrlPort(buildDirectory, servePort);
 
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
     const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
@@ -130,14 +129,10 @@ export class PortalServeAction {
   }
 
   // Rewrites the portal's configured localhost base URL so its port matches the port
-  // the portal is actually served on, then persists it to the build file. Only
-  // localhost base URLs are touched; non-localhost URLs and matching ports are left
-  // as-is. `informUser` is false during quickstart, where the CLI chose the port.
-  private async reconcileBaseUrlPort(
-    buildDirectory: DirectoryPath,
-    servePort: number,
-    informUser: boolean
-  ): Promise<void> {
+  // the portal is actually served on, then persists it to the build file and informs
+  // the user. Only localhost base URLs are touched; non-localhost URLs and matching
+  // ports are left as-is.
+  private async reconcileBaseUrlPort(buildDirectory: DirectoryPath, servePort: number): Promise<void> {
     const buildContext = new BuildContext(buildDirectory);
     let buildConfig;
     try {
@@ -167,9 +162,7 @@ export class PortalServeAction {
     }
     await buildContext.updateBuildFileContents(buildConfig);
 
-    if (informUser) {
-      this.prompts.baseUrlPortUpdated(baseUrl, updatedUrl);
-    }
+    this.prompts.baseUrlPortUpdated(baseUrl, updatedUrl);
   }
 
   // This clears the standard input to allow interrupts like CTRL+C to work properly.
