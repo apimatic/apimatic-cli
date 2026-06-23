@@ -23,7 +23,6 @@ import { BuildConfig, CopilotConfig } from '../../types/build/build.js';
 import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
 
 const defaultPort: number = 23513 as const;
-const copilotBaseUrl: string = `http://localhost:${defaultPort}` as const;
 // `portalSettings.languageSettings` must be keyed by codegen's SupportedTemplates id
 // (codegen resolves the key via `SdkLanguage.FromSupportedTemplate`), NOT by the
 // friendly `languageConfig` key. These ids are version-specific in codegen
@@ -247,7 +246,6 @@ export class PortalQuickstartAction {
       key: copilotKey,
       welcomeMessage: DEFAULT_COPILOT_WELCOME_MESSAGE
     };
-    buildFile.generatePortal!.baseUrl = copilotBaseUrl;
     buildFile.apiCopilotConfig = apiCopilotConfig;
     this.enableAiIntegrations(buildFile);
   }
