@@ -13,13 +13,12 @@ import { ValidateAction } from '../api/validate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
-import { getLanguagesConfig } from '../../types/build/build.js';
+import { getLanguagesConfig, BuildConfig, CopilotConfig } from '../../types/build/build.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { SpecContext } from '../../types/spec-context.js';
 import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
 import { FileName } from '../../types/file/fileName.js';
 import { ApiService } from '../../infrastructure/services/api-service.js';
-import { BuildConfig, CopilotConfig } from '../../types/build/build.js';
 import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
 
 const defaultPort: number = 23513 as const;

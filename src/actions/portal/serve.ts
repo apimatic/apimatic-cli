@@ -149,7 +149,7 @@ export class PortalServeAction {
     }
 
     const parsedUrl = UrlPath.create(baseUrl);
-    if (!parsedUrl || !parsedUrl.isLocalhost()) {
+    if (!parsedUrl?.isLocalhost()) {
       return;
     }
 
