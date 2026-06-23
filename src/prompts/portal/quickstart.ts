@@ -230,6 +230,13 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error("No API Copilot key was selected.");
   }
 
+  public copilotEnabled(key: string) {
+    const message =
+      `API Copilot is enabled with key ${f.var(key)}. ` +
+      `Any existing training data associated with this key will be overwritten when the portal is generated.`;
+    log.warn(message);
+  }
+
   public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
     const heading = `${f.var("src")} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());

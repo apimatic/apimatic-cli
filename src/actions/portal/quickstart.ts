@@ -262,6 +262,7 @@ export class PortalQuickstartAction {
     buildFile.generatePortal!.baseUrl = defaultBaseUrl;
     buildFile.apiCopilotConfig = apiCopilotConfig;
     this.enableAiIntegrations(buildFile);
+    this.prompts.copilotEnabled(copilotKey);
     return false;
   }
 
