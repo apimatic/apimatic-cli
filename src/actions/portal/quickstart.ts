@@ -250,8 +250,6 @@ export class PortalQuickstartAction {
     buildFile.generatePortal!.baseUrl = copilotBaseUrl;
     buildFile.apiCopilotConfig = apiCopilotConfig;
     this.enableAiIntegrations(buildFile);
-
-    this.prompts.copilotEnabled(copilotKey);
   }
 
   // Enables Cursor, Claude Code and VS Code integrations for every SDK language in

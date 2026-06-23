@@ -226,10 +226,6 @@ ${f.link(referenceDocumentationUrl)}`;
     return selectedKey;
   }
 
-  public copilotEnabled(key: string) {
-    log.info(`API Copilot enabled with key ${f.var(key)} and AI integrations turned on for all selected languages.`);
-  }
-
   public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
     const heading = `${f.var("src")} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());
