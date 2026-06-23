@@ -177,6 +177,12 @@ export class PortalQuickstartAction {
         break;
       }
 
+      const copilotKeyResult = await this.resolveCopilotKey();
+      if (copilotKeyResult.cancelled) {
+        this.prompts.noCopilotKeySelected();
+        return ActionResult.cancelled();
+      }
+
       const masterBuildFile = await this.prompts.downloadBuildDirectory(
         this.fileDownloadService.downloadFile(this.buildFileUrl)
       );
@@ -194,9 +200,8 @@ export class PortalQuickstartAction {
 
       const buildFile = await tempBuildContext.getBuildFileContents();
       buildFile.generatePortal!.languageConfig = getLanguagesConfig(languages);
-      if (await this.configureApiCopilot(buildFile)) {
-        this.prompts.noCopilotKeySelected();
-        return ActionResult.cancelled();
+      if (copilotKeyResult.key) {
+        this.applyCopilotConfig(buildFile, copilotKeyResult.key);
       }
       await tempBuildContext.updateBuildFileContents(buildFile);
 
@@ -224,23 +229,20 @@ export class PortalQuickstartAction {
     });
   };
 
-  // When the account has an API Copilot key, wires Copilot into the build config:
-  // points the portal base URL at the local serve port, adds the apiCopilotConfig
-  // block, and enables AI editor integrations for every configured SDK language.
-  // Copilot is opt-in based on account access: when the user has no Copilot key
-  // (or the lookup fails) it is skipped silently, never fatal.
-  // Returns true if the user cancelled Copilot key selection — quickstart should
-  // abort. When the account has no Copilot key (or the lookup fails), Copilot is
-  // skipped silently and this returns false so quickstart continues without it.
-  private async configureApiCopilot(buildFile: BuildConfig): Promise<boolean> {
+  // Resolves the API Copilot key to enable, if any, BEFORE the source directory is set
+  // up so the user decides on Copilot up front. Copilot is opt-in based on account
+  // access: when the user has no Copilot key (or the lookup fails) it is skipped
+  // silently ({ cancelled: false } with no key). When multiple keys exist and the user
+  // cancels selection, returns { cancelled: true } so quickstart aborts.
+  private async resolveCopilotKey(): Promise<{ cancelled: boolean; key?: string }> {
     const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
     if (accountInfo.isErr()) {
-      return false;
+      return { cancelled: false };
     }
 
     const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
     if (copilotKeys.length === 0) {
-      return false;
+      return { cancelled: false };
     }
 
     let copilotKey: string;
@@ -249,11 +251,19 @@ export class PortalQuickstartAction {
     } else {
       const selectedKey = await this.prompts.selectCopilotKey(copilotKeys);
       if (!selectedKey) {
-        return true;
+        return { cancelled: true };
       }
       copilotKey = selectedKey;
     }
 
+    this.prompts.copilotEnabled(copilotKey);
+    return { cancelled: false, key: copilotKey };
+  }
+
+  // Wires the resolved Copilot key into the build config: points the portal base URL
+  // at the local serve port, adds the apiCopilotConfig block, and enables AI editor
+  // integrations for every configured SDK language.
+  private applyCopilotConfig(buildFile: BuildConfig, copilotKey: string): void {
     const apiCopilotConfig: CopilotConfig = {
       isEnabled: true,
       key: copilotKey,
@@ -262,8 +272,6 @@ export class PortalQuickstartAction {
     buildFile.generatePortal!.baseUrl = defaultBaseUrl;
     buildFile.apiCopilotConfig = apiCopilotConfig;
     this.enableAiIntegrations(buildFile);
-    this.prompts.copilotEnabled(copilotKey);
-    return false;
   }
 
   // Enables Cursor/Claude Code/VS Code integrations for the selected SDK languages.
