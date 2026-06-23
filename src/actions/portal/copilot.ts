@@ -21,7 +21,7 @@ export const DEFAULT_COPILOT_WELCOME_MESSAGE =
   "Ask me anything about this API or try one of these example prompts:\n" +
   "\n" +
   "- `What authentication methods does this API support?`\n" +
-  "- `[Enter another prompt here]`";
+  "- `What endpoints are available in this API?`\n" ;
 
 export class CopilotAction {
   private readonly apiService = new ApiService();
