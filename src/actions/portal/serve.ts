@@ -155,7 +155,7 @@ export class PortalServeAction {
       return;
     }
 
-    await buildContext.updateBuildFileContents(buildConfig);
+    await buildContext.updateBuildFileContents(change.config);
     this.prompts.baseUrlPortUpdated(change.previous, change.updated);
   }
 

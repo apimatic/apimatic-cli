@@ -189,11 +189,10 @@ export class PortalQuickstartAction {
       // Update the build file in its final location via BuildContext,
       // mirroring exactly how CopilotAction reads and writes the build file
       const buildContext = new BuildContext(sourceDirectory);
-      const buildConfig = await buildContext.getBuildFileContents();
-      buildConfig.setPortalLanguages(languages);
-      if (copilotKeyResult.key) {
-        buildConfig.enableApiCopilotForPortal(copilotKeyResult.key, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl);
-      }
+      const baseConfig = (await buildContext.getBuildFileContents()).withPortalLanguages(languages);
+      const buildConfig = copilotKeyResult.key
+        ? baseConfig.withApiCopilotForPortal(copilotKeyResult.key, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl)
+        : baseConfig;
       await buildContext.updateBuildFileContents(buildConfig);
 
       const specDirectory = sourceDirectory.join('spec');

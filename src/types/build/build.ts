@@ -16,22 +16,22 @@ export interface PortalConfig {
   /** URL where the portal will be hosted. Mirrors `generatePortal.baseUrl` in codegen. */
   baseUrl?: string;
   /** Portal UI settings. Mirrors `generatePortal.portalSettings` in codegen. */
-  portalSettings?: PortalSettings;
+  portalSettings?: PortalSettingsData;
   apiSpecPath?: DirectoryPath;
   [key: string]: unknown;
 }
 
-export interface PortalSettings {
+export interface PortalSettingsData {
   /** Base URL for the API calls made by the portal. Preferred over `generatePortal.baseUrl` for portal artifacts. */
   baseUrl?: string;
   /** Language/template id the portal opens on first load. */
   initialPlatform?: string;
   /** Per-language portal settings, keyed by language/template id. */
-  languageSettings?: { [language: string]: LanguageSetting };
+  languageSettings?: { [language: string]: LanguageSettingData };
   [key: string]: unknown;
 }
 
-export interface LanguageSetting {
+export interface LanguageSettingData {
   aiIntegration?: AiIntegration;
   [key: string]: unknown;
 }
@@ -89,11 +89,93 @@ const CODEGEN_TEMPLATE_ID_BY_LANGUAGE: Readonly<Record<string, string>> = {
 // languageSettings entry for http must exist or the portal widget fails to render.
 const HTTP_TEMPLATE_ID = "http_curl_v1" as const;
 
-// Rich wrapper around the parsed APIMATIC-BUILD.json. All build-config reads and
-// mutations go through here so callers express intent rather than poking at the
-// raw JSON shape. Construct via `BuildConfig.parse`; persist via `BuildContext`.
+// Deep clone used for copy-on-write transforms. The config is plain JSON, so a JSON
+// round-trip is an exact, dependency-free copy.
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+// Immutable per-language portal setting. Build new values via the static factory and
+// the with* transforms; the wrapped data is never mutated after construction.
+export class LanguageSetting {
+  private constructor(private readonly data: LanguageSettingData) {}
+
+  public static from(data: LanguageSettingData = {}): LanguageSetting {
+    return new LanguageSetting(clone(data));
+  }
+
+  /** Returns a copy with all AI editor integrations (Cursor/Claude Code/VS Code) enabled. */
+  public withAiIntegrationsEnabled(): LanguageSetting {
+    const data = clone(this.data);
+    data.aiIntegration = {
+      cursor: { isEnabled: true },
+      claudeCode: { isEnabled: true },
+      vscode: { isEnabled: true }
+    };
+    return new LanguageSetting(data);
+  }
+
+  public toJSON(): LanguageSettingData {
+    return this.data;
+  }
+}
+
+// Immutable portal UI settings. Build new values via the static factory and the with*
+// transforms; the wrapped data is never mutated after construction.
+export class PortalSettings {
+  private constructor(private readonly data: PortalSettingsData) {}
+
+  public static from(data: PortalSettingsData = {}): PortalSettings {
+    return new PortalSettings(clone(data));
+  }
+
+  public baseUrl(): string | undefined {
+    return this.data.baseUrl;
+  }
+
+  /** Returns a copy with the API-call base URL set. */
+  public withBaseUrl(baseUrl: string): PortalSettings {
+    const data = clone(this.data);
+    data.baseUrl = baseUrl;
+    return new PortalSettings(data);
+  }
+
+  // Returns a copy with AI editor integrations enabled for the given SDK languages
+  // (friendly ids). Always adds the http entry the portal needs to render and opens the
+  // portal on the first SDK language. Languages without a codegen template id are skipped.
+  public withAiIntegrations(languages: string[]): PortalSettings {
+    const data = clone(this.data);
+    const languageSettings: { [language: string]: LanguageSettingData } = { ...data.languageSettings };
+    languageSettings[HTTP_TEMPLATE_ID] = languageSettings[HTTP_TEMPLATE_ID] ?? {};
+
+    let firstSdkTemplateId: string | undefined;
+    for (const language of languages) {
+      const templateId = CODEGEN_TEMPLATE_ID_BY_LANGUAGE[language];
+      if (!templateId) {
+        continue;
+      }
+      firstSdkTemplateId ??= templateId;
+      languageSettings[templateId] = LanguageSetting.from(languageSettings[templateId]).withAiIntegrationsEnabled().toJSON();
+    }
+
+    data.languageSettings = languageSettings;
+    if (firstSdkTemplateId) {
+      data.initialPlatform = firstSdkTemplateId;
+    }
+    return new PortalSettings(data);
+  }
+
+  public toJSON(): PortalSettingsData {
+    return this.data;
+  }
+}
+
+// Immutable wrapper around the parsed APIMATIC-BUILD.json. All build-config reads go
+// through accessor methods and all changes go through with*/reconcile methods that
+// return a NEW BuildConfig — the wrapped data is never mutated after construction.
+// Construct via `BuildConfig.parse`; persist via `BuildContext`.
 export class BuildConfig {
-  constructor(private readonly data: BuildConfigData) {}
+  private constructor(private readonly data: BuildConfigData) {}
 
   public static parse(json: string): BuildConfig {
     return new BuildConfig(JSON.parse(json) as BuildConfigData);
@@ -124,28 +206,40 @@ export class BuildConfig {
     return this.data.apiCopilotConfig != null;
   }
 
-  /** Sets the portal's languageConfig from the selected friendly language ids. */
-  public setPortalLanguages(languages: string[]): void {
-    this.portal().languageConfig = getLanguagesConfig(languages);
+  /** Returns a copy with the portal's languageConfig set from the selected friendly language ids. */
+  public withPortalLanguages(languages: string[]): BuildConfig {
+    const data = clone(this.data);
+    portalConfigOf(data).languageConfig = getLanguagesConfig(languages);
+    return new BuildConfig(data);
   }
 
-  /** Sets (or overwrites) the API Copilot configuration. */
-  public setApiCopilotConfig(config: CopilotConfig): void {
-    this.data.apiCopilotConfig = config;
+  /** Returns a copy with the API Copilot configuration set (or overwritten). */
+  public withApiCopilotConfig(config: CopilotConfig): BuildConfig {
+    const data = clone(this.data);
+    data.apiCopilotConfig = { ...config };
+    return new BuildConfig(data);
   }
 
-  // Enables API Copilot for a locally-served portal: stores the Copilot config, points
-  // the portal base URL at the local serve URL, and turns on AI editor integrations.
-  public enableApiCopilotForPortal(key: string, welcomeMessage: string, baseUrl: string): void {
-    this.data.apiCopilotConfig = { isEnabled: true, key, welcomeMessage };
-    this.portal().baseUrl = baseUrl;
-    this.enableAiIntegrations();
+  // Returns a copy with API Copilot enabled for a locally-served portal: stores the
+  // Copilot config, points the portal base URL at the local serve URL, and turns on AI
+  // editor integrations for the configured SDK languages.
+  public withApiCopilotForPortal(key: string, welcomeMessage: string, baseUrl: string): BuildConfig {
+    const data = clone(this.data);
+    const portal = portalConfigOf(data);
+    data.apiCopilotConfig = { isEnabled: true, key, welcomeMessage };
+    portal.baseUrl = baseUrl;
+    portal.portalSettings = PortalSettings.from(portal.portalSettings)
+      .withAiIntegrations(Object.keys(portal.languageConfig))
+      .toJSON();
+    return new BuildConfig(data);
   }
 
-  // Aligns a localhost base URL's port with the actual serve port. Returns the
-  // before/after URLs when a change was made, or undefined when nothing changed
-  // (no base URL, non-localhost URL, or the port already matches).
-  public reconcileLocalhostBaseUrlPort(servePort: number): { previous: string; updated: string } | undefined {
+  // Aligns a localhost base URL's port with the actual serve port. Returns the new
+  // config plus the before/after URLs when a change was made, or undefined when nothing
+  // changed (no base URL, non-localhost URL, or the port already matches).
+  public reconcileLocalhostBaseUrlPort(
+    servePort: number
+  ): { config: BuildConfig; previous: string; updated: string } | undefined {
     // `portalSettings.baseUrl` is preferred for portal artifacts; otherwise fall back
     // to `generatePortal.baseUrl`. Mirrors how codegen resolves the base URL.
     const portalSettings = this.data.generatePortal?.portalSettings;
@@ -160,17 +254,20 @@ export class BuildConfig {
     }
 
     const updated = parsedUrl.withPort(servePort).toString();
-    if (portalSettings?.baseUrl) {
-      portalSettings.baseUrl = updated;
+    const data = clone(this.data);
+    const portal = portalConfigOf(data);
+    if (portal.portalSettings?.baseUrl) {
+      portal.portalSettings = PortalSettings.from(portal.portalSettings).withBaseUrl(updated).toJSON();
     } else {
-      this.portal().baseUrl = updated;
+      portal.baseUrl = updated;
     }
-    return { previous: baseUrl, updated };
+    return { config: new BuildConfig(data), previous: baseUrl, updated };
   }
 
-  // Adds (or replaces, by permalink) a recipe workflow entry.
-  public addRecipeWorkflow(name: string, functionName: string, scriptPath: string): void {
-    const recipes = (this.data.recipes ??= {});
+  // Returns a copy with a recipe workflow added (or replaced, matched by permalink).
+  public withRecipeWorkflow(name: string, functionName: string, scriptPath: string): BuildConfig {
+    const data = clone(this.data);
+    const recipes = (data.recipes ??= {});
     const workflows = (recipes.workflows ??= []);
     const permalink = `page:recipes/${functionName}`;
     const workflow: RecipeWorkflow = { name, permalink, functionName, scriptPath };
@@ -180,43 +277,11 @@ export class BuildConfig {
     } else {
       workflows[existingIndex] = workflow;
     }
+    return new BuildConfig(data);
   }
+}
 
-  // Enables Cursor/Claude Code/VS Code integrations for the selected SDK languages.
-  // Supplying languageSettings suppresses codegen's own per-language auto-population,
-  // so the http entry (no AI integration) the portal needs to render is added too:
-  // initialPlatform defaults to http, and a missing entry leaves the widget unrendered.
-  private enableAiIntegrations(): void {
-    const portalSettings = (this.portal().portalSettings ??= {});
-    const languageSettings = (portalSettings.languageSettings ??= {});
-
-    languageSettings[HTTP_TEMPLATE_ID] ??= {};
-
-    let firstSdkTemplateId: string | undefined;
-    for (const language of Object.keys(this.portal().languageConfig)) {
-      const templateId = CODEGEN_TEMPLATE_ID_BY_LANGUAGE[language];
-      if (!templateId) {
-        continue;
-      }
-      firstSdkTemplateId ??= templateId;
-      languageSettings[templateId] = {
-        ...languageSettings[templateId],
-        aiIntegration: {
-          cursor: { isEnabled: true },
-          claudeCode: { isEnabled: true },
-          vscode: { isEnabled: true }
-        }
-      };
-    }
-
-    // Open the portal on the first SDK language (the entry after http) rather than http.
-    if (firstSdkTemplateId) {
-      portalSettings.initialPlatform = firstSdkTemplateId;
-    }
-  }
-
-  // Portal-config accessor for mutations. Assumes a single (non-versioned) portal build.
-  private portal(): PortalConfig {
-    return this.data.generatePortal!;
-  }
+// Portal-config accessor for transforms. Assumes a single (non-versioned) portal build.
+function portalConfigOf(data: BuildConfigData): PortalConfig {
+  return data.generatePortal!;
 }

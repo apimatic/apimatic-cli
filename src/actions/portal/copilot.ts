@@ -74,13 +74,13 @@ export class CopilotAction {
 
     const welcomeMessage = await this.prepareWelcomeMessage();
 
-    buildJson.setApiCopilotConfig({
+    const updatedBuild = buildJson.withApiCopilotConfig({
       isEnabled: enable,
       key: apiCopilotKeyResult.value,
       welcomeMessage: welcomeMessage
     });
 
-    await buildContext.updateBuildFileContents(buildJson);
+    await buildContext.updateBuildFileContents(updatedBuild);
 
     this.prompts.copilotConfigured(enable, apiCopilotKeyResult.value);
 
