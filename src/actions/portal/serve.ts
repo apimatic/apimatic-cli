@@ -70,12 +70,6 @@ export class PortalServeAction {
 
     const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
     const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
-    // get error if the live reload server fails to start (e.g. EADDRINUSE)
-    const liveReloadHttpServer = (liveReloadServer as unknown as { config: { server: Server } }).config.server;
-    if ((await this.waitForServerListening(liveReloadHttpServer)).isErr()) {
-      this.prompts.serverStartFailed(liveReloadPort);
-      return ActionResult.failed();
-    }
 
     const server = this.application
       .use(connectLiveReload())
