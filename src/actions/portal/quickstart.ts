@@ -193,8 +193,6 @@ export class PortalQuickstartAction {
       buildConfig.setPortalLanguages(languages);
       if (copilotKeyResult.key) {
         buildConfig.enableApiCopilotForPortal(copilotKeyResult.key, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl);
-      } else {
-        buildConfig.enableAiIntegrations();
       }
       await buildContext.updateBuildFileContents(buildConfig);
 

@@ -186,7 +186,7 @@ export class BuildConfig {
   // Supplying languageSettings suppresses codegen's own per-language auto-population,
   // so the http entry (no AI integration) the portal needs to render is added too:
   // initialPlatform defaults to http, and a missing entry leaves the widget unrendered.
-  public enableAiIntegrations(): void {
+  private enableAiIntegrations(): void {
     const portalSettings = (this.portal().portalSettings ??= {});
     const languageSettings = (portalSettings.languageSettings ??= {});
 
