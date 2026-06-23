@@ -212,7 +212,7 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error(serviceError.errorMessage);
   }
 
-  public async selectCopilotKey(keys: string[]): Promise<string | null> {
+  public async selectCopilotKey(keys: string[]): Promise<string | undefined> {
     const selectedKey = await select({
       message: "Select the API Copilot key you would like to enable for this Portal:",
       maxItems: 10,
@@ -220,7 +220,7 @@ ${f.link(referenceDocumentationUrl)}`;
     });
 
     if (isCancel(selectedKey)) {
-      return null;
+      return undefined;
     }
 
     return selectedKey;
