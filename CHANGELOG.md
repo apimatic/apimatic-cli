@@ -1,3 +1,10 @@
+# [1.1.0-beta.19](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.18...v1.1.0-beta.19) (2026-06-24)
+
+
+### Features
+
+* **portal:** prefer port 23513 and auto-configure API Copilot in quickstart ([#290](https://github.com/apimatic/apimatic-cli/issues/290)) ([45cc0e6](https://github.com/apimatic/apimatic-cli/commit/45cc0e69517892ecba33b8f6caf6770032bb42ba)), closes [#291](https://github.com/apimatic/apimatic-cli/issues/291)
+
 # [1.1.0-beta.18](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.17...v1.1.0-beta.18) (2026-06-11)
 
 
