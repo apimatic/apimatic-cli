@@ -212,6 +212,35 @@ ${f.link(referenceDocumentationUrl)}`;
     log.error(serviceError.errorMessage);
   }
 
+  public async selectCopilotKey(keys: string[]): Promise<string | undefined> {
+    const selectedKey = await select({
+      message: "Select an API Copilot key for this portal:",
+      maxItems: 10,
+      options: keys.map((key) => ({ value: key, label: key }))
+    });
+
+    if (isCancel(selectedKey)) {
+      return undefined;
+    }
+
+    return selectedKey;
+  }
+
+  public noCopilotKeySelected() {
+    log.error("No API Copilot key was selected.");
+  }
+
+  public accountInfoFetchFailed(serviceError: ServiceError) {
+    log.error(`Failed to fetch your account information. ${serviceError.errorMessage}`);
+  }
+
+  public copilotEnabled(key: string) {
+    const message =
+      `API Copilot is enabled with key ${f.var(key)}. ` +
+      `Any existing AI context associated with this key will be overwritten when the portal is generated.`;
+    log.warn(message);
+  }
+
   public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
     const heading = `${f.var("src")} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());

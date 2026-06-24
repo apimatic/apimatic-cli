@@ -7,10 +7,36 @@ import { noteWrapped } from "../prompt.js";
 
 export class PortalServePrompts {
   public usingFallbackPort(currentPort: number, availablePort: number) {
-    const message = `Port ${f.var(currentPort.toString())} is already in use. Available port ${f.var(
+    const message = `Port ${f.var(currentPort.toString())} is already in use. The portal will use port ${f.var(
       availablePort.toString()
-    )} will be used.`;
+    )} instead.`;
     log.step(message);
+  }
+
+  public serverStartFailed(port: number) {
+    const message =
+      `Could not start the portal server on port ${f.var(port.toString())}; ` +
+      `it may have just been taken by another process. Please try again.`;
+    log.error(message);
+  }
+
+  public noPortalSource(buildDirectory: DirectoryPath) {
+    const message =
+      `No portal source found at ${f.path(buildDirectory)}. ` +
+      `Run ${f.cmdAlt("apimatic", "portal", "quickstart")} to set one up.`;
+    log.error(message);
+  }
+
+  public invalidBuildConfig(buildDirectory: DirectoryPath) {
+    const message =
+      `Could not read the build configuration in ${f.path(buildDirectory)}. ` +
+      `Ensure ${f.var("APIMATIC-BUILD.json")} exists and is valid JSON.`;
+    log.error(message);
+  }
+
+  public baseUrlPortUpdated(updatedUrl: UrlPath) {
+    const message = `Updated the base URL in ${f.var("APIMATIC-BUILD.json")} to ${f.var(updatedUrl.toString())} to match the serve port.`;
+    log.info(message);
   }
 
   public portalServed(urlPath: UrlPath) {

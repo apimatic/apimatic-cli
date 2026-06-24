@@ -15,6 +15,14 @@ import { err, ok, Result } from "neverthrow";
 type SelectKeyFailure = "failed" | "cancelled";
 type SelectKeyResult = Result<string, SelectKeyFailure>;
 
+export const DEFAULT_COPILOT_WELCOME_MESSAGE =
+  "Hi there! I'm your API Integration Assistant, here to help you learn and integrate with this API.\n" +
+  "\n" +
+  "Ask me anything about this API or try one of these example prompts:\n" +
+  "\n" +
+  "- `What authentication methods does this API support?`\n" +
+  "- `What endpoints are available in this API?`\n" ;
+
 export class CopilotAction {
   private readonly apiService = new ApiService();
   private readonly fileService = new FileService();
@@ -42,9 +50,9 @@ export class CopilotAction {
       return ActionResult.failed();
     }
 
-    const buildJson = await buildContext.getBuildFileContents();
+    const buildConfig = await buildContext.getBuildFileContents();
 
-    if (!force && buildJson.apiCopilotConfig != null && !(await this.prompts.confirmOverwrite())) {
+    if (!force && buildConfig.hasApiCopilot() && !(await this.prompts.confirmOverwrite())) {
       this.prompts.cancelled();
       return ActionResult.cancelled();
     }
@@ -66,13 +74,13 @@ export class CopilotAction {
 
     const welcomeMessage = await this.prepareWelcomeMessage();
 
-    buildJson.apiCopilotConfig = {
+    const updatedBuildConfig = buildConfig.withApiCopilotConfig({
       isEnabled: enable,
       key: apiCopilotKeyResult.value,
       welcomeMessage: welcomeMessage
-    };
+    });
 
-    await buildContext.updateBuildFileContents(buildJson);
+    await buildContext.updateBuildFileContents(updatedBuildConfig);
 
     this.prompts.copilotConfigured(enable, apiCopilotKeyResult.value);
 
@@ -104,14 +112,7 @@ export class CopilotAction {
   private async prepareWelcomeMessage(): Promise<string> {
     return await withDirPath(async (tempDir) => {
       const tempFile = new FilePath(tempDir, new FileName("welcome-message.md"));
-      const defaultContent =
-        "Hi there! I'm your API Integration Assistant, here to help you learn and integrate with this API.\n" +
-        "\n" +
-        "Ask me anything about this API or try one of these example prompts:\n" +
-        "\n" +
-        "- `What authentication methods does this API support?`\n" +
-        "- `[Enter another prompt here]`";
-      await this.fileService.writeContents(tempFile, defaultContent);
+      await this.fileService.writeContents(tempFile, DEFAULT_COPILOT_WELCOME_MESSAGE);
       this.prompts.openWelcomeMessageEditor();
       await this.launcherService.openInEditor(tempFile);
       const welcomeMessage = await this.fileService.getContents(tempFile);

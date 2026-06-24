@@ -36,11 +36,11 @@ export class BuildContext {
 
   public async getBuildFileContents(): Promise<BuildConfig> {
     const buildFileContent = await this.fileService.getContents(this.buildFile);
-    return JSON.parse(buildFileContent) as BuildConfig;
+    return BuildConfig.parse(buildFileContent);
   }
 
-  public async updateBuildFileContents(buildJson: BuildConfig) {
-    await this.fileService.writeContents(this.buildFile, JSON.stringify(buildJson, null, 2));
+  public async updateBuildFileContents(buildConfig: BuildConfig) {
+    await this.fileService.writeContents(this.buildFile, JSON.stringify(buildConfig, null, 2));
   }
 
   public async deleteWorkflowDir() {
@@ -77,19 +77,15 @@ export class BuildContext {
     if (!await this.validate()) {
       return false;
     }
-    const buildConfig = await this.getBuildFileContents();
-    if (buildConfig.generateVersionedPortal) {
-      return true;
-    }
-    return false;
+    return (await this.getBuildFileContents()).isVersioned();
   }
 
   public async getVersionedBuildDirectory(): Promise<DirectoryPath | undefined> {
     const buildConfig = await this.getBuildFileContents();
-    if (!buildConfig.generateVersionedPortal) {
+    if (!buildConfig.isVersioned()) {
       return undefined;
     }
-    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath ?? 'versioned_docs');
+    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
     if (!await this.fileService.directoryExists(versionsDirectory)) {
       return undefined;
     }
@@ -99,10 +95,10 @@ export class BuildContext {
 
   public async getSingleVersionedBuildDirectory(): Promise<DirectoryPath | undefined> {
     const buildConfig = await this.getBuildFileContents();
-    if (!buildConfig.generateVersionedPortal) {
+    if (!buildConfig.isVersioned()) {
       return undefined;
     }
-    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath ?? 'versioned_docs');
+    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
     if (!await this.fileService.directoryExists(versionsDirectory)) {
       return undefined;
     }
@@ -112,10 +108,10 @@ export class BuildContext {
 
   public async getSelectedVersionedBuildDirectory(versionSelector: (versions: string[]) => Promise<string | undefined>): Promise<DirectoryPath | undefined> {
     const buildConfig = await this.getBuildFileContents();
-    if (!buildConfig.generateVersionedPortal) {
+    if (!buildConfig.isVersioned()) {
       return undefined;
     }
-    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath ?? 'versioned_docs');
+    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
     if (!await this.fileService.directoryExists(versionsDirectory)) {
       return undefined;
     }

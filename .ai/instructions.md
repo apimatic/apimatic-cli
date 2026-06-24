@@ -26,7 +26,9 @@ pnpm test              # tsx + mocha, runs test/**/*.test.ts
 pnpm exec tsx node_modules/mocha/bin/_mocha "test/actions/portal/serve.test.ts" --timeout 99999
 
 # Run CLI locally
-node bin/run.js <command>
+pnpm build:watch       # tsc -b --watch: recompiles src/ → lib/ on change; keep running in a separate terminal
+pnpm apimatic <command>
+pnpm apimatic <command> -i <abs-path-to-dir-containing-src>   # -i: for commands operating on a project directory containing src/
 ```
 
 ## Adding / upgrading dependencies
