@@ -15,8 +15,8 @@ export default class PortalServe extends Command {
     port: Flags.integer({
       char: "p",
       description: "port to serve the portal.",
-      default: 3000,
-      helpValue: "3000"
+      default: 23513,
+      helpValue: "23513"
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.destination("portal", "portal"),
@@ -38,7 +38,7 @@ export default class PortalServe extends Command {
     `${this.cmdTxt} ` +
       `${format.flag("input", './')} ` +
       `${format.flag("destination", './portal')} ` +
-      `${format.flag("port", "3000")} ` +
+      `${format.flag("port", "23513")} ` +
       `${format.flag("open")} ` +
       `${format.flag("no-reload")}`
   ];

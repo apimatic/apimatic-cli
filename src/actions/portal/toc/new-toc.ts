@@ -53,7 +53,7 @@ export class PortalNewTocAction {
       return ActionResult.failed();
     }
     const buildConfig = await buildContext.getBuildFileContents();
-    const contentDirectory = buildDirectory.join(buildConfig.generatePortal?.contentFolder ?? 'content');
+    const contentDirectory = buildDirectory.join(buildConfig.contentFolder());
 
     const tocDir = tocDirectory ?? contentDirectory;
     const tocContext = new TocContext(tocDir);

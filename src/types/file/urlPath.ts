@@ -22,4 +22,15 @@ export class UrlPath {
   public toString(): string {
     return this.url;
   }
+
+  /** True when the URL points at the local machine (`localhost` or `127.0.0.1`). */
+  public isLocalhost(): boolean {
+    const hostname = new URL(this.url).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  }
+
+  /** Structural equality against another URL. */
+  public isEqual(other: UrlPath): boolean {
+    return this.url === other.url;
+  }
 }

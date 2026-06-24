@@ -1,3 +1,5 @@
+import { Server } from "node:http";
+import { err, ok, Result } from "neverthrow";
 import { createServer as createLiveReloadServer } from "livereload";
 import connectLiveReload from "connect-livereload";
 import express, { Express } from "express";
@@ -11,6 +13,7 @@ import { NetworkService } from "../../infrastructure/network-service.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { LauncherService } from "../../infrastructure/launcher-service.js";
 import { DebounceService } from "../../infrastructure/debounce-service.js";
+import { BuildContext } from "../../types/build-context.js";
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
@@ -35,28 +38,68 @@ export class PortalServeAction {
     hotReload: boolean,
     onAfterServe?: () => void
   ): Promise<ActionResult> {
+    const buildContext = new BuildContext(buildDirectory);
+    if (!(await buildContext.exists())) {
+      this.prompts.noPortalSource(buildDirectory);
+      return ActionResult.failed();
+    }
+    let buildConfig;
+    try {
+      buildConfig = await buildContext.getBuildFileContents();
+    } catch {
+      this.prompts.invalidBuildConfig(buildDirectory);
+      return ActionResult.failed();
+    }
+
+    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
+    if (servePort != port) {
+      this.prompts.usingFallbackPort(port, servePort);
+    }
+    const serveUrl = new UrlPath(`http://localhost:${servePort}`);
+
+    // Update the configured localhost base URL to the actual serve URL BEFORE
+    // generation bakes it into the portal artifacts; otherwise the portal would load
+    // its content from the wrong port and fail to render.
+    const updatedBuildConfig = buildConfig.updateBuildConfigBaseUrl(serveUrl);
+    if (updatedBuildConfig !== buildConfig) {
+      await buildContext.updateBuildFileContents(updatedBuildConfig);
+      this.prompts.baseUrlPortUpdated(serveUrl);
+    }
+
     const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
     const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
     if (result.isFailed()) {
       return ActionResult.failed();
     }
 
-    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-    if (servePort != port && !onAfterServe) {
-      this.prompts.usingFallbackPort(port, servePort);
-    }
-
     const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
     const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
+
+    // livereload attaches its "error" handler to the inner WebSocket server, not to the
+    // HTTP server it binds the port on, so a failed bind (e.g. the port was taken in the
+    // gap since getServerPort) emits an unhandled "error" that would crash the process.
+    // Guard the HTTP server the same way as the main server below.
+    const liveReloadHttpServer = (liveReloadServer as unknown as { config: { server: Server } }).config.server;
+    if ((await this.waitForServerListening(liveReloadHttpServer)).isErr()) {
+      liveReloadServer.close();
+      this.prompts.serverStartFailed(liveReloadPort);
+      return ActionResult.failed();
+    }
+
     const server = this.application
       .use(connectLiveReload())
       .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
       .listen(servePort);
 
-    const portalUrl = new UrlPath(`http://localhost:${servePort}`);
-    this.prompts.portalServed(portalUrl);
+    if ((await this.waitForServerListening(server)).isErr()) {
+      liveReloadServer.close();
+      this.prompts.serverStartFailed(servePort);
+      return ActionResult.failed();
+    }
+
+    this.prompts.portalServed(serveUrl);
     if (openInBrowser) {
-      await this.launcherService.openUrlInBrowser(portalUrl);
+      await this.launcherService.openUrlInBrowser(serveUrl);
     }
     this.prompts.promptForExit();
 
@@ -102,6 +145,22 @@ export class PortalServeAction {
 
         await debounceService.batchSingleRequest(async () => {
           this.prompts.changesDetected();
+          // Re-reconcile on every hot-reload cycle: portalSettings.baseUrl takes
+          // precedence over generatePortal.baseUrl and may have been added or changed
+          // since serve started. If a mismatch is found the file is rewritten, which
+          // triggers a second watcher event — the debounce queues it, and the second
+          // cycle sees no mismatch and generates cleanly.
+          try {
+            const latestConfig = await buildContext.getBuildFileContents();
+            const reconciledConfig = latestConfig.updateBuildConfigBaseUrl(serveUrl);
+            if (reconciledConfig !== latestConfig) {
+              await buildContext.updateBuildFileContents(reconciledConfig);
+              this.prompts.baseUrlPortUpdated(serveUrl);
+            }
+          } catch {
+            // Build file temporarily unreadable (e.g. mid-save); skip reconciliation
+            // this cycle. GenerateAction will surface the error if the file is broken.
+          }
           await generatePortalAction.execute(buildDirectory, portalDirectory, true, false, false);
           liveReloadServer.refresh(portalDirectory.toString());
           this.clearStandardInput();
@@ -120,6 +179,23 @@ export class PortalServeAction {
     liveReloadServer.close();
     server.close();
     return ActionResult.success();
+  }
+
+  // Resolves ok once the server is bound, or err with the bind error (e.g. EADDRINUSE)
+  // so a failed listen is reported cleanly instead of crashing via an unhandled "error".
+  private waitForServerListening(server: Server): Promise<Result<void, Error>> {
+    return new Promise((resolve) => {
+      const onListening = () => {
+        server.removeListener("error", onError);
+        resolve(ok(undefined));
+      };
+      const onError = (error: Error) => {
+        server.removeListener("listening", onListening);
+        resolve(err(error));
+      };
+      server.once("listening", onListening);
+      server.once("error", onError);
+    });
   }
 
   // This clears the standard input to allow interrupts like CTRL+C to work properly.

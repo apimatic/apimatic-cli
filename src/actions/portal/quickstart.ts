@@ -13,13 +13,15 @@ import { ValidateAction } from '../api/validate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
-import { getLanguagesConfig } from '../../types/build/build.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { SpecContext } from '../../types/spec-context.js';
 import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
 import { FileName } from '../../types/file/fileName.js';
+import { ApiService } from '../../infrastructure/services/api-service.js';
+import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
 
-const defaultPort: number = 3000 as const;
+const defaultPort: number = 23513 as const;
+const defaultBaseUrl = new UrlPath(`http://localhost:${defaultPort}`);
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -28,6 +30,7 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly fileDownloadService = new FileDownloadService();
+  private readonly apiService = new ApiService();
   private readonly buildFileUrl = new UrlPath(
     `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
   );
@@ -157,6 +160,31 @@ export class PortalQuickstartAction {
         break;
       }
 
+      // Resolve the API Copilot key to enable, if any, before setting up the source
+      // directory so the user decides on Copilot up front. The lookup failing is fatal;
+      // an account with no key continues silently (no Copilot); cancelling the multi-key
+      // selection aborts quickstart.
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isErr()) {
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
+        return ActionResult.failed();
+      }
+
+      let copilotKey: string | undefined;
+      const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
+      if (copilotKeys.length === 1) {
+        copilotKey = copilotKeys[0];
+      } else if (copilotKeys.length > 1) {
+        copilotKey = await this.prompts.selectCopilotKey(copilotKeys);
+        if (!copilotKey) {
+          this.prompts.noCopilotKeySelected();
+          return ActionResult.cancelled();
+        }
+      }
+      if (copilotKey) {
+        this.prompts.copilotEnabled(copilotKey);
+      }
+
       const masterBuildFile = await this.prompts.downloadBuildDirectory(
         this.fileDownloadService.downloadFile(this.buildFileUrl)
       );
@@ -169,15 +197,22 @@ export class PortalQuickstartAction {
       await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
       const extractedFolder = tempDirectory.join(this.repositoryFolderName);
 
+      // Clean up the workflow dir from the template before copying
       const tempBuildContext = new BuildContext(extractedFolder);
       await tempBuildContext.deleteWorkflowDir();
 
-      const buildFile = await tempBuildContext.getBuildFileContents();
-      buildFile.generatePortal!.languageConfig = getLanguagesConfig(languages);
-      await tempBuildContext.updateBuildFileContents(buildFile);
-
+      // Copy the template into the final destination
       const sourceDirectory = inputDirectory.join('src');
       await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
+
+      // Update the build file in its final location via BuildContext,
+      // mirroring exactly how CopilotAction reads and writes the build file
+      const buildContext = new BuildContext(sourceDirectory);
+      const baseConfig = (await buildContext.getBuildFileContents()).withPortalLanguages(languages);
+      const buildConfig = copilotKey
+        ? baseConfig.withApiCopilotForPortal(copilotKey, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl)
+        : baseConfig;
+      await buildContext.updateBuildFileContents(buildConfig);
 
       const specDirectory = sourceDirectory.join('spec');
       const specContext = new SpecContext(specDirectory);
