@@ -46,6 +46,7 @@
         "format": "prettier --write \"src/**/*.{js,ts}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
+        "readme": "oclif readme",
         "test": "tsx node_modules/mocha/bin/_mocha --forbid-only \"test/**/*.test.ts\" --timeout 99999"
     },
     "dependencies": {
@@ -161,8 +162,7 @@
                 "description": "Generate a Table of Contents (TOC) file for your API documentation portal."
             }
         },
-        "topicSeparator": " ",
-        "state": "beta"
+        "topicSeparator": " "
     },
     "lint-staged": {
         "*.js": "eslint --cache --fix",
