@@ -38,6 +38,8 @@
     "types": "lib/index.d.ts",
     "scripts": {
         "build": "tsc -b",
+        "build:watch": "tsc -b --watch",
+        "apimatic": "node ./bin/run.js",
         "postpack": "rimraf oclif.manifest.json",
         "posttest": "eslint . --ext .ts",
         "prettier": "prettier \"src/**/*.{js,ts}\"",
