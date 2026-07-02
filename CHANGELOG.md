@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/apimatic/apimatic-cli/compare/v1.0.0...v1.1.0) (2026-07-02)
+
+
+### Features
+
+* graduate APIMatic CLI to first stable release ([#293](https://github.com/apimatic/apimatic-cli/issues/293)) ([7e92410](https://github.com/apimatic/apimatic-cli/commit/7e924107f8cf7ca6da67b9ab5f433be1404a51d3))
+
 # [1.1.0-beta.19](https://github.com/apimatic/apimatic-cli/compare/v1.1.0-beta.18...v1.1.0-beta.19) (2026-06-24)
 
 
