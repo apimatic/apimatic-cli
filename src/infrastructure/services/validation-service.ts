@@ -17,7 +17,7 @@ import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import FormData from "form-data";
 import { handleServiceError, ServiceError } from "../service-error.js";
-import axios from "axios";
+import axios, { AxiosResponse } from "axios";
 import { envInfo } from "../env-info.js";
 import { Buffer } from "node:buffer";
 
@@ -158,7 +158,7 @@ export class ValidationService {
     return "Unexpected error occurred while validating API specification.";
   }
 
-  private async parseErrorResponse(response: any): Promise<ServiceError> {
+  private async parseErrorResponse(response: AxiosResponse): Promise<ServiceError> {
     const chunks: Buffer[] = [];
     for await (const chunk of response.data) {
       chunks.push(Buffer.from(chunk));

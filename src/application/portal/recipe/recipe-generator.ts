@@ -3,13 +3,12 @@ import { stringify } from "yaml";
 import { SerializableRecipe, ContentStepConfig, EndpointStepConfig } from "../../../types/recipe/recipe.js";
 import { DirectoryPath } from "../../../types/file/directoryPath.js";
 import { FileService } from "../../../infrastructure/file-service.js";
-import { Toc } from "../../../types/toc/toc.js";
+import { Toc, TocGroup, TocGenerated, TocCustomPage } from "../../../types/toc/toc.js";
 import { FilePath } from "../../../types/file/filePath.js";
 import { FileName } from "../../../types/file/fileName.js";
 import { BuildContext } from "../../../types/build-context.js";
 
 export class PortalRecipeGenerator {
-  //TODO: Replace tocFileContent any type with concrete type.
   private readonly fileService: FileService = new FileService();
 
   public async createRecipe(
@@ -41,8 +40,10 @@ export class PortalRecipeGenerator {
     recipeName: string,
     recipeMarkdownFileName: FileName
   ): Promise<void> {
-    let toc = tocData.toc as any;
-    let apiRecipesGroup = toc.find((item: any) => item.group === "API Recipes");
+    const toc = tocData.toc;
+    const isGroup = (item: TocGroup | TocGenerated): item is TocGroup => "group" in item;
+
+    let apiRecipesGroup = toc.find((item): item is TocGroup => isGroup(item) && item.group === "API Recipes");
 
     if (!apiRecipesGroup) {
       // If the group doesn't exist, create and insert it after the last group
@@ -53,19 +54,25 @@ export class PortalRecipeGenerator {
       // Insert after the last group section, before generate sections
       let lastGroupIdx = -1;
       for (let i = 0; i < toc.length; i++) {
-        if (toc[i].group) lastGroupIdx = i;
+        const item = toc[i];
+        // `&& item.group` preserves the original truthiness check (a group with
+        // an empty name is not treated as a section boundary).
+        if (isGroup(item) && item.group) lastGroupIdx = i;
       }
       toc.splice(lastGroupIdx + 1, 0, apiRecipesGroup);
     }
 
+    const recipeFile = `recipes/${recipeMarkdownFileName}`;
     // Only add the recipe if it doesn't already exist
     const existingRecipe = apiRecipesGroup.items.find(
-      (item: any) => item.page === recipeName || item.file === `recipes/${recipeMarkdownFileName}`
+      (item): item is TocCustomPage => "page" in item && (item.page === recipeName || item.file === recipeFile)
     );
     if (!existingRecipe) {
-      apiRecipesGroup.items.push({
+      // `items` is declared readonly on the Toc model, but recipe registration
+      // intentionally appends a custom page before persisting the whole TOC.
+      (apiRecipesGroup.items as TocCustomPage[]).push({
         page: recipeName,
-        file: `recipes/${recipeMarkdownFileName}`
+        file: recipeFile
       });
       await this.fileService.writeContents(tocFilePath, stringify(tocData));
     }
