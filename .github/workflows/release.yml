@@ -59,4 +59,4 @@ jobs:
         working-directory: cli
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec semantic-release --dry-run
+        run: pnpm exec semantic-release
