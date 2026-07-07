@@ -19,6 +19,7 @@ import { FeaturesToRemove, ValidationService } from '../../infrastructure/servic
 import { FileName } from '../../types/file/fileName.js';
 import { ApiService } from '../../infrastructure/services/api-service.js';
 import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
+import { Language, mapLanguages } from '../../types/sdk/generate.js';
 
 const defaultPort: number = 23513 as const;
 const defaultBaseUrl = new UrlPath(`http://localhost:${defaultPort}`);
@@ -170,6 +171,16 @@ export class PortalQuickstartAction {
         return ActionResult.failed();
       }
 
+      // Fail fast if a selected SDK language isn't on the plan (http docs are always allowed).
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+      const disallowedLanguages = languages.filter(
+        (language) => language !== 'http' && !allowedLanguages.includes(language as Language)
+      );
+      if (disallowedLanguages.length > 0) {
+        this.prompts.languagesNotAllowed(disallowedLanguages);
+        return ActionResult.failed();
+      }
+
       let copilotKey: string | undefined;
       const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
       if (copilotKeys.length === 1) {
@@ -213,6 +224,21 @@ export class PortalQuickstartAction {
         ? baseConfig.withApiCopilotForPortal(copilotKey, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl)
         : baseConfig;
       await buildContext.updateBuildFileContents(buildConfig);
+
+      // Prune the build file to what the plan allows (SDK languages + AI features)
+      // before serving. Fail closed: a prune failure aborts rather than serving a
+      // build the plan can't generate.
+      const buildFilePath = new FilePath(sourceDirectory, new FileName('APIMATIC-BUILD.json'));
+      const pruneResult = await this.validationService.pruneBuildFile(buildFilePath);
+      if (pruneResult.isErr()) {
+        this.prompts.serviceError(pruneResult.error);
+        return ActionResult.failed();
+      }
+      await this.fileService.writeContents(
+        buildFilePath,
+        JSON.stringify(pruneResult.value.buildFile, null, 2)
+      );
+      this.prompts.buildFilePruned(pruneResult.value.report);
 
       const specDirectory = sourceDirectory.join('spec');
       const specContext = new SpecContext(specDirectory);

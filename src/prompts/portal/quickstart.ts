@@ -9,7 +9,10 @@ import { Directory } from "../../types/file/directory.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
 import { noteWrapped, withSpinner } from "../prompt.js";
-import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
+import {
+  BuildFilePruneReport,
+  UnallowedFeaturesResponse
+} from "../../infrastructure/services/validation-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
@@ -146,6 +149,43 @@ export class PortalQuickstartPrompts {
 
   public noLanguagesSelected() {
     log.error("No programming languages were selected.");
+  }
+
+  public languagesNotAllowed(languages: string[]): void {
+    const languagesList = languages.map((language) => `  • ${language}`).join("\n");
+    const message = [
+      "The following SDK languages are not available on your current subscription plan:",
+      "",
+      languagesList,
+      "",
+      "Select only the languages your plan includes, or upgrade your subscription to unlock more: https://www.apimatic.io/pricing"
+    ].join("\n");
+    log.error(message);
+  }
+
+  public buildFilePruned(report: BuildFilePruneReport): void {
+    const removed: string[] = [];
+    if (report.removedLanguages.length > 0) {
+      removed.push(`SDK languages: ${report.removedLanguages.join(", ")}`);
+    }
+    if (report.removedApiCopilot) {
+      removed.push("API Copilot");
+    }
+    if (report.removedAiIntegration) {
+      removed.push("AI context plugins (Cursor / VS Code / Claude Code)");
+    }
+    if (removed.length === 0) {
+      return;
+    }
+
+    const message = [
+      "Some build features aren't on your current subscription plan and were removed before generation:",
+      "",
+      ...removed.map((item) => `  • ${item}`),
+      "",
+      "Upgrade your subscription to unlock these: https://www.apimatic.io/pricing"
+    ].join("\n");
+    log.warn(message);
   }
 
   public selectInputDirectoryStep() {

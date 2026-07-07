@@ -53,6 +53,17 @@ export interface ValidateApiResponse {
   unallowedFeatures: UnallowedFeaturesResponse | null;
 }
 
+export interface BuildFilePruneReport {
+  removedLanguages: string[];
+  removedApiCopilot: boolean;
+  removedAiIntegration: boolean;
+}
+
+export interface PruneBuildFileResponse {
+  buildFile: unknown;
+  report: BuildFilePruneReport;
+}
+
 export class ValidationService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
 
@@ -132,6 +143,55 @@ export class ValidationService {
     }
   }
 
+  /**
+   * Prunes a build file down to what the user's subscription allows (SDK languages +
+   * AI features) via the platform, returning the pruned build file and a report of
+   * what was removed. The platform is the entitlement authority, so the build we
+   * submit for generation is never rejected for a build-file feature the plan lacks.
+   */
+  public async pruneBuildFile(
+    buildFilePath: FilePath,
+    authKey?: string | null
+  ): Promise<Result<PruneBuildFileResponse, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
+
+    const formData = new FormData();
+    formData.append("file", createReadStream(buildFilePath.toString()), {
+      filename: "APIMATIC-BUILD.json",
+      contentType: "application/json"
+    });
+
+    const baseURL = envInfo.getBaseUrl() ?? this.apiBaseUrl;
+
+    try {
+      const response = await axios({
+        method: "POST",
+        url: `${baseURL}/build-features/prune`,
+        data: formData,
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: authorizationHeader
+        },
+        validateStatus: () => true
+      });
+
+      if (response.status >= 400) {
+        const data = response.data as { errors?: { summary?: string[] }; message?: string; title?: string };
+        const message =
+          data?.errors?.summary?.[0] ??
+          data?.message ??
+          data?.title ??
+          `Error ${response.status}: Failed to prune the build file for your subscription.`;
+        return err(ServiceError.badRequest(message, {}));
+      }
+
+      return ok(response.data as PruneBuildFileResponse);
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
+    }
+  }
+
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {
     const key = overrideAuthKey || authInfo?.authKey;
     return `X-Auth-Key ${key ?? ""}`;
@@ -158,7 +218,9 @@ export class ValidationService {
     return "Unexpected error occurred while validating API specification.";
   }
 
-  private async parseErrorResponse(response: any): Promise<ServiceError> {
+  private async parseErrorResponse(
+    response: { status: number; data: AsyncIterable<Buffer> }
+  ): Promise<ServiceError> {
     const chunks: Buffer[] = [];
     for await (const chunk of response.data) {
       chunks.push(Buffer.from(chunk));
