@@ -19,7 +19,7 @@ import { FeaturesToRemove, ValidationService } from '../../infrastructure/servic
 import { FileName } from '../../types/file/fileName.js';
 import { ApiService } from '../../infrastructure/services/api-service.js';
 import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
-import { Language, mapLanguages } from '../../types/sdk/generate.js';
+import { mapLanguages } from '../../types/sdk/generate.js';
 
 const defaultPort: number = 23513 as const;
 const defaultBaseUrl = new UrlPath(`http://localhost:${defaultPort}`);
@@ -130,9 +130,19 @@ export class PortalQuickstartAction {
         }
       }
 
+      // Fetch account info up front so the language step can offer only the SDK
+      // languages the plan allows, and so the API Copilot key (below) is resolved
+      // from the same lookup. A lookup failure is fatal.
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isErr()) {
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
+        return ActionResult.failed();
+      }
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+
       // Step 3/4
       this.prompts.selectLanguagesStep();
-      const languages = await this.prompts.selectLanguagesPrompt();
+      const languages = await this.prompts.selectLanguagesPrompt(allowedLanguages);
       if (!languages) {
         this.prompts.noLanguagesSelected();
         return ActionResult.cancelled();
@@ -162,25 +172,10 @@ export class PortalQuickstartAction {
       }
 
       // Resolve the API Copilot key to enable, if any, before setting up the source
-      // directory so the user decides on Copilot up front. The lookup failing is fatal;
-      // an account with no key continues silently (no Copilot); cancelling the multi-key
-      // selection aborts quickstart.
-      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-      if (accountInfo.isErr()) {
-        this.prompts.accountInfoFetchFailed(accountInfo.error);
-        return ActionResult.failed();
-      }
-
-      // Fail fast if a selected SDK language isn't on the plan (http docs are always allowed).
-      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
-      const disallowedLanguages = languages.filter(
-        (language) => language !== 'http' && !allowedLanguages.includes(language as Language)
-      );
-      if (disallowedLanguages.length > 0) {
-        this.prompts.languagesNotAllowed(disallowedLanguages);
-        return ActionResult.failed();
-      }
-
+      // directory. An account with no key continues silently (no Copilot); cancelling
+      // the multi-key selection aborts quickstart. (Account info was already fetched
+      // above for the language step.) Whether Copilot is actually on the plan is only
+      // known after the prune below, so the "enabled" caution is deferred until then.
       let copilotKey: string | undefined;
       const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
       if (copilotKeys.length === 1) {
@@ -191,9 +186,6 @@ export class PortalQuickstartAction {
           this.prompts.noCopilotKeySelected();
           return ActionResult.cancelled();
         }
-      }
-      if (copilotKey) {
-        this.prompts.copilotEnabled(copilotKey);
       }
 
       const masterBuildFile = await this.prompts.downloadBuildDirectory(
@@ -239,6 +231,12 @@ export class PortalQuickstartAction {
         JSON.stringify(pruneResult.value.buildFile, null, 2)
       );
       this.prompts.buildFilePruned(pruneResult.value.report);
+
+      // Only surface the Copilot caution if Copilot survived the prune — i.e. it's
+      // actually on the plan. If it was stripped, buildFilePruned already reported it.
+      if (copilotKey && !pruneResult.value.report.removedApiCopilot) {
+        this.prompts.copilotEnabled(copilotKey);
+      }
 
       const specDirectory = sourceDirectory.join('spec');
       const specContext = new SpecContext(specDirectory);

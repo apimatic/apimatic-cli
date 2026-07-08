@@ -1,5 +1,6 @@
 import { Result } from "neverthrow";
 import { isCancel, log, multiselect, select, text } from "@clack/prompts";
+import { Language, LANGUAGE_CHOICES } from "../../types/sdk/generate.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, getTree } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -123,22 +124,22 @@ export class PortalQuickstartPrompts {
     log.info(`Step 3 of 4: Select programming languages`);
   }
 
-  public async selectLanguagesPrompt(): Promise<string[] | undefined> {
+  public async selectLanguagesPrompt(allowedLanguages: Language[]): Promise<string[] | undefined> {
+    const allowed = new Set(allowedLanguages);
+    const available = LANGUAGE_CHOICES.filter(({ value }) => allowed.has(value));
+    const excluded = LANGUAGE_CHOICES.filter(({ value }) => !allowed.has(value));
+
+    if (excluded.length > 0) {
+      log.info(this.languagesNotOnPlanNote(excluded.map(({ label }) => label)));
+    }
+
     const languages = (await multiselect({
       message:
         "Your API Portal will contain SDKs and SDK Documentation in the following Languages (HTTP is enabled by default). Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
-      options: [
-        { label: "Typescript", value: "typescript" },
-        { label: "Ruby", value: "ruby" },
-        { label: "Python", value: "python" },
-        { label: "Java", value: "java" },
-        { label: "C#", value: "csharp" },
-        { label: "PHP", value: "php" },
-        { label: "Go", value: "go" }
-      ],
-      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"],
+      options: available.map(({ label, value }) => ({ label, value })),
+      initialValues: available.map(({ value }) => value),
       required: false
-    })) as string[];
+    })) as Language[];
 
     if (isCancel(languages)) {
       return undefined;
@@ -147,20 +148,17 @@ export class PortalQuickstartPrompts {
     return ["http", ...languages];
   }
 
-  public noLanguagesSelected() {
-    log.error("No programming languages were selected.");
+  private languagesNotOnPlanNote(languages: string[]): string {
+    return [
+      `The following languages aren't included in your current subscription plan, so they aren't available to select:`,
+      ...languages.map((language) => `  • ${language}`),
+      "",
+      "Upgrade your subscription to unlock them: https://www.apimatic.io/pricing"
+    ].join("\n");
   }
 
-  public languagesNotAllowed(languages: string[]): void {
-    const languagesList = languages.map((language) => `  • ${language}`).join("\n");
-    const message = [
-      "The following SDK languages are not available on your current subscription plan:",
-      "",
-      languagesList,
-      "",
-      "Select only the languages your plan includes, or upgrade your subscription to unlock more: https://www.apimatic.io/pricing"
-    ].join("\n");
-    log.error(message);
+  public noLanguagesSelected() {
+    log.error("No programming languages were selected.");
   }
 
   public buildFilePruned(report: BuildFilePruneReport): void {

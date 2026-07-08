@@ -12,11 +12,12 @@ import { ValidateAction } from '../api/validate.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GenerateAction } from './generate.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, mapLanguages, Stability } from '../../types/sdk/generate.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { ZipService } from '../../infrastructure/zip-service.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
+import { ApiService } from '../../infrastructure/services/api-service.js';
 
 export class SdkQuickstartAction {
   private readonly prompts = new SdkQuickstartPrompts();
@@ -24,6 +25,7 @@ export class SdkQuickstartAction {
   private readonly fileService = new FileService();
   private readonly launcherService = new LauncherService();
   private readonly zipService = new ZipService();
+  private readonly apiService = new ApiService();
   private readonly validationService = new ValidationService(this.configDir);
   private readonly metadataFileUrl = new UrlPath(
     `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/APIMATIC-META.json`
@@ -118,10 +120,19 @@ export class SdkQuickstartAction {
         }
       }
 
+      // Fetch account info so the language step only offers SDK languages the plan
+      // allows. A lookup failure is fatal.
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isErr()) {
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
+        return ActionResult.failed();
+      }
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+
       // Step 3/4
       this.prompts.selectLanguageStep();
 
-      const language = await this.prompts.selectLanguagePrompt();
+      const language = await this.prompts.selectLanguagePrompt(allowedLanguages);
       if (!language) {
         this.prompts.noLanguageSelected();
         return ActionResult.cancelled();

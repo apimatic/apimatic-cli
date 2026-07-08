@@ -9,7 +9,7 @@ import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { Directory } from "../../types/file/directory.js";
-import { Language } from "../../types/sdk/generate.js";
+import { Language, LANGUAGE_CHOICES } from "../../types/sdk/generate.js";
 import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
 
 const vscodeExtensionUrl =
@@ -143,18 +143,18 @@ export class SdkQuickstartPrompts {
     log.info(`Step 3 of 4: Select programming language`);
   }
 
-  public async selectLanguagePrompt(): Promise<Language | undefined> {
+  public async selectLanguagePrompt(allowedLanguages: Language[]): Promise<Language | undefined> {
+    const allowed = new Set(allowedLanguages);
+    const available = LANGUAGE_CHOICES.filter(({ value }) => allowed.has(value));
+    const excluded = LANGUAGE_CHOICES.filter(({ value }) => !allowed.has(value));
+
+    if (excluded.length > 0) {
+      log.info(this.languagesNotOnPlanNote(excluded.map(({ label }) => label)));
+    }
+
     const language = await select({
       message: "Choose the programming language for your SDK:",
-      options: [
-        { label: "Typescript", value: Language.TYPESCRIPT },
-        { label: "Ruby", value: Language.RUBY },
-        { label: "Python", value: Language.PYTHON },
-        { label: "Java", value: Language.JAVA },
-        { label: "C#", value: Language.CSHARP },
-        { label: "PHP", value: Language.PHP },
-        { label: "Go", value: Language.GO }
-      ]
+      options: available.map(({ label, value }) => ({ label, value }))
     });
 
     if (isCancel(language)) {
@@ -164,8 +164,21 @@ export class SdkQuickstartPrompts {
     return language;
   }
 
+  private languagesNotOnPlanNote(languages: string[]): string {
+    return [
+      `The following languages aren't included in your current subscription plan, so they aren't available to select:`,
+      ...languages.map((language) => `  • ${language}`),
+      "",
+      "Upgrade your subscription to unlock them: https://www.apimatic.io/pricing"
+    ].join("\n");
+  }
+
   public noLanguageSelected() {
     log.error("No programming language was selected.");
+  }
+
+  public accountInfoFetchFailed(serviceError: ServiceError) {
+    log.error(`Failed to fetch your account information. ${serviceError.errorMessage}`);
   }
 
   public selectInputDirectoryStep() {
