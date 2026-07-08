@@ -57,6 +57,23 @@ export class PortalQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
+      // Fetch account info before anything else so the plan is known up front: it
+      // gates the free-plan exit below, feeds the language step the allowed SDK
+      // languages, and resolves the API Copilot key later. A lookup failure is fatal.
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isErr()) {
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
+        return ActionResult.failed();
+      }
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+      // Quickstart builds a portal around SDKs; with no SDK languages on the plan
+      // (e.g. the free plan) there's nothing to generate, so stop before importing
+      // or pruning a spec.
+      if (allowedLanguages.length === 0) {
+        this.prompts.noLanguagesAvailableOnPlan();
+        return ActionResult.cancelled();
+      }
+
       // Step 1/4
       this.prompts.importSpecStep();
 
@@ -128,22 +145,6 @@ export class PortalQuickstartAction {
             specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName('pruned-spec.zip'));
           }
         }
-      }
-
-      // Fetch account info up front so the language step can offer only the SDK
-      // languages the plan allows, and so the API Copilot key (below) is resolved
-      // from the same lookup. A lookup failure is fatal.
-      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-      if (accountInfo.isErr()) {
-        this.prompts.accountInfoFetchFailed(accountInfo.error);
-        return ActionResult.failed();
-      }
-      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
-      // Quickstart builds a portal around SDKs; with no SDK languages on the plan
-      // (e.g. the free plan) there's nothing to generate, so stop with guidance.
-      if (allowedLanguages.length === 0) {
-        this.prompts.noLanguagesAvailableOnPlan();
-        return ActionResult.cancelled();
       }
 
       // Step 3/4

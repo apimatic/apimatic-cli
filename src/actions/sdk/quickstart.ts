@@ -46,6 +46,22 @@ export class SdkQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
+      // Fetch account info before anything else so the plan is known up front: it
+      // gates the free-plan exit below and feeds the language step the allowed SDK
+      // languages. A lookup failure is fatal.
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isErr()) {
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
+        return ActionResult.failed();
+      }
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+      // An SDK needs a language; with none on the plan (e.g. the free plan) there's
+      // nothing to generate, so stop before importing or pruning a spec.
+      if (allowedLanguages.length === 0) {
+        this.prompts.noLanguagesAvailableOnPlan();
+        return ActionResult.cancelled();
+      }
+
       // Step 1/4
       this.prompts.importSpecStep();
 
@@ -118,21 +134,6 @@ export class SdkQuickstartAction {
             specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName('pruned-spec.zip'));
           }
         }
-      }
-
-      // Fetch account info so the language step only offers SDK languages the plan
-      // allows. A lookup failure is fatal.
-      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-      if (accountInfo.isErr()) {
-        this.prompts.accountInfoFetchFailed(accountInfo.error);
-        return ActionResult.failed();
-      }
-      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
-      // An SDK needs a language; with none on the plan (e.g. the free plan) there's
-      // nothing to generate, so stop with guidance instead of an empty prompt.
-      if (allowedLanguages.length === 0) {
-        this.prompts.noLanguagesAvailableOnPlan();
-        return ActionResult.cancelled();
       }
 
       // Step 3/4
