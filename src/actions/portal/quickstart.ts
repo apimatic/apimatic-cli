@@ -139,6 +139,12 @@ export class PortalQuickstartAction {
         return ActionResult.failed();
       }
       const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+      // Quickstart builds a portal around SDKs; with no SDK languages on the plan
+      // (e.g. the free plan) there's nothing to generate, so stop with guidance.
+      if (allowedLanguages.length === 0) {
+        this.prompts.noLanguagesAvailableOnPlan();
+        return ActionResult.cancelled();
+      }
 
       // Step 3/4
       this.prompts.selectLanguagesStep();

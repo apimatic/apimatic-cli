@@ -148,9 +148,17 @@ export class PortalQuickstartPrompts {
     return ["http", ...languages];
   }
 
+  public noLanguagesAvailableOnPlan(): void {
+    const message = [
+      "You're on the Free plan",
+      "Upgrade your subscription to get started: https://www.apimatic.io/pricing"
+    ].join("\n");
+    log.warn(message);
+  }
+
   private languagesNotOnPlanNote(languages: string[]): string {
     return [
-      `The following languages aren't included in your current subscription plan, so they aren't available to select:`,
+      `The following languages aren't included in your current subscription plan`,
       ...languages.map((language) => `  • ${language}`),
       "",
       "Upgrade your subscription to unlock them: https://www.apimatic.io/pricing"

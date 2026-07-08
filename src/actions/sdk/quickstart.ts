@@ -128,6 +128,12 @@ export class SdkQuickstartAction {
         return ActionResult.failed();
       }
       const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+      // An SDK needs a language; with none on the plan (e.g. the free plan) there's
+      // nothing to generate, so stop with guidance instead of an empty prompt.
+      if (allowedLanguages.length === 0) {
+        this.prompts.noLanguagesAvailableOnPlan();
+        return ActionResult.cancelled();
+      }
 
       // Step 3/4
       this.prompts.selectLanguageStep();
