@@ -19,7 +19,7 @@ import { FeaturesToRemove, ValidationService } from '../../infrastructure/servic
 import { FileName } from '../../types/file/fileName.js';
 import { ApiService } from '../../infrastructure/services/api-service.js';
 import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
-import { mapLanguages } from '../../types/sdk/generate.js';
+import { resolveQuickstartPlan } from '../quickstart-plan.js';
 
 const defaultPort: number = 23513 as const;
 const defaultBaseUrl = new UrlPath(`http://localhost:${defaultPort}`);
@@ -57,22 +57,14 @@ export class PortalQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
-      // Fetch account info before anything else so the plan is known up front: it
-      // gates the free-plan exit below, feeds the language step the allowed SDK
-      // languages, and resolves the API Copilot key later. A lookup failure is fatal.
-      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-      if (accountInfo.isErr()) {
-        this.prompts.accountInfoFetchFailed(accountInfo.error);
-        return ActionResult.failed();
+      // Resolve the plan before anything else: it gates the free-plan exit, feeds
+      // the language step the allowed SDK languages, and its account info resolves
+      // the API Copilot key later. Stops before importing or pruning a spec.
+      const plan = await resolveQuickstartPlan(this.apiService, this.configDir, this.commandMetadata, this.prompts);
+      if (plan.isErr()) {
+        return plan.error;
       }
-      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
-      // Quickstart builds a portal around SDKs; with no SDK languages on the plan
-      // (e.g. the free plan) there's nothing to generate, so stop before importing
-      // or pruning a spec.
-      if (allowedLanguages.length === 0) {
-        this.prompts.noLanguagesAvailableOnPlan();
-        return ActionResult.cancelled();
-      }
+      const { accountInfo, allowedLanguages } = plan.value;
 
       // Step 1/4
       this.prompts.importSpecStep();
@@ -184,7 +176,7 @@ export class PortalQuickstartAction {
       // above for the language step.) Whether Copilot is actually on the plan is only
       // known after the prune below, so the "enabled" caution is deferred until then.
       let copilotKey: string | undefined;
-      const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
+      const copilotKeys = accountInfo.ApiCopilotKeys ?? [];
       if (copilotKeys.length === 1) {
         copilotKey = copilotKeys[0];
       } else if (copilotKeys.length > 1) {
