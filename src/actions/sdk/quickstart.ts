@@ -12,8 +12,7 @@ import { ValidateAction } from '../api/validate.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GenerateAction } from './generate.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
-import { resolveQuickstartPlan } from '../quickstart-plan.js';
+import { CodeGenerationVersion, Language, mapLanguages, Stability } from '../../types/sdk/generate.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { ZipService } from '../../infrastructure/zip-service.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -47,14 +46,21 @@ export class SdkQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
-      // Resolve the plan before anything else: it gates the free-plan exit and
-      // feeds the language step the allowed SDK languages. Stops before importing
-      // or pruning a spec.
-      const plan = await resolveQuickstartPlan(this.apiService, this.configDir, this.commandMetadata, this.prompts);
-      if (plan.isErr()) {
-        return plan.error;
+      // Fetch account info before anything else so the plan is known up front: it
+      // gates the free-plan exit below and feeds the language step the allowed SDK
+      // languages. A lookup failure is fatal.
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isErr()) {
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
+        return ActionResult.failed();
       }
-      const { allowedLanguages } = plan.value;
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+      // An SDK needs a language; with none on the plan (e.g. the free plan) there's
+      // nothing to generate, so stop before importing or pruning a spec.
+      if (allowedLanguages.length === 0) {
+        this.prompts.noLanguagesAvailableOnPlan();
+        return ActionResult.cancelled();
+      }
 
       // Step 1/4
       this.prompts.importSpecStep();
