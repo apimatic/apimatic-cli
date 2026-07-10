@@ -16,11 +16,12 @@ import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import FormData from "form-data";
+import AdmZip from "adm-zip";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
 import { envInfo } from "../env-info.js";
 import { Buffer } from "node:buffer";
-import { BuildConfig, BuildConfigData } from "../../types/build/build.js";
+import { BuildConfig } from "../../types/build/build.js";
 
 export enum RemovableFeature {
   Merging = 'Merging',
@@ -62,13 +63,6 @@ export interface BuildFilePruneReport {
 
 export interface PruneBuildFileResponse {
   buildFile: BuildConfig;
-  report: BuildFilePruneReport;
-}
-
-// Wire shape of the prune endpoint's response; the service converts `buildFile`
-// into a rich BuildConfig at this boundary.
-interface PruneBuildFileWireResponse {
-  buildFile: BuildConfigData;
   report: BuildFilePruneReport;
 }
 
@@ -181,24 +175,44 @@ export class ValidationService {
           ...formData.getHeaders(),
           Authorization: authorizationHeader
         },
+        // The endpoint returns a zip (pruned APIMATIC-BUILD.json + report.json),
+        // so read the raw bytes rather than letting axios parse JSON.
+        responseType: "arraybuffer",
         validateStatus: () => true
       });
 
       if (response.status >= 400) {
-        const data = response.data as { errors?: { summary?: string[] }; message?: string; title?: string };
-        const message =
-          data?.errors?.summary?.[0] ??
-          data?.message ??
-          data?.title ??
-          `Error ${response.status}: Failed to prune the build file for your subscription.`;
-        return err(ServiceError.badRequest(message, {}));
+        return err(this.parsePruneErrorResponse(response.status, response.data));
       }
 
-      const data = response.data as PruneBuildFileWireResponse;
-      return ok({ buildFile: BuildConfig.from(data.buildFile), report: data.report });
+      const zip = new AdmZip(globalThis.Buffer.from(response.data as ArrayBuffer));
+      const buildEntry = zip.getEntry("APIMATIC-BUILD.json");
+      const reportEntry = zip.getEntry("report.json");
+      if (!buildEntry || !reportEntry) {
+        return err(
+          ServiceError.badRequest("The build-file prune returned an unexpected response.", {})
+        );
+      }
+
+      const buildFile = BuildConfig.parse(buildEntry.getData().toString("utf-8"));
+      const report = JSON.parse(reportEntry.getData().toString("utf-8")) as BuildFilePruneReport;
+      return ok({ buildFile, report });
     } catch (error: unknown) {
       return err(handleServiceError(error));
     }
+  }
+
+  /** Decodes an error body that arrived as raw zip-request bytes into a ServiceError. */
+  private parsePruneErrorResponse(status: number, data: unknown): ServiceError {
+    let message = `Error ${status}: Failed to prune the build file for your subscription.`;
+    try {
+      const text = globalThis.Buffer.from(data as ArrayBuffer).toString("utf-8");
+      const body = JSON.parse(text) as { errors?: { summary?: string[] }; message?: string; title?: string };
+      message = body?.errors?.summary?.[0] ?? body?.message ?? body?.title ?? message;
+    } catch {
+      // Non-JSON / undecodable body — keep the default message.
+    }
+    return ServiceError.badRequest(message, {});
   }
 
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {
