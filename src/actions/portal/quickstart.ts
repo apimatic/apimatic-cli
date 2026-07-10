@@ -233,15 +233,13 @@ export class PortalQuickstartAction {
         this.prompts.serviceError(pruneResult.error);
         return ActionResult.failed();
       }
-      await this.fileService.writeContents(
-        buildFilePath,
-        JSON.stringify(pruneResult.value.buildFile, null, 2)
-      );
-      this.prompts.buildFilePruned(pruneResult.value.report);
+      const { buildFile: prunedConfig, report } = pruneResult.value;
+      await buildContext.updateBuildFileContents(prunedConfig);
+      this.prompts.buildFilePruned(report);
 
       // Only surface the Copilot caution if Copilot survived the prune — i.e. it's
       // actually on the plan. If it was stripped, buildFilePruned already reported it.
-      if (copilotKey && !pruneResult.value.report.removedApiCopilot) {
+      if (prunedConfig.hasApiCopilot() && copilotKey) {
         this.prompts.copilotEnabled(copilotKey);
       }
 

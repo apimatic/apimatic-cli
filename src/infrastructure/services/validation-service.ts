@@ -20,6 +20,7 @@ import { handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
 import { envInfo } from "../env-info.js";
 import { Buffer } from "node:buffer";
+import { BuildConfig, BuildConfigData } from "../../types/build/build.js";
 
 export enum RemovableFeature {
   Merging = 'Merging',
@@ -60,7 +61,14 @@ export interface BuildFilePruneReport {
 }
 
 export interface PruneBuildFileResponse {
-  buildFile: unknown;
+  buildFile: BuildConfig;
+  report: BuildFilePruneReport;
+}
+
+// Wire shape of the prune endpoint's response; the service converts `buildFile`
+// into a rich BuildConfig at this boundary.
+interface PruneBuildFileWireResponse {
+  buildFile: BuildConfigData;
   report: BuildFilePruneReport;
 }
 
@@ -186,7 +194,8 @@ export class ValidationService {
         return err(ServiceError.badRequest(message, {}));
       }
 
-      return ok(response.data as PruneBuildFileResponse);
+      const data = response.data as PruneBuildFileWireResponse;
+      return ok({ buildFile: BuildConfig.from(data.buildFile), report: data.report });
     } catch (error: unknown) {
       return err(handleServiceError(error));
     }
