@@ -15,6 +15,7 @@ import { UnallowedFeaturesResponse } from "../../infrastructure/services/validat
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
 const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/";
+const pricingUrl = "https://www.apimatic.io/pricing";
 
 export class SdkQuickstartPrompts {
   public importSpecStep() {
@@ -58,7 +59,7 @@ export class SdkQuickstartPrompts {
       "To continue:",
       "- Remove these components from your API Specification and re-run this command.",
       "- Combine your split API Specification files into a single file. We can automatically remove unsupported components from single-file specs.",
-      "- Upgrade your subscription to unlock additional features: https://www.apimatic.io/pricing"
+      `- Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
     ].join("\n");
 
     log.info(message);
@@ -80,7 +81,7 @@ export class SdkQuickstartPrompts {
       endpointMessage,
       "",
       "You won't see these components in the generated SDKs or documentation.",
-      "Want to keep them? Upgrade your subscription to unlock additional features: https://www.apimatic.io/pricing"
+      `Want to keep them? Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
     ].join("\n");
 
     log.info(message);
@@ -167,7 +168,7 @@ export class SdkQuickstartPrompts {
   public noLanguagesAvailableOnPlan(): void {
     const message = [
       "You're on the Free plan.",
-      "Upgrade your subscription to get started: https://www.apimatic.io/pricing"
+      `Upgrade your subscription to get started: ${f.link(pricingUrl)}`
     ].join("\n");
     log.warn(message);
   }
@@ -177,7 +178,7 @@ export class SdkQuickstartPrompts {
       `The following languages aren't included in your current subscription plan:`,
       ...languages.map((language) => `  • ${language}`),
       "",
-      "Upgrade your subscription to unlock them: https://www.apimatic.io/pricing"
+      `Upgrade your subscription to unlock them: ${f.link(pricingUrl)}`
     ].join("\n");
   }
 
