@@ -186,7 +186,7 @@ export class PortalQuickstartPrompts {
     }
 
     const message = [
-      "Some build features aren't on your current subscription plan and were removed before generation:",
+      "Some portal features aren't on your current subscription plan and were removed before generation:",
       "",
       ...removed.map((item) => `  • ${item}`),
       "",
