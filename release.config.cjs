@@ -1,21 +1,22 @@
-// eslint-disable-next-line no-undef
 module.exports = {
+  // Three-tier release flow: alpha → beta → main.
+  // - `main`  publishes stable releases to the npm `latest` dist-tag.
+  // - `beta`  publishes prereleases to the `beta` dist-tag.
+  // - `alpha` publishes prereleases to the `alpha` dist-tag.
+  // The existing `v1.1.0-beta.*` git notes carry channels ["beta", null], so
+  // `main` (default/`latest` channel) sees beta.19 as its last release and
+  // graduates it to 1.1.0, while `beta` keeps its own counter — no notes
+  // migration is needed. (Previously `beta` used `channel: false` to point
+  // `latest` at the beta because no stable channel existed; `main` now owns it.)
   branches: [
-    "v3",
+    "main",
     {
-      name: "alpha",
+      name: "beta",
       prerelease: true
     },
     {
-      name: "beta",
-      prerelease: true,
-      // Publish beta releases to the npm `latest` dist-tag (the default channel)
-      // rather than a `beta` dist-tag, so `npm install @apimatic/cli` resolves to
-      // the current beta. The dist-tag is applied during `npm publish`, so this
-      // works with OIDC trusted publishing (no NPM_TOKEN needed).
-      // NOTE: existing beta tags' git notes were migrated to include the default
-      // channel so version continuity is preserved (beta.N keeps incrementing).
-      channel: false
+      name: "alpha",
+      prerelease: true
     }
   ],
   plugins: [

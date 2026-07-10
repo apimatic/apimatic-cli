@@ -1,6 +1,5 @@
 @apimatic/cli
 =============
-apimatic is in beta.
 
 The official CLI for APIMatic.
 
