@@ -16,7 +16,7 @@ import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import FormData from "form-data";
-import AdmZip from "adm-zip";
+import { ZipService } from "../zip-service.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
 import { envInfo } from "../env-info.js";
@@ -68,6 +68,7 @@ export interface PruneBuildFileResponse {
 
 export class ValidationService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
+  private readonly zipService = new ZipService();
 
   constructor(private readonly configDir: DirectoryPath) {}
 
@@ -185,17 +186,17 @@ export class ValidationService {
         return err(this.parsePruneErrorResponse(response.status, response.data));
       }
 
-      const zip = new AdmZip(globalThis.Buffer.from(response.data as ArrayBuffer));
-      const buildEntry = zip.getEntry("APIMATIC-BUILD.json");
-      const reportEntry = zip.getEntry("report.json");
+      const zipData = globalThis.Buffer.from(response.data as ArrayBuffer);
+      const buildEntry = this.zipService.readEntry(zipData, "APIMATIC-BUILD.json");
+      const reportEntry = this.zipService.readEntry(zipData, "report.json");
       if (!buildEntry || !reportEntry) {
         return err(
           ServiceError.badRequest("The build-file prune returned an unexpected response.", {})
         );
       }
 
-      const buildFile = BuildConfig.parse(buildEntry.getData().toString("utf-8"));
-      const report = JSON.parse(reportEntry.getData().toString("utf-8")) as BuildFilePruneReport;
+      const buildFile = BuildConfig.parse(buildEntry.toString("utf-8"));
+      const report = JSON.parse(reportEntry.toString("utf-8")) as BuildFilePruneReport;
       return ok({ buildFile, report });
     } catch (error: unknown) {
       return err(handleServiceError(error));

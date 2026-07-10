@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { Buffer } from 'node:buffer';
 import yazl from 'yazl';
 import AdmZip from 'adm-zip';
 import { DirectoryPath } from '../types/file/directoryPath.js';
@@ -34,6 +35,11 @@ export class ZipService {
       output.on('close', resolve);
       output.on('error', reject);
     });
+  }
+
+  /** Reads a single entry's contents from an in-memory zip; undefined if absent. */
+  public readEntry(zipData: Buffer, entryName: string): Buffer | undefined {
+    return new AdmZip(zipData).getEntry(entryName)?.getData();
   }
 
   public async unArchive(sourceFile: FilePath, destinationDirectory: DirectoryPath): Promise<void> {
