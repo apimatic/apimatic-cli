@@ -14,9 +14,12 @@ import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
+import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import FormData from "form-data";
 import { ZipService } from "../zip-service.js";
+import { FileService } from "../file-service.js";
+import { withDirPath } from "../tmp-extensions.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
 import { envInfo } from "../env-info.js";
@@ -69,6 +72,7 @@ export interface PruneBuildFileResponse {
 export class ValidationService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
   private readonly zipService = new ZipService();
+  private readonly fileService = new FileService();
 
   constructor(private readonly configDir: DirectoryPath) {}
 
@@ -177,38 +181,52 @@ export class ValidationService {
           Authorization: authorizationHeader
         },
         // The endpoint returns a zip (pruned APIMATIC-BUILD.json + report.json),
-        // so read the raw bytes rather than letting axios parse JSON.
-        responseType: "arraybuffer",
+        // streamed so it can be written straight to disk and unarchived.
+        responseType: "stream",
         validateStatus: () => true
       });
 
       if (response.status >= 400) {
-        return err(this.parsePruneErrorResponse(response.status, response.data));
+        return err(await this.parsePruneErrorResponse(response));
       }
 
-      const zipData = globalThis.Buffer.from(response.data as ArrayBuffer);
-      const buildEntry = this.zipService.readEntry(zipData, "APIMATIC-BUILD.json");
-      const reportEntry = this.zipService.readEntry(zipData, "report.json");
-      if (!buildEntry || !reportEntry) {
-        return err(
-          ServiceError.badRequest("The build-file prune returned an unexpected response.", {})
-        );
-      }
+      // Persist the zip to a temp dir and extract it via ZipService, then read the
+      // two entries back off disk — no in-memory zip handling.
+      return await withDirPath<Result<PruneBuildFileResponse, ServiceError>>(async (tempDir) => {
+        const zipPath = new FilePath(tempDir, new FileName("prune-response.zip"));
+        await this.fileService.writeFile(zipPath, response.data);
 
-      const buildFile = BuildConfig.parse(buildEntry.toString("utf-8"));
-      const report = JSON.parse(reportEntry.toString("utf-8")) as BuildFilePruneReport;
-      return ok({ buildFile, report });
+        const extractDir = tempDir.join("prune");
+        await this.zipService.unArchive(zipPath, extractDir);
+
+        const prunedBuildConfigFile = new FilePath(extractDir, new FileName("APIMATIC-BUILD.json"));
+        const reportFile = new FilePath(extractDir, new FileName("report.json"));
+        if (!(await this.fileService.fileExists(prunedBuildConfigFile)) || !(await this.fileService.fileExists(reportFile))) {
+          return err(ServiceError.badRequest("The build-file prune returned an unexpected response.", {}));
+        }
+
+        const buildConfigFile = BuildConfig.parse(await this.fileService.getContents(prunedBuildConfigFile));
+        const report = JSON.parse(await this.fileService.getContents(reportFile)) as BuildFilePruneReport;
+        return ok({ buildFile: buildConfigFile, report });
+      });
     } catch (error: unknown) {
       return err(handleServiceError(error));
     }
   }
 
-  /** Decodes an error body that arrived as raw zip-request bytes into a ServiceError. */
-  private parsePruneErrorResponse(status: number, data: unknown): ServiceError {
-    let message = `Error ${status}: Failed to prune the build file for your subscription.`;
+  /** Decodes a streamed error body into a ServiceError with a prune-specific fallback message. */
+  private async parsePruneErrorResponse(
+    response: { status: number; data: AsyncIterable<Buffer> }
+  ): Promise<ServiceError> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.data) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const errorBody = Buffer.concat(chunks).toString("utf-8");
+
+    let message = `Error ${response.status}: Failed to prune the build file for your subscription.`;
     try {
-      const text = globalThis.Buffer.from(data as ArrayBuffer).toString("utf-8");
-      const body = JSON.parse(text) as { errors?: { summary?: string[] }; message?: string; title?: string };
+      const body = JSON.parse(errorBody) as { errors?: { summary?: string[] }; message?: string; title?: string };
       message = body?.errors?.summary?.[0] ?? body?.message ?? body?.title ?? message;
     } catch {
       // Non-JSON / undecodable body — keep the default message.
