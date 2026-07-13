@@ -58,21 +58,20 @@ export class PortalQuickstartAction {
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
       // Fetch account info before anything else so the plan is known up front: it
-      // gates the free-plan exit below, feeds the language step the allowed SDK
-      // languages, and resolves the API Copilot key later. A lookup failure is fatal.
+      // gates the on-prem generation exit below, feeds the language step the allowed
+      // SDK languages, and resolves the API Copilot key later. A lookup failure is fatal.
       const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
       if (accountInfo.isErr()) {
         this.prompts.accountInfoFetchFailed(accountInfo.error);
         return ActionResult.failed();
       }
-      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
-      // Quickstart builds a portal around SDKs; with no SDK languages on the plan
-      // (e.g. the free plan) there's nothing to generate, so stop before importing
-      // or pruning a spec.
-      if (allowedLanguages.length === 0) {
-        this.prompts.noLanguagesAvailableOnPlan();
+      // Quickstart generates the portal locally (on-prem); a plan that doesn't allow
+      // on-prem generation can't run it, so stop before importing or pruning a spec.
+      if (!accountInfo.value.isOnPremGenerationAllowed) {
+        this.prompts.onPremGenerationNotAllowedOnPlan();
         return ActionResult.cancelled();
       }
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
 
       // Step 1/4
       this.prompts.importSpecStep();
@@ -149,10 +148,19 @@ export class PortalQuickstartAction {
 
       // Step 3/4
       this.prompts.selectLanguagesStep();
-      const languages = await this.prompts.selectLanguagesPrompt(allowedLanguages);
-      if (!languages) {
-        this.prompts.noLanguagesSelected();
-        return ActionResult.cancelled();
+      let languages: string[];
+      if (allowedLanguages.length === 0) {
+        // With no SDK languages on the plan there's nothing to select, so skip the
+        // menu and build the portal with HTTP documentation only.
+        this.prompts.httpOnlyPortalOnPlan();
+        languages = ['http'];
+      } else {
+        const selectedLanguages = await this.prompts.selectLanguagesPrompt(allowedLanguages);
+        if (!selectedLanguages) {
+          this.prompts.noLanguagesSelected();
+          return ActionResult.cancelled();
+        }
+        languages = selectedLanguages;
       }
 
       // Step 4/4

@@ -149,9 +149,17 @@ export class PortalQuickstartPrompts {
     return ["http", ...languages];
   }
 
-  public noLanguagesAvailableOnPlan(): void {
+  public httpOnlyPortalOnPlan(): void {
     const message = [
-      "You're on the Free plan",
+      "Your current subscription plan doesn't include any SDK languages, so the portal will contain HTTP documentation only.",
+      `Upgrade your subscription to unlock SDK languages: ${f.link(pricingUrl)}`
+    ].join("\n");
+    log.warn(message);
+  }
+
+  public onPremGenerationNotAllowedOnPlan(): void {
+    const message = [
+      "Your current subscription plan doesn't include on-prem generation.",
       `Upgrade your subscription to get started: ${f.link(pricingUrl)}`
     ].join("\n");
     log.warn(message);

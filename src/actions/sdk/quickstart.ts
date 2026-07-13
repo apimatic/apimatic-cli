@@ -54,14 +54,12 @@ export class SdkQuickstartAction {
         this.prompts.accountInfoFetchFailed(accountInfo.error);
         return ActionResult.failed();
       }
-      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
       // An SDK needs a language; with none on the plan (e.g. the free plan) there's
       // nothing to generate, so stop before importing or pruning a spec.
-      if (allowedLanguages.length === 0) {
+      if (mapLanguages(accountInfo.value.allowedLanguages).length === 0) {
         this.prompts.noLanguagesAvailableOnPlan();
         return ActionResult.cancelled();
       }
-
       // Step 1/4
       this.prompts.importSpecStep();
 
@@ -138,8 +136,7 @@ export class SdkQuickstartAction {
 
       // Step 3/4
       this.prompts.selectLanguageStep();
-
-      const language = await this.prompts.selectLanguagePrompt(allowedLanguages);
+      const language = await this.prompts.selectLanguagePrompt(mapLanguages(accountInfo.value.allowedLanguages));
       if (!language) {
         this.prompts.noLanguageSelected();
         return ActionResult.cancelled();
