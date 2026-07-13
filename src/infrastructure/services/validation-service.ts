@@ -153,14 +153,14 @@ export class ValidationService {
    * submit for generation is never rejected for a build-file feature the plan lacks.
    */
   public async pruneBuildFile(
-    buildFilePath: FilePath,
+    buildConfigFilePath: FilePath,
     authKey?: string | null
   ): Promise<Result<PruneBuildFileResponse, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
 
     const formData = new FormData();
-    formData.append("file", createReadStream(buildFilePath.toString()), {
+    formData.append("file", createReadStream(buildConfigFilePath.toString()), {
       filename: "APIMATIC-BUILD.json",
       contentType: "application/json"
     });

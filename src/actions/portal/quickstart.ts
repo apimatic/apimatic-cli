@@ -235,7 +235,7 @@ export class PortalQuickstartAction {
       // Prune the build file to what the plan allows (SDK languages + AI features)
       // before serving. Fail closed: a prune failure aborts rather than serving a
       // build the plan can't generate.
-      const pruneResult = await this.validationService.pruneBuildFile(buildContext.buildFilePath());
+      const pruneResult = await this.validationService.pruneBuildFile(buildContext.buildConfigFilePath());
       if (pruneResult.isErr()) {
         this.prompts.serviceError(pruneResult.error);
         return ActionResult.failed();

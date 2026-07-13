@@ -20,7 +20,7 @@ export class BuildContext {
   }
 
   /** The APIMATIC-BUILD.json path within this build directory, for callers that hand it to a service. */
-  public buildFilePath(): FilePath {
+  public buildConfigFilePath(): FilePath {
     return this.buildFile;
   }
 
