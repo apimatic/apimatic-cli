@@ -1,0 +1,206 @@
+<style>
+  :root {
+    --page-bg: #eceef2;
+    --page-fg: #2a2f3a;
+    --page-muted: #667085;
+    --card-shadow: 0 20px 50px -20px rgba(20, 24, 33, 0.45);
+    --rule: #d6dae1;
+    --accent: #7c5cff;
+
+    /* Terminal is a committed dark world — same in both page themes */
+    --term-bg: #14161c;
+    --term-chrome: #1d2028;
+    --term-fg: #c9cdd6;      /* default text */
+    --term-dim: #7f8694;     /* inactive but allowed */
+    --term-off: #4b5160;     /* disabled / not on plan */
+    --term-green: #7fd88f;   /* selected / submitted */
+    --term-cyan: #58c4dd;    /* active cursor / step */
+    --term-bar: #3a3f4b;     /* │ gutter bar */
+    --term-red: #e06c75;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #0d0f13;
+      --page-fg: #dfe3ea;
+      --page-muted: #8b93a1;
+      --card-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+      --rule: #23272f;
+      --accent: #9d86ff;
+    }
+  }
+  :root[data-theme="light"] {
+    --page-bg: #eceef2; --page-fg: #2a2f3a; --page-muted: #667085;
+    --rule: #d6dae1; --accent: #7c5cff;
+    --card-shadow: 0 20px 50px -20px rgba(20, 24, 33, 0.45);
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #0d0f13; --page-fg: #dfe3ea; --page-muted: #8b93a1;
+    --rule: #23272f; --accent: #9d86ff;
+    --card-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+  }
+
+  * { box-sizing: border-box; }
+
+  .wrap {
+    background: var(--page-bg);
+    color: var(--page-fg);
+    min-height: 100vh;
+    margin: 0;
+    padding: clamp(1.5rem, 4vw, 4rem) clamp(1rem, 4vw, 3rem);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
+  }
+
+  header { max-width: 62ch; width: 100%; }
+  .eyebrow {
+    font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin: 0 0 0.5rem;
+  }
+  h1 {
+    font-size: clamp(1.4rem, 3vw, 2rem); line-height: 1.15; margin: 0 0 0.6rem;
+    text-wrap: balance; font-weight: 650; letter-spacing: -0.01em;
+  }
+  header p { margin: 0; color: var(--page-muted); font-size: 0.98rem; line-height: 1.55; max-width: 58ch; }
+  header code {
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em; background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent); padding: 0.05em 0.4em; border-radius: 4px;
+  }
+
+  .panels { display: flex; flex-direction: column; gap: 2.25rem; width: 100%; max-width: 760px; }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+  figcaption { color: var(--page-muted); font-size: 0.9rem; line-height: 1.5; padding-left: 0.2rem; }
+  figcaption b { color: var(--page-fg); font-weight: 600; }
+  .step-tag {
+    display: inline-block; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    font-weight: 600; color: var(--page-fg);
+    border: 1px solid var(--rule); border-radius: 999px; padding: 0.2rem 0.7rem; margin-bottom: 0.1rem;
+    align-self: flex-start;
+  }
+
+  .term {
+    background: var(--term-bg);
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .term-bar {
+    background: var(--term-chrome);
+    padding: 0.55rem 0.85rem;
+    display: flex; align-items: center; gap: 0.45rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .term-title { margin-left: 0.6rem; color: #7f8694; font-size: 0.78rem;
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace; }
+
+  pre.screen {
+    margin: 0; padding: 1.1rem 1.25rem 1.3rem;
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9rem; line-height: 1.62;
+    color: var(--term-fg);
+    overflow-x: auto;
+    tab-size: 2;
+  }
+  .bar   { color: var(--term-bar); }
+  .green { color: var(--term-green); }
+  .cyan  { color: var(--term-cyan); }
+  .dim   { color: var(--term-dim); }
+  .off   { color: var(--term-off); }
+  .red   { color: var(--term-red); }
+  .cur   { background: color-mix(in srgb, var(--term-cyan) 22%, transparent); border-radius: 3px; }
+  .strike { text-decoration: line-through; text-decoration-thickness: from-font; }
+
+  .legend {
+    width: 100%; max-width: 760px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.6rem 1.4rem;
+    padding: 1.1rem 1.25rem; border: 1px solid var(--rule); border-radius: 12px;
+    background: color-mix(in srgb, var(--page-fg) 3%, transparent);
+  }
+  .legend h2 { grid-column: 1 / -1; margin: 0 0 0.1rem; font-size: 0.78rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--page-muted); font-weight: 600; }
+  .key { display: flex; align-items: baseline; gap: 0.6rem; font-size: 0.88rem; }
+  .key .g { font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 1rem; width: 1.2em; text-align: center; flex: none; }
+  .key .lbl { color: var(--page-muted); line-height: 1.4; }
+  .key .lbl b { color: var(--page-fg); font-weight: 600; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Quickstart · language step</p>
+    <h1>Plan-aware language selection</h1>
+    <p>Languages your subscription doesn't include are shown <b>greyed out, struck through, with an on-plan hint</b>. The cursor <b>skips</b> them, and in the multi-select they <b>can't be toggled</b> — so an unavailable language can never be chosen. Below is the real clack rendering for both <code>apimatic quickstart</code> flows. Plan shown allows TypeScript, Python, Java &amp; Go.</p>
+  </header>
+
+  <div class="panels">
+
+    <!-- SDK single-select -->
+    <figure>
+      <span class="step-tag">SDK quickstart · single-select</span>
+      <div class="term">
+        <div class="term-bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="term-title">apimatic quickstart — sdk</span>
+        </div>
+<pre class="screen"><span class="bar">┌</span>  <span class="cyan">Quickstart</span>
+<span class="bar">│</span>
+<span class="green">◇</span>  Step 3 of 4: Select programming language
+<span class="bar">│</span>
+<span class="cyan">◆</span>  Choose the programming language for your SDK:
+<span class="bar">│</span>  <span class="green">●</span> <span class="cur">Typescript</span>
+<span class="bar">│</span>  <span class="dim">○ Python</span>
+<span class="bar">│</span>  <span class="dim">○ Java</span>
+<span class="bar">│</span>  <span class="dim">○ Go</span>
+<span class="bar">│</span>  <span class="off">○ <span class="strike">Ruby</span>      (not available on your plan)</span>
+<span class="bar">│</span>  <span class="off">○ <span class="strike">C#</span>        (not available on your plan)</span>
+<span class="bar">│</span>  <span class="off">○ <span class="strike">PHP</span>       (not available on your plan)</span>
+<span class="bar">└</span></pre>
+      </div>
+      <figcaption>Pressing <b>↓</b> moves Typescript → Python → Java → Go → then wraps back to Typescript, <b>never landing on Ruby, C# or PHP</b>. The cursor physically cannot rest on a greyed row, so <kbd>Enter</kbd> can only confirm an allowed language.</figcaption>
+    </figure>
+
+    <!-- Portal multiselect -->
+    <figure>
+      <span class="step-tag">Portal quickstart · multi-select</span>
+      <div class="term">
+        <div class="term-bar">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="term-title">apimatic quickstart — portal</span>
+        </div>
+<pre class="screen"><span class="bar">┌</span>  <span class="cyan">Quickstart</span>
+<span class="bar">│</span>
+<span class="green">◇</span>  Step 3 of 4: Select programming languages
+<span class="bar">│</span>
+<span class="cyan">◆</span>  Your API Portal will contain SDKs in these languages (HTTP is enabled by default).
+<span class="bar">│</span>  Use arrow keys + space to customize, then Enter to continue:
+<span class="bar">│</span>  <span class="green">◼</span> <span class="cur">Typescript</span>
+<span class="bar">│</span>  <span class="green">◼</span> <span class="dim">Python</span>
+<span class="bar">│</span>  <span class="green">◼</span> <span class="dim">Java</span>
+<span class="bar">│</span>  <span class="green">◼</span> <span class="dim">Go</span>
+<span class="bar">│</span>  <span class="off">◻ <span class="strike">Ruby</span>      (not available on your plan)</span>
+<span class="bar">│</span>  <span class="off">◻ <span class="strike">C#</span>        (not available on your plan)</span>
+<span class="bar">│</span>  <span class="off">◻ <span class="strike">PHP</span>       (not available on your plan)</span>
+<span class="bar">└</span></pre>
+      </div>
+      <figcaption>Allowed languages start pre-checked (<b class="" style="color:var(--term-green)">◼</b>). The cursor skips the greyed rows and <b>space does nothing on them</b>, so they stay unchecked and out of the result. HTTP is always included and isn't shown as a toggle.</figcaption>
+    </figure>
+
+  </div>
+
+  <div class="legend">
+    <h2>How to read the screen</h2>
+    <div class="key"><span class="g green">●</span><span class="lbl"><b>Green radio</b> — the highlighted / chosen single option</span></div>
+    <div class="key"><span class="g green">◼</span><span class="lbl"><b>Green box</b> — a checked (selected) language</span></div>
+    <div class="key"><span class="g dim">○</span><span class="lbl"><b>Grey</b> — allowed, currently not the cursor</span></div>
+    <div class="key"><span class="g off"><span class="strike">◻</span></span><span class="lbl"><b>Dim + struck + hint</b> — not on your plan; skipped &amp; non-selectable</span></div>
+    <div class="key"><span class="g cyan">◆</span><span class="lbl"><b>Cyan diamond</b> — the active prompt step</span></div>
+    <div class="key"><span class="g cyan" style="opacity:.7">▍</span><span class="lbl"><b>Cyan highlight</b> — where the cursor currently rests</span></div>
+  </div>
+</div>

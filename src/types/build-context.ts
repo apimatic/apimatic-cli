@@ -19,6 +19,11 @@ export class BuildContext {
     return new FilePath(this.buildDirectory, new FileName("APIMATIC-BUILD.json"));
   }
 
+  /** The APIMATIC-BUILD.json path within this build directory, for callers that hand it to a service. */
+  public buildFilePath(): FilePath {
+    return this.buildFile;
+  }
+
   public async validate(): Promise<boolean> {
     // TODO: add more checks here
     if (!(await this.fileService.directoryExists(this.buildDirectory))) return false;
