@@ -14,12 +14,17 @@ import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { err, ok, Result } from "neverthrow";
 import { FilePath } from "../../types/file/filePath.js";
+import { FileName } from "../../types/file/fileName.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import FormData from "form-data";
+import { ZipService } from "../zip-service.js";
+import { FileService } from "../file-service.js";
+import { withDirPath } from "../tmp-extensions.js";
 import { handleServiceError, ServiceError } from "../service-error.js";
-import axios, { AxiosResponse } from "axios";
+import axios from "axios";
 import { envInfo } from "../env-info.js";
 import { Buffer } from "node:buffer";
+import { BuildConfig } from "../../types/build/build.js";
 
 export enum RemovableFeature {
   Merging = 'Merging',
@@ -53,8 +58,21 @@ export interface ValidateApiResponse {
   unallowedFeatures: UnallowedFeaturesResponse | null;
 }
 
+export interface BuildFilePruneReport {
+  removedLanguages: string[];
+  removedApiCopilot: boolean;
+  removedAiIntegration: boolean;
+}
+
+export interface PruneBuildFileResponse {
+  buildFile: BuildConfig;
+  report: BuildFilePruneReport;
+}
+
 export class ValidationService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
+  private readonly zipService = new ZipService();
+  private readonly fileService = new FileService();
 
   constructor(private readonly configDir: DirectoryPath) {}
 
@@ -132,6 +150,90 @@ export class ValidationService {
     }
   }
 
+  /**
+   * Prunes a build file down to what the user's subscription allows (SDK languages +
+   * AI features) via the platform, returning the pruned build file and a report of
+   * what was removed. The platform is the entitlement authority, so the build we
+   * submit for generation is never rejected for a build-file feature the plan lacks.
+   */
+  public async pruneBuildFile(
+    buildConfigFilePath: FilePath,
+    authKey?: string | null
+  ): Promise<Result<PruneBuildFileResponse, ServiceError>> {
+    const authInfo: AuthInfo | null = await getAuthInfo(this.configDir.toString());
+    const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
+
+    const formData = new FormData();
+    formData.append("file", createReadStream(buildConfigFilePath.toString()), {
+      filename: "APIMATIC-BUILD.json",
+      contentType: "application/json"
+    });
+
+    const baseURL = envInfo.getBaseUrl() ?? this.apiBaseUrl;
+
+    try {
+      const response = await axios({
+        method: "POST",
+        url: `${baseURL}/build-features/prune`,
+        data: formData,
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: authorizationHeader
+        },
+        // The endpoint returns a zip (pruned APIMATIC-BUILD.json + report.json),
+        // streamed so it can be written straight to disk and unarchived.
+        responseType: "stream",
+        validateStatus: () => true
+      });
+
+      if (response.status >= 400) {
+        return err(await this.parsePruneErrorResponse(response));
+      }
+
+      // Persist the zip to a temp dir and extract it via ZipService, then read the
+      // two entries back off disk — no in-memory zip handling.
+      return await withDirPath<Result<PruneBuildFileResponse, ServiceError>>(async (tempDir) => {
+        const zipPath = new FilePath(tempDir, new FileName("prune-response.zip"));
+        await this.fileService.writeFile(zipPath, response.data);
+
+        const extractDir = tempDir.join("prune");
+        await this.zipService.unArchive(zipPath, extractDir);
+
+        const prunedBuildConfigFile = new FilePath(extractDir, new FileName("APIMATIC-BUILD.json"));
+        const reportFile = new FilePath(extractDir, new FileName("report.json"));
+        if (!(await this.fileService.fileExists(prunedBuildConfigFile)) || !(await this.fileService.fileExists(reportFile))) {
+          return err(ServiceError.ServerError);
+        }
+
+        const buildConfigFile = BuildConfig.parse(await this.fileService.getContents(prunedBuildConfigFile));
+        const report = JSON.parse(await this.fileService.getContents(reportFile)) as BuildFilePruneReport;
+        return ok({ buildFile: buildConfigFile, report });
+      });
+    } catch (error: unknown) {
+      return err(handleServiceError(error));
+    }
+  }
+
+  /** Decodes a streamed error body into a ServiceError with a prune-specific fallback message. */
+  private async parsePruneErrorResponse(
+    response: { status: number; data: AsyncIterable<Buffer> }
+  ): Promise<ServiceError> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.data) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const errorBody = Buffer.concat(chunks).toString("utf-8");
+
+    let message = `Error ${response.status}: Failed to prune the build file for your subscription.`;
+    try {
+      const body = JSON.parse(errorBody) as { errors?: { summary?: string[] }; message?: string; title?: string };
+      message = body?.errors?.summary?.[0] ?? body?.message ?? body?.title ?? message;
+    } catch {
+      // Non-JSON / undecodable body — keep the default message.
+    }
+    return ServiceError.badRequest(message, {});
+  }
+
   private createAuthorizationHeader(authInfo: AuthInfo | null, overrideAuthKey: string | null): string {
     const key = overrideAuthKey || authInfo?.authKey;
     return `X-Auth-Key ${key ?? ""}`;
@@ -158,7 +260,9 @@ export class ValidationService {
     return "Unexpected error occurred while validating API specification.";
   }
 
-  private async parseErrorResponse(response: AxiosResponse): Promise<ServiceError> {
+  private async parseErrorResponse(
+    response: { status: number; data: AsyncIterable<Buffer> }
+  ): Promise<ServiceError> {
     const chunks: Buffer[] = [];
     for await (const chunk of response.data) {
       chunks.push(Buffer.from(chunk));

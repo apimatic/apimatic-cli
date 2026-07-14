@@ -19,6 +19,7 @@ import { FeaturesToRemove, ValidationService } from '../../infrastructure/servic
 import { FileName } from '../../types/file/fileName.js';
 import { ApiService } from '../../infrastructure/services/api-service.js';
 import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
+import { mapLanguages } from '../../types/sdk/generate.js';
 
 const defaultPort: number = 23513 as const;
 const defaultBaseUrl = new UrlPath(`http://localhost:${defaultPort}`);
@@ -56,6 +57,22 @@ export class PortalQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
+      // Fetch account info before anything else so the plan is known up front: it
+      // gates the on-prem generation exit below, feeds the language step the allowed
+      // SDK languages, and resolves the API Copilot key later. A lookup failure is fatal.
+      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
+      if (accountInfo.isErr()) {
+        this.prompts.accountInfoFetchFailed(accountInfo.error);
+        return ActionResult.failed();
+      }
+      // Quickstart generates the portal locally (on-prem); a plan that doesn't allow
+      // on-prem generation can't run it, so stop before importing or pruning a spec.
+      if (!accountInfo.value.isOnPremGenerationAllowed) {
+        this.prompts.onPremGenerationNotAllowedOnPlan();
+        return ActionResult.cancelled();
+      }
+      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+
       // Step 1/4
       this.prompts.importSpecStep();
 
@@ -131,10 +148,19 @@ export class PortalQuickstartAction {
 
       // Step 3/4
       this.prompts.selectLanguagesStep();
-      const languages = await this.prompts.selectLanguagesPrompt();
-      if (!languages) {
-        this.prompts.noLanguagesSelected();
-        return ActionResult.cancelled();
+      let languages: string[];
+      if (allowedLanguages.length === 0) {
+        // With no SDK languages on the plan there's nothing to select, so skip the
+        // menu and build the portal with HTTP documentation only.
+        this.prompts.httpOnlyPortalOnPlan();
+        languages = ['http'];
+      } else {
+        const selectedLanguages = await this.prompts.selectLanguagesPrompt(allowedLanguages);
+        if (!selectedLanguages) {
+          this.prompts.noLanguagesSelected();
+          return ActionResult.cancelled();
+        }
+        languages = selectedLanguages;
       }
 
       // Step 4/4
@@ -161,15 +187,10 @@ export class PortalQuickstartAction {
       }
 
       // Resolve the API Copilot key to enable, if any, before setting up the source
-      // directory so the user decides on Copilot up front. The lookup failing is fatal;
-      // an account with no key continues silently (no Copilot); cancelling the multi-key
-      // selection aborts quickstart.
-      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-      if (accountInfo.isErr()) {
-        this.prompts.accountInfoFetchFailed(accountInfo.error);
-        return ActionResult.failed();
-      }
-
+      // directory. An account with no key continues silently (no Copilot); cancelling
+      // the multi-key selection aborts quickstart. (Account info was already fetched
+      // above for the language step.) Whether Copilot is actually on the plan is only
+      // known after the prune below, so the "enabled" caution is deferred until then.
       let copilotKey: string | undefined;
       const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
       if (copilotKeys.length === 1) {
@@ -180,9 +201,6 @@ export class PortalQuickstartAction {
           this.prompts.noCopilotKeySelected();
           return ActionResult.cancelled();
         }
-      }
-      if (copilotKey) {
-        this.prompts.copilotEnabled(copilotKey);
       }
 
       const masterBuildFile = await this.prompts.downloadBuildDirectory(
@@ -213,6 +231,24 @@ export class PortalQuickstartAction {
         ? baseConfig.withApiCopilotForPortal(copilotKey, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl)
         : baseConfig;
       await buildContext.updateBuildFileContents(buildConfig);
+
+      // Prune the build file to what the plan allows (SDK languages + AI features)
+      // before serving. Fail closed: a prune failure aborts rather than serving a
+      // build the plan can't generate.
+      const pruneResult = await this.validationService.pruneBuildFile(buildContext.buildConfigFilePath());
+      if (pruneResult.isErr()) {
+        this.prompts.serviceError(pruneResult.error);
+        return ActionResult.failed();
+      }
+      const { buildFile: prunedConfig, report } = pruneResult.value;
+      await buildContext.updateBuildFileContents(prunedConfig);
+      this.prompts.buildFilePruned(report);
+
+      // Only surface the Copilot caution if Copilot survived the prune — i.e. it's
+      // actually on the plan. If it was stripped, buildFilePruned already reported it.
+      if (prunedConfig.hasApiCopilot() && copilotKey) {
+        this.prompts.copilotEnabled(copilotKey);
+      }
 
       const specDirectory = sourceDirectory.join('spec');
       const specContext = new SpecContext(specDirectory);

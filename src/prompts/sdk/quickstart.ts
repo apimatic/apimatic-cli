@@ -9,12 +9,13 @@ import { ServiceError } from "../../infrastructure/service-error.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { removeQuotes } from "../../utils/string-utils.js";
 import { Directory } from "../../types/file/directory.js";
-import { Language } from "../../types/sdk/generate.js";
+import { Language, LANGUAGE_CHOICES } from "../../types/sdk/generate.js";
 import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
 const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/";
+const pricingUrl = "https://www.apimatic.io/pricing";
 
 export class SdkQuickstartPrompts {
   public importSpecStep() {
@@ -58,7 +59,7 @@ export class SdkQuickstartPrompts {
       "To continue:",
       "- Remove these components from your API Specification and re-run this command.",
       "- Combine your split API Specification files into a single file. We can automatically remove unsupported components from single-file specs.",
-      "- Upgrade your subscription to unlock additional features: https://www.apimatic.io/pricing"
+      `- Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
     ].join("\n");
 
     log.info(message);
@@ -80,7 +81,7 @@ export class SdkQuickstartPrompts {
       endpointMessage,
       "",
       "You won't see these components in the generated SDKs or documentation.",
-      "Want to keep them? Upgrade your subscription to unlock additional features: https://www.apimatic.io/pricing"
+      `Want to keep them? Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
     ].join("\n");
 
     log.info(message);
@@ -143,18 +144,18 @@ export class SdkQuickstartPrompts {
     log.info(`Step 3 of 4: Select programming language`);
   }
 
-  public async selectLanguagePrompt(): Promise<Language | undefined> {
+  public async selectLanguagePrompt(allowedLanguages: Language[]): Promise<Language | undefined> {
+    const allowed = new Set(allowedLanguages);
+    const available = LANGUAGE_CHOICES.filter(({ value }) => allowed.has(value));
+    const excluded = LANGUAGE_CHOICES.filter(({ value }) => !allowed.has(value));
+
+    if (excluded.length > 0) {
+      log.info(this.languagesNotOnPlanNote(excluded.map(({ label }) => label)));
+    }
+
     const language = await select({
       message: "Choose the programming language for your SDK:",
-      options: [
-        { label: "Typescript", value: Language.TYPESCRIPT },
-        { label: "Ruby", value: Language.RUBY },
-        { label: "Python", value: Language.PYTHON },
-        { label: "Java", value: Language.JAVA },
-        { label: "C#", value: Language.CSHARP },
-        { label: "PHP", value: Language.PHP },
-        { label: "Go", value: Language.GO }
-      ]
+      options: available.map(({ label, value }) => ({ label, value }))
     });
 
     if (isCancel(language)) {
@@ -164,8 +165,29 @@ export class SdkQuickstartPrompts {
     return language;
   }
 
+  public noLanguagesAvailableOnPlan(): void {
+    const message = [
+      "You're on the Free plan.",
+      `Upgrade your subscription to get started: ${f.link(pricingUrl)}`
+    ].join("\n");
+    log.warn(message);
+  }
+
+  private languagesNotOnPlanNote(languages: string[]): string {
+    return [
+      `The following languages aren't included in your current subscription plan:`,
+      ...languages.map((language) => `  • ${language}`),
+      "",
+      `Upgrade your subscription to unlock them: ${f.link(pricingUrl)}`
+    ].join("\n");
+  }
+
   public noLanguageSelected() {
     log.error("No programming language was selected.");
+  }
+
+  public accountInfoFetchFailed(serviceError: ServiceError) {
+    log.error(`Failed to fetch your account information. ${serviceError.errorMessage}`);
   }
 
   public selectInputDirectoryStep() {

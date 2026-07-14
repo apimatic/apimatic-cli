@@ -33,3 +33,19 @@ export function mapLanguages(languageFlag: number): Language[] {
     .filter(([flag]) => (languageFlag & parseInt(flag)) !== 0)
     .map(([, language]) => language);
 }
+
+/**
+ * The languages offered in the quickstart prompts, in display order.
+ * Shared by the portal (multi-select) and SDK (single-select) flows so both
+ * present the same list; the subscription's allowed languages decide which
+ * are selectable.
+ */
+export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
+  { label: "Typescript", value: Language.TYPESCRIPT },
+  { label: "Ruby", value: Language.RUBY },
+  { label: "Python", value: Language.PYTHON },
+  { label: "Java", value: Language.JAVA },
+  { label: "C#", value: Language.CSHARP },
+  { label: "PHP", value: Language.PHP },
+  { label: "Go", value: Language.GO }
+];
