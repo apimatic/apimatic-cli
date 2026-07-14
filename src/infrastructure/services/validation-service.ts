@@ -202,7 +202,7 @@ export class ValidationService {
         const prunedBuildConfigFile = new FilePath(extractDir, new FileName("APIMATIC-BUILD.json"));
         const reportFile = new FilePath(extractDir, new FileName("report.json"));
         if (!(await this.fileService.fileExists(prunedBuildConfigFile)) || !(await this.fileService.fileExists(reportFile))) {
-          return err(ServiceError.badRequest("The build-file prune returned an unexpected response.", {}));
+          return err(ServiceError.ServerError);
         }
 
         const buildConfigFile = BuildConfig.parse(await this.fileService.getContents(prunedBuildConfigFile));
