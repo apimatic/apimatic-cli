@@ -74,9 +74,15 @@ export class PortalService {
         if (error.statusCode === 400) {
           return err(ServiceError.badRequest(errorMessage, errors));
         }
-        if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
+        if (error.statusCode === 401) {
+          return err(ServiceError.UnAuthorized);
         }
+      }
+      if (error instanceof ApiError && error.statusCode === 401) {
+        // The API reports the reason as {"message": "..."} which the SDK
+        // deserializes into `result` for its typed 401 error.
+        const apiMessage = (error.result as { message?: string } | undefined)?.message ?? null;
+        return err(ServiceError.unauthorized(apiMessage));
       }
       const serviceError = handleServiceError(error);
       return err(serviceError);

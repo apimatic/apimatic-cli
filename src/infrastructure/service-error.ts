@@ -30,6 +30,14 @@ export class ServiceError {
   static notFound(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
   }
+  static unauthorized(apiMessage: string | null): ServiceError {
+    const message = `${apiMessage ?? "You are not authorized to perform this action."} Please run ${f.cmdAlt(
+      "apimatic",
+      "auth",
+      "login"
+    )} to log in, or provide a valid auth key using the ${f.flag("auth-key")} flag.`;
+    return new ServiceError(ServiceErrorCode.UnAuthorized, message, {});
+  }
 
   static readonly values: ServiceError[] = [
     ServiceError.NotFound,
