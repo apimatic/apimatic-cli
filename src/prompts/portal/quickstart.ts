@@ -1,5 +1,6 @@
 import { Result } from "neverthrow";
 import { isCancel, log, multiselect, select, text } from "@clack/prompts";
+import { Language, LANGUAGE_CHOICES } from "../../types/sdk/generate.js";
 import { UrlPath } from "../../types/file/urlPath.js";
 import { format as f, getTree } from "../format.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
@@ -9,11 +10,15 @@ import { Directory } from "../../types/file/directory.js";
 import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
 import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
 import { noteWrapped, withSpinner } from "../prompt.js";
-import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
+import {
+  BuildFilePruneReport,
+  UnallowedFeaturesResponse
+} from "../../infrastructure/services/validation-service.js";
 
 const vscodeExtensionUrl =
   "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
 const referenceDocumentationUrl = "https://docs.apimatic.io/cli-getting-started/advanced-portal-setup";
+const pricingUrl = "https://www.apimatic.io/pricing";
 
 export class PortalQuickstartPrompts {
   public importSpecStep() {
@@ -88,7 +93,7 @@ export class PortalQuickstartPrompts {
       "To continue:",
       "- Remove these components from your API Specification and re-run this command.",
       "- Combine your split API Specification files into a single file. We can automatically remove unsupported components from single-file specs.",
-      "- Upgrade your subscription to unlock additional features: https://www.apimatic.io/pricing"
+      `- Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
     ].join("\n");
 
     log.info(message);
@@ -110,7 +115,7 @@ export class PortalQuickstartPrompts {
       endpointMessage,
       "",
       "You won't see these components in the generated SDKs or documentation.",
-      "Want to keep them? Upgrade your subscription to unlock additional features: https://www.apimatic.io/pricing"
+      `Want to keep them? Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
     ].join("\n");
 
     log.info(message);
@@ -120,22 +125,22 @@ export class PortalQuickstartPrompts {
     log.info(`Step 3 of 4: Select programming languages`);
   }
 
-  public async selectLanguagesPrompt(): Promise<string[] | undefined> {
+  public async selectLanguagesPrompt(allowedLanguages: Language[]): Promise<string[] | undefined> {
+    const allowed = new Set(allowedLanguages);
+    const available = LANGUAGE_CHOICES.filter(({ value }) => allowed.has(value));
+    const excluded = LANGUAGE_CHOICES.filter(({ value }) => !allowed.has(value));
+
+    if (excluded.length > 0) {
+      log.info(this.languagesNotOnPlanNote(excluded.map(({ label }) => label)));
+    }
+
     const languages = (await multiselect({
       message:
         "Your API Portal will contain SDKs and SDK Documentation in the following Languages (HTTP is enabled by default). Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
-      options: [
-        { label: "Typescript", value: "typescript" },
-        { label: "Ruby", value: "ruby" },
-        { label: "Python", value: "python" },
-        { label: "Java", value: "java" },
-        { label: "C#", value: "csharp" },
-        { label: "PHP", value: "php" },
-        { label: "Go", value: "go" }
-      ],
-      initialValues: ["typescript", "ruby", "python", "java", "csharp", "php", "go"],
+      options: available.map(({ label, value }) => ({ label, value })),
+      initialValues: available.map(({ value }) => value),
       required: false
-    })) as string[];
+    })) as Language[];
 
     if (isCancel(languages)) {
       return undefined;
@@ -144,8 +149,58 @@ export class PortalQuickstartPrompts {
     return ["http", ...languages];
   }
 
+  public httpOnlyPortalOnPlan(): void {
+    const message = [
+      "Your current subscription plan doesn't include any SDK languages, so the portal will contain HTTP documentation only.",
+      `Upgrade your subscription to unlock SDK languages: ${f.link(pricingUrl)}`
+    ].join("\n");
+    log.warn(message);
+  }
+
+  public onPremGenerationNotAllowedOnPlan(): void {
+    const message = [
+      "Your current subscription plan doesn't include on-prem generation.",
+      `Upgrade your subscription to get started: ${f.link(pricingUrl)}`
+    ].join("\n");
+    log.warn(message);
+  }
+
+  private languagesNotOnPlanNote(languages: string[]): string {
+    return [
+      `The following languages aren't included in your current subscription plan`,
+      ...languages.map((language) => `  • ${language}`),
+      "",
+      `Upgrade your subscription to unlock them: ${f.link(pricingUrl)}`
+    ].join("\n");
+  }
+
   public noLanguagesSelected() {
     log.error("No programming languages were selected.");
+  }
+
+  public buildFilePruned(report: BuildFilePruneReport): void {
+    const removed: string[] = [];
+    if (report.removedLanguages.length > 0) {
+      removed.push(`SDK languages: ${report.removedLanguages.join(", ")}`);
+    }
+    if (report.removedApiCopilot) {
+      removed.push("API Copilot");
+    }
+    if (report.removedAiIntegration) {
+      removed.push("AI context plugins (Cursor / VS Code / Claude Code)");
+    }
+    if (removed.length === 0) {
+      return;
+    }
+
+    const message = [
+      "Some portal features aren't on your current subscription plan and were removed before generation:",
+      "",
+      ...removed.map((item) => `  • ${item}`),
+      "",
+      `Upgrade your subscription to unlock these: ${f.link(pricingUrl)}`
+    ].join("\n");
+    log.warn(message);
   }
 
   public selectInputDirectoryStep() {

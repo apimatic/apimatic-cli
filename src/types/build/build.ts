@@ -166,7 +166,11 @@ export class BuildConfig {
   private constructor(private readonly data: BuildConfigData) {}
 
   public static parse(json: string): BuildConfig {
-    return new BuildConfig(JSON.parse(json) as BuildConfigData);
+    return BuildConfig.from(JSON.parse(json) as BuildConfigData);
+  }
+
+  public static from(data: BuildConfigData): BuildConfig {
+    return new BuildConfig(data);
   }
 
   // Called implicitly by JSON.stringify when the config is written back to disk.
