@@ -1,4 +1,5 @@
 import axios from "axios";
+import { ApiError } from "@apimatic/sdk";
 import { format as f } from "../prompts/format.js";
 
 export enum ServiceErrorCode {
@@ -63,6 +64,15 @@ export class ServiceError {
 }
 
 export function handleServiceError(error: unknown): ServiceError {
+  // SDK controllers throw typed `ApiError`s (not axios errors). The API reports
+  // the reason as {"message": "..."} deserialized into `result`.
+  if (error instanceof ApiError) {
+    const apiMessage = (error.result as { message?: string } | undefined)?.message ?? null;
+    if (error.statusCode === 401) return ServiceError.unauthorized(apiMessage);
+    if (error.statusCode === 404) return ServiceError.NotFound;
+    if (error.statusCode === 500) return ServiceError.ServerError;
+  }
+
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
     if (status === 401) return ServiceError.UnAuthorized;
