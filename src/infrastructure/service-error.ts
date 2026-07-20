@@ -63,15 +63,19 @@ export class ServiceError {
   }
 }
 
-export function handleServiceError(error: unknown): ServiceError {
-  // SDK controllers throw typed `ApiError`s (not axios errors). The API reports
-  // the reason as {"message": "..."} deserialized into `result`.
-  if (error instanceof ApiError) {
+// SDK controllers throw typed `ApiError`s (not axios errors). The API reports
+// the reason as {"message": "..."} deserialized into `result`.
+function mapApiError(error: ApiError): ServiceError {
+  if (error.statusCode === 401) {
     const apiMessage = (error.result as { message?: string } | undefined)?.message ?? null;
-    if (error.statusCode === 401) return ServiceError.unauthorized(apiMessage);
-    if (error.statusCode === 404) return ServiceError.NotFound;
-    if (error.statusCode === 500) return ServiceError.ServerError;
+    return ServiceError.unauthorized(apiMessage);
   }
+  if (error.statusCode === 404) return ServiceError.NotFound;
+  return ServiceError.ServerError;
+}
+
+export function handleServiceError(error: unknown): ServiceError {
+  if (error instanceof ApiError) return mapApiError(error);
 
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
