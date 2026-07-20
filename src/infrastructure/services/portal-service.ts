@@ -6,7 +6,6 @@ import {
   ContentType,
   DocsPortalGenerationAsyncController,
   SdkSourceTreeGenerationAsyncController,
-  ProblemDetailsError,
   FileWrapper,
   TransformationController,
   Transformation,
@@ -66,21 +65,8 @@ export class PortalService {
       );
       generationId = portalInstance.result.id;
     } catch (error) {
-      if (error instanceof ProblemDetailsError) {
-        const errors = error.result!.errors as Record<string, string[]>;
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = error.result!.title + "\n- " + message;
-        if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-        if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
-        }
-      }
-      // 401 (and other SDK ApiError statuses) are mapped centrally in handleServiceError.
-      const serviceError = handleServiceError(error);
-      return err(serviceError);
+      // ProblemDetails (400/403), 401 and other SDK statuses are mapped centrally.
+      return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
     }
@@ -156,20 +142,7 @@ export class PortalService {
       );
       generationId = response.result.id;
     } catch (error) {
-      if (error instanceof ProblemDetailsError) {
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const errors = error.result!.errors as Record<string, string[]>;
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = error.result!.title + "\n- " + message;
-        if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-        if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
-        }
-      }
-      const serviceError = handleServiceError(error);
-      return err(serviceError);
+      return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
     }
@@ -254,20 +227,7 @@ export class PortalService {
       );
       generationId = response.result.id;
     } catch (error) {
-      if (error instanceof ProblemDetailsError) {
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const errors = error.result!.errors as Record<string, string[]>;
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = error.result!.title + '\n- ' + message;
-        if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-        if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
-        }
-      }
-      const serviceError = handleServiceError(error);
-      return err(serviceError);
+      return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
     }

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { ApiError } from "@apimatic/sdk";
+import { ApiError, ProblemDetailsError } from "@apimatic/sdk";
 import { format as f } from "../prompts/format.js";
 
 export enum ServiceErrorCode {
@@ -63,9 +63,25 @@ export class ServiceError {
   }
 }
 
+// A ProblemDetails body carries a `title` plus a map of field errors; surface
+// the title and the first field message.
+function mapProblemDetailsError(error: ProblemDetailsError): ServiceError | null {
+  // TODO: This only picks the first error message, improve it to show all errors.
+  const errors = error.result!.errors as Record<string, string[]>;
+  const message = Object.values(errors)[0]?.[0] ?? null;
+  const errorMessage = error.result!.title + "\n- " + message;
+  if (error.statusCode === 400) return ServiceError.badRequest(errorMessage, errors);
+  if (error.statusCode === 403) return ServiceError.forbidden(errorMessage);
+  return null;
+}
+
 // SDK controllers throw typed `ApiError`s (not axios errors). The API reports
 // the reason as {"message": "..."} deserialized into `result`.
 function mapApiError(error: ApiError): ServiceError {
+  if (error instanceof ProblemDetailsError) {
+    const serviceError = mapProblemDetailsError(error);
+    if (serviceError) return serviceError;
+  }
   if (error.statusCode === 401) {
     const apiMessage = (error.result as { message?: string } | undefined)?.message ?? null;
     return ServiceError.unauthorized(apiMessage);
