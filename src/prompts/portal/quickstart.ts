@@ -136,7 +136,7 @@ export class PortalQuickstartPrompts {
 
     const languages = (await multiselect({
       message:
-        "Your API Portal will contain SDKs and SDK Documentation in the following Languages (HTTP is enabled by default). Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
+        "Your API Portal will contain Context Plugins for AI agents, SDKs, and SDK documentation in the following languages (HTTP is enabled by default). Press Enter to continue with all languages, or use the arrow keys and Space to customize your selection",
       options: available.map(({ label, value }) => ({ label, value })),
       initialValues: available.map(({ value }) => value),
       required: false
@@ -256,8 +256,15 @@ export class PortalQuickstartPrompts {
     );
   }
 
-  public nextSteps(): void {
-    const message = `Use the API Playground or an SDK to call your API.
+  public nextSteps(hasAiIntegration: boolean): void {
+    const message = hasAiIntegration
+      ? `Nice work! Your API Portal is ready.
+
+Install your API's Context Plugins to help AI coding agents understand your API and generate more accurate code.
+
+You can also customize the Portal theme, add API recipes and enable AI features.
+${f.link(referenceDocumentationUrl)}`
+      : `Use the API Playground or an SDK to call your API.
 Customize the Portal theme, add API recipes and enable AI features
 ${f.link(referenceDocumentationUrl)}`;
     noteWrapped(message, "Next Steps");

@@ -198,6 +198,20 @@ export class BuildConfig {
     return this.data.apiCopilotConfig != null;
   }
 
+  // True when at least one language has an AI editor integration (Context Plugin)
+  // enabled in the portal settings. AI integration cannot exist without Copilot, but
+  // Copilot can be present with AI integration disabled — so this is a distinct check.
+  public hasAiIntegration(): boolean {
+    const languageSettings = this.data.generatePortal?.portalSettings?.languageSettings;
+    if (!languageSettings) {
+      return false;
+    }
+    return Object.values(languageSettings).some((setting) => {
+      const ai = setting.aiIntegration;
+      return ai != null && [ai.cursor, ai.claudeCode, ai.vscode].some((editor) => editor?.isEnabled === true);
+    });
+  }
+
   /** Returns a copy with the portal's languageConfig set from the selected friendly language ids. */
   public withPortalLanguages(languages: string[]): BuildConfig {
     const portal = this.data.generatePortal!;

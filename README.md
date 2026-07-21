@@ -23,7 +23,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.1.0-beta.16 win32-x64 node-v23.4.0
+@apimatic/cli/1.1.0 win32-x64 node-v24.14.1
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -53,7 +53,7 @@ USAGE
 
 ## `apimatic api transform`
 
-Transform API specifications between different formats.
+Transform API specifications between different formats
 
 ```
 USAGE
@@ -62,17 +62,17 @@ USAGE
     0|graphqlschema [--file <value>] [--url <value>] [-d <value>] [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: ./] directory to save the transformed file to
+  -d, --destination=<value>  [default: ./] Directory to save the transformed file to
   -f, --force                overwrite changes without asking for user consent.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --file=<value>         path to the API specification file to transform
-      --format=<option>      (required) specification format to transform API specification into
+      --file=<value>         Path to the API specification file to transform
+      --format=<option>      (required) Specification format to transform API specification into
                              <options: apimatic|wadl2009|wsdl|swagger10|swagger20|swaggeryaml|oas3|openapi3yaml|apibluep
                              rint|raml|raml10|postman10|postman20|graphqlschema>
       --url=<value>          URL to the API specification file to transform (publicly accessible)
 
 DESCRIPTION
-  Transform API specifications between different formats.
+  Transform API specifications between different formats
 
   Transform API specifications from one format to another.
   Supports multiple formats including OpenAPI/Swagger, RAML, WSDL, and Postman Collections.
@@ -83,11 +83,11 @@ EXAMPLES
   apimatic api transform --format=raml --url="https://petstore.swagger.io/v2/swagger.json" --destination=./
 ```
 
-_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/api/transform.ts)_
+_See code: [src/commands/api/transform.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/api/transform.ts)_
 
 ## `apimatic api validate`
 
-Validate API specification for syntactic and semantic correctness.
+Validate API specification for syntactic and semantic correctness
 
 ```
 USAGE
@@ -99,7 +99,7 @@ FLAGS
       --url=<value>       URL to the API specification file to validate (publicly accessible)
 
 DESCRIPTION
-  Validate API specification for syntactic and semantic correctness.
+  Validate API specification for syntactic and semantic correctness
 
   Validate your API specification to ensure it adheres to syntactic and semantic standards.
 
@@ -109,11 +109,11 @@ EXAMPLES
   apimatic api validate --url="https://petstore.swagger.io/v2/swagger.json"
 ```
 
-_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/api/validate.ts)_
+_See code: [src/commands/api/validate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/api/validate.ts)_
 
 ## `apimatic auth login`
 
-Login to your APIMatic account.
+Login to your APIMatic account
 
 ```
 USAGE
@@ -123,7 +123,7 @@ FLAGS
   -k, --auth-key=<value>  Sets authentication key for all commands.
 
 DESCRIPTION
-  Login to your APIMatic account.
+  Login to your APIMatic account
 
   Login using your APIMatic credentials or an API Key
 
@@ -133,7 +133,7 @@ EXAMPLES
   apimatic auth login --auth-key={api-key}
 ```
 
-_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/login.ts)_
+_See code: [src/commands/auth/login.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/auth/login.ts)_
 
 ## `apimatic auth logout`
 
@@ -152,7 +152,7 @@ EXAMPLES
   apimatic auth logout
 ```
 
-_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/logout.ts)_
+_See code: [src/commands/auth/logout.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/auth/logout.ts)_
 
 ## `apimatic auth status`
 
@@ -169,7 +169,7 @@ EXAMPLES
   apimatic auth status
 ```
 
-_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/auth/status.ts)_
+_See code: [src/commands/auth/status.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/auth/status.ts)_
 
 ## `apimatic autocomplete [SHELL]`
 
@@ -180,7 +180,7 @@ USAGE
   $ apimatic autocomplete [SHELL] [-r]
 
 ARGUMENTS
-  SHELL  (zsh|bash|powershell) Shell type
+  [SHELL]  (zsh|bash|powershell) Shell type
 
 FLAGS
   -r, --refresh-cache  Refresh cache (ignores displaying instructions)
@@ -200,7 +200,7 @@ EXAMPLES
   $ apimatic autocomplete --refresh-cache
 ```
 
-_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/main/src/commands/autocomplete/index.ts)_
+_See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v3.2.47/src/commands/autocomplete/index.ts)_
 
 ## `apimatic help [COMMAND]`
 
@@ -211,7 +211,7 @@ USAGE
   $ apimatic help [COMMAND...] [-n]
 
 ARGUMENTS
-  COMMAND...  Command to show help for.
+  [COMMAND...]  Command to show help for.
 
 FLAGS
   -n, --nested-commands  Include all nested commands in the output.
@@ -220,7 +220,7 @@ DESCRIPTION
   Display help for apimatic.
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/main/src/commands/help.ts)_
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46/src/commands/help.ts)_
 
 ## `apimatic portal copilot`
 
@@ -250,11 +250,11 @@ EXAMPLES
   apimatic portal copilot --input=./ --disable
 ```
 
-_See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/copilot.ts)_
+_See code: [src/commands/portal/copilot.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/portal/copilot.ts)_
 
 ## `apimatic portal generate`
 
-Generate an API Documentation portal.
+Generate Context Plugins, API Documentation Portal with AI Assist Features.
 
 ```
 USAGE
@@ -266,10 +266,10 @@ FLAGS
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --zip                  download the generated portal as a .zip archive
+      --zip                  Download the generated portal as a .zip archive
 
 DESCRIPTION
-  Generate an API Documentation portal.
+  Generate Context Plugins, API Documentation Portal with AI Assist Features.
 
   Generate an API Documentation portal. Requires an input directory containing API specifications, a config file and
   optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/gu
@@ -281,7 +281,7 @@ EXAMPLES
   apimatic portal generate --input="./" --destination="./portal"
 ```
 
-_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/generate.ts)_
+_See code: [src/commands/portal/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/portal/generate.ts)_
 
 ## `apimatic portal recipe new`
 
@@ -308,10 +308,10 @@ DESCRIPTION
 EXAMPLES
   apimatic portal recipe new
 
-  apimatic portal recipe new --name="My API Recipe" --input="./"
+  apimatic portal recipe new --name='"My API Recipe"' --input="./"
 ```
 
-_See code: [src/commands/portal/recipe/new.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/recipe/new.ts)_
+_See code: [src/commands/portal/recipe/new.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/portal/recipe/new.ts)_
 
 ## `apimatic portal serve`
 
@@ -319,7 +319,7 @@ Generate and serve an API Documentation Portal with hot reload.
 
 ```
 USAGE
-  $ apimatic portal serve [-p 3000] [-i <value>] [-d <value>] [-o] [--no-reload] [-k <value>]
+  $ apimatic portal serve [-p 23513] [-i <value>] [-d <value>] [-o] [--no-reload] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
@@ -327,7 +327,7 @@ FLAGS
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
   -o, --open                 open the portal in the default browser.
-  -p, --port=3000            [default: 3000] port to serve the portal.
+  -p, --port=23513           [default: 23513] port to serve the portal.
       --no-reload            disable hot reload.
 
 DESCRIPTION
@@ -339,10 +339,10 @@ DESCRIPTION
 EXAMPLES
   apimatic portal serve
 
-  apimatic portal serve --input=./ --destination=./portal --port=3000 --open --no-reload
+  apimatic portal serve --input=./ --destination=./portal --port=23513 --open --no-reload
 ```
 
-_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/serve.ts)_
+_See code: [src/commands/portal/serve.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/portal/serve.ts)_
 
 ## `apimatic portal toc new`
 
@@ -386,7 +386,7 @@ EXAMPLES
   apimatic portal toc new --input=./ --destination=./src/content/
 ```
 
-_See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/portal/toc/new.ts)_
+_See code: [src/commands/portal/toc/new.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/portal/toc/new.ts)_
 
 ## `apimatic publishing profile list`
 
@@ -405,18 +405,18 @@ EXAMPLES
   apimatic publishing profile list
 ```
 
-_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/publishing/profile/list.ts)_
+_See code: [src/commands/publishing/profile/list.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/publishing/profile/list.ts)_
 
 ## `apimatic quickstart`
 
-Create your first SDK or API Portal using APIMatic.
+Create your first Context Plugins, API Portal or SDK using APIMatic.
 
 ```
 USAGE
   $ apimatic quickstart
 
 DESCRIPTION
-  Create your first SDK or API Portal using APIMatic.
+  Create your first Context Plugins, API Portal or SDK using APIMatic.
 
   Get started with your first SDK or API Portal in four easy steps.
 
@@ -424,7 +424,7 @@ EXAMPLES
   apimatic quickstart
 ```
 
-_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/quickstart.ts)_
+_See code: [src/commands/quickstart.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/quickstart.ts)_
 
 ## `apimatic sdk generate`
 
@@ -468,7 +468,7 @@ EXAMPLES
   apimatic sdk generate --language=python --destination=./sdk --zip
 ```
 
-_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/generate.ts)_
+_See code: [src/commands/sdk/generate.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/sdk/generate.ts)_
 
 ## `apimatic sdk publish`
 
@@ -510,7 +510,7 @@ EXAMPLES
   apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
 ```
 
-_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_
+_See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/sdk/publish.ts)_
 
 ## `apimatic sdk save-changes`
 
@@ -542,5 +542,5 @@ EXAMPLES
   apimatic sdk save-changes --language=java --sdk=./sdk
 ```
 
-_See code: [src/commands/sdk/save-changes.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/save-changes.ts)_
+_See code: [src/commands/sdk/save-changes.ts](https://github.com/apimatic/apimatic-cli/blob/v1.1.0/src/commands/sdk/save-changes.ts)_
 <!-- commandsstop -->

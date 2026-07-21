@@ -260,7 +260,7 @@ export class PortalQuickstartAction {
       const portalDirectory = inputDirectory.join('portal');
       const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
       const result = await portalServeAction.execute(sourceDirectory, portalDirectory, defaultPort, true, false, () => {
-        this.prompts.nextSteps();
+        this.prompts.nextSteps(prunedConfig.hasAiIntegration());
       });
 
       if (result.isFailed()) {

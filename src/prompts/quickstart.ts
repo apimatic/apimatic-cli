@@ -5,16 +5,16 @@ export type QuickstartFlow = "sdk" | "portal" | undefined;
 export class QuickstartPrompts {
   public welcomeMessage() {
     log.info(`Welcome to the APIMatic quickstart wizard.`);
-    log.message(`This wizard will guide you through creating your first SDK or API Documentation Portal in just four easy steps.
+    log.message(`This wizard will guide you through creating your first Context Plugins, API Documentation Portal or SDK in just four easy steps.
 Let's get started!`);
   }
 
   public async selectQuickstartFlow(): Promise<QuickstartFlow> {
     const option = await select({
-      message: "What would you like to create?",
+      message: "How do you want to get started?",
       options: [
-        { value: "portal", label: "API Documentation Portal", hint: "Generate API docs + SDKs" },
-        { value: "sdk", label: "SDK" }
+        { value: "portal", label: "API Portal + Context Plugins + SDKs", hint: "" },
+        { value: "sdk", label: "SDK Only", hint: "Add the API Portal and Context Plugins later" }
       ]
     });
 
