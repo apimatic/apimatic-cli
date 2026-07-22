@@ -136,7 +136,7 @@ export class PortalQuickstartPrompts {
 
     const languages = (await multiselect({
       message:
-        "Your API Portal will contain SDKs and SDK Documentation in the following Languages (HTTP is enabled by default). Press enter to continue with all languages, or use the arrow keys and space to customize your selection:",
+        "Your API Portal can contain Context Plugins for AI agents, SDKs, and SDK documentation in the following languages (HTTP is enabled by default). Press Enter to continue with all languages, or use the arrow keys and Space to customize your selection",
       options: available.map(({ label, value }) => ({ label, value })),
       initialValues: available.map(({ value }) => value),
       required: false
@@ -187,7 +187,7 @@ export class PortalQuickstartPrompts {
       removed.push("API Copilot");
     }
     if (report.removedAiIntegration) {
-      removed.push("AI context plugins (Cursor / VS Code / Claude Code)");
+      removed.push("Context plugins (Cursor / VS Code / Claude Code)");
     }
     if (removed.length === 0) {
       return;
@@ -256,8 +256,15 @@ export class PortalQuickstartPrompts {
     );
   }
 
-  public nextSteps(): void {
-    const message = `Use the API Playground or an SDK to call your API.
+  public nextSteps(hasAiIntegration: boolean): void {
+    const message = hasAiIntegration
+      ? `Your API Portal is ready with Context Plugins enabled.
+
+Install your API's Context Plugins in Cursor, VS Code, or Claude Code to help AI coding agents understand your API and generate more accurate code.
+
+Explore customization options, including Portal themes and API Recipes.
+${f.link(referenceDocumentationUrl)}`
+      : `Use the API Playground or an SDK to call your API.
 Customize the Portal theme, add API recipes and enable AI features
 ${f.link(referenceDocumentationUrl)}`;
     noteWrapped(message, "Next Steps");
@@ -292,7 +299,7 @@ ${f.link(referenceDocumentationUrl)}`;
   public copilotEnabled(key: string) {
     const message =
       `API Copilot is enabled with key ${f.var(key)}. ` +
-      `Any existing AI context associated with this key will be overwritten when the portal is generated.`;
+      `Any existing Copilot context associated with this key will be overwritten when the portal is generated.`;
     log.warn(message);
   }
 

@@ -252,6 +252,8 @@ export class SdkQuickstartPrompts {
 '${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)}'
 to regenerate your SDK.
 
+Explore API Portals and Context Plugins next to enhance your API experience.
+
 To learn more about customizing your SDK, visit:
 ${f.link(sdkCustomizationUrl)}`;
     noteWrapped(message, "Next Steps");
