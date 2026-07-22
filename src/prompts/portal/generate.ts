@@ -39,7 +39,7 @@ export class PortalGeneratePrompts {
 
   public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>>) {
     return withSpinner(
-      "Generating API Portal, Context Plugins, and SDKs...",
+      "Generating API Portal",
       "Portal generated successfully.",
       "Portal Generation failed.",
       fn

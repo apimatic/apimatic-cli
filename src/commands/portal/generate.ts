@@ -6,7 +6,7 @@ import { format, intro, outro } from "../../prompts/format.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 
 export class PortalGenerate extends Command {
-  static summary = "Generate Context Plugins, API Documentation Portal with AI Assist Features.";
+  static summary = "Generate API Documentation Portal with Context Plugins and AI Assist Features.";
 
   static description =
     "Generate an API Documentation portal. Requires an input directory containing API specifications, a config file and optionally, markdown guides. For details, refer to the [documentation](https://docs.apimatic.io/platform-api/#/http/guides/generating-on-prem-api-portal/build-file-reference)";

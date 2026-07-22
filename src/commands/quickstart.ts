@@ -10,7 +10,7 @@ import { QuickstartCompletedEvent } from "../types/events/quickstart-completed.j
 export default class Quickstart extends Command {
   static description = "Get started with your first SDK or API Portal in four easy steps.";
 
-  static summary = "Create your first Context Plugins, API Portal or SDK using APIMatic.";
+  static summary = "Create your first API Portal with Context Plugins and SDKs, or a standalone SDK, using APIMatic.";
 
   static cmdTxt = format.cmd("apimatic", "quickstart");
 
