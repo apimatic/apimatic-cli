@@ -31,7 +31,7 @@ export class ServiceError {
   static notFound(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
   }
-  static unauthorized(apiMessage: string | null): ServiceError {
+  static unauthorizedWithHint(apiMessage: string | null): ServiceError {
     const message = `${apiMessage ?? "You are not authorized to perform this action."} Please run ${f.cmdAlt(
       "apimatic",
       "auth",
@@ -66,10 +66,13 @@ export class ServiceError {
 // A ProblemDetails body carries a `title` plus a map of field errors; surface
 // the title and the first field message.
 function mapProblemDetailsError(error: ProblemDetailsError): ServiceError | null {
+  // ProblemDetails.title and .errors are optional and result may be absent — guard
+  // all three so a sparse body can't crash or render a trailing "- null".
   // TODO: This only picks the first error message, improve it to show all errors.
-  const errors = error.result!.errors as Record<string, string[]>;
-  const message = Object.values(errors)[0]?.[0] ?? null;
-  const errorMessage = error.result!.title + "\n- " + message;
+  const errors = (error.result?.errors ?? {}) as Record<string, string[]>;
+  const firstFieldMessage = Object.values(errors)[0]?.[0];
+  const title = error.result?.title ?? "Request failed.";
+  const errorMessage = firstFieldMessage ? `${title}\n- ${firstFieldMessage}` : title;
   if (error.statusCode === 400) return ServiceError.badRequest(errorMessage, errors);
   if (error.statusCode === 403) return ServiceError.forbidden(errorMessage);
   return null;
@@ -84,7 +87,7 @@ function mapApiError(error: ApiError): ServiceError {
   }
   if (error.statusCode === 401) {
     const apiMessage = (error.result as { message?: string } | undefined)?.message ?? null;
-    return ServiceError.unauthorized(apiMessage);
+    return ServiceError.unauthorizedWithHint(apiMessage);
   }
   if (error.statusCode === 404) return ServiceError.NotFound;
   return ServiceError.ServerError;
