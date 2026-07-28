@@ -17,6 +17,7 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result} from "neverthrow";
+import { ServiceError } from "../service-error.js";
 
 export interface TransformViaFileParams {
   file: FilePath;
@@ -86,7 +87,7 @@ export class TransformationService {
         return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
       } else if (apiError.statusCode === 401) {
         const message = JSON.parse(apiError.body as string).message;
-        return `${message} You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.`;
+        return ServiceError.unauthorizedWithHint(message).errorMessage;
       }
       return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
     } else {

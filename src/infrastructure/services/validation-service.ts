@@ -247,7 +247,7 @@ export class ValidationService {
         case 400:
           return "Your API Definition is invalid. Please fix the issues and try again.";
         case 401:
-          return "You are not authorized to perform this action. Please run 'auth:login' or provide a valid auth key.";
+          return ServiceError.unauthorizedWithHint(null).errorMessage;
         case 403:
           return "You do not have permission to perform this action.";
         case 500:

@@ -24,8 +24,10 @@ export class PublishingApiService {
     shell: string
   ): Promise<Result<PublishingProfileItem[], ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    if (authInfo === null) {
-      return err(ServiceError.UnAuthorized);
+    // `auth logout` blanks config.json rather than deleting it, so a logged-out user
+    // still has a non-null AuthInfo with an empty key — check the key, not the object.
+    if (!authInfo?.authKey) {
+      return err(ServiceError.unauthorizedWithHint(null));
     }
 
     try {
@@ -51,8 +53,10 @@ export class PublishingApiService {
     shell: string
   ): Promise<Result<PublishingInfo, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    if (authInfo === null) {
-      return err(ServiceError.UnAuthorized);
+    // `auth logout` blanks config.json rather than deleting it, so a logged-out user
+    // still has a non-null AuthInfo with an empty key — check the key, not the object.
+    if (!authInfo?.authKey) {
+      return err(ServiceError.unauthorizedWithHint(null));
     }
     const sdkFileStream = await this.fileService.getStream(sdkFilePath);
 
@@ -107,8 +111,10 @@ export class PublishingApiService {
     shell: string
   ): Promise<Result<PublishLogItem, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    if (authInfo === null) {
-      return err(ServiceError.UnAuthorized);
+    // `auth logout` blanks config.json rather than deleting it, so a logged-out user
+    // still has a non-null AuthInfo with an empty key — check the key, not the object.
+    if (!authInfo?.authKey) {
+      return err(ServiceError.unauthorizedWithHint(null));
     }
 
     try {
