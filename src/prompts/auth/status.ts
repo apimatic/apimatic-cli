@@ -16,11 +16,16 @@ export class StatusPrompts {
     );
   }
 
+  public notLoggedIn() {
+    log.error(`You are not logged in. Please run ${format.cmdAlt("apimatic", "auth", "login")} to log in.`);
+  }
+
   public invalidKeyProvided(serviceError: ServiceError) {
     const message =
       serviceError === ServiceError.UnAuthorized ? "Invalid API key provided." : serviceError.errorMessage;
     log.error(message);
   }
+
 
   public showAccountInfo(info: SubscriptionInfo) {
     const languages = mapLanguages(info.allowedLanguages);
