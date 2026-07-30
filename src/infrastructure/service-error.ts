@@ -32,7 +32,7 @@ export class ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
   }
   static unauthorizedWithHint(apiMessage: string | null): ServiceError {
-    const message = `${apiMessage ?? "You are not authorized to perform this action."} Please run ${f.cmdAlt(
+    const message = `${apiMessage ?? "Authorization has been denied for this request."} Please run ${f.cmdAlt(
       "apimatic",
       "auth",
       "login"
