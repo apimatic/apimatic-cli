@@ -32,11 +32,14 @@ export class ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
   }
   static unauthorizedWithHint(apiMessage: string | null): ServiceError {
-    const message = `${apiMessage ?? "You are not authorized to perform this action."} Please run ${f.cmdAlt(
-      "apimatic",
-      "auth",
-      "login"
-    )} to log in, or provide a valid auth key using the ${f.flag("auth-key")} flag.`;
+    // Both remedies name the full `auth login` command: the key is supplied to
+    // that command, not to whichever one hit the 401 — most of them don't accept
+    // an --auth-key flag at all.
+    const loginCommand = f.cmdAlt("apimatic", "auth", "login");
+    const message =
+      `${apiMessage ?? "Authorization has been denied for this request."} ` +
+      `Please run ${loginCommand} to log in via browser, ` +
+      `or provide a valid auth key using the ${loginCommand} ${f.flag("auth-key")}`;
     return new ServiceError(ServiceErrorCode.UnAuthorized, message, {});
   }
 

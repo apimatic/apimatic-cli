@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { ServiceError } from "../../infrastructure/service-error.js";
+import { ServiceError, ServiceErrorCode } from "../../infrastructure/service-error.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
@@ -14,8 +14,15 @@ export class LoginPrompts {
   }
 
   public invalidKeyProvided(serviceError: ServiceError) {
+    // A rejected key is the failure this reports, so key off the 401 rather than
+    // the network error it was previously matching. Compared by code, not by
+    // reference: `unauthorizedWithHint` and friends build fresh instances, so an
+    // identity check silently stops matching. Anything else (unreachable server,
+    // server error) already describes itself accurately.
     const message =
-      serviceError === ServiceError.NetworkError ? "Invalid API key provided." : serviceError.errorMessage;
+      serviceError.code === ServiceErrorCode.UnAuthorized
+        ? ServiceError.unauthorizedWithHint("Invalid API key provided.").errorMessage
+        : serviceError.errorMessage;
     log.error(message);
   }
 

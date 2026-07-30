@@ -17,7 +17,9 @@ export class StatusPrompts {
   }
 
   public notLoggedIn() {
-    log.error(`You are not logged in. Please run ${format.cmdAlt("apimatic", "auth", "login")} to log in.`);
+    // Same message as every 401 the services surface: the user isn't authorized
+    // to perform the action, whether that's caught locally or by the API.
+    log.error(ServiceError.unauthorizedWithHint(null).errorMessage);
   }
 
   public invalidKeyProvided(serviceError: ServiceError) {
