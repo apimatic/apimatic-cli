@@ -20,7 +20,7 @@ import FormData from "form-data";
 import { ZipService } from "../zip-service.js";
 import { FileService } from "../file-service.js";
 import { withDirPath } from "../tmp-extensions.js";
-import { handleServiceError, ServiceError } from "../service-error.js";
+import { discardStreamBody, handleServiceError, ServiceError } from "../service-error.js";
 import axios from "axios";
 import { envInfo } from "../env-info.js";
 import { Buffer } from "node:buffer";
@@ -242,6 +242,10 @@ export class ValidationService {
   private async handleValidationErrors(error: unknown): Promise<string> {
     if (error instanceof ApiError) {
       const apiError = error as ApiError;
+
+      // A stream-endpoint error body is an undrained response that would keep
+      // the event loop alive and hang the CLI after its outro.
+      discardStreamBody(apiError);
 
       switch (apiError.statusCode) {
         case 400:

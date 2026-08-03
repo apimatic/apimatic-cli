@@ -29,7 +29,7 @@ export class PortalNewTocPrompts {
     log.error(`Please enter a different destination path or delete the existing toc.yml file and try again.`);
   }
 
-  public logError(message: string) {
+  public tocExtractionFailed(message: string) {
     log.error(message);
   }
 

@@ -96,8 +96,29 @@ function mapApiError(error: ApiError): ServiceError {
   return ServiceError.ServerError;
 }
 
+// Endpoints the SDK issues via `callAsStream` (TOC data, portal/SDK downloads,
+// transformed files) hand back an undrained `IncomingMessage` on `ApiError.body`
+// when they fail. Its socket stays open and keeps the Node event loop alive, so
+// the CLI hangs after printing its outro — `outro()` only sets
+// `process.exitCode` and we never call `process.exit()`. Discard the body once
+// we've decided to map the error to a message.
+//
+// Callers that need the body read it *before* reaching here (see
+// `PortalService.generatePortal`, which returns the 422 body as the error
+// report). Non-stream bodies are strings or Blobs and have no `destroy`.
+export function discardStreamBody(error: ApiError): void {
+  const body = error.body as { destroy?: () => void } | undefined;
+  if (typeof body?.destroy === "function") {
+    body.destroy();
+  }
+}
+
 export function handleServiceError(error: unknown): ServiceError {
-  if (error instanceof ApiError) return mapApiError(error);
+  if (error instanceof ApiError) {
+    const serviceError = mapApiError(error);
+    discardStreamBody(error);
+    return serviceError;
+  }
 
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;

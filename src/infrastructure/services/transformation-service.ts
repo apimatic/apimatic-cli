@@ -17,7 +17,7 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result} from "neverthrow";
-import { ServiceError } from "../service-error.js";
+import { discardStreamBody, ServiceError } from "../service-error.js";
 
 export interface TransformViaFileParams {
   file: FilePath;
@@ -83,13 +83,20 @@ export class TransformationService {
   private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof ApiError) {
       const apiError = error as ApiError;
-      if (apiError.statusCode === 400) {
-        return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
-      } else if (apiError.statusCode === 401) {
-        const message = JSON.parse(apiError.body as string).message;
-        return ServiceError.unauthorizedWithHint(message).errorMessage;
+      try {
+        if (apiError.statusCode === 400) {
+          return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
+        } else if (apiError.statusCode === 401) {
+          const message = JSON.parse(apiError.body as string).message;
+          return ServiceError.unauthorizedWithHint(message).errorMessage;
+        }
+        return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
+      } finally {
+        // `downloadTransformedFile` is a stream endpoint: its error body is an
+        // undrained response that would keep the event loop alive. Released
+        // after the message is built, so the 401 branch can still read it.
+        discardStreamBody(apiError);
       }
-      return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
     } else {
       return "An unexpected error occurred while validating your API Definition. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
     }
