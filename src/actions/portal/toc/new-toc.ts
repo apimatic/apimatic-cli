@@ -54,6 +54,27 @@ export class PortalNewTocAction {
       this.prompts.invalidBuildDirectory(buildDirectory);
       return ActionResult.failed();
     }
+
+    // The `--expand-*` flags enumerate endpoints, models and events in the TOC,
+    // which only the spec can supply. Without one the generator falls back to the
+    // collapsed `generate:` directives and the flags are dropped, so honour the
+    // documented requirement instead of reporting success for a TOC the user did
+    // not ask for. Checked before the overwrite prompt below so a run that cannot
+    // succeed asks nothing first.
+    const specDirectory = buildDirectory.join('spec');
+    const specExists = await this.fileService.directoryExists(specDirectory);
+    const requestedExpansions = [
+      expandEndpoints && 'expand-endpoints',
+      expandModels && 'expand-models',
+      expandWebhooks && 'expand-webhooks',
+      expandCallbacks && 'expand-callbacks'
+    ].filter((flag): flag is string => typeof flag === 'string');
+
+    if (!specExists && requestedExpansions.length > 0) {
+      this.prompts.expandFlagsRequireSpec(requestedExpansions, specDirectory);
+      return ActionResult.failed();
+    }
+
     const buildConfig = await buildContext.getBuildFileContents();
     const contentDirectory = buildDirectory.join(buildConfig.contentFolder());
 
@@ -66,11 +87,10 @@ export class PortalNewTocAction {
     }
 
     const tocComponentsResult: Result<TocComponents, ServiceError> = await (async () => {
-      const specDirectory = buildDirectory.join('spec');
-
       // No spec to extract from is an expected case, not a failure: the default
-      // TOC is the correct output. A failed extraction is not — see below.
-      if (!(await this.fileService.directoryExists(specDirectory))) {
+      // TOC is the correct output. A failed extraction is not — see below. Any
+      // `--expand-*` flag combined with a missing spec already failed above.
+      if (!specExists) {
         this.prompts.fallingBackToDefault();
         return ok(TocComponents.empty());
       }

@@ -25,6 +25,17 @@ export class PortalNewTocPrompts {
     log.warn(`Falling back to the default TOC structure.`);
   }
 
+  public expandFlagsRequireSpec(flagNames: string[], specDirectory: DirectoryPath) {
+    const flags = flagNames.map((name) => f.flag(name)).join(", ");
+    const plural = flagNames.length > 1;
+    log.error(
+      `${flags} ${plural ? "require" : "requires"} an API specification to expand, ` +
+        `but no spec directory was found at ${f.path(specDirectory)}.\n` +
+        `Add your API specification there, or re-run without ${plural ? "the flags" : "the flag"} ` +
+        `to generate the default TOC.`
+    );
+  }
+
   public tocFileAlreadyExists() {
     log.error(`Please enter a different destination path or delete the existing toc.yml file and try again.`);
   }
