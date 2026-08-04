@@ -23,7 +23,7 @@ export class PortalNewTocPrompts {
 
   public specDirectoryNotFound(directory: DirectoryPath) {
     log.error(
-      `The ${f.var("spec")} directory was not found at ${f.path(directory)}.\n` +
+      `The ${f.var("spec")} directory was not found in ${f.path(directory)}.\n` +
         `Add your API specification there and try again.`
     );
   }

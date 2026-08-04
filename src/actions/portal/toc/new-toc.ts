@@ -62,13 +62,16 @@ export class PortalNewTocAction {
     // Missing and empty are reported separately: `SpecContext.validate()` treats
     // both as invalid, but only one of them is fixed by adding files to a
     // directory that already exists.
+    // Both messages report the build directory rather than the `spec/` path
+    // inside it: that is the directory the user works in, and it is what the
+    // sibling messages here and in `sdk generate` already name.
     const specDirectory = buildDirectory.join('spec');
     if (!(await this.fileService.directoryExists(specDirectory))) {
-      this.prompts.specDirectoryNotFound(specDirectory);
+      this.prompts.specDirectoryNotFound(buildDirectory);
       return ActionResult.failed();
     }
     if (!(await new SpecContext(specDirectory).validate())) {
-      this.prompts.specDirectoryEmpty(specDirectory);
+      this.prompts.specDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
 
