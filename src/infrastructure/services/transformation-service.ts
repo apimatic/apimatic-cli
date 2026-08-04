@@ -80,6 +80,23 @@ export class TransformationService {
     };
   };
 
+  /**
+   * A 401 body is not guaranteed to be JSON: a stream endpoint hands back an
+   * `IncomingMessage`, an empty body parses to nothing, and an authenticating
+   * proxy can answer with an HTML error page. Throwing here would escape the
+   * catch in `transformViaFile` — this runs inside the `err(await ...)` it
+   * builds — and surface as an unhandled rejection, skipping the outro and the
+   * failure telemetry. Fall back to the hint's own default message instead.
+   */
+  private parseApiMessage(body: unknown): string | null {
+    if (typeof body !== "string") return null;
+    try {
+      return (JSON.parse(body) as { message?: string })?.message ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
     if (error instanceof ApiError) {
       const apiError = error as ApiError;
@@ -87,8 +104,7 @@ export class TransformationService {
         if (apiError.statusCode === 400) {
           return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
         } else if (apiError.statusCode === 401) {
-          const message = JSON.parse(apiError.body as string).message;
-          return ServiceError.unauthorizedWithHint(message).errorMessage;
+          return ServiceError.unauthorizedWithHint(this.parseApiMessage(apiError.body)).errorMessage;
         }
         return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
       } finally {
