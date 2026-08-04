@@ -11,7 +11,6 @@ import {
   Transformation,
   ExportFormats,
   SdkLanguages,
-  Status,
   TableOfContentsController,
   StabilityLevelTag,
   V2SdkGenerationController,
@@ -31,6 +30,12 @@ import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
 import { SemVersion } from "../../types/publish/version.js";
 import { TocData } from "../../types/toc/toc-components.js";
+import { GenerationStatusEndpoint } from "../../types/api/generation-status-endpoint.js";
+import {
+  formatValidationErrors,
+  GenerationStatusPoller,
+  ValidationErrorFormatter
+} from "./generation-status-poller.js";
 
 export interface GeneratedSdkResult {
   sdk: NodeJS.ReadableStream;
@@ -38,9 +43,12 @@ export interface GeneratedSdkResult {
 }
 
 export class PortalService {
+  private static readonly STATUS_POLL_INTERVAL_MS = 3000;
+
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly fileService = new FileService();
   private readonly apiService = new ApiService();
+  private readonly statusPoller = new GenerationStatusPoller(PortalService.STATUS_POLL_INTERVAL_MS);
 
   // TODO: Pass stream as parameter instead of file path.
   public async generatePortal(
@@ -71,37 +79,18 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    let statusResult;
-    do {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      statusResult = await this.apiService.getPortalGenerationStatus(
+    const statusResult = await this.statusPoller.pollUntilCompleted(() =>
+      this.apiService.getGenerationStatus(
+        GenerationStatusEndpoint.Portal,
         generationId,
         configDir,
         commandMetadata.shell,
         authKey
-      );
-      if (statusResult.isErr()) {
-        return err(statusResult.error);
-      }
-      if (statusResult.value.status === Status.Failed) {
-        return err(ServiceError.ServerError);
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage =
-          "One or more validation errors occurred." +
-           "\n- " + message;
-        return err(ServiceError.badRequest(errorMessage, errors));
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = "Access denied to resource." + "\n- " + message;
-        return err(ServiceError.forbidden(errorMessage));
-      }
-    } while (statusResult.value.status !== Status.Completed);
+      )
+    );
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
 
     try {
       const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
@@ -147,46 +136,20 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    let statusResult;
-    do {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      statusResult = await this.apiService.getSdkGenerationStatus(
-        generationId,
-        configDir,
-        commandMetadata.shell,
-        authKey
-      );
-      
-      if (statusResult.isErr()) {
-        return err(statusResult.error);
-      }
-      if (statusResult.value.status === Status.Failed) {
-        return err(ServiceError.ServerError);
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const sdkMergeFailedLanguages = errors.sdkMergeFailed;
-        if (sdkMergeFailedLanguages?.length) {
-          const errorMessage =
-            "SDK generation failed for these languages due to merge conflict." +
-            "\n- " +
-            sdkMergeFailedLanguages.join("\n- ");
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-
-        const messages = Object.values(errors).flat();
-        const errorMessage =
-          "One or more validation errors occurred." +
-          (messages.length ? "\n- " + messages.join("\n- ") : "");
-        return err(ServiceError.badRequest(errorMessage, errors));
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const message = Object.values(errors).flat()[0] ?? null;
-        const errorMessage = "Access denied to resource." + "\n- " + message;
-        return err(ServiceError.forbidden(errorMessage));
-      }
-    } while (statusResult.value.status !== Status.Completed);
+    const statusResult = await this.statusPoller.pollUntilCompleted(
+      () =>
+        this.apiService.getGenerationStatus(
+          GenerationStatusEndpoint.Sdk,
+          generationId,
+          configDir,
+          commandMetadata.shell,
+          authKey
+        ),
+      this.formatSdkValidationError
+    );
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
 
     try {
       const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
@@ -232,36 +195,18 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    let statusResult;
-    do {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      statusResult = await this.apiService.getV4SdkGenerationStatus(
+    const statusResult = await this.statusPoller.pollUntilCompleted(() =>
+      this.apiService.getGenerationStatus(
+        GenerationStatusEndpoint.V4Sdk,
         generationId,
         configDir,
         commandMetadata.shell,
         authKey
-      );
-
-      if (statusResult.isErr()) {
-        return err(statusResult.error);
-      }
-      if (statusResult.value.status === Status.Failed) {
-        return err(ServiceError.ServerError);
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const messages = Object.values(errors).flat();
-        const errorMessage =
-          'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
-        return err(ServiceError.badRequest(errorMessage, errors));
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const message = Object.values(errors).flat()[0] ?? null;
-        const errorMessage = 'Access denied to resource.' + '\n- ' + message;
-        return err(ServiceError.forbidden(errorMessage));
-      }
-    } while (statusResult.value.status !== Status.Completed);
+      )
+    );
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
 
     try {
       const sdkResponse = await v2sdkGenerationController.downloadGeneratedV2Sdk(generationId);
@@ -333,6 +278,23 @@ export class PortalService {
       return err(handleServiceError(error));
     }
   }
+
+  /**
+   * SDK generation reports per-language merge conflicts under a dedicated
+   * `sdkMergeFailed` key, which needs its own wording. Everything else falls
+   * back to the shared format.
+   */
+  private readonly formatSdkValidationError: ValidationErrorFormatter = (errors) => {
+    const sdkMergeFailedLanguages = errors.sdkMergeFailed;
+    if (sdkMergeFailedLanguages?.length) {
+      return (
+        "SDK generation failed for these languages due to merge conflict." +
+        "\n- " +
+        sdkMergeFailedLanguages.join("\n- ")
+      );
+    }
+    return formatValidationErrors(errors);
+  };
 
   private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
     const key = overrideAuthKey || authInfo?.authKey;

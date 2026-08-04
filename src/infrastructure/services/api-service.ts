@@ -5,7 +5,9 @@ import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../service-error.js";
-import { PortalGenerationStatusResponse, SdkGenerationStatusResponse } from "@apimatic/sdk";
+import { Status } from "@apimatic/sdk";
+import { GenerationStatusEndpoint } from "../../types/api/generation-status-endpoint.js";
+import { GenerationStatusResponse } from "./generation-status-poller.js";
 
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
@@ -33,12 +35,17 @@ export class ApiService {
     }
   }
 
-  public async getPortalGenerationStatus(
+  /**
+   * Reads the status of one in-flight generation request. Shared by every
+   * async generation endpoint — see `GenerationStatusEndpoint`.
+   */
+  public async getGenerationStatus(
+    endpoint: GenerationStatusEndpoint,
     requestId: string,
     configDir: DirectoryPath,
     shell: string,
     authKey: string | null
-  ): Promise<Result<PortalGenerationStatusResponse, ServiceError>> {
+  ): Promise<Result<GenerationStatusResponse, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     if (authInfo === null && !authKey) {
       return err(ServiceError.UnAuthorized);
@@ -46,84 +53,19 @@ export class ApiService {
 
     try {
       const token = authKey || authInfo?.authKey;
-      const response = await this.axiosInstance(shell, token).get(`/portal/v2/${requestId}/status`, {
+      const response = await this.axiosInstance(shell, token).get(`${endpoint}/${requestId}/status`, {
         headers: { Accept: "application/json" },
         maxRedirects: 0,
         validateStatus: () => true
       });
 
       if (response.status === 200) {
-        return ok(response.data as PortalGenerationStatusResponse);
+        return ok(response.data as GenerationStatusResponse);
       }
 
+      // Once generation finishes, the API redirects to the download location.
       if (response.status === 302) {
-        return ok({ status: "Completed" } as PortalGenerationStatusResponse);
-      }
-
-      return err(ServiceError.InvalidResponse);
-    } catch (error: unknown) {
-      return err(handleServiceError(error));
-    }
-  }
-
-  public async getSdkGenerationStatus(
-    requestId: string,
-    configDir: DirectoryPath,
-    shell: string,
-    authKey: string | null
-  ): Promise<Result<SdkGenerationStatusResponse, ServiceError>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    if (authInfo === null && !authKey) {
-      return err(ServiceError.UnAuthorized);
-    }
-
-    try {
-      const token = authKey || authInfo?.authKey;
-      const response = await this.axiosInstance(shell, token).get(`/sdk/${requestId}/status`, {
-        headers: { Accept: 'application/json' },
-        maxRedirects: 0,
-        validateStatus: () => true
-      });
-
-      if (response.status === 200) {
-        return ok(response.data as SdkGenerationStatusResponse);
-      }
-
-      if (response.status === 302) {
-        return ok({ status: 'Completed' } as SdkGenerationStatusResponse);
-      }
-
-      return err(ServiceError.InvalidResponse);
-    } catch (error: unknown) {
-      return err(handleServiceError(error));
-    }
-  }
-
-  public async getV4SdkGenerationStatus(
-    requestId: string,
-    configDir: DirectoryPath,
-    shell: string,
-    authKey: string | null
-  ): Promise<Result<SdkGenerationStatusResponse, ServiceError>> {
-    const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
-    if (authInfo === null && !authKey) {
-      return err(ServiceError.UnAuthorized);
-    }
-
-    try {
-      const token = authKey || authInfo?.authKey;
-      const response = await this.axiosInstance(shell, token).get(`/sdk/v2/${requestId}/status`, {
-        headers: { Accept: 'application/json' },
-        maxRedirects: 0,
-        validateStatus: () => true
-      });
-
-      if (response.status === 200) {
-        return ok(response.data as SdkGenerationStatusResponse);
-      }
-
-      if (response.status === 302) {
-        return ok({ status: 'Completed' } as SdkGenerationStatusResponse);
+        return ok({ status: Status.Completed });
       }
 
       return err(ServiceError.InvalidResponse);
