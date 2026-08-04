@@ -21,19 +21,16 @@ export class PortalNewTocPrompts {
     return overwrite;
   }
 
-  public fallingBackToDefault() {
-    log.warn(`Falling back to the default TOC structure.`);
+  public specDirectoryNotFound(directory: DirectoryPath) {
+    log.error(
+      `The ${f.var("spec")} directory was not found at ${f.path(directory)}.\n` +
+        `Add your API specification there and try again.`
+    );
   }
 
-  public expandFlagsRequireSpec(flagNames: string[], specDirectory: DirectoryPath) {
-    const flags = flagNames.map((name) => f.flag(name)).join(", ");
-    const plural = flagNames.length > 1;
-    log.error(
-      `${flags} ${plural ? "require" : "requires"} an API specification to expand, ` +
-        `but no spec directory was found at ${f.path(specDirectory)}.\n` +
-        `Add your API specification there, or re-run without ${plural ? "the flags" : "the flag"} ` +
-        `to generate the default TOC.`
-    );
+  public specDirectoryEmpty(directory: DirectoryPath) {
+    const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
+    log.error(message);
   }
 
   public tocFileAlreadyExists() {

@@ -13,6 +13,7 @@ import {
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PortalService } from '../../../infrastructure/services/portal-service.js';
+import { SpecContext } from '../../../types/spec-context.js';
 import { err, ok, Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 
@@ -55,23 +56,19 @@ export class PortalNewTocAction {
       return ActionResult.failed();
     }
 
-    // The `--expand-*` flags enumerate endpoints, models and events in the TOC,
-    // which only the spec can supply. Without one the generator falls back to the
-    // collapsed `generate:` directives and the flags are dropped, so honour the
-    // documented requirement instead of reporting success for a TOC the user did
-    // not ask for. Checked before the overwrite prompt below so a run that cannot
-    // succeed asks nothing first.
+    // The spec is required, not optional: it is what the TOC is built from, and
+    // the next step — portal generation — needs it regardless. Writing a TOC
+    // without it only defers the failure to a later command, so fail here.
+    // Missing and empty are reported separately: `SpecContext.validate()` treats
+    // both as invalid, but only one of them is fixed by adding files to a
+    // directory that already exists.
     const specDirectory = buildDirectory.join('spec');
-    const specExists = await this.fileService.directoryExists(specDirectory);
-    const requestedExpansions = [
-      expandEndpoints && 'expand-endpoints',
-      expandModels && 'expand-models',
-      expandWebhooks && 'expand-webhooks',
-      expandCallbacks && 'expand-callbacks'
-    ].filter((flag): flag is string => typeof flag === 'string');
-
-    if (!specExists && requestedExpansions.length > 0) {
-      this.prompts.expandFlagsRequireSpec(requestedExpansions, specDirectory);
+    if (!(await this.fileService.directoryExists(specDirectory))) {
+      this.prompts.specDirectoryNotFound(specDirectory);
+      return ActionResult.failed();
+    }
+    if (!(await new SpecContext(specDirectory).validate())) {
+      this.prompts.specDirectoryEmpty(specDirectory);
       return ActionResult.failed();
     }
 
@@ -86,41 +83,32 @@ export class PortalNewTocAction {
       return ActionResult.cancelled();
     }
 
-    const tocComponentsResult: Result<TocComponents, ServiceError> = await (async () => {
-      // No spec to extract from is an expected case, not a failure: the default
-      // TOC is the correct output. A failed extraction is not — see below. Any
-      // `--expand-*` flag combined with a missing spec already failed above.
-      if (!specExists) {
-        this.prompts.fallingBackToDefault();
-        return ok(TocComponents.empty());
-      }
-
-      return await withDirPath(async (tempDirectory) => {
-        const tempContext = new TempContext(tempDirectory);
-        const specZipPath = await tempContext.zip(specDirectory);
-        const specFileStream = await this.fileService.getStream(specZipPath);
-        try {
-          const result = await this.prompts.extractTocData(
-            this.portalService.generateTocData(specFileStream, this.configDirectory, this.commandMetadata),
-            expandEndpoints,
-            expandModels,
-            expandWebhooks,
-            expandCallbacks
-          );
-          if (result.isErr()) {
-            return err(result.error);
-          }
-
-          return ok(TocComponents.fromTocData(result.value));
-        } finally {
-          specFileStream.close();
+    const tocComponentsResult: Result<TocComponents, ServiceError> = await withDirPath(async (tempDirectory) => {
+      const tempContext = new TempContext(tempDirectory);
+      const specZipPath = await tempContext.zip(specDirectory);
+      const specFileStream = await this.fileService.getStream(specZipPath);
+      try {
+        const result = await this.prompts.extractTocData(
+          this.portalService.generateTocData(specFileStream, this.configDirectory, this.commandMetadata),
+          expandEndpoints,
+          expandModels,
+          expandWebhooks,
+          expandCallbacks
+        );
+        if (result.isErr()) {
+          return err(result.error);
         }
-      });
-    })();
 
-    // Falling back here would write a TOC missing its Endpoints, Events and
-    // Models sections over a possibly valid toc.yml, and report success. Surface
-    // the reason (auth, network, invalid spec) and leave the file alone.
+        return ok(TocComponents.fromTocData(result.value));
+      } finally {
+        specFileStream.close();
+      }
+    });
+
+    // This used to fall back to the default TOC, which wrote a file missing its
+    // Endpoints, Events and Models sections over a possibly valid toc.yml and
+    // reported success. Surface the reason (auth, network, invalid spec) and
+    // leave the file alone.
     if (tocComponentsResult.isErr()) {
       this.prompts.tocExtractionFailed(tocComponentsResult.error.errorMessage);
       return ActionResult.failed();
