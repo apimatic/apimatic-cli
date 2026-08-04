@@ -119,18 +119,25 @@ describe("generation status polling over HTTP", () => {
     expect(observed, "must not keep polling after a terminal state").to.have.lengthOf(1);
   });
 
-  // `validateStatus: () => true` keeps axios from throwing, so non-2xx/302 codes
-  // never reach handleServiceError and all collapse to InvalidResponse. Pinned
-  // here because it means an auth key that expires mid-poll reports a generic
-  // error rather than "Unauthorized".
-  it("stops polling on an unexpected status code", async () => {
-    respond = (_req, res) => json(res, 401, {});
+  // `validateStatus: () => true` keeps axios from throwing, so getGenerationStatus
+  // classifies these itself rather than relying on the catch block.
+  const statusCodeCases: [string, number, ServiceErrorCode][] = [
+    ["an expired auth key", 401, ServiceErrorCode.UnAuthorized],
+    ["an unknown endpoint path", 404, ServiceErrorCode.NotFound],
+    ["a server failure", 500, ServiceErrorCode.ServerError],
+    ["an unmapped status code", 418, ServiceErrorCode.InvalidResponse]
+  ];
 
-    const result = await new GenerationStatusPoller(5).pollUntilCompleted(() =>
-      fetchStatus(GenerationStatusEndpoint.Portal)
-    );
+  statusCodeCases.forEach(([name, statusCode, expectedCode]) => {
+    it(`stops polling and reports ${name} (${statusCode})`, async () => {
+      respond = (_req, res) => json(res, statusCode, {});
 
-    expect(result._unsafeUnwrapErr().code).to.equal(ServiceErrorCode.InvalidResponse);
-    expect(observed).to.have.lengthOf(1);
+      const result = await new GenerationStatusPoller(5).pollUntilCompleted(() =>
+        fetchStatus(GenerationStatusEndpoint.Portal)
+      );
+
+      expect(result._unsafeUnwrapErr().code).to.equal(expectedCode);
+      expect(observed, "must not keep polling after a terminal state").to.have.lengthOf(1);
+    });
   });
 });
