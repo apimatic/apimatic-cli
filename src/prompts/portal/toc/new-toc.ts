@@ -29,8 +29,7 @@ export class PortalNewTocPrompts {
   }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("spec")} directory in ${f.path(directory)} is either empty or invalid.`;
-    log.error(message);
+    log.error(`The ${f.var("spec")} directory in ${f.path(directory)} is either empty or invalid.`);
   }
 
   public tocFileAlreadyExists() {

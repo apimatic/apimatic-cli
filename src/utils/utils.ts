@@ -23,7 +23,7 @@ export async function parseStreamBodyToJson(body: NodeJS.ReadableStream): Promis
 // and `IncomingMessage` — so narrowing an `ApiError.body` union still won't let
 // us call it. Probe for the method instead.
 function isDestroyable(value: unknown): value is { destroy: () => void } {
-  return typeof (value as { destroy?: unknown } | undefined)?.destroy === "function";
+  return typeof (value as { destroy?: unknown })?.destroy === "function";
 }
 
 // Counterpart to `parseStreamBodyToJson`: releases a response body we are never
