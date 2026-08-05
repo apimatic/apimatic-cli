@@ -101,8 +101,9 @@ export function handleServiceError(error: unknown): ServiceError {
 
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
-    const mappedError = status === undefined ? undefined : serviceErrorForStatus(status);
-    if (mappedError) return mappedError;
+    if (status === 401) return ServiceError.UnAuthorized;
+    if (status === 404) return ServiceError.NotFound;
+    if (status === 500) return ServiceError.ServerError;
 
     if (error.code === "ECONNABORTED" || error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
       return ServiceError.NetworkError;

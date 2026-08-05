@@ -4,7 +4,7 @@ import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { SubscriptionInfo } from "../../types/api/account.js";
 import { envInfo } from "../env-info.js";
 import { err, ok, Result } from "neverthrow";
-import { handleServiceError, serviceErrorForStatus, ServiceError } from "../service-error.js";
+import { handleServiceError, ServiceError } from "../service-error.js";
 import { Status } from "@apimatic/sdk";
 import { GenerationStatusEndpoint } from "../../types/api/generation-status-endpoint.js";
 import { GenerationStatusResponse } from "./generation-status-poller.js";
@@ -71,7 +71,17 @@ export class ApiService {
       // `validateStatus` above stops axios throwing, so nothing reaches the
       // catch block — classify the status here, or a mistyped endpoint path and
       // an expired auth key both surface as a generic "unexpected error".
-      return err(serviceErrorForStatus(response.status) ?? ServiceError.InvalidResponse);
+      if (response.status === 401) {
+        return err(ServiceError.UnAuthorized);
+      }
+      if (response.status === 404) {
+        return err(ServiceError.NotFound);
+      }
+      if (response.status === 500) {
+        return err(ServiceError.ServerError);
+      }
+
+      return err(ServiceError.InvalidResponse);
     } catch (error: unknown) {
       return err(handleServiceError(error));
     }
