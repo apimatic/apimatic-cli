@@ -34,7 +34,7 @@ Services live at `src/infrastructure/services/` and are the only layer that make
 
 - Instantiate controller per method call: `new {ControllerName}(client)` inside the method.
 - `apiClientFactory.createApiClient(authHeader, shell)` provides the configured client.
-- For async/polling SDK methods, don't hand-roll the poll loop — reuse `GenerationStatusPoller.pollUntilCompleted()`. Add a `static readonly` instance to `GenerationStatusEndpoint` for the new `{basePath}/{requestId}/status` endpoint and pass it to `ApiService.getGenerationStatus()`. Only supply a `ValidationErrorFormatter` when the endpoint needs custom validation wording (see `PortalService.formatSdkValidationError`).
+- For async/polling SDK methods, don't hand-roll the poll loop — reuse `pollUntilCompleted()` in `portal-service.ts`, passing the poll interval as its first argument. Add a `static readonly` instance to `GenerationStatusEndpoint` for the new `{basePath}/{requestId}/status` endpoint and pass it to `ApiService.getGenerationStatus()`. Only supply a `ValidationErrorFormatter` when the endpoint needs custom validation wording (see `formatSdkValidationError`).
 
 ### Axios-auth variant rules
 
@@ -72,7 +72,6 @@ Services live at `src/infrastructure/services/` and are the only layer that make
 | Pattern | File |
 |---|---|
 | SDK controller + async polling | `src/infrastructure/services/portal-service.ts` |
-| Shared generation status polling | `src/infrastructure/services/generation-status-poller.ts` |
 | Pollable generation endpoints | `src/types/api/generation-status-endpoint.ts` |
 | SDK controller + FormData | `src/infrastructure/services/validation-service.ts` |
 | Raw axios with auth + axiosInstance | `src/infrastructure/services/api-service.ts` |
