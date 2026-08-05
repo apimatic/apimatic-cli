@@ -48,6 +48,11 @@ export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly fileService = new FileService();
   private readonly apiService = new ApiService();
+  private readonly statusPollIntervalMs: number;
+
+  constructor(statusPollIntervalMs: number = STATUS_POLL_INTERVAL_MS) {
+    this.statusPollIntervalMs = statusPollIntervalMs;
+  }
 
   // TODO: Pass stream as parameter instead of file path.
   public async generatePortal(
@@ -78,7 +83,7 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    const statusResult = await pollUntilCompleted(STATUS_POLL_INTERVAL_MS, () =>
+    const statusResult = await pollUntilCompleted(this.statusPollIntervalMs, () =>
       this.apiService.getGenerationStatus(
         GenerationStatusEndpoint.Portal,
         generationId,
@@ -136,7 +141,7 @@ export class PortalService {
     }
 
     const statusResult = await pollUntilCompleted(
-      STATUS_POLL_INTERVAL_MS,
+      this.statusPollIntervalMs,
       () =>
         this.apiService.getGenerationStatus(
           GenerationStatusEndpoint.Sdk,
@@ -195,7 +200,7 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    const statusResult = await pollUntilCompleted(STATUS_POLL_INTERVAL_MS, () =>
+    const statusResult = await pollUntilCompleted(this.statusPollIntervalMs, () =>
       this.apiService.getGenerationStatus(
         GenerationStatusEndpoint.V4Sdk,
         generationId,

@@ -90,7 +90,8 @@ describe("PortalService generation status polling", () => {
     buildPath = FilePath.create(buildFile)!;
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
-    service = new PortalService();
+    // Near-zero poll interval so the suite is not paced by the 3s production default.
+    service = new PortalService(1);
   });
 
   after(async () => {
