@@ -14,7 +14,9 @@ Always start work from `dev` — never from `main`. This applies to branches and
 
 ### Worktrees
 
-A new worktree does **not** start from `dev` by default — it starts from this repo's default branch, which is `beta`. Re-base it onto `dev` before making any changes:
+Base every worktree on `origin/dev` too.
+
+Be aware that a new worktree starts from this repo's default branch, `beta`. Always move it onto `dev` before making any changes:
 
 ```sh
 git fetch origin dev
