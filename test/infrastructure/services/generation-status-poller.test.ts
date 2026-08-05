@@ -99,7 +99,7 @@ describe("GenerationStatusPoller", () => {
 
   it("maps a SubscriptionError onto a forbidden error with the first message", async () => {
     const { fetchStatus } = fetcherFor([
-      ok({ status: Status.SubscriptionError, errors: { subscription: ["Quota exceeded"] } })
+      ok({ status: Status.SubscriptionError, errors: { subscription: ["Quota exceeded", "Not allowed"] } })
     ]);
 
     const result = await poller.pollUntilCompleted(fetchStatus);
