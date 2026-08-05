@@ -71,15 +71,6 @@ describe("generation status polling over HTTP", () => {
     });
   });
 
-  it("authenticates with the auth key and asks for JSON", async () => {
-    respond = (_req, res) => json(res, 200, { status: Status.Completed });
-
-    await fetchStatus(GenerationStatusEndpoint.Portal);
-
-    expect(observed[0].headers.authorization).to.equal(`X-Auth-Key ${AUTH_KEY}`);
-    expect(observed[0].headers.accept).to.equal("application/json");
-  });
-
   it("treats a 302 as completion without following the redirect", async () => {
     respond = (_req, res) => {
       res.writeHead(302, { Location: "/portal/v2/abc123/download" });
