@@ -99,8 +99,10 @@ function mapApiError(error: ApiError): ServiceError {
 
 export function handleServiceError(error: unknown): ServiceError {
   if (error instanceof ApiError) {
-    // Mapped first so it can still read `error.result`, then the body is
-    // released — a `callAsStream` error body would otherwise hang the CLI.
+    // A `callAsStream` error body would otherwise hang the CLI. Order against
+    // `mapApiError` is free: `error.result` is only populated when the SDK
+    // drained the body itself, so a live stream and a readable `result` never
+    // coexist.
     const serviceError = mapApiError(error);
     discardStreamBody(error.body);
     return serviceError;
