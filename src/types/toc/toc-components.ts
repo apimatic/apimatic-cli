@@ -60,10 +60,6 @@ export class TocComponents {
     this.callbackGroups = callbackGroups;
   }
 
-  static empty(): TocComponents {
-    return new TocComponents(new Map(), [], [], [], [], [], new Map(), new Map());
-  }
-
   static fromTocData(tocData: TocData): TocComponents {
     return new TocComponents(
       TocComponents.toEndpointGroups(tocData.endpoints),

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { ApiError, ProblemDetailsError } from "@apimatic/sdk";
 import { format as f } from "../prompts/format.js";
+import { discardStreamBody } from "../utils/utils.js";
 
 export enum ServiceErrorCode {
   NotFound = "NOT_FOUND",
@@ -97,7 +98,15 @@ function mapApiError(error: ApiError): ServiceError {
 }
 
 export function handleServiceError(error: unknown): ServiceError {
-  if (error instanceof ApiError) return mapApiError(error);
+  if (error instanceof ApiError) {
+    // A `callAsStream` error body would otherwise hang the CLI. Order against
+    // `mapApiError` is free: `error.result` is only populated when the SDK
+    // drained the body itself, so a live stream and a readable `result` never
+    // coexist.
+    const serviceError = mapApiError(error);
+    discardStreamBody(error.body);
+    return serviceError;
+  }
 
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
