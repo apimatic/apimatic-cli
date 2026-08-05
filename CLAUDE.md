@@ -25,6 +25,15 @@ git reset --hard origin/dev   # only in a fresh, clean worktree
 
 Then confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip. Branch names and PRs from a worktree follow the same rules as above: cut from `origin/dev`, target `dev`.
 
+## Comments
+
+AI-generated comments are not allowed.
+
+- Do not add comments that restate what the code already says.
+- Do not narrate a change, leave notes for a future agent, or address the reader as an AI.
+- Comment only to explain non-obvious *why*: a constraint, a workaround, a subtle invariant.
+- Default to no comment. Do not add comments because nearby code has them — existing comment density is never a reason to add more.
+
 ## Skills
 
 Reference these files as needed for scaffolding:
