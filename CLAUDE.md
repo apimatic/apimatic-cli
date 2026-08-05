@@ -4,6 +4,14 @@ This file provides guidance to Claude Code when working in this repository.
 
 Read `.ai/instructions.md` for full project instructions (architecture, conventions, testing, commits).
 
+## Branching
+
+Always start work from `dev` — never from `main`.
+
+- Before creating a branch, make sure `dev` is current (`git fetch origin dev`) and branch from `origin/dev`.
+- Open pull requests against `dev`.
+- Never commit to, branch from, or target `main` directly. If a task appears to require it, stop and ask.
+
 ## Skills
 
 Reference these files as needed for scaffolding:
