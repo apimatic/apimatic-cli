@@ -15,19 +15,10 @@ const fetcherFor = (responses: Result<GenerationStatusResponse, ServiceError>[])
   return { fetchStatus, callCount: () => calls };
 };
 
-/**
- * Every terminal status below was exercised end to end against a local
- * apimatic-io instance with the status action stubbed, across all three
- * endpoints (/portal/v2, /sdk, /sdk/v2) — so these expectations reflect
- * observed server behaviour, not guesses. The dev API only ever produces
- * InProgress, ValidationError and completion-via-302 on its own.
- */
 describe("GenerationStatusPoller", () => {
   // Zero interval keeps the tests fast; production uses 3s.
   const poller = new GenerationStatusPoller(0);
 
-  // A `Completed` body is accepted, but note the server never sends one: it
-  // redirects instead, and getGenerationStatus maps that 302 to this shape.
   it("resolves with the status once generation completes", async () => {
     const { fetchStatus } = fetcherFor([ok({ status: Status.Completed })]);
 
@@ -97,10 +88,6 @@ describe("GenerationStatusPoller", () => {
     expect(result._unsafeUnwrapErr().errorMessage).to.equal("Merge conflict in: java, python");
   });
 
-  // The dev API always sends `errors` alongside a ValidationError, but the
-  // payload-free shape was reproduced against a local instance and confirmed to
-  // terminate here. The previous code guarded on `errors && status === ...`,
-  // which matched no branch and left the loop polling indefinitely.
   it("terminates on a validation error that carries no messages", async () => {
     const { fetchStatus, callCount } = fetcherFor([ok({ status: Status.ValidationError })]);
 
@@ -130,11 +117,8 @@ describe("GenerationStatusPoller", () => {
     expect(result._unsafeUnwrapErr().errorMessage).to.equal("Access denied to resource.");
   });
 
-  // Pins the known gap in apimatic/apimatic-cli#305: a status outside the enum,
-  // or no status at all, is treated as "not finished yet" and polled through.
-  // Reproduced against a local instance on all three endpoints. When #305 is
-  // fixed this test should start failing — replace it with one asserting the
-  // poller terminates instead.
+  // Asserts the current, unwanted behaviour tracked by #305. When that is
+  // fixed this test will fail; replace it with one asserting termination.
   it("keeps polling on a status it does not recognise (#305)", async () => {
     const { fetchStatus, callCount } = fetcherFor([
       ok({ status: "Quarantined" as Status }),
@@ -148,11 +132,10 @@ describe("GenerationStatusPoller", () => {
     expect(callCount()).to.equal(3);
   });
 
-  // Payloads copied verbatim from the dev API. Both were produced by submitting
-  // a deliberately broken build, then reading the raw status response.
-  describe("payloads returned by the dev API", () => {
-    it("handles the empty-string error key portal generation uses", async () => {
-      // GET /portal/v2/{id}/status after posting a build with no build tasks.
+  // Payloads copied verbatim from real API responses — the odd shapes here
+  // (empty-string key, HTML inside a message) are intentional, not typos.
+  describe("real API payloads", () => {
+    it("handles an empty-string error key", async () => {
       const { fetchStatus } = fetcherFor([
         ok({
           status: Status.ValidationError,
@@ -170,8 +153,7 @@ describe("GenerationStatusPoller", () => {
       expect(error.getError("")).to.have.lengthOf(1);
     });
 
-    it("passes through the HTML sdk generation embeds in messages", async () => {
-      // GET /sdk/{id}/status after posting a build with an unparseable spec.
+    it("passes through HTML embedded in a message", async () => {
       const message =
         "Main API definition file could not be identified as provided file(s) are either invalid or are in an " +
         'unrecognized/unsupported format.  (<a href="https://docs.apimatic.io/rulesets/input-file-validation/' +
