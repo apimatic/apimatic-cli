@@ -17,7 +17,8 @@ import { apiClientFactory } from "./api-client-factory.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result} from "neverthrow";
-import { discardStreamBody, ServiceError } from "../service-error.js";
+import { ServiceError } from "../service-error.js";
+import { discardStreamBody } from "../../utils/utils.js";
 
 export interface TransformViaFileParams {
   file: FilePath;
@@ -65,7 +66,7 @@ export class TransformationService {
         apiValidationSummary
       });
     } catch (error) {
-      return err(await this.handleTransformationErrors(error));
+      return err(this.handleTransformationErrors(error));
     }
   }
 
@@ -80,14 +81,6 @@ export class TransformationService {
     };
   };
 
-  /**
-   * A 401 body is not guaranteed to be JSON: a stream endpoint hands back an
-   * `IncomingMessage`, an empty body parses to nothing, and an authenticating
-   * proxy can answer with an HTML error page. Throwing here would escape the
-   * catch in `transformViaFile` — this runs inside the `err(await ...)` it
-   * builds — and surface as an unhandled rejection, skipping the outro and the
-   * failure telemetry. Fall back to the hint's own default message instead.
-   */
   private parseApiMessage(body: unknown): string | null {
     if (typeof body !== "string") return null;
     try {
@@ -97,24 +90,24 @@ export class TransformationService {
     }
   }
 
-  private readonly handleTransformationErrors = async (error: unknown): Promise<string> => {
-    if (error instanceof ApiError) {
-      const apiError = error as ApiError;
-      try {
-        if (apiError.statusCode === 400) {
-          return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
-        } else if (apiError.statusCode === 401) {
-          return ServiceError.unauthorizedWithHint(this.parseApiMessage(apiError.body)).errorMessage;
-        }
-        return `Error ${apiError.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
-      } finally {
-        // `downloadTransformedFile` is a stream endpoint: its error body is an
-        // undrained response that would keep the event loop alive. Released
-        // after the message is built, so the 401 branch can still read it.
-        discardStreamBody(apiError);
-      }
-    } else {
+  private readonly handleTransformationErrors = (error: unknown): string => {
+    if (!(error instanceof ApiError)) {
       return "An unexpected error occurred while validating your API Definition. Please try again later. If the problem persists, please reach out to our team at support@apimatic.io";
+    }
+
+    // `downloadTransformedFile` is a stream endpoint, so its error body is an
+    // undrained response that would keep the event loop alive. Discarding it
+    // first is safe: a string body (from `transformViaFile`) has no `destroy`
+    // and is left intact for `parseApiMessage` below.
+    discardStreamBody(error.body);
+
+    switch (error.statusCode) {
+      case 400:
+        return "Your API Definition is invalid. Please use the APIMatic VS Code Extension to fix the errors and try again.";
+      case 401:
+        return ServiceError.unauthorizedWithHint(this.parseApiMessage(error.body)).errorMessage;
+      default:
+        return `Error ${error.statusCode}: An error occurred during the transformation. Please try again or contact support@apimatic.io for assistance.`;
     }
   };
 }

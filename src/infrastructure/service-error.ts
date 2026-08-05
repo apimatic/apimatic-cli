@@ -1,6 +1,7 @@
 import axios from "axios";
 import { ApiError, ProblemDetailsError } from "@apimatic/sdk";
 import { format as f } from "../prompts/format.js";
+import { discardStreamBody } from "../utils/utils.js";
 
 export enum ServiceErrorCode {
   NotFound = "NOT_FOUND",
@@ -96,27 +97,12 @@ function mapApiError(error: ApiError): ServiceError {
   return ServiceError.ServerError;
 }
 
-// Endpoints the SDK issues via `callAsStream` (TOC data, portal/SDK downloads,
-// transformed files) hand back an undrained `IncomingMessage` on `ApiError.body`
-// when they fail. Its socket stays open and keeps the Node event loop alive, so
-// the CLI hangs after printing its outro — `outro()` only sets
-// `process.exitCode` and we never call `process.exit()`. Discard the body once
-// we've decided to map the error to a message.
-//
-// Callers that need the body read it *before* reaching here (see
-// `PortalService.generatePortal`, which returns the 422 body as the error
-// report). Non-stream bodies are strings or Blobs and have no `destroy`.
-export function discardStreamBody(error: ApiError): void {
-  const body = error.body as { destroy?: () => void } | undefined;
-  if (typeof body?.destroy === "function") {
-    body.destroy();
-  }
-}
-
 export function handleServiceError(error: unknown): ServiceError {
   if (error instanceof ApiError) {
+    // Mapped first so it can still read `error.result`, then the body is
+    // released — a `callAsStream` error body would otherwise hang the CLI.
     const serviceError = mapApiError(error);
-    discardStreamBody(error);
+    discardStreamBody(error.body);
     return serviceError;
   }
 
