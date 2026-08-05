@@ -42,60 +42,7 @@ export interface GeneratedSdkResult {
 const STATUS_POLL_INTERVAL_MS = 3000;
 
 type FetchGenerationStatus = () => Promise<Result<GenerationStatusResponse, ServiceError>>;
-
 type ValidationErrorFormatter = (errors: Record<string, string[]>) => string;
-
-const asMessages = (errors: Record<string, unknown> | undefined): Record<string, string[]> =>
-  (errors ?? {}) as Record<string, string[]>;
-
-const formatValidationErrors: ValidationErrorFormatter = (errors) => {
-  const messages = Object.values(errors).flat();
-  return "One or more validation errors occurred." + (messages.length ? "\n- " + messages.join("\n- ") : "");
-};
-
-const formatSdkValidationError: ValidationErrorFormatter = (errors) => {
-  const sdkMergeFailedLanguages = errors.sdkMergeFailed;
-  if (sdkMergeFailedLanguages?.length) {
-    return (
-      "SDK generation failed for these languages due to merge conflict." +
-      "\n- " +
-      sdkMergeFailedLanguages.join("\n- ")
-    );
-  }
-  return formatValidationErrors(errors);
-};
-
-async function pollUntilCompleted(
-  pollIntervalMs: number,
-  fetchStatus: FetchGenerationStatus,
-  formatValidationError: ValidationErrorFormatter = formatValidationErrors
-): Promise<Result<GenerationStatusResponse, ServiceError>> {
-  for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-
-    const statusResult = await fetchStatus();
-    if (statusResult.isErr()) {
-      return err(statusResult.error);
-    }
-
-    const { status, errors } = statusResult.value;
-
-    if (status === Status.Completed) {
-      return ok(statusResult.value);
-    }
-    if (status === Status.Failed) {
-      return err(ServiceError.ServerError);
-    }
-    if (status === Status.ValidationError) {
-      const validationErrors = asMessages(errors);
-      return err(ServiceError.badRequest(formatValidationError(validationErrors), validationErrors));
-    }
-    if (status === Status.SubscriptionError) {
-      const message = Object.values(asMessages(errors)).flat()[0];
-      return err(ServiceError.forbidden("Access denied to resource." + (message ? "\n- " + message : "")));
-    }
-  }
-}
 
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
@@ -363,3 +310,56 @@ export class PortalService {
     [Stability.BETA]: StabilityLevelTag.Beta
   };
 }
+
+async function pollUntilCompleted(
+  pollIntervalMs: number,
+  fetchStatus: FetchGenerationStatus,
+  formatValidationError: ValidationErrorFormatter = formatValidationErrors
+): Promise<Result<GenerationStatusResponse, ServiceError>> {
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+    const statusResult = await fetchStatus();
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
+
+    const { status, errors } = statusResult.value;
+
+    if (status === Status.Completed) {
+      return ok(statusResult.value);
+    }
+    if (status === Status.Failed) {
+      return err(ServiceError.ServerError);
+    }
+    if (status === Status.ValidationError) {
+      const validationErrors = asMessages(errors);
+      return err(ServiceError.badRequest(formatValidationError(validationErrors), validationErrors));
+    }
+    if (status === Status.SubscriptionError) {
+      const message = Object.values(asMessages(errors)).flat()[0];
+      return err(ServiceError.forbidden("Access denied to resource." + (message ? "\n- " + message : "")));
+    }
+  }
+}
+
+const formatSdkValidationError: ValidationErrorFormatter = (errors) => {
+  const sdkMergeFailedLanguages = errors.sdkMergeFailed;
+  if (sdkMergeFailedLanguages?.length) {
+    return (
+      "SDK generation failed for these languages due to merge conflict." +
+      "\n- " +
+      sdkMergeFailedLanguages.join("\n- ")
+    );
+  }
+  return formatValidationErrors(errors);
+};
+
+const formatValidationErrors: ValidationErrorFormatter = (errors) => {
+  const messages = Object.values(errors).flat();
+  return "One or more validation errors occurred." + (messages.length ? "\n- " + messages.join("\n- ") : "");
+};
+
+const asMessages = (errors: Record<string, unknown> | undefined): Record<string, string[]> =>
+  (errors ?? {}) as Record<string, string[]>;
+
