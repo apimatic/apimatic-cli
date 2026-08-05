@@ -6,11 +6,22 @@ Read `.ai/instructions.md` for full project instructions (architecture, conventi
 
 ## Branching
 
-Always start work from `dev` — never from `main`.
+Always start work from `dev` — never from `main`. This applies to branches and worktrees alike.
 
 - Before creating a branch, make sure `dev` is current (`git fetch origin dev`) and branch from `origin/dev`.
 - Open pull requests against `dev`.
 - Never commit to, branch from, or target `main` directly. If a task appears to require it, stop and ask.
+
+### Worktrees
+
+A new worktree does **not** start from `dev` by default — it starts from this repo's default branch, which is `beta`. Re-base it onto `dev` before making any changes:
+
+```sh
+git fetch origin dev
+git reset --hard origin/dev   # only in a fresh, clean worktree
+```
+
+Then confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip. Branch names and PRs from a worktree follow the same rules as above: cut from `origin/dev`, target `dev`.
 
 ## Skills
 
