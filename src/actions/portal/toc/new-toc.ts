@@ -13,7 +13,6 @@ import {
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PortalService } from '../../../infrastructure/services/portal-service.js';
-import { SpecContext } from '../../../types/spec-context.js';
 import { err, ok, Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 
@@ -56,21 +55,12 @@ export class PortalNewTocAction {
       return ActionResult.failed();
     }
 
-    // The spec is required, not optional: it is what the TOC is built from, and
-    // the next step — portal generation — needs it regardless. Writing a TOC
-    // without it only defers the failure to a later command, so fail here.
-    // Missing and empty are reported separately: `SpecContext.validate()` treats
-    // both as invalid, but only one of them is fixed by adding files to a
-    // directory that already exists.
-    // Both messages report the build directory rather than the `spec/` path
-    // inside it: that is the directory the user works in, and it is what the
-    // sibling messages here and in `sdk generate` already name.
     const specDirectory = buildDirectory.join('spec');
     if (!(await this.fileService.directoryExists(specDirectory))) {
       this.prompts.specDirectoryNotFound(buildDirectory);
       return ActionResult.failed();
     }
-    if (!(await new SpecContext(specDirectory).validate())) {
+    if (!(await buildContext.getSpecContext().validate())) {
       this.prompts.specDirectoryEmpty(buildDirectory);
       return ActionResult.failed();
     }
@@ -108,10 +98,6 @@ export class PortalNewTocAction {
       }
     });
 
-    // This used to fall back to the default TOC, which wrote a file missing its
-    // Endpoints, Events and Models sections over a possibly valid toc.yml and
-    // reported success. Surface the reason (auth, network, invalid spec) and
-    // leave the file alone.
     if (tocComponentsResult.isErr()) {
       this.prompts.tocExtractionFailed(tocComponentsResult.error.errorMessage);
       return ActionResult.failed();
