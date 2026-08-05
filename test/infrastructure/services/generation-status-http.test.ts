@@ -80,9 +80,6 @@ describe("generation status polling over HTTP", () => {
     expect(observed[0].headers.accept).to.equal("application/json");
   });
 
-  // This, not a `Completed` status body, is how the dev API signals completion:
-  // every observed portal/sdk/v4sdk generation ended on a bare 302 to the
-  // download location. The `Completed` branch is defensive.
   it("treats a 302 as completion without following the redirect", async () => {
     respond = (_req, res) => {
       res.writeHead(302, { Location: "/portal/v2/abc123/download" });
