@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code when working in this repository.
 
-Read `.ai/instructions.md` for full project instructions (architecture, conventions, testing, commits).
+Read `.ai/instructions.md` for full project instructions (architecture, conventions, branching, testing, commits).
 
 ## Skills
 
