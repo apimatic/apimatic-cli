@@ -7,7 +7,7 @@ import { err, ok, Result } from "neverthrow";
 import { handleServiceError, ServiceError } from "../service-error.js";
 import { Status } from "@apimatic/sdk";
 import { GenerationStatusEndpoint } from "../../types/api/generation-status-endpoint.js";
-import { GenerationStatusResponse } from "./generation-status-poller.js";
+import { GenerationStatusResponse } from "../../types/api/generation-status.js";
 
 export class ApiService {
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;

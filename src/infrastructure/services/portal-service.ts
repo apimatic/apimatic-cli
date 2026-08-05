@@ -11,6 +11,7 @@ import {
   Transformation,
   ExportFormats,
   SdkLanguages,
+  Status,
   TableOfContentsController,
   StabilityLevelTag,
   V2SdkGenerationController,
@@ -31,24 +32,75 @@ import { ApiService } from "./api-service.js";
 import { SemVersion } from "../../types/publish/version.js";
 import { TocData } from "../../types/toc/toc-components.js";
 import { GenerationStatusEndpoint } from "../../types/api/generation-status-endpoint.js";
-import {
-  formatValidationErrors,
-  GenerationStatusPoller,
-  ValidationErrorFormatter
-} from "./generation-status-poller.js";
+import { GenerationStatusResponse } from "../../types/api/generation-status.js";
 
 export interface GeneratedSdkResult {
   sdk: NodeJS.ReadableStream;
   sdkSourceTree: NodeJS.ReadableStream;
 }
 
-export class PortalService {
-  private static readonly STATUS_POLL_INTERVAL_MS = 3000;
+const STATUS_POLL_INTERVAL_MS = 3000;
 
+type FetchGenerationStatus = () => Promise<Result<GenerationStatusResponse, ServiceError>>;
+
+type ValidationErrorFormatter = (errors: Record<string, string[]>) => string;
+
+const asMessages = (errors: Record<string, unknown> | undefined): Record<string, string[]> =>
+  (errors ?? {}) as Record<string, string[]>;
+
+const formatValidationErrors: ValidationErrorFormatter = (errors) => {
+  const messages = Object.values(errors).flat();
+  return "One or more validation errors occurred." + (messages.length ? "\n- " + messages.join("\n- ") : "");
+};
+
+const formatSdkValidationError: ValidationErrorFormatter = (errors) => {
+  const sdkMergeFailedLanguages = errors.sdkMergeFailed;
+  if (sdkMergeFailedLanguages?.length) {
+    return (
+      "SDK generation failed for these languages due to merge conflict." +
+      "\n- " +
+      sdkMergeFailedLanguages.join("\n- ")
+    );
+  }
+  return formatValidationErrors(errors);
+};
+
+async function pollUntilCompleted(
+  pollIntervalMs: number,
+  fetchStatus: FetchGenerationStatus,
+  formatValidationError: ValidationErrorFormatter = formatValidationErrors
+): Promise<Result<GenerationStatusResponse, ServiceError>> {
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+    const statusResult = await fetchStatus();
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
+
+    const { status, errors } = statusResult.value;
+
+    if (status === Status.Completed) {
+      return ok(statusResult.value);
+    }
+    if (status === Status.Failed) {
+      return err(ServiceError.ServerError);
+    }
+    if (status === Status.ValidationError) {
+      const validationErrors = asMessages(errors);
+      return err(ServiceError.badRequest(formatValidationError(validationErrors), validationErrors));
+    }
+    if (status === Status.SubscriptionError) {
+      const message = Object.values(asMessages(errors)).flat()[0];
+      return err(ServiceError.forbidden("Access denied to resource." + (message ? "\n- " + message : "")));
+    }
+  }
+}
+
+export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly fileService = new FileService();
   private readonly apiService = new ApiService();
-  private readonly statusPoller = new GenerationStatusPoller(PortalService.STATUS_POLL_INTERVAL_MS);
 
   // TODO: Pass stream as parameter instead of file path.
   public async generatePortal(
@@ -79,7 +131,7 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    const statusResult = await this.statusPoller.pollUntilCompleted(() =>
+    const statusResult = await pollUntilCompleted(STATUS_POLL_INTERVAL_MS, () =>
       this.apiService.getGenerationStatus(
         GenerationStatusEndpoint.Portal,
         generationId,
@@ -136,7 +188,8 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    const statusResult = await this.statusPoller.pollUntilCompleted(
+    const statusResult = await pollUntilCompleted(
+      STATUS_POLL_INTERVAL_MS,
       () =>
         this.apiService.getGenerationStatus(
           GenerationStatusEndpoint.Sdk,
@@ -145,7 +198,7 @@ export class PortalService {
           commandMetadata.shell,
           authKey
         ),
-      this.formatSdkValidationError
+      formatSdkValidationError
     );
     if (statusResult.isErr()) {
       return err(statusResult.error);
@@ -195,7 +248,7 @@ export class PortalService {
       buildFileStream.close();
     }
 
-    const statusResult = await this.statusPoller.pollUntilCompleted(() =>
+    const statusResult = await pollUntilCompleted(STATUS_POLL_INTERVAL_MS, () =>
       this.apiService.getGenerationStatus(
         GenerationStatusEndpoint.V4Sdk,
         generationId,
@@ -284,19 +337,7 @@ export class PortalService {
    * `sdkMergeFailed` key, which needs its own wording. Everything else falls
    * back to the shared format.
    */
-  private readonly formatSdkValidationError: ValidationErrorFormatter = (errors) => {
-    const sdkMergeFailedLanguages = errors.sdkMergeFailed;
-    if (sdkMergeFailedLanguages?.length) {
-      return (
-        "SDK generation failed for these languages due to merge conflict." +
-        "\n- " +
-        sdkMergeFailedLanguages.join("\n- ")
-      );
-    }
-    return formatValidationErrors(errors);
-  };
-
-  private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
+  private createAuthorizationHeader =(authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
     const key = overrideAuthKey || authInfo?.authKey;
     return `X-Auth-Key ${key ?? ""}`;
   };
