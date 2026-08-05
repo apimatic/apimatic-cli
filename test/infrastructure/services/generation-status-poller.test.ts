@@ -15,10 +15,19 @@ const fetcherFor = (responses: Result<GenerationStatusResponse, ServiceError>[])
   return { fetchStatus, callCount: () => calls };
 };
 
+/**
+ * Every terminal status below was exercised end to end against a local
+ * apimatic-io instance with the status action stubbed, across all three
+ * endpoints (/portal/v2, /sdk, /sdk/v2) — so these expectations reflect
+ * observed server behaviour, not guesses. The dev API only ever produces
+ * InProgress, ValidationError and completion-via-302 on its own.
+ */
 describe("GenerationStatusPoller", () => {
-  // Zero interval keeps the tests fast; production uses the 3s default.
+  // Zero interval keeps the tests fast; production uses 3s.
   const poller = new GenerationStatusPoller(0);
 
+  // A `Completed` body is accepted, but note the server never sends one: it
+  // redirects instead, and getGenerationStatus maps that 302 to this shape.
   it("resolves with the status once generation completes", async () => {
     const { fetchStatus } = fetcherFor([ok({ status: Status.Completed })]);
 
@@ -88,10 +97,10 @@ describe("GenerationStatusPoller", () => {
     expect(result._unsafeUnwrapErr().errorMessage).to.equal("Merge conflict in: java, python");
   });
 
-  // Defensive: the dev API always sends `errors` alongside a ValidationError,
-  // so this shape has not been seen in the wild. It is pinned because the
-  // previous code guarded on `errors && status === ...`, which matched no
-  // branch here and left the loop polling indefinitely.
+  // The dev API always sends `errors` alongside a ValidationError, but the
+  // payload-free shape was reproduced against a local instance and confirmed to
+  // terminate here. The previous code guarded on `errors && status === ...`,
+  // which matched no branch and left the loop polling indefinitely.
   it("terminates on a validation error that carries no messages", async () => {
     const { fetchStatus, callCount } = fetcherFor([ok({ status: Status.ValidationError })]);
 
@@ -119,6 +128,24 @@ describe("GenerationStatusPoller", () => {
     const result = await poller.pollUntilCompleted(fetchStatus);
 
     expect(result._unsafeUnwrapErr().errorMessage).to.equal("Access denied to resource.");
+  });
+
+  // Pins the known gap in apimatic/apimatic-cli#305: a status outside the enum,
+  // or no status at all, is treated as "not finished yet" and polled through.
+  // Reproduced against a local instance on all three endpoints. When #305 is
+  // fixed this test should start failing — replace it with one asserting the
+  // poller terminates instead.
+  it("keeps polling on a status it does not recognise (#305)", async () => {
+    const { fetchStatus, callCount } = fetcherFor([
+      ok({ status: "Quarantined" as Status }),
+      ok({ status: undefined as unknown as Status }),
+      ok({ status: Status.Completed })
+    ]);
+
+    const result = await poller.pollUntilCompleted(fetchStatus);
+
+    expect(result.isOk(), "unrecognised statuses do not currently terminate").to.be.true;
+    expect(callCount()).to.equal(3);
   });
 
   // Payloads copied verbatim from the dev API. Both were produced by submitting
