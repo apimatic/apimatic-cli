@@ -29,7 +29,7 @@ export class PortalNewTocPrompts {
   }
 
   public specDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("spec")} directory is either empty or invalid: ${f.path(directory)}`;
+    const message = `The ${f.var("spec")} directory in ${f.path(directory)} is either empty or invalid.`;
     log.error(message);
   }
 
