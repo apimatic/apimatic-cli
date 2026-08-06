@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/apimatic/apimatic-cli/compare/v1.2.0...v1.2.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* surface better errors in auth, toc & portal commands ([#308](https://github.com/apimatic/apimatic-cli/issues/308)) ([743caaf](https://github.com/apimatic/apimatic-cli/commit/743caaf2797e633d92bf21126f226b9f6337c44e)), closes [#302](https://github.com/apimatic/apimatic-cli/issues/302) [#300](https://github.com/apimatic/apimatic-cli/issues/300)
+
 # [1.2.0](https://github.com/apimatic/apimatic-cli/compare/v1.1.0...v1.2.0) (2026-07-14)
 
 
