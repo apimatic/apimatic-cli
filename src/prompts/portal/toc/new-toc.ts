@@ -21,15 +21,22 @@ export class PortalNewTocPrompts {
     return overwrite;
   }
 
-  public fallingBackToDefault() {
-    log.warn(`Falling back to the default TOC structure.`);
+  public specDirectoryNotFound(directory: DirectoryPath) {
+    log.error(
+      `The ${f.var("spec")} directory was not found in ${f.path(directory)}.\n` +
+        `Add your API specification there and try again.`
+    );
+  }
+
+  public specDirectoryEmpty(directory: DirectoryPath) {
+    log.error(`The ${f.var("spec")} directory in ${f.path(directory)} is either empty or invalid.`);
   }
 
   public tocFileAlreadyExists() {
     log.error(`Please enter a different destination path or delete the existing toc.yml file and try again.`);
   }
 
-  public logError(message: string) {
+  public tocExtractionFailed(message: string) {
     log.error(message);
   }
 

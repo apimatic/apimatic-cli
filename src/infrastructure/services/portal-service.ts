@@ -6,7 +6,6 @@ import {
   ContentType,
   DocsPortalGenerationAsyncController,
   SdkSourceTreeGenerationAsyncController,
-  ProblemDetailsError,
   FileWrapper,
   TransformationController,
   Transformation,
@@ -32,16 +31,28 @@ import { handleServiceError, ServiceError } from "../service-error.js";
 import { ApiService } from "./api-service.js";
 import { SemVersion } from "../../types/publish/version.js";
 import { TocData } from "../../types/toc/toc-components.js";
+import { GenerationStatusEndpoint } from "../../types/api/generation-status-endpoint.js";
+import { GenerationStatusResponse } from "../../types/api/generation-status.js";
 
 export interface GeneratedSdkResult {
   sdk: NodeJS.ReadableStream;
   sdkSourceTree: NodeJS.ReadableStream;
 }
 
+const STATUS_POLL_INTERVAL_MS = 3000;
+
+type FetchGenerationStatus = () => Promise<Result<GenerationStatusResponse, ServiceError>>;
+type ValidationErrorFormatter = (errors: Record<string, string[]>) => string;
+
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly fileService = new FileService();
   private readonly apiService = new ApiService();
+  private readonly statusPollIntervalMs: number;
+
+  constructor(statusPollIntervalMs: number = STATUS_POLL_INTERVAL_MS) {
+    this.statusPollIntervalMs = statusPollIntervalMs;
+  }
 
   // TODO: Pass stream as parameter instead of file path.
   public async generatePortal(
@@ -66,55 +77,24 @@ export class PortalService {
       );
       generationId = portalInstance.result.id;
     } catch (error) {
-      if (error instanceof ProblemDetailsError) {
-        const errors = error.result!.errors as Record<string, string[]>;
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = error.result!.title + "\n- " + message;
-        if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-        if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
-        }
-      }
-      const serviceError = handleServiceError(error);
-      return err(serviceError);
+      // ProblemDetails (400/403), 401 and other SDK statuses are mapped centrally.
+      return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
     }
 
-    let statusResult;
-    do {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      statusResult = await this.apiService.getPortalGenerationStatus(
+    const statusResult = await pollUntilCompleted(this.statusPollIntervalMs, () =>
+      this.apiService.getGenerationStatus(
+        GenerationStatusEndpoint.Portal,
         generationId,
         configDir,
         commandMetadata.shell,
         authKey
-      );
-      if (statusResult.isErr()) {
-        return err(statusResult.error);
-      }
-      if (statusResult.value.status === Status.Failed) {
-        return err(ServiceError.ServerError);
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage =
-          "One or more validation errors occurred." +
-           "\n- " + message;
-        return err(ServiceError.badRequest(errorMessage, errors));
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = "Access denied to resource." + "\n- " + message;
-        return err(ServiceError.forbidden(errorMessage));
-      }
-    } while (statusResult.value.status !== Status.Completed);
+      )
+    );
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
 
     try {
       const portalDownloadResponse = await docsPortalAsyncController.downloadGeneratedPortal(generationId);
@@ -155,64 +135,26 @@ export class PortalService {
       );
       generationId = response.result.id;
     } catch (error) {
-      if (error instanceof ProblemDetailsError) {
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const errors = error.result!.errors as Record<string, string[]>;
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = error.result!.title + "\n- " + message;
-        if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-        if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
-        }
-      }
-      const serviceError = handleServiceError(error);
-      return err(serviceError);
+      return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
     }
 
-    let statusResult;
-    do {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      statusResult = await this.apiService.getSdkGenerationStatus(
-        generationId,
-        configDir,
-        commandMetadata.shell,
-        authKey
-      );
-      
-      if (statusResult.isErr()) {
-        return err(statusResult.error);
-      }
-      if (statusResult.value.status === Status.Failed) {
-        return err(ServiceError.ServerError);
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const sdkMergeFailedLanguages = errors.sdkMergeFailed;
-        if (sdkMergeFailedLanguages?.length) {
-          const errorMessage =
-            "SDK generation failed for these languages due to merge conflict." +
-            "\n- " +
-            sdkMergeFailedLanguages.join("\n- ");
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-
-        const messages = Object.values(errors).flat();
-        const errorMessage =
-          "One or more validation errors occurred." +
-          (messages.length ? "\n- " + messages.join("\n- ") : "");
-        return err(ServiceError.badRequest(errorMessage, errors));
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const message = Object.values(errors).flat()[0] ?? null;
-        const errorMessage = "Access denied to resource." + "\n- " + message;
-        return err(ServiceError.forbidden(errorMessage));
-      }
-    } while (statusResult.value.status !== Status.Completed);
+    const statusResult = await pollUntilCompleted(
+      this.statusPollIntervalMs,
+      () =>
+        this.apiService.getGenerationStatus(
+          GenerationStatusEndpoint.Sdk,
+          generationId,
+          configDir,
+          commandMetadata.shell,
+          authKey
+        ),
+      formatSdkValidationError
+    );
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
 
     try {
       const sdkResponse = await sdkGenerationController.downloadGeneratedSdk(generationId);
@@ -253,54 +195,23 @@ export class PortalService {
       );
       generationId = response.result.id;
     } catch (error) {
-      if (error instanceof ProblemDetailsError) {
-        // TODO: This only picks the first error message, improve it to show all errors.
-        const errors = error.result!.errors as Record<string, string[]>;
-        const message = Object.values(errors)[0]?.[0] ?? null;
-        const errorMessage = error.result!.title + '\n- ' + message;
-        if (error.statusCode === 400) {
-          return err(ServiceError.badRequest(errorMessage, errors));
-        }
-        if (error.statusCode === 403) {
-          return err(ServiceError.forbidden(errorMessage));
-        }
-      }
-      const serviceError = handleServiceError(error);
-      return err(serviceError);
+      return err(handleServiceError(error));
     } finally {
       buildFileStream.close();
     }
 
-    let statusResult;
-    do {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      statusResult = await this.apiService.getV4SdkGenerationStatus(
+    const statusResult = await pollUntilCompleted(this.statusPollIntervalMs, () =>
+      this.apiService.getGenerationStatus(
+        GenerationStatusEndpoint.V4Sdk,
         generationId,
         configDir,
         commandMetadata.shell,
         authKey
-      );
-
-      if (statusResult.isErr()) {
-        return err(statusResult.error);
-      }
-      if (statusResult.value.status === Status.Failed) {
-        return err(ServiceError.ServerError);
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.ValidationError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const messages = Object.values(errors).flat();
-        const errorMessage =
-          'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
-        return err(ServiceError.badRequest(errorMessage, errors));
-      }
-      if (statusResult.value.errors && statusResult.value.status === Status.SubscriptionError) {
-        const errors = statusResult.value.errors as Record<string, string[]>;
-        const message = Object.values(errors).flat()[0] ?? null;
-        const errorMessage = 'Access denied to resource.' + '\n- ' + message;
-        return err(ServiceError.forbidden(errorMessage));
-      }
-    } while (statusResult.value.status !== Status.Completed);
+      )
+    );
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
 
     try {
       const sdkResponse = await v2sdkGenerationController.downloadGeneratedV2Sdk(generationId);
@@ -373,7 +284,12 @@ export class PortalService {
     }
   }
 
-  private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
+  /**
+   * SDK generation reports per-language merge conflicts under a dedicated
+   * `sdkMergeFailed` key, which needs its own wording. Everything else falls
+   * back to the shared format.
+   */
+  private createAuthorizationHeader =(authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
     const key = overrideAuthKey || authInfo?.authKey;
     return `X-Auth-Key ${key ?? ""}`;
   };
@@ -399,3 +315,56 @@ export class PortalService {
     [Stability.BETA]: StabilityLevelTag.Beta
   };
 }
+
+async function pollUntilCompleted(
+  pollIntervalMs: number,
+  fetchStatus: FetchGenerationStatus,
+  formatValidationError: ValidationErrorFormatter = formatValidationErrors
+): Promise<Result<GenerationStatusResponse, ServiceError>> {
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+    const statusResult = await fetchStatus();
+    if (statusResult.isErr()) {
+      return err(statusResult.error);
+    }
+
+    const { status, errors } = statusResult.value;
+
+    if (status === Status.Completed) {
+      return ok(statusResult.value);
+    }
+    if (status === Status.Failed) {
+      return err(ServiceError.ServerError);
+    }
+    if (status === Status.ValidationError) {
+      const validationErrors = asMessages(errors);
+      return err(ServiceError.badRequest(formatValidationError(validationErrors), validationErrors));
+    }
+    if (status === Status.SubscriptionError) {
+      const message = Object.values(asMessages(errors)).flat()[0];
+      return err(ServiceError.forbidden("Access denied to resource." + (message ? "\n- " + message : "")));
+    }
+  }
+}
+
+const formatSdkValidationError: ValidationErrorFormatter = (errors) => {
+  const sdkMergeFailedLanguages = errors.sdkMergeFailed;
+  if (sdkMergeFailedLanguages?.length) {
+    return (
+      "SDK generation failed for these languages due to merge conflict." +
+      "\n- " +
+      sdkMergeFailedLanguages.join("\n- ")
+    );
+  }
+  return formatValidationErrors(errors);
+};
+
+const formatValidationErrors: ValidationErrorFormatter = (errors) => {
+  const messages = Object.values(errors).flat();
+  return "One or more validation errors occurred." + (messages.length ? "\n- " + messages.join("\n- ") : "");
+};
+
+const asMessages = (errors: Record<string, unknown> | undefined): Record<string, string[]> =>
+  (errors ?? {}) as Record<string, string[]>;
+

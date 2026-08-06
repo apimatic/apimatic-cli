@@ -13,7 +13,11 @@ export class StatusAction {
 
   public async execute(authKey: string | null): Promise<ActionResult> {
     const accountInfo = await getAuthInfo(this.configDir.toString());
-    if (accountInfo === null) {
+    // `auth logout` blanks config.json rather than deleting it, so a logged-out user still
+    // has a non-null AuthInfo with an empty key. Checking the key catches both that and a
+    // missing config file, and avoids a request that can only come back 401.
+    if (!accountInfo?.authKey) {
+      this.prompts.notLoggedIn();
       return ActionResult.failed();
     }
     const result = await this.prompts.accountInfoSpinner(

@@ -13,6 +13,8 @@ import {
 import { withDirPath } from '../../../infrastructure/tmp-extensions.js';
 import { TempContext } from '../../../types/temp-context.js';
 import { PortalService } from '../../../infrastructure/services/portal-service.js';
+import { err, ok, Result } from 'neverthrow';
+import { ServiceError } from '../../../infrastructure/service-error.js';
 
 export class ContentContext {
   private readonly fileService = new FileService();
@@ -52,6 +54,17 @@ export class PortalNewTocAction {
       this.prompts.invalidBuildDirectory(buildDirectory);
       return ActionResult.failed();
     }
+
+    const specDirectory = buildDirectory.join('spec');
+    if (!(await this.fileService.directoryExists(specDirectory))) {
+      this.prompts.specDirectoryNotFound(buildDirectory);
+      return ActionResult.failed();
+    }
+    if (!(await buildContext.getSpecContext().validate())) {
+      this.prompts.specDirectoryEmpty(buildDirectory);
+      return ActionResult.failed();
+    }
+
     const buildConfig = await buildContext.getBuildFileContents();
     const contentDirectory = buildDirectory.join(buildConfig.contentFolder());
 
@@ -63,18 +76,11 @@ export class PortalNewTocAction {
       return ActionResult.cancelled();
     }
 
-    const tocComponents: TocComponents = await (async () => {
-      const specDirectory = buildDirectory.join('spec');
-
-      if (!(await this.fileService.directoryExists(specDirectory))) {
-        this.prompts.fallingBackToDefault();
-        return TocComponents.empty();
-      }
-
-      return await withDirPath(async (tempDirectory) => {
-        const tempContext = new TempContext(tempDirectory);
-        const specZipPath = await tempContext.zip(specDirectory);
-        const specFileStream = await this.fileService.getStream(specZipPath);
+    const tocComponentsResult: Result<TocComponents, ServiceError> = await withDirPath(async (tempDirectory) => {
+      const tempContext = new TempContext(tempDirectory);
+      const specZipPath = await tempContext.zip(specDirectory);
+      const specFileStream = await this.fileService.getStream(specZipPath);
+      try {
         const result = await this.prompts.extractTocData(
           this.portalService.generateTocData(specFileStream, this.configDirectory, this.commandMetadata),
           expandEndpoints,
@@ -82,15 +88,22 @@ export class PortalNewTocAction {
           expandWebhooks,
           expandCallbacks
         );
-        specFileStream.close();
         if (result.isErr()) {
-          this.prompts.fallingBackToDefault();
-          return TocComponents.empty();
+          return err(result.error);
         }
 
-        return TocComponents.fromTocData(result.value);
-      });
-    })();
+        return ok(TocComponents.fromTocData(result.value));
+      } finally {
+        specFileStream.close();
+      }
+    });
+
+    if (tocComponentsResult.isErr()) {
+      this.prompts.tocExtractionFailed(tocComponentsResult.error.errorMessage);
+      return ActionResult.failed();
+    }
+    const tocComponents = tocComponentsResult.value;
+
     const contentContext = new ContentContext(contentDirectory);
     const contentExists = await contentContext.exists();
 

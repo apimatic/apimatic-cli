@@ -67,7 +67,18 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 - **Commands use `export default class`** — oclif requires default export; actions, prompts, and services use named exports (`export class`)
 - **Static fields use `readonly`** — `static readonly summary`, `static readonly description`, `static readonly cmdTxt` on every Command
 - **Topic separator is space** — `apimatic portal generate`, not `apimatic portal:generate`
+- **No AI-generated comments** — comment only to explain non-obvious *why*: a constraint, a workaround, a subtle invariant. Never restate what the code already says, narrate a change, or leave notes addressed to a future agent. Default to no comment; existing comment density in nearby code is never a reason to add more.
 - **Telemetry** — After `outro(result)`, commands optionally track failures via `result.mapAll(() => {}, async () => { await new TelemetryService(configDir).trackEvent(new SomeFailedEvent(...), shell) }, () => {})`. Event classes extend `DomainEvent` (`src/types/events/`). Only the failure callback is populated; success/cancel are no-ops.
+
+## Branching
+
+Always start work from `dev` — never from `main`. This applies to branches and worktrees alike.
+
+- Make sure `dev` is current (`git fetch origin dev`) and branch from `origin/dev`.
+- Open pull requests against `dev`.
+- Never commit to, branch from, or target `main` directly. If a task appears to require it, stop and ask.
+
+**Worktrees** — a new worktree starts from this repo's default branch, `beta`, so move it onto `dev` before making any changes: `git fetch origin dev && git reset --hard origin/dev` (fresh, clean worktrees only). Confirm with `git log --oneline -1` that HEAD matches the `origin/dev` tip.
 
 ## Commit Conventions
 
