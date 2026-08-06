@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/apimatic/apimatic-cli/compare/v1.1.0...v1.2.0) (2026-07-14)
+
+
+### Features
+
+* **quickstart:** prune build file to subscription before generating ([#294](https://github.com/apimatic/apimatic-cli/issues/294)) ([#296](https://github.com/apimatic/apimatic-cli/issues/296)) ([5f90b2a](https://github.com/apimatic/apimatic-cli/commit/5f90b2a57d47f3e2934f62f5994d3e4489fd1ba8))
+
 # [1.1.0](https://github.com/apimatic/apimatic-cli/compare/v1.0.0...v1.1.0) (2026-07-02)
 
 
