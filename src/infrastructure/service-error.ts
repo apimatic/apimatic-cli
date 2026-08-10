@@ -10,7 +10,8 @@ export enum ServiceErrorCode {
   InvalidResponse = "INVALID_RESPONSE",
   UnAuthorized = "UNAUTHORIZED",
   BadRequest = "BAD_REQUEST",
-  Forbidden = "FORBIDDEN"
+  Forbidden = "FORBIDDEN",
+  Timeout = "TIMEOUT"
 }
 
 export class ServiceError {
@@ -31,6 +32,12 @@ export class ServiceError {
   }
   static notFound(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.NotFound, customMessage, {});
+  }
+  static timeout(customMessage: string): ServiceError {
+    return new ServiceError(ServiceErrorCode.Timeout, customMessage, {});
+  }
+  static serverError(customMessage: string): ServiceError {
+    return new ServiceError(ServiceErrorCode.ServerError, customMessage, {});
   }
   static unauthorizedWithHint(apiMessage: string | null): ServiceError {
     // Both remedies name the full `auth login` command: the key is supplied to
