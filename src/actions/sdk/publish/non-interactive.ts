@@ -122,28 +122,6 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    // Since publishing was not initiated, skip the next steps for polling.
-    if (dryRun) {
-      return ActionResult.success();
-    }
-
-    const publishingInfo = publishResult.getValue();
-    this.prompts.publishingRunningNotice(publishingProfile, language, semVersion, publishTypes);
-
-    const publishingSucceeded = await this.prompts.pollPublishingStatus(() =>
-      this.publishingApiService.getSdkPublishingLog(
-        publishingInfo.publishLogId,
-        this.configDir,
-        this.commandMetadata.shell
-      )
-    );
-
-    this.prompts.postPublishingMessage(publishingInfo.publishingLogUrl);
-
-    if (!publishingSucceeded) {
-      return ActionResult.failed();
-    }
-
     return ActionResult.success();
   };
 }

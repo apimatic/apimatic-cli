@@ -1,7 +1,7 @@
 import { confirm, isCancel, log, select, text } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { format as f } from '../../../prompts/format.js';
-import { noteWrapped, withSpinner } from '../../prompt.js';
+import { withSpinner } from '../../prompt.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
 import {
@@ -193,11 +193,5 @@ export class SdkPublishInteractivePrompts {
     log.info(
       'Version tags will not be created in your Git repository because you have opted to publish Source Code only.'
     );
-  }
-
-  public sdkPublishingInProgress(publishingLogUrl: string) {
-    const message = `To view the status of publishing, please visit: 
-${f.link(publishingLogUrl)}`;
-    noteWrapped(message, 'Next Steps');
   }
 }
