@@ -47,10 +47,10 @@ export class SdkPublishPrompts {
     log.info('Publishing is still running on APIMatic and will continue without the CLI.');
   }
 
-  public postPublishingMessage(publishingLogUrl: string) {
-    const message = `To view publishing logs, please visit:
+  public publishingLogsMessage(publishingLogUrl: string) {
+    const message = `To track progress and view publishing logs, please visit:
 ${f.link(publishingLogUrl)}`;
-    noteWrapped(message, 'Next Steps');
+    noteWrapped(message, 'Publishing Logs');
   }
 
   public async pollPublishingStatus(

@@ -115,6 +115,7 @@ export class SdkPublishAction {
 
     const publishingInfo = publishResult.getValue();
     this.prompts.publishingRunningNotice(publishingProfile, language, semVersion, publishType);
+    this.prompts.publishingLogsMessage(publishingInfo.publishingLogUrl);
 
     const publishingOutcome = await this.prompts.pollPublishingStatus(() =>
       this.publishingApiService.getSdkPublishingLog(
@@ -127,8 +128,6 @@ export class SdkPublishAction {
     if (publishingOutcome === 'cancelled') {
       this.prompts.publishingWaitCancelledNotice();
     }
-
-    this.prompts.postPublishingMessage(publishingInfo.publishingLogUrl);
 
     switch (publishingOutcome) {
       case 'succeeded':
