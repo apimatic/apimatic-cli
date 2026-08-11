@@ -224,6 +224,17 @@ describe('PluginService', () => {
       expect(errorFrom(result).errorMessage).to.equal('Plugin generation timed out.');
     });
 
+    it('gives up on a status request that never answers', async () => {
+      // Without a request timeout this hangs rather than fails: the generation budget is
+      // only read once a status call returns, and this one never does.
+      const impatient = new PluginService(1, 5_000, 30);
+      respondToStatus = () => {};
+
+      const result = await impatient.generatePlugin(buildPath, configDir, metadata, AUTH_KEY);
+
+      expect(errorFrom(result).code).to.equal(ServiceErrorCode.NetworkError);
+    });
+
     it('reads one last status before declaring a timeout', async () => {
       // The budget is spent during the wait, but the run finished in that window.
       const impatient = new PluginService(20, 10);

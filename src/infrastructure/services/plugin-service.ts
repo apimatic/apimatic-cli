@@ -2,6 +2,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { err, ok, Result } from 'neverthrow';
 import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
+import { REQUEST_TIMEOUT_MS } from '../../config/axios-config.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -23,13 +24,16 @@ export class PluginService {
   private readonly fileService = new FileService();
   private readonly statusPollIntervalMs: number;
   private readonly generationTimeoutMs: number;
+  private readonly requestTimeoutMs: number;
 
   constructor(
     statusPollIntervalMs: number = STATUS_POLL_INTERVAL_MS,
-    generationTimeoutMs: number = GENERATION_TIMEOUT_MS
+    generationTimeoutMs: number = GENERATION_TIMEOUT_MS,
+    requestTimeoutMs: number = REQUEST_TIMEOUT_MS
   ) {
     this.statusPollIntervalMs = statusPollIntervalMs;
     this.generationTimeoutMs = generationTimeoutMs;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   public async generatePlugin(
@@ -146,6 +150,9 @@ export class PluginService {
   private axiosInstance(shell: string, apiKey: string) {
     return axios.create({
       baseURL: envInfo.getBaseUrl() ?? this.apiBaseUrl,
+      // The generation budget is only read between polls, so a request that connects and
+      // then never answers would outlive it. Bounding the request is what makes it a limit.
+      timeout: this.requestTimeoutMs,
       headers: {
         'User-Agent': envInfo.getUserAgent(shell),
         Authorization: `X-Auth-Key ${apiKey}`
