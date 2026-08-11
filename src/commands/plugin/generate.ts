@@ -21,7 +21,7 @@ export default class PluginGenerate extends Command {
   static readonly flags = {
     zip: Flags.boolean({
       default: false,
-      description: 'Download the generated plugin as a .zip archive'
+      description: 'download the generated plugin as a .zip archive'
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.destination('plugin', 'plugin'),
@@ -43,8 +43,12 @@ export default class PluginGenerate extends Command {
     };
 
     intro('Generate Context Plugin');
-    const action = new PluginGenerateAction(new DirectoryPath(this.config.configDir), commandMetadata, authKey);
+    const action = new PluginGenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(buildDirectory, pluginDirectory, force, zipPlugin);
     outro(result);
   }
+
+  private readonly getConfigDir = () => {
+    return new DirectoryPath(this.config.configDir);
+  };
 }

@@ -167,9 +167,13 @@ const UNKNOWN_STATUS_MESSAGE = 'Unable to determine generation status. Please tr
 type PollDecision = { kind: 'continue' } | { kind: 'done' } | { kind: 'error'; error: ServiceError };
 
 /**
- * Context plugin generation reports completion as a status body rather than a redirect, and
- * unlike the portal and SDK endpoints it is bounded: a run that never reaches a terminal
- * status gives up rather than polling forever.
+ * A second copy of the loop in `portal-service.ts`, which `.ai/skills/service.md` says to reuse.
+ * It can't be reused yet: this endpoint reports completion as a status body rather than a 302,
+ * and its status vocabulary is absent from the SDK's `Status` enum. Deduping the two is left to
+ * the follow-up that lands the regenerated SDK.
+ *
+ * Unlike the portal and SDK loops this one gives up rather than polling forever — though the
+ * deadline is only checked between polls, so a request that hangs still outlives it.
  */
 async function pollUntilCompleted(
   pollIntervalMs: number,
@@ -245,9 +249,9 @@ function mapRequestError(error: unknown): ServiceError {
 
 /**
  * `handleServiceError` only reads ProblemDetails off the SDK's typed errors, so a raw axios
- * 400/403/404 would otherwise collapse into a generic server error and lose its message.
+ * 400 or 403 would otherwise collapse into a generic server error and lose its message.
  * Unlike the SDK path this also falls back to `detail`, which io uses when it sends no
- * `errors` map.
+ * `errors` map. Every other status is left to `mapTransportError`.
  */
 function mapProblemDetails(error: unknown): ServiceError | undefined {
   if (!axios.isAxiosError(error)) {
