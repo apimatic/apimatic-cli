@@ -9,7 +9,7 @@ export default class PluginGenerate extends Command {
   static readonly summary = 'Generate a Claude Code context plugin for your published SDKs.';
 
   static readonly description =
-    'Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory containing a `src` directory with a `plugin-config.json`. Running without one creates the file so that `apimatic sdk publish` can record each SDK it publishes.';
+    'Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory containing a `src` directory with a `plugin-config.json`.';
 
   static readonly cmdTxt = format.cmd('apimatic', 'plugin', 'generate');
 
@@ -18,7 +18,7 @@ export default class PluginGenerate extends Command {
     `${PluginGenerate.cmdTxt} ${format.flag('input', '"./"')} ${format.flag('destination', '"./plugin"')}`
   ];
 
-  static flags = {
+  static readonly flags = {
     zip: Flags.boolean({
       default: false,
       description: 'Download the generated plugin as a .zip archive'

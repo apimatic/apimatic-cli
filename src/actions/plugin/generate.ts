@@ -59,12 +59,8 @@ export class PluginGenerateAction {
         return ActionResult.failed();
       }
 
-      const tempPluginZipPath = await tempContext.save(response.value.plugin);
+      const tempPluginZipPath = await tempContext.save(response.value);
       await pluginContext.save(tempPluginZipPath, zipPlugin);
-
-      if (response.value.deferred.length > 0) {
-        this.prompts.languagesDeferred(response.value.deferred);
-      }
 
       if (displayMessages) {
         this.prompts.pluginGenerated(pluginDirectory);

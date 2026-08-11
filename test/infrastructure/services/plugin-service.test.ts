@@ -123,7 +123,7 @@ describe('PluginService', () => {
       const result = await generatePlugin();
 
       expect(result.isOk()).to.be.true;
-      expect(await drain(result._unsafeUnwrap().plugin)).to.equal('PK context-plugin');
+      expect(await drain(result._unsafeUnwrap())).to.equal('PK context-plugin');
       expect(generateRequests).to.have.length(1);
       expect(statusRequests[0].url).to.equal(`/plugin/${GENERATION_ID}/status`);
     });
@@ -153,29 +153,6 @@ describe('PluginService', () => {
 
       expect(result.isOk()).to.be.true;
       expect(statusRequests).to.have.length(4);
-    });
-
-    it('reports the languages the backend deferred alongside the artifact', async () => {
-      respondToStatus = statusBody({
-        status: 'Completed',
-        deferred: [
-          { language: 'python', reason: 'NoPluginGenerator' },
-          { language: 'java', reason: 'TargetsV3' }
-        ]
-      });
-
-      const result = await generatePlugin();
-
-      expect(result._unsafeUnwrap().deferred).to.deep.equal([
-        { language: 'python', reason: 'NoPluginGenerator' },
-        { language: 'java', reason: 'TargetsV3' }
-      ]);
-    });
-
-    it('reports no deferrals when the status omits them', async () => {
-      const result = await generatePlugin();
-
-      expect(result._unsafeUnwrap().deferred).to.deep.equal([]);
     });
 
     it('refuses to call the API at all without a key', async () => {
@@ -296,7 +273,20 @@ describe('PluginService', () => {
       const error = errorFrom(await generatePlugin());
 
       expect(error.code).to.equal(ServiceErrorCode.UnAuthorized);
-      expect(error.errorMessage).to.include('auth');
+      // A bare 401 carries no body, so the remedy can only come from the CLI.
+      expect(error.errorMessage).to.equal(ServiceError.unauthorizedWithHint(null).errorMessage);
+    });
+
+    it('points an expired key at the login command when the download 401s', async () => {
+      respondToDownload = (res) => {
+        res.writeHead(401);
+        res.end();
+      };
+
+      const error = errorFrom(await generatePlugin());
+
+      expect(error.code).to.equal(ServiceErrorCode.UnAuthorized);
+      expect(error.errorMessage).to.equal(ServiceError.unauthorizedWithHint(null).errorMessage);
     });
 
     it('reports a generate response that carries no id', async () => {

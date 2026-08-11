@@ -14,30 +14,13 @@ export enum PluginGenerationStatus {
   Unknown = 'Unknown'
 }
 
-export enum DeferralReason {
-  TargetsV3 = 'TargetsV3',
-  NoPluginGenerator = 'NoPluginGenerator'
-}
-
-/** A language named in the config that this generator skipped; generation still succeeds. */
-export interface DeferredLanguage {
-  language: string;
-  reason: DeferralReason | string;
-}
-
 export interface PluginGenerationStatusResponse {
   status: PluginGenerationStatus;
   errors?: Record<string, string[]>;
-  deferred?: DeferredLanguage[];
 }
 
 export interface PluginGenerationInitiatedResponse {
   id: string;
-}
-
-export interface GeneratedPluginResult {
-  plugin: NodeJS.ReadableStream;
-  deferred: DeferredLanguage[];
 }
 
 const IN_FLIGHT: ReadonlySet<PluginGenerationStatus> = new Set([

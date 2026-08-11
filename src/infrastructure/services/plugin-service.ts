@@ -6,7 +6,6 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import {
-  GeneratedPluginResult,
   isInFlight,
   PluginGenerationInitiatedResponse,
   PluginGenerationStatus,
@@ -45,7 +44,7 @@ export class PluginService {
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
-  ): Promise<Result<GeneratedPluginResult, ServiceError>> {
+  ): Promise<Result<NodeJS.ReadableStream, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     // `auth logout` blanks config.json rather than deleting it, so a logged-out user
     // still has a non-null AuthInfo with an empty key — check the key, not the object.
@@ -67,12 +66,7 @@ export class PluginService {
       return err(completed.error);
     }
 
-    const download = await this.downloadPlugin(generationId, commandMetadata.shell, token);
-    if (download.isErr()) {
-      return err(download.error);
-    }
-
-    return ok({ plugin: download.value, deferred: completed.value.deferred ?? [] });
+    return await this.downloadPlugin(generationId, commandMetadata.shell, token);
   }
 
   private async initiateGeneration(
@@ -95,7 +89,7 @@ export class PluginService {
       const id = (response.data as PluginGenerationInitiatedResponse | undefined)?.id;
       return id ? ok({ id }) : err(ServiceError.InvalidResponse);
     } catch (error) {
-      return err(mapProblemDetails(error) ?? handleServiceError(error));
+      return err(mapRequestError(error));
     } finally {
       buildFileStream.close();
     }
@@ -148,10 +142,11 @@ export class PluginService {
       return ok(response.data as NodeJS.ReadableStream);
     } catch (error) {
       // The body of a failed streamed response is itself a stream; leaving it open hangs the CLI.
+      // Discarding it also rules out reading ProblemDetails here, so only the status code maps.
       if (axios.isAxiosError(error)) {
         discardStreamBody(error.response?.data);
       }
-      return err(handleServiceError(error));
+      return err(mapTransportError(error));
     }
   }
 
@@ -230,6 +225,23 @@ const formatValidationErrors = (errors: Record<string, string[]>): string => {
   const messages = Object.values(errors).flat();
   return 'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
 };
+
+/**
+ * `handleServiceError` maps a 401 onto the bare `Unauthorized access.`, which leaves the user
+ * with nothing to act on. An auth key can expire between any two calls here, so every one of
+ * them offers the same remedy the status poll already does.
+ */
+function mapTransportError(error: unknown): ServiceError {
+  if (axios.isAxiosError(error) && error.response?.status === 401) {
+    return ServiceError.unauthorizedWithHint(null);
+  }
+  return handleServiceError(error);
+}
+
+/** For responses whose body is readable JSON; a streamed body can only be mapped by status. */
+function mapRequestError(error: unknown): ServiceError {
+  return mapProblemDetails(error) ?? mapTransportError(error);
+}
 
 /**
  * `handleServiceError` only reads ProblemDetails off the SDK's typed errors, so a raw axios

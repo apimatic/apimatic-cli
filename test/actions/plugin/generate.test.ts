@@ -23,10 +23,8 @@ describe('PluginGenerateAction', () => {
   const execute = (force = false, zipPlugin = true) =>
     action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(pluginDirectory), force, zipPlugin);
 
-  const generated = (deferred: { language: string; reason: string }[] = []) =>
-    sinon
-      .stub(PluginService.prototype, 'generatePlugin')
-      .resolves(ok({ plugin: Readable.from(['PK context-plugin']), deferred }));
+  const generated = () =>
+    sinon.stub(PluginService.prototype, 'generatePlugin').resolves(ok(Readable.from(['PK context-plugin'])));
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
@@ -112,25 +110,6 @@ describe('PluginGenerateAction', () => {
 
       expect(result.isSuccess()).to.be.true;
       expect(fsExtra.readFileSync(path.join(pluginDirectory, 'plugin.zip'), 'utf-8')).to.equal('PK context-plugin');
-    });
-
-    it('reports deferred languages without failing the run', async () => {
-      generated([{ language: 'python', reason: 'NoPluginGenerator' }]);
-      const languagesDeferred = sinon.stub(PluginGeneratePrompts.prototype, 'languagesDeferred');
-
-      const result = await execute();
-
-      expect(result.isSuccess()).to.be.true;
-      expect(languagesDeferred.firstCall.args[0]).to.deep.equal([{ language: 'python', reason: 'NoPluginGenerator' }]);
-    });
-
-    it('stays quiet about deferrals when there are none', async () => {
-      generated();
-      const languagesDeferred = sinon.stub(PluginGeneratePrompts.prototype, 'languagesDeferred');
-
-      await execute();
-
-      expect(languagesDeferred.called).to.be.false;
     });
   });
 

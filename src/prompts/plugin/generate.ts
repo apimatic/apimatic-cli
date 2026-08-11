@@ -2,20 +2,13 @@ import { confirm, isCancel, log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { DeferralReason, DeferredLanguage, GeneratedPluginResult } from '../../types/plugin/generation-status.js';
 import { format as f } from '../format.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 
-/** The wire carries the reason's name; the sentence that explains it lives here. */
-const DEFERRAL_DETAIL: Record<string, string> = {
-  [DeferralReason.NoPluginGenerator]: 'has no context plugin generator',
-  [DeferralReason.TargetsV3]: 'targets v3, which this generator does not build'
-};
-
 export class PluginGeneratePrompts {
-  public generatePlugin(fn: Promise<Result<GeneratedPluginResult, ServiceError>>) {
+  public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner('Generating Context Plugin', 'Plugin generated successfully.', 'Plugin Generation failed.', fn);
   }
 
@@ -60,13 +53,6 @@ export class PluginGeneratePrompts {
   public noBuildableLanguages(messages: string[]) {
     const message = `No language in ${f.var('sdkRepos')} can be built yet:\n- ${messages.join('\n- ')}`;
     log.error(message);
-  }
-
-  public languagesDeferred(deferred: DeferredLanguage[]) {
-    const lines = deferred.map(
-      ({ language, reason }) => `Skipped ${f.var(language)} — ${DEFERRAL_DETAIL[reason] ?? 'is not supported yet'}.`
-    );
-    log.info(lines.join('\n'));
   }
 
   public nextStepsPublishSdks() {
