@@ -118,7 +118,6 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    this.prompts.sdkPublishingInProgress(publishResult.getValue().publishingLogUrl);
     return ActionResult.success();
   };
 

@@ -1,15 +1,12 @@
-import { log, spinner } from '@clack/prompts';
+import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
-import { SemVersion } from '../../../types/publish/version.js';
 import { format as f } from '../../../prompts/format.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { noteWrapped, withSpinner } from '../../prompt.js';
+import { withSpinner } from '../../prompt.js';
 import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile-item.js';
-import { PublishLogItem } from '../../../types/publish-api/publish-log.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
-import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { Language } from '../../../types/sdk/generate.js';
 
 export class SdkPublishNonInteractivePrompts {
@@ -82,70 +79,5 @@ export class SdkPublishNonInteractivePrompts {
     log.info(
       'Version tags will not be created in your Git repository because you have opted to publish Source Code only.'
     );
-  }
-
-  public publishingRunningNotice(
-    profile: PublishingProfile,
-    language: Language,
-    version: SemVersion,
-    publishType: PublishType[]
-  ): void {
-    const targets = [...publishType]
-      .sort((a, b) => (a === PublishType.SourceCodePublishing ? -1 : b === PublishType.SourceCodePublishing ? 1 : 0))
-      .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
-      .join(' + ');
-    log.info(
-      `Publishing is running for the following:\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
-    );
-  }
-
-  public postPublishingMessage(publishingLogUrl: string) {
-    const message = `To view publishing logs, please visit:
-${f.link(publishingLogUrl)}`;
-    noteWrapped(message, 'Next Steps');
-  }
-
-  public async pollPublishingStatus(
-    getSdkPublishingLogFn: () => Promise<Result<PublishLogItem, ServiceError>>
-  ): Promise<boolean> {
-    const TERMINAL_STATES = new Set(['Succeeded', 'Failed', 'Exception', 'InternalError']);
-    const POLL_INTERVAL_MS = 10000; // poll after every 10 seconds.
-    const spin = spinner();
-
-    spin.start('Waiting for publishing status...');
-
-    while (true) {
-      const publishingLogResult = await getSdkPublishingLogFn();
-
-      if (publishingLogResult.isErr()) {
-        spin.stop('Failed to fetch publishing status.', 1);
-        return false;
-      }
-
-      const { events } = publishingLogResult.value;
-      const executionCompleted = events.every((event) => TERMINAL_STATES.has(event.eventType));
-      const statusMessage = [...events]
-        .sort((a, b) => (a.publishType === 'SourceCode' ? -1 : b.publishType === 'SourceCode' ? 1 : 0))
-        .map((event) => {
-          const target = event.publishType === 'SourceCode' ? 'Source Code' : 'Package';
-          const eventLabels: Record<string, string> = {
-            Queued: 'Queued',
-            InProgress: 'In Progress',
-            Succeeded: 'Published'
-          };
-          const label = eventLabels[event.eventType] ?? 'Failed';
-          return `${target}: [${label}]`;
-        })
-        .join(' | ');
-
-      if (executionCompleted) {
-        const isExecutionSuccessful = events.every((event) => event.eventType === 'Succeeded');
-        spin.stop(statusMessage, isExecutionSuccessful ? 0 : 1);
-        return isExecutionSuccessful;
-      }
-
-      spin.message(statusMessage);
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    }
   }
 }

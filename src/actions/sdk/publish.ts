@@ -35,8 +35,8 @@ export class SdkPublishAction {
     publishingProfile: PublishingProfile,
     dryRun: boolean,
     onPublishSdkError: (errorMessage: string) => void
-  ): Promise<ActionResult<PublishingInfo>> => {
-    return await withDirPath(async (tempDirectory) => {
+  ): Promise<ActionResult> => {
+    const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
       const packageConfigurationData = publishingProfile.getPackageConfigurationDataForLanguage(language);
       let packageSettingsDirectory: DirectoryPath | undefined;
 
@@ -100,5 +100,38 @@ export class SdkPublishAction {
 
       return ActionResult.success(publishSdkResponse.value);
     });
+
+    if (publishResult.isFailed()) {
+      return ActionResult.failed();
+    }
+    if (publishResult.isCancelled()) {
+      return ActionResult.cancelled();
+    }
+
+    // Since publishing was not initiated, skip the next steps for polling.
+    if (dryRun) {
+      return ActionResult.success();
+    }
+
+    const publishingInfo = publishResult.getValue();
+    this.prompts.publishingRunningNotice(publishingProfile, language, semVersion, publishType);
+    this.prompts.publishingLogsMessage(publishingInfo.publishingLogUrl);
+
+    const publishingOutcome = await this.prompts.pollPublishingStatus(() =>
+      this.publishingApiService.getSdkPublishingLog(
+        publishingInfo.publishLogId,
+        this.configDir,
+        this.commandMetadata.shell
+      )
+    );
+
+    switch (publishingOutcome) {
+      case 'succeeded':
+        return ActionResult.success();
+      case 'cancelled':
+        return ActionResult.cancelled();
+      default:
+        return ActionResult.failed();
+    }
   };
 }
