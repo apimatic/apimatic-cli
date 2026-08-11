@@ -125,10 +125,6 @@ export class SdkPublishAction {
       )
     );
 
-    if (publishingOutcome === 'cancelled') {
-      this.prompts.publishingWaitCancelledNotice();
-    }
-
     switch (publishingOutcome) {
       case 'succeeded':
         return ActionResult.success();

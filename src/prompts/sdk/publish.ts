@@ -43,10 +43,6 @@ export class SdkPublishPrompts {
     );
   }
 
-  public publishingWaitCancelledNotice(): void {
-    log.info('Publishing is still running on APIMatic and will continue without the CLI.');
-  }
-
   public publishingLogsMessage(publishingLogUrl: string) {
     const message = `To track progress and view publishing logs, please visit:
 ${f.link(publishingLogUrl)}`;
@@ -66,7 +62,8 @@ ${f.link(publishingLogUrl)}`;
     const spin = spinner({
       onCancel: () => {
         abortWait?.();
-      }
+      },
+      cancelMessage: 'Publishing is still running on APIMatic and will continue without the CLI.'
     });
 
     spin.start('Waiting for publishing status...');
