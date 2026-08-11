@@ -73,7 +73,6 @@ ${f.link(publishingLogUrl)}`;
 
     while (!spin.isCancelled) {
       const publishingLogResult = await getSdkPublishingLogFn();
-      if (spin.isCancelled) break;
 
       if (publishingLogResult.isErr()) {
         spin.stop('Failed to fetch publishing status.', 1);
