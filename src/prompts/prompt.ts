@@ -1,9 +1,48 @@
 import type { Writable } from "node:stream";
 import pc from "picocolors";
 import { getColumns } from "@clack/core";
-import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from "@clack/prompts";
+import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner, SpinnerResult } from "@clack/prompts";
 import { Result } from "neverthrow";
 import { stripAnsi } from "../utils/string-utils.js";
+
+export interface CancellableSpinner {
+  spin: SpinnerResult;
+  dispose: () => void;
+}
+
+// `@clack/core`'s `block()`, which every spinner starts, owns the Ctrl+C key: its stdin
+// keypress listener calls `process.exit(0)`. Raw mode also stops the terminal raising SIGINT,
+// so a spinner the user may sit in front of for minutes has no reachable cancel seam — the
+// process dies mid-await, reporting success, and the spinner's `exit` listener prints its
+// cancel line on the way out. Owning that key for the spinner's lifetime is the only fix
+// clack leaves room for; `onCancel` still covers SIGTERM, which clack does handle.
+export function startCancellableSpinner(message: string, onCancel: () => void): CancellableSpinner {
+  const input = process.stdin;
+  const listenersBeforeStart = new Set(input.rawListeners('keypress'));
+
+  const spin = spinner({ onCancel });
+  spin.start(message);
+
+  for (const listener of input.rawListeners('keypress')) {
+    if (!listenersBeforeStart.has(listener)) {
+      input.off('keypress', listener as (...args: unknown[]) => void);
+    }
+  }
+
+  const onKeypress = (_char: string, key?: { name?: string; ctrl?: boolean }) => {
+    if (key?.ctrl && key.name === 'c') {
+      onCancel();
+    }
+  };
+  input.on('keypress', onKeypress);
+
+  return {
+    spin,
+    dispose: () => {
+      input.off('keypress', onKeypress);
+    }
+  };
+}
 
 export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
   const s = spinner({
