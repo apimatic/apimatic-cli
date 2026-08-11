@@ -59,7 +59,15 @@ ${f.link(publishingLogUrl)}`;
     const TERMINAL_STATES = new Set(['Succeeded', 'Failed', 'Exception', 'InternalError']);
     const POLL_INTERVAL_MS = 10000; // poll after every 10 seconds.
 
-    const spin = spinner();
+    let abortWait: (() => void) | undefined;
+    // The spinner prints its own cancel line and removes its signal listeners on Ctrl+C, so a
+    // cancelled poll must return without stopping the spinner again. Without this callback the
+    // loop would keep polling invisibly until a second Ctrl+C killed the process.
+    const spin = spinner({
+      onCancel: () => {
+        abortWait?.();
+      }
+    });
 
     spin.start('Waiting for publishing status...');
 
@@ -94,7 +102,14 @@ ${f.link(publishingLogUrl)}`;
       }
 
       spin.message(statusMessage);
-      await new Promise<void>((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, POLL_INTERVAL_MS);
+        abortWait = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      abortWait = undefined;
     }
 
     return 'cancelled';
