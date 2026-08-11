@@ -1,6 +1,7 @@
 import { log, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
+import { sleep } from '../../infrastructure/timer-extensions.js';
 import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
@@ -55,10 +56,10 @@ ${f.link(publishingLogUrl)}`;
     const TERMINAL_STATES = new Set(['Succeeded', 'Failed', 'Exception', 'InternalError']);
     const POLL_INTERVAL_MS = 10000; // poll after every 10 seconds.
 
-    let abortWait: (() => void) | undefined;
+    const waitAbort = new AbortController();
     const spin = spinner({
       onCancel: () => {
-        abortWait?.();
+        waitAbort.abort();
       },
       cancelMessage: 'Publishing is still running on APIMatic and will continue without the CLI.'
     });
@@ -96,14 +97,11 @@ ${f.link(publishingLogUrl)}`;
       }
 
       spin.message(statusMessage);
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, POLL_INTERVAL_MS);
-        abortWait = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-      });
-      abortWait = undefined;
+
+      const sleepResult = await sleep(POLL_INTERVAL_MS, waitAbort.signal);
+      if (sleepResult !== 'ok') {
+        return sleepResult;
+      }
     }
 
     return 'cancelled';
