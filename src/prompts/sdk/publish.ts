@@ -59,23 +59,21 @@ ${f.link(publishingLogUrl)}`;
     const TERMINAL_STATES = new Set(['Succeeded', 'Failed', 'Exception', 'InternalError']);
     const POLL_INTERVAL_MS = 10000; // poll after every 10 seconds.
 
-    let cancelled = false;
     let abortWait: (() => void) | undefined;
     // The spinner prints its own cancel line and removes its signal listeners on Ctrl+C, so a
     // cancelled poll must return without stopping the spinner again. Without this callback the
     // loop would keep polling invisibly until a second Ctrl+C killed the process.
     const spin = spinner({
       onCancel: () => {
-        cancelled = true;
         abortWait?.();
       }
     });
 
     spin.start('Waiting for publishing status...');
 
-    while (!cancelled) {
+    while (!spin.isCancelled) {
       const publishingLogResult = await getSdkPublishingLogFn();
-      if (cancelled) break;
+      if (spin.isCancelled) break;
 
       if (publishingLogResult.isErr()) {
         spin.stop('Failed to fetch publishing status.', 1);
