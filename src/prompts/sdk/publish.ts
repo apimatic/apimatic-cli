@@ -56,9 +56,6 @@ ${f.link(publishingLogUrl)}`;
     const POLL_INTERVAL_MS = 10000; // poll after every 10 seconds.
 
     let abortWait: (() => void) | undefined;
-    // The spinner prints its own cancel line and removes its signal listeners on Ctrl+C, so a
-    // cancelled poll must return without stopping the spinner again. Without this callback the
-    // loop would keep polling invisibly until a second Ctrl+C killed the process.
     const spin = spinner({
       onCancel: () => {
         abortWait?.();
