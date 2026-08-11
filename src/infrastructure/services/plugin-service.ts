@@ -6,7 +6,6 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import {
-  isInFlight,
   PluginGenerationInitiatedResponse,
   PluginGenerationStatus,
   PluginGenerationStatusResponse
@@ -14,16 +13,10 @@ import {
 import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import { FileService } from '../file-service.js';
-import { handleServiceError, ServiceError } from '../service-error.js';
+import { handleServiceError, mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
 
 const STATUS_POLL_INTERVAL_MS = 3000;
 const GENERATION_TIMEOUT_MS = 5 * 60 * 1000;
-
-interface ProblemDetailsBody {
-  title?: string;
-  detail?: string;
-  errors?: Record<string, string[]>;
-}
 
 export class PluginService {
   private readonly apiBaseUrl = 'https://api.apimatic.io' as const;
@@ -161,118 +154,50 @@ export class PluginService {
   }
 }
 
-const TIMED_OUT_MESSAGE = 'Plugin generation timed out after 5 minutes.';
-const UNKNOWN_STATUS_MESSAGE = 'Unable to determine generation status. Please try again.';
-
-type PollDecision = { kind: 'continue' } | { kind: 'done' } | { kind: 'error'; error: ServiceError };
-
-/**
- * A second copy of the loop in `portal-service.ts`, which `.ai/skills/service.md` says to reuse.
- * It can't be reused yet: this endpoint reports completion as a status body rather than a 302,
- * and its status vocabulary is absent from the SDK's `Status` enum. Deduping the two is left to
- * the follow-up that lands the regenerated SDK.
- *
- * Unlike the portal and SDK loops this one gives up rather than polling forever — though the
- * deadline is only checked between polls, so a request that hangs still outlives it.
- */
 async function pollUntilCompleted(
   pollIntervalMs: number,
   timeoutMs: number,
   fetchStatus: () => Promise<Result<PluginGenerationStatusResponse, ServiceError>>
 ): Promise<Result<PluginGenerationStatusResponse, ServiceError>> {
-  const startedAt = Date.now();
+  const deadline = Date.now() + timeoutMs;
 
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-
-    if (Date.now() - startedAt >= timeoutMs) {
-      return err(ServiceError.timeout(TIMED_OUT_MESSAGE));
-    }
 
     const statusResult = await fetchStatus();
     if (statusResult.isErr()) {
       return err(statusResult.error);
     }
 
-    const decision = classifyPluginStatus(statusResult.value);
-    if (decision.kind === 'done') {
+    const { status, errors } = statusResult.value;
+
+    if (status === PluginGenerationStatus.Completed) {
       return ok(statusResult.value);
     }
-    if (decision.kind === 'error') {
-      return err(decision.error);
+    if (status === PluginGenerationStatus.Failed) {
+      return err(ServiceError.ServerError);
+    }
+    if (status === PluginGenerationStatus.ValidationError) {
+      const validationErrors = errors ?? {};
+      return err(ServiceError.badRequest(formatValidationErrors(validationErrors), validationErrors));
+    }
+
+    // `Unknown` joins the in-flight values here rather than ending the run: the orchestrator
+    // reports it whenever it has not written a custom status yet, which includes the window
+    // right after a healthy run starts. The deadline is what stops a genuinely stuck one, and
+    // it is read after the status so a run that finished during the last wait still counts.
+    if (Date.now() >= deadline) {
+      return err(ServiceError.timeout(timedOutMessage(timeoutMs)));
     }
   }
 }
 
-function classifyPluginStatus({ status, errors }: PluginGenerationStatusResponse): PollDecision {
-  if (isInFlight(status)) {
-    return { kind: 'continue' };
-  }
-  if (status === PluginGenerationStatus.Completed) {
-    return { kind: 'done' };
-  }
-  if (status === PluginGenerationStatus.Failed) {
-    return { kind: 'error', error: ServiceError.ServerError };
-  }
-  if (status === PluginGenerationStatus.ValidationError) {
-    const validationErrors = errors ?? {};
-    return {
-      kind: 'error',
-      error: ServiceError.badRequest(formatValidationErrors(validationErrors), validationErrors)
-    };
-  }
-  // `Unknown`, and anything a newer backend adds, ends the run rather than polling to the timeout.
-  return { kind: 'error', error: ServiceError.serverError(UNKNOWN_STATUS_MESSAGE) };
-}
+const timedOutMessage = (timeoutMs: number): string => {
+  const minutes = Math.round(timeoutMs / 60_000);
+  return minutes >= 1 ? `Plugin generation timed out after ${minutes} minutes.` : 'Plugin generation timed out.';
+};
 
 const formatValidationErrors = (errors: Record<string, string[]>): string => {
   const messages = Object.values(errors).flat();
   return 'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
 };
-
-/**
- * `handleServiceError` maps a 401 onto the bare `Unauthorized access.`, which leaves the user
- * with nothing to act on. An auth key can expire between any two calls here, so every one of
- * them offers the same remedy the status poll already does.
- */
-function mapTransportError(error: unknown): ServiceError {
-  if (axios.isAxiosError(error) && error.response?.status === 401) {
-    return ServiceError.unauthorizedWithHint(null);
-  }
-  return handleServiceError(error);
-}
-
-/** For responses whose body is readable JSON; a streamed body can only be mapped by status. */
-function mapRequestError(error: unknown): ServiceError {
-  return mapProblemDetails(error) ?? mapTransportError(error);
-}
-
-/**
- * `handleServiceError` only reads ProblemDetails off the SDK's typed errors, so a raw axios
- * 400 or 403 would otherwise collapse into a generic server error and lose its message.
- * Unlike the SDK path this also falls back to `detail`, which io uses when it sends no
- * `errors` map. Every other status is left to `mapTransportError`.
- */
-function mapProblemDetails(error: unknown): ServiceError | undefined {
-  if (!axios.isAxiosError(error)) {
-    return undefined;
-  }
-
-  const body = error.response?.data as ProblemDetailsBody | undefined;
-  if (typeof body !== 'object' || body === null) {
-    return undefined;
-  }
-
-  const errors = body.errors ?? {};
-  const firstMessage = Object.values(errors).flat()[0] ?? body.detail;
-  const title = body.title ?? 'Request failed.';
-  const message = firstMessage ? `${title}\n- ${firstMessage}` : title;
-
-  if (error.response?.status === 400) {
-    return ServiceError.badRequest(message, errors);
-  }
-  if (error.response?.status === 403) {
-    return ServiceError.forbidden(message);
-  }
-  return undefined;
-}

@@ -22,13 +22,3 @@ export interface PluginGenerationStatusResponse {
 export interface PluginGenerationInitiatedResponse {
   id: string;
 }
-
-const IN_FLIGHT: ReadonlySet<PluginGenerationStatus> = new Set([
-  PluginGenerationStatus.Queued,
-  PluginGenerationStatus.ExecutionStarted,
-  PluginGenerationStatus.GeneratingArtifacts
-]);
-
-export function isInFlight(status: PluginGenerationStatus): boolean {
-  return IN_FLIGHT.has(status);
-}

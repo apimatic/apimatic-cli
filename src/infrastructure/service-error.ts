@@ -104,6 +104,58 @@ function mapApiError(error: ApiError): ServiceError {
   return ServiceError.ServerError;
 }
 
+interface ProblemDetailsBody {
+  title?: string;
+  detail?: string;
+  errors?: Record<string, string[]>;
+}
+
+/**
+ * `handleServiceError` reads a ProblemDetails body only off the SDK's typed errors, so on a raw
+ * axios call a 400 or 403 would collapse into a generic server error and lose its message.
+ * Unlike the SDK path this also falls back to `detail`, which io uses when it sends no `errors`
+ * map. Every other status is left to `mapTransportError`.
+ */
+function mapAxiosProblemDetails(error: unknown): ServiceError | undefined {
+  if (!axios.isAxiosError(error)) {
+    return undefined;
+  }
+
+  const body = error.response?.data as ProblemDetailsBody | undefined;
+  if (typeof body !== "object" || body === null) {
+    return undefined;
+  }
+
+  const errors = body.errors ?? {};
+  const firstMessage = Object.values(errors).flat()[0] ?? body.detail;
+  const title = body.title ?? "Request failed.";
+  const message = firstMessage ? `${title}\n- ${firstMessage}` : title;
+
+  if (error.response?.status === 400) {
+    return ServiceError.badRequest(message, errors);
+  }
+  if (error.response?.status === 403) {
+    return ServiceError.forbidden(message);
+  }
+  return undefined;
+}
+
+/**
+ * `handleServiceError` maps an axios 401 onto the bare `Unauthorized access.`, which leaves the
+ * user with nothing to act on — the SDK path names the remedy but the axios path does not.
+ */
+export function mapTransportError(error: unknown): ServiceError {
+  if (axios.isAxiosError(error) && error.response?.status === 401) {
+    return ServiceError.unauthorizedWithHint(null);
+  }
+  return handleServiceError(error);
+}
+
+/** For responses whose body is readable JSON; a streamed body can only be mapped by status. */
+export function mapRequestError(error: unknown): ServiceError {
+  return mapAxiosProblemDetails(error) ?? mapTransportError(error);
+}
+
 export function handleServiceError(error: unknown): ServiceError {
   if (error instanceof ApiError) {
     // A `callAsStream` error body would otherwise hang the CLI. Order against

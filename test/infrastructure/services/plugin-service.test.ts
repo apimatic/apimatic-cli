@@ -203,13 +203,15 @@ describe('PluginService', () => {
       expect(errorFrom(await generatePlugin()).code).to.equal(ServiceErrorCode.ServerError);
     });
 
-    it('stops on an Unknown status rather than polling to the timeout', async () => {
-      respondToStatus = statusBody({ status: 'Unknown' });
+    it('keeps polling through an Unknown status', async () => {
+      // The orchestrator reports Unknown until it writes its first custom status, so a run
+      // polled in that window is healthy rather than broken.
+      respondToStatus = (res, attempt) => json(res, 200, { status: attempt === 1 ? 'Unknown' : 'Completed' });
 
-      const error = errorFrom(await generatePlugin());
+      const result = await generatePlugin();
 
-      expect(error.errorMessage).to.equal('Unable to determine generation status. Please try again.');
-      expect(statusRequests).to.have.length(1);
+      expect(result.isOk()).to.be.true;
+      expect(statusRequests).to.have.length(2);
     });
 
     it('gives up once the generation budget is spent', async () => {
@@ -219,7 +221,17 @@ describe('PluginService', () => {
       const result = await impatient.generatePlugin(buildPath, configDir, metadata, AUTH_KEY);
 
       expect(errorFrom(result).code).to.equal(ServiceErrorCode.Timeout);
-      expect(errorFrom(result).errorMessage).to.equal('Plugin generation timed out after 5 minutes.');
+      expect(errorFrom(result).errorMessage).to.equal('Plugin generation timed out.');
+    });
+
+    it('reads one last status before declaring a timeout', async () => {
+      // The budget is spent during the wait, but the run finished in that window.
+      const impatient = new PluginService(20, 10);
+      respondToStatus = statusBody({ status: 'Completed' });
+
+      const result = await impatient.generatePlugin(buildPath, configDir, metadata, AUTH_KEY);
+
+      expect(result.isOk()).to.be.true;
     });
   });
 
