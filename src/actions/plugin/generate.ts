@@ -58,12 +58,16 @@ export class PluginGenerateAction {
         const pluginConfigErrors = error.getError('pluginConfig');
         const sdkRepoErrors = error.getError('sdkRepos');
 
+        // One response can carry both keys, so these are not alternatives: reporting only
+        // the first costs the user a second upload and generation to learn the rest.
         if (pluginConfigErrors?.length) {
           this.prompts.pluginConfigInvalid(pluginConfigErrors);
-        } else if (sdkRepoErrors?.length) {
+        }
+        if (sdkRepoErrors?.length) {
           this.prompts.noBuildableLanguages(sdkRepoErrors);
           this.prompts.nextStepsPublishSdks();
-        } else {
+        }
+        if (!pluginConfigErrors?.length && !sdkRepoErrors?.length) {
           this.prompts.pluginGenerationError(error.errorMessage);
         }
 

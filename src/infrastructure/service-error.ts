@@ -36,9 +36,6 @@ export class ServiceError {
   static timeout(customMessage: string): ServiceError {
     return new ServiceError(ServiceErrorCode.Timeout, customMessage, {});
   }
-  static serverError(customMessage: string): ServiceError {
-    return new ServiceError(ServiceErrorCode.ServerError, customMessage, {});
-  }
   static unauthorizedWithHint(apiMessage: string | null): ServiceError {
     // Both remedies name the full `auth login` command: the key is supplied to
     // that command, not to whichever one hit the 401 — most of them don't accept

@@ -156,6 +156,27 @@ describe('PluginGenerateAction', () => {
       expect(pluginSaveFailed.firstCall.args[0]).to.equal('Invalid or unsupported zip format');
     });
 
+    it('reports every error key the response carries, not just the first', async () => {
+      // Both arrive in one response; showing only one costs the user a second upload
+      // and generation to discover the other.
+      sinon.stub(PluginService.prototype, 'generatePlugin').resolves(
+        err(
+          ServiceError.badRequest('invalid', {
+            pluginConfig: ["'pluginId' must be kebab-case."],
+            sdkRepos: ['nothing buildable']
+          })
+        )
+      );
+      const pluginConfigInvalid = sinon.stub(PluginGeneratePrompts.prototype, 'pluginConfigInvalid');
+      const noBuildableLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'noBuildableLanguages');
+      const nextSteps = sinon.stub(PluginGeneratePrompts.prototype, 'nextStepsPublishSdks');
+
+      expect((await execute()).isFailed()).to.be.true;
+      expect(pluginConfigInvalid.firstCall.args[0]).to.deep.equal(["'pluginId' must be kebab-case."]);
+      expect(noBuildableLanguages.firstCall.args[0]).to.deep.equal(['nothing buildable']);
+      expect(nextSteps.called).to.be.true;
+    });
+
     it('ignores an error key that carries no messages', async () => {
       // An empty array is truthy, so a bare `if (errors)` would print a headed but
       // empty list and swallow the message the service already assembled.

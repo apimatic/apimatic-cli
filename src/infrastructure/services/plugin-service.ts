@@ -200,8 +200,11 @@ async function pollUntilCompleted(
 }
 
 const timedOutMessage = (timeoutMs: number): string => {
-  const minutes = Math.round(timeoutMs / 60_000);
-  return minutes >= 1 ? `Plugin generation timed out after ${minutes} minutes.` : 'Plugin generation timed out.';
+  const minutes = Math.floor(timeoutMs / 60_000);
+  if (minutes < 1) {
+    return 'Plugin generation timed out.';
+  }
+  return `Plugin generation timed out after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
 };
 
 const formatValidationErrors = (errors: Record<string, string[]>): string => {

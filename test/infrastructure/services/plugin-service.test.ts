@@ -28,6 +28,7 @@ describe('PluginService', () => {
 
   const generateRequests: { url: string; headers: http.IncomingHttpHeaders; body: string }[] = [];
   const statusRequests: { url: string; headers: http.IncomingHttpHeaders }[] = [];
+  const downloadRequests: { url: string; headers: http.IncomingHttpHeaders }[] = [];
 
   const json = (res: http.ServerResponse, statusCode: number, body: unknown) => {
     res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -72,6 +73,7 @@ describe('PluginService', () => {
       }
 
       if (url.endsWith('/download')) {
+        downloadRequests.push({ url, headers: req.headers });
         respondToDownload(res);
         return;
       }
@@ -106,6 +108,7 @@ describe('PluginService', () => {
   beforeEach(() => {
     generateRequests.length = 0;
     statusRequests.length = 0;
+    downloadRequests.length = 0;
     respondToGenerate = (res) => json(res, 202, { id: GENERATION_ID });
     respondToStatus = statusBody({ status: 'Completed' });
     respondToDownload = (res) => {
@@ -143,6 +146,7 @@ describe('PluginService', () => {
       await generatePlugin();
 
       expect(statusRequests[0].headers.authorization).to.equal(`X-Auth-Key ${AUTH_KEY}`);
+      expect(downloadRequests[0].headers.authorization).to.equal(`X-Auth-Key ${AUTH_KEY}`);
     });
 
     it('keeps polling through every in-flight status', async () => {
@@ -328,7 +332,7 @@ describe('PluginService', () => {
       expect(statusRequests).to.have.length(1);
     });
 
-    it('reports a failed download without hanging on its body', async () => {
+    it('maps a failed download onto a server error', async () => {
       respondToDownload = (res) => {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ title: 'boom' }));
