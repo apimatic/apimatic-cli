@@ -1,4 +1,4 @@
-import { log } from '@clack/prompts';
+import { log, spinner } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { PublishLogItem } from '../../types/publish-api/publish-log.js';
@@ -6,7 +6,7 @@ import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { Language } from '../../types/sdk/generate.js';
-import { noteWrapped, startCancellableSpinner, withSpinner } from '../prompt.js';
+import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 
@@ -61,63 +61,60 @@ ${f.link(publishingLogUrl)}`;
 
     let cancelled = false;
     let abortWait: (() => void) | undefined;
-    const { spin, dispose } = startCancellableSpinner('Waiting for publishing status...', () => {
-      cancelled = true;
-      // Aborting the pending timer keeps Ctrl+C immediate instead of up to 10 s late.
-      abortWait?.();
+    // The spinner prints its own cancel line and removes its signal listeners on Ctrl+C, so a
+    // cancelled poll must return without stopping the spinner again. Without this callback the
+    // loop would keep polling invisibly until a second Ctrl+C killed the process.
+    const spin = spinner({
+      onCancel: () => {
+        cancelled = true;
+        abortWait?.();
+      }
     });
 
-    try {
-      while (!cancelled) {
-        const publishingLogResult = await getSdkPublishingLogFn();
-        if (cancelled) break;
+    spin.start('Waiting for publishing status...');
 
-        if (publishingLogResult.isErr()) {
-          spin.stop('Failed to fetch publishing status.', 1);
-          return 'failed';
-        }
+    while (!cancelled) {
+      const publishingLogResult = await getSdkPublishingLogFn();
+      if (cancelled) break;
 
-        const { events } = publishingLogResult.value;
-        const executionCompleted = events.every((event) => TERMINAL_STATES.has(event.eventType));
-        const statusMessage = [...events]
-          .sort((a, b) => (a.publishType === 'SourceCode' ? -1 : b.publishType === 'SourceCode' ? 1 : 0))
-          .map((event) => {
-            const target = event.publishType === 'SourceCode' ? 'Source Code' : 'Package';
-            const eventLabels: Record<string, string> = {
-              Queued: 'Queued',
-              InProgress: 'In Progress',
-              Succeeded: 'Published'
-            };
-            const label = eventLabels[event.eventType] ?? 'Failed';
-            return `${target}: [${label}]`;
-          })
-          .join(' | ');
+      if (publishingLogResult.isErr()) {
+        spin.stop('Failed to fetch publishing status.', 1);
+        return 'failed';
+      }
 
-        if (executionCompleted) {
-          const isExecutionSuccessful = events.every((event) => event.eventType === 'Succeeded');
-          spin.stop(statusMessage, isExecutionSuccessful ? 0 : 1);
-          return isExecutionSuccessful ? 'succeeded' : 'failed';
-        }
-
-        spin.message(statusMessage);
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, POLL_INTERVAL_MS);
-          abortWait = () => {
-            clearTimeout(timer);
-            resolve();
+      const { events } = publishingLogResult.value;
+      const executionCompleted = events.every((event) => TERMINAL_STATES.has(event.eventType));
+      const statusMessage = [...events]
+        .sort((a, b) => (a.publishType === 'SourceCode' ? -1 : b.publishType === 'SourceCode' ? 1 : 0))
+        .map((event) => {
+          const target = event.publishType === 'SourceCode' ? 'Source Code' : 'Package';
+          const eventLabels: Record<string, string> = {
+            Queued: 'Queued',
+            InProgress: 'In Progress',
+            Succeeded: 'Published'
           };
-        });
-        abortWait = undefined;
+          const label = eventLabels[event.eventType] ?? 'Failed';
+          return `${target}: [${label}]`;
+        })
+        .join(' | ');
+
+      if (executionCompleted) {
+        const isExecutionSuccessful = events.every((event) => event.eventType === 'Succeeded');
+        spin.stop(statusMessage, isExecutionSuccessful ? 0 : 1);
+        return isExecutionSuccessful ? 'succeeded' : 'failed';
       }
 
-      // A SIGTERM cancel goes through clack's own handling, which has already printed its
-      // cancel line and torn the spinner down.
-      if (!spin.isCancelled) {
-        spin.stop('Cancelled waiting for publishing status.', 1);
-      }
-      return 'cancelled';
-    } finally {
-      dispose();
+      spin.message(statusMessage);
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, POLL_INTERVAL_MS);
+        abortWait = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      abortWait = undefined;
     }
+
+    return 'cancelled';
   }
 }

@@ -45,32 +45,18 @@ Two smaller calls, made without discussion: `sourceCodeOnlyPublishingNotice` sta
 
 ## The cancellation bug
 
-Worth recording because it is not obvious from the clack API, and because the first attempt at it was wrong.
+Worth recording because it is not obvious from the clack API.
 
-`@clack/prompts@1.0.0-alpha.1`'s **spinner** contains no `process.exit`. On SIGINT it stops the spinner (printing its cancel line), calls an optional `onCancel`, sets `isCancelled`, and removes its own signal listeners. That reading is correct as far as it goes, and it is what the first fix (commit `cd38dd0`) was built on: pass `onCancel` to `spinner()` to flag cancellation and clear the pending 10 s `setTimeout`, then return **without** calling `spin.stop()` again.
+`@clack/prompts@1.0.0-alpha.1`'s spinner contains **no `process.exit`**. On SIGINT it stops the spinner (printing its cancel line), calls an optional `onCancel`, sets `isCancelled`, and *removes its own signal listeners*. Because a SIGINT listener was registered, Node's default termination is suppressed while the spinner runs.
 
-That fix never ran. `spin.start()` calls `block()` from `@clack/core`, which puts stdin in raw mode and registers a **keypress** listener that calls **`process.exit(0)`** as soon as it sees a key aliased to `cancel` — `\x03` (Ctrl+C) or `escape`. Raw mode also stops the terminal from raising SIGINT at all, so on Ctrl+C:
+So the old `while (true)` loop, on Ctrl+C: printed the cancel line, then **kept polling invisibly with a dead spinner**, and only a second Ctrl+C killed the process (by then clack had removed its listener, so the default handler applied). Non-interactive is mostly CI, where nobody presses Ctrl+C; making interactive wait promoted this to a likely path.
 
-1. `block()`'s keypress listener calls `process.exit(0)` synchronously.
-2. The spinner's `process.on('exit')` listener fires with code `0`, so it prints its cancel line with the **green submit symbol** (`◇  Canceled`, not red `■`) and, because that path sets `isCancelled = false`, **never calls `onCancel`**.
-3. The process is gone. `pollPublishingStatus` never returns, the running notice and log URL never print, and the CLI reports **exit code 0** for an abandoned publish.
-
-The `◇` rather than `■` in a bug report is the tell that this path, not SIGINT, was taken.
-
-Because clack offers no way to opt out of `block()` (`spinner()` takes `output` and `signal`, never `input`) and `updateSettings` can only *add* key aliases, never remove them, the only seam left is to take the key back. `startCancellableSpinner` in `src/prompts/prompt.ts` starts the spinner, diffs stdin's `keypress` listeners against a snapshot taken before `start()` to remove exactly the one `block()` added, and installs its own Ctrl+C listener that flags cancellation and aborts the pending timer. `dispose()` in a `finally` removes it again.
-
-Consequences worth knowing:
-
-- **The poll now stops its own spinner.** With clack's hard exit gone, nothing prints a cancel line, so the cancelled branch calls `spin.stop(...)` itself — guarded by `if (!spin.isCancelled)`, because SIGTERM still reaches clack's own handler, which prints and tears down first. Both paths therefore produce exactly one cancel line.
-- **`spin.stop()` still performs teardown** (cursor restore, raw mode off, readline close) via the unblock closure `block()` returned, which is untouched.
-- **Escape no longer aborts the wait.** It used to, by falling into the same `process.exit(0)`; only Ctrl+C is honoured now, which is the documented escape hatch anyway.
-- **Keystrokes during the wait are no longer erased.** `block()`'s listener also redrew over stray input; the spinner's own 80 ms repaint (`\x1b[999D\x1b[J`) already covers same-line garbage, so the only visible artifact is one stale spinner line per Enter press.
+The fix passes `onCancel` to `spinner()`, which both flags cancellation and clears the pending 10 s `setTimeout`, so the wait aborts immediately instead of up to 10 s later. A cancelled poll returns **without** calling `spin.stop()` again — clack has already printed its line and torn down its listeners.
 
 ## Files touched
 
 | File | Change |
 | --- | --- |
-| `src/prompts/prompt.ts` | New `startCancellableSpinner` — a spinner whose Ctrl+C is observable rather than fatal (see the cancellation bug) |
 | `src/prompts/sdk/publish.ts` | Shared prompts gain `publishingRunningNotice`, `postPublishingMessage`, `publishingWaitCancelledNotice`, `pollPublishingStatus`, and `export type PublishingOutcome` |
 | `src/actions/sdk/publish.ts` | Polls after `withDirPath` closes; maps outcome to `ActionResult`; return type narrowed to `Promise<ActionResult>` |
 | `src/actions/sdk/publish/interactive.ts` | Dropped the fire-and-forget note; now only inspects the result |
@@ -82,7 +68,6 @@ Consequences worth knowing:
 
 - [#312](https://github.com/apimatic/apimatic-cli/issues/312) — missing array-length check makes an empty publish log report a false success; also carries the no-retry-tolerance and unbounded-wait notes.
 - [#313](https://github.com/apimatic/apimatic-cli/issues/313) — no telemetry for publishes that fail *after* being accepted. `SdkPublishValidationFailedEvent` models a rejected publish request; folding remote failures into it would corrupt that metric, so it wants its own event.
-- Every other long wait behind `withSpinner` still has clack's `process.exit(0)` on Ctrl+C: portal generation (`pollUntilCompleted` in `infrastructure/services/portal-service.ts`) and the device-code login loop (`actions/auth/login.ts`). They exit `0` with a green `◇ cancelled` and no notice. `startCancellableSpinner` is the seam to fix them with; not done here because each needs its own decision about what to print and return on cancel.
 
 ## Verification
 
@@ -93,6 +78,5 @@ Manual matrix (requires a real publishing profile):
 1. Interactive, Package + Source Code → polls to `[Published] | [Published]`, exit `0`.
 2. Interactive, package-only → one target in the status line.
 3. Interactive, a publish that fails → exit `1`, log URL printed.
-4. Interactive, Ctrl+C mid-poll → immediate `■ Cancelled waiting for publishing status.`, "still running" notice, log URL, exit `130`. Verified by driving `pollPublishingStatus` from the built output in a child process and writing `\x03` to its stdin: it returns `'cancelled'`, the caller's notices print, and the process exits `130`. Before the fix the same harness died at `process.exit(0)` with nothing after the cancel line.
-5. Interactive, Ctrl+C pressed repeatedly → one cancel line, one notice, exit `130`; the replacement listener is idempotent and nothing hard-exits. Verified in the same harness with three `\x03` writes.
-6. Non-interactive regression → output unchanged from before this change.
+4. Interactive, Ctrl+C mid-poll → immediate clean exit `130`, "still running" notice, log URL.
+5. Non-interactive regression → output unchanged from before this change.
