@@ -23,6 +23,7 @@ import { Sdl } from "../../types/sdl/sdl.js";
 import { FilePath } from "../../types/file/filePath.js";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FileService } from "../file-service.js";
+import { sleep } from "../timer-extensions.js";
 import { apiClientFactory } from "./api-client-factory.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { err, ok, Result } from "neverthrow";
@@ -322,7 +323,7 @@ async function pollUntilCompleted(
   formatValidationError: ValidationErrorFormatter = formatValidationErrors
 ): Promise<Result<GenerationStatusResponse, ServiceError>> {
   for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    await sleep(pollIntervalMs);
 
     const statusResult = await fetchStatus();
     if (statusResult.isErr()) {

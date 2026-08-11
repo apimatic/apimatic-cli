@@ -7,6 +7,7 @@ import { FilePath } from "../types/file/filePath.js";
 import { DirectoryPath } from "../types/file/directoryPath.js";
 import { Directory } from "../types/file/directory.js";
 import { FileName } from "../types/file/fileName.js";
+import { sleep } from "./timer-extensions.js";
 
 export class FileService {
 
@@ -169,7 +170,7 @@ export class FileService {
         onDeleteFailurePersists();
         actionPerformed = true;
       }
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      await sleep(500);
     }
   }
 
