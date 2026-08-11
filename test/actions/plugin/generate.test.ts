@@ -143,5 +143,21 @@ describe('PluginGenerateAction', () => {
       expect((await execute()).isFailed()).to.be.true;
       expect(pluginGenerationError.called).to.be.true;
     });
+
+    it('ignores an error key that carries no messages', async () => {
+      // An empty array is truthy, so a bare `if (errors)` would print a headed but
+      // empty list and swallow the message the service already assembled.
+      sinon
+        .stub(PluginService.prototype, 'generatePlugin')
+        .resolves(err(ServiceError.badRequest('nothing buildable', { pluginConfig: [], sdkRepos: [] })));
+      const pluginConfigInvalid = sinon.stub(PluginGeneratePrompts.prototype, 'pluginConfigInvalid');
+      const noBuildableLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'noBuildableLanguages');
+      const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
+
+      expect((await execute()).isFailed()).to.be.true;
+      expect(pluginConfigInvalid.called).to.be.false;
+      expect(noBuildableLanguages.called).to.be.false;
+      expect(pluginGenerationError.firstCall.args[0]).to.equal('nothing buildable');
+    });
   });
 });

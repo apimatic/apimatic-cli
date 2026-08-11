@@ -1,6 +1,5 @@
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
-import { ServiceError } from '../../infrastructure/service-error.js';
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
@@ -55,7 +54,19 @@ export class PluginGenerateAction {
       );
 
       if (response.isErr()) {
-        this.reportGenerationError(response.error);
+        const error = response.error;
+        const pluginConfigErrors = error.getError('pluginConfig');
+        const sdkRepoErrors = error.getError('sdkRepos');
+
+        if (pluginConfigErrors?.length) {
+          this.prompts.pluginConfigInvalid(pluginConfigErrors);
+        } else if (sdkRepoErrors?.length) {
+          this.prompts.noBuildableLanguages(sdkRepoErrors);
+          this.prompts.nextStepsPublishSdks();
+        } else {
+          this.prompts.pluginGenerationError(error.errorMessage);
+        }
+
         return ActionResult.failed();
       }
 
@@ -69,21 +80,4 @@ export class PluginGenerateAction {
       return ActionResult.success();
     });
   };
-
-  private reportGenerationError(error: ServiceError) {
-    const pluginConfigErrors = error.getError('pluginConfig');
-    if (pluginConfigErrors) {
-      this.prompts.pluginConfigInvalid(pluginConfigErrors);
-      return;
-    }
-
-    const sdkRepoErrors = error.getError('sdkRepos');
-    if (sdkRepoErrors) {
-      this.prompts.noBuildableLanguages(sdkRepoErrors);
-      this.prompts.nextStepsPublishSdks();
-      return;
-    }
-
-    this.prompts.pluginGenerationError(error.errorMessage);
-  }
 }
