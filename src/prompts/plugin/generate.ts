@@ -45,6 +45,10 @@ export class PluginGeneratePrompts {
     log.error(error);
   }
 
+  public pluginSaveFailed(reason: string) {
+    log.error(`The generated plugin could not be saved: ${reason}`);
+  }
+
   public pluginConfigInvalid(messages: string[]) {
     const message = `Your ${f.var(PLUGIN_CONFIG_FILE)} is invalid:\n- ${messages.join('\n- ')}`;
     log.error(message);

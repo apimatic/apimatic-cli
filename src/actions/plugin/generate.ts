@@ -70,8 +70,13 @@ export class PluginGenerateAction {
         return ActionResult.failed();
       }
 
-      const tempPluginZipPath = await tempContext.save(response.value);
-      await pluginContext.save(tempPluginZipPath, zipPlugin);
+      try {
+        const tempPluginZipPath = await tempContext.save(response.value);
+        await pluginContext.save(tempPluginZipPath, zipPlugin);
+      } catch (error) {
+        this.prompts.pluginSaveFailed(error instanceof Error ? error.message : String(error));
+        return ActionResult.failed();
+      }
 
       if (displayMessages) {
         this.prompts.pluginGenerated(pluginDirectory);
