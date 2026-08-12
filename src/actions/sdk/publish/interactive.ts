@@ -5,6 +5,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
+import { CodeGenerationVersion, Stability } from '../../../types/sdk/generate.js';
 import { ActionResult } from '../../action-result.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
@@ -109,6 +110,8 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
+      CodeGenerationVersion.V3,
+      Stability.STABLE,
       onPublishSdkError
     );
     if (publishResult.isFailed()) {

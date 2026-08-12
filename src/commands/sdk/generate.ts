@@ -8,6 +8,7 @@ import { format, intro, outro } from "../../prompts/format.js";
 import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
 import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
 import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
+import { warnIfStabilityIgnored } from "../../prompts/sdk/stability.js";
 
 export default class SdkGenerate extends Command {
   static readonly summary = "Generate an SDK for your API";
@@ -79,7 +80,8 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
         "api-version": apiVersion, 
         "codegen-version": codegenVersion,
         stability
-      }
+      },
+      metadata
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -93,6 +95,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     const telemetryService = new TelemetryService(this.getConfigDir());
 
     intro("Generate SDK");
+    warnIfStabilityIgnored(codegenVersion as CodeGenerationVersion, metadata.flags.stability?.setFromDefault !== true);
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
       buildDirectory,

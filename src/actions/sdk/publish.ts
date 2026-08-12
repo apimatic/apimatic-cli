@@ -34,6 +34,8 @@ export class SdkPublishAction {
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
+    codegenVersion: CodeGenerationVersion,
+    stability: Stability,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
@@ -55,8 +57,8 @@ export class SdkPublishAction {
         false,
         false,
         false,
-        CodeGenerationVersion.V3,
-        Stability.STABLE,
+        codegenVersion,
+        stability,
         undefined,
         semVersion,
         packageSettingsDirectory
