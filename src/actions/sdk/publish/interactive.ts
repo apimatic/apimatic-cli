@@ -128,6 +128,7 @@ export class SdkPublishInteractiveAction {
       publishingProfile,
       false,
       codegenOption,
+      false,
       publishingSummary,
       onPublishSdkError
     );

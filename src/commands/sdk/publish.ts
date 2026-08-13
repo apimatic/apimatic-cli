@@ -2,7 +2,6 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { CodeGenerationVersion, CodegenOption, Language, Stability } from '../../types/sdk/generate.js';
-import { warnIfStabilityIgnored } from '../../prompts/sdk/stability.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
@@ -137,12 +136,6 @@ export default class SdkPublish extends Command {
           );
 
     intro('Publish SDK');
-    if (!interactive) {
-      warnIfStabilityIgnored(
-        codegenVersion as CodeGenerationVersion,
-        metadata.flags.stability?.setFromDefault !== true
-      );
-    }
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
           workingDirectory,
@@ -156,6 +149,7 @@ export default class SdkPublish extends Command {
           force,
           dryRun,
           CodegenOption.resolve(codegenVersion as CodeGenerationVersion, stability as Stability),
+          metadata.flags.stability?.setFromDefault !== true,
           onPublishSdkError,
           profileId,
           version,

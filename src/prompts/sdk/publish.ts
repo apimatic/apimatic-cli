@@ -5,7 +5,7 @@ import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodegenOption, Language } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, CodegenOption, Language } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
@@ -13,6 +13,17 @@ import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 export type PublishingOutcome = 'succeeded' | 'failed' | 'cancelled';
 
 export class SdkPublishPrompts {
+  public warnIfStabilityIgnored(codegenOption: CodegenOption, stabilityWasProvided: boolean) {
+    if (!stabilityWasProvided || codegenOption.isV4()) {
+      return;
+    }
+
+    const message =
+      `${f.flag('stability')} has no effect with ${f.flag('codegen-version', CodeGenerationVersion.V3)}. ` +
+      `The V3 code generator always produces a stable SDK.`;
+    log.warn(message);
+  }
+
   public publishSdk(fn: Promise<Result<PublishingInfo, ServiceError>>) {
     return withSpinner('Publishing SDK', 'Publishing initiated.', 'SDK Publishing failed.', fn);
   }

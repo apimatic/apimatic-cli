@@ -29,6 +29,7 @@ export class SdkPublishNonInteractiveAction {
     force: boolean,
     dryRun: boolean,
     codegenOption: CodegenOption,
+    stabilityWasProvided: boolean,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
     version?: string
@@ -123,6 +124,7 @@ export class SdkPublishNonInteractiveAction {
       publishingProfile,
       dryRun,
       codegenOption,
+      stabilityWasProvided,
       publishingSummary,
       onPublishSdkError
     );

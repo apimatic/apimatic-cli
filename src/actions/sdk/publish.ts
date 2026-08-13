@@ -35,9 +35,12 @@ export class SdkPublishAction {
     publishingProfile: PublishingProfile,
     dryRun: boolean,
     codegenOption: CodegenOption,
+    stabilityWasProvided: boolean,
     publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
+    this.prompts.warnIfStabilityIgnored(codegenOption, stabilityWasProvided);
+
     const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
       const packageConfigurationData = publishingProfile.getPackageConfigurationDataForLanguage(language);
       let packageSettingsDirectory: DirectoryPath | undefined;

@@ -1,10 +1,13 @@
 import { expect } from "chai";
 import sinon from "sinon";
 import { log } from "@clack/prompts";
-import { warnIfStabilityIgnored } from "../../../src/prompts/sdk/stability.js";
-import { CodeGenerationVersion } from "../../../src/types/sdk/generate.js";
+import { SdkPublishPrompts } from "../../../../src/prompts/sdk/publish.js";
+import { CodeGenerationVersion, CodegenOption, Stability } from "../../../../src/types/sdk/generate.js";
 
-describe("warnIfStabilityIgnored", () => {
+const v4 = CodegenOption.resolve(CodeGenerationVersion.V4, Stability.BETA);
+
+describe("SdkPublishPrompts.warnIfStabilityIgnored", () => {
+  const prompts = new SdkPublishPrompts();
   let warn: sinon.SinonStub;
 
   beforeEach(() => {
@@ -16,19 +19,19 @@ describe("warnIfStabilityIgnored", () => {
   });
 
   it("warns when the flag was typed alongside codegen version v3", () => {
-    warnIfStabilityIgnored(CodeGenerationVersion.V3, true);
+    prompts.warnIfStabilityIgnored(CodegenOption.v3, true);
 
     expect(warn.calledOnce).to.equal(true);
   });
 
   it("stays silent when the flag was only filled in from its default", () => {
-    warnIfStabilityIgnored(CodeGenerationVersion.V3, false);
+    prompts.warnIfStabilityIgnored(CodegenOption.v3, false);
 
     expect(warn.called).to.equal(false);
   });
 
   it("stays silent on v4, where stability reaches the generation service", () => {
-    warnIfStabilityIgnored(CodeGenerationVersion.V4, true);
+    prompts.warnIfStabilityIgnored(v4, true);
 
     expect(warn.called).to.equal(false);
   });
