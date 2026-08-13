@@ -40,6 +40,7 @@ USAGE
 * [`apimatic auth status`](#apimatic-auth-status)
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
+* [`apimatic plugin generate`](#apimatic-plugin-generate)
 * [`apimatic portal copilot`](#apimatic-portal-copilot)
 * [`apimatic portal generate`](#apimatic-portal-generate)
 * [`apimatic portal recipe new`](#apimatic-portal-recipe-new)
@@ -221,6 +222,36 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/main/src/commands/help.ts)_
+
+## `apimatic plugin generate`
+
+Generate a Claude Code context plugin for your published SDKs.
+
+```
+USAGE
+  $ apimatic plugin generate [--zip] [-i <value>] [-d <value>] [-f] [-k <value>]
+
+FLAGS
+  -d, --destination=<value>  [default: <input>/plugin] path where the plugin will be generated.
+  -f, --force                overwrite changes without asking for user consent.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
+      --zip                  download the generated plugin as a .zip archive
+
+DESCRIPTION
+  Generate a Claude Code context plugin for your published SDKs.
+
+  Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
+  containing a `src` directory with a `plugin-config.json`.
+
+EXAMPLES
+  apimatic plugin generate
+
+  apimatic plugin generate --input="./" --destination="./plugin"
+```
+
+_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/plugin/generate.ts)_
 
 ## `apimatic portal copilot`
 

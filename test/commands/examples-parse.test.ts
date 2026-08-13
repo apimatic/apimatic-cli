@@ -16,6 +16,7 @@ const COMMANDS: CommandMapping[] = [
   { id: "auth login", fileParts: ["commands", "auth", "login.js"] },
   { id: "auth logout", fileParts: ["commands", "auth", "logout.js"] },
   { id: "auth status", fileParts: ["commands", "auth", "status.js"] },
+  { id: "plugin generate", fileParts: ["commands", "plugin", "generate.js"] },
   { id: "portal copilot", fileParts: ["commands", "portal", "copilot.js"] },
   { id: "portal generate", fileParts: ["commands", "portal", "generate.js"], exportName: "PortalGenerate" },
   { id: "portal recipe new", fileParts: ["commands", "portal", "recipe", "new.js"] },
