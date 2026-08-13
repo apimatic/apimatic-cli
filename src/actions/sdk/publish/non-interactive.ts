@@ -5,7 +5,7 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { CodegenOption, CodeGenerationVersion, Language } from '../../../types/sdk/generate.js';
+import { CodegenOption, Language } from '../../../types/sdk/generate.js';
 import { ActionResult } from '../../action-result.js';
 import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
@@ -137,15 +137,20 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    // No prompt here: this path is documented for CI/CD, so the answer comes from the flag.
+    // No prompt here: this path is documented for CI/CD, so the answer comes from the flag. A dry
+    // run publishes nothing, so recording it would claim an SDK that does not exist anywhere.
     if (updatePluginConfig) {
-      await new PluginRecordSdkAction().execute(
-        buildDirectory,
-        language,
-        publishingProfile,
-        codegenOption.codeGenerationVersion(),
-        false
-      );
+      if (dryRun) {
+        this.prompts.dryRunPluginConfigNotice();
+      } else {
+        await new PluginRecordSdkAction().execute(
+          buildDirectory,
+          language,
+          publishingProfile,
+          codegenOption.codeGenerationVersion(),
+          false
+        );
+      }
     }
 
     return ActionResult.success();

@@ -9,6 +9,8 @@ import { PublishingProfileItem } from '../../../types/publish-api/publishing-pro
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { Language } from '../../../types/sdk/generate.js';
 
+const PLUGIN_CONFIG_FILE = 'plugin-config.json';
+
 export class SdkPublishNonInteractivePrompts {
   public directoryCannotBeSame(directory: DirectoryPath) {
     const message = `The ${f.var('src')} and ${f.var('sdk')} directories must be different. Current value: ${f.path(
@@ -79,5 +81,12 @@ export class SdkPublishNonInteractivePrompts {
     log.info(
       'Version tags will not be created in your Git repository because you have opted to publish Source Code only.'
     );
+  }
+
+  public dryRunPluginConfigNotice() {
+    const message =
+      `${f.flag('update-plugin-config')} was ignored because ${f.flag('dry-run')} does not publish the SDK. ` +
+      `Re-run without ${f.flag('dry-run')} to record it in ${f.var(PLUGIN_CONFIG_FILE)}.`;
+    log.info(message);
   }
 }
