@@ -107,11 +107,6 @@ export interface PublishingDetails {
   codegenOption: CodegenOption;
 }
 
-/**
- * The detail block shared by the pre-publish summary, the dry-run notice and the running notice.
- * Kept in one place so the three cannot drift apart again — they previously disagreed on whether
- * to sort the targets.
- */
 export function formatPublishingDetails({
   profile,
   language,
