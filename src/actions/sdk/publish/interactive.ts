@@ -8,6 +8,7 @@ import { PublishingProfiles } from '../../../types/publish/publishing-profiles.j
 import { getCodegenOptions } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
+import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
@@ -138,6 +139,16 @@ export class SdkPublishInteractiveAction {
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
     }
+
+    // Interactive only: the non-interactive path is documented for CI/CD, where a prompt would
+    // never be answered. The publish is already polled to completion by this point, so the SDK
+    // really is published, and the entry records the generator that actually produced it.
+    await new PluginRecordSdkAction().execute(
+      buildDirectory,
+      language,
+      publishingProfile,
+      codegenOption.codeGenerationVersion()
+    );
 
     return ActionResult.success();
   };

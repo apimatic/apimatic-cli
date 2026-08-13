@@ -56,6 +56,11 @@ export default class SdkPublish extends Command {
       description: 'Stability level of the generated SDK',
       options: Object.values(Stability).map((s) => s.valueOf()),
       default: Stability.STABLE
+    }),
+    'update-plugin-config': Flags.boolean({
+      default: false,
+      description:
+        "Record the published SDK in 'plugin-config.json', creating the file if it does not exist. Interactive runs are asked instead."
     })
   };
 
@@ -97,7 +102,8 @@ export default class SdkPublish extends Command {
         'publish-type': publishType,
         'dry-run': dryRun,
         'codegen-version': codegenVersion,
-        stability
+        stability,
+        'update-plugin-config': updatePluginConfig
       },
       metadata
     } = await this.parse(SdkPublish);
@@ -153,6 +159,7 @@ export default class SdkPublish extends Command {
           onPublishSdkError,
           profileId,
           version,
+          updatePluginConfig
         );
     outro(result);
   }

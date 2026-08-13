@@ -5,12 +5,13 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { CodegenOption, Language } from '../../../types/sdk/generate.js';
+import { CodegenOption, CodeGenerationVersion, Language } from '../../../types/sdk/generate.js';
 import { ActionResult } from '../../action-result.js';
 import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { BuildContext } from '../../../types/build-context.js';
+import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { FileService } from '../../../infrastructure/file-service.js';
 
@@ -32,7 +33,8 @@ export class SdkPublishNonInteractiveAction {
     stabilityWasProvided: boolean,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
-    version?: string
+    version?: string,
+    updatePluginConfig: boolean = false
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.directoryCannotBeSame(sdkDirectory);
@@ -133,6 +135,17 @@ export class SdkPublishNonInteractiveAction {
     }
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
+    }
+
+    // No prompt here: this path is documented for CI/CD, so the answer comes from the flag.
+    if (updatePluginConfig) {
+      await new PluginRecordSdkAction().execute(
+        buildDirectory,
+        language,
+        publishingProfile,
+        codegenOption.codeGenerationVersion(),
+        false
+      );
     }
 
     return ActionResult.success();
