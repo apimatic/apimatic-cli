@@ -38,14 +38,6 @@ export class SdkPublishAction {
     stability: Stability,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
-    const publishingDetails: PublishingDetails = {
-      profile: publishingProfile,
-      language,
-      version: semVersion,
-      publishType,
-      codegenOption: { version: codegenVersion, stability }
-    };
-
     const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
       const packageConfigurationData = publishingProfile.getPackageConfigurationDataForLanguage(language);
       let packageSettingsDirectory: DirectoryPath | undefined;
@@ -81,6 +73,13 @@ export class SdkPublishAction {
       const sdkLanguageDirectory = outputDirectory.join(language);
 
       if (dryRun) {
+        const publishingDetails: PublishingDetails = {
+          profile: publishingProfile,
+          language,
+          version: semVersion,
+          publishType,
+          codegenOption: { version: codegenVersion, stability }
+        };
         this.prompts.dryRunNotice(publishingDetails);
         const readmeFilePath = new FilePath(sdkLanguageDirectory, new FileName('README.md'));
         await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory, readmeFilePath);
@@ -124,7 +123,6 @@ export class SdkPublishAction {
     }
 
     const publishingInfo = publishResult.getValue();
-    this.prompts.publishingRunningNotice(publishingDetails);
     this.prompts.publishingLogsMessage(publishingInfo.publishingLogUrl);
 
     const publishingOutcome = await this.prompts.pollPublishingStatus(() =>
