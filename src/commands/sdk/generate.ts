@@ -79,7 +79,8 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
         "api-version": apiVersion, 
         "codegen-version": codegenVersion,
         stability
-      }
+      },
+      metadata
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -103,6 +104,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       skipChanges,
       trackChanges,
       CodegenOption.resolve(codegenVersion as CodeGenerationVersion, stability as Stability),
+      metadata.flags.stability?.setFromDefault !== true,
       apiVersion
     );
     outro(result);

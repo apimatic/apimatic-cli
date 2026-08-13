@@ -33,10 +33,13 @@ export class GenerateAction {
     skipChanges: boolean,
     trackChanges: boolean,
     codegenOption: CodegenOption,
+    stabilityWasProvided: boolean,
     apiVersion?: string,
     packageVersion?: SemVersion,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<ActionResult<{ sourceTreeTrackingInitiated: boolean; conflictsResolved: boolean }>> => {
+    this.prompts.warnIfStabilityIgnored(codegenOption, stabilityWasProvided);
+
     if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();

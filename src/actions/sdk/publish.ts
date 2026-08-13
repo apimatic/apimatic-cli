@@ -39,8 +39,6 @@ export class SdkPublishAction {
     publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
-    this.prompts.warnIfStabilityIgnored(codegenOption, stabilityWasProvided);
-
     const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
       const packageConfigurationData = publishingProfile.getPackageConfigurationDataForLanguage(language);
       let packageSettingsDirectory: DirectoryPath | undefined;
@@ -61,6 +59,7 @@ export class SdkPublishAction {
         false,
         false,
         codegenOption,
+        stabilityWasProvided,
         undefined,
         semVersion,
         packageSettingsDirectory

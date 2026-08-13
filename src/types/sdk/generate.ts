@@ -67,6 +67,10 @@ export class CodegenOption {
     return new CodegenOption(version, stability);
   }
 
+  public isV3(): boolean {
+    return this.version === CodeGenerationVersion.V3;
+  }
+
   public isV4(): boolean {
     return this.version === CodeGenerationVersion.V4;
   }
