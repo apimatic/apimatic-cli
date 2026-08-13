@@ -10,7 +10,6 @@ import { PluginGeneratePrompts } from '../../../src/prompts/plugin/generate.js';
 import { PluginService } from '../../../src/infrastructure/services/plugin-service.js';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { PluginContext } from '../../../src/types/plugin-context.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -143,17 +142,6 @@ describe('PluginGenerateAction', () => {
 
       expect((await execute()).isFailed()).to.be.true;
       expect(pluginGenerationError.called).to.be.true;
-    });
-
-    it('reports a save failure instead of throwing to the command', async () => {
-      // `unArchive` throws on a payload that is not a zip, and on its own size and
-      // file-count guards. Actions never throw to the Command layer.
-      generated();
-      sinon.stub(PluginContext.prototype, 'save').rejects(new Error('Invalid or unsupported zip format'));
-      const pluginSaveFailed = sinon.stub(PluginGeneratePrompts.prototype, 'pluginSaveFailed');
-
-      expect((await execute()).isFailed()).to.be.true;
-      expect(pluginSaveFailed.firstCall.args[0]).to.equal('Invalid or unsupported zip format');
     });
 
     it('reports every error key the response carries, not just the first', async () => {

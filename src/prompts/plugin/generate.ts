@@ -45,8 +45,26 @@ export class PluginGeneratePrompts {
     log.error(error);
   }
 
-  public pluginSaveFailed(reason: string) {
-    log.error(`The generated plugin could not be saved: ${reason}`);
+  /**
+   * One response can carry several error keys, so these are reported together rather than
+   * as alternatives: showing only the first costs a second upload and generation to learn
+   * the rest. Keys the backend adds later fall through to the assembled message, which
+   * already lists every one of them.
+   */
+  public pluginGenerationServiceError(error: ServiceError) {
+    const pluginConfigErrors = error.getError('pluginConfig');
+    const sdkRepoErrors = error.getError('sdkRepos');
+
+    if (pluginConfigErrors?.length) {
+      this.pluginConfigInvalid(pluginConfigErrors);
+    }
+    if (sdkRepoErrors?.length) {
+      this.noBuildableLanguages(sdkRepoErrors);
+      this.nextStepsPublishSdks();
+    }
+    if (!pluginConfigErrors?.length && !sdkRepoErrors?.length) {
+      this.pluginGenerationError(error.errorMessage);
+    }
   }
 
   public pluginConfigInvalid(messages: string[]) {

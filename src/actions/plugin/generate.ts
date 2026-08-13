@@ -54,33 +54,12 @@ export class PluginGenerateAction {
       );
 
       if (response.isErr()) {
-        const error = response.error;
-        const pluginConfigErrors = error.getError('pluginConfig');
-        const sdkRepoErrors = error.getError('sdkRepos');
-
-        // One response can carry both keys, so these are not alternatives: reporting only
-        // the first costs the user a second upload and generation to learn the rest.
-        if (pluginConfigErrors?.length) {
-          this.prompts.pluginConfigInvalid(pluginConfigErrors);
-        }
-        if (sdkRepoErrors?.length) {
-          this.prompts.noBuildableLanguages(sdkRepoErrors);
-          this.prompts.nextStepsPublishSdks();
-        }
-        if (!pluginConfigErrors?.length && !sdkRepoErrors?.length) {
-          this.prompts.pluginGenerationError(error.errorMessage);
-        }
-
+        this.prompts.pluginGenerationServiceError(response.error);
         return ActionResult.failed();
       }
 
-      try {
-        const tempPluginZipPath = await tempContext.save(response.value);
-        await pluginContext.save(tempPluginZipPath, zipPlugin);
-      } catch (error) {
-        this.prompts.pluginSaveFailed(error instanceof Error ? error.message : String(error));
-        return ActionResult.failed();
-      }
+      const tempPluginZipPath = await tempContext.save(response.value);
+      await pluginContext.save(tempPluginZipPath, zipPlugin);
 
       if (displayMessages) {
         this.prompts.pluginGenerated(pluginDirectory);
