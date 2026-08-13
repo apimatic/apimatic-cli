@@ -5,7 +5,7 @@ import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodeGenerationVersion, CodegenOption, formatCodegenOption, Language } from '../../types/sdk/generate.js';
+import { CodegenOption, formatCodegenOption, Language } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
