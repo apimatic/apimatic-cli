@@ -127,8 +127,7 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
-      codegenOption.version,
-      codegenOption.stability,
+      codegenOption,
       publishingSummary,
       onPublishSdkError
     );

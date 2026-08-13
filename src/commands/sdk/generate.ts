@@ -2,7 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
-import { CodeGenerationVersion, Language, Stability } from "../../types/sdk/generate.js";
+import { CodeGenerationVersion, CodegenOption, Language, Stability } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
@@ -105,8 +105,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       zipSdk,
       skipChanges,
       trackChanges,
-      codegenVersion as CodeGenerationVersion,
-      stability as Stability,
+      CodegenOption.resolve(codegenVersion as CodeGenerationVersion, stability as Stability),
       apiVersion
     );
     outro(result);

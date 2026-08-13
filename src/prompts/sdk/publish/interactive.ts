@@ -10,7 +10,7 @@ import {
   PublishType
 } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { CodegenOption, formatCodegenOption, Language } from '../../../types/sdk/generate.js';
+import { CodegenOption, Language } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
 
@@ -146,7 +146,7 @@ export class SdkPublishInteractivePrompts {
     const codegenOption = await select({
       message: 'Select the Code Generator version:',
       initialValue: options[0],
-      options: options.map((option) => ({ value: option, label: formatCodegenOption(option) }))
+      options: options.map((option) => ({ value: option, label: `${option}` }))
     });
 
     if (isCancel(codegenOption)) {

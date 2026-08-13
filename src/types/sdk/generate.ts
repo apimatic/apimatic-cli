@@ -52,9 +52,32 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
   { label: "Go", value: Language.GO }
 ];
 
-export interface CodegenOption {
-  version: CodeGenerationVersion;
-  stability: Stability;
+export class CodegenOption {
+  public static readonly v3 = new CodegenOption(CodeGenerationVersion.V3, Stability.STABLE);
+
+  private constructor(
+    private readonly version: CodeGenerationVersion,
+    private readonly stability: Stability
+  ) {}
+
+  public static resolve(version: CodeGenerationVersion, stability: Stability): CodegenOption {
+    if (version === CodeGenerationVersion.V3) {
+      return CodegenOption.v3;
+    }
+    return new CodegenOption(version, stability);
+  }
+
+  public isV4(): boolean {
+    return this.version === CodeGenerationVersion.V4;
+  }
+
+  public stabilityLevel(): Stability {
+    return this.stability;
+  }
+
+  public toString(): string {
+    return `${this.version.toUpperCase()} (${this.stability})`;
+  }
 }
 
 /**
@@ -62,22 +85,15 @@ export interface CodegenOption {
  * Non-interactive validation is handled server-side by codegen API.
  */
 export const CODEGEN_OPTIONS: Readonly<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>> = {
-  [Language.CSHARP]: [
-    { version: CodeGenerationVersion.V3, stability: Stability.STABLE },
-    { version: CodeGenerationVersion.V4, stability: Stability.BETA }
-  ],
-  [Language.GO]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
-  [Language.JAVA]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
-  [Language.PHP]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
-  [Language.PYTHON]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
-  [Language.RUBY]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
-  [Language.TYPESCRIPT]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }]
+  [Language.CSHARP]: [CodegenOption.v3, CodegenOption.resolve(CodeGenerationVersion.V4, Stability.BETA)],
+  [Language.GO]: [CodegenOption.v3],
+  [Language.JAVA]: [CodegenOption.v3],
+  [Language.PHP]: [CodegenOption.v3],
+  [Language.PYTHON]: [CodegenOption.v3],
+  [Language.RUBY]: [CodegenOption.v3],
+  [Language.TYPESCRIPT]: [CodegenOption.v3]
 };
 
 export function getCodegenOptions(language: Language): Readonly<NonEmptyArray<CodegenOption>> {
   return CODEGEN_OPTIONS[language];
-}
-
-export function formatCodegenOption({ version, stability }: CodegenOption): string {
-  return `${version.toUpperCase()} (${stability})`;
 }

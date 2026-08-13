@@ -5,7 +5,7 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { CodeGenerationVersion, Language, Stability } from '../../../types/sdk/generate.js';
+import { CodegenOption, Language } from '../../../types/sdk/generate.js';
 import { ActionResult } from '../../action-result.js';
 import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
@@ -28,8 +28,7 @@ export class SdkPublishNonInteractiveAction {
     publishTypes: PublishType[],
     force: boolean,
     dryRun: boolean,
-    codegenVersion: CodeGenerationVersion,
-    stability: Stability,
+    codegenOption: CodegenOption,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
     version?: string
@@ -110,7 +109,7 @@ export class SdkPublishNonInteractiveAction {
       language,
       version: semVersion,
       publishType: publishTypes,
-      codegenOption: { version: codegenVersion, stability }
+      codegenOption
     });
     const outputDir = dryRun ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk')) : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
@@ -123,8 +122,7 @@ export class SdkPublishNonInteractiveAction {
       semVersion,
       publishingProfile,
       dryRun,
-      codegenVersion,
-      stability,
+      codegenOption,
       publishingSummary,
       onPublishSdkError
     );

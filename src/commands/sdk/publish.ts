@@ -1,7 +1,7 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, CodegenOption, Language, Stability } from '../../types/sdk/generate.js';
 import { warnIfStabilityIgnored } from '../../prompts/sdk/stability.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
@@ -155,8 +155,7 @@ export default class SdkPublish extends Command {
           publishTypes,
           force,
           dryRun,
-          codegenVersion as CodeGenerationVersion,
-          stability as Stability,
+          CodegenOption.resolve(codegenVersion as CodeGenerationVersion, stability as Stability),
           onPublishSdkError,
           profileId,
           version,
