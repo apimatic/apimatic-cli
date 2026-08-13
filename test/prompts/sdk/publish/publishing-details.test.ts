@@ -8,13 +8,13 @@ import { CodeGenerationVersion, Language, Stability } from "../../../../src/type
 const profile = { toString: () => "My Profile" } as unknown as PublishingProfile;
 const version = SemVersion.tryCreate("1.2.3")._unsafeUnwrap();
 
-const details = (publishType: PublishType[], codegenVersion: CodeGenerationVersion, stability: Stability) =>
+const details = (publishType: PublishType[], codegenVersion?: CodeGenerationVersion, stability?: Stability) =>
   formatPublishingDetails({
     profile,
     language: Language.CSHARP,
     version,
     publishType,
-    codegenOption: { version: codegenVersion, stability }
+    codegenOption: codegenVersion && stability ? { version: codegenVersion, stability } : undefined
   });
 
 describe("formatPublishingDetails", () => {
@@ -27,8 +27,8 @@ describe("formatPublishingDetails", () => {
     expect(output).to.contain("Targets:   Package");
   });
 
-  it("omits the generator row for v3, leaving pre-existing output unchanged", () => {
-    const output = details([PublishType.PackagePublishing], CodeGenerationVersion.V3, Stability.STABLE);
+  it("omits the generator row when no codegen option is given, leaving pre-existing output unchanged", () => {
+    const output = details([PublishType.PackagePublishing]);
 
     expect(output).to.not.contain("Generator:");
   });
