@@ -8,8 +8,11 @@ import { PluginRecordSdkPrompts } from '../../../src/prompts/plugin/record-sdk.j
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PluginConfigContext } from '../../../src/types/plugin-config-context.js';
 import { PluginConfigData } from '../../../src/types/plugin/plugin-config.js';
+import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate.js';
+
+const BOTH = [PublishType.SourceCodePublishing, PublishType.PackagePublishing];
 
 const profileWith = (gitConfiguration: object | undefined, packageConfiguration: object | undefined = undefined) =>
   ({
@@ -33,12 +36,19 @@ describe('PluginRecordSdkAction', () => {
   const configPath = () => path.join(buildDirectory, 'plugin-config.json');
   const writtenConfig = (): PluginConfigData => fsExtra.readJsonSync(configPath());
 
-  const execute = (profile: PublishingProfile) =>
-    action.execute(new DirectoryPath(buildDirectory), Language.CSHARP, profile, CodeGenerationVersion.V3);
+  const execute = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
+    action.execute(new DirectoryPath(buildDirectory), Language.CSHARP, profile, publishTypes, CodeGenerationVersion.V3);
 
   // What `sdk publish --update-plugin-config` does: the flag already answered the question.
-  const executeWithoutAsking = (profile: PublishingProfile) =>
-    action.execute(new DirectoryPath(buildDirectory), Language.CSHARP, profile, CodeGenerationVersion.V3, false);
+  const executeWithoutAsking = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
+    action.execute(
+      new DirectoryPath(buildDirectory),
+      Language.CSHARP,
+      profile,
+      publishTypes,
+      CodeGenerationVersion.V3,
+      false
+    );
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
@@ -128,9 +138,51 @@ describe('PluginRecordSdkAction', () => {
     expect(fsExtra.existsSync(configPath())).to.be.false;
   });
 
+  // The entry must describe the run, not the profile: recording either half that was not published
+  // sends plugin generation at an artifact that does not exist.
+  describe('records only what the run published', () => {
+    it('leaves out the source when only the package was published', async () => {
+      accepts();
+
+      await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
+
+      expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
+      expect(fsExtra.existsSync(configPath())).to.be.false;
+    });
+
+    it('leaves out the package when only the source was published', async () => {
+      accepts();
+
+      await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.SourceCodePublishing]);
+
+      expect(writtenConfig().languages.csharp).to.not.have.property('package');
+    });
+  });
+
+  it('refuses a repository name it cannot resolve to a URL', async () => {
+    const confirmRecordSdk = accepts();
+    const unresolvable = sinon.stub(PluginRecordSdkPrompts.prototype, 'unresolvableRepositoryName');
+
+    await execute(profileWith({ ...GIT_CONFIG, repositoryName: 'git@github.com:acme/sdk.git' }));
+
+    expect(unresolvable.calledOnceWith(Language.CSHARP, 'git@github.com:acme/sdk.git')).to.be.true;
+    expect(confirmRecordSdk.called).to.be.false;
+    expect(fsExtra.existsSync(configPath())).to.be.false;
+  });
+
+  it('warns when the config cannot be written', async () => {
+    accepts();
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unwritable');
+    const notWritten = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigNotWritten');
+
+    await execute(profileWith(GIT_CONFIG));
+
+    expect(notWritten.calledOnce).to.be.true;
+  });
+
   it('reports a config that became unreadable after the user agreed to record', async () => {
     const confirmRecordSdk = accepts();
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(false);
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unreadable');
     const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
 
     await execute(profileWith(GIT_CONFIG));

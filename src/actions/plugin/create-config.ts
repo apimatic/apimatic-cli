@@ -44,9 +44,14 @@ export class PluginCreateConfigAction {
     }
 
     const author = account.isOk() ? authorOf(account.value) : undefined;
-    if (!(await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author))) {
-      this.prompts.pluginConfigUnreadable();
-      return ActionResult.failed('plugin-config.json could not be read');
+    const written = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
+    if (written !== 'written') {
+      if (written === 'unreadable') {
+        this.prompts.pluginConfigUnreadable();
+      } else {
+        this.prompts.pluginConfigNotWritten();
+      }
+      return ActionResult.failed();
     }
 
     this.prompts.pluginConfigCreated(metadata);

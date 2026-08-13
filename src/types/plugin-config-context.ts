@@ -22,6 +22,12 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | { state: 'present'; hasMetadata: boolean; hasLanguages: boolean };
 
+/**
+ * Why a write did or did not happen. A bare boolean cannot say whether the file was unusable or
+ * the disk refused it, and callers have to tell the user which.
+ */
+export type PluginConfigWriteResult = 'written' | 'unreadable' | 'unwritable';
+
 type ParseResult = { config: PluginConfigData } | { reason: string };
 
 export class PluginConfigContext {
@@ -43,6 +49,16 @@ export class PluginConfigContext {
       return { state: 'unreadable', reason: parsed.reason, path: this.configPath };
     }
 
+    // A version this CLI does not model would be uploaded and rejected server-side, so it is
+    // refused here instead. Absent is fine — the next write backfills it.
+    const { schemaVersion } = parsed.config;
+    if (schemaVersion !== undefined && schemaVersion !== PLUGIN_CONFIG_SCHEMA_VERSION) {
+      const reason =
+        `it declares schemaVersion ${schemaVersion}, ` +
+        `and this version of the CLI only understands ${PLUGIN_CONFIG_SCHEMA_VERSION}`;
+      return { state: 'unreadable', reason, path: this.configPath };
+    }
+
     return {
       state: 'present',
       hasMetadata: namesThePlugin(parsed.config),
@@ -54,7 +70,7 @@ export class PluginConfigContext {
    * Adds the plugin's identity, creating the file when absent. `license` is written unprompted
    * because the backend consumes it; `pluginKey` is deliberately not written, because nothing does.
    */
-  public async upsertMetadata(metadata: PluginMetadata, author?: PluginAuthor): Promise<boolean> {
+  public async upsertMetadata(metadata: PluginMetadata, author?: PluginAuthor): Promise<PluginConfigWriteResult> {
     return await this.merge((config) => ({
       ...config,
       pluginId: metadata.pluginId,
@@ -66,7 +82,7 @@ export class PluginConfigContext {
   }
 
   /** Adds one language, creating the file — with no metadata — when absent. */
-  public async upsertLanguage(language: Language, entry: LanguageEntry): Promise<boolean> {
+  public async upsertLanguage(language: Language, entry: LanguageEntry): Promise<PluginConfigWriteResult> {
     return await this.merge((config) => ({
       ...config,
       languages: { ...config.languages, [language]: entry }
@@ -74,17 +90,27 @@ export class PluginConfigContext {
   }
 
   /**
-   * Reads, applies, writes. Returns false only when the file exists but could not be parsed, so a
-   * caller can stay silent rather than overwrite something the user wrote by hand.
+   * Reads, applies, writes. A file that exists but cannot be parsed is left alone rather than
+   * overwritten, and a write fault is reported rather than thrown: this runs after a publish that
+   * already succeeded, and nothing here may turn that into a crash.
    */
-  private async merge(apply: (config: PluginConfigData) => PluginConfigData): Promise<boolean> {
+  private async merge(apply: (config: PluginConfigData) => PluginConfigData): Promise<PluginConfigWriteResult> {
     const existing = await this.read();
     if ('reason' in existing) {
-      return false;
+      return 'unreadable';
     }
 
-    await this.write(apply(existing.config));
-    return true;
+    const merged = apply(existing.config);
+    // A hand-written file may omit it, and the backend accepts only this one version.
+    merged.schemaVersion = merged.schemaVersion ?? PLUGIN_CONFIG_SCHEMA_VERSION;
+
+    try {
+      await this.write(merged);
+    } catch {
+      return 'unwritable';
+    }
+
+    return 'written';
   }
 
   private async read(): Promise<ParseResult> {

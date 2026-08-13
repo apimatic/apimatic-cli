@@ -72,6 +72,23 @@ describe('buildLanguageEntry', () => {
 
       expect(result).to.deep.equal({ kind: 'noSourceRepository' });
     });
+
+    // Nothing downstream validates the URL — the backend checks only that it is non-blank — so a
+    // guess would survive all the way to a failed clone. These are refused instead.
+    ['git@github.com:acme/sdk.git', 'ssh://git@github.com/acme/sdk', 'acme-payments-csharp'].forEach(
+      (repositoryName) => {
+        it(`refuses to invent a URL for ${repositoryName}`, () => {
+          const result = buildLanguageEntry(
+            Language.CSHARP,
+            gitConfig(repositoryName),
+            undefined,
+            CodeGenerationVersion.V3
+          );
+
+          expect(result).to.deep.equal({ kind: 'unresolvableRepositoryName', repositoryName });
+        });
+      }
+    );
   });
 
   describe('package', () => {

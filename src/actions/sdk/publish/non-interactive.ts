@@ -147,6 +147,7 @@ export class SdkPublishNonInteractiveAction {
           buildDirectory,
           language,
           publishingProfile,
+          publishTypes,
           codegenOption.codeGenerationVersion(),
           false
         );

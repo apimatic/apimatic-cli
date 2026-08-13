@@ -48,8 +48,7 @@ export class PluginGeneratePrompts {
 
   public pluginConfigUnreadable(reason: string, path: FilePath) {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} could not be read: ${reason}. ` +
-      `Fix or delete it at ${f.path(path)} and try again.`;
+      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used: ${reason}. ` + `Fix or delete it at ${f.path(path)} and try again.`;
     log.error(message);
   }
 

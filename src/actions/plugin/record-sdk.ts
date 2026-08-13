@@ -2,6 +2,7 @@ import { PluginRecordSdkPrompts } from '../../prompts/plugin/record-sdk.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { buildLanguageEntry } from '../../types/plugin/language-entry.js';
 import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
 
@@ -23,18 +24,30 @@ export class PluginRecordSdkAction {
     buildDirectory: DirectoryPath,
     language: Language,
     publishingProfile: PublishingProfile,
+    publishTypes: PublishType[],
     codegenVersion: CodeGenerationVersion,
     confirmFirst: boolean = true
   ): Promise<void> => {
+    // The entry has to describe what this run published, not what the profile happens to enable.
+    // A package-only run must not claim a repository it never pushed to, nor a source-only run a
+    // package that was never released.
     const built = buildLanguageEntry(
       language,
-      publishingProfile.getGitConfigurationForLanguage(language),
-      publishingProfile.getPackageConfigurationDataForLanguage(language),
+      publishTypes.includes(PublishType.SourceCodePublishing)
+        ? publishingProfile.getGitConfigurationForLanguage(language)
+        : undefined,
+      publishTypes.includes(PublishType.PackagePublishing)
+        ? publishingProfile.getPackageConfigurationDataForLanguage(language)
+        : undefined,
       codegenVersion
     );
-    // A package-only profile names no repository, and a language cannot be described without one,
-    // so there is nothing to offer. This returns before the confirm below, so without a message
-    // the prompt would simply never appear.
+
+    // Both of these return before the confirm below, so without a message the prompt would simply
+    // never appear.
+    if (built.kind === 'unresolvableRepositoryName') {
+      this.prompts.unresolvableRepositoryName(language, built.repositoryName);
+      return;
+    }
     if (built.kind !== 'entry') {
       this.prompts.noSourceRepository(language);
       return;
@@ -52,11 +65,17 @@ export class PluginRecordSdkAction {
       return;
     }
 
-    // The state was readable a moment ago, so this only fails if the file changed underneath us.
-    if (await pluginConfigContext.upsertLanguage(language, built.entry)) {
-      this.prompts.sdkRecorded(language);
-    } else {
-      this.prompts.pluginConfigUnreadable();
+    switch (await pluginConfigContext.upsertLanguage(language, built.entry)) {
+      case 'written':
+        this.prompts.sdkRecorded(language);
+        break;
+      // Readable a moment ago, so this only happens if the file changed underneath us.
+      case 'unreadable':
+        this.prompts.pluginConfigUnreadable();
+        break;
+      case 'unwritable':
+        this.prompts.pluginConfigNotWritten();
+        break;
     }
   };
 }

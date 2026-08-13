@@ -13,13 +13,20 @@ import { CodeGenerationVersion, Language } from '../sdk/generate.js';
 import { LanguageEntry, LanguageSource, PluginPackage } from './plugin-config.js';
 
 const ABSOLUTE_HTTP_URL = /^https?:\/\//i;
+/** `owner/repo` — the only bare form that can be resolved to a URL without guessing. */
+const OWNER_AND_REPO = /^[^/@:\s]+\/[^/@:\s]+$/;
 const GITHUB_BASE_URL = 'https://github.com';
 
 /**
- * `noSourceRepository` is routine rather than a fault: a package-only publishing profile has no
- * repository configured, and a language entry cannot describe an SDK without one.
+ * `noSourceRepository` is routine rather than a fault: the run published no source code, so there
+ * is nothing for a language entry to describe. `unresolvableRepositoryName` is the opposite — a
+ * repository is configured, but its name is not a shape that can be turned into a URL, and a guess
+ * would be written as a clone target that only fails once the backend tries to use it.
  */
-export type LanguageEntryResult = { kind: 'entry'; entry: LanguageEntry } | { kind: 'noSourceRepository' };
+export type LanguageEntryResult =
+  | { kind: 'entry'; entry: LanguageEntry }
+  | { kind: 'noSourceRepository' }
+  | { kind: 'unresolvableRepositoryName'; repositoryName: string };
 
 export function buildLanguageEntry(
   language: Language,
@@ -27,9 +34,20 @@ export function buildLanguageEntry(
   packageConfiguration: PackageConfigurationData | undefined,
   version: CodeGenerationVersion
 ): LanguageEntryResult {
-  const source = sourceOf(gitConfiguration);
-  if (!source) {
+  const repositoryName = gitConfiguration?.repositoryName?.trim();
+  if (!repositoryName) {
     return { kind: 'noSourceRepository' };
+  }
+
+  const repositoryUrl = repositoryUrlOf(repositoryName);
+  if (!repositoryUrl) {
+    return { kind: 'unresolvableRepositoryName', repositoryName };
+  }
+
+  const source: LanguageSource = { repositoryUrl };
+  const branch = gitConfiguration?.branch?.trim();
+  if (branch) {
+    source.branch = branch;
   }
 
   const entry: LanguageEntry = { source, version };
@@ -41,27 +59,19 @@ export function buildLanguageEntry(
   return { kind: 'entry', entry };
 }
 
-function sourceOf(gitConfiguration: GitConfiguration | undefined): LanguageSource | undefined {
-  const repositoryName = gitConfiguration?.repositoryName?.trim();
-  if (!repositoryName) {
-    return undefined;
-  }
-
-  const source: LanguageSource = { repositoryUrl: repositoryUrlOf(repositoryName) };
-  const branch = gitConfiguration?.branch?.trim();
-  if (branch) {
-    source.branch = branch;
-  }
-
-  return source;
-}
-
-/** Publishing profiles target GitHub, so a repository named without a host resolves against it. */
-function repositoryUrlOf(repositoryName: string): string {
+/**
+ * A publishing profile carries no git host, so a bare name can only be resolved against GitHub —
+ * an assumption the profile itself cannot confirm. Anything that is not plainly `owner/repo` is
+ * refused rather than guessed at, because nothing downstream validates the URL: the backend checks
+ * only that it is non-blank, so a wrong one survives until a clone fails.
+ */
+function repositoryUrlOf(repositoryName: string): string | undefined {
   if (ABSOLUTE_HTTP_URL.test(repositoryName)) {
     return repositoryName;
   }
-  return `${GITHUB_BASE_URL}/${repositoryName.replace(/^\/+/, '').replace(/\/+$/, '')}`;
+
+  const bareName = repositoryName.replace(/^\/+/, '').replace(/\/+$/, '');
+  return OWNER_AND_REPO.test(bareName) ? `${GITHUB_BASE_URL}/${bareName}` : undefined;
 }
 
 function packageOf(language: Language, configuration: PackageConfigurationData | undefined): PluginPackage | undefined {

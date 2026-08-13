@@ -28,12 +28,24 @@ export class PluginRecordSdkPrompts {
 
   public noSourceRepository(language: Language) {
     const message =
-      `The publishing profile has no source repository for ${f.var(language)}. ` +
+      `No source repository was published for ${f.var(language)}. ` +
       `${f.var(PLUGIN_CONFIG_FILE)} needs one to describe an SDK, so nothing was recorded.`;
     log.info(message);
   }
 
+  public unresolvableRepositoryName(language: Language, repositoryName: string) {
+    const message =
+      `The publishing profile names the ${f.var(language)} repository as ${f.var(repositoryName)}, ` +
+      `which cannot be resolved to a URL. Nothing was recorded — set it to ${f.var('owner/repo')} ` +
+      `or a full https:// URL and publish again.`;
+    log.warn(message);
+  }
+
   public pluginConfigUnreadable() {
-    log.warn(`${f.var(PLUGIN_CONFIG_FILE)} could not be read, so this SDK was not added to it.`);
+    log.warn(`${f.var(PLUGIN_CONFIG_FILE)} cannot be used, so this SDK was not added to it.`);
+  }
+
+  public pluginConfigNotWritten() {
+    log.warn(`${f.var(PLUGIN_CONFIG_FILE)} could not be written, so this SDK was not added to it.`);
   }
 }

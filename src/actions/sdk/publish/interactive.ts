@@ -147,6 +147,7 @@ export class SdkPublishInteractiveAction {
       buildDirectory,
       language,
       publishingProfile,
+      publishTypes,
       codegenOption.codeGenerationVersion()
     );
 

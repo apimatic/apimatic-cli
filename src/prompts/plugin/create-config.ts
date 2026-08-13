@@ -66,6 +66,10 @@ export class PluginCreateConfigPrompts {
     log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be read, so its plugin details were not written.`);
   }
 
+  public pluginConfigNotWritten() {
+    log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be written, so its plugin details were not saved.`);
+  }
+
   public pluginConfigCreated(metadata: PluginMetadata) {
     const message =
       `Plugin ID: ${f.var(metadata.pluginId)}\n` +
