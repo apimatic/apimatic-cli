@@ -120,7 +120,6 @@ export function formatPublishingDetails({
   codegenOption
 }: PublishingDetails): string {
   const targets = [...publishType]
-    .sort((a, b) => (a === PublishType.SourceCodePublishing ? -1 : b === PublishType.SourceCodePublishing ? 1 : 0))
     .map((t) => (t === PublishType.PackagePublishing ? "Package" : "Source Code"))
     .join(" + ");
 
