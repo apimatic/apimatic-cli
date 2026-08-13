@@ -100,7 +100,7 @@ export class SdkPublishInteractiveAction {
       language,
       version,
       publishType: publishTypes,
-      codegenOption: codegenOptions.length === 1 ? codegenOption : undefined
+      codegenOption: codegenOptions.length === 1 ? undefined : codegenOption
     });
 
     const confirmed = await this.prompts.confirmPublishing();
