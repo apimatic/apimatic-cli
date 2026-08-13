@@ -68,15 +68,15 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, 
-        input, 
-        destination, 
-        force, 
-        zip: zipSdk, 
-        "auth-key": authKey, 
-        "skip-changes": skipChanges, 
+      flags: { language,
+        input,
+        destination,
+        force,
+        zip: zipSdk,
+        "auth-key": authKey,
+        "skip-changes": skipChanges,
         "track-changes": trackChanges,
-        "api-version": apiVersion, 
+        "api-version": apiVersion,
         "codegen-version": codegenVersion,
         stability
       },
@@ -103,7 +103,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       zipSdk,
       skipChanges,
       trackChanges,
-      CodegenOption.resolve(codegenVersion as CodeGenerationVersion, stability as Stability),
+      CodegenOption.create(codegenVersion as CodeGenerationVersion, stability as Stability),
       metadata.flags.stability?.setFromDefault !== true,
       apiVersion
     );

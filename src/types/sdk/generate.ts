@@ -60,7 +60,7 @@ export class CodegenOption {
     private readonly stability: Stability
   ) {}
 
-  public static resolve(version: CodeGenerationVersion, stability: Stability): CodegenOption {
+  public static create(version: CodeGenerationVersion, stability: Stability): CodegenOption {
     if (version === CodeGenerationVersion.V3) {
       return CodegenOption.v3;
     }
@@ -89,7 +89,7 @@ export class CodegenOption {
  * Non-interactive validation is handled server-side by codegen API.
  */
 export const CODEGEN_OPTIONS: Readonly<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>> = {
-  [Language.CSHARP]: [CodegenOption.v3, CodegenOption.resolve(CodeGenerationVersion.V4, Stability.BETA)],
+  [Language.CSHARP]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
   [Language.GO]: [CodegenOption.v3],
   [Language.JAVA]: [CodegenOption.v3],
   [Language.PHP]: [CodegenOption.v3],

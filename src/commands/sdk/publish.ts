@@ -148,7 +148,7 @@ export default class SdkPublish extends Command {
           publishTypes,
           force,
           dryRun,
-          CodegenOption.resolve(codegenVersion as CodeGenerationVersion, stability as Stability),
+          CodegenOption.create(codegenVersion as CodeGenerationVersion, stability as Stability),
           metadata.flags.stability?.setFromDefault !== true,
           onPublishSdkError,
           profileId,
