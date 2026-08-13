@@ -28,6 +28,10 @@ export class SdkPublishPrompts {
     );
   }
 
+  public publishingRunningNotice(details: PublishingDetails): void {
+    log.info(`Publishing is running for the following:` + formatPublishingDetails(details));
+  }
+
   public publishingLogsMessage(publishingLogUrl: string) {
     const message = `To track progress and view publishing logs, please visit:
 ${f.link(publishingLogUrl)}`;
