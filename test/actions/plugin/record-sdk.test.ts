@@ -6,6 +6,7 @@ import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
 import { PluginRecordSdkAction } from '../../../src/actions/plugin/record-sdk.js';
 import { PluginRecordSdkPrompts } from '../../../src/prompts/plugin/record-sdk.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { PluginConfigContext } from '../../../src/types/plugin-config-context.js';
 import { PluginConfigData } from '../../../src/types/plugin/plugin-config.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate.js';
@@ -27,6 +28,7 @@ describe('PluginRecordSdkAction', () => {
   let tmpDirResult: DirectoryResult;
   let buildDirectory: string;
   let action: PluginRecordSdkAction;
+  let noSourceRepository: sinon.SinonStub;
 
   const configPath = () => path.join(buildDirectory, 'plugin-config.json');
   const writtenConfig = (): PluginConfigData => fsExtra.readJsonSync(configPath());
@@ -43,6 +45,7 @@ describe('PluginRecordSdkAction', () => {
     buildDirectory = path.join(tmpDirResult.path, 'acme-payments', 'src');
     await fsExtra.ensureDir(buildDirectory);
     sinon.stub(PluginRecordSdkPrompts.prototype, 'sdkRecorded');
+    noSourceRepository = sinon.stub(PluginRecordSdkPrompts.prototype, 'noSourceRepository');
     action = new PluginRecordSdkAction();
   });
 
@@ -113,13 +116,27 @@ describe('PluginRecordSdkAction', () => {
     expect(fsExtra.existsSync(configPath())).to.be.false;
   });
 
-  it('stays silent when the profile names no source repository', async () => {
+  // The return happens before the confirm, so without this message the prompt would just never
+  // appear and the user would have nothing to act on.
+  it('explains itself instead of skipping the prompt silently when there is no source repository', async () => {
     const confirmRecordSdk = accepts();
 
     await execute(profileWith(undefined));
 
     expect(confirmRecordSdk.called).to.be.false;
+    expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
     expect(fsExtra.existsSync(configPath())).to.be.false;
+  });
+
+  it('reports a config that became unreadable after the user agreed to record', async () => {
+    const confirmRecordSdk = accepts();
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(false);
+    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+
+    await execute(profileWith(GIT_CONFIG));
+
+    expect(confirmRecordSdk.called).to.be.true;
+    expect(pluginConfigUnreadable.calledOnce).to.be.true;
   });
 
   describe('without confirmation (the --update-plugin-config path)', () => {
@@ -142,9 +159,10 @@ describe('PluginRecordSdkAction', () => {
       expect(config).to.not.have.property('pluginId');
     });
 
-    it('still skips a profile that names no source repository', async () => {
+    it('still skips a profile that names no source repository, and says so', async () => {
       await executeWithoutAsking(profileWith(undefined));
 
+      expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
       expect(fsExtra.existsSync(configPath())).to.be.false;
     });
 

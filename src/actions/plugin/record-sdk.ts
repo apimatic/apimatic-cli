@@ -33,8 +33,10 @@ export class PluginRecordSdkAction {
       codegenVersion
     );
     // A package-only profile names no repository, and a language cannot be described without one,
-    // so there is nothing to offer.
+    // so there is nothing to offer. This returns before the confirm below, so without a message
+    // the prompt would simply never appear.
     if (built.kind !== 'entry') {
+      this.prompts.noSourceRepository(language);
       return;
     }
 
@@ -50,8 +52,11 @@ export class PluginRecordSdkAction {
       return;
     }
 
+    // The state was readable a moment ago, so this only fails if the file changed underneath us.
     if (await pluginConfigContext.upsertLanguage(language, built.entry)) {
       this.prompts.sdkRecorded(language);
+    } else {
+      this.prompts.pluginConfigUnreadable();
     }
   };
 }

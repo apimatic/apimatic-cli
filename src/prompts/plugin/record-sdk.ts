@@ -26,6 +26,13 @@ export class PluginRecordSdkPrompts {
     log.info(message);
   }
 
+  public noSourceRepository(language: Language) {
+    const message =
+      `The publishing profile has no source repository for ${f.var(language)}. ` +
+      `${f.var(PLUGIN_CONFIG_FILE)} needs one to describe an SDK, so nothing was recorded.`;
+    log.info(message);
+  }
+
   public pluginConfigUnreadable() {
     log.warn(`${f.var(PLUGIN_CONFIG_FILE)} could not be read, so this SDK was not added to it.`);
   }
