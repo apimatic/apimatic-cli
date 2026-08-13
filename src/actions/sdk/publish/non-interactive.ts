@@ -1,5 +1,6 @@
 import { PublishingApiService } from '../../../infrastructure/services/publishing-api-service.js';
 import { SdkPublishNonInteractivePrompts } from '../../../prompts/sdk/publish/non-interactive.js';
+import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
@@ -104,6 +105,13 @@ export class SdkPublishNonInteractiveAction {
     }
 
     const semVersion = semVersionResult.value;
+    const publishingSummary = formatPublishingDetails({
+      profile: publishingProfile,
+      language,
+      version: semVersion,
+      publishType: publishTypes,
+      codegenOption: { version: codegenVersion, stability }
+    });
     const outputDir = dryRun ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk')) : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
@@ -117,6 +125,7 @@ export class SdkPublishNonInteractiveAction {
       dryRun,
       codegenVersion,
       stability,
+      publishingSummary,
       onPublishSdkError
     );
     if (publishResult.isFailed()) {

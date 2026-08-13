@@ -13,7 +13,6 @@ import { PublishingProfile } from '../../../types/publish/publishing-profile.js'
 import { CodegenOption, formatCodegenOption, Language } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
-import { formatPublishingDetails, PublishingDetails } from '../publish.js';
 
 export class SdkPublishInteractivePrompts {
   public async inputWorkingDirectory(
@@ -184,8 +183,8 @@ export class SdkPublishInteractivePrompts {
     log.error('No version was specified for publishing the SDK.');
   }
 
-  public publishingSummary(details: PublishingDetails) {
-    log.info(`Ready to publish:` + formatPublishingDetails(details));
+  public publishingSummary(publishingSummary: string) {
+    log.info(`Ready to publish:` + publishingSummary);
   }
 
   public async confirmPublishing(): Promise<boolean> {

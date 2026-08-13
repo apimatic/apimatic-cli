@@ -6,6 +6,7 @@ import { PublishType } from '../../../types/publish-api/publishing-profile-item.
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
 import { getCodegenOptions } from '../../../types/sdk/generate.js';
+import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
@@ -95,13 +96,15 @@ export class SdkPublishInteractiveAction {
 
     const publishTypes = publishingProfile.getPublishTypesForLanguage(language);
 
-    this.prompts.publishingSummary({
+    const publishingSummary = formatPublishingDetails({
       profile: publishingProfile,
       language,
       version,
       publishType: publishTypes,
       codegenOption: codegenOptions.length === 1 ? undefined : codegenOption
     });
+
+    this.prompts.publishingSummary(publishingSummary);
 
     const confirmed = await this.prompts.confirmPublishing();
     if (!confirmed) {
@@ -126,6 +129,7 @@ export class SdkPublishInteractiveAction {
       false,
       codegenOption.version,
       codegenOption.stability,
+      publishingSummary,
       onPublishSdkError
     );
     if (publishResult.isFailed()) {

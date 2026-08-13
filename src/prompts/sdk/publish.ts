@@ -21,15 +21,15 @@ export class SdkPublishPrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public dryRunNotice(details: PublishingDetails): void {
+  public dryRunNotice(publishingSummary: string): void {
     log.info(
       `You can publish this SDK by removing the --dry-run flag. It will be published for the following:` +
-        formatPublishingDetails(details)
+        publishingSummary
     );
   }
 
-  public publishingRunningNotice(details: PublishingDetails): void {
-    log.info(`Publishing is running for the following:` + formatPublishingDetails(details));
+  public publishingRunningNotice(publishingSummary: string): void {
+    log.info(`Publishing is running for the following:` + publishingSummary);
   }
 
   public publishingLogsMessage(publishingLogUrl: string) {
