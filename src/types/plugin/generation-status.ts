@@ -1,8 +1,9 @@
 /**
  * Context plugin generation reports its own status vocabulary, which does not match the
  * shared `Status` enum in `@apimatic/sdk`: there is no `SubscriptionError` (entitlement is
- * a 403 on the generate call instead), completion is a status rather than a redirect, and
- * the three in-flight values below have no equivalent.
+ * a 403 on the generate call instead), and the in-flight values below have no equivalent.
+ * `Completed` is not sent on the wire — as with portal generation, a finished run is a 302
+ * to the download endpoint, which `getGenerationStatus` maps onto it.
  */
 export enum PluginGenerationStatus {
   Queued = 'Queued',

@@ -13,11 +13,13 @@ import {
 } from '../../types/plugin/generation-status.js';
 import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
+import {
+  GENERATION_TIMEOUT_MS,
+  pollUntilCompleted,
+  STATUS_POLL_INTERVAL_MS
+} from '../generation-status-poller.js';
 import { FileService } from '../file-service.js';
-import { handleServiceError, mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
-
-const STATUS_POLL_INTERVAL_MS = 3000;
-const GENERATION_TIMEOUT_MS = 5 * 60 * 1000;
+import { mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
 
 export class PluginService {
   private readonly apiBaseUrl = 'https://api.apimatic.io' as const;
@@ -56,9 +58,11 @@ export class PluginService {
     }
 
     const generationId = initiated.value.id;
-    const completed = await pollUntilCompleted(this.statusPollIntervalMs, this.generationTimeoutMs, () =>
-      this.getGenerationStatus(generationId, commandMetadata.shell, token)
-    );
+    const completed = await pollUntilCompleted({
+      pollIntervalMs: this.statusPollIntervalMs,
+      fetchStatus: () => this.getGenerationStatus(generationId, commandMetadata.shell, token),
+      timeout: { budgetMs: this.generationTimeoutMs, label: 'Plugin generation' }
+    });
     if (completed.isErr()) {
       return err(completed.error);
     }
@@ -100,14 +104,17 @@ export class PluginService {
     try {
       const response = await this.axiosInstance(shell, token).get(`/plugin/${generationId}/status`, {
         headers: { Accept: 'application/json' },
-        // This endpoint reports completion as a status body, never a redirect. Refusing to
-        // follow one surfaces a contract change immediately instead of polling to the timeout.
         maxRedirects: 0,
         validateStatus: () => true
       });
 
       if (response.status === 200) {
         return ok(response.data as PluginGenerationStatusResponse);
+      }
+
+      // Once generation finishes, the API redirects to the download location.
+      if (response.status === 302) {
+        return ok({ status: PluginGenerationStatus.Completed });
       }
 
       // `validateStatus` above stops axios throwing, so nothing reaches the catch block.
@@ -123,7 +130,7 @@ export class PluginService {
 
       return err(ServiceError.InvalidResponse);
     } catch (error) {
-      return err(handleServiceError(error));
+      return err(mapRequestError(error));
     }
   }
 
@@ -150,8 +157,6 @@ export class PluginService {
   private axiosInstance(shell: string, apiKey: string) {
     return axios.create({
       baseURL: envInfo.getBaseUrl() ?? this.apiBaseUrl,
-      // The generation budget is only read between polls, so a request that connects and
-      // then never answers would outlive it. Bounding the request is what makes it a limit.
       timeout: this.requestTimeoutMs,
       headers: {
         'User-Agent': envInfo.getUserAgent(shell),
@@ -161,53 +166,3 @@ export class PluginService {
   }
 }
 
-async function pollUntilCompleted(
-  pollIntervalMs: number,
-  timeoutMs: number,
-  fetchStatus: () => Promise<Result<PluginGenerationStatusResponse, ServiceError>>
-): Promise<Result<PluginGenerationStatusResponse, ServiceError>> {
-  const deadline = Date.now() + timeoutMs;
-
-  for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-
-    const statusResult = await fetchStatus();
-    if (statusResult.isErr()) {
-      return err(statusResult.error);
-    }
-
-    const { status, errors } = statusResult.value;
-
-    if (status === PluginGenerationStatus.Completed) {
-      return ok(statusResult.value);
-    }
-    if (status === PluginGenerationStatus.Failed) {
-      return err(ServiceError.ServerError);
-    }
-    if (status === PluginGenerationStatus.ValidationError) {
-      const validationErrors = errors ?? {};
-      return err(ServiceError.badRequest(formatValidationErrors(validationErrors), validationErrors));
-    }
-
-    // `Unknown` joins the in-flight values here rather than ending the run: the orchestrator
-    // reports it whenever it has not written a custom status yet, which includes the window
-    // right after a healthy run starts. The deadline is what stops a genuinely stuck one, and
-    // it is read after the status so a run that finished during the last wait still counts.
-    if (Date.now() >= deadline) {
-      return err(ServiceError.timeout(timedOutMessage(timeoutMs)));
-    }
-  }
-}
-
-const timedOutMessage = (timeoutMs: number): string => {
-  const minutes = Math.floor(timeoutMs / 60_000);
-  if (minutes < 1) {
-    return 'Plugin generation timed out.';
-  }
-  return `Plugin generation timed out after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
-};
-
-const formatValidationErrors = (errors: Record<string, string[]>): string => {
-  const messages = Object.values(errors).flat();
-  return 'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
-};

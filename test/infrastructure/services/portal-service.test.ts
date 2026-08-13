@@ -305,4 +305,52 @@ describe("PortalService generation status polling", () => {
       expect(statusRequests.map((request) => request.url)).to.deep.equal([`/sdk/v2/${GENERATION_ID}/status`]);
     });
   });
+
+  // Each flow names itself in the timeout message, so each one's wiring is pinned separately.
+  // Before the shared poller these three polled a stuck generation forever.
+  describe("giving up on a generation that never finishes", () => {
+    const impatient = () => new PortalService(1, 15);
+
+    beforeEach(() => {
+      respondToStatus = statusBody({ status: Status.InProgress });
+    });
+
+    it("bounds portal generation", async () => {
+      const result = await impatient().generatePortal(buildPath, configDir, metadata, AUTH_KEY);
+
+      expect(errorFrom(result).code).to.equal(ServiceErrorCode.Timeout);
+      expect(errorFrom(result).errorMessage).to.equal("Portal generation timed out.");
+    });
+
+    it("bounds sdk generation", async () => {
+      const result = await impatient().generateSdk(buildPath, Language.TYPESCRIPT, configDir, metadata, AUTH_KEY);
+
+      expect(errorFrom(result).code).to.equal(ServiceErrorCode.Timeout);
+      expect(errorFrom(result).errorMessage).to.equal("SDK generation timed out.");
+    });
+
+    it("bounds v4 sdk generation", async () => {
+      const result = await impatient().generateV4Sdk(
+        buildPath,
+        Language.CSHARP,
+        Stability.BETA,
+        configDir,
+        metadata,
+        AUTH_KEY
+      );
+
+      expect(errorFrom(result).code).to.equal(ServiceErrorCode.Timeout);
+      expect(errorFrom(result).errorMessage).to.equal("SDK generation timed out.");
+    });
+
+    it("gives up on a status request that never answers", async () => {
+      // The budget above is only read once a status call returns, so it cannot end a run
+      // whose poll hangs. Only the request timeout can, which is why one is set.
+      respondToStatus = () => {};
+
+      const result = await new PortalService(1, 5_000, 30).generatePortal(buildPath, configDir, metadata, AUTH_KEY);
+
+      expect(errorFrom(result).code).to.equal(ServiceErrorCode.NetworkError);
+    });
+  });
 });

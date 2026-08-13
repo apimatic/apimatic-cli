@@ -42,6 +42,12 @@ describe('PluginService', () => {
 
   const statusBody = (body: unknown) => (res: http.ServerResponse) => json(res, 200, body);
 
+  // A finished run is signalled by a redirect to the download endpoint, not by a status body.
+  const redirect = (res: http.ServerResponse) => {
+    res.writeHead(302, { Location: `/plugin/${GENERATION_ID}/download` });
+    res.end();
+  };
+
   const drain = async (stream: NodeJS.ReadableStream) => {
     const chunks: Buffer[] = [];
     for await (const chunk of stream) chunks.push(Buffer.from(chunk));
@@ -110,7 +116,7 @@ describe('PluginService', () => {
     statusRequests.length = 0;
     downloadRequests.length = 0;
     respondToGenerate = (res) => json(res, 202, { id: GENERATION_ID });
-    respondToStatus = statusBody({ status: 'Completed' });
+    respondToStatus = redirect;
     respondToDownload = (res) => {
       res.writeHead(200, { 'Content-Type': 'application/zip' });
       res.end(Buffer.from('PK context-plugin'));
@@ -149,9 +155,26 @@ describe('PluginService', () => {
       expect(downloadRequests[0].headers.authorization).to.equal(`X-Auth-Key ${AUTH_KEY}`);
     });
 
+    it('treats the redirect to the download endpoint as completion', async () => {
+      // The status endpoint answers a finished run with a 302, as `/portal/v2` does. Following
+      // it transparently would hand the zip back as a status body and poll to the timeout.
+      const result = await generatePlugin();
+
+      expect(result.isOk()).to.be.true;
+      expect(statusRequests).to.have.length(1);
+      expect(downloadRequests).to.have.length(1);
+    });
+
+    it('completes on a Completed status body too', async () => {
+      respondToStatus = statusBody({ status: 'Completed' });
+
+      expect((await generatePlugin()).isOk()).to.be.true;
+    });
+
     it('keeps polling through every in-flight status', async () => {
       const inFlight = ['Queued', 'ExecutionStarted', 'GeneratingArtifacts'];
-      respondToStatus = (res, attempt) => json(res, 200, { status: inFlight[attempt - 1] ?? 'Completed' });
+      respondToStatus = (res, attempt) =>
+        inFlight[attempt - 1] ? json(res, 200, { status: inFlight[attempt - 1] }) : redirect(res);
 
       const result = await generatePlugin();
 
@@ -210,7 +233,7 @@ describe('PluginService', () => {
     it('keeps polling through an Unknown status', async () => {
       // The orchestrator reports Unknown until it writes its first custom status, so a run
       // polled in that window is healthy rather than broken.
-      respondToStatus = (res, attempt) => json(res, 200, { status: attempt === 1 ? 'Unknown' : 'Completed' });
+      respondToStatus = (res, attempt) => (attempt === 1 ? json(res, 200, { status: 'Unknown' }) : redirect(res));
 
       const result = await generatePlugin();
 
@@ -242,7 +265,7 @@ describe('PluginService', () => {
     it('reads one last status before declaring a timeout', async () => {
       // The budget is spent during the wait, but the run finished in that window.
       const impatient = new PluginService(20, 10);
-      respondToStatus = statusBody({ status: 'Completed' });
+      respondToStatus = redirect;
 
       const result = await impatient.generatePlugin(buildPath, configDir, metadata, AUTH_KEY);
 
