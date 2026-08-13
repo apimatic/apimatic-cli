@@ -5,7 +5,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { CodeGenerationVersion, Stability } from '../../../types/sdk/generate.js';
+import { getCodegenOptions } from '../../../types/sdk/generate.js';
 import { ActionResult } from '../../action-result.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
@@ -79,6 +79,17 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
+    const codegenOptions = getCodegenOptions(language);
+    let codegenOption = codegenOptions[0];
+    if (codegenOptions.length > 1) {
+      const selectedCodegenOption = await this.prompts.selectCodegenVersion(codegenOptions);
+      if (!selectedCodegenOption) {
+        this.prompts.noCodegenVersionSelected();
+        return ActionResult.cancelled();
+      }
+      codegenOption = selectedCodegenOption;
+    }
+
     const version = await this.prompts.inputVersion();
     if (!version) {
       this.prompts.noVersionSpecified();
@@ -87,7 +98,13 @@ export class SdkPublishInteractiveAction {
 
     const publishTypes = publishingProfile.getPublishTypesForLanguage(language);
 
-    this.prompts.publishingSummary(publishingProfile, language, version, publishTypes);
+    this.prompts.publishingSummary({
+      profile: publishingProfile,
+      language,
+      version,
+      publishType: publishTypes,
+      codegenOption
+    });
 
     const confirmed = await this.prompts.confirmPublishing();
     if (!confirmed) {
@@ -110,8 +127,8 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
-      CodeGenerationVersion.V3,
-      Stability.STABLE,
+      codegenOption.version,
+      codegenOption.stability,
       onPublishSdkError
     );
     if (publishResult.isFailed()) {

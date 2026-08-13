@@ -1,3 +1,5 @@
+import { NonEmptyArray } from "../utils.js";
+
 export enum Language {
   CSHARP = "csharp",
   JAVA = "java",
@@ -49,3 +51,33 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
   { label: "PHP", value: Language.PHP },
   { label: "Go", value: Language.GO }
 ];
+
+export interface CodegenOption {
+  version: CodeGenerationVersion;
+  stability: Stability;
+}
+
+/**
+ * For validating only interactive `sdk publish/generate` commands.
+ * Non-interactive validation is handled server-side by codegen API.
+ */
+export const CODEGEN_OPTIONS: Readonly<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>> = {
+  [Language.CSHARP]: [
+    { version: CodeGenerationVersion.V3, stability: Stability.STABLE },
+    { version: CodeGenerationVersion.V4, stability: Stability.BETA }
+  ],
+  [Language.GO]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
+  [Language.JAVA]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
+  [Language.PHP]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
+  [Language.PYTHON]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
+  [Language.RUBY]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }],
+  [Language.TYPESCRIPT]: [{ version: CodeGenerationVersion.V3, stability: Stability.STABLE }]
+};
+
+export function getCodegenOptions(language: Language): Readonly<NonEmptyArray<CodegenOption>> {
+  return CODEGEN_OPTIONS[language];
+}
+
+export function formatCodegenOption({ version, stability }: CodegenOption): string {
+  return `${version.toUpperCase()} (${stability})`;
+}
