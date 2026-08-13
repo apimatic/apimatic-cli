@@ -114,28 +114,6 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('generation failures', () => {
-    it('routes plugin-config validation errors to their own message', async () => {
-      sinon
-        .stub(PluginService.prototype, 'generatePlugin')
-        .resolves(err(ServiceError.badRequest('invalid', { pluginConfig: ["'pluginId' must be kebab-case."] })));
-      const pluginConfigInvalid = sinon.stub(PluginGeneratePrompts.prototype, 'pluginConfigInvalid');
-
-      expect((await execute()).isFailed()).to.be.true;
-      expect(pluginConfigInvalid.firstCall.args[0]).to.deep.equal(["'pluginId' must be kebab-case."]);
-    });
-
-    it('routes sdkRepos validation errors to the next-steps message', async () => {
-      sinon
-        .stub(PluginService.prototype, 'generatePlugin')
-        .resolves(err(ServiceError.badRequest('invalid', { sdkRepos: ['nothing buildable'] })));
-      const noBuildableLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'noBuildableLanguages');
-      const nextSteps = sinon.stub(PluginGeneratePrompts.prototype, 'nextStepsPublishSdks');
-
-      expect((await execute()).isFailed()).to.be.true;
-      expect(noBuildableLanguages.firstCall.args[0]).to.deep.equal(['nothing buildable']);
-      expect(nextSteps.called).to.be.true;
-    });
-
     it('falls back to the plain service message for any other failure', async () => {
       sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(ServiceError.ServerError));
       const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
@@ -144,41 +122,18 @@ describe('PluginGenerateAction', () => {
       expect(pluginGenerationError.called).to.be.true;
     });
 
-    it('reports every error key the response carries, not just the first', async () => {
-      // Both arrive in one response; showing only one costs the user a second upload
-      // and generation to discover the other.
-      sinon.stub(PluginService.prototype, 'generatePlugin').resolves(
-        err(
-          ServiceError.badRequest('invalid', {
-            pluginConfig: ["'pluginId' must be kebab-case."],
-            sdkRepos: ['nothing buildable']
-          })
-        )
-      );
-      const pluginConfigInvalid = sinon.stub(PluginGeneratePrompts.prototype, 'pluginConfigInvalid');
-      const noBuildableLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'noBuildableLanguages');
-      const nextSteps = sinon.stub(PluginGeneratePrompts.prototype, 'nextStepsPublishSdks');
-
-      expect((await execute()).isFailed()).to.be.true;
-      expect(pluginConfigInvalid.firstCall.args[0]).to.deep.equal(["'pluginId' must be kebab-case."]);
-      expect(noBuildableLanguages.firstCall.args[0]).to.deep.equal(['nothing buildable']);
-      expect(nextSteps.called).to.be.true;
-    });
-
-    it('ignores an error key that carries no messages', async () => {
-      // An empty array is truthy, so a bare `if (errors)` would print a headed but
-      // empty list and swallow the message the service already assembled.
-      sinon
-        .stub(PluginService.prototype, 'generatePlugin')
-        .resolves(err(ServiceError.badRequest('nothing buildable', { pluginConfig: [], sdkRepos: [] })));
-      const pluginConfigInvalid = sinon.stub(PluginGeneratePrompts.prototype, 'pluginConfigInvalid');
-      const noBuildableLanguages = sinon.stub(PluginGeneratePrompts.prototype, 'noBuildableLanguages');
+    it('reports every message the response carries, whatever key it arrived under', async () => {
+      // The service assembles one message from every key, so no key can be dropped for
+      // being one the CLI does not recognise.
+      const error = ServiceError.badRequest('One or more validation errors occurred.\n- a\n- b', {
+        pluginConfig: ['a'],
+        someKeyTheCliDoesNotKnow: ['b']
+      });
+      sinon.stub(PluginService.prototype, 'generatePlugin').resolves(err(error));
       const pluginGenerationError = sinon.stub(PluginGeneratePrompts.prototype, 'pluginGenerationError');
 
       expect((await execute()).isFailed()).to.be.true;
-      expect(pluginConfigInvalid.called).to.be.false;
-      expect(noBuildableLanguages.called).to.be.false;
-      expect(pluginGenerationError.firstCall.args[0]).to.equal('nothing buildable');
+      expect(pluginGenerationError.firstCall.args[0]).to.equal('One or more validation errors occurred.\n- a\n- b');
     });
   });
 });

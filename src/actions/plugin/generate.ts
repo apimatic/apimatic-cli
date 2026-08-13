@@ -54,7 +54,7 @@ export class PluginGenerateAction {
       );
 
       if (response.isErr()) {
-        this.prompts.pluginGenerationServiceError(response.error);
+        this.prompts.pluginGenerationError(response.error.errorMessage);
         return ActionResult.failed();
       }
 
