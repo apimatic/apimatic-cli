@@ -114,6 +114,10 @@ export class PublishingProfile {
     return this.languageConfigs[language];
   }
 
+  public getGitConfigurationForLanguage(language: Language): GitConfiguration | undefined {
+    return this.gitConfigs[language];
+  }
+
   private static createCSharpConfiguration(config: CSharpConfigurationItem): CSharpPackageConfiguration {
     return  {
           packageId: config.packageId,
