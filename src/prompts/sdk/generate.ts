@@ -5,8 +5,18 @@ import { Result } from "neverthrow";
 import { withSpinner } from "../prompt.js";
 import { ServiceError } from "../../infrastructure/service-error.js";
 import { GeneratedSdkResult } from "../../infrastructure/services/portal-service.js";
+import { CodeGenerationVersion, CodegenOption } from "../../types/sdk/generate.js";
 
 export class SdkGeneratePrompts {
+  public warnIfStabilityIgnored(codegenOption: CodegenOption, stabilityWasProvided: boolean) {
+    if (stabilityWasProvided && codegenOption.isV3()) {
+      log.warn(
+        `${f.flag("stability")} has no effect with ${f.flag("codegen-version", CodeGenerationVersion.V3)}. ` +
+          `The V3 code generator always produces a stable SDK.`
+      );
+    }
+  }
+
   public async overwriteSdk(directory: DirectoryPath): Promise<boolean> {
     const overwrite = await confirm({
       message: `The destination ${f.path(directory)} is not empty, do you want to overwrite?`,

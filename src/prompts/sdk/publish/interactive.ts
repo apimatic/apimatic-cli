@@ -10,7 +10,7 @@ import {
   PublishType
 } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { Language } from '../../../types/sdk/generate.js';
+import { CodegenOption, Language } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
 
@@ -142,6 +142,24 @@ export class SdkPublishInteractivePrompts {
     log.error('No language was selected for publishing.');
   }
 
+  public async selectCodegenVersion(options: readonly CodegenOption[]): Promise<CodegenOption | undefined> {
+    const codegenOption = await select({
+      message: 'Select the Code Generator version:',
+      initialValue: options[0],
+      options: options.map((option) => ({ value: option, label: `${option}` }))
+    });
+
+    if (isCancel(codegenOption)) {
+      return undefined;
+    }
+
+    return codegenOption;
+  }
+
+  public noCodegenVersionSelected() {
+    log.error('No Code Generator version was selected.');
+  }
+
   public async inputVersion(): Promise<SemVersion | undefined> {
     const version = await text({
       message: 'Enter version to publish (e.g. 1.0.0):',
@@ -165,18 +183,8 @@ export class SdkPublishInteractivePrompts {
     log.error('No version was specified for publishing the SDK.');
   }
 
-  public publishingSummary(
-    profile: PublishingProfile,
-    language: Language,
-    version: SemVersion,
-    publishType: PublishType[]
-  ) {
-    const targets = publishType
-      .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
-      .join(' + ');
-    log.info(
-      `Ready to publish:\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
-    );
+  public publishingSummary(publishingSummary: string) {
+    log.info(`Ready to publish:` + publishingSummary);
   }
 
   public async confirmPublishing(): Promise<boolean> {

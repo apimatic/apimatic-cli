@@ -477,7 +477,7 @@ Generate and publish an SDK to a package registry and/or source repository
 ```
 USAGE
   $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript] [-f]
-    [-i <value>] [--publish-type package|sourcecode...] [--dry-run]
+    [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v3|v4] [--stability stable|beta]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
@@ -488,10 +488,14 @@ FLAGS
                                   <options: csharp|java|php|python|ruby|typescript>
   -p, --profile-id=<value>        Id of the publishing profile to use.
   -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
+      --codegen-version=<option>  [default: v3] Version of the code generator to use
+                                  <options: v3|v4>
       --dry-run                   Generate the SDK locally for review without publishing.
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.
                                   <options: package|sourcecode>
+      --stability=<option>        [default: stable] Stability level of the generated SDK
+                                  <options: stable|beta>
 
 DESCRIPTION
   Generate and publish an SDK to a package registry and/or source repository
@@ -508,6 +512,8 @@ EXAMPLES
   apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=java --version=2.0.0 --publish-type=sourcecode
 
   apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
+
+  apimatic sdk publish --profile-id=d4e5f6a1b2c3d4e5f6a1b2c3 --language=csharp --version=1.0.0 --publish-type=package --codegen-version=v4 --stability=beta
 ```
 
 _See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_
