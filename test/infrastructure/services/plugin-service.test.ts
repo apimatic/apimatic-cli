@@ -100,7 +100,7 @@ describe('PluginService', () => {
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
     // Near-zero interval and budget so the suite is not paced by the production 3s / 5min.
-    service = new PluginService(1, 5000);
+    service = new PluginService({ pollIntervalMs: 1, generationTimeoutMs: 5000 });
   });
 
   after(async () => {
@@ -242,7 +242,7 @@ describe('PluginService', () => {
     });
 
     it('gives up once the generation budget is spent', async () => {
-      const impatient = new PluginService(1, 15);
+      const impatient = new PluginService({ pollIntervalMs: 1, generationTimeoutMs: 15 });
       respondToStatus = statusBody({ status: 'GeneratingArtifacts' });
 
       const result = await impatient.generatePlugin(buildPath, configDir, metadata, AUTH_KEY);
@@ -254,7 +254,7 @@ describe('PluginService', () => {
     it('gives up on a status request that never answers', async () => {
       // Without a request timeout this hangs rather than fails: the generation budget is
       // only read once a status call returns, and this one never does.
-      const impatient = new PluginService(1, 5_000, 30);
+      const impatient = new PluginService({ pollIntervalMs: 1, generationTimeoutMs: 5_000, requestTimeoutMs: 30 });
       respondToStatus = () => {};
 
       const result = await impatient.generatePlugin(buildPath, configDir, metadata, AUTH_KEY);
@@ -264,7 +264,7 @@ describe('PluginService', () => {
 
     it('reads one last status before declaring a timeout', async () => {
       // The budget is spent during the wait, but the run finished in that window.
-      const impatient = new PluginService(20, 10);
+      const impatient = new PluginService({ pollIntervalMs: 20, generationTimeoutMs: 10 });
       respondToStatus = redirect;
 
       const result = await impatient.generatePlugin(buildPath, configDir, metadata, AUTH_KEY);

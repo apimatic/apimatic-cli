@@ -47,22 +47,23 @@ export interface GeneratedSdkResult {
   sdkSourceTree: NodeJS.ReadableStream;
 }
 
+const TIMING_DEFAULTS = {
+  pollIntervalMs: STATUS_POLL_INTERVAL_MS,
+  generationTimeoutMs: GENERATION_TIMEOUT_MS,
+  requestTimeoutMs: REQUEST_TIMEOUT_MS
+};
+
+/** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
+export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
+
 export class PortalService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly apiBaseUrl = "https://api.apimatic.io" as const;
   private readonly fileService = new FileService();
-  private readonly statusPollIntervalMs: number;
-  private readonly generationTimeoutMs: number;
-  private readonly requestTimeoutMs: number;
+  private readonly timings: typeof TIMING_DEFAULTS;
 
-  constructor(
-    statusPollIntervalMs: number = STATUS_POLL_INTERVAL_MS,
-    generationTimeoutMs: number = GENERATION_TIMEOUT_MS,
-    requestTimeoutMs: number = REQUEST_TIMEOUT_MS
-  ) {
-    this.statusPollIntervalMs = statusPollIntervalMs;
-    this.generationTimeoutMs = generationTimeoutMs;
-    this.requestTimeoutMs = requestTimeoutMs;
+  constructor(timings: GenerationTimings = {}) {
+    this.timings = { ...TIMING_DEFAULTS, ...timings };
   }
 
   // TODO: Pass stream as parameter instead of file path.
@@ -95,10 +96,10 @@ export class PortalService {
     }
 
     const statusResult = await pollUntilCompleted({
-      pollIntervalMs: this.statusPollIntervalMs,
+      pollIntervalMs: this.timings.pollIntervalMs,
       fetchStatus: () =>
         this.getPortalGenerationStatus(generationId, commandMetadata.shell, this.resolveToken(authInfo, authKey)),
-      timeout: { budgetMs: this.generationTimeoutMs, label: "Portal generation" }
+      timeout: { budgetMs: this.timings.generationTimeoutMs, label: "Portal generation" }
     });
     if (statusResult.isErr()) {
       return err(statusResult.error);
@@ -149,10 +150,10 @@ export class PortalService {
     }
 
     const statusResult = await pollUntilCompleted({
-      pollIntervalMs: this.statusPollIntervalMs,
+      pollIntervalMs: this.timings.pollIntervalMs,
       fetchStatus: () =>
         this.getSdkGenerationStatus(generationId, commandMetadata.shell, this.resolveToken(authInfo, authKey)),
-      timeout: { budgetMs: this.generationTimeoutMs, label: "SDK generation" },
+      timeout: { budgetMs: this.timings.generationTimeoutMs, label: "SDK generation" },
       formatValidationError: formatSdkValidationError
     });
     if (statusResult.isErr()) {
@@ -204,10 +205,10 @@ export class PortalService {
     }
 
     const statusResult = await pollUntilCompleted({
-      pollIntervalMs: this.statusPollIntervalMs,
+      pollIntervalMs: this.timings.pollIntervalMs,
       fetchStatus: () =>
         this.getV4SdkGenerationStatus(generationId, commandMetadata.shell, this.resolveToken(authInfo, authKey)),
-      timeout: { budgetMs: this.generationTimeoutMs, label: "SDK generation" }
+      timeout: { budgetMs: this.timings.generationTimeoutMs, label: "SDK generation" }
     });
     if (statusResult.isErr()) {
       return err(statusResult.error);
@@ -284,12 +285,7 @@ export class PortalService {
     }
   }
 
-  /**
-   * SDK generation reports per-language merge conflicts under a dedicated
-   * `sdkMergeFailed` key, which needs its own wording. Everything else falls
-   * back to the shared format.
-   */
-  private createAuthorizationHeader =(authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
+  private createAuthorizationHeader = (authInfo: AuthInfo | null, overrideAuthKey: string | null): string => {
     return `X-Auth-Key ${this.resolveToken(authInfo, overrideAuthKey) ?? ""}`;
   };
 
@@ -432,7 +428,7 @@ export class PortalService {
   private axiosInstance(shell: string, apiKey: string) {
     return axios.create({
       baseURL: envInfo.getBaseUrl() ?? this.apiBaseUrl,
-      timeout: this.requestTimeoutMs,
+      timeout: this.timings.requestTimeoutMs,
       headers: {
         "User-Agent": envInfo.getUserAgent(shell),
         Authorization: `X-Auth-Key ${apiKey}`
@@ -462,6 +458,10 @@ export class PortalService {
   };
 }
 
+/**
+ * SDK generation reports per-language merge conflicts under a dedicated `sdkMergeFailed`
+ * key, which needs its own wording. Everything else falls back to the shared format.
+ */
 const formatSdkValidationError: ValidationErrorFormatter = (errors) => {
   const sdkMergeFailedLanguages = errors.sdkMergeFailed;
   if (sdkMergeFailedLanguages?.length) {

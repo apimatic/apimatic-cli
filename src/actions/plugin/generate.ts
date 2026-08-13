@@ -25,8 +25,7 @@ export class PluginGenerateAction {
     buildDirectory: DirectoryPath,
     pluginDirectory: DirectoryPath,
     force: boolean,
-    zipPlugin: boolean,
-    displayMessages: boolean = true
+    zipPlugin: boolean
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
@@ -61,9 +60,7 @@ export class PluginGenerateAction {
       const tempPluginZipPath = await tempContext.save(response.value);
       await pluginContext.save(tempPluginZipPath, zipPlugin);
 
-      if (displayMessages) {
-        this.prompts.pluginGenerated(pluginDirectory);
-      }
+      this.prompts.pluginGenerated(pluginDirectory);
 
       return ActionResult.success();
     });

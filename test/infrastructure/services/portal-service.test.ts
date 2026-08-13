@@ -91,7 +91,7 @@ describe("PortalService generation status polling", () => {
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
     // Near-zero poll interval so the suite is not paced by the 3s production default.
-    service = new PortalService(1);
+    service = new PortalService({ pollIntervalMs: 1 });
   });
 
   after(async () => {
@@ -309,7 +309,7 @@ describe("PortalService generation status polling", () => {
   // Each flow names itself in the timeout message, so each one's wiring is pinned separately.
   // Before the shared poller these three polled a stuck generation forever.
   describe("giving up on a generation that never finishes", () => {
-    const impatient = () => new PortalService(1, 15);
+    const impatient = () => new PortalService({ pollIntervalMs: 1, generationTimeoutMs: 15 });
 
     beforeEach(() => {
       respondToStatus = statusBody({ status: Status.InProgress });
@@ -348,7 +348,9 @@ describe("PortalService generation status polling", () => {
       // whose poll hangs. Only the request timeout can, which is why one is set.
       respondToStatus = () => {};
 
-      const result = await new PortalService(1, 5_000, 30).generatePortal(buildPath, configDir, metadata, AUTH_KEY);
+      const bounded = new PortalService({ pollIntervalMs: 1, generationTimeoutMs: 5_000, requestTimeoutMs: 30 });
+
+      const result = await bounded.generatePortal(buildPath, configDir, metadata, AUTH_KEY);
 
       expect(errorFrom(result).code).to.equal(ServiceErrorCode.NetworkError);
     });

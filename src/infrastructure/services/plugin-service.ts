@@ -21,21 +21,22 @@ import {
 import { FileService } from '../file-service.js';
 import { mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
 
+const TIMING_DEFAULTS = {
+  pollIntervalMs: STATUS_POLL_INTERVAL_MS,
+  generationTimeoutMs: GENERATION_TIMEOUT_MS,
+  requestTimeoutMs: REQUEST_TIMEOUT_MS
+};
+
+/** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
+export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
+
 export class PluginService {
   private readonly apiBaseUrl = 'https://api.apimatic.io' as const;
   private readonly fileService = new FileService();
-  private readonly statusPollIntervalMs: number;
-  private readonly generationTimeoutMs: number;
-  private readonly requestTimeoutMs: number;
+  private readonly timings: typeof TIMING_DEFAULTS;
 
-  constructor(
-    statusPollIntervalMs: number = STATUS_POLL_INTERVAL_MS,
-    generationTimeoutMs: number = GENERATION_TIMEOUT_MS,
-    requestTimeoutMs: number = REQUEST_TIMEOUT_MS
-  ) {
-    this.statusPollIntervalMs = statusPollIntervalMs;
-    this.generationTimeoutMs = generationTimeoutMs;
-    this.requestTimeoutMs = requestTimeoutMs;
+  constructor(timings: GenerationTimings = {}) {
+    this.timings = { ...TIMING_DEFAULTS, ...timings };
   }
 
   public async generatePlugin(
@@ -59,9 +60,9 @@ export class PluginService {
 
     const generationId = initiated.value.id;
     const completed = await pollUntilCompleted({
-      pollIntervalMs: this.statusPollIntervalMs,
+      pollIntervalMs: this.timings.pollIntervalMs,
       fetchStatus: () => this.getGenerationStatus(generationId, commandMetadata.shell, token),
-      timeout: { budgetMs: this.generationTimeoutMs, label: 'Plugin generation' }
+      timeout: { budgetMs: this.timings.generationTimeoutMs, label: 'Plugin generation' }
     });
     if (completed.isErr()) {
       return err(completed.error);
@@ -157,7 +158,7 @@ export class PluginService {
   private axiosInstance(shell: string, apiKey: string) {
     return axios.create({
       baseURL: envInfo.getBaseUrl() ?? this.apiBaseUrl,
-      timeout: this.requestTimeoutMs,
+      timeout: this.timings.requestTimeoutMs,
       headers: {
         'User-Agent': envInfo.getUserAgent(shell),
         Authorization: `X-Auth-Key ${apiKey}`
