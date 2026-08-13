@@ -80,15 +80,11 @@ export class SdkPublishInteractiveAction {
     }
 
     const codegenOptions = getCodegenOptions(language);
-    let codegenOption = codegenOptions[0];
-    const userChoosesCodeGenVersion = codegenOptions.length > 1;
-    if (userChoosesCodeGenVersion) {
-      const selectedCodegenOption = await this.prompts.selectCodegenVersion(codegenOptions);
-      if (!selectedCodegenOption) {
+    let codegenOption = codegenOptions.length === 1 ? codegenOptions[0]
+      : await this.prompts.selectCodegenVersion(codegenOptions);
+    if (!codegenOption) {
         this.prompts.noCodegenVersionSelected();
         return ActionResult.cancelled();
-      }
-      codegenOption = selectedCodegenOption;
     }
 
     const version = await this.prompts.inputVersion();
@@ -104,7 +100,7 @@ export class SdkPublishInteractiveAction {
       language,
       version,
       publishType: publishTypes,
-      codegenOption: userChoosesCodeGenVersion ? codegenOption : undefined
+      codegenOption: codegenOptions.length === 1 ? codegenOption : undefined
     });
 
     const confirmed = await this.prompts.confirmPublishing();
