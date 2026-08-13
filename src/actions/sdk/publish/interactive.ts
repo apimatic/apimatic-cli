@@ -81,7 +81,7 @@ export class SdkPublishInteractiveAction {
     }
 
     const codegenOptions = getCodegenOptions(language);
-    let codegenOption = codegenOptions.length === 1 ? codegenOptions[0]
+    const codegenOption = codegenOptions.length === 1 ? codegenOptions[0]
       : await this.prompts.selectCodegenVersion(codegenOptions);
     if (!codegenOption) {
         this.prompts.noCodegenVersionSelected();
