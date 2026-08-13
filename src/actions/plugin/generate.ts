@@ -4,9 +4,11 @@ import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
+import { PluginCreateConfigAction } from './create-config.js';
 
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
@@ -44,6 +46,33 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
+    const configState = await new PluginConfigContext(buildDirectory).validate();
+    if (configState.state === 'unreadable') {
+      this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
+      return ActionResult.failed();
+    }
+
+    // Read before the metadata prompts, which do not touch languages: `sdk publish` is the only
+    // thing that records them, so what is on disk now is what the run has to work with.
+    const namesAnySdk = configState.state === 'present' && configState.hasLanguages;
+
+    if (configState.state === 'missing' || !configState.hasMetadata) {
+      const created = await this.createConfig(buildDirectory);
+      if (created.isCancelled()) {
+        this.prompts.metadataCancelled();
+      }
+      if (!created.isSuccess()) {
+        return created;
+      }
+    }
+
+    // The config is complete but names nothing to build, so there is no point uploading it.
+    if (!namesAnySdk) {
+      this.prompts.noPublishedSdks();
+      this.prompts.nextStepsPublishSdks();
+      return ActionResult.success();
+    }
+
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildDirectory);
@@ -65,4 +94,7 @@ export class PluginGenerateAction {
       return ActionResult.success();
     });
   };
+
+  private readonly createConfig = (buildDirectory: DirectoryPath): Promise<ActionResult> =>
+    new PluginCreateConfigAction(this.configDir, this.commandMetadata, this.authKey).execute(buildDirectory);
 }
