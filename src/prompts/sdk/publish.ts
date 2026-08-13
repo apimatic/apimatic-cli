@@ -104,7 +104,7 @@ export interface PublishingDetails {
   language: Language;
   version: SemVersion;
   publishType: PublishType[];
-  codegenOption: CodegenOption;
+  codegenOption?: CodegenOption;
 }
 
 export function formatPublishingDetails({
@@ -118,10 +118,6 @@ export function formatPublishingDetails({
     .map((t) => (t === PublishType.PackagePublishing ? "Package" : "Source Code"))
     .join(" + ");
 
-  // V3 is the default generator, so naming it would add a line to every pre-existing flow. The row
-  // earns its place only when something other than the default produced the SDK.
-  const generator =
-    codegenOption.version === CodeGenerationVersion.V3 ? "" : `\n  Generator: ${formatCodegenOption(codegenOption)}`;
-
+  const generator = codegenOption ? `\n  Generator: ${formatCodegenOption(codegenOption)}` : "";
   return `\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}${generator}`;
 }

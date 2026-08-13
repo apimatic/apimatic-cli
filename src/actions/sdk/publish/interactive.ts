@@ -81,7 +81,8 @@ export class SdkPublishInteractiveAction {
 
     const codegenOptions = getCodegenOptions(language);
     let codegenOption = codegenOptions[0];
-    if (codegenOptions.length > 1) {
+    const userChoosesCodeGenVersion = codegenOptions.length > 1;
+    if (userChoosesCodeGenVersion) {
       const selectedCodegenOption = await this.prompts.selectCodegenVersion(codegenOptions);
       if (!selectedCodegenOption) {
         this.prompts.noCodegenVersionSelected();
@@ -103,7 +104,7 @@ export class SdkPublishInteractiveAction {
       language,
       version,
       publishType: publishTypes,
-      codegenOption
+      codegenOption: userChoosesCodeGenVersion ? codegenOption : undefined
     });
 
     const confirmed = await this.prompts.confirmPublishing();
