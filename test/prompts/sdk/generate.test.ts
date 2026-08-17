@@ -4,7 +4,7 @@ import { log } from "@clack/prompts";
 import { SdkGeneratePrompts } from "../../../src/prompts/sdk/generate.js";
 import { CodeGenerationVersion, CodegenOption, Stability } from "../../../src/types/sdk/generate.js";
 
-const v4 = CodegenOption.resolve(CodeGenerationVersion.V4, Stability.BETA);
+const v4 = CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA);
 
 describe("SdkGeneratePrompts.warnIfStabilityIgnored", () => {
   const prompts = new SdkGeneratePrompts();

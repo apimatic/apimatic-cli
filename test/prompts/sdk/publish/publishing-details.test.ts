@@ -36,7 +36,7 @@ describe("formatPublishingDetails", () => {
   it("names the generator once it is no longer the default", () => {
     const output = details(
       [PublishType.PackagePublishing],
-      CodegenOption.resolve(CodeGenerationVersion.V4, Stability.BETA)
+      CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
     );
 
     expect(output).to.contain("Generator: V4 (beta)");
@@ -45,7 +45,7 @@ describe("formatPublishingDetails", () => {
   it("reports v3 as stable even when beta was requested", () => {
     const output = details(
       [PublishType.PackagePublishing],
-      CodegenOption.resolve(CodeGenerationVersion.V3, Stability.BETA)
+      CodegenOption.create(CodeGenerationVersion.V3, Stability.BETA)
     );
 
     expect(output).to.contain("Generator: V3 (stable)");
