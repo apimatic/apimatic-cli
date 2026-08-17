@@ -68,14 +68,20 @@ export class PluginConfigContext {
 
   /**
    * Adds the plugin's identity, creating the file when absent. `license` is written unprompted
-   * because the backend consumes it; `pluginKey` is deliberately not written, because nothing does.
+   * because the backend consumes it. `pluginKey` is the account's API Copilot key and is always
+   * written: it is the only field that identifies the plugin to anything outside this file.
    */
-  public async upsertMetadata(metadata: PluginMetadata, author?: PluginAuthor): Promise<PluginConfigWriteResult> {
+  public async upsertMetadata(
+    metadata: PluginMetadata,
+    pluginKey: string,
+    author?: PluginAuthor
+  ): Promise<PluginConfigWriteResult> {
     return await this.merge((config) => ({
       ...config,
       pluginId: metadata.pluginId,
       pluginName: metadata.pluginName,
       pluginVersion: metadata.pluginVersion,
+      pluginKey,
       ...(author && { author }),
       license: config.license ?? DEFAULT_PLUGIN_LICENSE
     }));

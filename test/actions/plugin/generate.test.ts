@@ -117,7 +117,11 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('plugin config', () => {
-    const ACCOUNT = { FullName: 'Acme', Email: 'developers@acme.com' } as unknown as SubscriptionInfo;
+    const ACCOUNT = {
+      FullName: 'Acme',
+      Email: 'developers@acme.com',
+      ApiCopilotKeys: ['copilot-key']
+    } as unknown as SubscriptionInfo;
     const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
     const CSHARP = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } };
 
