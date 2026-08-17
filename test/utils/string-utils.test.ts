@@ -101,3 +101,77 @@ describe('toTitleCase', () => {
     expect(toTitleCase('---')).to.equal('');
   });
 });
+
+// Both helpers are seeded from a project directory name, which the user chose and the OS accepted,
+// so they have to survive any script at all. Neither recognises a letter outside ASCII, so the
+// question these cover is not what they produce but that they always produce something, and never
+// something the plugin id prompt would then reject.
+describe('case conversion of non-Latin input', () => {
+  const NON_LATIN = {
+    'japanese kanji': '請求書',
+    'japanese hiragana': 'せいきゅうしょ',
+    'japanese katakana': 'アクメペイメント',
+    chinese: '发票系统',
+    korean: '결제서비스',
+    cyrillic: 'Платежи',
+    greek: 'Πληρωμές',
+    arabic: 'مدفوعات',
+    hebrew: 'תשלומים',
+    thai: 'การชำระเงิน',
+    devanagari: 'भुगतान',
+    emoji: '🎉🎊',
+    'lone high surrogate': '\uD83D',
+    'lone low surrogate': '\uDE00'
+  };
+
+  Object.entries(NON_LATIN).forEach(([label, input]) => {
+    it(`yields nothing rather than throwing for ${label}`, () => {
+      expect(() => toKebabCase(input)).to.not.throw();
+      expect(() => toTitleCase(input)).to.not.throw();
+      expect(toKebabCase(input)).to.equal('');
+      expect(toTitleCase(input)).to.equal('');
+    });
+  });
+
+  it('keeps the ASCII part of a name that mixes scripts', () => {
+    expect(toKebabCase('請求書API-v2')).to.equal('api-v2');
+    expect(toTitleCase('請求書API-v2')).to.equal('API V2');
+  });
+
+  it('treats a non-breaking space as a separator', () => {
+    expect(toKebabCase('acme\u00A0payments')).to.equal('acme-payments');
+  });
+
+  // Accented letters are dropped rather than folded to their ASCII base, so `münchen` loses its `ü`
+  // instead of becoming `munchen`. Pinned because it is a silent loss, not because it is desirable.
+  it('drops accented letters instead of folding them', () => {
+    expect(toKebabCase('café-münchen')).to.equal('caf-m-nchen');
+    expect(toKebabCase('straße')).to.equal('stra-e');
+  });
+
+  it('survives control characters and zero-width joiners', () => {
+    expect(() => toKebabCase('a\u0000b')).to.not.throw();
+    expect(toKebabCase('a\u0000b')).to.equal('a-b');
+    expect(toKebabCase('a\u200Db')).to.equal('a-b');
+  });
+
+  // The whole point of the sweep: whatever the directory was called, the seeded id is either absent
+  // or something the prompt will accept. There is no third outcome that reaches the user.
+  it('only ever emits an empty string or a valid plugin id', () => {
+    const everyInput = [
+      ...Object.values(NON_LATIN),
+      '請求書API-v2',
+      'café-münchen',
+      'straße',
+      'a\u0000b',
+      'acme\u00A0payments',
+      '🎉-payments'
+    ];
+
+    everyInput.forEach((input) => {
+      const kebab = toKebabCase(input);
+      expect(kebab === '' || PLUGIN_ID.test(kebab), `${JSON.stringify(input)} produced ${JSON.stringify(kebab)}`).to.be
+        .true;
+    });
+  });
+});
