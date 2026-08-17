@@ -29,10 +29,13 @@ export class PluginCreateConfigAction {
   }
 
   public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult> => {
-    const metadata = await this.prompts.inputPluginMetadata(defaultMetadata(buildDirectory));
-    if (!metadata) {
-      return ActionResult.cancelled();
+    const input = await this.prompts.inputPluginMetadata(defaultMetadata(buildDirectory));
+    if ('cancelled' in input) {
+      // Carried on the result so the caller can say which answer was missing, rather than assuming
+      // the run stopped at the first question.
+      return ActionResult.cancelled(input.cancelled);
     }
+    const metadata = input.metadata;
 
     // Asked after the prompts so a network failure cannot discard what the user just typed. The
     // account supplies only the optional author, so failing here would cost more than it saves.

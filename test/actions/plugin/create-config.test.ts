@@ -50,10 +50,12 @@ describe('PluginCreateConfigAction', () => {
 
   const answers = (overrides: Partial<{ pluginId: string; pluginName: string; pluginVersion: string }> = {}) =>
     sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves({
-      pluginId: 'acme-payments',
-      pluginName: 'Acme Payments',
-      pluginVersion: '0.1.0',
-      ...overrides
+      metadata: {
+        pluginId: 'acme-payments',
+        pluginName: 'Acme Payments',
+        pluginVersion: '0.1.0',
+        ...overrides
+      }
     });
 
   it('writes the metadata and a default licence into the config', async () => {
@@ -100,12 +102,25 @@ describe('PluginCreateConfigAction', () => {
   });
 
   it('cancels without writing anything when the user escapes the prompts', async () => {
-    sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves(undefined);
+    sinon
+      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .resolves({ cancelled: 'A plugin ID is required' });
 
     const result = await execute();
 
     expect(result.isCancelled()).to.be.true;
     expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
+  });
+
+  // The caller prints this to say which answer was missing, so it has to survive on the result.
+  it('carries the reason the prompts were abandoned', async () => {
+    sinon
+      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .resolves({ cancelled: 'A plugin version is required' });
+
+    const result = await execute();
+
+    expect(result.getMessage()).to.equal('A plugin version is required');
   });
 
   it('still writes the config when the account lookup fails, leaving the author out', async () => {

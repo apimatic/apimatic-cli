@@ -52,9 +52,12 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  /** A cancelled metadata prompt stops the run, so it is a warning rather than an error. */
-  public metadataCancelled() {
-    log.warn('A plugin ID is required. Exiting without generating a plugin.');
+  /**
+   * A cancelled metadata prompt stops the run, so it is a warning rather than an error. The reason
+   * is passed in because the run can stop at any of the answers, not only the first.
+   */
+  public metadataCancelled(reason: string) {
+    log.warn(`${reason}. Exiting without generating a plugin.`);
   }
 
   public noPublishedSdks() {

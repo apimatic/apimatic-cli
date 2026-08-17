@@ -58,8 +58,10 @@ export class PluginGenerateAction {
 
     if (configState.state === 'missing' || !configState.hasMetadata) {
       const result = await this.createConfig(buildDirectory);
+      // The reason names whichever answer was missing, which only the config action knows.
       if (result.isCancelled()) {
-        this.prompts.metadataCancelled();
+        this.prompts.metadataCancelled(result.getMessage());
+        return ActionResult.cancelled();
       }
       if (!result.isSuccess()) {
         return result;

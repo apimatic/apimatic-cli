@@ -10,6 +10,12 @@ import { noteWrapped, withSpinner } from '../prompt.js';
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 const KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/**
+ * Which answer was missing, so a caller that abandons the run can say what it was waiting for
+ * instead of naming whichever field happens to be asked first.
+ */
+export type PluginMetadataResult = { metadata: PluginMetadata } | { cancelled: string };
+
 export class PluginCreateConfigPrompts {
   public spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
     return withSpinner(
@@ -24,7 +30,7 @@ export class PluginCreateConfigPrompts {
    * Required fields get a `placeholder` but no `defaultValue`, so an empty answer re-prompts.
    * Optional ones get both, so Enter accepts the suggestion — the same split `sdk quickstart` uses.
    */
-  public async inputPluginMetadata(defaults: PluginMetadata): Promise<PluginMetadata | undefined> {
+  public async inputPluginMetadata(defaults: PluginMetadata): Promise<PluginMetadataResult> {
     const pluginId = await text({
       message: 'Enter an ID for your plugin:',
       placeholder: defaults.pluginId,
@@ -34,7 +40,7 @@ export class PluginCreateConfigPrompts {
           return `Plugin ID must be lower-case alphanumeric words separated by single dashes, for example 'acme-payments'.`;
       }
     });
-    if (isCancel(pluginId)) return undefined;
+    if (isCancel(pluginId)) return { cancelled: 'A plugin ID is required' };
 
     const pluginName = await text({
       message: 'Enter a name for your plugin:',
@@ -43,7 +49,7 @@ export class PluginCreateConfigPrompts {
         if (!value) return 'Plugin name is required.';
       }
     });
-    if (isCancel(pluginName)) return undefined;
+    if (isCancel(pluginName)) return { cancelled: 'A plugin name is required' };
 
     const pluginVersion = await text({
       message: 'Enter a version for your plugin:',
@@ -54,9 +60,9 @@ export class PluginCreateConfigPrompts {
           return 'Please enter a valid version in the format major.minor.patch (e.g., 0.1.0).';
       }
     });
-    if (isCancel(pluginVersion)) return undefined;
+    if (isCancel(pluginVersion)) return { cancelled: 'A plugin version is required' };
 
-    return { pluginId, pluginName, pluginVersion };
+    return { metadata: { pluginId, pluginName, pluginVersion } };
   }
 
   public accountInfoUnavailable() {
