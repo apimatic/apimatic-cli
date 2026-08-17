@@ -52,20 +52,33 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  /** A cancelled metadata prompt stops the run, so it is a warning rather than an error. */
-  public metadataCancelled() {
-    log.warn('A plugin ID is required. Exiting without generating a plugin.');
+  /**
+   * A cancelled metadata prompt stops the run, so it is a warning rather than an error. The reason
+   * is passed in because the run can stop at any of the answers, not only the first.
+   */
+  public metadataCancelled(reason: string) {
+    log.warn(`${reason}. Exiting without generating a plugin.`);
   }
 
   public noPublishedSdks() {
     log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs yet.`);
   }
 
-  /** Reached on a successful run that found nothing to build, not on a generation failure. */
+  /**
+   * Reached on a successful run that found nothing to build, not on a generation failure. Points at
+   * the interactive publish — it takes no flags and walks the user through the profile, language and
+   * version — and names the Source Code requirement, which is the one thing a plugin cannot do
+   * without: an entry describes an SDK by its repository, so a package-only publish records nothing.
+   */
   public nextStepsPublishSdks() {
     const message =
-      `Publish an SDK for each language you want in the plugin:\n` +
-      `'${f.cmdAlt('apimatic', 'sdk', 'publish')} ${f.flag('language', '<language>')}'\n` +
+      `Publish an SDK for each language you want in the plugin, and include ${f.var('Source Code')} ` +
+      `among its publishing targets — a plugin describes each SDK by its source repository, so a ` +
+      `package-only publish cannot be recorded.\n\n` +
+      `Run '${f.cmdAlt('apimatic', 'sdk', 'publish')}' with no flags to be walked through it, or ` +
+      `pass them yourself:\n` +
+      `'${f.cmdAlt('apimatic', 'sdk', 'publish')} ${f.flag('language', '<language>')} ` +
+      `${f.flag('publish-type', 'sourcecode')}'\n\n` +
       `Then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;
     noteWrapped(message, 'Next Steps');
   }

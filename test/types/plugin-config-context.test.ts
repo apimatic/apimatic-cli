@@ -19,6 +19,9 @@ describe('PluginConfigContext', () => {
 
   const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
 
+  // `pluginKey` is the account's API Copilot key, resolved before the write and always recorded.
+  const PLUGIN_KEY = 'copilot-key-1';
+
   const writtenConfig = (): PluginConfigData =>
     JSON.parse(fs.readFileSync(path.join(buildDirectory.toString(), 'plugin-config.json'), 'utf-8'));
 
@@ -26,94 +29,109 @@ describe('PluginConfigContext', () => {
 
   afterEach(() => mockFs.restore());
 
-  describe('validate', () => {
+  describe('getPluginConfigState', () => {
     it('is missing when there is no file', async () => {
       mockFs({ src: {} });
 
-      expect(await context.validate()).to.deep.equal({ state: 'missing' });
+      const state = await context.getPluginConfigState();
+
+      expect(state.exists()).to.be.false;
+      expect(state.unusable()).to.be.undefined;
+      expect(state.needsMetadata()).to.be.true;
     });
 
     it('is unreadable when the file is not valid JSON', async () => {
       mockFs({ src: { 'plugin-config.json': '{ not json' } });
 
-      const state = await context.validate();
+      const state = await context.getPluginConfigState();
 
-      expect(state.state).to.equal('unreadable');
+      expect(state.unusable()).to.not.be.undefined;
+      expect(state.exists()).to.be.true;
     });
 
     it('is unreadable when the file is a JSON array', async () => {
       mockFs({ src: { 'plugin-config.json': '[]' } });
 
-      const state = await context.validate();
+      const state = await context.getPluginConfigState();
 
-      expect(state).to.include({ state: 'unreadable', reason: 'it is not a JSON object' });
+      expect(state.unusable()?.reason).to.equal('it is not a JSON object');
+    });
+
+    it('reports where an unusable file is, so the caller can say what to fix', async () => {
+      mockFs({ src: { 'plugin-config.json': '{ not json' } });
+
+      const state = await context.getPluginConfigState();
+
+      expect(state.unusable()?.path.toString()).to.contain('plugin-config.json');
     });
 
     it('is unreadable when the file declares a schema version this CLI does not model', async () => {
       withConfig({ schemaVersion: 2, languages: {} });
 
-      const state = await context.validate();
+      const state = await context.getPluginConfigState();
 
-      expect(state.state).to.equal('unreadable');
-      expect((state as { reason: string }).reason).to.contain('schemaVersion 2');
+      expect(state.unusable()?.reason).to.contain('schemaVersion 2');
     });
 
     it('reports neither metadata nor languages for a bare file', async () => {
       withConfig({ schemaVersion: 1, languages: {} });
 
-      expect(await context.validate()).to.deep.equal({
-        state: 'present',
-        hasMetadata: false,
-        hasLanguages: false
-      });
+      const state = await context.getPluginConfigState();
+
+      expect(state.exists()).to.be.true;
+      expect(state.hasMetadata()).to.be.false;
+      expect(state.hasLanguages()).to.be.false;
+      expect(state.needsMetadata()).to.be.true;
     });
 
     it('reports languages without metadata for a file written by sdk publish', async () => {
       withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
 
-      expect(await context.validate()).to.deep.equal({
-        state: 'present',
-        hasMetadata: false,
-        hasLanguages: true
-      });
+      const state = await context.getPluginConfigState();
+
+      expect(state.hasMetadata()).to.be.false;
+      expect(state.hasLanguages()).to.be.true;
+      expect(state.needsMetadata()).to.be.true;
     });
 
     it('reports metadata without languages for a file written by plugin generate', async () => {
       withConfig({ schemaVersion: 1, ...METADATA, languages: {} });
 
-      expect(await context.validate()).to.deep.equal({
-        state: 'present',
-        hasMetadata: true,
-        hasLanguages: false
-      });
+      const state = await context.getPluginConfigState();
+
+      expect(state.hasMetadata()).to.be.true;
+      expect(state.hasLanguages()).to.be.false;
+      expect(state.needsMetadata()).to.be.false;
     });
 
     it('reports both once the config is complete', async () => {
       withConfig({ schemaVersion: 1, ...METADATA, languages: { csharp: CSHARP_ENTRY } });
 
-      expect(await context.validate()).to.deep.equal({
-        state: 'present',
-        hasMetadata: true,
-        hasLanguages: true
-      });
+      const state = await context.getPluginConfigState();
+
+      expect(state.hasMetadata()).to.be.true;
+      expect(state.hasLanguages()).to.be.true;
     });
 
     it('does not count a blank plugin id as metadata', async () => {
       withConfig({ schemaVersion: 1, pluginId: '   ', pluginName: 'Acme', languages: {} });
 
-      expect(await context.validate()).to.include({ hasMetadata: false });
+      const state = await context.getPluginConfigState();
+
+      expect(state.hasMetadata()).to.be.false;
     });
   });
 
   describe('upsertMetadata', () => {
-    it('creates the file with schema version, metadata and a default licence', async () => {
+    it('creates the file with schema version, metadata, plugin key and a default licence', async () => {
       mockFs({ src: {} });
 
-      expect(await context.upsertMetadata(METADATA)).to.equal('written');
+      expect(await context.upsertMetadata(METADATA, PLUGIN_KEY)).to.equal('written');
       expect(writtenConfig()).to.deep.equal({
         schemaVersion: 1,
         languages: {},
         ...METADATA,
+        pluginKey: PLUGIN_KEY,
         license: 'MIT'
       });
     });
@@ -121,23 +139,33 @@ describe('PluginConfigContext', () => {
     it('records the author when one is supplied', async () => {
       mockFs({ src: {} });
 
-      await context.upsertMetadata(METADATA, { name: 'Acme', email: 'developers@acme.com' });
+      await context.upsertMetadata(METADATA, PLUGIN_KEY, { name: 'Acme', email: 'developers@acme.com' });
 
       expect(writtenConfig().author).to.deep.equal({ name: 'Acme', email: 'developers@acme.com' });
     });
 
-    it('never writes a plugin key', async () => {
+    // Nothing outside the file identifies the plugin except this key, so a write without one would
+    // produce a config that cannot be attributed to a copilot.
+    it('always writes the plugin key', async () => {
       mockFs({ src: {} });
 
-      await context.upsertMetadata(METADATA);
+      await context.upsertMetadata(METADATA, PLUGIN_KEY);
 
-      expect(writtenConfig()).to.not.have.property('pluginKey');
+      expect(writtenConfig().pluginKey).to.equal(PLUGIN_KEY);
+    });
+
+    it('replaces a plugin key already on disk with the one just resolved', async () => {
+      withConfig({ schemaVersion: 1, pluginKey: 'stale-key', languages: {} });
+
+      await context.upsertMetadata(METADATA, PLUGIN_KEY);
+
+      expect(writtenConfig().pluginKey).to.equal(PLUGIN_KEY);
     });
 
     it('leaves a hand-written licence alone', async () => {
       withConfig({ schemaVersion: 1, license: 'Apache-2.0', languages: {} });
 
-      await context.upsertMetadata(METADATA);
+      await context.upsertMetadata(METADATA, PLUGIN_KEY);
 
       expect(writtenConfig().license).to.equal('Apache-2.0');
     });
@@ -145,7 +173,7 @@ describe('PluginConfigContext', () => {
     it('adds metadata to a config sdk publish already created, keeping its languages', async () => {
       withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
 
-      await context.upsertMetadata(METADATA);
+      await context.upsertMetadata(METADATA, PLUGIN_KEY);
 
       const config = writtenConfig();
       expect(config).to.include(METADATA);
@@ -153,19 +181,24 @@ describe('PluginConfigContext', () => {
     });
 
     it('preserves fields this CLI version does not model', async () => {
-      withConfig({ schemaVersion: 1, pluginKey: 'hand-written', homepage: 'https://acme.com', languages: {} });
+      withConfig({
+        schemaVersion: 1,
+        homepage: 'https://acme.com',
+        repository: 'https://github.com/acme/sdk',
+        languages: {}
+      });
 
-      await context.upsertMetadata(METADATA);
+      await context.upsertMetadata(METADATA, PLUGIN_KEY);
 
       const config = writtenConfig();
-      expect(config.pluginKey).to.equal('hand-written');
       expect(config.homepage).to.equal('https://acme.com');
+      expect(config.repository).to.equal('https://github.com/acme/sdk');
     });
 
     it('refuses to overwrite a file it could not read', async () => {
       mockFs({ src: { 'plugin-config.json': '{ not json' } });
 
-      expect(await context.upsertMetadata(METADATA)).to.equal('unreadable');
+      expect(await context.upsertMetadata(METADATA, PLUGIN_KEY)).to.equal('unreadable');
       expect(fs.readFileSync(path.join('src', 'plugin-config.json'), 'utf-8')).to.equal('{ not json');
     });
   });
@@ -174,7 +207,7 @@ describe('PluginConfigContext', () => {
     it('backfills it into a hand-written file that omits it', async () => {
       mockFs({ src: { 'plugin-config.json': JSON.stringify({ languages: {} }) } });
 
-      await context.upsertMetadata(METADATA);
+      await context.upsertMetadata(METADATA, PLUGIN_KEY);
 
       expect(writtenConfig().schemaVersion).to.equal(1);
     });
@@ -196,7 +229,8 @@ describe('PluginConfigContext', () => {
 
       const typescriptEntry: LanguageEntry = {
         source: { repositoryUrl: 'https://github.com/acme/acme-payments-typescript' },
-        package: { name: '@acme/payments-sdk' }
+        package: { name: '@acme/payments-sdk' },
+        version: CodeGenerationVersion.V3
       };
       await context.upsertLanguage(Language.TYPESCRIPT, typescriptEntry);
 

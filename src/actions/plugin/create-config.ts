@@ -1,3 +1,4 @@
+import { err, ok, Result } from 'neverthrow';
 import { ApiService } from '../../infrastructure/services/api-service.js';
 import { PluginCreateConfigPrompts } from '../../prompts/plugin/create-config.js';
 import { SubscriptionInfo } from '../../types/api/account.js';
@@ -9,6 +10,9 @@ import { toKebabCase, toTitleCase } from '../../utils/string-utils.js';
 import { ActionResult } from '../action-result.js';
 
 const DEFAULT_PLUGIN_VERSION = '0.1.0';
+
+/** `cancelled` is the user backing out of the key prompt; `failed` is an account with no key. */
+type ResolveKeyFailure = 'failed' | 'cancelled';
 
 /**
  * Writes the plugin's own details into `plugin-config.json`, creating the file when absent. Only
@@ -29,22 +33,34 @@ export class PluginCreateConfigAction {
   }
 
   public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult> => {
-    const metadata = await this.prompts.inputPluginMetadata(defaultMetadata(buildDirectory));
-    if (!metadata) {
-      return ActionResult.cancelled();
+    const input = await this.prompts.inputPluginMetadata(defaultMetadata(buildDirectory));
+    if ('cancelled' in input) {
+      // Carried on the result so the caller can say which answer was missing, rather than assuming
+      // the run stopped at the first question.
+      return ActionResult.cancelled(input.cancelled);
     }
+    const metadata = input.metadata;
 
     // Asked after the prompts so a network failure cannot discard what the user just typed. The
-    // account supplies only the optional author, so failing here would cost more than it saves.
+    // account carries the API Copilot key the config cannot be written without, so unlike the
+    // optional author, a failure here has to stop the run.
     const account = await this.prompts.spinnerAccountInfo(
       this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, this.authKey)
     );
     if (account.isErr()) {
-      this.prompts.accountInfoUnavailable();
+      this.prompts.accountInfoUnavailable(account.error);
+      return ActionResult.failed();
     }
 
-    const author = account.isOk() ? authorOf(account.value) : undefined;
-    const written = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
+    const pluginKey = await this.resolvePluginKey(account.value);
+    if (pluginKey.isErr()) {
+      return pluginKey.error === 'cancelled'
+        ? ActionResult.cancelled('An API Copilot key is required')
+        : ActionResult.failed();
+    }
+
+    const author = authorOf(account.value);
+    const written = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, pluginKey.value, author);
     if (written !== 'written') {
       if (written === 'unreadable') {
         this.prompts.pluginConfigUnreadable();
@@ -54,8 +70,33 @@ export class PluginCreateConfigAction {
       return ActionResult.failed();
     }
 
-    this.prompts.pluginConfigCreated(metadata);
+    this.prompts.pluginConfigCreated(metadata, pluginKey.value);
     return ActionResult.success();
+  };
+
+  /**
+   * The plugin's `pluginKey` is the account's API Copilot key, resolved the way `portal copilot`
+   * resolves it. A lone key is taken without asking — there is nothing to choose between — but
+   * several cannot be guessed at, because the key decides which copilot the plugin belongs to.
+   */
+  private readonly resolvePluginKey = async (account: SubscriptionInfo): Promise<Result<string, ResolveKeyFailure>> => {
+    const keys = account.ApiCopilotKeys ?? [];
+    if (keys.length === 0) {
+      this.prompts.noApiCopilotKeyFound();
+      return err('failed');
+    }
+
+    if (keys.length === 1) {
+      return ok(keys[0]);
+    }
+
+    const selected = await this.prompts.selectApiCopilotKey(keys);
+    if (selected === undefined) {
+      this.prompts.noApiCopilotKeySelected();
+      return err('cancelled');
+    }
+
+    return ok(selected);
   };
 }
 

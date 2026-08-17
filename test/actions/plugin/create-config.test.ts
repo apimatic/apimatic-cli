@@ -50,11 +50,18 @@ describe('PluginCreateConfigAction', () => {
 
   const answers = (overrides: Partial<{ pluginId: string; pluginName: string; pluginVersion: string }> = {}) =>
     sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves({
-      pluginId: 'acme-payments',
-      pluginName: 'Acme Payments',
-      pluginVersion: '0.1.0',
-      ...overrides
+      metadata: {
+        pluginId: 'acme-payments',
+        pluginName: 'Acme Payments',
+        pluginVersion: '0.1.0',
+        ...overrides
+      }
     });
+
+  const accountWithKeys = (keys: string[] | undefined) =>
+    (ApiService.prototype.getAccountInfo as sinon.SinonStub).resolves(
+      ok({ ...ACCOUNT, ApiCopilotKeys: keys } as unknown as SubscriptionInfo)
+    );
 
   it('writes the metadata and a default licence into the config', async () => {
     answers();
@@ -79,12 +86,12 @@ describe('PluginCreateConfigAction', () => {
     expect(writtenConfig().author).to.deep.equal({ name: 'Acme', email: 'developers@acme.com' });
   });
 
-  it('never writes a plugin key', async () => {
+  it('writes the account API Copilot key as the plugin key', async () => {
     answers();
 
     await execute();
 
-    expect(writtenConfig()).to.not.have.property('pluginKey');
+    expect(writtenConfig().pluginKey).to.equal('copilot-key');
   });
 
   it('seeds the prompt defaults from the project directory name', async () => {
@@ -100,7 +107,9 @@ describe('PluginCreateConfigAction', () => {
   });
 
   it('cancels without writing anything when the user escapes the prompts', async () => {
-    sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves(undefined);
+    sinon
+      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .resolves({ cancelled: 'A plugin ID is required' });
 
     const result = await execute();
 
@@ -108,17 +117,85 @@ describe('PluginCreateConfigAction', () => {
     expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
   });
 
-  it('still writes the config when the account lookup fails, leaving the author out', async () => {
+  // The caller prints this to say which answer was missing, so it has to survive on the result.
+  it('carries the reason the prompts were abandoned', async () => {
+    sinon
+      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .resolves({ cancelled: 'A plugin version is required' });
+
+    const result = await execute();
+
+    expect(result.getMessage()).to.equal('A plugin version is required');
+  });
+
+  // The account is the only source of the plugin key, so unlike the optional author it cannot be
+  // skipped over: a config without a key identifies the plugin to nothing.
+  it('fails without writing anything when the account lookup fails', async () => {
     answers();
     (ApiService.prototype.getAccountInfo as sinon.SinonStub).resolves(err(ServiceError.ServerError));
     const accountInfoUnavailable = sinon.stub(PluginCreateConfigPrompts.prototype, 'accountInfoUnavailable');
 
     const result = await execute();
 
-    expect(result.isSuccess()).to.be.true;
+    expect(result.isFailed()).to.be.true;
     expect(accountInfoUnavailable.called).to.be.true;
-    expect(writtenConfig()).to.not.have.property('author');
-    expect(writtenConfig().pluginId).to.equal('acme-payments');
+    expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
+  });
+
+  it('fails when the subscription holds no API Copilot key', async () => {
+    answers();
+    accountWithKeys([]);
+    const noApiCopilotKeyFound = sinon.stub(PluginCreateConfigPrompts.prototype, 'noApiCopilotKeyFound');
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(noApiCopilotKeyFound.called).to.be.true;
+    expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
+  });
+
+  it('fails when the subscription reports no API Copilot keys at all', async () => {
+    answers();
+    accountWithKeys(undefined);
+    sinon.stub(PluginCreateConfigPrompts.prototype, 'noApiCopilotKeyFound');
+
+    expect((await execute()).isFailed()).to.be.true;
+  });
+
+  it('does not ask which key to use when the account holds exactly one', async () => {
+    answers();
+    const selectApiCopilotKey = sinon.stub(PluginCreateConfigPrompts.prototype, 'selectApiCopilotKey');
+
+    await execute();
+
+    expect(selectApiCopilotKey.called).to.be.false;
+  });
+
+  it('asks which key to use when the account holds several, and writes the chosen one', async () => {
+    answers();
+    accountWithKeys(['copilot-key', 'other-copilot-key']);
+    const selectApiCopilotKey = sinon
+      .stub(PluginCreateConfigPrompts.prototype, 'selectApiCopilotKey')
+      .resolves('other-copilot-key');
+
+    const result = await execute();
+
+    expect(result.isSuccess()).to.be.true;
+    expect(selectApiCopilotKey.firstCall.args[0]).to.deep.equal(['copilot-key', 'other-copilot-key']);
+    expect(writtenConfig().pluginKey).to.equal('other-copilot-key');
+  });
+
+  it('cancels without writing anything when no key is chosen', async () => {
+    answers();
+    accountWithKeys(['copilot-key', 'other-copilot-key']);
+    sinon.stub(PluginCreateConfigPrompts.prototype, 'selectApiCopilotKey').resolves(undefined);
+    const noApiCopilotKeySelected = sinon.stub(PluginCreateConfigPrompts.prototype, 'noApiCopilotKeySelected');
+
+    const result = await execute();
+
+    expect(result.isCancelled()).to.be.true;
+    expect(noApiCopilotKeySelected.called).to.be.true;
+    expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
   });
 
   it('keeps the languages a previous sdk publish recorded', async () => {
