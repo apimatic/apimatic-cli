@@ -57,12 +57,12 @@ export class PluginGenerateAction {
     const namesAnySdk = configState.state === 'present' && configState.hasLanguages;
 
     if (configState.state === 'missing' || !configState.hasMetadata) {
-      const created = await this.createConfig(buildDirectory);
-      if (created.isCancelled()) {
+      const result = await this.createConfig(buildDirectory);
+      if (result.isCancelled()) {
         this.prompts.metadataCancelled();
       }
-      if (!created.isSuccess()) {
-        return created;
+      if (!result.isSuccess()) {
+        return result;
       }
     }
 
