@@ -18,30 +18,25 @@ export interface LanguageSource {
 
 export interface CSharpPluginPackage {
   packageId: string;
-  packageUrl?: string;
 }
 
 /** Shared by typescript, python and ruby, which all identify a package by a single name. */
 export interface NamedPluginPackage {
   name: string;
-  packageUrl?: string;
 }
 
 export interface JavaPluginPackage {
   groupId: string;
   artifactId: string;
-  packageUrl?: string;
 }
 
 export interface PhpPluginPackage {
   vendorName: string;
   projectName: string;
-  packageUrl?: string;
 }
 
 export interface GoPluginPackage {
   packageName: string;
-  packageUrl?: string;
 }
 
 export type PluginPackage =
@@ -54,22 +49,20 @@ export type PluginPackage =
 export interface LanguageEntry {
   source: LanguageSource;
   package?: PluginPackage;
-  version?: CodeGenerationVersion;
+  version: CodeGenerationVersion;
 }
 
-/** The backend also accepts a bare source URL in place of an entry. Read, never written. */
-export type LanguageValue = LanguageEntry | string;
-
-export type PluginLanguages = Partial<Record<Language, LanguageValue>>;
+export type PluginLanguages = Partial<Record<Language, LanguageEntry>>;
 
 export interface PluginConfigData {
   schemaVersion: number;
   // Optional on disk: `sdk publish` creates a config carrying languages alone, and
-  // `plugin generate` fills these in before it ever uploads.
+  // `plugin generate` fills these in — all four together — before it ever uploads. `pluginKey` is
+  // the account's API Copilot key, which is why publishing cannot write it: resolving one costs an
+  // account call, and picking between several needs a prompt the CI path could not answer.
   pluginId?: string;
   pluginName?: string;
   pluginVersion?: string;
-  // Read and preserved on a round-trip, never written: nothing in codegen-v2 consumes it.
   pluginKey?: string;
   author?: PluginAuthor;
   license?: string;
@@ -81,13 +74,9 @@ export interface PluginConfigData {
   [key: string]: unknown;
 }
 
-/** The fields the CLI asks for; everything else is derived or constant. */
+/** The fields the CLI asks for; everything else is derived, resolved or constant. */
 export interface PluginMetadata {
   pluginId: string;
   pluginName: string;
   pluginVersion: string;
-}
-
-export function isLanguageEntry(value: LanguageValue): value is LanguageEntry {
-  return typeof value !== 'string';
 }
