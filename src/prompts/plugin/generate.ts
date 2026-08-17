@@ -61,11 +61,16 @@ export class PluginGeneratePrompts {
     log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs yet.`);
   }
 
-  /** Reached on a successful run that found nothing to build, not on a generation failure. */
+  /**
+   * Reached on a successful run that found nothing to build, not on a generation failure. Names the
+   * bare command because it is the interactive form, and names Source Code because an entry
+   * describes an SDK by its repository: a package-only publish records nothing.
+   */
   public nextStepsPublishSdks() {
     const message =
-      `Publish an SDK for each language you want in the plugin:\n` +
-      `'${f.cmdAlt('apimatic', 'sdk', 'publish')} ${f.flag('language', '<language>')}'\n` +
+      `Publish an SDK for each language you want in the plugin, and include ${f.var('Source Code')} ` +
+      `publishing.\n\n` +
+      `Run '${f.cmdAlt('apimatic', 'sdk', 'publish')}'\n\n` +
       `Then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;
     noteWrapped(message, 'Next Steps');
   }
