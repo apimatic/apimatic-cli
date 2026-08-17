@@ -122,6 +122,7 @@ export class PluginConfigContext {
 
   private async parse(): Promise<ParseResult> {
     try {
+      // TODO: JSON Parsing/Stringify should be in a dedicated JSON infra layer which preferably uses zod
       const parsed: unknown = JSON.parse(await this.fileService.getContents(this.configPath));
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         return { reason: 'it is not a JSON object' };
