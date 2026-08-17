@@ -1,4 +1,4 @@
-import { isCancel, log, select, text } from '@clack/prompts';
+import { isCancel, log, text } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../types/api/account.js';
@@ -9,12 +9,6 @@ import { noteWrapped, withSpinner } from '../prompt.js';
 
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 const KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-/**
- * Which answer was missing, so a caller that abandons the run can say what it was waiting for
- * instead of naming whichever field happens to be asked first.
- */
-export type PluginMetadataResult = { metadata: PluginMetadata } | { cancelled: string };
 
 export class PluginCreateConfigPrompts {
   public spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
@@ -30,17 +24,16 @@ export class PluginCreateConfigPrompts {
    * Required fields get a `placeholder` but no `defaultValue`, so an empty answer re-prompts.
    * Optional ones get both, so Enter accepts the suggestion — the same split `sdk quickstart` uses.
    */
-  public async inputPluginMetadata(defaults: PluginMetadata): Promise<PluginMetadataResult> {
+  public async inputPluginMetadata(defaults: PluginMetadata): Promise<PluginMetadata | undefined> {
     const pluginId = await text({
       message: 'Enter an ID for your plugin:',
       placeholder: defaults.pluginId,
       validate: (value) => {
         if (!value) return 'Plugin ID is required.';
-        if (!KEBAB_CASE.test(value))
-          return `Plugin ID must be lower-case alphanumeric words separated by single dashes, for example 'acme-payments'.`;
+        if (!KEBAB_CASE.test(value)) return `Plugin ID must be lower-case kebab-case, for example 'acme-payments'.`;
       }
     });
-    if (isCancel(pluginId)) return { cancelled: 'A plugin ID is required' };
+    if (isCancel(pluginId)) return undefined;
 
     const pluginName = await text({
       message: 'Enter a name for your plugin:',
@@ -49,7 +42,7 @@ export class PluginCreateConfigPrompts {
         if (!value) return 'Plugin name is required.';
       }
     });
-    if (isCancel(pluginName)) return { cancelled: 'A plugin name is required' };
+    if (isCancel(pluginName)) return undefined;
 
     const pluginVersion = await text({
       message: 'Enter a version for your plugin:',
@@ -60,41 +53,13 @@ export class PluginCreateConfigPrompts {
           return 'Please enter a valid version in the format major.minor.patch (e.g., 0.1.0).';
       }
     });
-    if (isCancel(pluginVersion)) return { cancelled: 'A plugin version is required' };
+    if (isCancel(pluginVersion)) return undefined;
 
-    return { metadata: { pluginId, pluginName, pluginVersion } };
+    return { pluginId, pluginName, pluginVersion };
   }
 
-  /** Only asked when the account holds several; one key is used without interrupting the run. */
-  public async selectApiCopilotKey(keys: string[]): Promise<string | undefined> {
-    const key = await select({
-      message: 'Select the API Copilot this plugin belongs to:',
-      maxItems: 10,
-      options: keys.map((value) => ({ value, label: value }))
-    });
-
-    if (isCancel(key)) {
-      return undefined;
-    }
-
-    return key;
-  }
-
-  public accountInfoUnavailable(error: ServiceError) {
-    log.error(`Could not read your subscription info, so ${f.var(PLUGIN_CONFIG_FILE)} was not written.`);
-    log.error(error.errorMessage);
-  }
-
-  /** The key is what ties the plugin to a copilot, so there is nothing to write without one. */
-  public noApiCopilotKeyFound() {
-    const message =
-      `No API Copilot key was found for your subscription, and ${f.var(PLUGIN_CONFIG_FILE)} needs one. ` +
-      `Please contact support at ${f.var('support@apimatic.io')}.`;
-    log.error(message);
-  }
-
-  public noApiCopilotKeySelected() {
-    log.warn('No API Copilot key was selected.');
+  public accountInfoUnavailable() {
+    log.warn(`Could not read your subscription info, so the author was left out of ${f.var(PLUGIN_CONFIG_FILE)}.`);
   }
 
   public pluginConfigUnreadable() {
@@ -105,12 +70,11 @@ export class PluginCreateConfigPrompts {
     log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be written, so its plugin details were not saved.`);
   }
 
-  public pluginConfigCreated(metadata: PluginMetadata, pluginKey: string) {
+  public pluginConfigCreated(metadata: PluginMetadata) {
     const message =
       `Plugin ID: ${f.var(metadata.pluginId)}\n` +
       `Plugin Name: ${f.var(metadata.pluginName)}\n` +
-      `Version: ${f.var(metadata.pluginVersion)}\n` +
-      `API Copilot: ${f.var(pluginKey)}\n\n` +
+      `Version: ${f.var(metadata.pluginVersion)}\n\n` +
       `Configuration saved to: ${f.var(PLUGIN_CONFIG_FILE)}`;
     noteWrapped(message, 'Plugin Configuration');
   }

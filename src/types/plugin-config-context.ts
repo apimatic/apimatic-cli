@@ -12,61 +12,15 @@ import {
 } from './plugin/plugin-config.js';
 import { Language } from './sdk/generate.js';
 
-/** Where and why a config cannot be used, so the prompt can tell the user what to go and fix. */
-export interface PluginConfigFailure {
-  reason: string;
-  path: FilePath;
-}
-
 /**
  * What a caller needs to know before generating. Metadata and languages are written by different
  * commands — `plugin generate` owns the first, `sdk publish` the second — so they are reported
- * separately, and the questions callers actually ask of the three cases are answered here rather
- * than by re-deriving them from a discriminator at each call site.
+ * separately. `path` rides on `unreadable` purely so the prompt can say where to fix the file.
  */
-export class PluginConfigState {
-  private constructor(
-    private readonly fileExists: boolean,
-    private readonly metadata: boolean,
-    private readonly languages: boolean,
-    private readonly failure: PluginConfigFailure | undefined
-  ) {}
-
-  public static missing(): PluginConfigState {
-    return new PluginConfigState(false, false, false, undefined);
-  }
-
-  public static unreadable(reason: string, path: FilePath): PluginConfigState {
-    return new PluginConfigState(true, false, false, { reason, path });
-  }
-
-  public static present(hasMetadata: boolean, hasLanguages: boolean): PluginConfigState {
-    return new PluginConfigState(true, hasMetadata, hasLanguages, undefined);
-  }
-
-  /** The failure to report, or `undefined` when the file can be used. Check this before the rest. */
-  public unusable(): PluginConfigFailure | undefined {
-    return this.failure;
-  }
-
-  /** Whether there is a file at all — what decides between `Create` and `Add to` in a prompt. */
-  public exists(): boolean {
-    return this.fileExists;
-  }
-
-  public hasMetadata(): boolean {
-    return this.metadata;
-  }
-
-  public hasLanguages(): boolean {
-    return this.languages;
-  }
-
-  /** Covers both a config that names no plugin and no config at all: either way, ask for an id. */
-  public needsMetadata(): boolean {
-    return !this.metadata;
-  }
-}
+export type PluginConfigState =
+  | { state: 'missing' }
+  | { state: 'unreadable'; reason: string; path: FilePath }
+  | { state: 'present'; hasMetadata: boolean; hasLanguages: boolean };
 
 /**
  * Why a write did or did not happen. A bare boolean cannot say whether the file was unusable or
@@ -85,14 +39,14 @@ export class PluginConfigContext {
     return new FilePath(this.buildDirectory, new FileName('plugin-config.json'));
   }
 
-  public async getPluginConfigState(): Promise<PluginConfigState> {
+  public async validate(): Promise<PluginConfigState> {
     if (!(await this.fileService.fileExists(this.configPath))) {
-      return PluginConfigState.missing();
+      return { state: 'missing' };
     }
 
     const parsed = await this.parse();
     if ('reason' in parsed) {
-      return PluginConfigState.unreadable(parsed.reason, this.configPath);
+      return { state: 'unreadable', reason: parsed.reason, path: this.configPath };
     }
 
     // A version this CLI does not model would be uploaded and rejected server-side, so it is
@@ -102,28 +56,26 @@ export class PluginConfigContext {
       const reason =
         `it declares schemaVersion ${schemaVersion}, ` +
         `and this version of the CLI only understands ${PLUGIN_CONFIG_SCHEMA_VERSION}`;
-      return PluginConfigState.unreadable(reason, this.configPath);
+      return { state: 'unreadable', reason, path: this.configPath };
     }
 
-    return PluginConfigState.present(namesThePlugin(parsed.config), namesAnyLanguage(parsed.config));
+    return {
+      state: 'present',
+      hasMetadata: namesThePlugin(parsed.config),
+      hasLanguages: namesAnyLanguage(parsed.config)
+    };
   }
 
   /**
    * Adds the plugin's identity, creating the file when absent. `license` is written unprompted
-   * because the backend consumes it. `pluginKey` is the account's API Copilot key and is always
-   * written: it is the only field that identifies the plugin to anything outside this file.
+   * because the backend consumes it; `pluginKey` is deliberately not written, because nothing does.
    */
-  public async upsertMetadata(
-    metadata: PluginMetadata,
-    pluginKey: string,
-    author?: PluginAuthor
-  ): Promise<PluginConfigWriteResult> {
+  public async upsertMetadata(metadata: PluginMetadata, author?: PluginAuthor): Promise<PluginConfigWriteResult> {
     return await this.merge((config) => ({
       ...config,
       pluginId: metadata.pluginId,
       pluginName: metadata.pluginName,
       pluginVersion: metadata.pluginVersion,
-      pluginKey,
       ...(author && { author }),
       license: config.license ?? DEFAULT_PLUGIN_LICENSE
     }));

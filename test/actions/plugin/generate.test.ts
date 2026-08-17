@@ -117,11 +117,7 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('plugin config', () => {
-    const ACCOUNT = {
-      FullName: 'Acme',
-      Email: 'developers@acme.com',
-      ApiCopilotKeys: ['copilot-key']
-    } as unknown as SubscriptionInfo;
+    const ACCOUNT = { FullName: 'Acme', Email: 'developers@acme.com' } as unknown as SubscriptionInfo;
     const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
     const CSHARP = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } };
 
@@ -132,9 +128,9 @@ describe('PluginGenerateAction', () => {
     // The real PluginCreateConfigAction runs; only its prompts and the account call are stubbed,
     // so these assert what actually lands on disk.
     const answersMetadata = () =>
-      sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves({ metadata: METADATA });
-    const cancelsMetadata = (reason = 'A plugin ID is required') =>
-      sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves({ cancelled: reason });
+      sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves(METADATA);
+    const cancelsMetadata = () =>
+      sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves(undefined);
 
     beforeEach(() => {
       sinon.stub(PluginCreateConfigPrompts.prototype, 'spinnerAccountInfo').callsFake((fn) => fn);
@@ -206,19 +202,6 @@ describe('PluginGenerateAction', () => {
       expect(metadataCancelled.called).to.be.true;
       expect(generatePlugin.called).to.be.false;
       expect(fsExtra.existsSync(configPath())).to.be.false;
-    });
-
-    // The message named the plugin id whichever answer was actually missing, which read as a lie
-    // once the user had already typed one.
-    it('reports the answer that was actually missing, not always the plugin id', async () => {
-      await fsExtra.remove(configPath());
-      cancelsMetadata('A plugin version is required');
-      sinon.stub(PluginService.prototype, 'generatePlugin');
-      const metadataCancelled = sinon.stub(PluginGeneratePrompts.prototype, 'metadataCancelled');
-
-      await execute();
-
-      expect(metadataCancelled.firstCall.args[0]).to.equal('A plugin version is required');
     });
 
     it('generates straight away when the config is already complete', async () => {

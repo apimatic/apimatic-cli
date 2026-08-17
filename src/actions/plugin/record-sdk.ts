@@ -54,14 +54,14 @@ export class PluginRecordSdkAction {
     }
 
     const pluginConfigContext = new PluginConfigContext(buildDirectory);
-    const configState = await pluginConfigContext.getPluginConfigState();
-    if (configState.unusable()) {
+    const configState = await pluginConfigContext.validate();
+    if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable();
       return;
     }
 
     // A non-interactive run has already decided via `--update-plugin-config`; there is nobody to ask.
-    if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configState.exists()))) {
+    if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configState.state !== 'missing'))) {
       return;
     }
 

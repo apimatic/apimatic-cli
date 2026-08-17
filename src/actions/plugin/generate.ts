@@ -46,23 +46,20 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    const configState = await new PluginConfigContext(buildDirectory).getPluginConfigState();
-    const unusable = configState.unusable();
-    if (unusable) {
-      this.prompts.pluginConfigUnreadable(unusable.reason, unusable.path);
+    const configState = await new PluginConfigContext(buildDirectory).validate();
+    if (configState.state === 'unreadable') {
+      this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     }
 
     // Read before the metadata prompts, which do not touch languages: `sdk publish` is the only
     // thing that records them, so what is on disk now is what the run has to work with.
-    const namesAnySdk = configState.hasLanguages();
+    const namesAnySdk = configState.state === 'present' && configState.hasLanguages;
 
-    if (configState.needsMetadata()) {
+    if (configState.state === 'missing' || !configState.hasMetadata) {
       const created = await this.createConfig(buildDirectory);
-      // The reason names whichever answer was missing, which only the config action knows.
       if (created.isCancelled()) {
-        this.prompts.metadataCancelled(created.getMessage());
-        return ActionResult.cancelled();
+        this.prompts.metadataCancelled();
       }
       if (!created.isSuccess()) {
         return created;
