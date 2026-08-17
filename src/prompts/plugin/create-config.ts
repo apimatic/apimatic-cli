@@ -30,7 +30,8 @@ export class PluginCreateConfigPrompts {
       placeholder: defaults.pluginId,
       validate: (value) => {
         if (!value) return 'Plugin ID is required.';
-        if (!KEBAB_CASE.test(value)) return `Plugin ID must be lower-case kebab-case, for example 'acme-payments'.`;
+        if (!KEBAB_CASE.test(value))
+          return `Plugin ID must be lower-case alphanumeric words separated by single dashes, for example 'acme-payments'.`;
       }
     });
     if (isCancel(pluginId)) return undefined;
