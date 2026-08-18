@@ -4,8 +4,8 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
-import { PluginCreateConfigAction } from '../../../src/actions/plugin/create-config.js';
-import { PluginCreateConfigPrompts } from '../../../src/prompts/plugin/create-config.js';
+import { PluginRecordMetadataAction } from '../../../src/actions/plugin/record-metadata.js';
+import { PluginRecordMetadataPrompts } from '../../../src/prompts/plugin/record-metadata.js';
 import { ApiService } from '../../../src/infrastructure/services/api-service.js';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../../src/types/api/account.js';
@@ -27,10 +27,10 @@ const ACCOUNT = {
   ApiCopilotKeys: ['copilot-key']
 } as unknown as SubscriptionInfo;
 
-describe('PluginCreateConfigAction', () => {
+describe('PluginRecordMetadataAction', () => {
   let tmpDirResult: DirectoryResult;
   let buildDirectory: string;
-  let action: PluginCreateConfigAction;
+  let action: PluginRecordMetadataAction;
 
   const execute = () => action.execute(new DirectoryPath(buildDirectory));
 
@@ -42,11 +42,11 @@ describe('PluginCreateConfigAction', () => {
     await fsExtra.ensureDir(buildDirectory);
 
     // The spinner would render to stdout; pass the underlying promise straight through.
-    sinon.stub(PluginCreateConfigPrompts.prototype, 'spinnerAccountInfo').callsFake((fn) => fn);
-    sinon.stub(PluginCreateConfigPrompts.prototype, 'pluginConfigCreated');
+    sinon.stub(PluginRecordMetadataPrompts.prototype, 'spinnerAccountInfo').callsFake((fn) => fn);
+    sinon.stub(PluginRecordMetadataPrompts.prototype, 'metadataRecorded');
     sinon.stub(ApiService.prototype, 'getAccountInfo').resolves(ok(ACCOUNT));
 
-    action = new PluginCreateConfigAction(new DirectoryPath(tmpDirResult.path), COMMAND_METADATA, 'auth-key');
+    action = new PluginRecordMetadataAction(new DirectoryPath(tmpDirResult.path), COMMAND_METADATA, 'auth-key');
   });
 
   afterEach(async () => {
@@ -56,7 +56,7 @@ describe('PluginCreateConfigAction', () => {
 
   const answers = (overrides: Partial<typeof ANSWERS> = {}) =>
     sinon
-      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata')
       .resolves({ metadata: { ...ANSWERS, ...overrides } });
 
   it('writes the metadata and a default licence into the config', async () => {
@@ -114,7 +114,7 @@ describe('PluginCreateConfigAction', () => {
 
   it('cancels without writing anything when the user escapes the prompts', async () => {
     sinon
-      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata')
       .resolves({ cancelled: 'A plugin ID is required' });
 
     const result = await execute();
@@ -126,7 +126,7 @@ describe('PluginCreateConfigAction', () => {
   // The caller prints this to say which answer was missing, so it has to survive on the result.
   it('carries the reason the prompts were abandoned', async () => {
     sinon
-      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata')
       .resolves({ cancelled: 'A plugin version is required' });
 
     const result = await execute();
@@ -137,7 +137,7 @@ describe('PluginCreateConfigAction', () => {
   it('still writes the config when the account lookup fails, leaving the author out', async () => {
     answers();
     (ApiService.prototype.getAccountInfo as sinon.SinonStub).resolves(err(ServiceError.ServerError));
-    const accountInfoUnavailable = sinon.stub(PluginCreateConfigPrompts.prototype, 'accountInfoUnavailable');
+    const accountInfoUnavailable = sinon.stub(PluginRecordMetadataPrompts.prototype, 'accountInfoUnavailable');
 
     const result = await execute();
 
@@ -163,7 +163,7 @@ describe('PluginCreateConfigAction', () => {
   it('fails rather than overwriting a config it could not read', async () => {
     await fsExtra.writeFile(path.join(buildDirectory, 'plugin-config.json'), '{ not json');
     answers();
-    const pluginConfigUnreadable = sinon.stub(PluginCreateConfigPrompts.prototype, 'pluginConfigUnreadable');
+    const pluginConfigUnreadable = sinon.stub(PluginRecordMetadataPrompts.prototype, 'pluginConfigUnreadable');
 
     const result = await execute();
 

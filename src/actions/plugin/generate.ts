@@ -8,7 +8,7 @@ import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
-import { PluginCreateConfigAction } from './create-config.js';
+import { PluginRecordMetadataAction } from './record-metadata.js';
 
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
@@ -53,11 +53,11 @@ export class PluginGenerateAction {
     }
 
     if (configState.state === 'missing') {
-      return await this.createConfig(buildDirectory);
+      return await this.recordMetadata(buildDirectory);
     }
 
     if (!configState.hasMetadata()) {
-      return await this.createConfig(buildDirectory);
+      return await this.recordMetadata(buildDirectory);
     }
 
     if (!configState.hasPublishedSdks()) {
@@ -88,8 +88,8 @@ export class PluginGenerateAction {
     });
   };
 
-  private async createConfig(buildDirectory: DirectoryPath): Promise<ActionResult> {
-    const result = await new PluginCreateConfigAction(this.configDir, this.commandMetadata, this.authKey).execute(
+  private async recordMetadata(buildDirectory: DirectoryPath): Promise<ActionResult> {
+    const result = await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(
       buildDirectory
     );
 

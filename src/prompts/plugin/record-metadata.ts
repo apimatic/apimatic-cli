@@ -16,7 +16,7 @@ const KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
  */
 export type PluginMetadataResult = { metadata: PluginMetadata } | { cancelled: string };
 
-export class PluginCreateConfigPrompts {
+export class PluginRecordMetadataPrompts {
   public spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
     return withSpinner(
       'Retrieving your subscription info',
@@ -77,7 +77,7 @@ export class PluginCreateConfigPrompts {
     log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be written, so its plugin details were not saved.`);
   }
 
-  public pluginConfigCreated(metadata: PluginMetadata) {
+  public metadataRecorded(metadata: PluginMetadata) {
     const message =
       `Plugin ID: ${f.var(metadata.pluginId)}\n` +
       `Plugin Name: ${f.var(metadata.pluginName)}\n` +

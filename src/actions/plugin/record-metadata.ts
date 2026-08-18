@@ -1,5 +1,5 @@
 import { ApiService } from '../../infrastructure/services/api-service.js';
-import { PluginCreateConfigPrompts } from '../../prompts/plugin/create-config.js';
+import { PluginRecordMetadataPrompts } from '../../prompts/plugin/record-metadata.js';
 import { SubscriptionInfo } from '../../types/api/account.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -21,8 +21,8 @@ const DEFAULT_METADATA: PluginMetadata = {
  * identity alone, so a project can be published from long before anyone decides to build a context
  * plugin.
  */
-export class PluginCreateConfigAction {
-  private readonly prompts: PluginCreateConfigPrompts = new PluginCreateConfigPrompts();
+export class PluginRecordMetadataAction {
+  private readonly prompts: PluginRecordMetadataPrompts = new PluginRecordMetadataPrompts();
   private readonly apiService: ApiService = new ApiService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -59,7 +59,7 @@ export class PluginCreateConfigAction {
         this.prompts.pluginConfigNotWritten();
         return ActionResult.failed();
       case 'written':
-        this.prompts.pluginConfigCreated(metadata);
+        this.prompts.metadataRecorded(metadata);
         return ActionResult.success();
       default:
         throw result satisfies never;

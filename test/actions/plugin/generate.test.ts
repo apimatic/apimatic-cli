@@ -7,7 +7,7 @@ import { err, ok } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
 import { PluginGenerateAction } from '../../../src/actions/plugin/generate.js';
 import { PluginGeneratePrompts } from '../../../src/prompts/plugin/generate.js';
-import { PluginCreateConfigPrompts } from '../../../src/prompts/plugin/create-config.js';
+import { PluginRecordMetadataPrompts } from '../../../src/prompts/plugin/record-metadata.js';
 import { ApiService } from '../../../src/infrastructure/services/api-service.js';
 import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { PluginService } from '../../../src/infrastructure/services/plugin-service.js';
@@ -125,16 +125,16 @@ describe('PluginGenerateAction', () => {
     const writeConfig = (config: object) => fsExtra.writeJson(configPath(), config);
     const writtenConfig = () => fsExtra.readJsonSync(configPath());
 
-    // The real PluginCreateConfigAction runs; only its prompts and the account call are stubbed,
+    // The real PluginRecordMetadataAction runs; only its prompts and the account call are stubbed,
     // so these assert what actually lands on disk.
     const answersMetadata = () =>
-      sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves({ metadata: METADATA });
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata').resolves({ metadata: METADATA });
     const cancelsMetadata = (reason = 'A plugin ID is required') =>
-      sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves({ cancelled: reason });
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata').resolves({ cancelled: reason });
 
     beforeEach(() => {
-      sinon.stub(PluginCreateConfigPrompts.prototype, 'spinnerAccountInfo').callsFake((fn) => fn);
-      sinon.stub(PluginCreateConfigPrompts.prototype, 'pluginConfigCreated');
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'spinnerAccountInfo').callsFake((fn) => fn);
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'metadataRecorded');
       sinon.stub(ApiService.prototype, 'getAccountInfo').resolves(ok(ACCOUNT));
       sinon.stub(PluginGeneratePrompts.prototype, 'noPublishedSdks');
       sinon.stub(PluginGeneratePrompts.prototype, 'nextStepsPublishSdks');
