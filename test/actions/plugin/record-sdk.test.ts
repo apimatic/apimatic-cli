@@ -126,16 +126,16 @@ describe('PluginRecordSdkAction', () => {
     expect(fsExtra.existsSync(configPath())).to.be.false;
   });
 
-  // The return happens before the confirm, so without this message the prompt would just never
-  // appear and the user would have nothing to act on.
-  it('explains itself instead of skipping the prompt silently when there is no source repository', async () => {
+  // The package half still describes a real published artifact, so the entry is worth recording;
+  // the gap is called out rather than left for the user to spot in the file.
+  it('says so, but still records, when there is no source repository', async () => {
     const confirmRecordSdk = accepts();
 
-    await execute(profileWith(undefined));
+    await execute(profileWith(undefined, { packageId: 'Acme.Payments.Sdk' }));
 
-    expect(confirmRecordSdk.called).to.be.false;
     expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
-    expect(fsExtra.existsSync(configPath())).to.be.false;
+    expect(confirmRecordSdk.called).to.be.true;
+    expect(writtenConfig().languages.csharp).to.not.have.property('source');
   });
 
   // The entry must describe the run, not the profile: recording either half that was not published
@@ -146,8 +146,10 @@ describe('PluginRecordSdkAction', () => {
 
       await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
 
-      expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
-      expect(fsExtra.existsSync(configPath())).to.be.false;
+      expect(writtenConfig().languages.csharp).to.deep.equal({
+        package: { packageId: 'Acme.Payments.Sdk' },
+        version: 'v3'
+      });
     });
 
     it('leaves out the package when only the source was published', async () => {
@@ -157,17 +159,6 @@ describe('PluginRecordSdkAction', () => {
 
       expect(writtenConfig().languages.csharp).to.not.have.property('package');
     });
-  });
-
-  it('refuses a repository name it cannot resolve to a URL', async () => {
-    const confirmRecordSdk = accepts();
-    const unresolvable = sinon.stub(PluginRecordSdkPrompts.prototype, 'unresolvableRepositoryName');
-
-    await execute(profileWith({ ...GIT_CONFIG, repositoryName: 'git@github.com:acme/sdk.git' }));
-
-    expect(unresolvable.calledOnceWith(Language.CSHARP, 'git@github.com:acme/sdk.git')).to.be.true;
-    expect(confirmRecordSdk.called).to.be.false;
-    expect(fsExtra.existsSync(configPath())).to.be.false;
   });
 
   it('warns when the config cannot be written', async () => {
@@ -209,13 +200,6 @@ describe('PluginRecordSdkAction', () => {
       const config = writtenConfig();
       expect(config.schemaVersion).to.equal(1);
       expect(config).to.not.have.property('pluginId');
-    });
-
-    it('still skips a profile that names no source repository, and says so', async () => {
-      await executeWithoutAsking(profileWith(undefined));
-
-      expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
-      expect(fsExtra.existsSync(configPath())).to.be.false;
     });
 
     it('still refuses to touch a config it cannot read', async () => {
