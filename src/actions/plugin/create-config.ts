@@ -50,17 +50,20 @@ export class PluginCreateConfigAction {
 
     const author = account.isOk() ? authorOf(account.value) : undefined;
     const result = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
-    if (result === 'unreadable') {
-      this.prompts.pluginConfigUnreadable();
-      return ActionResult.failed();
-    }
-    if (result === 'unwritable') {
-      this.prompts.pluginConfigNotWritten();
-      return ActionResult.failed();
-    }
 
-    this.prompts.pluginConfigCreated(metadata);
-    return ActionResult.success();
+    switch (result) {
+      case 'unreadable':
+        this.prompts.pluginConfigUnreadable();
+        return ActionResult.failed();
+      case 'unwritable':
+        this.prompts.pluginConfigNotWritten();
+        return ActionResult.failed();
+      case 'written':
+        this.prompts.pluginConfigCreated(metadata);
+        return ActionResult.success();
+      default:
+        throw result satisfies never;
+    }
   };
 }
 
