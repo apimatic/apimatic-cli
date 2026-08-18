@@ -26,7 +26,7 @@ export class PluginRecordSdkAction {
     publishingProfile: PublishingProfile,
     publishTypes: PublishType[],
     codegenVersion: CodeGenerationVersion,
-    confirmFirst: boolean = true
+    confirmFirst: boolean
   ): Promise<void> => {
     // The entry has to describe what this run published, not what the profile happens to enable.
     // A package-only run must not claim a repository it never pushed to, nor a source-only run a
