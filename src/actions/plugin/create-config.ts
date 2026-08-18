@@ -37,14 +37,10 @@ export class PluginCreateConfigAction {
   public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult> => {
     const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
-      // Carried on the result so the caller can say which answer was missing, rather than assuming
-      // the run stopped at the first question.
       return ActionResult.cancelled(input.cancelled);
     }
-    const metadata = input.metadata;
 
-    // Asked after the prompts so a network failure cannot discard what the user just typed. The
-    // account supplies only the optional author, so failing here would cost more than it saves.
+    const metadata = input.metadata;
     const account = await this.prompts.spinnerAccountInfo(
       this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, this.authKey)
     );
@@ -53,13 +49,13 @@ export class PluginCreateConfigAction {
     }
 
     const author = account.isOk() ? authorOf(account.value) : undefined;
-    const written = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
-    if (written !== 'written') {
-      if (written === 'unreadable') {
-        this.prompts.pluginConfigUnreadable();
-      } else {
-        this.prompts.pluginConfigNotWritten();
-      }
+    const result = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
+    if (result === 'unreadable') {
+      this.prompts.pluginConfigUnreadable();
+      return ActionResult.failed();
+    }
+    if (result === 'unwritable') {
+      this.prompts.pluginConfigNotWritten();
       return ActionResult.failed();
     }
 
