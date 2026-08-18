@@ -17,46 +17,49 @@ import {
   GitConfiguration,
   GoPackageConfiguration,
   JavaPackageConfiguration,
-  PackageConfigurationData,
+  PackageConfigurationForLanguage,
   PhpPackageConfiguration,
   PythonPackageConfiguration,
   RubyPackageConfiguration,
   TypeScriptPackageConfiguration 
 } from './package-settings-configuration.js';
 
+/** Every language's slot filled in, so a language cannot be left out by accident. */
+type ConfigurationsByLanguage<T extends { [L in Language]: unknown }> = { [L in Language]: T[L] | undefined };
+
+/**
+ * `language in configs` is what reports a language enabled, and a key holding `undefined` answers
+ * that just as loudly as a real configuration, so the disabled ones are dropped rather than stored.
+ */
+function enabledOnly<T extends object>(configs: T): Partial<T> {
+  return Object.fromEntries(Object.entries(configs).filter(([, config]) => config !== undefined)) as Partial<T>;
+}
+
 export class PublishingProfile {
   private readonly profile: PublishingProfileItem;
-  private readonly languageConfigs: Partial<Record<Language, PackageConfigurationData>>;
+  private readonly languageConfigs: { [L in Language]?: PackageConfigurationForLanguage[L] };
   private readonly gitConfigs: Partial<Record<Language, GitConfiguration>>;
 
   private constructor(profile: PublishingProfileItem) {
     this.profile = profile;
-    this.languageConfigs = Object.fromEntries(
-      (
-        [
-          [Language.CSHARP, profile.cSharpConfiguration?.isEnabled ? PublishingProfile.createCSharpConfiguration(profile.cSharpConfiguration) : undefined],
-          [Language.GO, profile.goConfiguration?.isEnabled ? PublishingProfile.createGoConfiguration(profile.goConfiguration) : undefined],
-          [Language.JAVA, profile.javaConfiguration?.isEnabled ? PublishingProfile.createJavaConfiguration(profile.javaConfiguration) : undefined],
-          [Language.PHP, profile.phpConfiguration?.isEnabled ? PublishingProfile.createPhpConfiguration(profile.phpConfiguration) : undefined],
-          [Language.PYTHON, profile.pythonConfiguration?.isEnabled ? PublishingProfile.createPythonConfiguration(profile.pythonConfiguration) : undefined],
-          [Language.RUBY, profile.rubyConfiguration?.isEnabled ? PublishingProfile.createRubyConfiguration(profile.rubyConfiguration) : undefined],
-          [Language.TYPESCRIPT, profile.typeScriptConfiguration?.isEnabled ? PublishingProfile.createTypeScriptConfiguration(profile.typeScriptConfiguration) : undefined]
-        ] as [Language, PackageConfigurationData | undefined][]
-      ).filter(([, data]) => data !== undefined)
-    );
-    this.gitConfigs = Object.fromEntries(
-      (
-        [
-          [Language.CSHARP, profile.cSharpGitConfiguration?.isEnabled ? profile.cSharpGitConfiguration : undefined],
-          [Language.GO, profile.goGitConfiguration?.isEnabled ? profile.goGitConfiguration : undefined],
-          [Language.JAVA, profile.javaGitConfiguration?.isEnabled ? profile.javaGitConfiguration : undefined],
-          [Language.PHP, profile.phpGitConfiguration?.isEnabled ? profile.phpGitConfiguration : undefined],
-          [Language.PYTHON, profile.pythonGitConfiguration?.isEnabled ? profile.pythonGitConfiguration : undefined],
-          [Language.RUBY, profile.rubyGitConfiguration?.isEnabled ? profile.rubyGitConfiguration : undefined],
-          [Language.TYPESCRIPT, profile.typeScriptGitConfiguration?.isEnabled ? profile.typeScriptGitConfiguration : undefined]
-        ] as [Language, GitConfiguration | undefined][]
-      ).filter(([, config]) => config !== undefined)
-    );
+    this.languageConfigs = enabledOnly<ConfigurationsByLanguage<PackageConfigurationForLanguage>>({
+      [Language.CSHARP]: profile.cSharpConfiguration?.isEnabled ? PublishingProfile.createCSharpConfiguration(profile.cSharpConfiguration) : undefined,
+      [Language.GO]: profile.goConfiguration?.isEnabled ? PublishingProfile.createGoConfiguration(profile.goConfiguration) : undefined,
+      [Language.JAVA]: profile.javaConfiguration?.isEnabled ? PublishingProfile.createJavaConfiguration(profile.javaConfiguration) : undefined,
+      [Language.PHP]: profile.phpConfiguration?.isEnabled ? PublishingProfile.createPhpConfiguration(profile.phpConfiguration) : undefined,
+      [Language.PYTHON]: profile.pythonConfiguration?.isEnabled ? PublishingProfile.createPythonConfiguration(profile.pythonConfiguration) : undefined,
+      [Language.RUBY]: profile.rubyConfiguration?.isEnabled ? PublishingProfile.createRubyConfiguration(profile.rubyConfiguration) : undefined,
+      [Language.TYPESCRIPT]: profile.typeScriptConfiguration?.isEnabled ? PublishingProfile.createTypeScriptConfiguration(profile.typeScriptConfiguration) : undefined
+    });
+    this.gitConfigs = enabledOnly<Record<Language, GitConfiguration | undefined>>({
+      [Language.CSHARP]: profile.cSharpGitConfiguration?.isEnabled ? profile.cSharpGitConfiguration : undefined,
+      [Language.GO]: profile.goGitConfiguration?.isEnabled ? profile.goGitConfiguration : undefined,
+      [Language.JAVA]: profile.javaGitConfiguration?.isEnabled ? profile.javaGitConfiguration : undefined,
+      [Language.PHP]: profile.phpGitConfiguration?.isEnabled ? profile.phpGitConfiguration : undefined,
+      [Language.PYTHON]: profile.pythonGitConfiguration?.isEnabled ? profile.pythonGitConfiguration : undefined,
+      [Language.RUBY]: profile.rubyGitConfiguration?.isEnabled ? profile.rubyGitConfiguration : undefined,
+      [Language.TYPESCRIPT]: profile.typeScriptGitConfiguration?.isEnabled ? profile.typeScriptGitConfiguration : undefined
+    });
   }
 
   public static create(item: PublishingProfileItem): PublishingProfile {
@@ -110,7 +113,9 @@ export class PublishingProfile {
     };
   }
 
-  public getPackageConfigurationDataForLanguage(language: Language): PackageConfigurationData | undefined {
+  public getPackageConfigurationDataForLanguage<L extends Language>(
+    language: L
+  ): PackageConfigurationForLanguage[L] | undefined {
     return this.languageConfigs[language];
   }
 

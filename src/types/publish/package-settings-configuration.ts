@@ -1,3 +1,4 @@
+import { Language } from '../sdk/generate.js';
 import {
   JavaDeveloper,
   JavaDistributionManagement,
@@ -90,11 +91,20 @@ export interface GoPackageConfiguration {
   packageName: string;
 }
 
-export type PackageConfigurationData =
-  | CSharpPackageConfiguration
-  | JavaPackageConfiguration
-  | PhpPackageConfiguration
-  | PythonPackageConfiguration
-  | RubyPackageConfiguration
-  | TypeScriptPackageConfiguration
-  | GoPackageConfiguration;
+/**
+ * Keyed by language, so a caller that knows which language it is publishing is handed that
+ * language's fields. Collapsing this to a bare union loses the correspondence, and the only way
+ * back to the fields is a cast that no longer checks the language it came from.
+ */
+export interface PackageConfigurationForLanguage {
+  [Language.CSHARP]: CSharpPackageConfiguration;
+  [Language.JAVA]: JavaPackageConfiguration;
+  [Language.PHP]: PhpPackageConfiguration;
+  [Language.PYTHON]: PythonPackageConfiguration;
+  [Language.RUBY]: RubyPackageConfiguration;
+  [Language.TYPESCRIPT]: TypeScriptPackageConfiguration;
+  [Language.GO]: GoPackageConfiguration;
+}
+
+/** Any language's configuration, for the callers that handle them all the same way. */
+export type PackageConfigurationData = PackageConfigurationForLanguage[Language];

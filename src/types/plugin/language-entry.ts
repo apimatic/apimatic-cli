@@ -1,34 +1,95 @@
-import {
-  CSharpPackageConfiguration,
-  GitConfiguration,
-  GoPackageConfiguration,
-  JavaPackageConfiguration,
-  PackageConfigurationData,
-  PhpPackageConfiguration,
-  PythonPackageConfiguration,
-  RubyPackageConfiguration,
-  TypeScriptPackageConfiguration
-} from '../publish/package-settings-configuration.js';
-import { SemVersion } from '../publish/version.js';
+import { GitConfiguration, PackageConfigurationForLanguage } from '../publish/package-settings-configuration.js';
+import { SemVersion, SemVersionString } from '../publish/version.js';
 import { CodeGenerationVersion, Language } from '../sdk/generate.js';
-import { PluginLanguages } from './plugin-config.js';
+import { LanguageSource, PluginLanguageEntry } from './plugin-config.js';
 
 const GITHUB_BASE_URL = 'https://github.com';
 
+type LanguageEntryBuilder<L extends Language> = (
+  source: LanguageSource | undefined,
+  packageConfiguration: PackageConfigurationForLanguage[L] | undefined,
+  version: SemVersionString,
+  codegenVersion: CodeGenerationVersion
+) => PluginLanguageEntry<L>;
+
 /**
- * Keyed by the language it describes, so each branch below is checked against that one language's
- * config rather than against every language's at once.
- *
+ * One builder per language, each checked against that language's own profile fields and its own
+ * entry shape. A single builder taking every language's configuration at once can only reach those
+ * fields through a cast, which is what let a mismatched pair compile.
+ */
+const languageEntryBuilders: { [L in Language]: LanguageEntryBuilder<L> } = {
+  [Language.CSHARP]: (source, configuration, version, codegenVersion) => ({
+    source,
+    package: configuration?.packageId ? { packageId: configuration.packageId, version } : undefined,
+    codegenVersion
+  }),
+  [Language.JAVA]: (source, configuration, version, codegenVersion) => ({
+    source,
+    package:
+      configuration?.groupId && configuration.artifactId
+        ? { groupId: configuration.groupId, artifactId: configuration.artifactId, version }
+        : undefined,
+    codegenVersion
+  }),
+  [Language.PHP]: (source, configuration, version, codegenVersion) => ({
+    source,
+    package:
+      configuration?.vendorName && configuration.projectName
+        ? { vendorName: configuration.vendorName, projectName: configuration.projectName, version }
+        : undefined,
+    codegenVersion
+  }),
+  [Language.PYTHON]: (source, configuration, version, codegenVersion) => ({
+    source,
+    package: configuration?.name ? { name: configuration.name, version } : undefined,
+    codegenVersion
+  }),
+  [Language.RUBY]: (source, configuration, version, codegenVersion) => ({
+    source,
+    package: configuration?.name ? { name: configuration.name, version } : undefined,
+    codegenVersion
+  }),
+  [Language.TYPESCRIPT]: (source, configuration, version, codegenVersion) => ({
+    source,
+    package: configuration?.name ? { name: configuration.name, version } : undefined,
+    codegenVersion
+  }),
+  [Language.GO]: (source, configuration, version, codegenVersion) => ({
+    source,
+    package: configuration?.packageName ? { packageName: configuration.packageName, version } : undefined,
+    codegenVersion
+  })
+};
+
+/**
+ * A publish records one half of an entry at a time, so the half this run did not publish is carried
+ * over from what is already on disk rather than dropped: a package-only run must not erase the
+ * repository an earlier source-only run recorded, nor the other way round. `codegenVersion` is not
+ * a half — it always describes the generator this run used.
+ */
+export function mergeLanguageEntry<L extends Language>(
+  recorded: PluginLanguageEntry<L> | undefined,
+  published: PluginLanguageEntry<L>
+): PluginLanguageEntry<L> {
+  return {
+    ...recorded,
+    ...published,
+    source: published.source ?? recorded?.source,
+    package: published.package ?? recorded?.package
+  };
+}
+
+/**
  * The version rides inside the package block, so a source-only publish records no version at all —
  * there is no package for it to describe.
  */
-export function buildLanguageEntry(
-  language: Language,
+export function buildLanguageEntry<L extends Language>(
+  language: L,
   gitConfiguration: GitConfiguration | undefined,
-  packageConfiguration: PackageConfigurationData | undefined,
+  packageConfiguration: PackageConfigurationForLanguage[L] | undefined,
   packageVersion: SemVersion,
   codegenVersion: CodeGenerationVersion
-): PluginLanguages {
+): PluginLanguageEntry<L> {
   const repositoryName = gitConfiguration?.repositoryName?.trim();
   const source = repositoryName
     ? {
@@ -38,43 +99,5 @@ export function buildLanguageEntry(
     : undefined;
 
   // The config is JSON on disk, so the version unwraps to its string form here.
-  const version = packageVersion.toString();
-
-  switch (language) {
-    case Language.CSHARP: {
-      const { packageId } = fieldsOf<CSharpPackageConfiguration>(packageConfiguration);
-      return { csharp: { source, package: packageId ? { packageId, version } : undefined, codegenVersion } };
-    }
-    case Language.JAVA: {
-      const { groupId, artifactId } = fieldsOf<JavaPackageConfiguration>(packageConfiguration);
-      const artifact = groupId && artifactId ? { groupId, artifactId, version } : undefined;
-      return { java: { source, package: artifact, codegenVersion } };
-    }
-    case Language.PHP: {
-      const { vendorName, projectName } = fieldsOf<PhpPackageConfiguration>(packageConfiguration);
-      const artifact = vendorName && projectName ? { vendorName, projectName, version } : undefined;
-      return { php: { source, package: artifact, codegenVersion } };
-    }
-    case Language.PYTHON: {
-      const { name } = fieldsOf<PythonPackageConfiguration>(packageConfiguration);
-      return { python: { source, package: name ? { name, version } : undefined, codegenVersion } };
-    }
-    case Language.RUBY: {
-      const { name } = fieldsOf<RubyPackageConfiguration>(packageConfiguration);
-      return { ruby: { source, package: name ? { name, version } : undefined, codegenVersion } };
-    }
-    case Language.TYPESCRIPT: {
-      const { name } = fieldsOf<TypeScriptPackageConfiguration>(packageConfiguration);
-      return { typescript: { source, package: name ? { name, version } : undefined, codegenVersion } };
-    }
-    case Language.GO: {
-      const { packageName } = fieldsOf<GoPackageConfiguration>(packageConfiguration);
-      return { go: { source, package: packageName ? { packageName, version } : undefined, codegenVersion } };
-    }
-  }
-}
-
-/** Absent configuration destructures to absent fields, which is what leaves the package block off. */
-function fieldsOf<T>(configuration: PackageConfigurationData | undefined): Partial<T> {
-  return (configuration ?? {}) as Partial<T>;
+  return languageEntryBuilders[language](source, packageConfiguration, packageVersion.toString(), codegenVersion);
 }

@@ -5,7 +5,7 @@ import { expect } from 'chai';
 import { PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { PluginConfigData, PluginLanguages } from '../../src/types/plugin/plugin-config';
-import { CodeGenerationVersion } from '../../src/types/sdk/generate';
+import { CodeGenerationVersion, Language } from '../../src/types/sdk/generate';
 
 describe('PluginConfigContext', () => {
   const buildDirectory = new DirectoryPath('src');
@@ -129,6 +129,14 @@ describe('PluginConfigContext', () => {
       expect(writtenConfig().author).to.deep.equal({ name: 'Acme', email: 'developers@acme.com' });
     });
 
+    it('leaves an author the config already credits alone', async () => {
+      withConfig({ schemaVersion: 1, author: { name: 'Acme Engineering' }, languages: {} });
+
+      await context.upsertMetadata(METADATA, { name: 'Someone Else', email: 'someone@else.com' });
+
+      expect(writtenConfig().author).to.deep.equal({ name: 'Acme Engineering' });
+    });
+
     it('never writes a plugin key', async () => {
       mockFs({ src: {} });
 
@@ -183,11 +191,11 @@ describe('PluginConfigContext', () => {
     });
   });
 
-  describe('upsertLanguages', () => {
+  describe('upsertLanguage', () => {
     it('creates the file with no metadata at all', async () => {
       mockFs({ src: {} });
 
-      expect(await context.upsertLanguages({ csharp: CSHARP_ENTRY })).to.equal('written');
+      expect(await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).to.equal('written');
       expect(writtenConfig()).to.deep.equal({
         schemaVersion: 1,
         languages: { csharp: CSHARP_ENTRY }
@@ -202,23 +210,82 @@ describe('PluginConfigContext', () => {
         package: { name: '@acme/payments-sdk', version: '1.2.3' },
         codegenVersion: CodeGenerationVersion.V3
       } satisfies NonNullable<PluginLanguages['typescript']>;
-      await context.upsertLanguages({ typescript: typescriptEntry });
+      await context.upsertLanguage(Language.TYPESCRIPT, typescriptEntry);
 
       expect(writtenConfig().languages).to.deep.equal({ csharp: CSHARP_ENTRY, typescript: typescriptEntry });
     });
 
-    it('replaces an entry for a language already recorded', async () => {
+    it('replaces both halves when the run published both', async () => {
       withConfig({ schemaVersion: 1, languages: { csharp: { source: { repositoryUrl: 'https://old' } } } });
 
-      await context.upsertLanguages({ csharp: CSHARP_ENTRY });
+      await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
 
       expect(writtenConfig().languages).to.deep.equal({ csharp: CSHARP_ENTRY });
+    });
+
+    // One publish records one half, so dropping the other would point plugin generation at an
+    // artifact that is still published.
+    describe('keeps the half the run did not publish', () => {
+      it('carries the recorded package over a source-only publish', async () => {
+        withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+
+        await context.upsertLanguage(Language.CSHARP, {
+          source: { repositoryUrl: 'https://github.com/acme/renamed' },
+          codegenVersion: CodeGenerationVersion.V3
+        });
+
+        expect(writtenConfig().languages.csharp).to.deep.equal({
+          source: { repositoryUrl: 'https://github.com/acme/renamed' },
+          package: CSHARP_ENTRY.package,
+          codegenVersion: 'v3'
+        });
+      });
+
+      it('carries the recorded source over a package-only publish', async () => {
+        withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+
+        await context.upsertLanguage(Language.CSHARP, {
+          package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
+          codegenVersion: CodeGenerationVersion.V3
+        });
+
+        expect(writtenConfig().languages.csharp).to.deep.equal({
+          source: CSHARP_ENTRY.source,
+          package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
+          codegenVersion: 'v3'
+        });
+      });
+
+      it('records the entry as it stands when the language is new to the config', async () => {
+        withConfig({ schemaVersion: 1, languages: {} });
+
+        await context.upsertLanguage(Language.CSHARP, {
+          package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
+          codegenVersion: CodeGenerationVersion.V3
+        });
+
+        expect(writtenConfig().languages.csharp).to.deep.equal({
+          package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
+          codegenVersion: 'v3'
+        });
+      });
+
+      it('still takes the codegen version from the run that just published', async () => {
+        withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+
+        await context.upsertLanguage(Language.CSHARP, {
+          package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
+          codegenVersion: CodeGenerationVersion.V4
+        });
+
+        expect(writtenConfig().languages.csharp?.codegenVersion).to.equal('v4');
+      });
     });
 
     it('leaves existing metadata untouched', async () => {
       withConfig({ schemaVersion: 1, ...METADATA, license: 'MIT', languages: {} });
 
-      await context.upsertLanguages({ csharp: CSHARP_ENTRY });
+      await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
 
       expect(writtenConfig()).to.include({ ...METADATA, license: 'MIT' });
     });
@@ -226,7 +293,7 @@ describe('PluginConfigContext', () => {
     it('refuses to overwrite a file it could not read', async () => {
       mockFs({ src: { 'plugin-config.json': '{ not json' } });
 
-      expect(await context.upsertLanguages({ csharp: CSHARP_ENTRY })).to.equal('unreadable');
+      expect(await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).to.equal('unreadable');
     });
   });
 });

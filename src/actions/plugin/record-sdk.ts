@@ -27,7 +27,7 @@ export class PluginRecordSdkAction {
     // The entry has to describe what this run published, not what the profile happens to enable.
     // A package-only run must not claim a repository it never pushed to, nor a source-only run a
     // package that was never released.
-    const languages = buildLanguageEntry(
+    const entry = buildLanguageEntry(
       language,
       publishTypes.includes(PublishType.SourceCodePublishing)
         ? publishingProfile.getGitConfigurationForLanguage(language)
@@ -39,7 +39,7 @@ export class PluginRecordSdkAction {
       codegenVersion
     );
 
-    if (!languages[language]?.source) {
+    if (!entry.source) {
       this.prompts.noSourceRepository(language);
     }
 
@@ -55,7 +55,7 @@ export class PluginRecordSdkAction {
       return ActionResult.cancelled();
     }
 
-    const result = await pluginConfigContext.upsertLanguages(languages);
+    const result = await pluginConfigContext.upsertLanguage(language, entry);
 
     switch (result) {
       // Readable a moment ago, so this only happens if the file changed underneath us.

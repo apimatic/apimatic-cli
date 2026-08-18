@@ -1,6 +1,9 @@
 import { expect } from 'chai';
 import { buildLanguageEntry } from '../../../src/types/plugin/language-entry';
-import { GitConfiguration, PackageConfigurationData } from '../../../src/types/publish/package-settings-configuration';
+import {
+  GitConfiguration,
+  PackageConfigurationForLanguage
+} from '../../../src/types/publish/package-settings-configuration';
 import { SemVersion } from '../../../src/types/publish/version';
 import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate';
 
@@ -10,9 +13,6 @@ const gitConfig = (repositoryName: string, branch = 'main'): GitConfiguration =>
   repositoryName,
   branch
 });
-
-// The profile configurations carry a dozen presentational fields the entry never reads.
-const packageConfig = (data: object) => data as PackageConfigurationData;
 
 const VERSION = SemVersion.tryCreate('1.2.3')._unsafeUnwrap();
 
@@ -28,11 +28,9 @@ describe('buildLanguageEntry', () => {
       );
 
       expect(result).to.deep.equal({
-        csharp: {
-          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
-          package: undefined,
-          codegenVersion: 'v4'
-        }
+        source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+        package: undefined,
+        codegenVersion: 'v4'
       });
     });
 
@@ -45,27 +43,32 @@ describe('buildLanguageEntry', () => {
         CodeGenerationVersion.V3
       );
 
-      expect(result.go?.source?.branch).to.be.undefined;
+      expect(result.source?.branch).to.be.undefined;
     });
 
     it('omits the source when the profile has no git configuration', () => {
       const result = buildLanguageEntry(Language.CSHARP, undefined, undefined, VERSION, CodeGenerationVersion.V3);
 
-      expect(result.csharp?.source).to.be.undefined;
+      expect(result.source).to.be.undefined;
     });
 
     it('omits the source when the repository name is blank', () => {
       const result = buildLanguageEntry(Language.CSHARP, gitConfig('   '), undefined, VERSION, CodeGenerationVersion.V3);
 
-      expect(result.csharp?.source).to.be.undefined;
+      expect(result.source).to.be.undefined;
     });
   });
 
   describe('package', () => {
-    const packageFor = (language: Language, configuration: object) =>
-      buildLanguageEntry(language, gitConfig('acme/sdk'), packageConfig(configuration), VERSION, CodeGenerationVersion.V3)[
-        language
-      ]?.package;
+    // The profile configurations carry a dozen presentational fields the entry never reads.
+    const packageFor = <L extends Language>(language: L, configuration: object) =>
+      buildLanguageEntry(
+        language,
+        gitConfig('acme/sdk'),
+        configuration as PackageConfigurationForLanguage[L],
+        VERSION,
+        CodeGenerationVersion.V3
+      ).package;
 
     it('names a C# package by its package id', () => {
       expect(packageFor(Language.CSHARP, { packageId: 'Acme.Payments.Sdk' })).to.deep.equal({
@@ -107,7 +110,7 @@ describe('buildLanguageEntry', () => {
     it('omits the package when the profile configures none', () => {
       const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), undefined, VERSION, CodeGenerationVersion.V3);
 
-      expect(result.csharp?.package).to.be.undefined;
+      expect(result.package).to.be.undefined;
     });
 
     it('omits the package when the configuration is missing half its identity', () => {

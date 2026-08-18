@@ -2,11 +2,14 @@ import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { mergeLanguageEntry } from './plugin/language-entry.js';
+import { Language } from './sdk/generate.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
   PLUGIN_CONFIG_SCHEMA_VERSION,
   PluginAuthor,
   PluginConfigData,
+  PluginLanguageEntry,
   PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
@@ -90,16 +93,22 @@ export class PluginConfigContext {
       pluginId: metadata.pluginId,
       pluginName: metadata.pluginName,
       pluginVersion: metadata.pluginVersion,
-      ...(author && { author }),
+      // The account this run happens to be signed in to does not get to relabel a plugin someone
+      // has already attributed.
+      ...(!config.author && author && { author }),
       license: config.license ?? DEFAULT_PLUGIN_LICENSE
     }));
   }
 
-  public async upsertLanguages(languages: PluginLanguages): Promise<PluginConfigWriteResult> {
-    return await this.merge((config) => ({
-      ...config,
-      languages: { ...config.languages, ...languages }
-    }));
+  public async upsertLanguage<L extends Language>(
+    language: L,
+    entry: PluginLanguageEntry<L>
+  ): Promise<PluginConfigWriteResult> {
+    return await this.merge((config) => {
+      const languages: PluginLanguages = { ...config.languages };
+      languages[language] = mergeLanguageEntry(config.languages?.[language], entry);
+      return { ...config, languages };
+    });
   }
 
   /**

@@ -54,7 +54,7 @@ interface PluginConfig<TPackage> {
   codegenVersion: CodeGenerationVersion;
 }
 
-export type PluginLanguages = Partial<{
+interface PluginConfigForLanguage {
   [Language.CSHARP]: PluginConfig<CSharpPackageConfig>;
   [Language.JAVA]: PluginConfig<JavaPackageConfig>;
   [Language.PHP]: PluginConfig<PhpPackageConfig>;
@@ -62,7 +62,15 @@ export type PluginLanguages = Partial<{
   [Language.RUBY]: PluginConfig<RubyPackageConfig>;
   [Language.TYPESCRIPT]: PluginConfig<TypeScriptPackageConfig>;
   [Language.GO]: PluginConfig<GoPackageConfig>;
-}>;
+}
+
+/**
+ * One language's entry. Carrying the language in the type is what stops an entry built for one
+ * language from being filed under another.
+ */
+export type PluginLanguageEntry<L extends Language> = PluginConfigForLanguage[L];
+
+export type PluginLanguages = Partial<PluginConfigForLanguage>;
 
 export interface PluginConfigData {
   schemaVersion: number;

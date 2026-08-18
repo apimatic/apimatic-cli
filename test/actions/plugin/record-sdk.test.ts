@@ -175,9 +175,33 @@ describe('PluginRecordSdkAction', () => {
     });
   });
 
+  // The source repository an earlier run published is still published, so a package-only run has to
+  // leave it in place rather than record over it.
+  it('keeps a recorded source repository when only the package was published', async () => {
+    await fsExtra.writeJson(configPath(), {
+      schemaVersion: 1,
+      languages: {
+        csharp: {
+          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+          codegenVersion: 'v3'
+        }
+      }
+    });
+    accepts();
+
+    await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
+
+    expect(writtenConfig().languages.csharp).to.deep.equal({
+      source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+      package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
+      codegenVersion: 'v3'
+    });
+    expect(noSourceRepository.calledOnce).to.be.true;
+  });
+
   it('warns when the config cannot be written', async () => {
     accepts();
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguages').resolves('unwritable');
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unwritable');
     const notWritten = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigNotWritten');
 
     const result = await execute(profileWith(GIT_CONFIG));
@@ -188,7 +212,7 @@ describe('PluginRecordSdkAction', () => {
 
   it('reports a config that became unreadable after the user agreed to record', async () => {
     const confirmRecordSdk = accepts();
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguages').resolves('unreadable');
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unreadable');
     const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
 
     await execute(profileWith(GIT_CONFIG));
