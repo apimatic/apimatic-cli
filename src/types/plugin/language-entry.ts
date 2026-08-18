@@ -10,43 +10,29 @@ import {
   TypeScriptPackageConfiguration
 } from '../publish/package-settings-configuration.js';
 import { CodeGenerationVersion, Language } from '../sdk/generate.js';
-import { LanguageEntry, LanguageSource, PluginPackage } from './plugin-config.js';
+import { LanguageEntry, PluginPackage } from './plugin-config.js';
 
 const GITHUB_BASE_URL = 'https://github.com';
-
-/**
- * `noSourceRepository` is routine rather than a fault: the run published no source code, so there
- * is nothing for a language entry to describe. `unresolvableRepositoryName` is the opposite — a
- * repository is configured, but its name is not a shape that can be turned into a URL, and a guess
- * would be written as a clone target that only fails once the backend tries to use it.
- */
-export type LanguageEntryResult =
-  | { kind: 'entry'; entry: LanguageEntry }
-  | { kind: 'noSourceRepository' };
 
 export function buildLanguageEntry(
   language: Language,
   gitConfiguration: GitConfiguration | undefined,
   packageConfiguration: PackageConfigurationData | undefined,
   version: CodeGenerationVersion
-): LanguageEntryResult {
+): LanguageEntry {
   const repositoryName = gitConfiguration?.repositoryName?.trim();
-  if (!repositoryName) {
-    return { kind: 'noSourceRepository' };
-  }
+  const sourceConfig = repositoryName ? {
+      repositoryUrl: `${GITHUB_BASE_URL}/${repositoryName}`,
+      branch: gitConfiguration?.branch ? gitConfiguration.branch : undefined
+  } : undefined;
 
-  const source: LanguageSource = {
-    repositoryUrl: `${GITHUB_BASE_URL}/${repositoryName}`,
-    branch: gitConfiguration?.branch ? gitConfiguration.branch : undefined
+  const packageConfig = packageOf(language, packageConfiguration);
+
+  return {
+    source: sourceConfig,
+    package: packageConfig,
+    version
   };
-
-  const entry: LanguageEntry = { source, version };
-  const pluginPackage = packageOf(language, packageConfiguration);
-  if (pluginPackage) {
-    entry.package = pluginPackage;
-  }
-
-  return { kind: 'entry', entry };
 }
 
 function packageOf(language: Language, configuration: PackageConfigurationData | undefined): PluginPackage | undefined {

@@ -47,7 +47,7 @@ export type PluginPackage =
   | GoPluginPackage;
 
 export interface LanguageEntry {
-  source: LanguageSource;
+  source?: LanguageSource;
   package?: PluginPackage;
   version: CodeGenerationVersion;
 }
