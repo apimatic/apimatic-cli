@@ -5,10 +5,11 @@ import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
+import { ActionResult } from '../action-result.js';
 
 /**
- * Records a freshly published SDK in `plugin-config.json`. Returns nothing and never throws: this
- * runs after a successful publish, and no outcome here may change that result.
+ * Records a freshly published SDK in `plugin-config.json`. Callers discard the result: this runs
+ * after a publish that already succeeded, and no outcome here may change that.
  */
 export class PluginRecordSdkAction {
   private readonly prompts: PluginRecordSdkPrompts = new PluginRecordSdkPrompts();
@@ -20,7 +21,7 @@ export class PluginRecordSdkAction {
     publishTypes: PublishType[],
     codegenVersion: CodeGenerationVersion,
     confirmFirst: boolean
-  ): Promise<void> => {
+  ): Promise<ActionResult> => {
     // The entry has to describe what this run published, not what the profile happens to enable.
     // A package-only run must not claim a repository it never pushed to, nor a source-only run a
     // package that was never released.
@@ -43,25 +44,29 @@ export class PluginRecordSdkAction {
     const configState = await pluginConfigContext.loadState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable();
-      return;
+      return ActionResult.failed();
     }
 
     // A non-interactive run has already decided via `--update-plugin-config`; there is nobody to ask.
     if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configState.state === 'present'))) {
-      return;
+      return ActionResult.cancelled();
     }
 
-    switch (await pluginConfigContext.upsertLanguage(language, entry)) {
-      case 'written':
-        this.prompts.sdkRecorded(language);
-        break;
+    const result = await pluginConfigContext.upsertLanguage(language, entry);
+
+    switch (result) {
       // Readable a moment ago, so this only happens if the file changed underneath us.
       case 'unreadable':
         this.prompts.pluginConfigUnreadable();
-        break;
+        return ActionResult.failed();
       case 'unwritable':
         this.prompts.pluginConfigNotWritten();
-        break;
+        return ActionResult.failed();
+      case 'written':
+        this.prompts.sdkRecorded(language);
+        return ActionResult.success();
+      default:
+        throw result satisfies never;
     }
   };
 }
