@@ -42,12 +42,6 @@ export class PluginRecordSdkAction {
       codegenVersion
     );
 
-    // Both of these return before the confirm below, so without a message the prompt would simply
-    // never appear.
-    if (built.kind === 'unresolvableRepositoryName') {
-      this.prompts.unresolvableRepositoryName(language, built.repositoryName);
-      return;
-    }
     if (built.kind !== 'entry') {
       this.prompts.noSourceRepository(language);
       return;

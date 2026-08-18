@@ -12,9 +12,6 @@ import {
 import { CodeGenerationVersion, Language } from '../sdk/generate.js';
 import { LanguageEntry, LanguageSource, PluginPackage } from './plugin-config.js';
 
-const ABSOLUTE_HTTP_URL = /^https?:\/\//i;
-/** `owner/repo` — the only bare form that can be resolved to a URL without guessing. */
-const OWNER_AND_REPO = /^[^/@:\s]+\/[^/@:\s]+$/;
 const GITHUB_BASE_URL = 'https://github.com';
 
 /**
@@ -25,8 +22,7 @@ const GITHUB_BASE_URL = 'https://github.com';
  */
 export type LanguageEntryResult =
   | { kind: 'entry'; entry: LanguageEntry }
-  | { kind: 'noSourceRepository' }
-  | { kind: 'unresolvableRepositoryName'; repositoryName: string };
+  | { kind: 'noSourceRepository' };
 
 export function buildLanguageEntry(
   language: Language,
@@ -39,16 +35,10 @@ export function buildLanguageEntry(
     return { kind: 'noSourceRepository' };
   }
 
-  const repositoryUrl = repositoryUrlOf(repositoryName);
-  if (!repositoryUrl) {
-    return { kind: 'unresolvableRepositoryName', repositoryName };
-  }
-
-  const source: LanguageSource = { repositoryUrl };
-  const branch = gitConfiguration?.branch?.trim();
-  if (branch) {
-    source.branch = branch;
-  }
+  const source: LanguageSource = {
+    repositoryUrl: `${GITHUB_BASE_URL}/${repositoryName}`,
+    branch: gitConfiguration?.branch ? gitConfiguration.branch : undefined
+  };
 
   const entry: LanguageEntry = { source, version };
   const pluginPackage = packageOf(language, packageConfiguration);
@@ -57,21 +47,6 @@ export function buildLanguageEntry(
   }
 
   return { kind: 'entry', entry };
-}
-
-/**
- * A publishing profile carries no git host, so a bare name can only be resolved against GitHub —
- * an assumption the profile itself cannot confirm. Anything that is not plainly `owner/repo` is
- * refused rather than guessed at, because nothing downstream validates the URL: the backend checks
- * only that it is non-blank, so a wrong one survives until a clone fails.
- */
-function repositoryUrlOf(repositoryName: string): string | undefined {
-  if (ABSOLUTE_HTTP_URL.test(repositoryName)) {
-    return repositoryName;
-  }
-
-  const bareName = repositoryName.replace(/^\/+/, '').replace(/\/+$/, '');
-  return OWNER_AND_REPO.test(bareName) ? `${GITHUB_BASE_URL}/${bareName}` : undefined;
 }
 
 function packageOf(language: Language, configuration: PackageConfigurationData | undefined): PluginPackage | undefined {
