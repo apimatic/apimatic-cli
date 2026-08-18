@@ -1,4 +1,4 @@
-import { isCancel, log, select, text } from '@clack/prompts';
+import { isCancel, log, text } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../types/api/account.js';
@@ -65,36 +65,8 @@ export class PluginCreateConfigPrompts {
     return { metadata: { pluginId, pluginName, pluginVersion } };
   }
 
-  /** Only asked when the account holds several; one key is used without interrupting the run. */
-  public async selectApiCopilotKey(keys: string[]): Promise<string | undefined> {
-    const key = await select({
-      message: 'Select the API Copilot this plugin belongs to:',
-      maxItems: 10,
-      options: keys.map((value) => ({ value, label: value }))
-    });
-
-    if (isCancel(key)) {
-      return undefined;
-    }
-
-    return key;
-  }
-
-  public accountInfoUnavailable(error: ServiceError) {
-    log.error(`Could not read your subscription info, so ${f.var(PLUGIN_CONFIG_FILE)} was not written.`);
-    log.error(error.errorMessage);
-  }
-
-  /** The key is what ties the plugin to a copilot, so there is nothing to write without one. */
-  public noApiCopilotKeyFound() {
-    const message =
-      `No API Copilot key was found for your subscription, and ${f.var(PLUGIN_CONFIG_FILE)} needs one. ` +
-      `Please contact support at ${f.var('support@apimatic.io')}.`;
-    log.error(message);
-  }
-
-  public noApiCopilotKeySelected() {
-    log.warn('No API Copilot key was selected.');
+  public accountInfoUnavailable() {
+    log.warn(`Could not read your subscription info, so the author was left out of ${f.var(PLUGIN_CONFIG_FILE)}.`);
   }
 
   public pluginConfigUnreadable() {
@@ -105,12 +77,11 @@ export class PluginCreateConfigPrompts {
     log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be written, so its plugin details were not saved.`);
   }
 
-  public pluginConfigCreated(metadata: PluginMetadata, pluginKey: string) {
+  public pluginConfigCreated(metadata: PluginMetadata) {
     const message =
       `Plugin ID: ${f.var(metadata.pluginId)}\n` +
       `Plugin Name: ${f.var(metadata.pluginName)}\n` +
-      `Version: ${f.var(metadata.pluginVersion)}\n` +
-      `API Copilot: ${f.var(pluginKey)}\n\n` +
+      `Version: ${f.var(metadata.pluginVersion)}\n\n` +
       `Configuration saved to: ${f.var(PLUGIN_CONFIG_FILE)}`;
     noteWrapped(message, 'Plugin Configuration');
   }
