@@ -37,7 +37,14 @@ describe('PluginRecordSdkAction', () => {
   const writtenConfig = (): PluginConfigData => fsExtra.readJsonSync(configPath());
 
   const execute = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
-    action.execute(new DirectoryPath(buildDirectory), Language.CSHARP, profile, publishTypes, CodeGenerationVersion.V3);
+    action.execute(
+      new DirectoryPath(buildDirectory),
+      Language.CSHARP,
+      profile,
+      publishTypes,
+      CodeGenerationVersion.V3,
+      true
+    );
 
   // What `sdk publish --update-plugin-config` does: the flag already answered the question.
   const executeWithoutAsking = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
@@ -70,8 +77,9 @@ describe('PluginRecordSdkAction', () => {
   it('creates a config carrying the language and no metadata at all', async () => {
     accepts();
 
-    await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
+    const result = await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
 
+    expect(result.isSuccess()).to.be.true;
     expect(writtenConfig()).to.deep.equal({
       schemaVersion: 1,
       languages: {
@@ -121,8 +129,9 @@ describe('PluginRecordSdkAction', () => {
   it('writes nothing when the user declines', async () => {
     declines();
 
-    await execute(profileWith(GIT_CONFIG));
+    const result = await execute(profileWith(GIT_CONFIG));
 
+    expect(result.isCancelled()).to.be.true;
     expect(fsExtra.existsSync(configPath())).to.be.false;
   });
 
@@ -166,8 +175,9 @@ describe('PluginRecordSdkAction', () => {
     sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unwritable');
     const notWritten = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigNotWritten');
 
-    await execute(profileWith(GIT_CONFIG));
+    const result = await execute(profileWith(GIT_CONFIG));
 
+    expect(result.isFailed()).to.be.true;
     expect(notWritten.calledOnce).to.be.true;
   });
 
@@ -218,8 +228,9 @@ describe('PluginRecordSdkAction', () => {
     const confirmRecordSdk = accepts();
     const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
 
-    await execute(profileWith(GIT_CONFIG));
+    const result = await execute(profileWith(GIT_CONFIG));
 
+    expect(result.isFailed()).to.be.true;
     expect(pluginConfigUnreadable.called).to.be.true;
     expect(confirmRecordSdk.called).to.be.false;
     expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal('{ not json');
