@@ -57,9 +57,7 @@ export type PluginLanguages = Partial<Record<Language, LanguageEntry>>;
 export interface PluginConfigData {
   schemaVersion: number;
   // Optional on disk: `sdk publish` creates a config carrying languages alone, and
-  // `plugin generate` fills these in — all four together — before it ever uploads. `pluginKey` is
-  // the account's API Copilot key, which is why publishing cannot write it: resolving one costs an
-  // account call, and picking between several needs a prompt the CI path could not answer.
+  // `plugin generate` fills the identity in before it ever uploads.
   pluginId?: string;
   pluginName?: string;
   pluginVersion?: string;

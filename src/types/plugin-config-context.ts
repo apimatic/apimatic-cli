@@ -96,7 +96,6 @@ export class PluginConfigContext {
     }));
   }
 
-  /** Adds one language, creating the file — with no metadata — when absent. */
   public async upsertLanguage(language: Language, entry: LanguageEntry): Promise<PluginConfigWriteResult> {
     return await this.merge((config) => ({
       ...config,
@@ -105,9 +104,9 @@ export class PluginConfigContext {
   }
 
   /**
-   * Reads, applies, writes. A file that exists but cannot be parsed is left alone rather than
-   * overwritten, and a write fault is reported rather than thrown: this runs after a publish that
-   * already succeeded, and nothing here may turn that into a crash.
+   * A file that exists but cannot be parsed is left alone rather than overwritten, and a write
+   * fault is reported rather than thrown: this runs after a publish that already succeeded, and
+   * nothing here may turn that into a crash.
    */
   private async merge(apply: (config: PluginConfigData) => PluginConfigData): Promise<PluginConfigWriteResult> {
     const existing = await this.read();
@@ -116,7 +115,7 @@ export class PluginConfigContext {
     }
 
     const merged = apply(existing.config);
-    // A hand-written file may omit it, and the backend accepts only this one version.
+    // A hand-written file may omit it.
     merged.schemaVersion = merged.schemaVersion ?? PLUGIN_CONFIG_SCHEMA_VERSION;
 
     try {

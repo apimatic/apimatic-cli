@@ -17,9 +17,9 @@ const DEFAULT_METADATA: PluginMetadata = {
 };
 
 /**
- * Writes the plugin's own details into `plugin-config.json`, creating the file when absent. Only
- * `plugin generate` uses this: `sdk publish` records languages and leaves identity alone, so a
- * project can be published from long before anyone decides to build a context plugin.
+ * Only `plugin generate` writes the plugin's identity: `sdk publish` records languages and leaves
+ * identity alone, so a project can be published from long before anyone decides to build a context
+ * plugin.
  */
 export class PluginCreateConfigAction {
   private readonly prompts: PluginCreateConfigPrompts = new PluginCreateConfigPrompts();

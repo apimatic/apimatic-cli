@@ -186,7 +186,6 @@ describe('PluginGenerateAction', () => {
 
       expect(result.isSuccess()).to.be.true;
       expect(generatePlugin.called).to.be.false;
-      // Metadata is already there, so the user is not asked again.
       expect(inputPluginMetadata.called).to.be.false;
     });
 
@@ -204,8 +203,6 @@ describe('PluginGenerateAction', () => {
       expect(fsExtra.existsSync(configPath())).to.be.false;
     });
 
-    // The message named the plugin id whichever answer was actually missing, which read as a lie
-    // once the user had already typed one.
     it('reports the answer that was actually missing, not always the plugin id', async () => {
       await fsExtra.remove(configPath());
       cancelsMetadata('A plugin version is required');

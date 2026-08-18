@@ -52,10 +52,7 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  /**
-   * A cancelled metadata prompt stops the run, so it is a warning rather than an error. The reason
-   * is passed in because the run can stop at any of the answers, not only the first.
-   */
+  /** A cancelled metadata prompt stops the run, so it is a warning rather than an error. */
   public metadataCancelled(reason: string) {
     log.warn(`${reason}. Exiting without generating a plugin.`);
   }
@@ -64,11 +61,6 @@ export class PluginGeneratePrompts {
     log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs yet.`);
   }
 
-  /**
-   * Reached on a successful run that found nothing to build, not on a generation failure. Names the
-   * bare command because it is the interactive form, and names Source Code because an entry
-   * describes an SDK by its repository: a package-only publish records nothing.
-   */
   public nextStepsPublishSdks() {
     const message =
       `Publish an SDK for each language you want in the plugin, and include ${f.var('Source Code')} ` +

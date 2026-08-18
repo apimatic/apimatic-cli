@@ -79,7 +79,6 @@ export class CodegenOption {
     return this.stability;
   }
 
-  /** The generator that produced the SDK, as `plugin-config.json` records it. */
   public codeGenerationVersion(): CodeGenerationVersion {
     return this.version;
   }

@@ -9,13 +9,6 @@ import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
 /**
  * Records a freshly published SDK in `plugin-config.json`. Returns nothing and never throws: this
  * runs after a successful publish, and no outcome here may change that result.
- *
- * Interactive runs are asked first, which is what keeps the file from appearing for users who do
- * not want a context plugin. Non-interactive runs answer with `--update-plugin-config` instead,
- * because a prompt on the CI path would never be answered.
- *
- * Metadata is deliberately not written — `plugin generate` owns that, so publishing never has to
- * ask for a plugin id or reach the account API.
  */
 export class PluginRecordSdkAction {
   private readonly prompts: PluginRecordSdkPrompts = new PluginRecordSdkPrompts();

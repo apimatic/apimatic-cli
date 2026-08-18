@@ -137,8 +137,7 @@ export class SdkPublishNonInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    // No prompt here: this path is documented for CI/CD, so the answer comes from the flag. A dry
-    // run publishes nothing, so recording it would claim an SDK that does not exist anywhere.
+    // A dry run publishes nothing, so recording it would claim an SDK that does not exist anywhere.
     if (updatePluginConfig) {
       if (dryRun) {
         this.prompts.dryRunPluginConfigNotice();
