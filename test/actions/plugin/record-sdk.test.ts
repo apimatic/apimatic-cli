@@ -10,9 +10,12 @@ import { PluginConfigContext } from '../../../src/types/plugin-config-context.js
 import { PluginConfigData } from '../../../src/types/plugin/plugin-config.js';
 import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
+import { SemVersion } from '../../../src/types/publish/version.js';
 import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate.js';
 
 const BOTH = [PublishType.SourceCodePublishing, PublishType.PackagePublishing];
+
+const VERSION = SemVersion.tryCreate('1.2.3')._unsafeUnwrap();
 
 const profileWith = (gitConfiguration: object | undefined, packageConfiguration: object | undefined = undefined) =>
   ({
@@ -42,6 +45,7 @@ describe('PluginRecordSdkAction', () => {
       Language.CSHARP,
       profile,
       publishTypes,
+      VERSION,
       CodeGenerationVersion.V3,
       true
     );
@@ -53,6 +57,7 @@ describe('PluginRecordSdkAction', () => {
       Language.CSHARP,
       profile,
       publishTypes,
+      VERSION,
       CodeGenerationVersion.V3,
       false
     );
@@ -85,8 +90,8 @@ describe('PluginRecordSdkAction', () => {
       languages: {
         csharp: {
           source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
-          package: { packageId: 'Acme.Payments.Sdk' },
-          version: 'v3'
+          package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
+          codegenVersion: 'v3'
         }
       }
     });
@@ -156,8 +161,8 @@ describe('PluginRecordSdkAction', () => {
       await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
 
       expect(writtenConfig().languages.csharp).to.deep.equal({
-        package: { packageId: 'Acme.Payments.Sdk' },
-        version: 'v3'
+        package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
+        codegenVersion: 'v3'
       });
     });
 
@@ -172,7 +177,7 @@ describe('PluginRecordSdkAction', () => {
 
   it('warns when the config cannot be written', async () => {
     accepts();
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unwritable');
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguages').resolves('unwritable');
     const notWritten = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigNotWritten');
 
     const result = await execute(profileWith(GIT_CONFIG));
@@ -183,7 +188,7 @@ describe('PluginRecordSdkAction', () => {
 
   it('reports a config that became unreadable after the user agreed to record', async () => {
     const confirmRecordSdk = accepts();
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unreadable');
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguages').resolves('unreadable');
     const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
 
     await execute(profileWith(GIT_CONFIG));

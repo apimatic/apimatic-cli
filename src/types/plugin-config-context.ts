@@ -4,13 +4,12 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
-  LanguageEntry,
   PLUGIN_CONFIG_SCHEMA_VERSION,
   PluginAuthor,
   PluginConfigData,
+  PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
-import { Language } from './sdk/generate.js';
 
 /**
  * What a caller needs to know before generating. Metadata and languages are written by different
@@ -96,10 +95,10 @@ export class PluginConfigContext {
     }));
   }
 
-  public async upsertLanguage(language: Language, entry: LanguageEntry): Promise<PluginConfigWriteResult> {
+  public async upsertLanguages(languages: PluginLanguages): Promise<PluginConfigWriteResult> {
     return await this.merge((config) => ({
       ...config,
-      languages: { ...config.languages, [language]: entry }
+      languages: { ...config.languages, ...languages }
     }));
   }
 

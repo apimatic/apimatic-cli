@@ -1,5 +1,11 @@
 import { Result, ok, err } from 'neverthrow';
 
+/**
+ * Structural only — it also admits strings `tryCreate` rejects, such as `1.2.3.4`. It is useful as
+ * the return type of an already-validated `SemVersion`, never as a substitute for one.
+ */
+export type SemVersionString = `${number}.${number}.${number}`;
+
 export class SemVersion {
   private readonly value: string;
 
@@ -15,7 +21,8 @@ export class SemVersion {
     return ok(new SemVersion(value));
   }
 
-  public toString(): string {
-    return this.value;
+  // The narrower type is honest because `tryCreate` is the only way in.
+  public toString(): SemVersionString {
+    return this.value as SemVersionString;
   }
 }

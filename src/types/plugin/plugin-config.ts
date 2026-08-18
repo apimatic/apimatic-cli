@@ -1,3 +1,4 @@
+import { SemVersionString } from '../publish/version.js';
 import { CodeGenerationVersion, Language } from '../sdk/generate.js';
 
 /** The only schema version the backend accepts. */
@@ -16,43 +17,52 @@ export interface LanguageSource {
   branch?: string;
 }
 
-export interface CSharpPluginPackage {
+interface CSharpPackageConfig {
   packageId: string;
+  version: SemVersionString;
 }
 
-/** Shared by typescript, python and ruby, which all identify a package by a single name. */
-export interface NamedPluginPackage {
-  name: string;
-}
-
-export interface JavaPluginPackage {
+interface JavaPackageConfig {
   groupId: string;
   artifactId: string;
+  version: SemVersionString;
 }
 
-export interface PhpPluginPackage {
+interface PhpPackageConfig {
   vendorName: string;
   projectName: string;
+  version: SemVersionString;
 }
 
-export interface GoPluginPackage {
+interface NamedPackageConfig {
+  name: string;
+  version: SemVersionString;
+}
+
+type PythonPackageConfig = NamedPackageConfig;
+type RubyPackageConfig = NamedPackageConfig;
+type TypeScriptPackageConfig = NamedPackageConfig;
+
+interface GoPackageConfig {
   packageName: string;
+  version: SemVersionString;
 }
 
-export type PluginPackage =
-  | CSharpPluginPackage
-  | NamedPluginPackage
-  | JavaPluginPackage
-  | PhpPluginPackage
-  | GoPluginPackage;
-
-export interface LanguageEntry {
+interface PluginConfig<TPackage> {
   source?: LanguageSource;
-  package?: PluginPackage;
-  version: CodeGenerationVersion;
+  package?: TPackage;
+  codegenVersion: CodeGenerationVersion;
 }
 
-export type PluginLanguages = Partial<Record<Language, LanguageEntry>>;
+export type PluginLanguages = Partial<{
+  [Language.CSHARP]: PluginConfig<CSharpPackageConfig>;
+  [Language.JAVA]: PluginConfig<JavaPackageConfig>;
+  [Language.PHP]: PluginConfig<PhpPackageConfig>;
+  [Language.PYTHON]: PluginConfig<PythonPackageConfig>;
+  [Language.RUBY]: PluginConfig<RubyPackageConfig>;
+  [Language.TYPESCRIPT]: PluginConfig<TypeScriptPackageConfig>;
+  [Language.GO]: PluginConfig<GoPackageConfig>;
+}>;
 
 export interface PluginConfigData {
   schemaVersion: number;

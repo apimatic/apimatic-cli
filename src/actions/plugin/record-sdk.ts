@@ -4,6 +4,7 @@ import { buildLanguageEntry } from '../../types/plugin/language-entry.js';
 import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
+import { SemVersion } from '../../types/publish/version.js';
 import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
 import { ActionResult } from '../action-result.js';
 
@@ -19,13 +20,14 @@ export class PluginRecordSdkAction {
     language: Language,
     publishingProfile: PublishingProfile,
     publishTypes: PublishType[],
+    packageVersion: SemVersion,
     codegenVersion: CodeGenerationVersion,
     confirmFirst: boolean
   ): Promise<ActionResult> => {
     // The entry has to describe what this run published, not what the profile happens to enable.
     // A package-only run must not claim a repository it never pushed to, nor a source-only run a
     // package that was never released.
-    const entry = buildLanguageEntry(
+    const languages = buildLanguageEntry(
       language,
       publishTypes.includes(PublishType.SourceCodePublishing)
         ? publishingProfile.getGitConfigurationForLanguage(language)
@@ -33,10 +35,11 @@ export class PluginRecordSdkAction {
       publishTypes.includes(PublishType.PackagePublishing)
         ? publishingProfile.getPackageConfigurationDataForLanguage(language)
         : undefined,
+      packageVersion,
       codegenVersion
     );
 
-    if (!entry.source) {
+    if (!languages[language]?.source) {
       this.prompts.noSourceRepository(language);
     }
 
@@ -52,7 +55,7 @@ export class PluginRecordSdkAction {
       return ActionResult.cancelled();
     }
 
-    const result = await pluginConfigContext.upsertLanguage(language, entry);
+    const result = await pluginConfigContext.upsertLanguages(languages);
 
     switch (result) {
       // Readable a moment ago, so this only happens if the file changed underneath us.
