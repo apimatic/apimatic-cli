@@ -46,30 +46,21 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    const configState = await new PluginConfigContext(buildDirectory).validate();
+    const configState = await new PluginConfigContext(buildDirectory).loadState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     }
 
-    // Read before the metadata prompts, which do not touch languages: `sdk publish` is the only
-    // thing that records them, so what is on disk now is what the run has to work with.
-    const namesAnySdk = configState.state === 'present' && configState.hasLanguages;
-
-    if (configState.state === 'missing' || !configState.hasMetadata) {
-      const result = await this.createConfig(buildDirectory);
-      // The reason names whichever answer was missing, which only the config action knows.
-      if (result.isCancelled()) {
-        this.prompts.metadataCancelled(result.getMessage());
-        return ActionResult.cancelled();
-      }
-      if (!result.isSuccess()) {
-        return result;
-      }
+    if (configState.state === 'missing') {
+      return await this.createConfig(buildDirectory);
     }
 
-    // The config is complete but names nothing to build, so there is no point uploading it.
-    if (!namesAnySdk) {
+    if (!configState.hasMetadata()) {
+      return await this.createConfig(buildDirectory);
+    }
+
+    if (!configState.hasPublishedSdks()) {
       this.prompts.noPublishedSdks();
       this.prompts.nextStepsPublishSdks();
       return ActionResult.success();
@@ -97,6 +88,21 @@ export class PluginGenerateAction {
     });
   };
 
-  private readonly createConfig = (buildDirectory: DirectoryPath): Promise<ActionResult> =>
-    new PluginCreateConfigAction(this.configDir, this.commandMetadata, this.authKey).execute(buildDirectory);
+  private async createConfig(buildDirectory: DirectoryPath): Promise<ActionResult> {
+    const result = await new PluginCreateConfigAction(this.configDir, this.commandMetadata, this.authKey).execute(
+      buildDirectory
+    );
+
+    if (result.isCancelled()) {
+      this.prompts.metadataCancelled(result.getMessage());
+      return ActionResult.cancelled();
+    }
+    if (!result.isSuccess()) {
+      return result;
+    }
+
+    this.prompts.noPublishedSdks();
+    this.prompts.nextStepsPublishSdks();
+    return ActionResult.success();
+  }
 }

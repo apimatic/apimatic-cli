@@ -20,7 +20,26 @@ import { Language } from './sdk/generate.js';
 export type PluginConfigState =
   | { state: 'missing' }
   | { state: 'unreadable'; reason: string; path: FilePath }
-  | { state: 'present'; hasMetadata: boolean; hasLanguages: boolean };
+  | PluginConfigPresent;
+
+class PluginConfigPresent {
+  public readonly state = 'present' as const;
+
+  private constructor(private readonly config: PluginConfigData) {}
+
+  public static create(config: PluginConfigData): PluginConfigPresent {
+    return new PluginConfigPresent(config)
+  }
+
+  public hasPublishedSdks(): boolean {
+    const languages = this.config.languages;
+    return typeof languages === 'object' && languages !== null && Object.keys(languages).length > 0;
+  }
+
+  public hasMetadata(): boolean {
+    return Boolean(this.config.pluginId?.trim()) && Boolean(this.config.pluginName?.trim());
+  }
+}
 
 /**
  * Why a write did or did not happen. A bare boolean cannot say whether the file was unusable or
@@ -39,7 +58,7 @@ export class PluginConfigContext {
     return new FilePath(this.buildDirectory, new FileName('plugin-config.json'));
   }
 
-  public async validate(): Promise<PluginConfigState> {
+  public async loadState(): Promise<PluginConfigState> {
     if (!(await this.fileService.fileExists(this.configPath))) {
       return { state: 'missing' };
     }
@@ -59,11 +78,7 @@ export class PluginConfigContext {
       return { state: 'unreadable', reason, path: this.configPath };
     }
 
-    return {
-      state: 'present',
-      hasMetadata: namesThePlugin(parsed.config),
-      hasLanguages: namesAnyLanguage(parsed.config)
-    };
+    return PluginConfigPresent.create(parsed.config);
   }
 
   /**
@@ -145,10 +160,3 @@ export class PluginConfigContext {
   }
 }
 
-const namesThePlugin = (config: PluginConfigData): boolean =>
-  Boolean(config.pluginId?.trim()) && Boolean(config.pluginName?.trim());
-
-const namesAnyLanguage = (config: PluginConfigData): boolean => {
-  const languages = config.languages;
-  return typeof languages === 'object' && languages !== null && Object.keys(languages).length > 0;
-};
