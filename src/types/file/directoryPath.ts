@@ -31,8 +31,4 @@ export class DirectoryPath {
   public leafName() {
     return path.basename(this.directoryPath);
   }
-
-  public parent(): DirectoryPath {
-    return new DirectoryPath(path.dirname(this.directoryPath));
-  }
 }

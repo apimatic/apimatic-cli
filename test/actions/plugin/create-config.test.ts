@@ -15,6 +15,12 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
 
+// Kept deliberately different from SUGGESTED_DEFAULTS: if the two matched, an action that dropped
+// the answers and wrote its own suggestions would still satisfy every assertion below.
+const ANSWERS = { pluginId: 'bank-of-acme', pluginName: 'Bank of Acme', pluginVersion: '2.1.0' };
+
+const SUGGESTED_DEFAULTS = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
+
 const ACCOUNT = {
   FullName: 'Acme',
   Email: 'developers@acme.com',
@@ -32,7 +38,7 @@ describe('PluginCreateConfigAction', () => {
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
-    buildDirectory = path.join(tmpDirResult.path, 'acme-payments', 'src');
+    buildDirectory = path.join(tmpDirResult.path, 'some-project-folder', 'src');
     await fsExtra.ensureDir(buildDirectory);
 
     // The spinner would render to stdout; pass the underlying promise straight through.
@@ -48,15 +54,10 @@ describe('PluginCreateConfigAction', () => {
     await tmpDirResult.cleanup();
   });
 
-  const answers = (overrides: Partial<{ pluginId: string; pluginName: string; pluginVersion: string }> = {}) =>
-    sinon.stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata').resolves({
-      metadata: {
-        pluginId: 'acme-payments',
-        pluginName: 'Acme Payments',
-        pluginVersion: '0.1.0',
-        ...overrides
-      }
-    });
+  const answers = (overrides: Partial<typeof ANSWERS> = {}) =>
+    sinon
+      .stub(PluginCreateConfigPrompts.prototype, 'inputPluginMetadata')
+      .resolves({ metadata: { ...ANSWERS, ...overrides } });
 
   it('writes the metadata and a default licence into the config', async () => {
     answers();
@@ -64,13 +65,7 @@ describe('PluginCreateConfigAction', () => {
     const result = await execute();
 
     expect(result.isSuccess()).to.be.true;
-    expect(writtenConfig()).to.include({
-      schemaVersion: 1,
-      pluginId: 'acme-payments',
-      pluginName: 'Acme Payments',
-      pluginVersion: '0.1.0',
-      license: 'MIT'
-    });
+    expect(writtenConfig()).to.include({ schemaVersion: 1, ...ANSWERS, license: 'MIT' });
   });
 
   it('records the author from the account', async () => {
@@ -89,15 +84,31 @@ describe('PluginCreateConfigAction', () => {
     expect(writtenConfig()).to.not.have.property('pluginKey');
   });
 
-  it('seeds the prompt defaults from the project directory name', async () => {
-    const inputPluginMetadata = answers();
+  describe('the defaults offered to the prompts', () => {
+    it('are the hard-coded examples', async () => {
+      const inputPluginMetadata = answers();
 
-    await execute();
+      await execute();
 
-    expect(inputPluginMetadata.firstCall.args[0]).to.deep.equal({
-      pluginId: 'acme-payments',
-      pluginName: 'Acme Payments',
-      pluginVersion: '0.1.0'
+      expect(inputPluginMetadata.firstCall.args[0]).to.deep.equal(SUGGESTED_DEFAULTS);
+    });
+
+    it('do not follow the project directory name', async () => {
+      buildDirectory = path.join(tmpDirResult.path, 'invoicing-api', 'src');
+      await fsExtra.ensureDir(buildDirectory);
+      const inputPluginMetadata = answers();
+
+      await execute();
+
+      expect(inputPluginMetadata.firstCall.args[0]).to.deep.equal(SUGGESTED_DEFAULTS);
+    });
+
+    it('give way to whatever the user answered', async () => {
+      answers();
+
+      await execute();
+
+      expect(writtenConfig()).to.include(ANSWERS);
     });
   });
 
@@ -133,7 +144,7 @@ describe('PluginCreateConfigAction', () => {
     expect(result.isSuccess()).to.be.true;
     expect(accountInfoUnavailable.called).to.be.true;
     expect(writtenConfig()).to.not.have.property('author');
-    expect(writtenConfig().pluginId).to.equal('acme-payments');
+    expect(writtenConfig().pluginId).to.equal(ANSWERS.pluginId);
   });
 
   it('keeps the languages a previous sdk publish recorded', async () => {

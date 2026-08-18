@@ -5,10 +5,16 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginAuthor, PluginMetadata } from '../../types/plugin/plugin-config.js';
 import { PluginConfigContext } from '../../types/plugin-config-context.js';
-import { toKebabCase, toTitleCase } from '../../utils/string-utils.js';
 import { ActionResult } from '../action-result.js';
 
-const DEFAULT_PLUGIN_VERSION = '0.1.0';
+/**
+ * Suggested in the prompts as an example of the shape each field takes.
+ */
+const DEFAULT_METADATA: PluginMetadata = {
+  pluginId: 'acme-payments',
+  pluginName: 'Acme Payments',
+  pluginVersion: '0.1.0'
+};
 
 /**
  * Writes the plugin's own details into `plugin-config.json`, creating the file when absent. Only
@@ -29,7 +35,7 @@ export class PluginCreateConfigAction {
   }
 
   public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult> => {
-    const input = await this.prompts.inputPluginMetadata(defaultMetadata(buildDirectory));
+    const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
       // Carried on the result so the caller can say which answer was missing, rather than assuming
       // the run stopped at the first question.
@@ -59,16 +65,6 @@ export class PluginCreateConfigAction {
 
     this.prompts.pluginConfigCreated(metadata);
     return ActionResult.success();
-  };
-}
-
-/** Seeded from the project folder holding `src`, which is the closest thing to an API name on disk. */
-function defaultMetadata(buildDirectory: DirectoryPath): PluginMetadata {
-  const projectName = buildDirectory.parent().leafName();
-  return {
-    pluginId: toKebabCase(projectName),
-    pluginName: toTitleCase(projectName),
-    pluginVersion: DEFAULT_PLUGIN_VERSION
   };
 }
 
