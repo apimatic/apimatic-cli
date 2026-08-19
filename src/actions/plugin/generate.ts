@@ -4,7 +4,7 @@ import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext, PluginConfigPresent } from '../../types/plugin-config-context.js';
+import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
@@ -53,11 +53,19 @@ export class PluginGenerateAction {
     };
 
     if (configState.state === 'missing' || !configState.hasMetadata()) {
-      const newConfigState = await this.recordMetadata(buildDirectory);
-      if (!newConfigState.isSuccess()) {
-        return newConfigState.discardValue();
+      const metadataResult = await new PluginRecordMetadataAction(
+        this.configDir,
+        this.commandMetadata,
+        this.authKey
+      ).execute(buildDirectory);
+      if (metadataResult.isCancelled()) {
+        this.prompts.metadataCancelled(metadataResult.getMessage());
+        return ActionResult.cancelled();
       }
-      configState = newConfigState.getValue();
+      if (!metadataResult.isSuccess()) {
+        return metadataResult.discardValue();
+      }
+      configState = metadataResult.getValue();
     }
 
     if (!configState.hasPublishedSdks()) {
@@ -87,16 +95,4 @@ export class PluginGenerateAction {
       return ActionResult.success();
     });
   };
-
-  private async recordMetadata(buildDirectory: DirectoryPath): Promise<ActionResult<PluginConfigPresent>> {
-    const result = await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      buildDirectory
-    );
-
-    if (result.isCancelled()) {
-      this.prompts.metadataCancelled(result.getMessage());
-      return ActionResult.cancelled();
-    }
-    return result;
-  }
 }
