@@ -82,9 +82,6 @@ export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
 type ParseResult = { config: PluginConfigData } | { reason: string };
 
-/** Notepad and PowerShell redirection both write one, and JSON does not allow it. */
-const BYTE_ORDER_MARK = 0xfeff;
-
 export class PluginConfigContext {
   private readonly fileService = new FileService();
 
@@ -171,6 +168,7 @@ export class PluginConfigContext {
   }
 
   private async parse(): Promise<ParseResult> {
+    const BYTE_ORDER_MARK = 0xfeff; // Notepad and PowerShell redirection can write it
     try {
       // TODO: JSON Parsing/Stringify should be in a dedicated JSON infra layer which preferably uses zod
       const contents = await this.fileService.getContents(this.configPath);
