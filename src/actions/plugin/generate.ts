@@ -4,9 +4,11 @@ import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
+import { PluginRecordMetadataAction } from './record-metadata.js';
 
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
@@ -42,6 +44,34 @@ export class PluginGenerateAction {
     if (!force && (await pluginContext.exists()) && !(await this.prompts.overwritePlugin(pluginDirectory))) {
       this.prompts.pluginDirectoryNotEmpty();
       return ActionResult.cancelled();
+    }
+
+    let configState = await new PluginConfigContext(buildDirectory).getPluginConfigState();
+    if (configState.state === 'unreadable') {
+      this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
+      return ActionResult.failed();
+    };
+
+    if (configState.state === 'missing' || !configState.hasMetadata()) {
+      const metadataResult = await new PluginRecordMetadataAction(
+        this.configDir,
+        this.commandMetadata,
+        this.authKey
+      ).execute(buildDirectory);
+      if (metadataResult.isCancelled()) {
+        this.prompts.metadataCancelled(metadataResult.getMessage());
+        return ActionResult.cancelled();
+      }
+      if (!metadataResult.isSuccess()) {
+        return metadataResult.discardValue();
+      }
+      configState = metadataResult.getValue();
+    }
+
+    if (!configState.hasPublishedSdks()) {
+      this.prompts.noPublishedSdks();
+      this.prompts.nextStepsPublishSdks();
+      return ActionResult.success();
     }
 
     return await withDirPath(async (tempDirectory) => {

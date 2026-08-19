@@ -7,6 +7,9 @@ import { err, ok } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
 import { PluginGenerateAction } from '../../../src/actions/plugin/generate.js';
 import { PluginGeneratePrompts } from '../../../src/prompts/plugin/generate.js';
+import { PluginRecordMetadataPrompts } from '../../../src/prompts/plugin/record-metadata.js';
+import { ApiService } from '../../../src/infrastructure/services/api-service.js';
+import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { PluginService } from '../../../src/infrastructure/services/plugin-service.js';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
@@ -34,10 +37,9 @@ describe('PluginGenerateAction', () => {
     await fsExtra.ensureDir(buildDirectory);
     await fsExtra.writeJson(path.join(buildDirectory, 'APIMATIC-BUILD.json'), {});
     await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
-      schemaVersion: 1,
       pluginId: 'acme-payments',
       pluginName: 'Acme Payments',
-      sdkRepos: { csharp: { sourceCode: { srcCodeUrl: 'https://github.com/acme/acme-csharp' } } }
+      languages: { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } }
     });
 
     // The spinner would render to stdout; pass the underlying promise straight through.
@@ -110,6 +112,126 @@ describe('PluginGenerateAction', () => {
 
       expect(result.isSuccess()).to.be.true;
       expect(fsExtra.readFileSync(path.join(pluginDirectory, 'plugin.zip'), 'utf-8')).to.equal('PK context-plugin');
+    });
+  });
+
+  describe('plugin config', () => {
+    const ACCOUNT = { FullName: 'Acme', Email: 'developers@acme.com' } as unknown as SubscriptionInfo;
+    const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
+    const CSHARP = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } };
+
+    const configPath = () => path.join(buildDirectory, 'plugin-config.json');
+    const writeConfig = (config: object) => fsExtra.writeJson(configPath(), config);
+    const writtenConfig = () => fsExtra.readJsonSync(configPath());
+
+    // The real PluginRecordMetadataAction runs; only its prompts and the account call are stubbed,
+    // so these assert what actually lands on disk.
+    const answersMetadata = () =>
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata').resolves({ metadata: METADATA });
+    const cancelsMetadata = (reason = 'A plugin ID is required') =>
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata').resolves({ cancelled: reason });
+
+    beforeEach(() => {
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'spinnerAccountInfo').callsFake((fn) => fn);
+      sinon.stub(PluginRecordMetadataPrompts.prototype, 'metadataRecorded');
+      sinon.stub(ApiService.prototype, 'getAccountInfo').resolves(ok(ACCOUNT));
+      sinon.stub(PluginGeneratePrompts.prototype, 'noPublishedSdks');
+      sinon.stub(PluginGeneratePrompts.prototype, 'nextStepsPublishSdks');
+    });
+
+    it('fails without generating when the config cannot be read', async () => {
+      await fsExtra.writeFile(configPath(), '{ not json');
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+      const pluginConfigUnreadable = sinon.stub(PluginGeneratePrompts.prototype, 'pluginConfigUnreadable');
+
+      expect((await execute()).isFailed()).to.be.true;
+      expect(pluginConfigUnreadable.called).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+    });
+
+    it('creates the config, then stops with next steps when no SDK is recorded', async () => {
+      await fsExtra.remove(configPath());
+      answersMetadata();
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+      const nextSteps = PluginGeneratePrompts.prototype.nextStepsPublishSdks as sinon.SinonStub;
+
+      const result = await execute();
+
+      expect(result.isSuccess()).to.be.true;
+      expect(writtenConfig()).to.include(METADATA);
+      expect(nextSteps.called).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+    });
+
+    it('fills in metadata and generates when sdk publish already recorded a language', async () => {
+      await writeConfig({ languages: { csharp: CSHARP } });
+      answersMetadata();
+      const generatePlugin = generated();
+      const nextSteps = PluginGeneratePrompts.prototype.nextStepsPublishSdks as sinon.SinonStub;
+
+      const result = await execute();
+
+      expect(result.isSuccess()).to.be.true;
+      const config = writtenConfig();
+      expect(config).to.include(METADATA);
+      expect(config.languages).to.deep.equal({ csharp: CSHARP });
+      expect(generatePlugin.called).to.be.true;
+      expect(nextSteps.called).to.be.false;
+    });
+
+    it('stops with next steps when the config has metadata but no languages', async () => {
+      await writeConfig({ ...METADATA, languages: {} });
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+      const inputPluginMetadata = answersMetadata();
+
+      const result = await execute();
+
+      expect(result.isSuccess()).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+      expect(inputPluginMetadata.called).to.be.false;
+    });
+
+    it('stops with next steps when the only recorded language has neither a source nor a package', async () => {
+      await writeConfig({ ...METADATA, languages: { csharp: { codegenVersion: 'v3' } } });
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+
+      const result = await execute();
+
+      expect(result.isSuccess()).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+    });
+
+    it('cancels without generating when the metadata prompts are escaped', async () => {
+      await fsExtra.remove(configPath());
+      cancelsMetadata();
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+      const metadataCancelled = sinon.stub(PluginGeneratePrompts.prototype, 'metadataCancelled');
+
+      const result = await execute();
+
+      expect(result.isCancelled()).to.be.true;
+      expect(metadataCancelled.called).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+      expect(fsExtra.existsSync(configPath())).to.be.false;
+    });
+
+    it('reports the answer that was actually missing, not always the plugin id', async () => {
+      await fsExtra.remove(configPath());
+      cancelsMetadata('A plugin version is required');
+      sinon.stub(PluginService.prototype, 'generatePlugin');
+      const metadataCancelled = sinon.stub(PluginGeneratePrompts.prototype, 'metadataCancelled');
+
+      await execute();
+
+      expect(metadataCancelled.firstCall.args[0]).to.equal('A plugin version is required');
+    });
+
+    it('generates straight away when the config is already complete', async () => {
+      const inputPluginMetadata = answersMetadata();
+      generated();
+
+      expect((await execute()).isSuccess()).to.be.true;
+      expect(inputPluginMetadata.called).to.be.false;
     });
   });
 

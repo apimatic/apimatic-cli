@@ -11,6 +11,7 @@ import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js'
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { BuildContext } from '../../../types/build-context.js';
+import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { FileService } from '../../../infrastructure/file-service.js';
 
@@ -30,6 +31,7 @@ export class SdkPublishNonInteractiveAction {
     dryRun: boolean,
     codegenOption: CodegenOption,
     stabilityWasProvided: boolean,
+    updatePluginConfig: boolean,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
     version?: string
@@ -133,6 +135,23 @@ export class SdkPublishNonInteractiveAction {
     }
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
+    }
+
+    // A dry run publishes nothing, so recording it would claim an SDK that does not exist anywhere.
+    if (updatePluginConfig) {
+      if (dryRun) {
+        this.prompts.dryRunPluginConfigNotice();
+      } else {
+        await new PluginRecordSdkAction().execute(
+          buildDirectory,
+          language,
+          publishingProfile,
+          publishTypes,
+          semVersion,
+          codegenOption.codeGenerationVersion(),
+          false
+        );
+      }
     }
 
     return ActionResult.success();

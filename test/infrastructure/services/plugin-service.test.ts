@@ -205,15 +205,15 @@ describe('PluginService', () => {
       expect(error.errorMessage).to.include("'author.email' must be an email.");
     });
 
-    it('keeps the sdkRepos errors addressable by key', async () => {
+    it('keeps the language errors addressable by key', async () => {
       respondToStatus = statusBody({
         status: 'ValidationError',
-        errors: { sdkRepos: ['no language in sdkRepos can be built by this generator'] }
+        errors: { languages: ['no language in languages can be built by this generator'] }
       });
 
       const error = errorFrom(await generatePlugin());
 
-      expect(error.getError('sdkRepos')).to.deep.equal(['no language in sdkRepos can be built by this generator']);
+      expect(error.getError('languages')).to.deep.equal(['no language in languages can be built by this generator']);
     });
 
     it('terminates on a validation error that carries no messages', async () => {

@@ -2,8 +2,11 @@ import { confirm, isCancel, log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
-import { withSpinner } from '../prompt.js';
+import { noteWrapped, withSpinner } from '../prompt.js';
+
+const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 
 export class PluginGeneratePrompts {
   public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
@@ -41,6 +44,29 @@ export class PluginGeneratePrompts {
 
   public pluginGenerationError(error: string) {
     log.error(error);
+  }
+
+  public pluginConfigUnreadable(reason: string, path: FilePath) {
+    const message =
+      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used: ${reason}. ` + `Fix or delete it at ${f.path(path)} and try again.`;
+    log.error(message);
+  }
+
+  public metadataCancelled(reason: string) {
+    log.warn(`${reason}. Exiting without generating a plugin.`);
+  }
+
+  public noPublishedSdks() {
+    log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs yet.`);
+  }
+
+  public nextStepsPublishSdks() {
+    const message =
+      `Publish an SDK for each language you want in the plugin, and include ${f.var('Source Code')} ` +
+      `publishing.\n\n` +
+      `Run '${f.cmdAlt('apimatic', 'sdk', 'publish')}'\n\n` +
+      `Then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;
+    noteWrapped(message, 'Next Steps');
   }
 
   public pluginGenerated(plugin: DirectoryPath) {

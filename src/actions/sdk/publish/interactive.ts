@@ -8,6 +8,7 @@ import { PublishingProfiles } from '../../../types/publish/publishing-profiles.j
 import { getCodegenOptions } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
+import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
@@ -137,6 +138,18 @@ export class SdkPublishInteractiveAction {
     }
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
+    }
+
+    if (await this.prompts.confirmRecordSdk()) {
+      await new PluginRecordSdkAction().execute(
+        buildDirectory,
+        language,
+        publishingProfile,
+        publishTypes,
+        version,
+        codegenOption.codeGenerationVersion(),
+        true
+      );
     }
 
     return ActionResult.success();

@@ -79,6 +79,10 @@ export class CodegenOption {
     return this.stability;
   }
 
+  public codeGenerationVersion(): CodeGenerationVersion {
+    return this.version;
+  }
+
   public toString(): string {
     return `${this.version.toUpperCase()} (${this.stability})`;
   }
