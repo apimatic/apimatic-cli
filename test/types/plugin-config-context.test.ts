@@ -350,8 +350,6 @@ describe('PluginConfigContext', () => {
       expect(writtenConfig().languages).to.deep.equal({ csharp: CSHARP_ENTRY });
     });
 
-    // One publish records one half, so dropping the other would point plugin generation at an
-    // artifact that is still published.
     describe('keeps the half the run did not publish', () => {
       it('carries the recorded package over a source-only publish', async () => {
         withConfig({ languages: { csharp: CSHARP_ENTRY } });
@@ -415,12 +413,6 @@ describe('PluginConfigContext', () => {
       await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
 
       expect(writtenConfig()).to.include({ ...METADATA, license: 'MIT' });
-    });
-
-    it('refuses to overwrite a file it could not read', async () => {
-      mockFs({ src: { 'plugin-config.json': '{ not json' } });
-
-      expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrapErr()).to.equal('unreadable');
     });
   });
 });

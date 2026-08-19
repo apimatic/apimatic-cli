@@ -106,7 +106,6 @@ describe('buildLanguageEntry', () => {
       });
     }
 
-    // The version rides inside the package block, so this is also the case that records no version.
     it('omits the package when the profile configures none', () => {
       const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), undefined, VERSION, CodeGenerationVersion.V3);
 

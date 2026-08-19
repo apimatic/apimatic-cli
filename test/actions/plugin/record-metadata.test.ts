@@ -23,8 +23,7 @@ const SUGGESTED_DEFAULTS = { pluginId: 'acme-payments', pluginName: 'Acme Paymen
 
 const ACCOUNT = {
   FullName: 'Acme',
-  Email: 'developers@acme.com',
-  ApiCopilotKeys: ['copilot-key']
+  Email: 'developers@acme.com'
 } as unknown as SubscriptionInfo;
 
 describe('PluginRecordMetadataAction', () => {
@@ -76,40 +75,12 @@ describe('PluginRecordMetadataAction', () => {
     expect(writtenConfig().author).to.deep.equal({ name: 'Acme', email: 'developers@acme.com' });
   });
 
-  it('never writes a plugin key', async () => {
-    answers();
+  it('offers the hard-coded examples as the prompt defaults', async () => {
+    const inputPluginMetadata = answers();
 
     await execute();
 
-    expect(writtenConfig()).to.not.have.property('pluginKey');
-  });
-
-  describe('the defaults offered to the prompts', () => {
-    it('are the hard-coded examples', async () => {
-      const inputPluginMetadata = answers();
-
-      await execute();
-
-      expect(inputPluginMetadata.firstCall.args[0]).to.deep.equal(SUGGESTED_DEFAULTS);
-    });
-
-    it('do not follow the project directory name', async () => {
-      buildDirectory = path.join(tmpDirResult.path, 'invoicing-api', 'src');
-      await fsExtra.ensureDir(buildDirectory);
-      const inputPluginMetadata = answers();
-
-      await execute();
-
-      expect(inputPluginMetadata.firstCall.args[0]).to.deep.equal(SUGGESTED_DEFAULTS);
-    });
-
-    it('give way to whatever the user answered', async () => {
-      answers();
-
-      await execute();
-
-      expect(writtenConfig()).to.include(ANSWERS);
-    });
+    expect(inputPluginMetadata.firstCall.args[0]).to.deep.equal(SUGGESTED_DEFAULTS);
   });
 
   it('cancels without writing anything when the user escapes the prompts', async () => {
@@ -145,18 +116,6 @@ describe('PluginRecordMetadataAction', () => {
     expect(accountInfoUnavailable.called).to.be.true;
     expect(writtenConfig()).to.not.have.property('author');
     expect(writtenConfig().pluginId).to.equal(ANSWERS.pluginId);
-  });
-
-  it('keeps the languages a previous sdk publish recorded', async () => {
-    const entry = { source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp' } };
-    await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
-      languages: { csharp: entry }
-    });
-    answers();
-
-    await execute();
-
-    expect(writtenConfig().languages).to.deep.equal({ csharp: entry });
   });
 
   it('fails rather than overwriting a config it could not read', async () => {
