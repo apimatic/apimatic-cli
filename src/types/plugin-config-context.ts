@@ -39,6 +39,7 @@ class PluginConfigPresent {
   }
 
   public hasMetadata(): boolean {
+    const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
   }
 
@@ -72,11 +73,6 @@ class PluginConfigPresent {
 export type PluginConfigWriteResult = 'written' | 'unreadable' | 'unwritable';
 
 type ParseResult = { config: PluginConfigData } | { reason: string };
-
-/** The file is hand-editable, so a field the type calls a string can be any JSON value on disk. */
-function isNonBlankString(value: unknown): boolean {
-  return typeof value === 'string' && value.trim() !== '';
-}
 
 /** Notepad and PowerShell redirection both write one, and JSON does not allow it. */
 const BYTE_ORDER_MARK = 0xfeff;
