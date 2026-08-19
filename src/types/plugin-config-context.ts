@@ -104,10 +104,6 @@ export class PluginConfigContext {
     return PluginConfigPresent.create(parsed.config);
   }
 
-  /**
-   * Adds the plugin's identity, creating the file when absent. `license` is written unprompted
-   * because the backend consumes it; `pluginKey` is deliberately not written, because nothing does.
-   */
   public async upsertMetadata(
     metadata: PluginMetadata,
     author?: PluginAuthor

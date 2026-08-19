@@ -61,10 +61,6 @@ interface PluginConfigForLanguage {
   [Language.GO]: PluginConfig<GoPackageConfig>;
 }
 
-/**
- * One language's entry. Carrying the language in the type is what stops an entry built for one
- * language from being filed under another.
- */
 export type PluginLanguageEntry<L extends Language> = PluginConfigForLanguage[L];
 
 export type PluginLanguages = Partial<PluginConfigForLanguage>;

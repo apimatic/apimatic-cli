@@ -98,6 +98,5 @@ export function buildLanguageEntry<L extends Language>(
       }
     : undefined;
 
-  // The config is JSON on disk, so the version unwraps to its string form here.
   return languageEntryBuilders[language](source, packageConfiguration, packageVersion.toString(), codegenVersion);
 }

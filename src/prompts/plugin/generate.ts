@@ -52,7 +52,6 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  /** A cancelled metadata prompt stops the run, so it is a warning rather than an error. */
   public metadataCancelled(reason: string) {
     log.warn(`${reason}. Exiting without generating a plugin.`);
   }

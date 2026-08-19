@@ -9,8 +9,8 @@ import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
 import { ActionResult } from '../action-result.js';
 
 /**
- * Records a freshly published SDK in `plugin-config.json`. Callers discard the result: this runs
- * after a publish that already succeeded, and no outcome here may change that.
+ * Callers discard the result: this runs after a publish that already succeeded, and no outcome here
+ * may change that.
  */
 export class PluginRecordSdkAction {
   private readonly prompts: PluginRecordSdkPrompts = new PluginRecordSdkPrompts();
