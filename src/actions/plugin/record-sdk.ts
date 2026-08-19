@@ -46,18 +46,19 @@ export class PluginRecordSdkAction {
       return ActionResult.failed();
     }
 
-    if (configState.state === 'present') {
+    const configExisted = configState.state === 'present';
+
+    if (configExisted) {
       const result = configState.assertNoCodegenVersionMismatch(codegenVersion, language, entry);
       if (result.isErr()) {
         this.prompts.codegenVersionMismatch(language, result.error.actual, result.error.expected);
       }
     }
 
-    if (!entry.source && (configState.state === 'missing' || configState.hasNoSourceRepository(language))) {
+    if (!entry.source && (!configExisted || configState.hasNoSourceRepository(language))) {
       this.prompts.noSourceRepository(language);
     }
 
-    const configExisted = configState.state === 'present';
     if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configExisted))) {
       return ActionResult.cancelled();
     }
