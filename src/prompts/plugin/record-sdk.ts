@@ -37,8 +37,7 @@ export class PluginRecordSdkPrompts {
     const message =
       `${f.var(PLUGIN_CONFIG_FILE)} records ${f.var(language)} against ${f.var(actual)}, ` +
       `but this SDK was generated with ${f.var(expected)}. ` +
-      `Recording it overwrites ${f.var(actual)} with ${f.var(expected)}, and a plugin that points ` +
-      `to two different code generator versions can confuse AI agents.`;
+      `Recording it overwrites ${f.var(actual)} with ${f.var(expected)}.`;
     log.warn(message);
   }
 
