@@ -116,6 +116,12 @@ describe('PluginConfigContext', () => {
 
       expect(presentState(await context.loadState()).hasMetadata()).to.be.false;
     });
+
+    it('does not count a plugin id that is not a string as metadata', async () => {
+      withConfig({ pluginId: 7, pluginName: 'Acme', languages: {} });
+
+      expect(presentState(await context.loadState()).hasMetadata()).to.be.false;
+    });
   });
 
   describe('upsertMetadata', () => {
