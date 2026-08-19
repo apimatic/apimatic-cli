@@ -251,32 +251,57 @@ describe('PluginRecordSdkAction', () => {
   });
 
   describe('code generator version mismatches', () => {
-    const recordedAs = (codegenVersion: string) =>
-      fsExtra.writeJson(configPath(), { languages: { csharp: { codegenVersion } } });
+    const PACKAGE_CONFIG = { packageId: 'Acme.Payments.Sdk' };
+    const RECORDED_SOURCE = { source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp' } };
+    const RECORDED_PACKAGE = { package: { packageId: 'Acme.Payments.Sdk', version: '1.0.0' } };
+
+    const recordedAs = (entry: object) => fsExtra.writeJson(configPath(), { languages: { csharp: entry } });
+
+    const publishPackageOnly = () => execute(profileWith(GIT_CONFIG, PACKAGE_CONFIG), [PublishType.PackagePublishing]);
 
     it('says nothing when the recorded version matches the published one', async () => {
-      await recordedAs('v3');
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v3' });
       accepts();
 
-      await execute(profileWith(GIT_CONFIG));
+      await publishPackageOnly();
+
+      expect(codegenVersionMismatch.called).to.be.false;
+    });
+
+    it('says nothing when the run republishes both halves', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+      accepts();
+
+      await execute(profileWith(GIT_CONFIG, PACKAGE_CONFIG));
+
+      expect(codegenVersionMismatch.called).to.be.false;
+    });
+
+    it('says nothing when the recorded entry has no half to carry over', async () => {
+      await recordedAs({ codegenVersion: 'v4' });
+      accepts();
+
+      await publishPackageOnly();
 
       expect(codegenVersionMismatch.called).to.be.false;
     });
 
     it('says nothing about a language this run is not recording', async () => {
-      await fsExtra.writeJson(configPath(), { languages: { java: { codegenVersion: 'v4' } } });
+      await fsExtra.writeJson(configPath(), {
+        languages: { java: { ...RECORDED_SOURCE, codegenVersion: 'v4' } }
+      });
       accepts();
 
-      await execute(profileWith(GIT_CONFIG));
+      await publishPackageOnly();
 
       expect(codegenVersionMismatch.called).to.be.false;
     });
 
-    it('warns before asking when the recorded version differs', async () => {
-      await recordedAs('v4');
+    it('warns before asking when a package-only run leaves a source from another version', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
       const confirmRecordSdk = accepts();
 
-      await execute(profileWith(GIT_CONFIG));
+      await publishPackageOnly();
 
       expect(codegenVersionMismatch.calledOnce).to.be.true;
       expect(codegenVersionMismatch.firstCall.args).to.deep.equal([
@@ -287,30 +312,39 @@ describe('PluginRecordSdkAction', () => {
       expect(codegenVersionMismatch.calledBefore(confirmRecordSdk)).to.be.true;
     });
 
-    it('still records the published version when the user accepts', async () => {
-      await recordedAs('v4');
+    it('warns when a source-only run leaves a package from another version', async () => {
+      await recordedAs({ ...RECORDED_PACKAGE, codegenVersion: 'v4' });
       accepts();
 
-      await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
+      await execute(profileWith(GIT_CONFIG, PACKAGE_CONFIG), [PublishType.SourceCodePublishing]);
+
+      expect(codegenVersionMismatch.calledOnce).to.be.true;
+    });
+
+    it('still records the published version when the user accepts', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+      accepts();
+
+      await publishPackageOnly();
 
       expect(writtenConfig().languages.csharp).to.include({ codegenVersion: 'v3' });
     });
 
     it('leaves the recorded version alone when the user declines', async () => {
-      await recordedAs('v4');
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
       declines();
 
-      const result = await execute(profileWith(GIT_CONFIG));
+      const result = await publishPackageOnly();
 
       expect(result.isCancelled()).to.be.true;
-      expect(writtenConfig().languages.csharp).to.deep.equal({ codegenVersion: 'v4' });
+      expect(writtenConfig().languages.csharp).to.deep.equal({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
     });
 
     it('warns on the --update-plugin-config path too', async () => {
-      await recordedAs('v4');
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
       sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmRecordSdk');
 
-      await executeWithoutAsking(profileWith(GIT_CONFIG));
+      await executeWithoutAsking(profileWith(GIT_CONFIG, PACKAGE_CONFIG), [PublishType.PackagePublishing]);
 
       expect(codegenVersionMismatch.calledOnce).to.be.true;
     });

@@ -51,7 +51,7 @@ export class PluginRecordSdkAction {
     }
 
     if (configState.state === 'present') {
-      const result = configState.assertNoCodegenVersionMismatch(codegenVersion, language);
+      const result = configState.assertNoCodegenVersionMismatch(codegenVersion, language, entry);
       if (result.isErr()) {
         this.prompts.codegenVersionMismatch(language, result.error.actual, result.error.expected);
       }

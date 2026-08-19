@@ -45,15 +45,23 @@ class PluginConfigPresent {
 
   public assertNoCodegenVersionMismatch(
     codegenVersion: CodeGenerationVersion,
-    language: Language
+    language: Language,
+    entry: PluginLanguageEntry<Language>
   ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
-    let extractedVersion;
-    try {
-      extractedVersion = this.config.languages?.[language]?.codegenVersion;
-    } catch {
-      return ok(); // TypeError, since we don't do zod validation
+    if (entry.package && entry.source) {
+      return ok();  // if both package and source are given, there is no possible mismatch
     }
 
+    const existingEntry = this.config.languages?.[language];
+    if (!existingEntry) {
+      return ok();
+    }
+
+    if (!existingEntry.package && !existingEntry.source) {
+      return ok();
+    }
+
+    const extractedVersion = this.config.languages?.[language]?.codegenVersion;
     if (!extractedVersion) {
       return ok();
     }

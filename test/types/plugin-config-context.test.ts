@@ -4,7 +4,7 @@ import mockFs from 'mock-fs';
 import { expect } from 'chai';
 import { PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { PluginConfigData, PluginLanguages } from '../../src/types/plugin/plugin-config';
+import { PluginConfigData, PluginLanguageEntry, PluginLanguages } from '../../src/types/plugin/plugin-config';
 import { CodeGenerationVersion, Language } from '../../src/types/sdk/generate';
 
 describe('PluginConfigContext', () => {
@@ -125,21 +125,39 @@ describe('PluginConfigContext', () => {
   });
 
   describe('assertNoCodegenVersionMismatch', () => {
-    const assertFor = async (languages: object, codegenVersion = CodeGenerationVersion.V3) => {
+    const PUBLISHED_SOURCE = {
+      source: CSHARP_ENTRY.source,
+      codegenVersion: CodeGenerationVersion.V3
+    } satisfies PluginLanguageEntry<Language.CSHARP>;
+
+    const PUBLISHED_PACKAGE = {
+      package: CSHARP_ENTRY.package,
+      codegenVersion: CodeGenerationVersion.V3
+    } satisfies PluginLanguageEntry<Language.CSHARP>;
+
+    const assertFor = async (
+      languages: object,
+      published: PluginLanguageEntry<Language.CSHARP>,
+      codegenVersion = CodeGenerationVersion.V3
+    ) => {
       withConfig({ languages });
       const state = await context.loadState();
       if (state.state !== 'present') {
         expect.fail(`expected a present config, got ${state.state}`);
       }
-      return state.assertNoCodegenVersionMismatch(codegenVersion, Language.CSHARP);
+      return state.assertNoCodegenVersionMismatch(codegenVersion, Language.CSHARP, published);
     };
 
-    it('passes when the recorded version is the one being published', async () => {
-      expect((await assertFor({ csharp: CSHARP_ENTRY })).isOk()).to.be.true;
+    it('passes when the run republishes both halves, whatever the config records', async () => {
+      const result = await assertFor({ csharp: CSHARP_ENTRY }, CSHARP_ENTRY, CodeGenerationVersion.V4);
+
+      expect(result.isOk()).to.be.true;
     });
 
-    it('reports the recorded version alongside the published one when they differ', async () => {
-      const result = await assertFor({ csharp: CSHARP_ENTRY }, CodeGenerationVersion.V4);
+    it('reports the recorded version alongside the published one when a package-only run leaves a source behind', async () => {
+      const recorded = { source: CSHARP_ENTRY.source, codegenVersion: CodeGenerationVersion.V3 };
+
+      const result = await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4);
 
       expect(result.isErr()).to.be.true;
       expect(result._unsafeUnwrapErr()).to.deep.equal({
@@ -148,22 +166,48 @@ describe('PluginConfigContext', () => {
       });
     });
 
-    it('passes for a language the config does not carry', async () => {
-      expect((await assertFor({ java: CSHARP_ENTRY }, CodeGenerationVersion.V4)).isOk()).to.be.true;
+    it('reports the mismatch when a source-only run leaves a package behind', async () => {
+      const recorded = { package: CSHARP_ENTRY.package, codegenVersion: CodeGenerationVersion.V3 };
+
+      const result = await assertFor({ csharp: recorded }, PUBLISHED_SOURCE, CodeGenerationVersion.V4);
+
+      expect(result.isErr()).to.be.true;
     });
 
-    it('passes when the entry records no version', async () => {
-      const languages = { csharp: { source: { repositoryUrl: 'https://github.com/acme/sdk' } } };
+    it('passes when the recorded version is the one being published', async () => {
+      const recorded = { source: CSHARP_ENTRY.source, codegenVersion: CodeGenerationVersion.V3 };
 
-      expect((await assertFor(languages, CodeGenerationVersion.V4)).isOk()).to.be.true;
+      expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE)).isOk()).to.be.true;
+    });
+
+    it('passes for a language the config does not carry', async () => {
+      const result = await assertFor({ java: CSHARP_ENTRY }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4);
+
+      expect(result.isOk()).to.be.true;
+    });
+
+    it('passes when the recorded entry has no half to carry over', async () => {
+      const recorded = { codegenVersion: CodeGenerationVersion.V3 };
+
+      expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
+    });
+
+    it('passes when the recorded entry records no version', async () => {
+      const recorded = { source: { repositoryUrl: 'https://github.com/acme/sdk' } };
+
+      expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
     });
 
     it('passes when the languages field is not an object', async () => {
-      expect((await assertFor('nope' as unknown as object, CodeGenerationVersion.V4)).isOk()).to.be.true;
+      const languages = 'nope' as unknown as object;
+
+      expect((await assertFor(languages, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
     });
 
-    it('passes when the entry is not an object', async () => {
-      expect((await assertFor({ csharp: 'v3' }, CodeGenerationVersion.V4)).isOk()).to.be.true;
+    it('passes when the recorded entry is not an object', async () => {
+      const result = await assertFor({ csharp: 'v3' }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4);
+
+      expect(result.isOk()).to.be.true;
     });
   });
 
