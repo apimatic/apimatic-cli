@@ -50,6 +50,9 @@ export type PluginConfigWriteResult = 'written' | 'unreadable' | 'unwritable';
 
 type ParseResult = { config: PluginConfigData } | { reason: string };
 
+/** Notepad and PowerShell redirection both write one, and JSON does not allow it. */
+const BYTE_ORDER_MARK = 0xfeff;
+
 export class PluginConfigContext {
   private readonly fileService = new FileService();
 
@@ -132,7 +135,17 @@ export class PluginConfigContext {
   private async parse(): Promise<ParseResult> {
     try {
       // TODO: JSON Parsing/Stringify should be in a dedicated JSON infra layer which preferably uses zod
-      const parsed: unknown = JSON.parse(await this.fileService.getContents(this.configPath));
+      const contents = await this.fileService.getContents(this.configPath);
+      // Both reach `JSON.parse` as a syntax error at some offset, which leaves the user with
+      // nothing to act on. Naming them is what makes "fix or delete it" a usable instruction.
+      if (contents.trim() === '') {
+        return { reason: 'it is empty' };
+      }
+      if (contents.charCodeAt(0) === BYTE_ORDER_MARK) {
+        return { reason: 'it starts with a byte-order mark, which JSON does not allow' };
+      }
+
+      const parsed: unknown = JSON.parse(contents);
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         return { reason: 'it is not a JSON object' };
       }

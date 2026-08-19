@@ -56,6 +56,25 @@ describe('PluginConfigContext', () => {
       expect(state).to.include({ state: 'unreadable', reason: 'it is not a JSON object' });
     });
 
+    it('says the file is empty rather than reporting a JSON syntax error', async () => {
+      mockFs({ src: { 'plugin-config.json': '' } });
+
+      const state = await context.loadState();
+
+      expect(state).to.include({ state: 'unreadable', reason: 'it is empty' });
+    });
+
+    it('names the byte-order mark an editor left at the front of the file', async () => {
+      mockFs({ src: { 'plugin-config.json': '﻿{ "languages": {} }' } });
+
+      const state = await context.loadState();
+
+      expect(state).to.include({
+        state: 'unreadable',
+        reason: 'it starts with a byte-order mark, which JSON does not allow'
+      });
+    });
+
     it('reports neither metadata nor languages for a bare file', async () => {
       withConfig({ languages: {} });
 

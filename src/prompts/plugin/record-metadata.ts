@@ -70,7 +70,10 @@ export class PluginRecordMetadataPrompts {
   }
 
   public pluginConfigUnreadable() {
-    log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be read, so its plugin details were not written.`);
+    const message =
+      `${f.var(PLUGIN_CONFIG_FILE)} could not be read, so its plugin details were not written. ` +
+      `Fix or delete it and try again.`;
+    log.error(message);
   }
 
   public pluginConfigNotWritten() {
