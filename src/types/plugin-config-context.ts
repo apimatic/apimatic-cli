@@ -24,7 +24,7 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | PluginConfigPresent;
 
-class PluginConfigPresent {
+export class PluginConfigPresent {
   public readonly state = 'present' as const;
 
   private constructor(private readonly config: PluginConfigData) {}
@@ -78,11 +78,7 @@ class PluginConfigPresent {
   }
 }
 
-/**
- * Why a write did or did not happen. A bare boolean cannot say whether the file was unusable or
- * the disk refused it, and callers have to tell the user which.
- */
-export type PluginConfigWriteResult = 'written' | 'unreadable' | 'unwritable';
+export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
 type ParseResult = { config: PluginConfigData } | { reason: string };
 
@@ -115,7 +111,10 @@ export class PluginConfigContext {
    * Adds the plugin's identity, creating the file when absent. `license` is written unprompted
    * because the backend consumes it; `pluginKey` is deliberately not written, because nothing does.
    */
-  public async upsertMetadata(metadata: PluginMetadata, author?: PluginAuthor): Promise<PluginConfigWriteResult> {
+  public async upsertMetadata(
+    metadata: PluginMetadata,
+    author?: PluginAuthor
+  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
     return await this.merge((config) => ({
       ...config,
       pluginId: metadata.pluginId,
@@ -131,7 +130,7 @@ export class PluginConfigContext {
   public async upsertLanguage<L extends Language>(
     language: L,
     entry: PluginLanguageEntry<L>
-  ): Promise<PluginConfigWriteResult> {
+  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
     return await this.merge((config) => {
       const languages: PluginLanguages = { ...config.languages };
       languages[language] = mergeLanguageEntry(config.languages?.[language], entry);
@@ -142,12 +141,15 @@ export class PluginConfigContext {
   /**
    * A file that exists but cannot be parsed is left alone rather than overwritten, and a write
    * fault is reported rather than thrown: this runs after a publish that already succeeded, and
-   * nothing here may turn that into a crash.
+   * nothing here may turn that into a crash. A success carries the config as it now stands, so a
+   * caller that has to decide something after writing does not have to read the file back.
    */
-  private async merge(apply: (config: PluginConfigData) => PluginConfigData): Promise<PluginConfigWriteResult> {
+  private async merge(
+    apply: (config: PluginConfigData) => PluginConfigData
+  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
     const existing = await this.read();
     if ('reason' in existing) {
-      return 'unreadable';
+      return err('unreadable');
     }
 
     const merged = apply(existing.config);
@@ -155,10 +157,10 @@ export class PluginConfigContext {
     try {
       await this.write(merged);
     } catch {
-      return 'unwritable';
+      return err('unwritable');
     }
 
-    return 'written';
+    return ok(PluginConfigPresent.create(merged));
   }
 
   private async read(): Promise<ParseResult> {

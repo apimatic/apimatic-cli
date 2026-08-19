@@ -62,21 +62,22 @@ export class PluginRecordSdkAction {
       return ActionResult.cancelled();
     }
 
-    const result = await pluginConfigContext.upsertLanguage(language, entry);
-
-    switch (result) {
-      // Readable a moment ago, so this only happens if the file changed underneath us.
-      case 'unreadable':
-        this.prompts.pluginConfigUnreadable();
-        return ActionResult.failed();
-      case 'unwritable':
-        this.prompts.pluginConfigNotWritten();
-        return ActionResult.failed();
-      case 'written':
-        this.prompts.sdkRecorded(language);
-        return ActionResult.success();
-      default:
-        throw result satisfies never;
+    const writeResult = await pluginConfigContext.upsertLanguage(language, entry);
+    if (writeResult.isErr()) {
+      switch (writeResult.error) {
+        // Readable a moment ago, so this only happens if the file changed underneath us.
+        case 'unreadable':
+          this.prompts.pluginConfigUnreadable();
+          return ActionResult.failed();
+        case 'unwritable':
+          this.prompts.pluginConfigNotWritten();
+          return ActionResult.failed();
+        default:
+          throw writeResult.error satisfies never;
+      }
     }
+
+    this.prompts.sdkRecorded(language);
+    return ActionResult.success();
   };
 }

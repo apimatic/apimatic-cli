@@ -4,7 +4,7 @@ import { SubscriptionInfo } from '../../types/api/account.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginAuthor, PluginMetadata } from '../../types/plugin/plugin-config.js';
-import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PluginConfigContext, PluginConfigPresent } from '../../types/plugin-config-context.js';
 import { ActionResult } from '../action-result.js';
 
 /**
@@ -34,7 +34,9 @@ export class PluginRecordMetadataAction {
     this.authKey = authKey;
   }
 
-  public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult> => {
+  public readonly execute = async (
+    buildDirectory: DirectoryPath
+  ): Promise<ActionResult<PluginConfigPresent>> => {
     const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
       return ActionResult.cancelled(input.cancelled);
@@ -49,21 +51,22 @@ export class PluginRecordMetadataAction {
     }
 
     const author = account.isOk() ? authorOf(account.value) : undefined;
-    const result = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
-
-    switch (result) {
-      case 'unreadable':
-        this.prompts.pluginConfigUnreadable();
-        return ActionResult.failed();
-      case 'unwritable':
-        this.prompts.pluginConfigNotWritten();
-        return ActionResult.failed();
-      case 'written':
-        this.prompts.metadataRecorded(metadata);
-        return ActionResult.success();
-      default:
-        throw result satisfies never;
+    const writeResult = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
+    if (writeResult.isErr()) {
+      switch (writeResult.error) {
+        case 'unreadable':
+          this.prompts.pluginConfigUnreadable();
+          return ActionResult.failed();
+        case 'unwritable':
+          this.prompts.pluginConfigNotWritten();
+          return ActionResult.failed();
+        default:
+          throw writeResult.error satisfies never;
+      }
     }
+
+    this.prompts.metadataRecorded(metadata);
+    return ActionResult.success(writeResult.value);
   };
 }
 

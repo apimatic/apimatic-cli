@@ -77,6 +77,11 @@ export class ActionResult<T = void> {
     return this.isSuccess() ? this.value! : defaultValue;
   }
 
+  /** The same outcome without its value, for a caller whose own result carries a different one. */
+  public discardValue(): ActionResult {
+    return new ActionResult(this.resultType, this.message);
+  }
+
   public mapAll<R>(
     onSuccess: (value?: T) => R,
     onFailure: () => R,

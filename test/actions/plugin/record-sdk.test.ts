@@ -2,6 +2,7 @@ import * as path from 'path';
 import fsExtra from 'fs-extra';
 import sinon from 'sinon';
 import { expect } from 'chai';
+import { err } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
 import { PluginRecordSdkAction } from '../../../src/actions/plugin/record-sdk.js';
 import { PluginRecordSdkPrompts } from '../../../src/prompts/plugin/record-sdk.js';
@@ -213,7 +214,7 @@ describe('PluginRecordSdkAction', () => {
 
   it('warns when the config cannot be written', async () => {
     accepts();
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unwritable');
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(err('unwritable'));
     const notWritten = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigNotWritten');
 
     const result = await execute(profileWith(GIT_CONFIG));
@@ -224,7 +225,7 @@ describe('PluginRecordSdkAction', () => {
 
   it('reports a config that became unreadable after the user agreed to record', async () => {
     const confirmRecordSdk = accepts();
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves('unreadable');
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(err('unreadable'));
     const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
 
     await execute(profileWith(GIT_CONFIG));

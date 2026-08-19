@@ -230,7 +230,7 @@ describe('PluginConfigContext', () => {
     it('creates the file with the metadata and a default licence', async () => {
       mockFs({ src: {} });
 
-      expect(await context.upsertMetadata(METADATA)).to.equal('written');
+      expect((await context.upsertMetadata(METADATA)).isOk()).to.be.true;
       expect(writtenConfig()).to.deep.equal({
         languages: {},
         ...METADATA,
@@ -293,8 +293,29 @@ describe('PluginConfigContext', () => {
     it('refuses to overwrite a file it could not read', async () => {
       mockFs({ src: { 'plugin-config.json': '{ not json' } });
 
-      expect(await context.upsertMetadata(METADATA)).to.equal('unreadable');
+      expect((await context.upsertMetadata(METADATA))._unsafeUnwrapErr()).to.equal('unreadable');
       expect(fs.readFileSync(path.join('src', 'plugin-config.json'), 'utf-8')).to.equal('{ not json');
+    });
+  });
+
+  describe('the state a write hands back', () => {
+    it('reports the metadata it just wrote', async () => {
+      mockFs({ src: {} });
+
+      const state = (await context.upsertMetadata(METADATA))._unsafeUnwrap();
+
+      expect(state.hasMetadata()).to.be.true;
+      expect(state.hasPublishedSdks()).to.be.false;
+    });
+
+    it('reports the language it just wrote, alongside metadata written earlier', async () => {
+      mockFs({ src: { 'plugin-config.json': JSON.stringify({ ...METADATA, languages: {} }) } });
+
+      const state = (await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrap();
+
+      expect(state.hasPublishedSdks()).to.be.true;
+      expect(state.hasMetadata()).to.be.true;
+      expect(state.hasNoSourceRepository(Language.CSHARP)).to.be.false;
     });
   });
 
@@ -302,7 +323,7 @@ describe('PluginConfigContext', () => {
     it('creates the file with no metadata at all', async () => {
       mockFs({ src: {} });
 
-      expect(await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).to.equal('written');
+      expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).isOk()).to.be.true;
       expect(writtenConfig()).to.deep.equal({
         languages: { csharp: CSHARP_ENTRY }
       });
@@ -399,7 +420,7 @@ describe('PluginConfigContext', () => {
     it('refuses to overwrite a file it could not read', async () => {
       mockFs({ src: { 'plugin-config.json': '{ not json' } });
 
-      expect(await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).to.equal('unreadable');
+      expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrapErr()).to.equal('unreadable');
     });
   });
 });

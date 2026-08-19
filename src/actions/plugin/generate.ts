@@ -4,7 +4,7 @@ import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PluginConfigContext, PluginConfigPresent } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
@@ -46,21 +46,21 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    const configState = await new PluginConfigContext(buildDirectory).loadState();
+    let configState = await new PluginConfigContext(buildDirectory).loadState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     };
 
     if (configState.state === 'missing' || !configState.hasMetadata()) {
-      const result = await this.recordMetadata(buildDirectory);
-      if (!result.isSuccess()) {
-        return result;
+      const newConfigState = await this.recordMetadata(buildDirectory);
+      if (!newConfigState.isSuccess()) {
+        return newConfigState.discardValue();
       }
-      // fall through, assuming metadata has been populated
+      configState = newConfigState.getValue();
     }
 
-    if (!(configState.state === 'present' && configState.hasPublishedSdks())) {
+    if (!configState.hasPublishedSdks()) {
       this.prompts.noPublishedSdks();
       this.prompts.nextStepsPublishSdks();
       return ActionResult.success();
@@ -88,7 +88,7 @@ export class PluginGenerateAction {
     });
   };
 
-  private async recordMetadata(buildDirectory: DirectoryPath): Promise<ActionResult> {
+  private async recordMetadata(buildDirectory: DirectoryPath): Promise<ActionResult<PluginConfigPresent>> {
     const result = await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(
       buildDirectory
     );
