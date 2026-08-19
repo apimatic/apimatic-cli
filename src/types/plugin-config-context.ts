@@ -174,7 +174,7 @@ export class PluginConfigContext {
       if (contents.trim() === '') {
         return { reason: 'it is empty' };
       }
-      if (contents.charCodeAt(0) === BYTE_ORDER_MARK) {
+      if (contents.codePointAt(0) === BYTE_ORDER_MARK) {
         return { reason: 'it starts with a byte-order mark, which JSON does not allow' };
       }
 
