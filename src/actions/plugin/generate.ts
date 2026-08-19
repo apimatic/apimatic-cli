@@ -50,17 +50,17 @@ export class PluginGenerateAction {
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
+    };
+
+    if (configState.state === 'missing' || !configState.hasMetadata()) {
+      const result = await this.recordMetadata(buildDirectory);
+      if (!result.isSuccess()) {
+        return result;
+      }
+      // fall through, assuming metadata has been populated
     }
 
-    if (configState.state === 'missing') {
-      return await this.recordMetadata(buildDirectory);
-    }
-
-    if (!configState.hasMetadata()) {
-      return await this.recordMetadata(buildDirectory);
-    }
-
-    if (!configState.hasPublishedSdks()) {
+    if (!(configState.state === 'present' && configState.hasPublishedSdks())) {
       this.prompts.noPublishedSdks();
       this.prompts.nextStepsPublishSdks();
       return ActionResult.success();
@@ -97,12 +97,6 @@ export class PluginGenerateAction {
       this.prompts.metadataCancelled(result.getMessage());
       return ActionResult.cancelled();
     }
-    if (!result.isSuccess()) {
-      return result;
-    }
-
-    this.prompts.noPublishedSdks();
-    this.prompts.nextStepsPublishSdks();
-    return ActionResult.success();
+    return result;
   }
 }

@@ -166,7 +166,8 @@ describe('PluginGenerateAction', () => {
     it('fills in metadata and generates when sdk publish already recorded a language', async () => {
       await writeConfig({ languages: { csharp: CSHARP } });
       answersMetadata();
-      generated();
+      const generatePlugin = generated();
+      const nextSteps = PluginGeneratePrompts.prototype.nextStepsPublishSdks as sinon.SinonStub;
 
       const result = await execute();
 
@@ -174,6 +175,8 @@ describe('PluginGenerateAction', () => {
       const config = writtenConfig();
       expect(config).to.include(METADATA);
       expect(config.languages).to.deep.equal({ csharp: CSHARP });
+      expect(generatePlugin.called).to.be.true;
+      expect(nextSteps.called).to.be.false;
     });
 
     it('stops with next steps when the config has metadata but no languages', async () => {
