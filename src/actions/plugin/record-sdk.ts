@@ -22,7 +22,7 @@ export class PluginRecordSdkAction {
     publishTypes: PublishType[],
     packageVersion: SemVersion,
     codegenVersion: CodeGenerationVersion,
-    confirmFirst: boolean
+    isInteractive: boolean
   ): Promise<ActionResult> => {
     // The entry has to describe what this run published, not what the profile happens to enable.
     // A package-only run must not claim a repository it never pushed to, nor a source-only run a
@@ -52,15 +52,14 @@ export class PluginRecordSdkAction {
       const result = configState.assertNoCodegenVersionMismatch(codegenVersion, language, entry);
       if (result.isErr()) {
         this.prompts.codegenVersionMismatch(language, result.error.actual, result.error.expected);
+        if (isInteractive && !(await this.prompts.confirmCodegenVersionOverwrite())) {
+          return ActionResult.cancelled();
+        }
       }
     }
 
     if (!entry.source && (!configExisted || configState.hasNoSourceRepository(language))) {
       this.prompts.noSourceRepository(language);
-    }
-
-    if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configExisted))) {
-      return ActionResult.cancelled();
     }
 
     const writeResult = await pluginConfigContext.upsertLanguage(language, entry);

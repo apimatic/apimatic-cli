@@ -140,15 +140,17 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    await new PluginRecordSdkAction().execute(
-      buildDirectory,
-      language,
-      publishingProfile,
-      publishTypes,
-      version,
-      codegenOption.codeGenerationVersion(),
-      true
-    );
+    if (await this.prompts.confirmRecordSdk()) {
+      await new PluginRecordSdkAction().execute(
+        buildDirectory,
+        language,
+        publishingProfile,
+        publishTypes,
+        version,
+        codegenOption.codeGenerationVersion(),
+        true
+      );
+    }
 
     return ActionResult.success();
   };

@@ -5,26 +5,6 @@ import { format as f } from '../format.js';
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 
 export class PluginRecordSdkPrompts {
-  /**
-   * The pointer to `--help` is shown only when there is no config yet, which is the closest thing
-   * to a first run this command can detect: once the file exists the user has already answered this
-   * once, and repeating the pointer on every publish would be noise.
-   */
-  public async confirmRecordSdk(language: Language, configExists: boolean): Promise<boolean> {
-    const message = configExists
-      ? `Update ${f.var(PLUGIN_CONFIG_FILE)} for ${f.var(language)}?`
-      : `Create ${f.var(PLUGIN_CONFIG_FILE)} and add ${f.var(language)} to it?\n` +
-        `See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`;
-
-    const record = await confirm({ message, initialValue: true });
-
-    if (isCancel(record)) {
-      return false;
-    }
-
-    return record;
-  }
-
   public sdkRecorded(language: Language, configExists: boolean) {
     const message = (configExists
       ? `Updated ${f.var(PLUGIN_CONFIG_FILE)} for ${f.var(language)}. `
@@ -39,6 +19,16 @@ export class PluginRecordSdkPrompts {
       `but this SDK was generated with ${f.var(expected)}. ` +
       `Recording it overwrites ${f.var(actual)} with ${f.var(expected)}.`;
     log.warn(message);
+  }
+
+  public async confirmCodegenVersionOverwrite(): Promise<boolean> {
+    const overwrite = await confirm({ message: 'Do you want to proceed?', initialValue: true });
+
+    if (isCancel(overwrite)) {
+      return false;
+    }
+
+    return overwrite;
   }
 
   public noSourceRepository(language: Language) {
