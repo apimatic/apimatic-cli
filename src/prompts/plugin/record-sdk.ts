@@ -12,7 +12,7 @@ export class PluginRecordSdkPrompts {
    */
   public async confirmRecordSdk(language: Language, configExists: boolean): Promise<boolean> {
     const message = configExists
-      ? `Add ${f.var(language)} to ${f.var(PLUGIN_CONFIG_FILE)}?`
+      ? `Update ${f.var(PLUGIN_CONFIG_FILE)} for ${f.var(language)}?`
       : `Create ${f.var(PLUGIN_CONFIG_FILE)} and add ${f.var(language)} to it?\n` +
         `See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`;
 
