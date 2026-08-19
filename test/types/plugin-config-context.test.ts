@@ -40,7 +40,7 @@ describe('PluginConfigContext', () => {
 
   afterEach(() => mockFs.restore());
 
-  describe('loadState', () => {
+  describe('getPluginConfigState', () => {
     const presentState = (state: PluginConfigState) => {
       if (state.state !== 'present') {
         expect.fail(`expected a present config, got ${state.state}`);
@@ -51,13 +51,13 @@ describe('PluginConfigContext', () => {
     it('is missing when there is no file', async () => {
       mockFs({ src: {} });
 
-      expect(await context.loadState()).to.deep.equal({ state: 'missing' });
+      expect(await context.getPluginConfigState()).to.deep.equal({ state: 'missing' });
     });
 
     it('is unreadable when the file is not valid JSON', async () => {
       mockFs({ src: { 'plugin-config.json': '{ not json' } });
 
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
 
       expect(state.state).to.equal('unreadable');
     });
@@ -65,7 +65,7 @@ describe('PluginConfigContext', () => {
     it('is unreadable when the file is a JSON array', async () => {
       mockFs({ src: { 'plugin-config.json': '[]' } });
 
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
 
       expect(state).to.include({ state: 'unreadable', reason: 'it is not a JSON object' });
     });
@@ -73,7 +73,7 @@ describe('PluginConfigContext', () => {
     it('says the file is empty rather than reporting a JSON syntax error', async () => {
       mockFs({ src: { 'plugin-config.json': '' } });
 
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
 
       expect(state).to.include({ state: 'unreadable', reason: 'it is empty' });
     });
@@ -81,7 +81,7 @@ describe('PluginConfigContext', () => {
     it('names the byte-order mark an editor left at the front of the file', async () => {
       mockFs({ src: { 'plugin-config.json': '﻿{ "languages": {} }' } });
 
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
 
       expect(state).to.include({
         state: 'unreadable',
@@ -92,7 +92,7 @@ describe('PluginConfigContext', () => {
     it('names the languages field when it is not a JSON object', async () => {
       withConfig({ languages: 'csharp' });
 
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
 
       expect(state).to.include({ state: 'unreadable', reason: `its 'languages' field is not a JSON object` });
     });
@@ -100,7 +100,7 @@ describe('PluginConfigContext', () => {
     it('names the language whose entry is not a JSON object', async () => {
       withConfig({ languages: { csharp: 'v3' } });
 
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
 
       expect(state).to.include({ state: 'unreadable', reason: `its 'languages.csharp' entry is not a JSON object` });
     });
@@ -108,7 +108,7 @@ describe('PluginConfigContext', () => {
     it('accepts a config carrying no languages field at all', async () => {
       withConfig({ ...METADATA });
 
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
 
       expect(presentState(state).hasPublishedSdks()).to.be.false;
     });
@@ -116,7 +116,7 @@ describe('PluginConfigContext', () => {
     it('reports neither metadata nor languages for a bare file', async () => {
       withConfig({ languages: {} });
 
-      const present = presentState(await context.loadState());
+      const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.false;
       expect(present.hasPublishedSdks()).to.be.false;
@@ -125,7 +125,7 @@ describe('PluginConfigContext', () => {
     it('reports languages without metadata for a file written by sdk publish', async () => {
       withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
-      const present = presentState(await context.loadState());
+      const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.false;
       expect(present.hasPublishedSdks()).to.be.true;
@@ -134,7 +134,7 @@ describe('PluginConfigContext', () => {
     it('reports metadata without languages for a file written by plugin generate', async () => {
       withConfig({ ...METADATA, languages: {} });
 
-      const present = presentState(await context.loadState());
+      const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.true;
       expect(present.hasPublishedSdks()).to.be.false;
@@ -143,7 +143,7 @@ describe('PluginConfigContext', () => {
     it('reports both once the config is complete', async () => {
       withConfig({ ...METADATA, languages: { csharp: CSHARP_ENTRY } });
 
-      const present = presentState(await context.loadState());
+      const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.true;
       expect(present.hasPublishedSdks()).to.be.true;
@@ -152,19 +152,19 @@ describe('PluginConfigContext', () => {
     it('does not count a language recorded with neither a source nor a package', async () => {
       withConfig({ languages: { csharp: UNPUBLISHED_ENTRY } });
 
-      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.false;
+      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.false;
     });
 
     it('counts a language published as source only', async () => {
       withConfig({ languages: { csharp: SOURCE_ONLY_ENTRY } });
 
-      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.true;
+      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
     });
 
     it('counts a language published as package only', async () => {
       withConfig({ languages: { csharp: PACKAGE_ONLY_ENTRY } });
 
-      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.true;
+      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
     });
 
     it('counts a published language recorded alongside one with neither half', async () => {
@@ -175,25 +175,25 @@ describe('PluginConfigContext', () => {
         }
       });
 
-      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.true;
+      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
     });
 
     it('does not count a blank plugin id as metadata', async () => {
       withConfig({ pluginId: '   ', pluginName: 'Acme', languages: {} });
 
-      expect(presentState(await context.loadState()).hasMetadata()).to.be.false;
+      expect(presentState(await context.getPluginConfigState()).hasMetadata()).to.be.false;
     });
 
     it('does not count a plugin id that is not a string as metadata', async () => {
       withConfig({ pluginId: 7, pluginName: 'Acme', languages: {} });
 
-      expect(presentState(await context.loadState()).hasMetadata()).to.be.false;
+      expect(presentState(await context.getPluginConfigState()).hasMetadata()).to.be.false;
     });
 
     it('reports a recorded source repository for the language', async () => {
       withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
-      const present = presentState(await context.loadState());
+      const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasNoSourceRepository(Language.CSHARP)).to.be.false;
       expect(present.hasNoSourceRepository(Language.JAVA)).to.be.true;
@@ -202,7 +202,7 @@ describe('PluginConfigContext', () => {
     it('reports no source repository for an entry carrying only a package', async () => {
       withConfig({ languages: { csharp: { package: CSHARP_ENTRY.package, codegenVersion: 'v3' } } });
 
-      expect(presentState(await context.loadState()).hasNoSourceRepository(Language.CSHARP)).to.be.true;
+      expect(presentState(await context.getPluginConfigState()).hasNoSourceRepository(Language.CSHARP)).to.be.true;
     });
   });
 
@@ -223,7 +223,7 @@ describe('PluginConfigContext', () => {
       codegenVersion = CodeGenerationVersion.V3
     ) => {
       withConfig({ languages });
-      const state = await context.loadState();
+      const state = await context.getPluginConfigState();
       if (state.state !== 'present') {
         expect.fail(`expected a present config, got ${state.state}`);
       }

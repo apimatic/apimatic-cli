@@ -46,7 +46,7 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    let configState = await new PluginConfigContext(buildDirectory).loadState();
+    let configState = await new PluginConfigContext(buildDirectory).getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();

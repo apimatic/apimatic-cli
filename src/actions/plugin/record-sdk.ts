@@ -40,7 +40,7 @@ export class PluginRecordSdkAction {
     );
 
     const pluginConfigContext = new PluginConfigContext(buildDirectory);
-    const configState = await pluginConfigContext.loadState();
+    const configState = await pluginConfigContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason);
       return ActionResult.failed();

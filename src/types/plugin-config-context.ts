@@ -98,7 +98,7 @@ export class PluginConfigContext {
     return new FilePath(this.buildDirectory, new FileName('plugin-config.json'));
   }
 
-  public async loadState(): Promise<PluginConfigState> {
+  public async getPluginConfigState(): Promise<PluginConfigState> {
     if (!(await this.fileService.fileExists(this.configPath))) {
       return { state: 'missing' };
     }
