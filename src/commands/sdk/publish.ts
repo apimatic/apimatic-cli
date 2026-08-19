@@ -156,10 +156,10 @@ export default class SdkPublish extends Command {
           dryRun,
           CodegenOption.create(codegenVersion as CodeGenerationVersion, stability as Stability),
           metadata.flags.stability?.setFromDefault !== true,
+          updatePluginConfig,
           onPublishSdkError,
           profileId,
-          version,
-          updatePluginConfig
+          version
         );
     outro(result);
   }

@@ -31,10 +31,10 @@ export class SdkPublishNonInteractiveAction {
     dryRun: boolean,
     codegenOption: CodegenOption,
     stabilityWasProvided: boolean,
+    updatePluginConfig: boolean,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
-    version?: string,
-    updatePluginConfig: boolean = false
+    version?: string
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(sdkDirectory)) {
       this.prompts.directoryCannotBeSame(sdkDirectory);
