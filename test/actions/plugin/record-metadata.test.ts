@@ -65,7 +65,7 @@ describe('PluginRecordMetadataAction', () => {
     const result = await execute();
 
     expect(result.isSuccess()).to.be.true;
-    expect(writtenConfig()).to.include({ schemaVersion: 1, ...ANSWERS, license: 'MIT' });
+    expect(writtenConfig()).to.include({ ...ANSWERS, license: 'MIT' });
   });
 
   it('records the author from the account', async () => {
@@ -150,7 +150,6 @@ describe('PluginRecordMetadataAction', () => {
   it('keeps the languages a previous sdk publish recorded', async () => {
     const entry = { source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp' } };
     await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
-      schemaVersion: 1,
       languages: { csharp: entry }
     });
     answers();

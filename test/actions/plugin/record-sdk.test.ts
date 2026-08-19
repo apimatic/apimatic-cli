@@ -86,7 +86,6 @@ describe('PluginRecordSdkAction', () => {
 
     expect(result.isSuccess()).to.be.true;
     expect(writtenConfig()).to.deep.equal({
-      schemaVersion: 1,
       languages: {
         csharp: {
           source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
@@ -99,7 +98,6 @@ describe('PluginRecordSdkAction', () => {
 
   it('adds the language to a config that already has metadata, leaving it alone', async () => {
     await fsExtra.writeJson(configPath(), {
-      schemaVersion: 1,
       pluginId: 'acme-payments',
       pluginName: 'Acme Payments',
       license: 'MIT',
@@ -123,7 +121,7 @@ describe('PluginRecordSdkAction', () => {
   });
 
   it('asks to add to the file when one already exists', async () => {
-    await fsExtra.writeJson(configPath(), { schemaVersion: 1, languages: {} });
+    await fsExtra.writeJson(configPath(), { languages: {} });
     const confirmRecordSdk = accepts();
 
     await execute(profileWith(GIT_CONFIG));
@@ -179,7 +177,6 @@ describe('PluginRecordSdkAction', () => {
   // leave it in place rather than record over it.
   it('keeps a recorded source repository when only the package was published', async () => {
     await fsExtra.writeJson(configPath(), {
-      schemaVersion: 1,
       languages: {
         csharp: {
           source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
@@ -237,7 +234,6 @@ describe('PluginRecordSdkAction', () => {
       await executeWithoutAsking(profileWith(GIT_CONFIG));
 
       const config = writtenConfig();
-      expect(config.schemaVersion).to.equal(1);
       expect(config).to.not.have.property('pluginId');
     });
 

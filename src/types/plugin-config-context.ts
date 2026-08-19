@@ -6,7 +6,6 @@ import { mergeLanguageEntry } from './plugin/language-entry.js';
 import { Language } from './sdk/generate.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
-  PLUGIN_CONFIG_SCHEMA_VERSION,
   PluginAuthor,
   PluginConfigData,
   PluginLanguageEntry,
@@ -70,16 +69,6 @@ export class PluginConfigContext {
       return { state: 'unreadable', reason: parsed.reason, path: this.configPath };
     }
 
-    // A version this CLI does not model would be uploaded and rejected server-side, so it is
-    // refused here instead. Absent is fine — the next write backfills it.
-    const { schemaVersion } = parsed.config;
-    if (schemaVersion !== undefined && schemaVersion !== PLUGIN_CONFIG_SCHEMA_VERSION) {
-      const reason =
-        `it declares schemaVersion ${schemaVersion}, ` +
-        `and this version of the CLI only understands ${PLUGIN_CONFIG_SCHEMA_VERSION}`;
-      return { state: 'unreadable', reason, path: this.configPath };
-    }
-
     return PluginConfigPresent.create(parsed.config);
   }
 
@@ -123,8 +112,6 @@ export class PluginConfigContext {
     }
 
     const merged = apply(existing.config);
-    // A hand-written file may omit it.
-    merged.schemaVersion = merged.schemaVersion ?? PLUGIN_CONFIG_SCHEMA_VERSION;
 
     try {
       await this.write(merged);
@@ -137,7 +124,7 @@ export class PluginConfigContext {
 
   private async read(): Promise<ParseResult> {
     if (!(await this.fileService.fileExists(this.configPath))) {
-      return { config: { schemaVersion: PLUGIN_CONFIG_SCHEMA_VERSION, languages: {} } };
+      return { config: { languages: {} } };
     }
     return await this.parse();
   }

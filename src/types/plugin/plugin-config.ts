@@ -1,9 +1,6 @@
 import { SemVersionString } from '../publish/version.js';
 import { CodeGenerationVersion, Language } from '../sdk/generate.js';
 
-/** The only schema version the backend accepts. */
-export const PLUGIN_CONFIG_SCHEMA_VERSION = 1;
-
 /** Written unprompted: the backend consumes it, and nothing in the CLI asks for it. */
 export const DEFAULT_PLUGIN_LICENSE = 'MIT';
 
@@ -73,7 +70,6 @@ export type PluginLanguageEntry<L extends Language> = PluginConfigForLanguage[L]
 export type PluginLanguages = Partial<PluginConfigForLanguage>;
 
 export interface PluginConfigData {
-  schemaVersion: number;
   // Optional on disk: `sdk publish` creates a config carrying languages alone, and
   // `plugin generate` fills the identity in before it ever uploads.
   pluginId?: string;

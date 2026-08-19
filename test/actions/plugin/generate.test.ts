@@ -37,7 +37,6 @@ describe('PluginGenerateAction', () => {
     await fsExtra.ensureDir(buildDirectory);
     await fsExtra.writeJson(path.join(buildDirectory, 'APIMATIC-BUILD.json'), {});
     await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
-      schemaVersion: 1,
       pluginId: 'acme-payments',
       pluginName: 'Acme Payments',
       languages: { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } }
@@ -165,7 +164,7 @@ describe('PluginGenerateAction', () => {
     });
 
     it('fills in metadata and generates when sdk publish already recorded a language', async () => {
-      await writeConfig({ schemaVersion: 1, languages: { csharp: CSHARP } });
+      await writeConfig({ languages: { csharp: CSHARP } });
       answersMetadata();
       generated();
 
@@ -178,7 +177,7 @@ describe('PluginGenerateAction', () => {
     });
 
     it('stops with next steps when the config has metadata but no languages', async () => {
-      await writeConfig({ schemaVersion: 1, ...METADATA, languages: {} });
+      await writeConfig({ ...METADATA, languages: {} });
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
       const inputPluginMetadata = answersMetadata();
 

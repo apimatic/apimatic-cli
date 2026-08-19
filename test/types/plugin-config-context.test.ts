@@ -56,17 +56,8 @@ describe('PluginConfigContext', () => {
       expect(state).to.include({ state: 'unreadable', reason: 'it is not a JSON object' });
     });
 
-    it('is unreadable when the file declares a schema version this CLI does not model', async () => {
-      withConfig({ schemaVersion: 2, languages: {} });
-
-      const state = await context.loadState();
-
-      expect(state.state).to.equal('unreadable');
-      expect((state as { reason: string }).reason).to.contain('schemaVersion 2');
-    });
-
     it('reports neither metadata nor languages for a bare file', async () => {
-      withConfig({ schemaVersion: 1, languages: {} });
+      withConfig({ languages: {} });
 
       const present = presentState(await context.loadState());
 
@@ -75,7 +66,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('reports languages without metadata for a file written by sdk publish', async () => {
-      withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
       const present = presentState(await context.loadState());
 
@@ -84,7 +75,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('reports metadata without languages for a file written by plugin generate', async () => {
-      withConfig({ schemaVersion: 1, ...METADATA, languages: {} });
+      withConfig({ ...METADATA, languages: {} });
 
       const present = presentState(await context.loadState());
 
@@ -93,7 +84,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('reports both once the config is complete', async () => {
-      withConfig({ schemaVersion: 1, ...METADATA, languages: { csharp: CSHARP_ENTRY } });
+      withConfig({ ...METADATA, languages: { csharp: CSHARP_ENTRY } });
 
       const present = presentState(await context.loadState());
 
@@ -102,19 +93,18 @@ describe('PluginConfigContext', () => {
     });
 
     it('does not count a blank plugin id as metadata', async () => {
-      withConfig({ schemaVersion: 1, pluginId: '   ', pluginName: 'Acme', languages: {} });
+      withConfig({ pluginId: '   ', pluginName: 'Acme', languages: {} });
 
       expect(presentState(await context.loadState()).hasMetadata()).to.be.false;
     });
   });
 
   describe('upsertMetadata', () => {
-    it('creates the file with schema version, metadata and a default licence', async () => {
+    it('creates the file with the metadata and a default licence', async () => {
       mockFs({ src: {} });
 
       expect(await context.upsertMetadata(METADATA)).to.equal('written');
       expect(writtenConfig()).to.deep.equal({
-        schemaVersion: 1,
         languages: {},
         ...METADATA,
         license: 'MIT'
@@ -130,7 +120,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('leaves an author the config already credits alone', async () => {
-      withConfig({ schemaVersion: 1, author: { name: 'Acme Engineering' }, languages: {} });
+      withConfig({ author: { name: 'Acme Engineering' }, languages: {} });
 
       await context.upsertMetadata(METADATA, { name: 'Someone Else', email: 'someone@else.com' });
 
@@ -146,7 +136,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('leaves a hand-written licence alone', async () => {
-      withConfig({ schemaVersion: 1, license: 'Apache-2.0', languages: {} });
+      withConfig({ license: 'Apache-2.0', languages: {} });
 
       await context.upsertMetadata(METADATA);
 
@@ -154,7 +144,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('adds metadata to a config sdk publish already created, keeping its languages', async () => {
-      withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
       await context.upsertMetadata(METADATA);
 
@@ -164,7 +154,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('preserves fields this CLI version does not model', async () => {
-      withConfig({ schemaVersion: 1, pluginKey: 'hand-written', homepage: 'https://acme.com', languages: {} });
+      withConfig({ pluginKey: 'hand-written', homepage: 'https://acme.com', languages: {} });
 
       await context.upsertMetadata(METADATA);
 
@@ -181,29 +171,18 @@ describe('PluginConfigContext', () => {
     });
   });
 
-  describe('schemaVersion', () => {
-    it('backfills it into a hand-written file that omits it', async () => {
-      mockFs({ src: { 'plugin-config.json': JSON.stringify({ languages: {} }) } });
-
-      await context.upsertMetadata(METADATA);
-
-      expect(writtenConfig().schemaVersion).to.equal(1);
-    });
-  });
-
   describe('upsertLanguage', () => {
     it('creates the file with no metadata at all', async () => {
       mockFs({ src: {} });
 
       expect(await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).to.equal('written');
       expect(writtenConfig()).to.deep.equal({
-        schemaVersion: 1,
         languages: { csharp: CSHARP_ENTRY }
       });
     });
 
     it('adds a second language beside the first', async () => {
-      withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
       const typescriptEntry = {
         source: { repositoryUrl: 'https://github.com/acme/acme-payments-typescript' },
@@ -216,7 +195,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('replaces both halves when the run published both', async () => {
-      withConfig({ schemaVersion: 1, languages: { csharp: { source: { repositoryUrl: 'https://old' } } } });
+      withConfig({ languages: { csharp: { source: { repositoryUrl: 'https://old' } } } });
 
       await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
 
@@ -227,7 +206,7 @@ describe('PluginConfigContext', () => {
     // artifact that is still published.
     describe('keeps the half the run did not publish', () => {
       it('carries the recorded package over a source-only publish', async () => {
-        withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+        withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
         await context.upsertLanguage(Language.CSHARP, {
           source: { repositoryUrl: 'https://github.com/acme/renamed' },
@@ -242,7 +221,7 @@ describe('PluginConfigContext', () => {
       });
 
       it('carries the recorded source over a package-only publish', async () => {
-        withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+        withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
         await context.upsertLanguage(Language.CSHARP, {
           package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
@@ -257,7 +236,7 @@ describe('PluginConfigContext', () => {
       });
 
       it('records the entry as it stands when the language is new to the config', async () => {
-        withConfig({ schemaVersion: 1, languages: {} });
+        withConfig({ languages: {} });
 
         await context.upsertLanguage(Language.CSHARP, {
           package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
@@ -271,7 +250,7 @@ describe('PluginConfigContext', () => {
       });
 
       it('still takes the codegen version from the run that just published', async () => {
-        withConfig({ schemaVersion: 1, languages: { csharp: CSHARP_ENTRY } });
+        withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
         await context.upsertLanguage(Language.CSHARP, {
           package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
@@ -283,7 +262,7 @@ describe('PluginConfigContext', () => {
     });
 
     it('leaves existing metadata untouched', async () => {
-      withConfig({ schemaVersion: 1, ...METADATA, license: 'MIT', languages: {} });
+      withConfig({ ...METADATA, license: 'MIT', languages: {} });
 
       await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
 
