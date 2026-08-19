@@ -172,8 +172,6 @@ export class PluginConfigContext {
     try {
       // TODO: JSON Parsing/Stringify should be in a dedicated JSON infra layer which preferably uses zod
       const contents = await this.fileService.getContents(this.configPath);
-      // Both reach `JSON.parse` as a syntax error at some offset, which leaves the user with
-      // nothing to act on. Naming them is what makes "fix or delete it" a usable instruction.
       if (contents.trim() === '') {
         return { reason: 'it is empty' };
       }
