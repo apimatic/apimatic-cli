@@ -27,10 +27,6 @@ import {
 /** Every language's slot filled in, so a language cannot be left out by accident. */
 type ConfigurationsByLanguage<T extends { [L in Language]: unknown }> = { [L in Language]: T[L] | undefined };
 
-/**
- * `language in configs` is what reports a language enabled, and a key holding `undefined` answers
- * that just as loudly as a real configuration, so the disabled ones are dropped rather than stored.
- */
 function enabledOnly<T extends object>(configs: T): Partial<T> {
   return Object.fromEntries(Object.entries(configs).filter(([, config]) => config !== undefined)) as Partial<T>;
 }
