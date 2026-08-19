@@ -43,6 +43,10 @@ class PluginConfigPresent {
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
   }
 
+  public hasNoSourceRepository(language: Language): boolean {
+    return !this.config.languages?.[language]?.source;
+  }
+
   public assertNoCodegenVersionMismatch(
     codegenVersion: CodeGenerationVersion,
     language: Language,

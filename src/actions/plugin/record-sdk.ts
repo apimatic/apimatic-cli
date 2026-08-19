@@ -39,10 +39,6 @@ export class PluginRecordSdkAction {
       codegenVersion
     );
 
-    if (!entry.source) {
-      this.prompts.noSourceRepository(language);
-    }
-
     const pluginConfigContext = new PluginConfigContext(buildDirectory);
     const configState = await pluginConfigContext.loadState();
     if (configState.state === 'unreadable') {
@@ -55,6 +51,10 @@ export class PluginRecordSdkAction {
       if (result.isErr()) {
         this.prompts.codegenVersionMismatch(language, result.error.actual, result.error.expected);
       }
+    }
+
+    if (!entry.source && (configState.state === 'missing' || configState.hasNoSourceRepository(language))) {
+      this.prompts.noSourceRepository(language);
     }
 
     // A non-interactive run has already decided via `--update-plugin-config`; there is nobody to ask.

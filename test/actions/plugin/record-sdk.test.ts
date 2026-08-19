@@ -195,7 +195,20 @@ describe('PluginRecordSdkAction', () => {
       package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
       codegenVersion: 'v3'
     });
-    expect(noSourceRepository.calledOnce).to.be.true;
+    expect(noSourceRepository.called).to.be.false;
+  });
+
+  it('says so when neither the run nor the config has a source repository', async () => {
+    await fsExtra.writeJson(configPath(), {
+      languages: {
+        csharp: { package: { packageId: 'Acme.Payments.Sdk', version: '1.0.0' }, codegenVersion: 'v3' }
+      }
+    });
+    accepts();
+
+    await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
+
+    expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
   });
 
   it('warns when the config cannot be written', async () => {

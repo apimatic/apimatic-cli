@@ -122,6 +122,21 @@ describe('PluginConfigContext', () => {
 
       expect(presentState(await context.loadState()).hasMetadata()).to.be.false;
     });
+
+    it('reports a recorded source repository for the language', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
+
+      const present = presentState(await context.loadState());
+
+      expect(present.hasNoSourceRepository(Language.CSHARP)).to.be.false;
+      expect(present.hasNoSourceRepository(Language.JAVA)).to.be.true;
+    });
+
+    it('reports no source repository for an entry carrying only a package', async () => {
+      withConfig({ languages: { csharp: { package: CSHARP_ENTRY.package, codegenVersion: 'v3' } } });
+
+      expect(presentState(await context.loadState()).hasNoSourceRepository(Language.CSHARP)).to.be.true;
+    });
   });
 
   describe('assertNoCodegenVersionMismatch', () => {
