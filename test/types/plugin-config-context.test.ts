@@ -124,6 +124,49 @@ describe('PluginConfigContext', () => {
     });
   });
 
+  describe('assertNoCodegenVersionMismatch', () => {
+    const assertFor = async (languages: object, codegenVersion = CodeGenerationVersion.V3) => {
+      withConfig({ languages });
+      const state = await context.loadState();
+      if (state.state !== 'present') {
+        expect.fail(`expected a present config, got ${state.state}`);
+      }
+      return state.assertNoCodegenVersionMismatch(codegenVersion, Language.CSHARP);
+    };
+
+    it('passes when the recorded version is the one being published', async () => {
+      expect((await assertFor({ csharp: CSHARP_ENTRY })).isOk()).to.be.true;
+    });
+
+    it('reports the recorded version alongside the published one when they differ', async () => {
+      const result = await assertFor({ csharp: CSHARP_ENTRY }, CodeGenerationVersion.V4);
+
+      expect(result.isErr()).to.be.true;
+      expect(result._unsafeUnwrapErr()).to.deep.equal({
+        expected: CodeGenerationVersion.V4,
+        actual: CodeGenerationVersion.V3
+      });
+    });
+
+    it('passes for a language the config does not carry', async () => {
+      expect((await assertFor({ java: CSHARP_ENTRY }, CodeGenerationVersion.V4)).isOk()).to.be.true;
+    });
+
+    it('passes when the entry records no version', async () => {
+      const languages = { csharp: { source: { repositoryUrl: 'https://github.com/acme/sdk' } } };
+
+      expect((await assertFor(languages, CodeGenerationVersion.V4)).isOk()).to.be.true;
+    });
+
+    it('passes when the languages field is not an object', async () => {
+      expect((await assertFor('nope' as unknown as object, CodeGenerationVersion.V4)).isOk()).to.be.true;
+    });
+
+    it('passes when the entry is not an object', async () => {
+      expect((await assertFor({ csharp: 'v3' }, CodeGenerationVersion.V4)).isOk()).to.be.true;
+    });
+  });
+
   describe('upsertMetadata', () => {
     it('creates the file with the metadata and a default licence', async () => {
       mockFs({ src: {} });

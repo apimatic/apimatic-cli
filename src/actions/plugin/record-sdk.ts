@@ -50,6 +50,13 @@ export class PluginRecordSdkAction {
       return ActionResult.failed();
     }
 
+    if (configState.state === 'present') {
+      const result = configState.assertNoCodegenVersionMismatch(codegenVersion, language);
+      if (result.isErr()) {
+        this.prompts.codegenVersionMismatch(language, result.error.actual, result.error.expected);
+      }
+    }
+
     // A non-interactive run has already decided via `--update-plugin-config`; there is nobody to ask.
     if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configState.state === 'present'))) {
       return ActionResult.cancelled();

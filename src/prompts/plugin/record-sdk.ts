@@ -1,5 +1,5 @@
 import { confirm, isCancel, log } from '@clack/prompts';
-import { Language } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
 import { format as f } from '../format.js';
 
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
@@ -32,6 +32,15 @@ export class PluginRecordSdkPrompts {
     log.info(message);
   }
 
+  public codegenVersionMismatch(language: Language, actual: CodeGenerationVersion, expected: CodeGenerationVersion) {
+    const message =
+      `${f.var(PLUGIN_CONFIG_FILE)} records ${f.var(language)} against ${f.var(actual)}, ` +
+      `but this SDK was generated with ${f.var(expected)}. ` +
+      `Recording it overwrites ${f.var(actual)} with ${f.var(expected)}, and a plugin that points ` +
+      `to two different code generator versions can confuse AI agents.`;
+    log.warn(message);
+  }
+
   public noSourceRepository(language: Language) {
     const message =
       `Context plugin generation needs a source repository, and none was published for ${f.var(language)}. ` +
@@ -40,7 +49,10 @@ export class PluginRecordSdkPrompts {
   }
 
   public pluginConfigUnreadable() {
-    log.warn(`${f.var(PLUGIN_CONFIG_FILE)} cannot be used, so this SDK was not added to it.`);
+    const message =
+      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used, so this SDK was not added to it. ` +
+      `Fix or delete it so the next run can update it.`;
+    log.warn(message);
   }
 
   public pluginConfigNotWritten() {

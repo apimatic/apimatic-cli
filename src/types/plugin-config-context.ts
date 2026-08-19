@@ -3,7 +3,7 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { mergeLanguageEntry } from './plugin/language-entry.js';
-import { Language } from './sdk/generate.js';
+import { CodeGenerationVersion, Language } from './sdk/generate.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
   PluginAuthor,
@@ -12,6 +12,7 @@ import {
   PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
+import { err, ok, Result } from 'neverthrow';
 
 /**
  * What a caller needs to know before generating. Metadata and languages are written by different
@@ -39,6 +40,28 @@ class PluginConfigPresent {
 
   public hasMetadata(): boolean {
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
+  }
+
+  public assertNoCodegenVersionMismatch(
+    codegenVersion: CodeGenerationVersion,
+    language: Language
+  ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
+    let extractedVersion;
+    try {
+      extractedVersion = this.config.languages?.[language]?.codegenVersion;
+    } catch {
+      return ok(); // TypeError, since we don't do zod validation
+    }
+
+    if (!extractedVersion) {
+      return ok();
+    }
+
+    if (extractedVersion === codegenVersion) {
+      return ok();
+    }
+
+    return err({ expected: codegenVersion, actual: extractedVersion });
   }
 }
 
@@ -165,4 +188,3 @@ export class PluginConfigContext {
     await this.fileService.writeContents(this.configPath, JSON.stringify(config, null, 2));
   }
 }
-
