@@ -58,7 +58,8 @@ export class PluginRecordSdkAction {
     }
 
     // A non-interactive run has already decided via `--update-plugin-config`; there is nobody to ask.
-    if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configState.state === 'present'))) {
+    const configExisted = configState.state === 'present';
+    if (confirmFirst && !(await this.prompts.confirmRecordSdk(language, configExisted))) {
       return ActionResult.cancelled();
     }
 
@@ -77,7 +78,7 @@ export class PluginRecordSdkAction {
       }
     }
 
-    this.prompts.sdkRecorded(language);
+    this.prompts.sdkRecorded(language, configExisted);
     return ActionResult.success();
   };
 }

@@ -25,9 +25,10 @@ export class PluginRecordSdkPrompts {
     return record;
   }
 
-  public sdkRecorded(language: Language) {
-    const message =
-      `Updated ${f.var(PLUGIN_CONFIG_FILE)} for ${f.var(language)}. ` +
+  public sdkRecorded(language: Language, configExists: boolean) {
+    const message = (configExists
+      ? `Updated ${f.var(PLUGIN_CONFIG_FILE)} for ${f.var(language)}. `
+      : `Created ${f.var(PLUGIN_CONFIG_FILE)} and added ${f.var(language)}`) +
       `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' to build your context plugin.`;
     log.info(message);
   }
