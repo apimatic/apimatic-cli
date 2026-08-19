@@ -2,7 +2,6 @@ import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
-import { mergeLanguageEntry } from './plugin/language-entry.js';
 import { CodeGenerationVersion, Language } from './sdk/generate.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
@@ -113,8 +112,6 @@ export class PluginConfigContext {
       pluginId: metadata.pluginId,
       pluginName: metadata.pluginName,
       pluginVersion: metadata.pluginVersion,
-      // The account this run happens to be signed in to does not get to relabel a plugin someone
-      // has already attributed.
       ...(!config.author && author && { author }),
       license: config.license ?? DEFAULT_PLUGIN_LICENSE
     }));
@@ -126,7 +123,13 @@ export class PluginConfigContext {
   ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
     return await this.merge((config) => {
       const languages: PluginLanguages = { ...config.languages };
-      languages[language] = mergeLanguageEntry(config.languages?.[language], entry);
+      const existingEntry = config.languages?.[language];
+      languages[language] = {
+        ...existingEntry,
+        ...entry,
+        source: entry.source ?? existingEntry?.source,
+        package: entry.package ?? existingEntry?.package
+      };
       return { ...config, languages };
     });
   }

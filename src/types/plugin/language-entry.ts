@@ -62,24 +62,6 @@ const languageEntryBuilders: { [L in Language]: LanguageEntryBuilder<L> } = {
 };
 
 /**
- * A publish records one half of an entry at a time, so the half this run did not publish is carried
- * over from what is already on disk rather than dropped: a package-only run must not erase the
- * repository an earlier source-only run recorded, nor the other way round. `codegenVersion` is not
- * a half — it always describes the generator this run used.
- */
-export function mergeLanguageEntry<L extends Language>(
-  recorded: PluginLanguageEntry<L> | undefined,
-  published: PluginLanguageEntry<L>
-): PluginLanguageEntry<L> {
-  return {
-    ...recorded,
-    ...published,
-    source: published.source ?? recorded?.source,
-    package: published.package ?? recorded?.package
-  };
-}
-
-/**
  * The version rides inside the package block, so a source-only publish records no version at all —
  * there is no package for it to describe.
  */
