@@ -34,7 +34,11 @@ export class PluginConfigPresent {
 
   public hasPublishedSdks(): boolean {
     const languages = this.config.languages;
-    return typeof languages === 'object' && languages !== null && Object.keys(languages).length > 0;
+    if (typeof languages !== 'object' || languages === null) {
+      return false;
+    }
+
+    return Object.values(languages).some((entry) => entry?.source || entry?.package);
   }
 
   public hasMetadata(): boolean {

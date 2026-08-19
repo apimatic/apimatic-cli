@@ -191,6 +191,16 @@ describe('PluginGenerateAction', () => {
       expect(inputPluginMetadata.called).to.be.false;
     });
 
+    it('stops with next steps when the only recorded language has neither a source nor a package', async () => {
+      await writeConfig({ ...METADATA, languages: { csharp: { codegenVersion: 'v3' } } });
+      const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+
+      const result = await execute();
+
+      expect(result.isSuccess()).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+    });
+
     it('cancels without generating when the metadata prompts are escaped', async () => {
       await fsExtra.remove(configPath());
       cancelsMetadata();

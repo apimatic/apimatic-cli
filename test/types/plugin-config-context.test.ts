@@ -17,6 +17,20 @@ describe('PluginConfigContext', () => {
     codegenVersion: CodeGenerationVersion.V3
   } satisfies NonNullable<PluginLanguages['csharp']>;
 
+  const SOURCE_ONLY_ENTRY = {
+    source: CSHARP_ENTRY.source,
+    codegenVersion: CSHARP_ENTRY.codegenVersion
+  } satisfies NonNullable<PluginLanguages['csharp']>;
+
+  const PACKAGE_ONLY_ENTRY = {
+    package: CSHARP_ENTRY.package,
+    codegenVersion: CSHARP_ENTRY.codegenVersion
+  } satisfies NonNullable<PluginLanguages['csharp']>;
+
+  const UNPUBLISHED_ENTRY = {
+    codegenVersion: CSHARP_ENTRY.codegenVersion
+  } satisfies NonNullable<PluginLanguages['csharp']>;
+
   const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
 
   const writtenConfig = (): PluginConfigData =>
@@ -133,6 +147,35 @@ describe('PluginConfigContext', () => {
 
       expect(present.hasMetadata()).to.be.true;
       expect(present.hasPublishedSdks()).to.be.true;
+    });
+
+    it('does not count a language recorded with neither a source nor a package', async () => {
+      withConfig({ languages: { csharp: UNPUBLISHED_ENTRY } });
+
+      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.false;
+    });
+
+    it('counts a language published as source only', async () => {
+      withConfig({ languages: { csharp: SOURCE_ONLY_ENTRY } });
+
+      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.true;
+    });
+
+    it('counts a language published as package only', async () => {
+      withConfig({ languages: { csharp: PACKAGE_ONLY_ENTRY } });
+
+      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.true;
+    });
+
+    it('counts a published language recorded alongside one with neither half', async () => {
+      withConfig({
+        languages: {
+          csharp: UNPUBLISHED_ENTRY,
+          typescript: { package: { name: '@acme/sdk', version: '1.2.3' }, codegenVersion: CodeGenerationVersion.V3 }
+        }
+      });
+
+      expect(presentState(await context.loadState()).hasPublishedSdks()).to.be.true;
     });
 
     it('does not count a blank plugin id as metadata', async () => {
