@@ -48,9 +48,10 @@ export class PluginRecordSdkPrompts {
     log.warn(message);
   }
 
-  public pluginConfigUnreadable() {
+  public pluginConfigUnreadable(reason?: string) {
+    const cause = reason ? `: ${reason}` : '';
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used, so this SDK was not added to it. ` +
+      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used${cause}, so this SDK was not added to it. ` +
       `Fix or delete it and try again.`;
     log.warn(message);
   }

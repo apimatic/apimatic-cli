@@ -75,6 +75,30 @@ describe('PluginConfigContext', () => {
       });
     });
 
+    it('names the languages field when it is not a JSON object', async () => {
+      withConfig({ languages: 'csharp' });
+
+      const state = await context.loadState();
+
+      expect(state).to.include({ state: 'unreadable', reason: `its 'languages' field is not a JSON object` });
+    });
+
+    it('names the language whose entry is not a JSON object', async () => {
+      withConfig({ languages: { csharp: 'v3' } });
+
+      const state = await context.loadState();
+
+      expect(state).to.include({ state: 'unreadable', reason: `its 'languages.csharp' entry is not a JSON object` });
+    });
+
+    it('accepts a config carrying no languages field at all', async () => {
+      withConfig({ ...METADATA });
+
+      const state = await context.loadState();
+
+      expect(presentState(state).hasPublishedSdks()).to.be.false;
+    });
+
     it('reports neither metadata nor languages for a bare file', async () => {
       withConfig({ languages: {} });
 
@@ -213,17 +237,6 @@ describe('PluginConfigContext', () => {
       expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
     });
 
-    it('passes when the languages field is not an object', async () => {
-      const languages = 'nope' as unknown as object;
-
-      expect((await assertFor(languages, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
-    });
-
-    it('passes when the recorded entry is not an object', async () => {
-      const result = await assertFor({ csharp: 'v3' }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4);
-
-      expect(result.isOk()).to.be.true;
-    });
   });
 
   describe('upsertMetadata', () => {
@@ -413,6 +426,14 @@ describe('PluginConfigContext', () => {
       await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY);
 
       expect(writtenConfig()).to.include({ ...METADATA, license: 'MIT' });
+    });
+
+    it('refuses a languages field it cannot merge rather than spreading it into the file', async () => {
+      const original = JSON.stringify({ languages: 'csharp' });
+      mockFs({ src: { 'plugin-config.json': original } });
+
+      expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrapErr()).to.equal('unreadable');
+      expect(fs.readFileSync(path.join('src', 'plugin-config.json'), 'utf-8')).to.equal(original);
     });
   });
 });

@@ -81,6 +81,10 @@ export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
 type ParseResult = { config: PluginConfigData } | { reason: string };
 
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export class PluginConfigContext {
   private readonly fileService = new FileService();
 
@@ -179,9 +183,23 @@ export class PluginConfigContext {
       }
 
       const parsed: unknown = JSON.parse(contents);
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      if (!isJsonObject(parsed)) {
         return { reason: 'it is not a JSON object' };
       }
+      // Every write merges these by spreading them, which turns a string into `{"0":"a"}` and a
+      // number into nothing, so a wrong shape has to be refused before it can corrupt the file.
+      const languages = parsed.languages;
+      if (languages !== undefined) {
+        if (!isJsonObject(languages)) {
+          return { reason: `its 'languages' field is not a JSON object` };
+        }
+        for (const [language, entry] of Object.entries(languages)) {
+          if (!isJsonObject(entry)) {
+            return { reason: `its 'languages.${language}' entry is not a JSON object` };
+          }
+        }
+      }
+
       return { config: parsed as PluginConfigData };
     } catch (error) {
       return { reason: error instanceof Error ? error.message : String(error) };

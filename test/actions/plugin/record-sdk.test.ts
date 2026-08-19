@@ -322,4 +322,16 @@ describe('PluginRecordSdkAction', () => {
     expect(confirmRecordSdk.called).to.be.false;
     expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal('{ not json');
   });
+
+  it('tells the user why the config could not be read', async () => {
+    const contents = JSON.stringify({ languages: 'csharp' });
+    await fsExtra.writeFile(configPath(), contents);
+    accepts();
+    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+
+    await execute(profileWith(GIT_CONFIG));
+
+    expect(pluginConfigUnreadable.firstCall.args[0]).to.equal(`its 'languages' field is not a JSON object`);
+    expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(contents);
+  });
 });
