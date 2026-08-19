@@ -6,6 +6,8 @@ import { Result, ok, err } from 'neverthrow';
  */
 export type SemVersionString = `${number}.${number}.${number}`;
 
+const DIGITS = /^\d+$/;
+
 export class SemVersion {
   private readonly value: string;
 
@@ -15,7 +17,10 @@ export class SemVersion {
 
   public static tryCreate(value: string): Result<SemVersion, string> {
     const parts = value.split('.');
-    if (parts.length !== 3 || !parts.every((p) => p !== '' && !isNaN(Number(p)) && Number(p) >= 0)) {
+    // Each part is matched as digits rather than run through `Number`, which also accepts the
+    // surrounding whitespace, `Infinity`, `0x10` and `1e3` — all of which would be written into
+    // the published package's version verbatim.
+    if (parts.length !== 3 || !parts.every((p) => DIGITS.test(p))) {
       return err('Invalid version format. Expected major.minor.patch (e.g., 1.0.0).');
     }
     return ok(new SemVersion(value));
