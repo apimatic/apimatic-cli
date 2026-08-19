@@ -51,7 +51,7 @@ export class PluginRecordSdkPrompts {
   public pluginConfigUnreadable() {
     const message =
       `${f.var(PLUGIN_CONFIG_FILE)} cannot be used, so this SDK was not added to it. ` +
-      `Fix or delete it so the next run can update it.`;
+      `Fix or delete it and try again.`;
     log.warn(message);
   }
 
