@@ -17,16 +17,12 @@ export class SemVersion {
 
   public static tryCreate(value: string): Result<SemVersion, string> {
     const parts = value.split('.');
-    // Each part is matched as digits rather than run through `Number`, which also accepts the
-    // surrounding whitespace, `Infinity`, `0x10` and `1e3` — all of which would be written into
-    // the published package's version verbatim.
     if (parts.length !== 3 || !parts.every((p) => DIGITS.test(p))) {
       return err('Invalid version format. Expected major.minor.patch (e.g., 1.0.0).');
     }
     return ok(new SemVersion(value));
   }
 
-  // The narrower type is honest because `tryCreate` is the only way in.
   public toString(): SemVersionString {
     return this.value as SemVersionString;
   }
