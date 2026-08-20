@@ -11,6 +11,7 @@ import {
   PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
+import { PluginRelease, PluginReleaseProblem } from './plugin/plugin-release.js';
 import { err, ok, Result } from 'neverthrow';
 
 /**
@@ -44,6 +45,14 @@ export class PluginConfigPresent {
   public hasMetadata(): boolean {
     const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
+  }
+
+  /**
+   * Narrower than `hasMetadata`: a publish names the repository and the tag, so it needs the ID and
+   * the version, and never reads the display name.
+   */
+  public getPluginRelease(): Result<PluginRelease, PluginReleaseProblem> {
+    return PluginRelease.create(this.config.pluginId, this.config.pluginVersion);
   }
 
   public hasNoSourceRepository(language: Language): boolean {

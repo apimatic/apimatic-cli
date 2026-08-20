@@ -3,6 +3,7 @@ import { ZipService } from '../infrastructure/zip-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { PluginContents } from './plugin/plugin-contents.js';
 
 const GIT_DIRECTORY_NAME = '.git';
 
@@ -18,6 +19,18 @@ export class PluginContext {
 
   public async exists(): Promise<boolean> {
     return !(await this.fileService.directoryEmpty(this.pluginDirectory));
+  }
+
+  /** Counts exclude the repository: `git add .` never stages `.git`, and its objects would dwarf the plugin. */
+  public async describeContents(): Promise<PluginContents> {
+    const directory = await this.fileService.getDirectory(this.pluginDirectory);
+    const publishable = directory.excluding([new FileName(GIT_DIRECTORY_NAME)]);
+
+    return { fileCount: publishable.countFiles(), directoryCount: publishable.countDirectories() };
+  }
+
+  public async isGitInitialized(): Promise<boolean> {
+    return await this.fileService.directoryExists(this.pluginDirectory.join(GIT_DIRECTORY_NAME));
   }
 
   public async save(tempPluginFilePath: FilePath, zipPlugin: boolean): Promise<void> {

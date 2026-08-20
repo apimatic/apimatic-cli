@@ -3,12 +3,12 @@ import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../types/api/account.js';
 import { PluginMetadata } from '../../types/plugin/plugin-config.js';
+import { PLUGIN_ID_PATTERN } from '../../types/plugin/plugin-release.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { format as f } from '../format.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
-const KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * Which answer was missing, so a caller that abandons the run can say what it was waiting for
@@ -36,7 +36,7 @@ export class PluginRecordMetadataPrompts {
       placeholder: defaults.pluginId,
       validate: (value) => {
         if (!value) return 'Plugin ID is required.';
-        if (!KEBAB_CASE.test(value))
+        if (!PLUGIN_ID_PATTERN.test(value))
           return `Plugin ID must be lower-case alphanumeric words separated by single dashes, for example 'acme-payments'.`;
       }
     });
