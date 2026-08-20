@@ -35,7 +35,7 @@ export class PluginPublishAction {
 
     const release = configState.getPluginRelease();
     if (release.isErr()) {
-      this.prompts.pluginReleaseIncomplete(release.error);
+      this.prompts.pluginReleaseUnusable(release.error);
       return ActionResult.failed();
     }
 

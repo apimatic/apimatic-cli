@@ -117,7 +117,7 @@ describe('PluginPublishAction', () => {
     });
 
     it('fails and names pluginId when the id is absent', async () => {
-      const prompt = spy('pluginReleaseIncomplete');
+      const prompt = spy('pluginReleaseUnusable');
       await writeConfig({ ...validConfig, pluginId: undefined });
 
       const result = await execute();
@@ -127,7 +127,7 @@ describe('PluginPublishAction', () => {
     });
 
     it('fails and names pluginId when the id is not kebab-case', async () => {
-      const prompt = spy('pluginReleaseIncomplete');
+      const prompt = spy('pluginReleaseUnusable');
       await writeConfig({ ...validConfig, pluginId: 'Hamza Plugin' });
 
       const result = await execute();
@@ -138,7 +138,7 @@ describe('PluginPublishAction', () => {
 
     // `hasMetadata` does not cover the version, so this is the only guard on the field the tag needs.
     it('fails and names pluginVersion when the version is absent', async () => {
-      const prompt = spy('pluginReleaseIncomplete');
+      const prompt = spy('pluginReleaseUnusable');
       await writeConfig({ ...validConfig, pluginVersion: undefined });
 
       const result = await execute();
@@ -148,7 +148,7 @@ describe('PluginPublishAction', () => {
     });
 
     it('fails and names pluginVersion when the version is not semver', async () => {
-      const prompt = spy('pluginReleaseIncomplete');
+      const prompt = spy('pluginReleaseUnusable');
       await writeConfig({ ...validConfig, pluginVersion: '1.2' });
 
       const result = await execute();

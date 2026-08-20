@@ -61,7 +61,7 @@ export class PluginPublishPrompts {
     log.error(message);
   }
 
-  public pluginReleaseIncomplete(problem: PluginReleaseProblem) {
+  public pluginReleaseUnusable(problem: PluginReleaseProblem) {
     const message =
       `${f.var(problem.field)} ${this.releaseProblemDetail(problem)}. ` +
       `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' to set it.`;
