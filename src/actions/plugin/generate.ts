@@ -91,6 +91,7 @@ export class PluginGenerateAction {
       await pluginContext.save(tempPluginZipPath, zipPlugin);
 
       this.prompts.pluginGenerated(pluginDirectory);
+      this.prompts.nextStepsPublishPlugin();
 
       return ActionResult.success();
     });

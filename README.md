@@ -41,6 +41,7 @@ USAGE
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
 * [`apimatic plugin generate`](#apimatic-plugin-generate)
+* [`apimatic plugin publish`](#apimatic-plugin-publish)
 * [`apimatic portal copilot`](#apimatic-portal-copilot)
 * [`apimatic portal generate`](#apimatic-portal-generate)
 * [`apimatic portal recipe new`](#apimatic-portal-recipe-new)
@@ -252,6 +253,33 @@ EXAMPLES
 ```
 
 _See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/plugin/generate.ts)_
+
+## `apimatic plugin publish`
+
+Print the git commands for publishing your context plugin to GitHub.
+
+```
+USAGE
+  $ apimatic plugin publish [-i <value>] [-d <value>]
+
+FLAGS
+  -d, --destination=<value>  [default: <input>/plugin] path where the plugin will be generated.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+
+DESCRIPTION
+  Print the git commands for publishing your context plugin to GitHub.
+
+  Print the commands that publish a generated context plugin to a GitHub repository. The commands are printed for you to
+  run — this command never touches your repository.
+
+EXAMPLES
+  apimatic plugin publish
+
+  apimatic plugin publish --input="./" --destination="./plugin"
+```
+
+_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/plugin/publish.ts)_
 
 ## `apimatic portal copilot`
 
