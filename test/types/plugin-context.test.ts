@@ -61,46 +61,25 @@ describe('PluginContext', () => {
 
       expect(fs.existsSync(path.join(pluginDirectory.toString(), 'plugin.zip'))).to.be.true;
     });
-  });
 
-  // The default `--zip=false` path, which every ordinary run takes. Real files rather than
-  // mock-fs: adm-zip reads the archive itself, so the bytes have to be a genuine zip.
-  describe('save, expanding the archive', () => {
-    let workDir: string;
-    let archive: FilePath;
-    let destination: DirectoryPath;
+    // Once published, the plugin directory is the user's repository. Clearing it wholesale would
+    // discard their history, their remote and every tag they have pushed.
+    it('leaves an existing repository in place', async () => {
+      mockFs({
+        plugin: {
+          'stale.md': 'from a language that is gone',
+          '.git': { HEAD: 'ref: refs/heads/main', config: '[remote "origin"]', refs: { tags: { 'v0.1.66': 'abc123' } } }
+        },
+        temp: { downloaded: 'zip-bytes' }
+      });
 
-    beforeEach(async () => {
-      workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-context-'));
-      const source = new DirectoryPath(path.join(workDir, 'source'));
-      fs.mkdirSync(path.join(source.toString(), 'skills'), { recursive: true });
-      fs.writeFileSync(path.join(source.toString(), 'README.md'), '# plugin');
-      fs.writeFileSync(path.join(source.toString(), 'skills', 'SKILL.md'), '# skill');
+      await context.save(tempZip, true);
 
-      archive = new FilePath(new DirectoryPath(workDir), new FileName('plugin.zip'));
-      await new ZipService().archive(source, archive);
-
-      destination = new DirectoryPath(path.join(workDir, 'destination'));
-    });
-
-    afterEach(() => fs.rmSync(workDir, { recursive: true, force: true }));
-
-    it('expands the archive into the destination', async () => {
-      await new PluginContext(destination).save(archive, false);
-
-      expect(fs.readFileSync(path.join(destination.toString(), 'README.md'), 'utf-8')).to.equal('# plugin');
-      expect(fs.readFileSync(path.join(destination.toString(), 'skills', 'SKILL.md'), 'utf-8')).to.equal('# skill');
-      expect(fs.existsSync(path.join(destination.toString(), 'plugin.zip'))).to.be.false;
-    });
-
-    it('clears a previous run before expanding', async () => {
-      fs.mkdirSync(destination.toString(), { recursive: true });
-      fs.writeFileSync(path.join(destination.toString(), 'stale.md'), 'from a language that is gone');
-
-      await new PluginContext(destination).save(archive, false);
-
-      expect(fs.existsSync(path.join(destination.toString(), 'stale.md'))).to.be.false;
-      expect(fs.existsSync(path.join(destination.toString(), 'README.md'))).to.be.true;
+      const git = path.join(pluginDirectory.toString(), '.git');
+      expect(fs.readFileSync(path.join(git, 'HEAD'), 'utf-8')).to.equal('ref: refs/heads/main');
+      expect(fs.readFileSync(path.join(git, 'config'), 'utf-8')).to.equal('[remote "origin"]');
+      expect(fs.readFileSync(path.join(git, 'refs', 'tags', 'v0.1.66'), 'utf-8')).to.equal('abc123');
+      expect(fs.existsSync(path.join(pluginDirectory.toString(), 'stale.md'))).to.be.false;
     });
   });
 });

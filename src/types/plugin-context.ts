@@ -4,6 +4,8 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 
+const GIT_DIRECTORY_NAME = '.git';
+
 export class PluginContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
@@ -19,7 +21,9 @@ export class PluginContext {
   }
 
   public async save(tempPluginFilePath: FilePath, zipPlugin: boolean): Promise<void> {
-    await this.fileService.cleanDirectory(this.pluginDirectory);
+    // Once published, this directory is the user's repository. Emptying it outright would take
+    // `.git` with it, discarding their history, their remote and every tag they have pushed.
+    await this.fileService.cleanDirectoryExcluding(this.pluginDirectory, [new FileName(GIT_DIRECTORY_NAME)]);
     if (zipPlugin) {
       await this.fileService.copy(tempPluginFilePath, this.zipPath);
     } else {
