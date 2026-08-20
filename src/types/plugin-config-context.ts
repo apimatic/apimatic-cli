@@ -33,12 +33,12 @@ export class PluginConfigPresent {
   }
 
   public hasPublishedSdks(): boolean {
-    const languages = this.config.languages;
-    if (typeof languages !== 'object' || languages === null) {
+    const pluginLanguages = this.config.pluginLanguages;
+    if (typeof pluginLanguages !== 'object' || pluginLanguages === null) {
       return false;
     }
 
-    return Object.values(languages).some((entry) => entry?.source || entry?.package);
+    return Object.values(pluginLanguages).some((entry) => entry?.source || entry?.package);
   }
 
   public hasMetadata(): boolean {
@@ -47,7 +47,7 @@ export class PluginConfigPresent {
   }
 
   public hasNoSourceRepository(language: Language): boolean {
-    return !this.config.languages?.[language]?.source;
+    return !this.config.pluginLanguages?.[language]?.source;
   }
 
   public assertNoCodegenVersionMismatch(
@@ -59,7 +59,7 @@ export class PluginConfigPresent {
       return ok();  // if both package and source are given, there is no possible mismatch
     }
 
-    const existingEntry = this.config.languages?.[language];
+    const existingEntry = this.config.pluginLanguages?.[language];
     if (!existingEntry) {
       return ok();
     }
@@ -68,7 +68,7 @@ export class PluginConfigPresent {
       return ok();
     }
 
-    const extractedVersion = this.config.languages?.[language]?.codegenVersion;
+    const extractedVersion = this.config.pluginLanguages?.[language]?.codegenVersion;
     if (!extractedVersion) {
       return ok();
     }
@@ -130,15 +130,15 @@ export class PluginConfigContext {
     entry: PluginLanguageEntry<L>
   ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
     return await this.merge((config) => {
-      const languages: PluginLanguages = { ...config.languages };
-      const existingEntry = config.languages?.[language];
-      languages[language] = {
+      const pluginLanguages: PluginLanguages = { ...config.pluginLanguages };
+      const existingEntry = config.pluginLanguages?.[language];
+      pluginLanguages[language] = {
         ...existingEntry,
         ...entry,
         source: entry.source ?? existingEntry?.source,
         package: entry.package ?? existingEntry?.package
       };
-      return { ...config, languages };
+      return { ...config, pluginLanguages };
     });
   }
 
@@ -169,7 +169,7 @@ export class PluginConfigContext {
 
   private async read(): Promise<ParseResult> {
     if (!(await this.fileService.fileExists(this.configPath))) {
-      return { config: { languages: {} } };
+      return { config: { pluginLanguages: {} } };
     }
     return await this.parse();
   }
@@ -192,14 +192,14 @@ export class PluginConfigContext {
       }
       // Every write merges these by spreading them, which turns a string into `{"0":"a"}` and a
       // number into nothing, so a wrong shape has to be refused before it can corrupt the file.
-      const languages = parsed.languages;
-      if (languages !== undefined) {
-        if (!isJsonObject(languages)) {
-          return { reason: `its 'languages' field is not a JSON object` };
+      const pluginLanguages = parsed.pluginLanguages;
+      if (pluginLanguages !== undefined) {
+        if (!isJsonObject(pluginLanguages)) {
+          return { reason: `its 'pluginLanguages' field is not a JSON object` };
         }
-        for (const [language, entry] of Object.entries(languages)) {
+        for (const [language, entry] of Object.entries(pluginLanguages)) {
           if (!isJsonObject(entry)) {
-            return { reason: `its 'languages.${language}' entry is not a JSON object` };
+            return { reason: `its 'pluginLanguages.${language}' entry is not a JSON object` };
           }
         }
       }

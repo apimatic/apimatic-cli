@@ -39,7 +39,7 @@ describe('PluginGenerateAction', () => {
     await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
       pluginId: 'acme-payments',
       pluginName: 'Acme Payments',
-      languages: { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } }
+      pluginLanguages: { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } }
     });
 
     // The spinner would render to stdout; pass the underlying promise straight through.
@@ -164,7 +164,7 @@ describe('PluginGenerateAction', () => {
     });
 
     it('fills in metadata and generates when sdk publish already recorded a language', async () => {
-      await writeConfig({ languages: { csharp: CSHARP } });
+      await writeConfig({ pluginLanguages: { csharp: CSHARP } });
       answersMetadata();
       const generatePlugin = generated();
       const nextSteps = PluginGeneratePrompts.prototype.nextStepsPublishSdks as sinon.SinonStub;
@@ -174,13 +174,13 @@ describe('PluginGenerateAction', () => {
       expect(result.isSuccess()).to.be.true;
       const config = writtenConfig();
       expect(config).to.include(METADATA);
-      expect(config.languages).to.deep.equal({ csharp: CSHARP });
+      expect(config.pluginLanguages).to.deep.equal({ csharp: CSHARP });
       expect(generatePlugin.called).to.be.true;
       expect(nextSteps.called).to.be.false;
     });
 
     it('stops with next steps when the config has metadata but no languages', async () => {
-      await writeConfig({ ...METADATA, languages: {} });
+      await writeConfig({ ...METADATA, pluginLanguages: {} });
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
       const inputPluginMetadata = answersMetadata();
 
@@ -192,7 +192,7 @@ describe('PluginGenerateAction', () => {
     });
 
     it('stops with next steps when the only recorded language has neither a source nor a package', async () => {
-      await writeConfig({ ...METADATA, languages: { csharp: { codegenVersion: 'v3' } } });
+      await writeConfig({ ...METADATA, pluginLanguages: { csharp: { codegenVersion: 'v3' } } });
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
       const result = await execute();

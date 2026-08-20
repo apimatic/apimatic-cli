@@ -76,7 +76,7 @@ export interface PluginConfigData {
   license?: string;
   homepage?: string;
   repository?: string;
-  languages: PluginLanguages;
+  pluginLanguages: PluginLanguages;
   // A hand-written config may carry fields this CLI version does not model; the index
   // signature is what lets a read-modify-write round-trip preserve them.
   [key: string]: unknown;
