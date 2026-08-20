@@ -56,7 +56,7 @@ export class PluginConfigPresent {
     entry: PluginLanguageEntry<Language>
   ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
     if (entry.package && entry.source) {
-      return ok();  // if both package and source are given, there is no possible mismatch
+      return ok(); // if both package and source are given, there is no possible mismatch
     }
 
     const existingEntry = this.config.languages?.[language];

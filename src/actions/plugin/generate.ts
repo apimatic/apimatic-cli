@@ -50,7 +50,7 @@ export class PluginGenerateAction {
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
-    };
+    }
 
     if (configState.state === 'missing' || !configState.hasMetadata()) {
       const metadataResult = await new PluginRecordMetadataAction(
