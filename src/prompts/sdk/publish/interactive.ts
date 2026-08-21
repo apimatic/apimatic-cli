@@ -39,7 +39,9 @@ export class SdkPublishInteractivePrompts {
 
   public srcDirectoryInvalid(directory: DirectoryPath) {
     log.error(
-      `${f.path(directory)} does not contain a valid ${f.var('APIMATIC-BUILD.json')}. Please check the path and try again.`
+      `${f.path(directory)} does not contain a valid ${f.var(
+        'APIMATIC-BUILD.json'
+      )}. Please check the path and try again.`
     );
   }
 
@@ -195,8 +197,8 @@ export class SdkPublishInteractivePrompts {
 
   public async confirmRecordSdk(): Promise<boolean> {
     const message =
-      `Update configuration for context plugin generation?\n` +
-      `See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`;
+      `Update configuration for context plugin generation?` +
+      f.continuation(`See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`);
 
     const record = await confirm({ message, initialValue: true });
     if (isCancel(record)) return false;
