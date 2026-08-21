@@ -6,6 +6,10 @@ import {
   PublishingProfileItem
 } from '../../../types/publish-api/publishing-profile-item.js';
 import { buildTableWithHeading, withSpinner } from '../../prompt.js';
+import { format as f } from '../../format.js';
+
+const sourceCodePublishingUrl = 'https://docs.apimatic.io/generate-sdks/publish-sdk-to-github/';
+const packagePublishingUrl = 'https://docs.apimatic.io/generate-sdks/sdk-publishing/configure-sdk-publishing/';
 
 export class PublishingProfileListPrompts {
   public fetchProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
@@ -22,7 +26,11 @@ export class PublishingProfileListPrompts {
   }
 
   public noProfilesFound() {
-    log.info('No publishing profiles found. Please create a publishing profile on the APIMatic App to view it here.');
+    log.info(
+      'No publishing profiles found. Please create a publishing profile on the APIMatic App to view it here.' +
+        `\n\nSource Code publishing: ${f.link(sourceCodePublishingUrl)}` +
+        `\nPackage publishing: ${f.link(packagePublishingUrl)}`
+    );
   }
 
   public displayProfiles(groups: PublishingProfileSummaryGroup[]) {
