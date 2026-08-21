@@ -39,7 +39,9 @@ export class SdkPublishInteractivePrompts {
 
   public srcDirectoryInvalid(directory: DirectoryPath) {
     log.error(
-      `${f.path(directory)} does not contain a valid ${f.var('APIMATIC-BUILD.json')}. Please check the path and try again.`
+      `${f.path(directory)} does not contain a valid ${f.var(
+        'APIMATIC-BUILD.json'
+      )}. Please check the path and try again.`
     );
   }
 

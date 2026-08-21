@@ -1,20 +1,21 @@
-import pc from "picocolors";
+import pc from 'picocolors';
 import { intro as i, outro as o } from '@clack/prompts';
-import { ActionResult } from "../actions/action-result.js";
-import { DirectoryPath } from "../types/file/directoryPath.js";
-import { FilePath } from "../types/file/filePath.js";
+import { ActionResult } from '../actions/action-result.js';
+import { DirectoryPath } from '../types/file/directoryPath.js';
+import { FilePath } from '../types/file/filePath.js';
 
 export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
-  cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map(arg => pc.dim(arg)).join(" ")}`,
-  cmdAlt: (cmd: string, ...args: string[]) => `${pc.dim(pc.blueBright(cmd))} ${args.map(arg => pc.blueBright(arg)).join(" ")}`,
+  cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map((arg) => pc.dim(arg)).join(' ')}`,
+  cmdAlt: (cmd: string, ...args: string[]) =>
+    `${pc.dim(pc.blueBright(cmd))} ${args.map((arg) => pc.blueBright(arg)).join(' ')}`,
   link: (text: string) => pc.underline(pc.blueBright(text)),
   description: (text: string) => pc.greenBright(`${text}`),
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
-      const sanitizedValue = value.includes(" ") ? `'${value}'` : value;
+      const sanitizedValue = value.includes(' ') ? `'${value}'` : value;
       return `${pc.green(`--${name}`)}=${pc.dim(sanitizedValue)}`;
     }
     return `${pc.green(`--${name}`)}`;
@@ -28,7 +29,7 @@ export const format = {
   intro: (text: string) => pc.bgCyan(text),
   outroSuccess: (text: string) => pc.bgGreen(text),
   outroFailure: (text: string) => pc.bgRed(text),
-  outroCancelled: (text: string) => pc.bgWhite(pc.blackBright(text)),
+  outroCancelled: (text: string) => pc.bgWhite(pc.blackBright(text))
 };
 
 export function intro(text: string) {
@@ -37,7 +38,7 @@ export function intro(text: string) {
 export function outro<T>(result: ActionResult<T>) {
   const exitCode = result.getExitCode();
   const message = result.getMessage();
-  
+
   const outroMessage = result.mapAll(
     () => format.outroSuccess(message),
     () => format.outroFailure(message),
@@ -57,19 +58,15 @@ export interface TreeNode extends LeafNode {
   items: Array<TreeNode | LeafNode>;
 }
 
-export function getTree(
-  dir: TreeNode,
-  prefix: string = "",
-  isLast: boolean = true
-): string {
-  const pointer = isLast ? "└─ " : "├─ ";
+export function getTree(dir: TreeNode, prefix: string = '', isLast: boolean = true): string {
+  const pointer = isLast ? '└─ ' : '├─ ';
   const folderName = dir.name;
-  const description = dir.description ? format.description(dir.description) : "";
+  const description = dir.description ? format.description(dir.description) : '';
 
-  let output = `${prefix}${pointer}${folderName}${description ? " " + description : ""}\n`;
+  let output = `${prefix}${pointer}${folderName}${description ? ' ' + description : ''}\n`;
 
   const items = dir.items;
-  const newPrefix = prefix + (isLast ? "   " : "|  ");
+  const newPrefix = prefix + (isLast ? '   ' : '|  ');
 
   items.forEach((item, index) => {
     const last = index === items.length - 1;
@@ -77,10 +74,10 @@ export function getTree(
     if ('items' in item) {
       output += getTree(item as TreeNode, newPrefix, last);
     } else {
-      const filePointer = last ? "└─ " : "├─ ";
+      const filePointer = last ? '└─ ' : '├─ ';
       const fileName = item.name;
-      const fileDescription = item.description ? format.description(item.description) : "";
-      output += `${newPrefix}${filePointer}${fileName}${fileDescription ? " " + fileDescription : ""}\n`;
+      const fileDescription = item.description ? format.description(item.description) : '';
+      output += `${newPrefix}${filePointer}${fileName}${fileDescription ? ' ' + fileDescription : ''}\n`;
     }
   });
 
