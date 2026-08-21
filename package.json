@@ -37,8 +37,8 @@
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
     "scripts": {
-        "build": "tsc -b",
-        "build:watch": "tsc -b --watch",
+        "build": "rimraf lib tsconfig.tsbuildinfo && tsc",
+        "build:watch": "tsc --watch",
         "apimatic": "node ./bin/run.js",
         "postpack": "rimraf oclif.manifest.json",
         "posttest": "eslint . --ext .ts",
