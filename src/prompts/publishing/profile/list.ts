@@ -1,7 +1,10 @@
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { PublishingProfileSummaryGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile-item.js';
+import {
+  PublishingProfileSummaryGroup,
+  PublishingProfileItem
+} from '../../../types/publish-api/publishing-profile-item.js';
 import { buildTableWithHeading, withSpinner } from '../../prompt.js';
 
 export class PublishingProfileListPrompts {
@@ -30,9 +33,15 @@ export class PublishingProfileListPrompts {
       rows: group.profiles.map((profile) => [
         profile.name,
         profile.id,
-        profile.enabledLanguages.length === 0 ? '—' : profile.enabledLanguages.join(', '),
-      ]),
+        profile.enabledLanguages.length === 0 ? '—' : profile.enabledLanguages.join(', ')
+      ])
     }));
-    log.info(`Publishing Profiles (${label})\n\n${buildTableWithHeading(tableGroups, ['Name', 'ID', 'Languages'], ['primary', 'secondary', 'item'])}`);
+    log.info(
+      `Publishing Profiles (${label})\n\n${buildTableWithHeading(
+        tableGroups,
+        ['Name', 'ID', 'Languages'],
+        ['primary', 'secondary', 'item']
+      )}`
+    );
   }
 }
