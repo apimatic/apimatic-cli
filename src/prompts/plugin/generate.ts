@@ -57,13 +57,13 @@ export class PluginGeneratePrompts {
   }
 
   public noPublishedSdks() {
-    log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs yet.`);
+    log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs config yet.`);
   }
 
   public nextStepsPublishSdks() {
     const message =
-      `Publish an SDK for each language you want in the plugin, and include ${f.var('Source Code')} ` +
-      `publishing.\n\n` +
+      `Publish SDK for the language(s) to add it to plugin-config.json. ` +
+      `${f.var('Source Code')} details are required.\n\n` +
       `Run '${f.cmdAlt('apimatic', 'sdk', 'publish')}'\n\n` +
       `Then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;
     noteWrapped(message, 'Next Steps');
