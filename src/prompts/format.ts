@@ -21,6 +21,8 @@ export const format = {
     return `${pc.green(`--${name}`)}`;
   },
 
+  continuation: (text: string) => `\n${pc.gray('│')}  ${text}`,
+
   // Common message styles
   success: (text: string) => pc.green(text),
   error: (text: string) => pc.red(text),

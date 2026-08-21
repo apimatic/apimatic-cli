@@ -197,8 +197,8 @@ export class SdkPublishInteractivePrompts {
 
   public async confirmRecordSdk(): Promise<boolean> {
     const message =
-      `Update configuration for context plugin generation?\n` +
-      `See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`;
+      `Update configuration for context plugin generation?` +
+      f.continuation(`See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`);
 
     const record = await confirm({ message, initialValue: true });
     if (isCancel(record)) return false;
