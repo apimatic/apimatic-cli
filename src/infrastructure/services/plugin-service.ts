@@ -179,7 +179,7 @@ const formatPluginValidationError: ValidationErrorFormatter = (errors) => {
 const qualify = (path: string, message: string): string => {
   if (!path) return message;
 
-  const quotedProperty = message.match(/^'([^']+)'/);
+  const quotedProperty = /^'([^']+)'/.exec(message);
   const property = quotedProperty?.[1];
   if (property && (path === property || path.endsWith(`.${property}`))) {
     return `'${path}'${message.slice(quotedProperty[0].length)}`;
