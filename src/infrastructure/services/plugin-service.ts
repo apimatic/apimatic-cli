@@ -16,7 +16,8 @@ import { envInfo } from '../env-info.js';
 import {
   GENERATION_TIMEOUT_MS,
   pollUntilCompleted,
-  STATUS_POLL_INTERVAL_MS
+  STATUS_POLL_INTERVAL_MS,
+  ValidationErrorFormatter
 } from '../generation-status-poller.js';
 import { FileService } from '../file-service.js';
 import { mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
@@ -62,7 +63,8 @@ export class PluginService {
     const completed = await pollUntilCompleted({
       pollIntervalMs: this.timings.pollIntervalMs,
       fetchStatus: () => this.getGenerationStatus(generationId, commandMetadata.shell, token),
-      timeout: { budgetMs: this.timings.generationTimeoutMs, label: 'Plugin generation' }
+      timeout: { budgetMs: this.timings.generationTimeoutMs, label: 'Plugin generation' },
+      formatValidationError: formatPluginValidationError
     });
     if (completed.isErr()) {
       return err(completed.error);
@@ -167,3 +169,21 @@ export class PluginService {
   }
 }
 
+const formatPluginValidationError: ValidationErrorFormatter = (errors) => {
+  const messages = Object.entries(errors).flatMap(([path, pathMessages]) =>
+    pathMessages.map((message) => qualify(path, message))
+  );
+  return 'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
+};
+
+const qualify = (path: string, message: string): string => {
+  if (!path) return message;
+
+  const quotedProperty = message.match(/^'([^']+)'/);
+  const property = quotedProperty?.[1];
+  if (property && (path === property || path.endsWith(`.${property}`))) {
+    return `'${path}'${message.slice(quotedProperty[0].length)}`;
+  }
+
+  return `${path}: ${message}`;
+};

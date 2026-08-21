@@ -216,6 +216,77 @@ describe('PluginService', () => {
       expect(error.getError('languages')).to.deep.equal(['no language in languages can be built by this generator']);
     });
 
+    it('qualifies each message with the config path the API keyed it by', async () => {
+      respondToStatus = statusBody({
+        status: 'ValidationError',
+        errors: { 'languages.php.source': ["'source' is required"] }
+      });
+
+      const error = errorFrom(await generatePlugin());
+
+      expect(error.errorMessage).to.equal(
+        "One or more validation errors occurred.\n- 'languages.php.source' is required"
+      );
+    });
+
+    it('tells two languages reporting the same property apart', async () => {
+      respondToStatus = statusBody({
+        status: 'ValidationError',
+        errors: {
+          'languages.csharp.package.version': ["'package.version' is required"],
+          'languages.java.package.version': ["'package.version' is required"]
+        }
+      });
+
+      const error = errorFrom(await generatePlugin());
+
+      expect(error.errorMessage).to.equal(
+        'One or more validation errors occurred.' +
+          "\n- 'languages.csharp.package.version' is required" +
+          "\n- 'languages.java.package.version' is required"
+      );
+    });
+
+    it('keeps the path ahead of a message that names no property', async () => {
+      respondToStatus = statusBody({
+        status: 'ValidationError',
+        errors: { languages: ['no language in languages can be built by this generator'] }
+      });
+
+      const error = errorFrom(await generatePlugin());
+
+      expect(error.errorMessage).to.equal(
+        'One or more validation errors occurred.' +
+          '\n- languages: no language in languages can be built by this generator'
+      );
+    });
+
+    it('leaves a message the API keyed to no property untouched', async () => {
+      respondToStatus = statusBody({
+        status: 'ValidationError',
+        errors: { '': ['Context plugin generation is not allowed on your subscription'] }
+      });
+
+      const error = errorFrom(await generatePlugin());
+
+      expect(error.errorMessage).to.equal(
+        'One or more validation errors occurred.\n- Context plugin generation is not allowed on your subscription'
+      );
+    });
+
+    it('does not re-qualify a property the API already spelled out in full', async () => {
+      respondToStatus = statusBody({
+        status: 'ValidationError',
+        errors: { pluginId: ["'pluginId' must be lower-case kebab-case."] }
+      });
+
+      const error = errorFrom(await generatePlugin());
+
+      expect(error.errorMessage).to.equal(
+        "One or more validation errors occurred.\n- 'pluginId' must be lower-case kebab-case."
+      );
+    });
+
     it('terminates on a validation error that carries no messages', async () => {
       respondToStatus = statusBody({ status: 'ValidationError' });
 
