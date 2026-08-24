@@ -6,6 +6,7 @@ import { CodeGenerationVersion, Language } from './sdk/generate.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
   PluginAuthor,
+  PluginConfigData,
   PluginLanguageEntry,
   PluginLanguages,
   PluginMetadata
@@ -27,17 +28,6 @@ const MALFORMED_PLUGIN_VERSION =
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
 /**
- * The config as `parse` resolved it. `raw` is the file as it was read, kept so a write preserves
- * fields this CLI version does not model; `release` and `languages` are already checked, so nothing
- * downstream tests them again.
- */
-export type ParsedPluginConfig = {
-  raw: Record<string, unknown>;
-  release: PluginReleaseData | undefined;
-  languages: PluginLanguages;
-};
-
-/**
  * What a caller needs to know before generating. Metadata and languages are written by different
  * commands — `plugin generate` owns the first, `sdk publish` the second — so they are reported
  * separately. `path` rides on `unreadable` purely so the prompt can say where to fix the file.
@@ -50,27 +40,36 @@ export type PluginConfigState =
 export class PluginConfigPresent {
   public readonly state = 'present' as const;
 
-  private constructor(private readonly parsed: ParsedPluginConfig) {}
+  private constructor(
+    private readonly config: PluginConfigData,
+    private readonly release: PluginReleaseData | undefined
+  ) {}
 
-  public static create(parsed: ParsedPluginConfig): PluginConfigPresent {
-    return new PluginConfigPresent(parsed);
+  public static create(config: PluginConfigData, release?: PluginReleaseData): PluginConfigPresent {
+    return new PluginConfigPresent(config, release);
   }
 
   public hasPublishedSdks(): boolean {
-    return Object.values(this.parsed.languages).some((entry) => entry?.source || entry?.package);
+    const languages = this.config.languages;
+    if (typeof languages !== 'object' || languages === null) {
+      return false;
+    }
+
+    return Object.values(languages).some((entry) => entry?.source || entry?.package);
   }
 
   public hasMetadata(): boolean {
-    return trimmed(this.parsed.raw.pluginId) !== '' && trimmed(this.parsed.raw.pluginName) !== '';
+    const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
+    return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
   }
 
   /** Absent until `plugin generate` records the identity; never malformed, `parse` refuses that. */
   public getRelease(): PluginReleaseData | undefined {
-    return this.parsed.release;
+    return this.release;
   }
 
   public hasNoSourceRepository(language: Language): boolean {
-    return !this.parsed.languages[language]?.source;
+    return !this.config.languages?.[language]?.source;
   }
 
   public assertNoCodegenVersionMismatch(
@@ -82,7 +81,7 @@ export class PluginConfigPresent {
       return ok(); // if both package and source are given, there is no possible mismatch
     }
 
-    const existingEntry = this.parsed.languages[language];
+    const existingEntry = this.config.languages?.[language];
     if (!existingEntry) {
       return ok();
     }
@@ -91,7 +90,7 @@ export class PluginConfigPresent {
       return ok();
     }
 
-    const extractedVersion = existingEntry.codegenVersion;
+    const extractedVersion = this.config.languages?.[language]?.codegenVersion;
     if (!extractedVersion) {
       return ok();
     }
@@ -106,32 +105,14 @@ export class PluginConfigPresent {
 
 export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
+type ParseResult = { config: PluginConfigData; release?: PluginReleaseData } | { reason: string };
+
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function trimmed(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-/**
- * Every write merges these by spreading them, which turns a string into `{"0":"a"}` and a number
- * into nothing, so a wrong shape has to be refused before it can corrupt the file.
- */
-function parseLanguages(value: unknown): Result<PluginLanguages, string> {
-  if (value === undefined) {
-    return ok({});
-  }
-  if (!isJsonObject(value)) {
-    return err(`its 'languages' field is not a JSON object`);
-  }
-  for (const [language, entry] of Object.entries(value)) {
-    if (!isJsonObject(entry)) {
-      return err(`its 'languages.${language}' entry is not a JSON object`);
-    }
-  }
-
-  return ok(value as PluginLanguages);
 }
 
 /**
@@ -178,24 +159,24 @@ export class PluginConfigContext {
     }
 
     const parsed = await this.parse();
-    if (parsed.isErr()) {
-      return { state: 'unreadable', reason: parsed.error, path: this.configPath };
+    if ('reason' in parsed) {
+      return { state: 'unreadable', reason: parsed.reason, path: this.configPath };
     }
 
-    return PluginConfigPresent.create(parsed.value);
+    return PluginConfigPresent.create(parsed.config, parsed.release);
   }
 
   public async upsertMetadata(
     metadata: PluginMetadata,
     author?: PluginAuthor
   ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
-    return await this.merge(({ raw }) => ({
-      ...raw,
+    return await this.merge((config) => ({
+      ...config,
       pluginId: metadata.pluginId,
       pluginName: metadata.pluginName,
       pluginVersion: metadata.pluginVersion,
-      ...(!raw.author && author && { author }),
-      license: raw.license ?? DEFAULT_PLUGIN_LICENSE
+      ...(!config.author && author && { author }),
+      license: config.license ?? DEFAULT_PLUGIN_LICENSE
     }));
   }
 
@@ -203,89 +184,94 @@ export class PluginConfigContext {
     language: L,
     entry: PluginLanguageEntry<L>
   ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
-    return await this.merge(({ raw, languages: recorded }) => {
-      const languages: PluginLanguages = { ...recorded };
-      const existingEntry = recorded[language];
+    return await this.merge((config) => {
+      const languages: PluginLanguages = { ...config.languages };
+      const existingEntry = config.languages?.[language];
       languages[language] = {
         ...existingEntry,
         ...entry,
         source: entry.source ?? existingEntry?.source,
         package: entry.package ?? existingEntry?.package
       };
-      return { ...raw, languages };
+      return { ...config, languages };
     });
   }
 
   /**
    * A file that exists but cannot be parsed is left alone rather than overwritten, and a write
    * fault is reported rather than thrown: this runs after a publish that already succeeded, and
-   * nothing here may turn that into a crash. The written file is read back through `parse` so a
-   * caller that has to decide something afterwards sees it resolved the one way it is ever
-   * resolved.
+   * nothing here may turn that into a crash. A success carries the config as it now stands, so a
+   * caller that has to decide something after writing does not have to read the file back.
    */
   private async merge(
-    apply: (parsed: ParsedPluginConfig) => Record<string, unknown>
+    apply: (config: PluginConfigData) => PluginConfigData
   ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
     const existing = await this.read();
-    if (existing.isErr()) {
+    if ('reason' in existing) {
       return err('unreadable');
     }
 
+    const merged = apply(existing.config);
+
     try {
-      await this.write(apply(existing.value));
+      await this.write(merged);
     } catch {
       return err('unwritable');
     }
 
-    const written = await this.parse();
-    if (written.isErr()) {
-      return err('unreadable');
-    }
-
-    return ok(PluginConfigPresent.create(written.value));
+    const release = parsePluginRelease(merged.pluginId, merged.pluginVersion);
+    return ok(PluginConfigPresent.create(merged, release.unwrapOr(undefined)));
   }
 
-  private async read(): Promise<Result<ParsedPluginConfig, string>> {
+  private async read(): Promise<ParseResult> {
     if (!(await this.fileService.fileExists(this.configPath))) {
-      return ok({ raw: { languages: {} }, release: undefined, languages: {} });
+      return { config: { languages: {} } };
     }
     return await this.parse();
   }
 
-  private async parse(): Promise<Result<ParsedPluginConfig, string>> {
+  private async parse(): Promise<ParseResult> {
     const BYTE_ORDER_MARK = 0xfeff; // Notepad and PowerShell redirection can write it
     try {
       // TODO: JSON Parsing/Stringify should be in a dedicated JSON infra layer which preferably uses zod
       const contents = await this.fileService.getContents(this.configPath);
       if (contents.trim() === '') {
-        return err('it is empty');
+        return { reason: 'it is empty' };
       }
       if (contents.codePointAt(0) === BYTE_ORDER_MARK) {
-        return err('it starts with a byte-order mark, which JSON does not allow');
+        return { reason: 'it starts with a byte-order mark, which JSON does not allow' };
       }
 
       const parsed: unknown = JSON.parse(contents);
       if (!isJsonObject(parsed)) {
-        return err('it is not a JSON object');
+        return { reason: 'it is not a JSON object' };
       }
-
-      const languages = parseLanguages(parsed.languages);
-      if (languages.isErr()) {
-        return err(languages.error);
+      // Every write merges these by spreading them, which turns a string into `{"0":"a"}` and a
+      // number into nothing, so a wrong shape has to be refused before it can corrupt the file.
+      const languages = parsed.languages;
+      if (languages !== undefined) {
+        if (!isJsonObject(languages)) {
+          return { reason: `its 'languages' field is not a JSON object` };
+        }
+        for (const [language, entry] of Object.entries(languages)) {
+          if (!isJsonObject(entry)) {
+            return { reason: `its 'languages.${language}' entry is not a JSON object` };
+          }
+        }
       }
 
       const release = parsePluginRelease(parsed.pluginId, parsed.pluginVersion);
       if (release.isErr()) {
-        return err(release.error);
+        return { reason: release.error };
       }
 
-      return ok({ raw: parsed, release: release.value, languages: languages.value });
+      return { config: parsed as PluginConfigData, release: release.value };
     } catch (error) {
-      return err(error instanceof Error ? error.message : String(error));
+      return { reason: error instanceof Error ? error.message : String(error) };
     }
   }
 
-  private async write(config: Record<string, unknown>): Promise<void> {
+  private async write(config: PluginConfigData): Promise<void> {
     await this.fileService.ensurePathExists(this.configPath);
     await this.fileService.writeContents(this.configPath, JSON.stringify(config, null, 2));
   }
