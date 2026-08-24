@@ -263,7 +263,7 @@ USAGE
   $ apimatic plugin publish [-i <value>] [-d <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: <input>/plugin] path where the plugin will be generated.
+  -d, --destination=<value>  [default: <input>/plugin] path where the plugin was generated.
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
 

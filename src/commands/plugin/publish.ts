@@ -19,7 +19,7 @@ export default class PluginPublish extends Command {
 
   static readonly flags = {
     ...FlagsProvider.input,
-    ...FlagsProvider.destination('plugin', 'plugin')
+    ...FlagsProvider.destination('plugin', 'plugin', 'was')
   };
 
   async run(): Promise<void> {

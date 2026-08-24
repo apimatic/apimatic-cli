@@ -7,7 +7,7 @@ import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
 
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
-const NOTE_TITLE = 'printed, not executed';
+const NOTE_TITLE = 'Commands to Copy and Run';
 
 export class PluginPublishPrompts {
   public firstPublishInstructions(release: PluginRelease, contents: PluginContents, pluginDirectory: DirectoryPath) {
@@ -80,7 +80,7 @@ export class PluginPublishPrompts {
   private contentsLine(contents: PluginContents): string {
     const files = `${contents.fileCount} ${contents.fileCount === 1 ? 'file' : 'files'}`;
     const directories = `${contents.directoryCount} ${contents.directoryCount === 1 ? 'dir' : 'dirs'}`;
-    return `what is about to become public: ${files}, ${directories}`;
+    return `What is about to become public: ${files}, ${directories}`;
   }
 
   /**

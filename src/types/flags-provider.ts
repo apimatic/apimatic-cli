@@ -11,11 +11,11 @@ export class FlagsProvider {
     })
   };
 
-  public static destination(artifact: string, artifactName: string) {
+  public static destination(artifact: string, artifactName: string, tense: "will be" | "was" = "will be") {
     return {
       destination: Flags.string({
         char: "d",
-        description: `[default: <${FlagsProvider.inputFlagName}>/${artifact}] path where the ${artifactName} will be generated.`
+        description: `[default: <${FlagsProvider.inputFlagName}>/${artifact}] path where the ${artifactName} ${tense} generated.`
       })
     };
   }
