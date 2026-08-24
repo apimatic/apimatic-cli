@@ -73,6 +73,12 @@ export class PluginGeneratePrompts {
     log.info(`Plugin artifacts can be found at ${f.path(plugin)}.`);
   }
 
+  public tryPluginInClaudeCode(plugin: DirectoryPath) {
+    const message =
+      `Start Claude Code with the plugin loaded to try it out.\n\n` + f.cmdAlt('claude', '--plugin-dir', `"${plugin}"`);
+    log.message(message);
+  }
+
   public nextStepsPublishPlugin() {
     const message =
       `Publish the plugin to GitHub so the people using your SDKs can install it.
