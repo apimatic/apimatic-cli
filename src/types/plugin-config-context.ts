@@ -24,7 +24,6 @@ const MALFORMED_PLUGIN_ID =
 const MALFORMED_PLUGIN_VERSION =
   `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
 
-/** The identity a publish needs: the repository it creates, and the version it tags. */
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
 /**
@@ -41,12 +40,11 @@ export class PluginConfigPresent {
   public readonly state = 'present' as const;
 
   private constructor(
-    private readonly config: PluginConfigData,
-    private readonly release: PluginReleaseData | undefined
+    private readonly config: PluginConfigData
   ) {}
 
-  public static create(config: PluginConfigData, release?: PluginReleaseData): PluginConfigPresent {
-    return new PluginConfigPresent(config, release);
+  public static create(config: PluginConfigData): PluginConfigPresent {
+    return new PluginConfigPresent(config);
   }
 
   public hasPublishedSdks(): boolean {
@@ -65,7 +63,11 @@ export class PluginConfigPresent {
 
   /** Absent until `plugin generate` records the identity; never malformed, `parse` refuses that. */
   public getRelease(): PluginReleaseData | undefined {
-    return this.release;
+    const pluginId = this.config.pluginId;
+    const version = this.config.pluginVersion
+    ? SemVersion.tryCreate(this.config.pluginVersion).unwrapOr(undefined)
+    : undefined;
+    return pluginId && version ? { pluginId , version } : undefined;
   }
 
   public hasNoSourceRepository(language: Language): boolean {
@@ -105,43 +107,10 @@ export class PluginConfigPresent {
 
 export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
-type ParseResult = { config: PluginConfigData; release?: PluginReleaseData } | { reason: string };
+type ParseResult = { config: PluginConfigData; } | { reason: string };
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function trimmed(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-/**
- * An absent field yields `undefined` rather than an error: `sdk publish` writes a config carrying
- * languages alone, which `plugin generate` then fills the identity into. A field that is present
- * but unusable can only have been hand-edited, so it is reported for the caller to refuse the
- * whole file over.
- */
-function parsePluginRelease(
-  pluginId: unknown,
-  pluginVersion: unknown
-): Result<PluginReleaseData | undefined, string> {
-  const id = trimmed(pluginId);
-  if (id !== '' && !PLUGIN_ID_PATTERN.test(id)) {
-    return err(MALFORMED_PLUGIN_ID);
-  }
-
-  const rawVersion = trimmed(pluginVersion);
-  if (rawVersion !== '') {
-    const version = SemVersion.tryCreate(rawVersion);
-    if (version.isErr()) {
-      return err(MALFORMED_PLUGIN_VERSION);
-    }
-    if (id !== '') {
-      return ok({ pluginId: id, version: version.value });
-    }
-  }
-
-  return ok(undefined);
 }
 
 export class PluginConfigContext {
@@ -163,7 +132,7 @@ export class PluginConfigContext {
       return { state: 'unreadable', reason: parsed.reason, path: this.configPath };
     }
 
-    return PluginConfigPresent.create(parsed.config, parsed.release);
+    return PluginConfigPresent.create(parsed.config);
   }
 
   public async upsertMetadata(
@@ -219,8 +188,7 @@ export class PluginConfigContext {
       return err('unwritable');
     }
 
-    const release = parsePluginRelease(merged.pluginId, merged.pluginVersion);
-    return ok(PluginConfigPresent.create(merged, release.unwrapOr(undefined)));
+    return ok(PluginConfigPresent.create(merged));
   }
 
   private async read(): Promise<ParseResult> {
@@ -260,12 +228,17 @@ export class PluginConfigContext {
         }
       }
 
-      const release = parsePluginRelease(parsed.pluginId, parsed.pluginVersion);
-      if (release.isErr()) {
-        return { reason: release.error };
+      const id = parsed.pluginId;
+      if (typeof id === 'string' && (id.trim() === '' || !PLUGIN_ID_PATTERN.test(id))) {
+        return { reason: MALFORMED_PLUGIN_ID };
       }
 
-      return { config: parsed as PluginConfigData, release: release.value };
+      const rawVersion = parsed.pluginVersion;
+      if (typeof rawVersion === 'string' && (rawVersion.trim() === '' || SemVersion.tryCreate(rawVersion).isErr())) {
+        return { reason: MALFORMED_PLUGIN_VERSION };
+      }
+
+      return { config: parsed as PluginConfigData };
     } catch (error) {
       return { reason: error instanceof Error ? error.message : String(error) };
     }
