@@ -39,9 +39,7 @@ export type PluginConfigState =
 export class PluginConfigPresent {
   public readonly state = 'present' as const;
 
-  private constructor(
-    private readonly config: PluginConfigData
-  ) {}
+  private constructor(private readonly config: PluginConfigData) {}
 
   public static create(config: PluginConfigData): PluginConfigPresent {
     return new PluginConfigPresent(config);
@@ -80,7 +78,7 @@ export class PluginConfigPresent {
     entry: PluginLanguageEntry<Language>
   ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
     if (entry.package && entry.source) {
-      return ok(); // if both package and source are given, there is no possible mismatch
+      return ok();  // if both package and source are given, there is no possible mismatch
     }
 
     const existingEntry = this.config.languages?.[language];
@@ -107,7 +105,7 @@ export class PluginConfigPresent {
 
 export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
-type ParseResult = { config: PluginConfigData; } | { reason: string };
+type ParseResult = { config: PluginConfigData } | { reason: string };
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
