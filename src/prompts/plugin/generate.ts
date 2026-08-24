@@ -72,4 +72,12 @@ export class PluginGeneratePrompts {
   public pluginGenerated(plugin: DirectoryPath) {
     log.info(`Plugin artifacts can be found at ${f.path(plugin)}.`);
   }
+
+  public nextStepsPublishPlugin() {
+    const message =
+      `Publish the plugin to GitHub so the people using your SDKs can install it.
+
+` + `Run '${f.cmdAlt('apimatic', 'plugin', 'publish')}' to see the commands.`;
+    noteWrapped(message, 'Next Steps');
+  }
 }

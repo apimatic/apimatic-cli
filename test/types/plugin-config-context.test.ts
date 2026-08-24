@@ -105,6 +105,80 @@ describe('PluginConfigContext', () => {
       expect(state).to.include({ state: 'unreadable', reason: `its 'languages.csharp' entry is not a JSON object` });
     });
 
+    const reasonOf = async (config: object) => {
+      withConfig(config);
+      const state = await context.getPluginConfigState();
+      expect(state).to.include({ state: 'unreadable' });
+      return (state as { reason: string }).reason;
+    };
+
+    const releaseOf = async (config: object) => {
+      withConfig(config);
+      return presentState(await context.getPluginConfigState()).getRelease();
+    };
+
+    ['Acme Payments', 'acme_payments', 'Acme-Payments', 'acme--payments', '-acme', 'acme-'].forEach((pluginId) => {
+      it(`names pluginId when it is '${pluginId}'`, async () => {
+        expect(await reasonOf({ ...METADATA, pluginId, languages: {} })).to.contain(`'pluginId'`);
+      });
+    });
+
+    ['1.2', '1.2.3.4', 'v1.2.3', '1.2.x', 'latest'].forEach((pluginVersion) => {
+      it(`names pluginVersion when it is '${pluginVersion}'`, async () => {
+        expect(await reasonOf({ ...METADATA, pluginVersion, languages: {} })).to.contain(`'pluginVersion'`);
+      });
+    });
+
+    // A hand-edited field is worth reporting even when the other one has yet to be written.
+    it('names a malformed pluginId whose version is not set yet', async () => {
+      expect(await reasonOf({ pluginId: 'Acme Payments', languages: {} })).to.contain(`'pluginId'`);
+    });
+
+    it('names a malformed pluginVersion whose id is not set yet', async () => {
+      expect(await reasonOf({ pluginVersion: '1.2', languages: {} })).to.contain(`'pluginVersion'`);
+    });
+
+    it('reports the release once the identity is recorded', async () => {
+      const release = await releaseOf({ ...METADATA, languages: {} });
+
+      expect(release?.pluginId).to.equal('acme-payments');
+      expect(`${release?.version}`).to.equal('0.1.0');
+    });
+
+    it('refuses an identity padded with whitespace', async () => {
+      expect(await reasonOf({ pluginId: '  acme-payments  ', pluginVersion: '0.1.0', languages: {} })).to.contain(
+        `'pluginId'`
+      );
+      expect(await reasonOf({ pluginId: 'acme-payments', pluginVersion: '  0.1.0  ', languages: {} })).to.contain(
+        `'pluginVersion'`
+      );
+    });
+
+    [
+      ['no id', { pluginVersion: '1.0.0' }],
+      ['no version', { pluginId: 'acme-payments' }],
+      ['neither field, as sdk publish writes it', { languages: { csharp: CSHARP_ENTRY } }]
+    ].forEach(([label, config]) => {
+      it(`reports no release for ${label}`, async () => {
+        expect(await releaseOf({ languages: {}, ...(config as object) })).to.be.undefined;
+      });
+    });
+
+    // A field written as blank can only be hand-edited, so it is refused rather than read as absent.
+    it('refuses a blank id', async () => {
+      expect(await reasonOf({ pluginId: '   ', pluginVersion: '1.0.0', languages: {} })).to.contain(`'pluginId'`);
+    });
+
+    it('refuses a blank version', async () => {
+      expect(await reasonOf({ pluginId: 'acme-payments', pluginVersion: '  ', languages: {} })).to.contain(
+        `'pluginVersion'`
+      );
+    });
+
+    it('reports no release for an id that is not a string', async () => {
+      expect(await releaseOf({ pluginId: 7, pluginVersion: '1.0.0', languages: {} })).to.be.undefined;
+    });
+
     it('accepts a config carrying no languages field at all', async () => {
       withConfig({ ...METADATA });
 
@@ -178,10 +252,10 @@ describe('PluginConfigContext', () => {
       expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
     });
 
-    it('does not count a blank plugin id as metadata', async () => {
+    it('refuses a blank plugin id before metadata is considered', async () => {
       withConfig({ pluginId: '   ', pluginName: 'Acme', languages: {} });
 
-      expect(presentState(await context.getPluginConfigState()).hasMetadata()).to.be.false;
+      expect(await context.getPluginConfigState()).to.include({ state: 'unreadable' });
     });
 
     it('does not count a plugin id that is not a string as metadata', async () => {

@@ -11,7 +11,20 @@ import {
   PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
+import { SemVersion } from './publish/version.js';
 import { err, ok, Result } from 'neverthrow';
+
+/** Also the rule the metadata prompt validates against, so a plugin ID is legal as a repository name. */
+export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+const MALFORMED_PLUGIN_ID =
+  `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` +
+  `for example 'acme-payments'`;
+
+const MALFORMED_PLUGIN_VERSION =
+  `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
+
+export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
 /**
  * What a caller needs to know before generating. Metadata and languages are written by different
@@ -44,6 +57,24 @@ export class PluginConfigPresent {
   public hasMetadata(): boolean {
     const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
+  }
+
+  /**
+   * Absent until `plugin generate` records the identity. The fields are checked rather than trusted:
+   * they reach this class through a cast of parsed JSON, so a hand-edited config can hold a number
+   * where the type promises a string.
+   */
+  public getRelease(): PluginReleaseData | undefined {
+    const pluginId = typeof this.config.pluginId === 'string' ? this.config.pluginId.trim() : '';
+    const rawVersion = typeof this.config.pluginVersion === 'string' ? this.config.pluginVersion.trim() : '';
+    if (pluginId === '' || rawVersion === '') {
+      return undefined;
+    }
+
+    return SemVersion.tryCreate(rawVersion).match(
+      (version) => ({ pluginId, version }),
+      () => undefined
+    );
   }
 
   public hasNoSourceRepository(language: Language): boolean {
@@ -202,6 +233,16 @@ export class PluginConfigContext {
             return { reason: `its 'languages.${language}' entry is not a JSON object` };
           }
         }
+      }
+
+      const id = parsed.pluginId;
+      if (typeof id === 'string' && (id.trim() === '' || !PLUGIN_ID_PATTERN.test(id))) {
+        return { reason: MALFORMED_PLUGIN_ID };
+      }
+
+      const rawVersion = parsed.pluginVersion;
+      if (typeof rawVersion === 'string' && (rawVersion.trim() === '' || SemVersion.tryCreate(rawVersion).isErr())) {
+        return { reason: MALFORMED_PLUGIN_VERSION };
       }
 
       return { config: parsed as PluginConfigData };

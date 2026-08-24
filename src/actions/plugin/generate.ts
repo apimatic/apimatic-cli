@@ -26,8 +26,7 @@ export class PluginGenerateAction {
   public readonly execute = async (
     buildDirectory: DirectoryPath,
     pluginDirectory: DirectoryPath,
-    force: boolean,
-    zipPlugin: boolean
+    force: boolean
   ): Promise<ActionResult> => {
     if (buildDirectory.isEqual(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
@@ -50,7 +49,7 @@ export class PluginGenerateAction {
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
-    };
+    }
 
     if (configState.state === 'missing' || !configState.hasMetadata()) {
       const metadataResult = await new PluginRecordMetadataAction(
@@ -88,9 +87,10 @@ export class PluginGenerateAction {
       }
 
       const tempPluginZipPath = await tempContext.save(response.value);
-      await pluginContext.save(tempPluginZipPath, zipPlugin);
+      await pluginContext.save(tempPluginZipPath);
 
       this.prompts.pluginGenerated(pluginDirectory);
+      this.prompts.nextStepsPublishPlugin();
 
       return ActionResult.success();
     });

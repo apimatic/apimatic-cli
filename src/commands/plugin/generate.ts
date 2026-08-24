@@ -1,4 +1,4 @@
-import { Command, Flags } from '@oclif/core';
+import { Command } from '@oclif/core';
 import { PluginGenerateAction } from '../../actions/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -19,10 +19,6 @@ export default class PluginGenerate extends Command {
   ];
 
   static readonly flags = {
-    zip: Flags.boolean({
-      default: false,
-      description: 'download the generated plugin as a .zip archive'
-    }),
     ...FlagsProvider.input,
     ...FlagsProvider.destination('plugin', 'plugin'),
     ...FlagsProvider.force,
@@ -31,7 +27,7 @@ export default class PluginGenerate extends Command {
 
   async run(): Promise<void> {
     const {
-      flags: { input, destination, force, zip: zipPlugin, 'auth-key': authKey }
+      flags: { input, destination, force, 'auth-key': authKey }
     } = await this.parse(PluginGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -44,7 +40,7 @@ export default class PluginGenerate extends Command {
 
     intro('Generate Context Plugin');
     const action = new PluginGenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, pluginDirectory, force, zipPlugin);
+    const result = await action.execute(buildDirectory, pluginDirectory, force);
     outro(result);
   }
 

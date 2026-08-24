@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { Buffer } from 'node:buffer';
 import { Readable } from 'node:stream';
 import fsExtra from 'fs-extra';
 import sinon from 'sinon';
@@ -13,6 +14,9 @@ import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { PluginService } from '../../../src/infrastructure/services/plugin-service.js';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { FileName } from '../../../src/types/file/fileName.js';
+import { FilePath } from '../../../src/types/file/filePath.js';
+import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -23,17 +27,27 @@ describe('PluginGenerateAction', () => {
   let pluginDirectory: string;
   let action: PluginGenerateAction;
 
-  const execute = (force = false, zipPlugin = true) =>
-    action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(pluginDirectory), force, zipPlugin);
+  let pluginArchive: Buffer;
 
+  const execute = (force = false) =>
+    action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(pluginDirectory), force);
+
+  // The action expands what the service returns, so the stubbed payload has to be a genuine zip.
   const generated = () =>
-    sinon.stub(PluginService.prototype, 'generatePlugin').resolves(ok(Readable.from(['PK context-plugin'])));
+    sinon.stub(PluginService.prototype, 'generatePlugin').resolves(ok(Readable.from([pluginArchive])));
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     const workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
     buildDirectory = path.join(workingDirectory, 'src');
     pluginDirectory = path.join(workingDirectory, 'plugin');
+    const archiveSource = path.join(tmpDirResult.path, 'archive-source');
+    await fsExtra.outputFile(path.join(archiveSource, 'README.md'), '# plugin');
+    await fsExtra.outputFile(path.join(archiveSource, 'skills', 'SKILL.md'), '# skill');
+    const archivePath = new FilePath(new DirectoryPath(tmpDirResult.path), new FileName('plugin.zip'));
+    await new ZipService().archive(new DirectoryPath(archiveSource), archivePath);
+    pluginArchive = await fsExtra.readFile(archivePath.toString());
+
     await fsExtra.ensureDir(buildDirectory);
     await fsExtra.writeJson(path.join(buildDirectory, 'APIMATIC-BUILD.json'), {});
     await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
@@ -60,8 +74,7 @@ describe('PluginGenerateAction', () => {
       const result = await action.execute(
         new DirectoryPath(buildDirectory),
         new DirectoryPath(buildDirectory),
-        false,
-        true
+        false
       );
 
       expect(result.isFailed()).to.be.true;
@@ -105,13 +118,15 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('generation', () => {
-    it('saves the downloaded artifact into the plugin directory', async () => {
+    it('expands the downloaded artifact into the plugin directory', async () => {
       generated();
 
       const result = await execute();
 
       expect(result.isSuccess()).to.be.true;
-      expect(fsExtra.readFileSync(path.join(pluginDirectory, 'plugin.zip'), 'utf-8')).to.equal('PK context-plugin');
+      expect(fsExtra.readFileSync(path.join(pluginDirectory, 'README.md'), 'utf-8')).to.equal('# plugin');
+      expect(fsExtra.readFileSync(path.join(pluginDirectory, 'skills', 'SKILL.md'), 'utf-8')).to.equal('# skill');
+      expect(fsExtra.existsSync(path.join(pluginDirectory, 'plugin.zip'))).to.be.false;
     });
   });
 
