@@ -1,4 +1,4 @@
-import { Command } from '@oclif/core';
+import { Command, Flags } from '@oclif/core';
 import { PluginPublishAction } from '../../actions/plugin/publish.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
@@ -19,7 +19,10 @@ export default class PluginPublish extends Command {
 
   static readonly flags = {
     ...FlagsProvider.input,
-    ...FlagsProvider.destination('plugin', 'plugin', 'was')
+    destination: Flags.string({
+      char: 'd',
+      description: '[default: <input>/plugin] path where the plugin was generated.'
+    })
   };
 
   async run(): Promise<void> {
