@@ -3,7 +3,7 @@ import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../types/api/account.js';
 import { PluginMetadata } from '../../types/plugin/plugin-config.js';
-import { PLUGIN_ID_PATTERN } from '../../types/plugin/plugin-release.js';
+import { PLUGIN_ID_PATTERN } from '../../types/plugin-config-context.js';
 import { SemVersion } from '../../types/publish/version.js';
 import { format as f } from '../format.js';
 import { noteWrapped, withSpinner } from '../prompt.js';

@@ -11,8 +11,21 @@ import {
   PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
-import { PluginRelease } from './plugin/plugin-release.js';
+import { SemVersion } from './publish/version.js';
 import { err, ok, Result } from 'neverthrow';
+
+/** Also the rule the metadata prompt validates against, so a plugin ID is legal as a repository name. */
+export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+const MALFORMED_PLUGIN_ID =
+  `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` +
+  `for example 'acme-payments'`;
+
+const MALFORMED_PLUGIN_VERSION =
+  `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
+
+/** The identity a publish needs: the repository it creates, and the version it tags. */
+export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
 /**
  * What a caller needs to know before generating. Metadata and languages are written by different
@@ -29,10 +42,10 @@ export class PluginConfigPresent {
 
   private constructor(
     private readonly config: PluginConfigData,
-    private readonly release: PluginRelease | undefined
+    private readonly release: PluginReleaseData | undefined
   ) {}
 
-  public static create(config: PluginConfigData, release?: PluginRelease): PluginConfigPresent {
+  public static create(config: PluginConfigData, release?: PluginReleaseData): PluginConfigPresent {
     return new PluginConfigPresent(config, release);
   }
 
@@ -51,7 +64,7 @@ export class PluginConfigPresent {
   }
 
   /** Absent until `plugin generate` records the identity; never malformed, `parse` refuses that. */
-  public getRelease(): PluginRelease | undefined {
+  public getRelease(): PluginReleaseData | undefined {
     return this.release;
   }
 
@@ -92,10 +105,43 @@ export class PluginConfigPresent {
 
 export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
-type ParseResult = { config: PluginConfigData; release?: PluginRelease } | { reason: string };
+type ParseResult = { config: PluginConfigData; release?: PluginReleaseData } | { reason: string };
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function trimmed(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * An absent field yields `undefined` rather than an error: `sdk publish` writes a config carrying
+ * languages alone, which `plugin generate` then fills the identity into. A field that is present
+ * but unusable can only have been hand-edited, so it is reported for the caller to refuse the
+ * whole file over.
+ */
+function parsePluginRelease(
+  pluginId: unknown,
+  pluginVersion: unknown
+): Result<PluginReleaseData | undefined, string> {
+  const id = trimmed(pluginId);
+  if (id !== '' && !PLUGIN_ID_PATTERN.test(id)) {
+    return err(MALFORMED_PLUGIN_ID);
+  }
+
+  const rawVersion = trimmed(pluginVersion);
+  if (rawVersion !== '') {
+    const version = SemVersion.tryCreate(rawVersion);
+    if (version.isErr()) {
+      return err(MALFORMED_PLUGIN_VERSION);
+    }
+    if (id !== '') {
+      return ok({ pluginId: id, version: version.value });
+    }
+  }
+
+  return ok(undefined);
 }
 
 export class PluginConfigContext {
@@ -173,7 +219,7 @@ export class PluginConfigContext {
       return err('unwritable');
     }
 
-    const release = PluginRelease.tryCreate(merged.pluginId, merged.pluginVersion);
+    const release = parsePluginRelease(merged.pluginId, merged.pluginVersion);
     return ok(PluginConfigPresent.create(merged, release.unwrapOr(undefined)));
   }
 
@@ -214,7 +260,7 @@ export class PluginConfigContext {
         }
       }
 
-      const release = PluginRelease.tryCreate(parsed.pluginId, parsed.pluginVersion);
+      const release = parsePluginRelease(parsed.pluginId, parsed.pluginVersion);
       if (release.isErr()) {
         return { reason: release.error };
       }

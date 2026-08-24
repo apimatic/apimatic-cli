@@ -105,37 +105,64 @@ describe('PluginConfigContext', () => {
       expect(state).to.include({ state: 'unreadable', reason: `its 'languages.csharp' entry is not a JSON object` });
     });
 
-    it('names pluginId when it is present but not kebab-case', async () => {
-      withConfig({ ...METADATA, pluginId: 'Acme Payments', languages: {} });
-
+    const reasonOf = async (config: object) => {
+      withConfig(config);
       const state = await context.getPluginConfigState();
-
       expect(state).to.include({ state: 'unreadable' });
-      expect((state as { reason: string }).reason).to.contain(`'pluginId'`);
+      return (state as { reason: string }).reason;
+    };
+
+    const releaseOf = async (config: object) => {
+      withConfig(config);
+      return presentState(await context.getPluginConfigState()).getRelease();
+    };
+
+    ['Acme Payments', 'acme_payments', 'Acme-Payments', 'acme--payments', '-acme', 'acme-'].forEach((pluginId) => {
+      it(`names pluginId when it is '${pluginId}'`, async () => {
+        expect(await reasonOf({ ...METADATA, pluginId, languages: {} })).to.contain(`'pluginId'`);
+      });
     });
 
-    it('names pluginVersion when it is present but not semver', async () => {
-      withConfig({ ...METADATA, pluginVersion: '1.2', languages: {} });
+    ['1.2', '1.2.3.4', 'v1.2.3', '1.2.x', 'latest'].forEach((pluginVersion) => {
+      it(`names pluginVersion when it is '${pluginVersion}'`, async () => {
+        expect(await reasonOf({ ...METADATA, pluginVersion, languages: {} })).to.contain(`'pluginVersion'`);
+      });
+    });
 
-      const state = await context.getPluginConfigState();
+    // A hand-edited field is worth reporting even when the other one has yet to be written.
+    it('names a malformed pluginId whose version is not set yet', async () => {
+      expect(await reasonOf({ pluginId: 'Acme Payments', languages: {} })).to.contain(`'pluginId'`);
+    });
 
-      expect(state).to.include({ state: 'unreadable' });
-      expect((state as { reason: string }).reason).to.contain(`'pluginVersion'`);
+    it('names a malformed pluginVersion whose id is not set yet', async () => {
+      expect(await reasonOf({ pluginVersion: '1.2', languages: {} })).to.contain(`'pluginVersion'`);
     });
 
     it('reports the release once the identity is recorded', async () => {
-      withConfig({ ...METADATA, languages: {} });
+      const release = await releaseOf({ ...METADATA, languages: {} });
 
-      const release = presentState(await context.getPluginConfigState()).getRelease();
-
-      expect(release?.toRepositoryName()).to.equal('acme-payments');
-      expect(release?.toTag()).to.equal('v0.1.0');
+      expect(release?.pluginId).to.equal('acme-payments');
+      expect(`${release?.version}`).to.equal('0.1.0');
     });
 
-    it('reports no release for a file written by sdk publish', async () => {
-      withConfig({ languages: { csharp: CSHARP_ENTRY } });
+    it('trims surrounding whitespace off the identity', async () => {
+      const release = await releaseOf({ pluginId: '  acme-payments  ', pluginVersion: '  0.1.0  ', languages: {} });
 
-      expect(presentState(await context.getPluginConfigState()).getRelease()).to.be.undefined;
+      expect(release?.pluginId).to.equal('acme-payments');
+      expect(`${release?.version}`).to.equal('0.1.0');
+    });
+
+    [
+      ['no id', { pluginVersion: '1.0.0' }],
+      ['a blank id', { pluginId: '   ', pluginVersion: '1.0.0' }],
+      ['an id that is not a string', { pluginId: 7, pluginVersion: '1.0.0' }],
+      ['no version', { pluginId: 'acme-payments' }],
+      ['a blank version', { pluginId: 'acme-payments', pluginVersion: '  ' }],
+      ['neither field, as sdk publish writes it', { languages: { csharp: CSHARP_ENTRY } }]
+    ].forEach(([label, config]) => {
+      it(`reports no release for ${label}`, async () => {
+        expect(await releaseOf({ languages: {}, ...(config as object) })).to.be.undefined;
+      });
     });
 
     it('accepts a config carrying no languages field at all', async () => {

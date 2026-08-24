@@ -7,7 +7,7 @@ import { PluginPublishAction } from '../../../src/actions/plugin/publish.js';
 import { PluginPublishPrompts } from '../../../src/prompts/plugin/publish.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PluginContents } from '../../../src/types/plugin/plugin-contents.js';
-import { PluginRelease } from '../../../src/types/plugin/plugin-release.js';
+import { PluginReleaseData } from '../../../src/types/plugin-config-context.js';
 
 describe('PluginPublishAction', () => {
   let tmpDirResult: DirectoryResult;
@@ -195,9 +195,9 @@ describe('PluginPublishAction', () => {
 
       await execute();
 
-      const release = prompt.firstCall.args[0] as PluginRelease;
-      expect(release.toRepositoryName()).to.equal('hamza');
-      expect(release.toTag()).to.equal('v0.1.67');
+      const release = prompt.firstCall.args[0] as PluginReleaseData;
+      expect(release.pluginId).to.equal('hamza');
+      expect(`${release.version}`).to.equal('0.1.67');
     });
 
     it('counts the plugin contents recursively', async () => {

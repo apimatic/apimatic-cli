@@ -2,17 +2,22 @@ import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PluginContents } from '../../types/plugin/plugin-contents.js';
-import { PluginRelease } from '../../types/plugin/plugin-release.js';
+import { PluginReleaseData } from '../../types/plugin-config-context.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
 
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 const NOTE_TITLE = 'Commands to Copy and Run';
+const TAG_PREFIX = 'v';
 
 export class PluginPublishPrompts {
-  public firstPublishInstructions(release: PluginRelease, contents: PluginContents, pluginDirectory: DirectoryPath) {
+  public firstPublishInstructions(
+    release: PluginReleaseData,
+    contents: PluginContents,
+    pluginDirectory: DirectoryPath
+  ) {
     const message =
-      `Publish version ${f.var(release.toVersion())} of your plugin to a new public GitHub repository.\n\n` +
+      `Publish version ${f.var(`${release.version}`)} of your plugin to a new public GitHub repository.\n\n` +
       `${this.contentsLine(contents)}\n\n` +
       `${this.changeDirectory(pluginDirectory)}\n` +
       `${f.cmdAlt('git', 'init', '-b', 'main')}\n` +
@@ -22,9 +27,9 @@ export class PluginPublishPrompts {
     noteWrapped(message, NOTE_TITLE);
   }
 
-  public updateInstructions(release: PluginRelease, contents: PluginContents, pluginDirectory: DirectoryPath) {
+  public updateInstructions(release: PluginReleaseData, contents: PluginContents, pluginDirectory: DirectoryPath) {
     const message =
-      `Publish version ${f.var(release.toVersion())} of your plugin as a new release of your ` +
+      `Publish version ${f.var(`${release.version}`)} of your plugin as a new release of your ` +
       `existing repository.\n\n` +
       `${this.contentsLine(contents)}\n\n` +
       `${this.changeDirectory(pluginDirectory)}\n` +
@@ -81,20 +86,20 @@ export class PluginPublishPrompts {
     return f.cmdAlt('cd', `"${pluginDirectory}"`);
   }
 
-  private createRepository(release: PluginRelease): string {
-    return f.cmdAlt('gh', 'repo', 'create', release.toRepositoryName(), '--public', '--source=.', '--remote=origin');
+  private createRepository(release: PluginReleaseData): string {
+    return f.cmdAlt('gh', 'repo', 'create', release.pluginId, '--public', '--source=.', '--remote=origin');
   }
 
   /**
    * The tag is annotated because `git push --follow-tags`, which ends both flows, carries annotated
    * tags only and would leave a lightweight one behind on the machine.
    */
-  private stageCommitAndTag(release: PluginRelease): string {
-    const label = `${release.toRepositoryName()} ${release.toVersion()}`;
+  private stageCommitAndTag(release: PluginReleaseData): string {
+    const label = `${release.pluginId} ${release.version}`;
     return (
       `${f.cmdAlt('git', 'add', '.')}\n` +
       `${f.cmdAlt('git', 'commit', '-m', `"Publish ${label}"`)}\n` +
-      `${f.cmdAlt('git', 'tag', '-a', release.toTag(), '-m', `"${label}"`)}`
+      `${f.cmdAlt('git', 'tag', '-a', `${TAG_PREFIX}${release.version}`, '-m', `"${label}"`)}`
     );
   }
 }
