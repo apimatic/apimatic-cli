@@ -38,7 +38,6 @@ describe('PluginPublishAction', () => {
     await fsExtra.ensureDir(buildDirectory);
     await writeConfig(validConfig);
 
-    // A generated plugin: two files at the root, one nested a level down.
     await fsExtra.ensureDir(path.join(pluginDirectory, 'skills', 'auth'));
     await fsExtra.writeFile(path.join(pluginDirectory, 'README.md'), '# plugin');
     await fsExtra.writeJson(path.join(pluginDirectory, 'plugin.json'), {});
@@ -211,7 +210,6 @@ describe('PluginPublishAction', () => {
       expect(contents).to.deep.equal({ fileCount: 3, directoryCount: 2 });
     });
 
-    // `git add .` never stages `.git`, so counting it would inflate the figure by every git object.
     it('leaves the repository out of the counts', async () => {
       const prompt = spy('updateInstructions');
       await fsExtra.ensureDir(path.join(pluginDirectory, '.git', 'refs', 'tags'));

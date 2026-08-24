@@ -93,7 +93,6 @@ export class PluginPublishPrompts {
     return f.cmdAlt('cd', `"${pluginDirectory}"`);
   }
 
-  /** `--push` is left out on purpose: nothing is committed yet at this point in the sequence. */
   private createRepository(release: PluginRelease): string {
     return f.cmdAlt('gh', 'repo', 'create', release.toRepositoryName(), '--public', '--source=.', '--remote=origin');
   }
@@ -103,7 +102,6 @@ export class PluginPublishPrompts {
     return `${f.cmdAlt('git', 'add', '.')} && ${f.cmdAlt('git', 'commit', '-m', commitMessage)}`;
   }
 
-  /** Chained so an existing tag stops the push instead of publishing a stale one. */
   private tagAndPush(release: PluginRelease): string {
     const tag = release.toTag();
     return `${f.cmdAlt('git', 'tag', tag)} && ${f.cmdAlt('git', 'push', 'origin', tag)}`;

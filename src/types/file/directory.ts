@@ -79,7 +79,6 @@ export class Directory {
     return this.items.length === 0;
   }
 
-  /** Top level only — the names callers exclude are root-level concerns such as `.git`. */
   public excluding(names: FileName[]): Directory {
     const excluded = names.map((name) => name.toString());
     const kept = this.items.filter((item) =>

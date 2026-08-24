@@ -62,8 +62,6 @@ describe('PluginContext', () => {
       expect(fs.existsSync(path.join(pluginDirectory.toString(), 'plugin.zip'))).to.be.true;
     });
 
-    // Once published, the plugin directory is the user's repository. Clearing it wholesale would
-    // discard their history, their remote and every tag they have pushed.
     it('leaves an existing repository in place', async () => {
       mockFs({
         plugin: {
@@ -116,7 +114,6 @@ describe('PluginContext', () => {
       expect(await context.describeContents()).to.deep.equal({ fileCount: 1, directoryCount: 1 });
     });
 
-    // `git add .` never stages `.git`, and its objects would dwarf the plugin's own files.
     it('leaves the repository out of the counts', async () => {
       mockFs({
         plugin: {

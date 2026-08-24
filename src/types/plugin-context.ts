@@ -21,7 +21,6 @@ export class PluginContext {
     return !(await this.fileService.directoryEmpty(this.pluginDirectory));
   }
 
-  /** Counts exclude the repository: `git add .` never stages `.git`, and its objects would dwarf the plugin. */
   public async describeContents(): Promise<PluginContents> {
     const directory = await this.fileService.getDirectory(this.pluginDirectory);
     const publishable = directory.excluding([new FileName(GIT_DIRECTORY_NAME)]);
@@ -34,8 +33,7 @@ export class PluginContext {
   }
 
   public async save(tempPluginFilePath: FilePath, zipPlugin: boolean): Promise<void> {
-    // Once published, this directory is the user's repository. Emptying it outright would take
-    // `.git` with it, discarding their history, their remote and every tag they have pushed.
+    // This directory is the user's repository once published: emptying it outright would discard their history.
     await this.fileService.cleanDirectoryExcluding(this.pluginDirectory, [new FileName(GIT_DIRECTORY_NAME)]);
     if (zipPlugin) {
       await this.fileService.copy(tempPluginFilePath, this.zipPath);

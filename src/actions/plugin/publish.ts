@@ -41,7 +41,6 @@ export class PluginPublishAction {
 
     const contents = await pluginContext.describeContents();
 
-    // A repository already here means every later release, where creating and linking it would fail.
     if (await pluginContext.isGitInitialized()) {
       this.prompts.updateInstructions(release.value, contents, pluginDirectory);
     } else {

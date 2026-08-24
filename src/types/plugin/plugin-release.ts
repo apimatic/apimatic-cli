@@ -12,10 +12,7 @@ export type PluginReleaseProblem = {
   reason: 'missing' | 'malformed';
 };
 
-/**
- * The identity a publish needs: what the repository is called, and which version this release is.
- * Naming rules live here rather than in the prompts so the tag prefix has one definition.
- */
+/** Naming rules live here rather than in the prompts so the tag prefix has one definition. */
 export class PluginRelease {
   private constructor(private readonly pluginId: string, private readonly version: SemVersion) {}
 
