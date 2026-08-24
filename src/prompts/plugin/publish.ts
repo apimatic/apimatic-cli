@@ -16,10 +16,9 @@ export class PluginPublishPrompts {
       `${this.contentsLine(contents)}\n\n` +
       `${this.changeDirectory(pluginDirectory)}\n` +
       `${f.cmdAlt('git', 'init', '-b', 'main')}\n` +
+      `${this.stageCommitAndTag(release)}\n` +
       `${this.createRepository(release)}\n` +
-      `${this.stageAndCommit(release)}\n` +
-      `${f.cmdAlt('git', 'push', '-u', 'origin', 'main')}\n` +
-      `${this.tagAndPush(release)}`;
+      `${f.cmdAlt('git', 'push', '-u', 'origin', 'main', '--follow-tags')}`;
     noteWrapped(message, NOTE_TITLE);
   }
 
@@ -29,9 +28,8 @@ export class PluginPublishPrompts {
       `existing repository.\n\n` +
       `${this.contentsLine(contents)}\n\n` +
       `${this.changeDirectory(pluginDirectory)}\n` +
-      `${this.stageAndCommit(release)}\n` +
-      `${f.cmdAlt('git', 'push')}\n` +
-      `${this.tagAndPush(release)}`;
+      `${this.stageCommitAndTag(release)}\n` +
+      `${f.cmdAlt('git', 'push', '--follow-tags')}`;
     noteWrapped(message, NOTE_TITLE);
   }
 
@@ -97,13 +95,16 @@ export class PluginPublishPrompts {
     return f.cmdAlt('gh', 'repo', 'create', release.toRepositoryName(), '--public', '--source=.', '--remote=origin');
   }
 
-  private stageAndCommit(release: PluginRelease): string {
-    const commitMessage = `"Publish ${release.toRepositoryName()} ${release.toVersion()}"`;
-    return `${f.cmdAlt('git', 'add', '.')} && ${f.cmdAlt('git', 'commit', '-m', commitMessage)}`;
-  }
-
-  private tagAndPush(release: PluginRelease): string {
-    const tag = release.toTag();
-    return `${f.cmdAlt('git', 'tag', tag)} && ${f.cmdAlt('git', 'push', 'origin', tag)}`;
+  /**
+   * The tag is annotated because `git push --follow-tags`, which ends both flows, carries annotated
+   * tags only and would leave a lightweight one behind on the machine.
+   */
+  private stageCommitAndTag(release: PluginRelease): string {
+    const label = `${release.toRepositoryName()} ${release.toVersion()}`;
+    return (
+      `${f.cmdAlt('git', 'add', '.')}\n` +
+      `${f.cmdAlt('git', 'commit', '-m', `"Publish ${label}"`)}\n` +
+      `${f.cmdAlt('git', 'tag', '-a', release.toTag(), '-m', `"${label}"`)}`
+    );
   }
 }
