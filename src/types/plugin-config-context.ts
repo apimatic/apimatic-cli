@@ -59,13 +59,22 @@ export class PluginConfigPresent {
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
   }
 
-  /** Absent until `plugin generate` records the identity; never malformed, `parse` refuses that. */
+  /**
+   * Absent until `plugin generate` records the identity. The fields are checked rather than trusted:
+   * they reach this class through a cast of parsed JSON, so a hand-edited config can hold a number
+   * where the type promises a string.
+   */
   public getRelease(): PluginReleaseData | undefined {
-    const pluginId = this.config.pluginId;
-    const version = this.config.pluginVersion
-    ? SemVersion.tryCreate(this.config.pluginVersion).unwrapOr(undefined)
-    : undefined;
-    return pluginId && version ? { pluginId , version } : undefined;
+    const pluginId = typeof this.config.pluginId === 'string' ? this.config.pluginId.trim() : '';
+    const rawVersion = typeof this.config.pluginVersion === 'string' ? this.config.pluginVersion.trim() : '';
+    if (pluginId === '' || rawVersion === '') {
+      return undefined;
+    }
+
+    return SemVersion.tryCreate(rawVersion).match(
+      (version) => ({ pluginId, version }),
+      () => undefined
+    );
   }
 
   public hasNoSourceRepository(language: Language): boolean {
