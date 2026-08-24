@@ -230,7 +230,7 @@ Generate a Claude Code context plugin for your published SDKs.
 
 ```
 USAGE
-  $ apimatic plugin generate [--zip] [-i <value>] [-d <value>] [-f] [-k <value>]
+  $ apimatic plugin generate [-i <value>] [-d <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/plugin] path where the plugin will be generated.
@@ -238,7 +238,6 @@ FLAGS
   -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
                              API specifications and configuration files.
   -k, --auth-key=<value>     override current authentication state with an authentication key.
-      --zip                  download the generated plugin as a .zip archive
 
 DESCRIPTION
   Generate a Claude Code context plugin for your published SDKs.

@@ -13,10 +13,6 @@ export class PluginContext {
 
   constructor(private readonly pluginDirectory: DirectoryPath) {}
 
-  private get zipPath(): FilePath {
-    return new FilePath(this.pluginDirectory, new FileName('plugin.zip'));
-  }
-
   public async exists(): Promise<boolean> {
     return !(await this.fileService.directoryEmpty(this.pluginDirectory));
   }
@@ -32,13 +28,9 @@ export class PluginContext {
     return await this.fileService.directoryExists(this.pluginDirectory.join(GIT_DIRECTORY_NAME));
   }
 
-  public async save(tempPluginFilePath: FilePath, zipPlugin: boolean): Promise<void> {
+  public async save(tempPluginFilePath: FilePath): Promise<void> {
     // This directory is the user's repository once published: emptying it outright would discard their history.
     await this.fileService.cleanDirectoryExcluding(this.pluginDirectory, [new FileName(GIT_DIRECTORY_NAME)]);
-    if (zipPlugin) {
-      await this.fileService.copy(tempPluginFilePath, this.zipPath);
-    } else {
-      await this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
-    }
+    await this.zipService.unArchive(tempPluginFilePath, this.pluginDirectory);
   }
 }
