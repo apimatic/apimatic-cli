@@ -57,7 +57,8 @@ export class PluginPublishPrompts {
 
   public pluginConfigUnreadable(reason: string, path: FilePath) {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used: ${reason}. ` + `Fix or delete it at ${f.path(path)} and try again.`;
+      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used: ${reason}. ` +
+      `Fix or delete it at ${f.path(path)}, then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;
     log.error(message);
   }
 
