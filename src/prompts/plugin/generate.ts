@@ -75,8 +75,7 @@ export class PluginGeneratePrompts {
 
   public tryPluginInClaudeCode(plugin: DirectoryPath) {
     const message =
-      `Start Claude Code with the plugin loaded to try it out.\n\n` +
-      `${f.cmdAlt('claude', '--plugin-dir', `"${plugin}"`)}`;
+      `Start Claude Code with the plugin loaded to try it out.\n\n` + f.cmdAlt('claude', '--plugin-dir', `"${plugin}"`);
     log.message(message);
   }
 
