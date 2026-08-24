@@ -105,6 +105,39 @@ describe('PluginConfigContext', () => {
       expect(state).to.include({ state: 'unreadable', reason: `its 'languages.csharp' entry is not a JSON object` });
     });
 
+    it('names pluginId when it is present but not kebab-case', async () => {
+      withConfig({ ...METADATA, pluginId: 'Acme Payments', languages: {} });
+
+      const state = await context.getPluginConfigState();
+
+      expect(state).to.include({ state: 'unreadable' });
+      expect((state as { reason: string }).reason).to.contain(`'pluginId'`);
+    });
+
+    it('names pluginVersion when it is present but not semver', async () => {
+      withConfig({ ...METADATA, pluginVersion: '1.2', languages: {} });
+
+      const state = await context.getPluginConfigState();
+
+      expect(state).to.include({ state: 'unreadable' });
+      expect((state as { reason: string }).reason).to.contain(`'pluginVersion'`);
+    });
+
+    it('reports the release once the identity is recorded', async () => {
+      withConfig({ ...METADATA, languages: {} });
+
+      const release = presentState(await context.getPluginConfigState()).getRelease();
+
+      expect(release?.toRepositoryName()).to.equal('acme-payments');
+      expect(release?.toTag()).to.equal('v0.1.0');
+    });
+
+    it('reports no release for a file written by sdk publish', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
+
+      expect(presentState(await context.getPluginConfigState()).getRelease()).to.be.undefined;
+    });
+
     it('accepts a config carrying no languages field at all', async () => {
       withConfig({ ...METADATA });
 

@@ -11,7 +11,7 @@ import {
   PluginLanguages,
   PluginMetadata
 } from './plugin/plugin-config.js';
-import { PluginRelease, PluginReleaseProblem } from './plugin/plugin-release.js';
+import { PluginRelease } from './plugin/plugin-release.js';
 import { err, ok, Result } from 'neverthrow';
 
 /**
@@ -27,10 +27,13 @@ export type PluginConfigState =
 export class PluginConfigPresent {
   public readonly state = 'present' as const;
 
-  private constructor(private readonly config: PluginConfigData) {}
+  private constructor(
+    private readonly config: PluginConfigData,
+    private readonly release: PluginRelease | undefined
+  ) {}
 
-  public static create(config: PluginConfigData): PluginConfigPresent {
-    return new PluginConfigPresent(config);
+  public static create(config: PluginConfigData, release?: PluginRelease): PluginConfigPresent {
+    return new PluginConfigPresent(config, release);
   }
 
   public hasPublishedSdks(): boolean {
@@ -47,12 +50,9 @@ export class PluginConfigPresent {
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
   }
 
-  /**
-   * Narrower than `hasMetadata`: a publish names the repository and the tag, so it needs the ID and
-   * the version, and never reads the display name.
-   */
-  public getPluginRelease(): Result<PluginRelease, PluginReleaseProblem> {
-    return PluginRelease.create(this.config.pluginId, this.config.pluginVersion);
+  /** Absent until `plugin generate` records the identity; never malformed, `parse` refuses that. */
+  public getRelease(): PluginRelease | undefined {
+    return this.release;
   }
 
   public hasNoSourceRepository(language: Language): boolean {
@@ -92,7 +92,7 @@ export class PluginConfigPresent {
 
 export type PluginConfigWriteFailure = 'unreadable' | 'unwritable';
 
-type ParseResult = { config: PluginConfigData } | { reason: string };
+type ParseResult = { config: PluginConfigData; release?: PluginRelease } | { reason: string };
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -117,7 +117,7 @@ export class PluginConfigContext {
       return { state: 'unreadable', reason: parsed.reason, path: this.configPath };
     }
 
-    return PluginConfigPresent.create(parsed.config);
+    return PluginConfigPresent.create(parsed.config, parsed.release);
   }
 
   public async upsertMetadata(
@@ -173,7 +173,8 @@ export class PluginConfigContext {
       return err('unwritable');
     }
 
-    return ok(PluginConfigPresent.create(merged));
+    const release = PluginRelease.tryCreate(merged.pluginId, merged.pluginVersion);
+    return ok(PluginConfigPresent.create(merged, release.unwrapOr(undefined)));
   }
 
   private async read(): Promise<ParseResult> {
@@ -213,7 +214,12 @@ export class PluginConfigContext {
         }
       }
 
-      return { config: parsed as PluginConfigData };
+      const release = PluginRelease.tryCreate(parsed.pluginId, parsed.pluginVersion);
+      if (release.isErr()) {
+        return { reason: release.error };
+      }
+
+      return { config: parsed as PluginConfigData, release: release.value };
     } catch (error) {
       return { reason: error instanceof Error ? error.message : String(error) };
     }

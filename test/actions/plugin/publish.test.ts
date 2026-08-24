@@ -115,45 +115,44 @@ describe('PluginPublishAction', () => {
       expect(prompt.calledOnce).to.be.true;
     });
 
-    it('fails and names pluginId when the id is absent', async () => {
-      const prompt = spy('pluginReleaseUnusable');
+    it('asks for the plugin details when the id is absent', async () => {
+      const prompt = spy('pluginDetailsNotSet');
       await writeConfig({ ...validConfig, pluginId: undefined });
 
       const result = await execute();
 
       expect(result.isFailed()).to.be.true;
-      expect(prompt.firstCall.args[0]).to.deep.equal({ field: 'pluginId', reason: 'missing' });
+      expect(prompt.calledOnce).to.be.true;
     });
 
-    it('fails and names pluginId when the id is not kebab-case', async () => {
-      const prompt = spy('pluginReleaseUnusable');
-      await writeConfig({ ...validConfig, pluginId: 'Hamza Plugin' });
-
-      const result = await execute();
-
-      expect(result.isFailed()).to.be.true;
-      expect(prompt.firstCall.args[0]).to.deep.equal({ field: 'pluginId', reason: 'malformed' });
-    });
-
-    // `hasMetadata` does not cover the version, so this is the only guard on the field the tag needs.
-    it('fails and names pluginVersion when the version is absent', async () => {
-      const prompt = spy('pluginReleaseUnusable');
+    it('asks for the plugin details when the version is absent', async () => {
+      const prompt = spy('pluginDetailsNotSet');
       await writeConfig({ ...validConfig, pluginVersion: undefined });
 
       const result = await execute();
 
       expect(result.isFailed()).to.be.true;
-      expect(prompt.firstCall.args[0]).to.deep.equal({ field: 'pluginVersion', reason: 'missing' });
+      expect(prompt.calledOnce).to.be.true;
     });
 
-    it('fails and names pluginVersion when the version is not semver', async () => {
-      const prompt = spy('pluginReleaseUnusable');
+    it('refuses the file when the id is not kebab-case', async () => {
+      const prompt = spy('pluginConfigUnreadable');
+      await writeConfig({ ...validConfig, pluginId: 'Hamza Plugin' });
+
+      const result = await execute();
+
+      expect(result.isFailed()).to.be.true;
+      expect(prompt.firstCall.args[0]).to.contain(`'pluginId'`);
+    });
+
+    it('refuses the file when the version is not semver', async () => {
+      const prompt = spy('pluginConfigUnreadable');
       await writeConfig({ ...validConfig, pluginVersion: '1.2' });
 
       const result = await execute();
 
       expect(result.isFailed()).to.be.true;
-      expect(prompt.firstCall.args[0]).to.deep.equal({ field: 'pluginVersion', reason: 'malformed' });
+      expect(prompt.firstCall.args[0]).to.contain(`'pluginVersion'`);
     });
 
     it('publishes without a display name, which it never reads', async () => {

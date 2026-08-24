@@ -2,80 +2,63 @@ import { expect } from 'chai';
 import { PluginRelease } from '../../../src/types/plugin/plugin-release.js';
 
 describe('PluginRelease', () => {
-  const create = (pluginId: string | undefined, pluginVersion: string | undefined) =>
-    PluginRelease.create(pluginId, pluginVersion);
+  const create = (pluginId: unknown, pluginVersion: unknown) => PluginRelease.tryCreate(pluginId, pluginVersion);
 
-  describe('create', () => {
+  describe('tryCreate', () => {
     it('accepts a kebab-case id and a semver version', () => {
-      const release = create('acme-payments', '1.0.0');
-
-      expect(release.isOk()).to.be.true;
+      expect(create('acme-payments', '1.0.0')._unsafeUnwrap()).to.not.be.undefined;
     });
 
     it('accepts a single-word id', () => {
-      expect(create('hamza', '0.1.67').isOk()).to.be.true;
+      expect(create('hamza', '0.1.67')._unsafeUnwrap()).to.not.be.undefined;
     });
 
     it('trims surrounding whitespace before validating', () => {
-      const release = create('  acme-payments  ', '  1.0.0  ');
+      const release = create('  acme-payments  ', '  1.0.0  ')._unsafeUnwrap();
 
-      expect(release.isOk()).to.be.true;
-      expect(release._unsafeUnwrap().toRepositoryName()).to.equal('acme-payments');
-      expect(release._unsafeUnwrap().toTag()).to.equal('v1.0.0');
-    });
-
-    it('reports a missing id', () => {
-      expect(create(undefined, '1.0.0')._unsafeUnwrapErr()).to.deep.equal({
-        field: 'pluginId',
-        reason: 'missing'
-      });
-    });
-
-    it('reports a blank id as missing', () => {
-      expect(create('   ', '1.0.0')._unsafeUnwrapErr()).to.deep.equal({ field: 'pluginId', reason: 'missing' });
+      expect(release?.toRepositoryName()).to.equal('acme-payments');
+      expect(release?.toTag()).to.equal('v1.0.0');
     });
 
     ['Acme Payments', 'acme_payments', 'Acme-Payments', 'acme--payments', '-acme', 'acme-'].forEach((pluginId) => {
-      it(`reports '${pluginId}' as a malformed id`, () => {
-        expect(create(pluginId, '1.0.0')._unsafeUnwrapErr()).to.deep.equal({
-          field: 'pluginId',
-          reason: 'malformed'
-        });
-      });
-    });
-
-    it('reports a missing version', () => {
-      expect(create('acme-payments', undefined)._unsafeUnwrapErr()).to.deep.equal({
-        field: 'pluginVersion',
-        reason: 'missing'
-      });
-    });
-
-    it('reports a blank version as missing', () => {
-      expect(create('acme-payments', '  ')._unsafeUnwrapErr()).to.deep.equal({
-        field: 'pluginVersion',
-        reason: 'missing'
+      it(`refuses '${pluginId}' as a malformed id`, () => {
+        expect(create(pluginId, '1.0.0')._unsafeUnwrapErr()).to.contain(`'pluginId'`);
       });
     });
 
     ['1.2', '1.2.3.4', 'v1.2.3', '1.2.x', 'latest'].forEach((pluginVersion) => {
-      it(`reports '${pluginVersion}' as a malformed version`, () => {
-        expect(create('acme-payments', pluginVersion)._unsafeUnwrapErr()).to.deep.equal({
-          field: 'pluginVersion',
-          reason: 'malformed'
-        });
+      it(`refuses '${pluginVersion}' as a malformed version`, () => {
+        expect(create('acme-payments', pluginVersion)._unsafeUnwrapErr()).to.contain(`'pluginVersion'`);
       });
     });
 
-    // The id is reported first so a caller fixing one field at a time is not sent to the version
-    // while the id is also unusable.
-    it('reports the id when both fields are unusable', () => {
-      expect(create(undefined, undefined)._unsafeUnwrapErr().field).to.equal('pluginId');
+    // A hand-edited field is worth reporting even when the other one has yet to be written.
+    it('refuses a malformed id whose version is not set yet', () => {
+      expect(create('Acme Payments', undefined)._unsafeUnwrapErr()).to.contain(`'pluginId'`);
+    });
+
+    it('refuses a malformed version whose id is not set yet', () => {
+      expect(create(undefined, '1.2')._unsafeUnwrapErr()).to.contain(`'pluginVersion'`);
+    });
+  });
+
+  describe('an identity that is not recorded yet', () => {
+    [
+      ['no id', undefined, '1.0.0'],
+      ['a blank id', '   ', '1.0.0'],
+      ['an id that is not a string', 7, '1.0.0'],
+      ['no version', 'acme-payments', undefined],
+      ['a blank version', 'acme-payments', '  '],
+      ['neither field', undefined, undefined]
+    ].forEach(([label, pluginId, pluginVersion]) => {
+      it(`reports no release for ${label}`, () => {
+        expect(create(pluginId, pluginVersion)._unsafeUnwrap()).to.be.undefined;
+      });
     });
   });
 
   describe('naming', () => {
-    const release = create('acme-payments', '0.1.67')._unsafeUnwrap();
+    const release = create('acme-payments', '0.1.67')._unsafeUnwrap()!;
 
     it('names the repository after the plugin id', () => {
       expect(release.toRepositoryName()).to.equal('acme-payments');

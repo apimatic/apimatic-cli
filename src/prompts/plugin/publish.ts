@@ -2,7 +2,7 @@ import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PluginContents } from '../../types/plugin/plugin-contents.js';
-import { PluginRelease, PluginReleaseProblem } from '../../types/plugin/plugin-release.js';
+import { PluginRelease } from '../../types/plugin/plugin-release.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
 
@@ -60,21 +60,11 @@ export class PluginPublishPrompts {
     log.error(message);
   }
 
-  public pluginReleaseUnusable(problem: PluginReleaseProblem) {
+  public pluginDetailsNotSet() {
     const message =
-      `${f.var(problem.field)} ${this.releaseProblemDetail(problem)}. ` +
-      `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' to set it.`;
+      `${f.var(PLUGIN_CONFIG_FILE)} does not name the plugin or its version. ` +
+      `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' to set them.`;
     log.error(message);
-  }
-
-  private releaseProblemDetail(problem: PluginReleaseProblem): string {
-    if (problem.reason === 'missing') {
-      return `is not set in ${f.var(PLUGIN_CONFIG_FILE)}`;
-    }
-    if (problem.field === 'pluginId') {
-      return `must be lower-case alphanumeric words separated by single dashes, for example ${f.var('acme-payments')}`;
-    }
-    return `must be a version in the format major.minor.patch, for example ${f.var('0.1.0')}`;
   }
 
   private contentsLine(contents: PluginContents): string {

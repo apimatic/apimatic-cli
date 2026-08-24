@@ -33,18 +33,18 @@ export class PluginPublishAction {
       return ActionResult.failed();
     }
 
-    const release = configState.getPluginRelease();
-    if (release.isErr()) {
-      this.prompts.pluginReleaseUnusable(release.error);
+    const release = configState.getRelease();
+    if (!release) {
+      this.prompts.pluginDetailsNotSet();
       return ActionResult.failed();
     }
 
     const contents = await pluginContext.describeContents();
 
     if (await pluginContext.isGitInitialized()) {
-      this.prompts.updateInstructions(release.value, contents, pluginDirectory);
+      this.prompts.updateInstructions(release, contents, pluginDirectory);
     } else {
-      this.prompts.firstPublishInstructions(release.value, contents, pluginDirectory);
+      this.prompts.firstPublishInstructions(release, contents, pluginDirectory);
     }
 
     return ActionResult.success();
