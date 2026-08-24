@@ -1,3 +1,35 @@
+# [1.3.0-beta.1](https://github.com/apimatic/apimatic-cli/compare/v1.2.0...v1.3.0-beta.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* clarify CLI messages for plugin generation and publishing setup ([#325](https://github.com/apimatic/apimatic-cli/issues/325)) ([711fc39](https://github.com/apimatic/apimatic-cli/commit/711fc39f6aff0b817daf5ec887db928d5eb53122))
+* fail when --expand-* flags cannot be honoured without a spec ([c1e826c](https://github.com/apimatic/apimatic-cli/commit/c1e826c9bb2308333b00dfa4d02f80a816f2e345))
+* guard the 401 body parse on the transformation error path ([0871f65](https://github.com/apimatic/apimatic-cli/commit/0871f65b599225221634a04b0a265de781b6c169))
+* name the build directory correctly in the empty spec error ([d73c5c3](https://github.com/apimatic/apimatic-cli/commit/d73c5c37e9c521d5fe069433de4dcad06152ee92))
+* point the auth hint at the command that accepts the key ([2ad98cd](https://github.com/apimatic/apimatic-cli/commit/2ad98cd7be0193455bf31d7a9e3a1f470cf63e46))
+* poll for publish completion in interactive sdk publish ([#315](https://github.com/apimatic/apimatic-cli/issues/315)) ([68b5660](https://github.com/apimatic/apimatic-cli/commit/68b566015955d278de9646c341fabaa2701daad9)), closes [#312](https://github.com/apimatic/apimatic-cli/issues/312) [#313](https://github.com/apimatic/apimatic-cli/issues/313)
+* report a rejected auth key accurately on login ([8bb35eb](https://github.com/apimatic/apimatic-cli/commit/8bb35eb59b17a0ecf3d9f1bb2a3080c1c03b0099))
+* report every validation error and extract shared generation status polling ([#307](https://github.com/apimatic/apimatic-cli/issues/307)) ([e823b4d](https://github.com/apimatic/apimatic-cli/commit/e823b4d25411608080eec0384a197697f4db3775))
+* report logged-out state correctly in auth status ([2993889](https://github.com/apimatic/apimatic-cli/commit/2993889c62306eefc14ed539cb3b37dcc580fa2f))
+* report the build directory in the toc spec errors ([9a56786](https://github.com/apimatic/apimatic-cli/commit/9a5678677939fd495f550a72b30bef4f0fbf67bd))
+* require a spec directory for portal toc new ([8432629](https://github.com/apimatic/apimatic-cli/commit/843262989f389ee090d4c3a4d710a65be8fc13f9))
+* surface actionable auth hint on validate, transform and publishing errors ([a1ab840](https://github.com/apimatic/apimatic-cli/commit/a1ab84045a389544fe73866286dd0acc9bd39c16))
+* surface TOC extraction failures instead of writing a partial toc.yml ([5332a99](https://github.com/apimatic/apimatic-cli/commit/5332a99740edf011c171b208613e71965a7a13d9))
+
+
+### Features
+
+* add `apimatic plugin generate`, and share one bounded generation poll ([#314](https://github.com/apimatic/apimatic-cli/issues/314)) ([8f00d76](https://github.com/apimatic/apimatic-cli/commit/8f00d7667b68b0da503c18d56e7222aca3566c00)), closes [apimatic/apimatic-docs#829](https://github.com/apimatic/apimatic-docs/issues/829)
+* add apimatic plugin publish ([#321](https://github.com/apimatic/apimatic-cli/issues/321)) ([31a233a](https://github.com/apimatic/apimatic-cli/commit/31a233a942e830bae47898bc13b3b1d1a453167e))
+* AI-first messaging and Copilot-aware portal quickstart next steps ([177de58](https://github.com/apimatic/apimatic-cli/commit/177de586e303f5a7e3534f2e9efb4f2d60956c8f))
+* create and maintain plugin-config.json from sdk publish and plugin generate ([#318](https://github.com/apimatic/apimatic-cli/issues/318)) ([4d2ecd7](https://github.com/apimatic/apimatic-cli/commit/4d2ecd7d384d972dba558a846b5e8175679798ca))
+* lead with Context Plugins in quickstart and portal messaging ([e522c1c](https://github.com/apimatic/apimatic-cli/commit/e522c1ce4c11a251f146852415aa06a0c592d240))
+* **quickstart:** prune build file to subscription before generating ([#294](https://github.com/apimatic/apimatic-cli/issues/294)) ([5d50968](https://github.com/apimatic/apimatic-cli/commit/5d509682696513d5fdd1de51b1b507b24dd8cd18))
+* sdk publish v4 ([#317](https://github.com/apimatic/apimatic-cli/issues/317)) ([9ce977f](https://github.com/apimatic/apimatic-cli/commit/9ce977f5c1b3bf26aea1b311cee6e2b19ab63aac))
+* surface API 401 error message with login suggestion in portal generation ([adaa8ae](https://github.com/apimatic/apimatic-cli/commit/adaa8aebd2a10bea57eec2e62a4409180be23ca4))
+* tell the user how to try the generated plugin in Claude Code ([#326](https://github.com/apimatic/apimatic-cli/issues/326)) ([c7bff42](https://github.com/apimatic/apimatic-cli/commit/c7bff4232f32ff9024b3a4c610a41774a3acca68))
+
 # [1.2.0](https://github.com/apimatic/apimatic-cli/compare/v1.1.0...v1.2.0) (2026-07-14)
 
 
