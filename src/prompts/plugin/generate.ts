@@ -77,7 +77,7 @@ export class PluginGeneratePrompts {
     const message =
       `Start Claude Code with the plugin loaded to try it out.\n\n` +
       `${f.cmdAlt('claude', '--plugin-dir', `"${plugin}"`)}`;
-    noteWrapped(message, 'Try It Out');
+    log.message(message);
   }
 
   public nextStepsPublishPlugin() {
