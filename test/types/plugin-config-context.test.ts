@@ -145,24 +145,38 @@ describe('PluginConfigContext', () => {
       expect(`${release?.version}`).to.equal('0.1.0');
     });
 
-    it('trims surrounding whitespace off the identity', async () => {
-      const release = await releaseOf({ pluginId: '  acme-payments  ', pluginVersion: '  0.1.0  ', languages: {} });
-
-      expect(release?.pluginId).to.equal('acme-payments');
-      expect(`${release?.version}`).to.equal('0.1.0');
+    it('refuses an identity padded with whitespace', async () => {
+      expect(await reasonOf({ pluginId: '  acme-payments  ', pluginVersion: '0.1.0', languages: {} })).to.contain(
+        `'pluginId'`
+      );
+      expect(await reasonOf({ pluginId: 'acme-payments', pluginVersion: '  0.1.0  ', languages: {} })).to.contain(
+        `'pluginVersion'`
+      );
     });
 
     [
       ['no id', { pluginVersion: '1.0.0' }],
-      ['a blank id', { pluginId: '   ', pluginVersion: '1.0.0' }],
-      ['an id that is not a string', { pluginId: 7, pluginVersion: '1.0.0' }],
       ['no version', { pluginId: 'acme-payments' }],
-      ['a blank version', { pluginId: 'acme-payments', pluginVersion: '  ' }],
       ['neither field, as sdk publish writes it', { languages: { csharp: CSHARP_ENTRY } }]
     ].forEach(([label, config]) => {
       it(`reports no release for ${label}`, async () => {
         expect(await releaseOf({ languages: {}, ...(config as object) })).to.be.undefined;
       });
+    });
+
+    // A field written as blank can only be hand-edited, so it is refused rather than read as absent.
+    it('refuses a blank id', async () => {
+      expect(await reasonOf({ pluginId: '   ', pluginVersion: '1.0.0', languages: {} })).to.contain(`'pluginId'`);
+    });
+
+    it('refuses a blank version', async () => {
+      expect(await reasonOf({ pluginId: 'acme-payments', pluginVersion: '  ', languages: {} })).to.contain(
+        `'pluginVersion'`
+      );
+    });
+
+    it('reports no release for an id that is not a string', async () => {
+      expect(await releaseOf({ pluginId: 7, pluginVersion: '1.0.0', languages: {} })).to.be.undefined;
     });
 
     it('accepts a config carrying no languages field at all', async () => {
@@ -238,10 +252,10 @@ describe('PluginConfigContext', () => {
       expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
     });
 
-    it('does not count a blank plugin id as metadata', async () => {
+    it('refuses a blank plugin id before metadata is considered', async () => {
       withConfig({ pluginId: '   ', pluginName: 'Acme', languages: {} });
 
-      expect(presentState(await context.getPluginConfigState()).hasMetadata()).to.be.false;
+      expect(await context.getPluginConfigState()).to.include({ state: 'unreadable' });
     });
 
     it('does not count a plugin id that is not a string as metadata', async () => {
