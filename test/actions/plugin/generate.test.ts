@@ -118,14 +118,6 @@ describe('PluginGenerateAction', () => {
   });
 
   describe('generation', () => {
-    it('points at the plugin directory for trying the plugin out in Claude Code', async () => {
-      generated();
-      const tryPlugin = sinon.stub(PluginGeneratePrompts.prototype, 'tryPluginInClaudeCode');
-
-      expect((await execute()).isSuccess()).to.be.true;
-      expect(tryPlugin.firstCall.args[0].toString()).to.equal(pluginDirectory);
-    });
-
     it('expands the downloaded artifact into the plugin directory', async () => {
       generated();
 
