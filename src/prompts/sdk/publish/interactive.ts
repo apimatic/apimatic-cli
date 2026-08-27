@@ -95,7 +95,9 @@ export class SdkPublishInteractivePrompts {
 
   public noProfileWithEnabledLanguagesFound() {
     log.error(
-      'No publishing profiles found with languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in a publishing profile before publishing an SDK.'
+      `No publishing profiles found with languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in a publishing profile before publishing an SDK.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
     );
   }
 
