@@ -1,3 +1,10 @@
+# [1.3.0-beta.2](https://github.com/apimatic/apimatic-cli/compare/v1.3.0-beta.1...v1.3.0-beta.2) (2026-08-27)
+
+
+### Bug Fixes
+
+* cold start and missing docs links ([#331](https://github.com/apimatic/apimatic-cli/issues/331)) ([591c10e](https://github.com/apimatic/apimatic-cli/commit/591c10ebe3df0035b8a5da744374f7b979187f39)), closes [#328](https://github.com/apimatic/apimatic-cli/issues/328) [#329](https://github.com/apimatic/apimatic-cli/issues/329)
+
 # [1.3.0-beta.1](https://github.com/apimatic/apimatic-cli/compare/v1.2.0...v1.3.0-beta.1) (2026-08-24)
 
 
