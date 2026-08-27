@@ -181,3 +181,7 @@ test-destination/
 test-portal/
 /.idea/
 .github/copilot-instructions.md
+
+# Generated at pack/publish time by `oclif manifest`; must never be committed
+# or linger in a dev tree, or oclif serves a stale command list.
+oclif.manifest.json

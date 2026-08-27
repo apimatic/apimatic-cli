@@ -37,10 +37,10 @@
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
     "scripts": {
-        "build": "rimraf lib tsconfig.tsbuildinfo && tsc",
-        "build:watch": "tsc --watch",
+        "build": "rimraf lib tsconfig.tsbuildinfo oclif.manifest.json && tsc",
+        "build:watch": "rimraf oclif.manifest.json && tsc --watch",
         "apimatic": "node ./bin/run.js",
-        "postpack": "rimraf oclif.manifest.json",
+        "prepack": "oclif manifest",
         "posttest": "eslint . --ext .ts",
         "prettier": "prettier \"src/**/*.{js,ts}\"",
         "format": "prettier --write \"src/**/*.{js,ts}\"",
