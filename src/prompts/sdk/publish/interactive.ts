@@ -13,6 +13,7 @@ import { PublishingProfile } from '../../../types/publish/publishing-profile.js'
 import { CodegenOption, Language } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
+import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
 
 export class SdkPublishInteractivePrompts {
   public async inputWorkingDirectory(
@@ -84,13 +85,19 @@ export class SdkPublishInteractivePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public noPublishingProfilesFound(errorMessage: string) {
-    log.error(errorMessage);
+  public noPublishingProfilesFound() {
+    log.error(
+      `No publishing profiles found. Please create a publishing profile on the APIMatic App before publishing an SDK.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
+    );
   }
 
   public noProfileWithEnabledLanguagesFound() {
     log.error(
-      'No publishing profiles found with languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in a publishing profile before publishing an SDK.'
+      `No publishing profiles found with languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in a publishing profile before publishing an SDK.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
     );
   }
 

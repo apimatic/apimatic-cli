@@ -55,7 +55,7 @@ export class SdkPublishInteractiveAction {
     const publishingProfileItems = publishingProfilesResponse.value;
     const publishingProfilesResult = PublishingProfiles.create(publishingProfileItems);
     if (publishingProfilesResult.isErr()) {
-      this.prompts.noPublishingProfilesFound(publishingProfilesResult.error);
+      this.prompts.noPublishingProfilesFound();
       return ActionResult.failed();
     }
 
