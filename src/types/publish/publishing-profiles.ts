@@ -9,9 +9,9 @@ import { PublishingProfile } from './publishing-profile.js';
 export class PublishingProfiles {
   private constructor(private readonly items: PublishingProfile[]) {}
 
-  public static create(items: PublishingProfileItem[]): Result<PublishingProfiles, string> {
+  public static create(items: PublishingProfileItem[]): Result<PublishingProfiles, 'No publishing profiles found.'> {
     if (items.length === 0) {
-      return err('No publishing profiles found. Please create a publishing profile on the APIMatic App before publishing an SDK.');
+      return err('No publishing profiles found.');
     }
 
     return ok(new PublishingProfiles(items.map((item) => PublishingProfile.create(item))));
