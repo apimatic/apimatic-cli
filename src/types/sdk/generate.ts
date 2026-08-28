@@ -97,7 +97,7 @@ export const CODEGEN_OPTIONS: Readonly<Record<Language, Readonly<NonEmptyArray<C
   [Language.GO]: [CodegenOption.v3],
   [Language.JAVA]: [CodegenOption.v3],
   [Language.PHP]: [CodegenOption.v3],
-  [Language.PYTHON]: [CodegenOption.v3],
+  [Language.PYTHON]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
   [Language.RUBY]: [CodegenOption.v3],
   [Language.TYPESCRIPT]: [CodegenOption.v3]
 };
