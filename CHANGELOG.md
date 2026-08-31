@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/apimatic/apimatic-cli/compare/v1.3.0...v1.3.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* stop requiring APIMATIC-BUILD.json for plugin generate ([#333](https://github.com/apimatic/apimatic-cli/issues/333)) ([61dc199](https://github.com/apimatic/apimatic-cli/commit/61dc1991bab810409ad4a68f7358ef5624747655)), closes [#332](https://github.com/apimatic/apimatic-cli/issues/332)
+
 # [1.3.0](https://github.com/apimatic/apimatic-cli/compare/v1.2.1...v1.3.0) (2026-08-27)
 
 
