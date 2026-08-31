@@ -2,7 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
 import { GenerateAction } from "../../actions/sdk/generate.js";
-import { CodeGenerationVersion, Language, Stability } from "../../types/sdk/generate.js";
+import { CodeGenerationVersion, CodegenOption, Language, Stability } from "../../types/sdk/generate.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { format, intro, outro } from "../../prompts/format.js";
 import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
@@ -68,18 +68,19 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
 
   async run() {
     const {
-      flags: { language, 
-        input, 
-        destination, 
-        force, 
-        zip: zipSdk, 
-        "auth-key": authKey, 
-        "skip-changes": skipChanges, 
+      flags: { language,
+        input,
+        destination,
+        force,
+        zip: zipSdk,
+        "auth-key": authKey,
+        "skip-changes": skipChanges,
         "track-changes": trackChanges,
-        "api-version": apiVersion, 
+        "api-version": apiVersion,
         "codegen-version": codegenVersion,
         stability
-      }
+      },
+      metadata
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -102,8 +103,8 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
       zipSdk,
       skipChanges,
       trackChanges,
-      codegenVersion as CodeGenerationVersion,
-      stability as Stability,
+      CodegenOption.create(codegenVersion as CodeGenerationVersion, stability as Stability),
+      metadata.flags.stability?.setFromDefault !== true,
       apiVersion
     );
     outro(result);

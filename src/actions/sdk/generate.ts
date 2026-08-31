@@ -6,7 +6,7 @@ import { SdkContext } from '../../types/sdk-context.js';
 import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { CodegenOption, Language } from '../../types/sdk/generate.js';
 import { MergeSourceTreeAction } from './merge-source-tree.js';
 import { BuildContext } from '../../types/build-context.js';
 import { SemVersion } from '../../types/publish/version.js';
@@ -32,12 +32,14 @@ export class GenerateAction {
     zipSdk: boolean,
     skipChanges: boolean,
     trackChanges: boolean,
-    codeGenVersion: CodeGenerationVersion,
-    stability: Stability,
+    codegenOption: CodegenOption,
+    stabilityWasProvided: boolean,
     apiVersion?: string,
     packageVersion?: SemVersion,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<ActionResult<{ sourceTreeTrackingInitiated: boolean; conflictsResolved: boolean }>> => {
+    this.prompts.warnIfStabilityIgnored(codegenOption, stabilityWasProvided);
+
     if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
       return ActionResult.failed();
@@ -106,14 +108,14 @@ export class GenerateAction {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await buildContext.getBuildZipPath(tempDirectory, packageSettingsDirectory);
 
-      if (codeGenVersion === CodeGenerationVersion.V4) {
+      if (codegenOption.isV4()) {
         this.prompts.sdkCustomizationsNotSupportedForV4();
 
         const response = await this.prompts.generateV4SDK(
           this.portalService.generateV4Sdk(
             buildZipPath,
             language,
-            stability,
+            codegenOption.stabilityLevel(),
             this.configDir,
             this.commandMetadata,
             this.authKey

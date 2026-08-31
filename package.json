@@ -1,7 +1,7 @@
 {
     "name": "@apimatic/cli",
     "description": "The official CLI for APIMatic.",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "author": "APIMatic",
     "bin": {
         "apimatic": "./bin/run.js"
@@ -37,10 +37,10 @@
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
     "scripts": {
-        "build": "tsc -b",
-        "build:watch": "tsc -b --watch",
+        "build": "rimraf lib tsconfig.tsbuildinfo oclif.manifest.json && tsc",
+        "build:watch": "rimraf oclif.manifest.json && tsc --watch",
         "apimatic": "node ./bin/run.js",
-        "postpack": "rimraf oclif.manifest.json",
+        "prepack": "oclif manifest",
         "posttest": "eslint . --ext .ts",
         "prettier": "prettier \"src/**/*.{js,ts}\"",
         "format": "prettier --write \"src/**/*.{js,ts}\"",
@@ -145,6 +145,9 @@
             },
             "auth": {
                 "description": "Login using your APIMatic credentials, or view your authentication status."
+            },
+            "plugin": {
+                "description": "Generate context plugins that teach AI coding assistants to use your SDKs."
             },
             "portal": {
                 "description": "Generate, download and serve an API Documentation portal for your APIs."

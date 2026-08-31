@@ -1,0 +1,309 @@
+import * as path from 'path';
+import fsExtra from 'fs-extra';
+import sinon from 'sinon';
+import { expect } from 'chai';
+import { err } from 'neverthrow';
+import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
+import { PluginRecordSdkAction } from '../../../src/actions/plugin/record-sdk.js';
+import { PluginRecordSdkPrompts } from '../../../src/prompts/plugin/record-sdk.js';
+import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { PluginConfigContext } from '../../../src/types/plugin-config-context.js';
+import { PluginConfigData } from '../../../src/types/plugin/plugin-config.js';
+import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
+import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
+import { SemVersion } from '../../../src/types/publish/version.js';
+import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate.js';
+
+const BOTH = [PublishType.SourceCodePublishing, PublishType.PackagePublishing];
+
+const VERSION = SemVersion.tryCreate('1.2.3')._unsafeUnwrap();
+
+const profileWith = (gitConfiguration: object | undefined, packageConfiguration: object | undefined = undefined) =>
+  ({
+    getGitConfigurationForLanguage: () => gitConfiguration,
+    getPackageConfigurationDataForLanguage: () => packageConfiguration
+  } as unknown as PublishingProfile);
+
+const RECORDED_SOURCE_ENTRY = {
+  source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' }
+};
+
+const GIT_CONFIG = {
+  isEnabled: true,
+  credentialsId: 'creds',
+  repositoryName: 'acme/acme-payments-csharp',
+  branch: 'main'
+};
+
+describe('PluginRecordSdkAction', () => {
+  let tmpDirResult: DirectoryResult;
+  let buildDirectory: string;
+  let action: PluginRecordSdkAction;
+  let noSourceRepository: sinon.SinonStub;
+  let codegenVersionMismatch: sinon.SinonStub;
+
+  const configPath = () => path.join(buildDirectory, 'plugin-config.json');
+  const writtenConfig = (): PluginConfigData => fsExtra.readJsonSync(configPath());
+
+  const execute = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
+    action.execute(
+      new DirectoryPath(buildDirectory),
+      Language.CSHARP,
+      profile,
+      publishTypes,
+      VERSION,
+      CodeGenerationVersion.V3,
+      true
+    );
+
+  // What `sdk publish --update-plugin-config` does: there is nobody there to answer a question.
+  const executeWithoutAsking = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
+    action.execute(
+      new DirectoryPath(buildDirectory),
+      Language.CSHARP,
+      profile,
+      publishTypes,
+      VERSION,
+      CodeGenerationVersion.V3,
+      false
+    );
+
+  beforeEach(async () => {
+    tmpDirResult = await tmpDir({ unsafeCleanup: true });
+    buildDirectory = path.join(tmpDirResult.path, 'acme-payments', 'src');
+    await fsExtra.ensureDir(buildDirectory);
+    sinon.stub(PluginRecordSdkPrompts.prototype, 'sdkRecorded');
+    noSourceRepository = sinon.stub(PluginRecordSdkPrompts.prototype, 'noSourceRepository');
+    codegenVersionMismatch = sinon.stub(PluginRecordSdkPrompts.prototype, 'codegenVersionMismatch');
+    action = new PluginRecordSdkAction();
+  });
+
+  afterEach(async () => {
+    sinon.restore();
+    await tmpDirResult.cleanup();
+  });
+
+  const accepts = () =>
+    sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite').resolves(true);
+  const declines = () =>
+    sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite').resolves(false);
+
+  it('creates a config carrying the language and no metadata at all', async () => {
+    const result = await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
+
+    expect(result.isSuccess()).to.be.true;
+    expect(writtenConfig()).to.deep.equal({
+      languages: {
+        csharp: {
+          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+          package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
+          codegenVersion: 'v3'
+        }
+      }
+    });
+  });
+
+  it('adds the language to a config that already has metadata, leaving it alone', async () => {
+    await fsExtra.writeJson(configPath(), {
+      pluginId: 'acme-payments',
+      pluginName: 'Acme Payments',
+      license: 'MIT',
+      languages: {}
+    });
+
+    await execute(profileWith(GIT_CONFIG));
+
+    const config = writtenConfig();
+    expect(config).to.include({ pluginId: 'acme-payments', pluginName: 'Acme Payments', license: 'MIT' });
+    expect(Object.keys(config.languages)).to.deep.equal(['csharp']);
+  });
+
+  it('records without asking, because the caller already asked', async () => {
+    await fsExtra.writeJson(configPath(), {
+      languages: { csharp: { ...RECORDED_SOURCE_ENTRY, codegenVersion: 'v3' } }
+    });
+    const confirmOverwrite = sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite');
+
+    const result = await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
+
+    expect(result.isSuccess()).to.be.true;
+    expect(confirmOverwrite.called).to.be.false;
+  });
+
+  // The package half still describes a real published artifact, so the entry is worth recording;
+  // the gap is called out rather than left for the user to spot in the file.
+  it('says so, but still records, when there is no source repository', async () => {
+    await execute(profileWith(undefined, { packageId: 'Acme.Payments.Sdk' }));
+
+    expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
+    expect(writtenConfig().languages.csharp).to.not.have.property('source');
+  });
+
+  describe('records only what the run published', () => {
+    it('leaves out the source when only the package was published', async () => {
+      await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
+
+      expect(writtenConfig().languages.csharp).to.deep.equal({
+        package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
+        codegenVersion: 'v3'
+      });
+    });
+
+    it('leaves out the package when only the source was published', async () => {
+      await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.SourceCodePublishing]);
+
+      expect(writtenConfig().languages.csharp).to.not.have.property('package');
+    });
+  });
+
+  it('keeps a recorded source repository when only the package was published', async () => {
+    await fsExtra.writeJson(configPath(), {
+      languages: {
+        csharp: {
+          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+          codegenVersion: 'v3'
+        }
+      }
+    });
+
+    await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
+
+    expect(writtenConfig().languages.csharp).to.deep.equal({
+      source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+      package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
+      codegenVersion: 'v3'
+    });
+    expect(noSourceRepository.called).to.be.false;
+  });
+
+  it('says so when neither the run nor the config has a source repository', async () => {
+    await fsExtra.writeJson(configPath(), {
+      languages: {
+        csharp: { package: { packageId: 'Acme.Payments.Sdk', version: '1.0.0' }, codegenVersion: 'v3' }
+      }
+    });
+
+    await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
+
+    expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
+  });
+
+  it('warns when the config cannot be written', async () => {
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(err('unwritable'));
+    const notWritten = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigNotWritten');
+
+    const result = await execute(profileWith(GIT_CONFIG));
+
+    expect(result.isFailed()).to.be.true;
+    expect(notWritten.calledOnce).to.be.true;
+  });
+
+  it('reports a config that became unreadable before the write', async () => {
+    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(err('unreadable'));
+    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+
+    await execute(profileWith(GIT_CONFIG));
+
+    expect(pluginConfigUnreadable.calledOnce).to.be.true;
+  });
+
+  describe('code generator version mismatches', () => {
+    const PACKAGE_CONFIG = { packageId: 'Acme.Payments.Sdk' };
+    const RECORDED_SOURCE = { source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp' } };
+    const RECORDED_PACKAGE = { package: { packageId: 'Acme.Payments.Sdk', version: '1.0.0' } };
+
+    const recordedAs = (entry: object) => fsExtra.writeJson(configPath(), { languages: { csharp: entry } });
+
+    const publishPackageOnly = () => execute(profileWith(GIT_CONFIG, PACKAGE_CONFIG), [PublishType.PackagePublishing]);
+
+    it('says nothing when the recorded version matches the published one', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v3' });
+
+      await publishPackageOnly();
+
+      expect(codegenVersionMismatch.called).to.be.false;
+    });
+
+    it('warns before asking when a package-only run leaves a source from another version', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+      const confirmOverwrite = accepts();
+
+      await publishPackageOnly();
+
+      expect(codegenVersionMismatch.calledOnce).to.be.true;
+      expect(codegenVersionMismatch.firstCall.args).to.deep.equal([
+        Language.CSHARP,
+        CodeGenerationVersion.V4,
+        CodeGenerationVersion.V3
+      ]);
+      expect(codegenVersionMismatch.calledBefore(confirmOverwrite)).to.be.true;
+    });
+
+    it('warns when a source-only run leaves a package from another version', async () => {
+      await recordedAs({ ...RECORDED_PACKAGE, codegenVersion: 'v4' });
+      accepts();
+
+      await execute(profileWith(GIT_CONFIG, PACKAGE_CONFIG), [PublishType.SourceCodePublishing]);
+
+      expect(codegenVersionMismatch.calledOnce).to.be.true;
+    });
+
+    it('still records the published version when the user accepts', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+      accepts();
+
+      await publishPackageOnly();
+
+      expect(writtenConfig().languages.csharp).to.include({ codegenVersion: 'v3' });
+    });
+
+    it('leaves the recorded version alone when the user declines', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+      declines();
+
+      const result = await publishPackageOnly();
+
+      expect(result.isCancelled()).to.be.true;
+      expect(writtenConfig().languages.csharp).to.deep.equal({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+    });
+
+    it('warns but does not ask on the --update-plugin-config path', async () => {
+      await recordedAs({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+      const confirmOverwrite = sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite');
+
+      await executeWithoutAsking(profileWith(GIT_CONFIG, PACKAGE_CONFIG), [PublishType.PackagePublishing]);
+
+      expect(codegenVersionMismatch.calledOnce).to.be.true;
+      expect(confirmOverwrite.called).to.be.false;
+      expect(writtenConfig().languages.csharp).to.include({ codegenVersion: 'v3' });
+    });
+  });
+
+  it('records on the --update-plugin-config path', async () => {
+    await executeWithoutAsking(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
+
+    expect(Object.keys(writtenConfig().languages)).to.deep.equal(['csharp']);
+  });
+
+  it('warns and records nothing when the config cannot be read', async () => {
+    await fsExtra.writeFile(configPath(), '{ not json');
+    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+
+    const result = await execute(profileWith(GIT_CONFIG));
+
+    expect(result.isFailed()).to.be.true;
+    expect(pluginConfigUnreadable.called).to.be.true;
+    expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal('{ not json');
+  });
+
+  it('tells the user why the config could not be read', async () => {
+    const contents = JSON.stringify({ languages: 'csharp' });
+    await fsExtra.writeFile(configPath(), contents);
+    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+
+    await execute(profileWith(GIT_CONFIG));
+
+    expect(pluginConfigUnreadable.firstCall.args[0]).to.equal(`its 'languages' field is not a JSON object`);
+    expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(contents);
+  });
+});

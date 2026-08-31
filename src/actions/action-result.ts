@@ -77,6 +77,10 @@ export class ActionResult<T = void> {
     return this.isSuccess() ? this.value! : defaultValue;
   }
 
+  public discardValue(): ActionResult {
+    return new ActionResult(this.resultType, this.message);
+  }
+
   public mapAll<R>(
     onSuccess: (value?: T) => R,
     onFailure: () => R,

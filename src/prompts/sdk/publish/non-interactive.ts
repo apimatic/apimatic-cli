@@ -8,6 +8,9 @@ import { withSpinner } from '../../prompt.js';
 import { PublishingProfileItem } from '../../../types/publish-api/publishing-profile-item.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { Language } from '../../../types/sdk/generate.js';
+import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
+
+const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 
 export class SdkPublishNonInteractivePrompts {
   public directoryCannotBeSame(directory: DirectoryPath) {
@@ -55,13 +58,17 @@ export class SdkPublishNonInteractivePrompts {
 
   public publishingProfileNotFound(profileId: ProfileId) {
     log.error(
-      `Publishing profile with id '${profileId}' not found. Please check if the provided profile id is correct or create a new publishing profile on the APIMatic App.`
+      `Publishing profile with id '${profileId}' not found. Please check if the provided profile id is correct or create a new publishing profile on the APIMatic App.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
     );
   }
 
   public languageNotConfiguredForProfile(language: Language) {
     log.error(
-      `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile's configuration on the APIMatic App and try again.`
+      `No configuration found for '${language}' in the selected publishing profile. Please check the provided profile's configuration on the APIMatic App and try again.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
     );
   }
 
@@ -71,7 +78,9 @@ export class SdkPublishNonInteractivePrompts {
       .join(' + ');
     const noun = publishTypes.length === 1 ? 'type' : 'types';
     log.error(
-      `Publish ${noun} '${types}' not found or not enabled for '${language}' in the selected publishing profile. Please check your profile configuration on the APIMatic App and try again.`
+      `Publish ${noun} '${types}' not found or not enabled for '${language}' in the selected publishing profile. Please check your profile configuration on the APIMatic App and try again.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
     );
   }
 
@@ -79,5 +88,12 @@ export class SdkPublishNonInteractivePrompts {
     log.info(
       'Version tags will not be created in your Git repository because you have opted to publish Source Code only.'
     );
+  }
+
+  public dryRunPluginConfigNotice() {
+    const message =
+      `${f.flag('update-plugin-config')} was ignored because ${f.flag('dry-run')} does not publish the SDK. ` +
+      `Re-run without ${f.flag('dry-run')} to record it in ${f.var(PLUGIN_CONFIG_FILE)}.`;
+    log.info(message);
   }
 }

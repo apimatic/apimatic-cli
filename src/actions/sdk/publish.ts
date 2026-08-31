@@ -8,7 +8,7 @@ import { PublishType } from '../../types/publish-api/publishing-profile-item.js'
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { CodegenOption, Language } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { TempContext } from '../../types/temp-context.js';
@@ -34,6 +34,9 @@ export class SdkPublishAction {
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
+    codegenOption: CodegenOption,
+    stabilityWasProvided: boolean,
+    publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const publishResult = await withDirPath(async (tempDirectory): Promise<ActionResult<PublishingInfo>> => {
@@ -55,8 +58,8 @@ export class SdkPublishAction {
         false,
         false,
         false,
-        CodeGenerationVersion.V3,
-        Stability.STABLE,
+        codegenOption,
+        stabilityWasProvided,
         undefined,
         semVersion,
         packageSettingsDirectory
@@ -71,7 +74,7 @@ export class SdkPublishAction {
       const sdkLanguageDirectory = outputDirectory.join(language);
 
       if (dryRun) {
-        this.prompts.dryRunNotice(publishingProfile, language, semVersion, publishType);
+        this.prompts.dryRunNotice(publishingSummary);
         const readmeFilePath = new FilePath(sdkLanguageDirectory, new FileName('README.md'));
         await this.launcherService.openDirectoryInEditorOrFileExplorer(sdkLanguageDirectory, readmeFilePath);
         return ActionResult.success();
@@ -114,7 +117,7 @@ export class SdkPublishAction {
     }
 
     const publishingInfo = publishResult.getValue();
-    this.prompts.publishingRunningNotice(publishingProfile, language, semVersion, publishType);
+    this.prompts.publishingRunningNotice(publishingSummary);
     this.prompts.publishingLogsMessage(publishingInfo.publishingLogUrl);
 
     const publishingOutcome = await this.prompts.pollPublishingStatus(() =>

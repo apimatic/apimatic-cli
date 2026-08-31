@@ -5,7 +5,10 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
+import { getCodegenOptions } from '../../../types/sdk/generate.js';
+import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
+import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
@@ -52,7 +55,7 @@ export class SdkPublishInteractiveAction {
     const publishingProfileItems = publishingProfilesResponse.value;
     const publishingProfilesResult = PublishingProfiles.create(publishingProfileItems);
     if (publishingProfilesResult.isErr()) {
-      this.prompts.noPublishingProfilesFound(publishingProfilesResult.error);
+      this.prompts.noPublishingProfilesFound();
       return ActionResult.failed();
     }
 
@@ -78,6 +81,14 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
+    const codegenOptions = getCodegenOptions(language);
+    const codegenOption = codegenOptions.length === 1 ? codegenOptions[0]
+      : await this.prompts.selectCodegenVersion(codegenOptions);
+    if (!codegenOption) {
+        this.prompts.noCodegenVersionSelected();
+        return ActionResult.cancelled();
+    }
+
     const version = await this.prompts.inputVersion();
     if (!version) {
       this.prompts.noVersionSpecified();
@@ -86,7 +97,15 @@ export class SdkPublishInteractiveAction {
 
     const publishTypes = publishingProfile.getPublishTypesForLanguage(language);
 
-    this.prompts.publishingSummary(publishingProfile, language, version, publishTypes);
+    const publishingSummary = formatPublishingDetails({
+      profile: publishingProfile,
+      language,
+      version,
+      publishType: publishTypes,
+      codegenOption: codegenOptions.length === 1 ? undefined : codegenOption
+    });
+
+    this.prompts.publishingSummary(publishingSummary);
 
     const confirmed = await this.prompts.confirmPublishing();
     if (!confirmed) {
@@ -109,6 +128,9 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
+      codegenOption,
+      false,
+      publishingSummary,
       onPublishSdkError
     );
     if (publishResult.isFailed()) {
@@ -116,6 +138,18 @@ export class SdkPublishInteractiveAction {
     }
     if (publishResult.isCancelled()) {
       return ActionResult.cancelled();
+    }
+
+    if (await this.prompts.confirmRecordSdk()) {
+      await new PluginRecordSdkAction().execute(
+        buildDirectory,
+        language,
+        publishingProfile,
+        publishTypes,
+        version,
+        codegenOption.codeGenerationVersion(),
+        true
+      );
     }
 
     return ActionResult.success();

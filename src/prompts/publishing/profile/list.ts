@@ -1,8 +1,13 @@
 import { log } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../../infrastructure/service-error.js';
-import { PublishingProfileSummaryGroup, PublishingProfileItem } from '../../../types/publish-api/publishing-profile-item.js';
+import {
+  PublishingProfileSummaryGroup,
+  PublishingProfileItem
+} from '../../../types/publish-api/publishing-profile-item.js';
 import { buildTableWithHeading, withSpinner } from '../../prompt.js';
+import { format as f } from '../../format.js';
+import { SDK_PUBLISHING_OVERVIEW_URL } from '../links.js';
 
 export class PublishingProfileListPrompts {
   public fetchProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
@@ -19,7 +24,11 @@ export class PublishingProfileListPrompts {
   }
 
   public noProfilesFound() {
-    log.info('No publishing profiles found. Please create a publishing profile on the APIMatic App to view it here.');
+    log.info(
+      `No publishing profiles found. Please create a publishing profile on the APIMatic App to view it here.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
+    );
   }
 
   public displayProfiles(groups: PublishingProfileSummaryGroup[]) {
@@ -30,9 +39,15 @@ export class PublishingProfileListPrompts {
       rows: group.profiles.map((profile) => [
         profile.name,
         profile.id,
-        profile.enabledLanguages.length === 0 ? '—' : profile.enabledLanguages.join(', '),
-      ]),
+        profile.enabledLanguages.length === 0 ? '—' : profile.enabledLanguages.join(', ')
+      ])
     }));
-    log.info(`Publishing Profiles (${label})\n\n${buildTableWithHeading(tableGroups, ['Name', 'ID', 'Languages'], ['primary', 'secondary', 'item'])}`);
+    log.info(
+      `Publishing Profiles (${label})\n\n${buildTableWithHeading(
+        tableGroups,
+        ['Name', 'ID', 'Languages'],
+        ['primary', 'secondary', 'item']
+      )}`
+    );
   }
 }

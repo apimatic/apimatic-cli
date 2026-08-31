@@ -10,9 +10,10 @@ import {
   PublishType
 } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { Language } from '../../../types/sdk/generate.js';
+import { CodegenOption, Language } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
+import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
 
 export class SdkPublishInteractivePrompts {
   public async inputWorkingDirectory(
@@ -35,12 +36,6 @@ export class SdkPublishInteractivePrompts {
 
   public async noInputDirectoryProvided() {
     log.error('No input directory was provided.');
-  }
-
-  public srcDirectoryInvalid(directory: DirectoryPath) {
-    log.error(
-      `${f.path(directory)} does not contain a valid ${f.var('APIMATIC-BUILD.json')}. Please check the path and try again.`
-    );
   }
 
   public async inputSdkDirectory(
@@ -82,13 +77,19 @@ export class SdkPublishInteractivePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public noPublishingProfilesFound(errorMessage: string) {
-    log.error(errorMessage);
+  public noPublishingProfilesFound() {
+    log.error(
+      `No publishing profiles found. Please create a publishing profile on the APIMatic App before publishing an SDK.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
+    );
   }
 
   public noProfileWithEnabledLanguagesFound() {
     log.error(
-      'No publishing profiles found with languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in a publishing profile before publishing an SDK.'
+      `No publishing profiles found with languages enabled for Source Code Publishing or Package Publishing. Please enable at least one language in a publishing profile before publishing an SDK.\n\nLearn more: ${f.link(
+        SDK_PUBLISHING_OVERVIEW_URL
+      )}`
     );
   }
 
@@ -142,6 +143,24 @@ export class SdkPublishInteractivePrompts {
     log.error('No language was selected for publishing.');
   }
 
+  public async selectCodegenVersion(options: readonly CodegenOption[]): Promise<CodegenOption | undefined> {
+    const codegenOption = await select({
+      message: 'Select the Code Generator version:',
+      initialValue: options[0],
+      options: options.map((option) => ({ value: option, label: `${option}` }))
+    });
+
+    if (isCancel(codegenOption)) {
+      return undefined;
+    }
+
+    return codegenOption;
+  }
+
+  public noCodegenVersionSelected() {
+    log.error('No Code Generator version was selected.');
+  }
+
   public async inputVersion(): Promise<SemVersion | undefined> {
     const version = await text({
       message: 'Enter version to publish (e.g. 1.0.0):',
@@ -165,24 +184,24 @@ export class SdkPublishInteractivePrompts {
     log.error('No version was specified for publishing the SDK.');
   }
 
-  public publishingSummary(
-    profile: PublishingProfile,
-    language: Language,
-    version: SemVersion,
-    publishType: PublishType[]
-  ) {
-    const targets = publishType
-      .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
-      .join(' + ');
-    log.info(
-      `Ready to publish:\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`
-    );
+  public publishingSummary(publishingSummary: string) {
+    log.info(`Ready to publish:` + publishingSummary);
   }
 
   public async confirmPublishing(): Promise<boolean> {
     const result = await confirm({ message: 'Do you want to proceed?' });
     if (isCancel(result)) return false;
     return result;
+  }
+
+  public async confirmRecordSdk(): Promise<boolean> {
+    const message =
+      `Update configuration for context plugin generation?` +
+      f.continuation(`See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`);
+
+    const record = await confirm({ message, initialValue: true });
+    if (isCancel(record)) return false;
+    return record;
   }
 
   public publishingCancelled() {

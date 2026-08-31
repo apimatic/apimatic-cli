@@ -34,7 +34,9 @@ Services live at `src/infrastructure/services/` and are the only layer that make
 
 - Instantiate controller per method call: `new {ControllerName}(client)` inside the method.
 - `apiClientFactory.createApiClient(authHeader, shell)` provides the configured client.
-- For async/polling SDK methods, don't hand-roll the poll loop — reuse `pollUntilCompleted()` in `portal-service.ts`, passing the poll interval as its first argument. Add a `static readonly` instance to `GenerationStatusEndpoint` for the new `{basePath}/{requestId}/status` endpoint and pass it to `ApiService.getGenerationStatus()`. Only supply a `ValidationErrorFormatter` when the endpoint needs custom validation wording (see `formatSdkValidationError`).
+- For async/polling SDK methods, don't hand-roll the poll loop — reuse `pollUntilCompleted()` from `src/infrastructure/generation-status-poller.ts`, passing `{ pollIntervalMs, fetchStatus, timeout }`. Every pollable flow must pass a `timeout: { budgetMs, label }`; without one a stuck generation sits on the spinner forever. The budget alone is not a limit — it is only read between polls, so the `axiosInstance` behind `fetchStatus` also needs a `timeout`, or a poll that connects and never answers outlives the budget and hangs the CLI. The `label` opens the timeout message, so name the flow as the user knows it (`"Portal generation"`, `"SDK generation"`). Take the budget from a `generationTimeoutMs` constructor parameter so tests can shrink it. Only supply a `formatValidationError` when the endpoint needs custom validation wording (see `formatSdkValidationError`).
+- Give each pollable endpoint its own private `get{Flow}GenerationStatus()` on the service that owns the flow, with the `{basePath}/{requestId}/status` path written out in it. Generation flows are independent and free to diverge, so the status fetch is deliberately not shared and takes no endpoint parameter, even where two flows currently read identically — resist factoring the bodies back together. A finished generation arrives as a `302` to the download location, not a `Completed` status body, so each method needs `maxRedirects: 0` and its own `302` mapping.
+- An SDK-controller service that polls therefore also carries the axios-auth plumbing (`axiosInstance`, `apiBaseUrl`): the status endpoints are read over raw axios because a generated controller cannot surface the `302`. `portal-service.ts` is both variants at once for that reason.
 
 ### Axios-auth variant rules
 
@@ -72,7 +74,8 @@ Services live at `src/infrastructure/services/` and are the only layer that make
 | Pattern | File |
 |---|---|
 | SDK controller + async polling | `src/infrastructure/services/portal-service.ts` |
-| Pollable generation endpoints | `src/types/api/generation-status-endpoint.ts` |
+| Per-endpoint generation status fetch | `src/infrastructure/services/portal-service.ts`, `src/infrastructure/services/plugin-service.ts` |
+| Shared generation poll loop | `src/infrastructure/generation-status-poller.ts` |
 | SDK controller + FormData | `src/infrastructure/services/validation-service.ts` |
 | Raw axios with auth + axiosInstance | `src/infrastructure/services/api-service.ts` |
 | Raw axios with different base URL | `src/infrastructure/services/auth-service.ts` |

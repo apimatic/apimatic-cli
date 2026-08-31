@@ -40,6 +40,8 @@ USAGE
 * [`apimatic auth status`](#apimatic-auth-status)
 * [`apimatic autocomplete [SHELL]`](#apimatic-autocomplete-shell)
 * [`apimatic help [COMMAND]`](#apimatic-help-command)
+* [`apimatic plugin generate`](#apimatic-plugin-generate)
+* [`apimatic plugin publish`](#apimatic-plugin-publish)
 * [`apimatic portal copilot`](#apimatic-portal-copilot)
 * [`apimatic portal generate`](#apimatic-portal-generate)
 * [`apimatic portal recipe new`](#apimatic-portal-recipe-new)
@@ -221,6 +223,62 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/main/src/commands/help.ts)_
+
+## `apimatic plugin generate`
+
+Generate a Claude Code context plugin for your published SDKs.
+
+```
+USAGE
+  $ apimatic plugin generate [-i <value>] [-d <value>] [-f] [-k <value>]
+
+FLAGS
+  -d, --destination=<value>  [default: <input>/plugin] path where the plugin will be generated.
+  -f, --force                overwrite changes without asking for user consent.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+  -k, --auth-key=<value>     override current authentication state with an authentication key.
+
+DESCRIPTION
+  Generate a Claude Code context plugin for your published SDKs.
+
+  Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
+  containing a `src` directory with a `plugin-config.json`.
+
+EXAMPLES
+  apimatic plugin generate
+
+  apimatic plugin generate --input="./" --destination="./plugin"
+```
+
+_See code: [src/commands/plugin/generate.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/plugin/generate.ts)_
+
+## `apimatic plugin publish`
+
+Print the git commands for publishing your context plugin to GitHub.
+
+```
+USAGE
+  $ apimatic plugin publish [-i <value>] [-d <value>]
+
+FLAGS
+  -d, --destination=<value>  [default: <input>/plugin] path where the plugin was generated.
+  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
+                             API specifications and configuration files.
+
+DESCRIPTION
+  Print the git commands for publishing your context plugin to GitHub.
+
+  Print the commands that publish a generated context plugin to a GitHub repository. The commands are printed for you to
+  run — this command never touches your repository.
+
+EXAMPLES
+  apimatic plugin publish
+
+  apimatic plugin publish --input="./" --destination="./plugin"
+```
+
+_See code: [src/commands/plugin/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/plugin/publish.ts)_
 
 ## `apimatic portal copilot`
 
@@ -477,7 +535,7 @@ Generate and publish an SDK to a package registry and/or source repository
 ```
 USAGE
   $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript] [-f]
-    [-i <value>] [--publish-type package|sourcecode...] [--dry-run]
+    [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v3|v4] [--stability stable|beta]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
@@ -488,10 +546,14 @@ FLAGS
                                   <options: csharp|java|php|python|ruby|typescript>
   -p, --profile-id=<value>        Id of the publishing profile to use.
   -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
+      --codegen-version=<option>  [default: v3] Version of the code generator to use
+                                  <options: v3|v4>
       --dry-run                   Generate the SDK locally for review without publishing.
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.
                                   <options: package|sourcecode>
+      --stability=<option>        [default: stable] Stability level of the generated SDK
+                                  <options: stable|beta>
 
 DESCRIPTION
   Generate and publish an SDK to a package registry and/or source repository
@@ -508,6 +570,8 @@ EXAMPLES
   apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=java --version=2.0.0 --publish-type=sourcecode
 
   apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
+
+  apimatic sdk publish --profile-id=d4e5f6a1b2c3d4e5f6a1b2c3 --language=csharp --version=1.0.0 --publish-type=package --codegen-version=v4 --stability=beta
 ```
 
 _See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/beta/src/commands/sdk/publish.ts)_

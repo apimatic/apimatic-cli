@@ -79,6 +79,24 @@ export class Directory {
     return this.items.length === 0;
   }
 
+  public excluding(names: FileName[]): Directory {
+    const excluded = names.map((name) => name.toString());
+    const kept = this.items.filter((item) =>
+      item instanceof Directory
+        ? !excluded.includes(item.directoryPath.leafName())
+        : !excluded.includes(item.fileName.toString())
+    );
+    return new Directory(this.directoryPath, kept);
+  }
+
+  public countFiles(): number {
+    return this.items.reduce((total, item) => total + (item instanceof Directory ? item.countFiles() : 1), 0);
+  }
+
+  public countDirectories(): number {
+    return this.items.reduce((total, item) => total + (item instanceof Directory ? 1 + item.countDirectories() : 0), 0);
+  }
+
   public getAllFiles(): FilePath[] {
     const files: FilePath[] = [];
     for (const item of this.items) {
