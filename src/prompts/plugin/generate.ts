@@ -33,8 +33,8 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`;
+  public srcDirectoryDoesNotExist(directory: DirectoryPath) {
+    const message = `The ${f.var('src')} directory does not exist at the provided location: ${f.path(directory)}`;
     log.error(message);
   }
 

@@ -81,12 +81,20 @@ describe('PluginGenerateAction', () => {
       expect(generatePlugin.called).to.be.false;
     });
 
-    it('fails when the build directory has no APIMATIC-BUILD.json', async () => {
+    it('fails when the src directory does not exist', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
-      await fsExtra.remove(path.join(buildDirectory, 'APIMATIC-BUILD.json'));
+      await fsExtra.remove(buildDirectory);
 
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
+    });
+
+    it('generates without an APIMATIC-BUILD.json, which only portal and v3 SDK builds need', async () => {
+      const generatePlugin = generated();
+      await fsExtra.remove(path.join(buildDirectory, 'APIMATIC-BUILD.json'));
+
+      expect((await execute()).isSuccess()).to.be.true;
+      expect(generatePlugin.called).to.be.true;
     });
   });
 

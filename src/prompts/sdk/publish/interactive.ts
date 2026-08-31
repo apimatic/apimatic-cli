@@ -38,14 +38,6 @@ export class SdkPublishInteractivePrompts {
     log.error('No input directory was provided.');
   }
 
-  public srcDirectoryInvalid(directory: DirectoryPath) {
-    log.error(
-      `${f.path(directory)} does not contain a valid ${f.var(
-        'APIMATIC-BUILD.json'
-      )}. Please check the path and try again.`
-    );
-  }
-
   public async inputSdkDirectory(
     defaultDirectory: DirectoryPath,
     validator: (value: string | undefined) => string | Error | undefined
