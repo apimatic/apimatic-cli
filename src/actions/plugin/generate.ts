@@ -90,7 +90,7 @@ export class PluginGenerateAction {
       await pluginContext.save(tempPluginZipPath);
 
       this.prompts.pluginGenerated(pluginDirectory);
-      this.prompts.tryPluginInClaudeCode(pluginDirectory);
+      this.prompts.tryPluginLocally(pluginDirectory);
       this.prompts.nextStepsPublishPlugin();
 
       return ActionResult.success();

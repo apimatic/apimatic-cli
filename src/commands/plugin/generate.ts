@@ -6,7 +6,7 @@ import { FlagsProvider } from '../../types/flags-provider.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
 export default class PluginGenerate extends Command {
-  static readonly summary = 'Generate a Claude Code context plugin for your published SDKs.';
+  static readonly summary = 'Generate a context plugin for your published SDKs.';
 
   static readonly description =
     'Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory containing a `src` directory with a `plugin-config.json`.';
