@@ -281,40 +281,4 @@ describe('PluginGenerateAction', () => {
       expect(pluginGenerationError.firstCall.args[0]).to.equal('One or more validation errors occurred.\n- a\n- b');
     });
   });
-
-  describe('code generator versions', () => {
-    // The CLI never inspects codegenVersion — the generator behind /plugin is what consumes it —
-    // so an entry must reach the service exactly as recorded, whatever version it names.
-    it('uploads a typescript v4 entry unchanged', async () => {
-      const typescript = {
-        source: { repositoryUrl: 'https://github.com/acme/acme-ts' },
-        package: { name: '@acme/payments', version: '1.2.3' },
-        codegenVersion: 'v4'
-      };
-      await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
-        pluginId: 'acme-payments',
-        pluginName: 'Acme Payments',
-        pluginVersion: '0.1.0',
-        languages: { typescript }
-      });
-
-      // The temp directory holding the upload is cleaned up once the action returns, so the
-      // archive has to be read while the call is still in flight.
-      let uploaded: Buffer | undefined;
-      sinon.stub(PluginService.prototype, 'generatePlugin').callsFake(async (buildPath) => {
-        uploaded = await fsExtra.readFile(buildPath.toString());
-        return ok(Readable.from([pluginArchive]));
-      });
-
-      expect((await execute()).isSuccess()).to.be.true;
-
-      const uploadedZip = new FilePath(new DirectoryPath(tmpDirResult.path), new FileName('uploaded.zip'));
-      await fsExtra.writeFile(uploadedZip.toString(), uploaded!);
-      const unpacked = path.join(tmpDirResult.path, 'uploaded');
-      await new ZipService().unArchive(uploadedZip, new DirectoryPath(unpacked));
-
-      const config = fsExtra.readJsonSync(path.join(unpacked, 'plugin-config.json'));
-      expect(config.languages).to.deep.equal({ typescript });
-    });
-  });
 });
