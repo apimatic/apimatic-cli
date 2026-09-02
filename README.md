@@ -226,7 +226,7 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/main/s
 
 ## `apimatic plugin generate`
 
-Generate a Claude Code context plugin for your published SDKs.
+Generate a context plugin for your published SDKs.
 
 ```
 USAGE
@@ -240,7 +240,7 @@ FLAGS
   -k, --auth-key=<value>     override current authentication state with an authentication key.
 
 DESCRIPTION
-  Generate a Claude Code context plugin for your published SDKs.
+  Generate a context plugin for your published SDKs.
 
   Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
   containing a `src` directory with a `plugin-config.json`.

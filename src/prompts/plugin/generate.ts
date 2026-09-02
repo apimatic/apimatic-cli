@@ -8,6 +8,11 @@ import { noteWrapped, withSpinner } from '../prompt.js';
 
 const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 
+// Each link lands on the section that covers loading an unpublished folder, not the page it sits in.
+const CLAUDE_CODE_PLUGINS_URL = 'https://code.claude.com/docs/en/plugins#test-your-plugins-locally';
+const CURSOR_PLUGINS_URL = 'https://cursor.com/docs/plugins#test-plugins-locally';
+const VS_CODE_PLUGINS_URL = 'https://code.visualstudio.com/docs/agent-customization/agent-plugins#_use-local-plugins';
+
 export class PluginGeneratePrompts {
   public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner('Generating Context Plugin', 'Plugin generated successfully.', 'Plugin Generation failed.', fn);
@@ -73,10 +78,18 @@ export class PluginGeneratePrompts {
     log.info(`Plugin artifacts can be found at ${f.path(plugin)}.`);
   }
 
-  public tryPluginInClaudeCode(plugin: DirectoryPath) {
+  /**
+   * Each assistant loads an unpublished folder its own way — a flag, a fixed directory, a settings
+   * entry — and each documents it, so the note points at those pages rather than restating three
+   * procedures that would then have to be kept current.
+   */
+  public tryPluginLocally(plugin: DirectoryPath) {
     const message =
-      `Start Claude Code with the plugin loaded to try it out.\n\n` + f.cmdAlt('claude', '--plugin-dir', `"${plugin}"`);
-    log.message(message);
+      `Load the plugin from ${f.path(plugin)} to try it before publishing.\n\n` +
+      `${f.description('Claude Code')} ${f.link(CLAUDE_CODE_PLUGINS_URL)}\n` +
+      `${f.description('Cursor')} ${f.link(CURSOR_PLUGINS_URL)}\n` +
+      `${f.description('VS Code')} ${f.link(VS_CODE_PLUGINS_URL)}`;
+    noteWrapped(message, 'Try It Locally');
   }
 
   public nextStepsPublishPlugin() {
