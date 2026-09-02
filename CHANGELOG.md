@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/apimatic/apimatic-cli/compare/v1.3.1...v1.3.2) (2026-09-02)
+
+
+### Bug Fixes
+
+* drop Claude Code references from plugin generate ([#335](https://github.com/apimatic/apimatic-cli/issues/335)) ([561a92a](https://github.com/apimatic/apimatic-cli/commit/561a92aa8ba5717a80b72fb9b12ad164d0495353))
+
 ## [1.3.1](https://github.com/apimatic/apimatic-cli/compare/v1.3.0...v1.3.1) (2026-08-31)
 
 
