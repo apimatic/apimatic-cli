@@ -1,6 +1,7 @@
 import { Status } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
 import { ServiceError } from './service-error.js';
+import { sleep } from './timer-extensions.js';
 
 export const STATUS_POLL_INTERVAL_MS = 3000;
 
@@ -40,7 +41,7 @@ export async function pollUntilCompleted<T extends GenerationStatus>({
   const deadline = Date.now() + timeout.budgetMs;
 
   for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    await sleep(pollIntervalMs);
 
     const statusResult = await fetchStatus();
     if (statusResult.isErr()) {
