@@ -8,6 +8,7 @@ import { LoginPrompts } from "../../prompts/auth/login.js";
 import { CommandMetadata } from "../../types/common/command-metadata.js";
 import { ActionResult } from "../action-result.js";
 import { err, ok, Result } from "neverthrow";
+import { sleep } from "../../infrastructure/timer-extensions.js";
 
 type LoginTimeout = "TIMEOUT";
 
@@ -58,7 +59,7 @@ export class LoginAction {
       if (result.isOk()) {
         return ok(result.value.apiKey);
       }
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      await sleep(delayMs);
     }
   }
 }
