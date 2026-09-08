@@ -12,6 +12,7 @@ const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 const CLAUDE_CODE_PLUGINS_URL = 'https://code.claude.com/docs/en/plugins#test-your-plugins-locally';
 const CURSOR_PLUGINS_URL = 'https://cursor.com/docs/plugins#test-plugins-locally';
 const VS_CODE_PLUGINS_URL = 'https://code.visualstudio.com/docs/agent-customization/agent-plugins#_use-local-plugins';
+const CODEX_PLUGINS_URL = 'https://developers.openai.com/plugins/build/plugins#install-a-local-plugin-manually';
 
 export class PluginGeneratePrompts {
   public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
@@ -88,7 +89,8 @@ export class PluginGeneratePrompts {
       `Load the plugin from ${f.path(plugin)} to try it before publishing.\n\n` +
       `${f.description('Claude Code')} ${f.link(CLAUDE_CODE_PLUGINS_URL)}\n` +
       `${f.description('Cursor')} ${f.link(CURSOR_PLUGINS_URL)}\n` +
-      `${f.description('VS Code')} ${f.link(VS_CODE_PLUGINS_URL)}`;
+      `${f.description('VS Code')} ${f.link(VS_CODE_PLUGINS_URL)}\n` +
+      `${f.description('Codex')} ${f.link(CODEX_PLUGINS_URL)}`;
     noteWrapped(message, 'Try It Locally');
   }
 
