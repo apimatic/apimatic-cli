@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/apimatic/apimatic-cli/compare/v1.3.2...v1.4.0) (2026-09-08)
+
+
+### Features
+
+* add Codex docs link to plugin try-it-locally note ([#338](https://github.com/apimatic/apimatic-cli/issues/338)) ([#339](https://github.com/apimatic/apimatic-cli/issues/339)) ([b0a0074](https://github.com/apimatic/apimatic-cli/commit/b0a0074941d15bc3a396a9afaff7f283b0b039e3))
+
 ## [1.3.2](https://github.com/apimatic/apimatic-cli/compare/v1.3.1...v1.3.2) (2026-09-02)
 
 
