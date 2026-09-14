@@ -1,3 +1,11 @@
+# [1.5.0](https://github.com/apimatic/apimatic-cli/compare/v1.4.0...v1.5.0) (2026-09-14)
+
+
+### Features
+
+* add Codex docs link to plugin try-it-locally note ([#338](https://github.com/apimatic/apimatic-cli/issues/338)) ([b834469](https://github.com/apimatic/apimatic-cli/commit/b83446937e0d1b94d08f0c04fef226f925788ef2))
+* offer v4 beta codegen for Python and TypeScript ([#341](https://github.com/apimatic/apimatic-cli/issues/341)) ([243ba2d](https://github.com/apimatic/apimatic-cli/commit/243ba2d5662e6b70326950c1a64153e1a787a164))
+
 # [1.4.0](https://github.com/apimatic/apimatic-cli/compare/v1.3.2...v1.4.0) (2026-09-08)
 
 
