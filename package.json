@@ -84,7 +84,7 @@
     },
     "devDependencies": {
         "@commitlint/cli": "^20.5.0",
-        "@commitlint/config-conventional": "^15.0.0",
+        "@commitlint/config-conventional": "^20.5.3",
         "@eslint/js": "^9.34.0",
         "@oclif/test": "^4.1.13",
         "@semantic-release/changelog": "^6.0.3",
