@@ -94,14 +94,21 @@ from Google Fonts at runtime, Fumadocs page actions) except where noted.
   is written as a real `index.html` (verified: without it the shell masks `/`
   and no root `index.html` exists).
 - Docs mounted at `/`, not `/docs`.
-- `content/` and `spec/` are read directly from the user's `src/` by absolute
-  path (verified); `static/` is Vite's `publicDir`. Nothing of the user's is
-  copied.
-- One `createOpenAPI()` server per spec file, each with `staticSource({ baseDir: 'api/<slug>', groupBy: 'tag', meta: true })` for `generate` and `dynamicSource()` for `serve` (so spec edits are picked up). Sharing one server across base dirs duplicates pages and clobbers the root `meta.json` (verified).
+- `content/`, `spec/` and `static/` are read directly from the user's `src/`
+  by absolute path; nothing of the user's is copied (verified: build and dev
+  server both work with all three outside the template root, and `static/`
+  files land in the output through Vite's `publicDir`). One constraint: the
+  `dir` of Fumadocs' `defineDocs` macro must be a string literal (the build
+  fails otherwise, verified), so the CLI writes `src/lib/content-dir.ts`
+  (or substitutes a placeholder in `source.ts`) with the literal path when it
+  prepares the temp project. Spec paths, static dir, title, description and
+  logo come from `portal.config.json`.
+- One `createOpenAPI()` server per spec file, each with `staticSource({ baseDir: 'api/<slug>', groupBy: 'tag', meta: true })`, for both `generate` and `serve`. In the dev server a spec edit is reflected immediately with the static source (verified), so `dynamicSource()` is not needed; the multi-source `loader({...})` form does not accept it anyway (`source.files is not iterable`, verified). Sharing one server across base dirs duplicates pages and clobbers the root `meta.json` (verified).
+- The prerender `pages` list for spec-derived pages (and their `.md` URLs) has to be computed at build time, since the CLI cannot know Fumadocs' slugs in advance. Intended approach: enumerate the same loader inside `vite.config.ts` (`defineConfig` accepts an async function). Not yet verified; first implementation task.
 - Route code treats every non-`docs` source key as an OpenAPI page.
 - Per-route `head()` with title, meta description (frontmatter or operation summary) and canonical URL.
 - Static Orama search index (`server.staticGET()`), `llms.txt` with a cheap per-page renderer (never serialize the spec per page).
-- Reads `portal.config.json` written by the CLI into the build directory (title, description, logo URL, absolute input paths).
+- Reads `portal.config.json` written by the CLI into the build directory (title, description, logo URL, absolute spec paths, absolute static dir); the content dir is the generated literal described above.
 - Uses `staticFunctionMiddleware` from `@tanstack/start-static-server-functions` so loaders run at build time.
 - The spike's placeholder GitHub link to the Fumadocs repository and its dead `src/lib/cn.ts` re-export are removed (`cn` is not a CLI dependency).
 - `app.css` adds `@source not "./dist";` so Tailwind never scans previous output.
@@ -124,9 +131,13 @@ Tailwind 4 is mandatory for Fumadocs UI.
    "the CLI's node_modules" does not work under pnpm global, `npx` or
    `pnpm dlx` (the package has no nested `node_modules`), and lets Vite write
    `.vite-temp` into the CLI's own install directory (verified). Vite's binary
-   is located the same way.
-5. Write `portal.config.json` (absolute paths to the user's `content/`,
-   `spec/` files and `static/`, plus title/description/logo).
+   is located the same way. Cleanup must go through Node's `fs.rm` (which
+   `tmp-promise` uses and which removes a junction without following it,
+   verified); never a shell `rm -rf`, which follows junctions on Windows and
+   deletes the linked packages (verified the hard way during the spike).
+5. Write `portal.config.json` (absolute paths to the user's `spec/` files and
+   `static/`, plus title/description/logo) and the generated content-dir
+   literal (section 4).
 6. Run `process.execPath <vite>/bin/vite.js build` through `execa` with
    `cwd: tempDir` (TanStack Start resolves entries from `process.cwd()`,
    verified), `extendEnv: false` and an allow-listed env (`PATH`,
@@ -189,7 +200,7 @@ Follow the five-layer conventions in `.ai/instructions.md` and the skills in
 - **Types**: `PortalConfig` value object (parses/validates `portal.json`); `PortalSourceContext` (layout existence and validation: `portal.json` present and valid, at least one OpenAPI document in `spec/`, `content/` and `static/` optional). `BuildContext` unchanged. `src/types/file/directory.ts` refactored so it no longer imports the deleted TOC types or describes `toc.yml`.
 - **Infrastructure**: `PortalBuildService` (section 5), `PortalDevServerService` (section 7 serve), `PortalAuthorizationService` (section 6). Remove `generatePortal`, `generateSdl`, `generateTocData` and the portal status polling from `PortalService`.
 - **`portal generate`** (`GenerateAction` rewritten): gate, validate source, confirm overwrite, build with a spinner showing elapsed time, report. Flags: `--input`, `--destination`, `--force`, `--zip`, `--auth-key`. Command class uses `export default class` (convention).
-- **`portal serve`** (rewritten on the Vite dev server, decided): gate once, prepare the same temp project as `generate` (template + linked deps + config pointing at the user's `src/`), start `vite dev` on the chosen port with the same env isolation, open the browser. Content edits hot-reload in the browser in under a second; spec edits are picked up through the OpenAPI dynamic source; compile errors appear in Vite's browser overlay with file and line. No Express, livereload or chokidar in the portal path (remove those dependencies if nothing else uses them). Ctrl+C returns `ActionResult.stopped()` (exit 130, convention) and quickstart's result check is adjusted. Flags: `--input`, `--port`, `--no-open`, `--auth-key`; `--hot-reload` is dropped (always on). Measured dev-server startup: ~9 s.
+- **`portal serve`** (rewritten on the Vite dev server, decided): gate once, prepare the same temp project as `generate` (template + linked deps + config pointing at the user's `src/`), start `vite dev` on the chosen port with the same env isolation, open the browser. Content edits are live in under a second and spec edits immediately (both verified against the dev server: content change visible after ~0.8 s, spec summary change visible on the next request); compile errors appear in Vite's browser overlay with file and line. Express, livereload, connect-livereload and chokidar are used only by the current serve action (verified), so they are removed from `package.json`. Ctrl+C returns `ActionResult.stopped()` (exit 130, convention) and quickstart's result check is adjusted. Flags: keep `--input`, `--port`, `--open`, `--auth-key`; drop `--destination` (the dev server has no output folder) and `--no-reload` (reload is always on). Measured dev-server startup: 9 to 18 s with a warm Vite cache, 45 to 60 s on the first run while Vite pre-bundles dependencies; the CLI shows a spinner until the server answers.
 - **Migration hint**: both commands print one when `APIMATIC-BUILD.json` has `generatePortal` or `generateVersionedPortal` and `portal.json` is missing, listing the old fields with no v1 equivalent and a minimal `portal.json` to copy.
 - **Removals**: `portal toc new`, `portal recipe new`, `portal copilot` commands, actions, prompts, application code (`application/portal/toc`, `application/portal/recipe`), related types and the `ToCCreationFailedEvent`/`RecipeCreationFailedEvent` telemetry events and tests. Hidden stub commands with the same ids remain for one major, print "removed in v2, see <migration notes>" and exit 1 (otherwise users get "not a command", exit 127). Update `test/commands/examples-parse.test.ts`, the `.ai/skills/*.md` files and `.ai/instructions.md` that cite the deleted files as examples, and remove the `portal:toc` topic from `package.json`. Release notes mention `apimatic autocomplete --refresh-cache`.
 - **Quickstart**: the portal step writes `portal.json`, `content/index.md`, `content/meta.json` and calls the new serve; its language-selection, build-file and prune steps are dropped for the portal path until `portal.json` gains `languages`. Its summary and closing "next steps" copy no longer mention themes, recipes or Copilot. The sample repository (`sample-docs-as-code-portal`) gets a new branch with the new layout; `sdk quickstart` keeps using the current one.
@@ -236,6 +247,7 @@ the new-layout branch in the sample repository.
 - No `APIMATIC_AUTH_KEY` environment tier.
 - `$ref` sanitisation deferred.
 - Spec edge cases: minimum rules only (at least one OpenAPI document).
-- `portal serve` uses the Vite dev server with HMR.
+- `portal serve` uses the Vite dev server with HMR (static OpenAPI source is enough; no dynamic source).
+- The content directory is injected as a string literal into the template at prepare time (Fumadocs macro constraint); everything else via `portal.config.json`.
 - Template kept as the spike has it, plus per-page `.md` output so its buttons work.
 - One PR for everything.
