@@ -349,6 +349,14 @@ the new-layout branch in the sample repository.
 - **Untagged operations** are grouped under `unknown`
   (`/api/<spec>/unknown/<operationId>`) in URLs and the sidebar. Choose a
   fallback group name.
+- **Cross-drive builds and fumadocs-mdx.** The `.apimatic-build/` fallback (section 5,
+  step 2) stays until fumadocs-mdx handles content on another Windows drive.
+  Evaluated 2026-09-17: the config-file mode with `index: { target: 'default' }`
+  does not help, because `formatImportPath` also uses `path.relative` and emits
+  `./D:/...` for a cross-drive file (run against the package's own codegen). The
+  fix belongs upstream: emit an absolute path (or `/@fs/`) when `path.relative`
+  returns one. File an issue with fumadocs-mdx; remove the fallback once a fixed
+  version is pinned.
 - **Sidebar tree dominates at scale.** Whole-spec prerenders measured 2026-09-17:
   Stripe (594 operations) 2.2 GB in 375 s, GitHub (1,511 pages) 2.4 GB in 229 s.
   A GitHub page is 1,971 KB: 1,453 KB of inlined router state (almost all the

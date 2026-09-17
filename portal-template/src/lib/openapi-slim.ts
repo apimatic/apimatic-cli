@@ -67,7 +67,8 @@ function reachableComponents(components: Components | undefined, roots: unknown[
       const name = unescapePointer(match[2]);
       const target = components[kind]?.[name];
       if (target === undefined || kept[kind]?.[name] !== undefined) return;
-      (kept[kind] ??= {})[name] = target;
+      kept[kind] ??= {};
+      kept[kind][name] = target;
       queue.push(target);
     } else if (Array.isArray(node)) {
       for (const item of node) visit(item);
@@ -87,5 +88,5 @@ function unescapePointer(segment: string): string {
   } catch {
     // Not percent-encoded; use it as written.
   }
-  return decoded.replace(/~1/g, '/').replace(/~0/g, '~');
+  return decoded.replaceAll('~1', '/').replaceAll('~0', '~');
 }

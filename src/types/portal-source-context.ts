@@ -145,8 +145,10 @@ export class PortalSourceContext {
   private uniqueSlug(fileName: FileName, used: Set<string>): string {
     const base = fileName.normalize().toString() || 'api';
     let slug = base;
-    for (let suffix = 2; used.has(slug); suffix++) {
+    let suffix = 2;
+    while (used.has(slug)) {
       slug = `${base}-${suffix}`;
+      suffix += 1;
     }
     used.add(slug);
     return slug;
@@ -179,7 +181,7 @@ export class PortalSourceContext {
 
     const unsupportedFields = Object.keys(portalFields)
       .filter((field) => !MIGRATABLE_PORTAL_FIELDS.includes(field))
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
     if (versionedPortal !== undefined) {
       unsupportedFields.push('generateVersionedPortal');
     }
