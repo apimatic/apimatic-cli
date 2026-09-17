@@ -6,7 +6,9 @@ import { BUILD_DIRECTORY_NAME, buildDirectoryBase, withBuildDirectory } from '..
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 
 describe('buildDirectoryBase', () => {
-  const source = new DirectoryPath('D:\\work\\my-api\\src');
+  // A plain string, not a DirectoryPath: that class resolves against the host's own path
+  // rules, and this Windows path is checked on every platform.
+  const source = 'D:\\work\\my-api\\src';
 
   it('uses the system temp directory when it shares the drive with the source', () => {
     expect(buildDirectoryBase(source, 'D:\\Temp', 'win32')).to.equal('D:\\Temp');
@@ -24,8 +26,8 @@ describe('buildDirectoryBase', () => {
   });
 
   it('never leaves the system temp directory on other platforms', () => {
-    expect(buildDirectoryBase(new DirectoryPath('/work/my-api/src'), '/tmp', 'linux')).to.equal('/tmp');
-    expect(buildDirectoryBase(new DirectoryPath('/work/my-api/src'), '/tmp', 'darwin')).to.equal('/tmp');
+    expect(buildDirectoryBase('/work/my-api/src', '/tmp', 'linux')).to.equal('/tmp');
+    expect(buildDirectoryBase('/work/my-api/src', '/tmp', 'darwin')).to.equal('/tmp');
   });
 });
 

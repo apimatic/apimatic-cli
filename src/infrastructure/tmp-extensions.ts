@@ -1,6 +1,6 @@
-import fs from 'fs/promises';
-import os from 'os';
-import path from 'path';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { withDir } from 'tmp-promise';
 
@@ -19,12 +19,12 @@ export const BUILD_DIRECTORY_NAME = '.apimatic-build';
  * GitHub's Windows runners (workspace on D:, temp on C:) are the common case.
  */
 export function buildDirectoryBase(
-  sourceDirectory: DirectoryPath,
+  sourceDirectory: string,
   systemTemp: string = os.tmpdir(),
   platform: NodeJS.Platform = process.platform
 ): string {
   if (platform !== 'win32') return systemTemp;
-  const source = path.win32.resolve(sourceDirectory.toString());
+  const source = path.win32.resolve(sourceDirectory);
   if (
     path.win32.parse(source).root.toLowerCase() === path.win32.parse(path.win32.resolve(systemTemp)).root.toLowerCase()
   ) {
@@ -38,11 +38,12 @@ export async function ensureBuildDirectoryBase(
   sourceDirectory: DirectoryPath,
   systemTemp: string = os.tmpdir()
 ): Promise<string> {
-  const base = buildDirectoryBase(sourceDirectory, systemTemp);
-  if (base === systemTemp) return base;
-  await fs.mkdir(base, { recursive: true });
-  // A gitignore that ignores everything keeps the folder out of the user's status while it exists.
-  await fs.writeFile(path.join(base, '.gitignore'), '*\n');
+  const base = buildDirectoryBase(sourceDirectory.toString(), systemTemp);
+  if (base !== systemTemp) {
+    await fs.mkdir(base, { recursive: true });
+    // A gitignore that ignores everything keeps the folder out of the user's status while it exists.
+    await fs.writeFile(path.join(base, '.gitignore'), '*\n');
+  }
   return base;
 }
 
