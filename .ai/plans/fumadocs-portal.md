@@ -145,7 +145,13 @@ Tailwind 4 is mandatory for Fumadocs UI.
 1. Preflight: Node `>=22.12.0` (engines is warn-only for npm installs), and
    resolve the platform bindings for rolldown, lightningcss and
    `@tailwindcss/oxide`; fail with a named error if missing.
-2. `withDirPath` temp dir under a short base path (Windows long paths may be off).
+2. Temp dir via `withBuildDirectory`: the system temp directory, unless it is on a
+   different Windows drive from the source, in which case a self-ignoring
+   `.apimatic-build/` folder beside `src/` is used and removed afterwards. Vite's
+   `import.meta.glob` needs a relative path from the project to the content
+   directory and `path.relative` cannot express one across drives, so the content
+   pages silently vanished (found on GitHub's Windows runners: workspace on D:,
+   temp on C:; reproduced locally with `subst`).
 3. Copy `portal-template/` into it.
 4. Create a real `tempDir/node_modules/` directory and add one junction
    (Windows) or symlink (elsewhere) per template dependency, each resolved to
@@ -304,11 +310,11 @@ the new-layout branch in the sample repository.
 
 ### Remaining before the PR merges
 
-1. **Open the PR against `dev`.** The `Tests` workflow runs on
-   `pull_request` only, so the ubuntu/windows/macos x Node 22.12/24 matrix has
-   never run; everything so far is verified on Windows with Node 23.4. Expect
-   the dependency linking (junction on Windows, symlink elsewhere) and path
-   length to be where platform differences show up.
+1. **PR #343 against `dev` is open** (2026-09-17). Its first run of the test matrix
+   found two problems, both fixed on the branch: pnpm 11 needs Node 22.13, so the
+   22.12 jobs could not install (now a standalone pnpm), and Windows builds lost
+   the content pages across drives (section 5, step 2). Node 24 on Linux and
+   macOS passed the full suite including the end-to-end build on the first run.
 2. **Squash commit with the `BREAKING CHANGE:` footer**: engine `>=22.12.0`;
    `portal toc new`, `portal recipe new` and `portal copilot` removed (hidden
    stubs exit 1); new `src/portal.json` layout; `portal serve` drops

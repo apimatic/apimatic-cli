@@ -3,7 +3,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { withBuildDirectory } from '../../infrastructure/tmp-extensions.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
@@ -63,7 +63,7 @@ export class PortalServeAction {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    return await withDirPath(async (tempDirectory) => {
+    return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
       const project = await this.projectService.prepare(tempDirectory, source.value);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);

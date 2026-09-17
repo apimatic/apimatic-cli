@@ -3,7 +3,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { PortalContext } from '../../types/portal-context.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { withDirPath } from '../../infrastructure/tmp-extensions.js';
+import { withBuildDirectory } from '../../infrastructure/tmp-extensions.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
@@ -71,7 +71,7 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
 
-    return await withDirPath(async (tempDirectory) => {
+    return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
       const project = await this.projectService.prepare(tempDirectory, source.value);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);

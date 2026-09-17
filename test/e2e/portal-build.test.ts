@@ -1,5 +1,4 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import { PortalBuildService } from '../../src/infrastructure/portal-build-service';
@@ -7,6 +6,7 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { ensureBuildDirectoryBase } from '../../src/infrastructure/tmp-extensions';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
@@ -21,7 +21,9 @@ const enabled = process.env.APIMATIC_E2E === '1';
   let output: DirectoryPath;
 
   before(async () => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-e2e-'));
+    // The same rule the commands follow: on a Windows runner the workspace and the temp
+    // directory sit on different drives, and a build across drives loses the content pages.
+    root = fs.mkdtempSync(path.join(await ensureBuildDirectoryBase(fixture), 'portal-e2e-'));
 
     // Drives the same path the command does: read the source directory, prepare the
     // project, build it, save it.
