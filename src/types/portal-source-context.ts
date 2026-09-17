@@ -9,6 +9,11 @@ import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from '
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
+// `/api/search` is the portal's own search index. A spec whose name slugs to `search`
+// would make the build write a file where that route's directory already stands, failing
+// with an unexplained EISDIR. Claiming the name here sends such a spec to `search-2`.
+const RESERVED_SPEC_SLUGS = ['search'];
+
 // `generatePortal` settings the v1 `portal.json` can express; everything else in the old
 // build file is reported as unsupported by the migration hint.
 const MIGRATABLE_PORTAL_FIELDS = ['pageTitle', 'logoUrl'];
@@ -68,7 +73,7 @@ export class PortalSourceContext {
 
   private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
     const specs: PortalSpec[] = [];
-    const usedSlugs = new Set<string>();
+    const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
 
     for (const fileName of await this.specFileNames()) {
       const file = new FilePath(this.specDirectory, fileName);
