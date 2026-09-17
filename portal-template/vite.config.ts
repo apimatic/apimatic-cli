@@ -18,8 +18,12 @@ export default defineConfig(async () => {
       tanstackStart({
         // Without a mask path the shell is rendered at "/" and no index.html is written;
         // without an explicit page list only the shell is prerendered.
-        spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true, crawlLinks: true } },
+        spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true } },
         pages,
+        // The page list above is complete. Crawling would also follow root-relative links
+        // found in the rendered pages, and a specification whose descriptions link to its
+        // author's own site ("/docs/connect") would fail the whole build with a 404.
+        prerender: { crawlLinks: false },
       }),
       react(),
     ],
