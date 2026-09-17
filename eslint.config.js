@@ -53,7 +53,11 @@ export default [
       'lib',
       'node_modules',
       // Built by Vite inside a temp project, not by this package's toolchain.
-      'portal-template'
+      'portal-template',
+      // Scratch input and output directories .gitignore already sets aside for local runs.
+      'test-source',
+      'test-destination',
+      'test-portal'
     ]
   }
 ];
