@@ -1,5 +1,5 @@
 import { log, spinner } from '@clack/prompts';
-import { once } from 'events';
+import { once } from 'node:events';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';

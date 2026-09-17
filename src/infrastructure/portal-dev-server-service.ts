@@ -13,9 +13,9 @@ const STARTUP_TIMEOUT_MS = 3 * 60 * 1000;
 const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)\/?[ \t]*[\r\n]/i;
 
 // Colour sequences only. `stripAnsi` in utils also drops newlines, which are exactly what
-// marks the end of the line the URL is printed on. Built from a char code so the escape
+// marks the end of the line the URL is printed on. Built from a code point so the escape
 // character never appears literally in this source.
-const COLOUR_SEQUENCE_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[a-zA-Z]`, 'g');
+const COLOUR_SEQUENCE_PATTERN = new RegExp(String.raw`${String.fromCodePoint(27)}\[[0-9;]*[a-zA-Z]`, 'g');
 
 export interface PortalDevServer {
   url: UrlPath;

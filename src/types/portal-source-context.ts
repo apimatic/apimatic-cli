@@ -16,7 +16,7 @@ const RESERVED_SPEC_SLUGS = ['search'];
 
 // `generatePortal` settings the v1 `portal.json` can express; everything else in the old
 // build file is reported as unsupported by the migration hint.
-const MIGRATABLE_PORTAL_FIELDS = ['pageTitle', 'logoUrl'];
+const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl']);
 
 /**
  * The `src/` directory of a portal project: `portal.json`, the OpenAPI documents in
@@ -134,12 +134,18 @@ export class PortalSourceContext {
       return openapi.startsWith('3.') ? { supported: true } : { supported: false, format: `OpenAPI ${openapi}` };
     }
     if (document.swagger !== undefined) {
-      return { supported: false, format: `Swagger ${String(document.swagger)}` };
+      return { supported: false, format: `Swagger ${this.versionLabel(document.swagger)}` };
     }
     if (document.asyncapi !== undefined) {
-      return { supported: false, format: `AsyncAPI ${String(document.asyncapi)}` };
+      return { supported: false, format: `AsyncAPI ${this.versionLabel(document.asyncapi)}` };
     }
     return { supported: false, format: null };
+  }
+
+  // Version keys are strings in well-formed documents; anything else is named rather than
+  // stringified into `[object Object]`.
+  private versionLabel(version: unknown): string {
+    return typeof version === 'string' || typeof version === 'number' ? `${version}` : '(unknown version)';
   }
 
   private uniqueSlug(fileName: FileName, used: Set<string>): string {
@@ -180,7 +186,7 @@ export class PortalSourceContext {
     const logo = typeof portalFields.logoUrl === 'string' ? portalFields.logoUrl : null;
 
     const unsupportedFields = Object.keys(portalFields)
-      .filter((field) => !MIGRATABLE_PORTAL_FIELDS.includes(field))
+      .filter((field) => !MIGRATABLE_PORTAL_FIELDS.has(field))
       .sort((a, b) => a.localeCompare(b));
     if (versionedPortal !== undefined) {
       unsupportedFields.push('generateVersionedPortal');

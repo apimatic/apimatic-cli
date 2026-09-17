@@ -80,12 +80,12 @@ const serverLoader = createServerFn({
     };
   });
 
-function Content({ path, markdownUrl }: { path: string; markdownUrl: string }) {
+function Content({ path, markdownUrl }: Readonly<{ path: string; markdownUrl: string }>) {
   const page = docs.getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
 
   const { toc } = use(page.load());
-  const MDX = page.body;
+  const PageBody = page.body;
 
   return (
     <DocsPage toc={toc}>
@@ -96,13 +96,13 @@ function Content({ path, markdownUrl }: { path: string; markdownUrl: string }) {
         <ViewOptionsPopover markdownUrl={markdownUrl} />
       </div>
       <DocsBody>
-        <MDX components={useMDXComponents()} />
+        <PageBody components={useMDXComponents()} />
       </DocsBody>
     </DocsPage>
   );
 }
 
-function Home({ title, description }: { title: string; description: string | null }) {
+function Home({ title, description }: Readonly<{ title: string; description: string | null }>) {
   return (
     <DocsPage>
       <DocsTitle>{title}</DocsTitle>
