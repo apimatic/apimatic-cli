@@ -85,9 +85,11 @@ was itself based on the official `tanstack-start-openapi` and
 from Google Fonts at runtime, Fumadocs page actions) except where noted.
 
 - `vite.config.ts`: `fumadocsMdx()`, `tailwindcss()`, `react()`, and
-  `tanstackStart({ spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true, crawlLinks: true } }, pages: [...] })`.
+  `tanstackStart({ spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true } }, pages: [...], prerender: { crawlLinks: false }, importProtection: { behavior: 'error' } })`.
   No `nitro()`. The `pages` list is mandatory: without it only the shell is
-  prerendered (verified). It lists `/`, the docs root, `/api/search`,
+  prerendered (verified). Link crawling stays off: the list is complete, and the
+  crawler follows root-relative links out of spec descriptions (Stripe links to
+  `/docs/connect`), which 404 and fail the whole build (verified). It lists `/`, the docs root, `/api/search`,
   `/llms.txt`, `/llms-full.txt`, every content page and every page's `.md`
   URL (so the "Copy Markdown" / "Open in ..." actions resolve).
 - `src/routes/spa-shell.tsx`: empty route used as the SPA mask path so that `/`
@@ -106,6 +108,20 @@ from Google Fonts at runtime, Fumadocs page actions) except where noted.
 - One `createOpenAPI()` server per spec file, each with `staticSource({ baseDir: 'api/<slug>', groupBy: 'tag', meta: true })`, for both `generate` and `serve`. In the dev server a spec edit is reflected immediately with the static source (verified), so `dynamicSource()` is not needed; the multi-source `loader({...})` form does not accept it anyway (`source.files is not iterable`, verified). Sharing one server across base dirs duplicates pages and clobbers the root `meta.json` (verified).
 - The prerender `pages` list for spec-derived pages (and their `.md` URLs) has to be computed at build time, since the CLI cannot know Fumadocs' slugs in advance. Intended approach: enumerate the same loader inside `vite.config.ts` (`defineConfig` accepts an async function). Not yet verified; first implementation task.
 - Route code treats every non-`docs` source key as an OpenAPI page.
+- Anything that reads the specification off disk lives in a `*.server.ts` module
+  (`source.server.ts`, `openapi.server.ts`, `llms.server.ts`, `sitemap.server.ts`)
+  and is only imported from server functions and server route handlers.
+  `src/lib/source.ts` keeps just the `defineDocs` collection the browser needs.
+  TanStack's import protection fails the build if client code imports a
+  `.server` module; before the split the loader shipped to the browser, threw
+  there, and left every page unhydrated (blank under `serve`, inert under
+  `generate`).
+- Per-page payload is trimmed: the page tree is loaded once by the root route
+  (one cache file), and `slimOpenAPIPageProps` cuts each operation page's
+  bundled document to its own path item, its webhooks and the components they
+  reach. Without this every page carried the whole specification twice (inlined
+  router state plus the server-function cache file), so output grew with
+  pages x document size: 150 Stripe operations produced 812 MB.
 - Per-route `head()` with title, meta description (frontmatter or operation summary) and canonical URL.
 - Static Orama search index (`server.staticGET()`), `llms.txt` with a cheap per-page renderer (never serialize the spec per page).
 - Reads `portal.config.json` written by the CLI into the build directory (title, description, logo URL, absolute spec paths, absolute static dir); the content dir is the generated literal described above.
