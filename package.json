@@ -159,7 +159,7 @@
                 "description": "Generate context plugins that teach AI coding assistants to use your SDKs."
             },
             "portal": {
-                "description": "Generate, download and serve an API Documentation portal for your APIs."
+                "description": "Build and serve an API Documentation portal for your APIs."
             },
             "sdk": {
                 "description": "Generate and publish SDKs for your APIs in multiple languages."
