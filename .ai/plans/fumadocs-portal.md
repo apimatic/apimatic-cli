@@ -1,7 +1,9 @@
 # Plan: Local Fumadocs Portal Generation (next major release)
 
-Status: approved design after adversarial review (three independent reviews,
-2026-09-16). Implementation not started. Last updated 2026-09-16.
+Status: implemented on branch `saeedjamshaid/fumadocs-portal` (steps 1 to 3
+committed 2026-09-16 and 2026-09-17, plus the review fixes listed in section
+12). Not merged; the PR against `dev` is not yet open. Last updated
+2026-09-17. Section 12 lists what remains.
 
 ## 1. Goal and scope
 
@@ -122,6 +124,10 @@ from Google Fonts at runtime, Fumadocs page actions) except where noted.
   reach. Without this every page carried the whole specification twice (inlined
   router state plus the server-function cache file), so output grew with
   pages x document size: 150 Stripe operations produced 812 MB.
+- Request samples: only curl is generated (`createOpenAPIPage({ codeUsages })` with a
+  registry holding the curl generator alone, `src/components/api-page.tsx`). Other
+  languages will come from `x-codeSamples` on each operation, added to the spec by a
+  later PR; the tabs already render those beside the generated one (verified).
 - Per-route `head()` with title, meta description (frontmatter or operation summary) and canonical URL.
 - Static Orama search index (`server.staticGET()`), `llms.txt` with a cheap per-page renderer (never serialize the spec per page).
 - Reads `portal.config.json` written by the CLI into the build directory (title, description, logo URL, absolute spec paths, absolute static dir); the content dir is the generated literal described above.
@@ -169,18 +175,24 @@ Tailwind 4 is mandatory for Fumadocs UI.
    the build log to `<destination>/apimatic-debug/build.log` and print its
    tail (the temp dir is deleted before the message is shown).
 
-Measured on Windows, Node 23 (must be re-measured on the installable
-versions, see section 7):
+Measured 2026-09-17 on Windows, Node 23.4, with the pinned versions and the
+payload trim from section 4 in place:
 
 | Case | Build time | Output |
 |---|---|---|
-| 2 small specs + 3 pages | 20 to 40 s | 14 MB |
-| 150 operations across 3 specs | 41 s | 136 MB on disk; ~37 KB gzipped per page |
+| Calculator fixture, 1 operation + 1 page | 6 s | 11 MB, of which 10.9 MB is the fixed JavaScript bundle (framework plus Shiki grammars) |
+| Stripe, 20 operations | 15 s | 68 MB; 1.2 MB of HTML plus a 1.8 MB cache file per operation |
+| Stripe, 150 operations | 45 s | 469 MB (812 MB before the trim, when every page carried the whole document) |
 
-Every page embeds the full sidebar tree and every OpenAPI page ships a
-~490 KB static-loader JSON containing the bundled spec. Accepted for the first
-cut. Deep non-recursive `$ref` chains inflate pages geometrically (a synthetic
-60-deep chain OOMed at 4 GB); real specs are fine.
+Each page writes its loader payload twice: inlined as router state in the
+HTML, and as `__tsr/staticServerFnCache/<hash>.json` for client-side
+navigation. The payload is the trimmed document, so the per-page cost depends
+on how connected the spec's schema graph is. Stripe reaches about 870 of its
+1454 schemas from a single operation, so the full 594-operation spec projects
+to about 1.2 GB of document bytes; GitHub's 1239 operations project to about
+44 MB; Petstore-shaped specs stay at a few kilobytes per page. Deep
+non-recursive `$ref` chains inflate pages geometrically (a synthetic 60-deep
+chain OOMed at 4 GB); real specs are fine.
 
 ## 6. Authorization gate (`portal generate` and `portal serve` only)
 
@@ -234,7 +246,9 @@ Follow the five-layer conventions in `.ai/instructions.md` and the skills in
 
 - **`$ref` file read / SSRF (deferred, known risk).** Fumadocs bundles refs with Scalar json-magic's directory confinement and private-network guard disabled. Verified: a `$ref` to an absolute path, a `../` traversal or a loopback URL is read during the build and embedded in the published static-loader JSON. Exposure is the machine running `portal generate`/`serve` on a spec it did not author (for example a spec from an untrusted pull request in CI). Mitigation options, all small (~20 to 100 lines): reject non-`#/` refs; validate refs to stay inside `src/spec/`; or pre-bundle with json-magic's guards on. Decided to ship v1 with Fumadocs' behaviour and document it in the release notes; revisit in a follow-up.
 - TanStack Start is a release candidate; mitigated by exact pinning.
-- Large APIs yield large output folders (see section 5).
+- Large, densely connected APIs still yield large output folders (section 5:
+  a Stripe-shaped spec approaches 1 GB at full size). The remaining lever is the
+  second copy of each page's payload; see section 12.
 - Generated site is not self-contained: Geist fonts load from Google Fonts at runtime and Fumadocs' page actions link to ChatGPT/Claude/Cursor (decided to keep as-is for v1).
 - Verified on Windows only; macOS/Linux via the new CI matrix.
 - Try-it playground requires CORS on the customer's API (Fumadocs' proxy needs a server). Out of scope.
@@ -267,3 +281,86 @@ the new-layout branch in the sample repository.
 - The content directory is injected as a string literal into the template at prepare time (Fumadocs macro constraint); everything else via `portal.config.json`.
 - Template kept as the spike has it, plus per-page `.md` output so its buttons work.
 - One PR for everything.
+
+## 12. Status and next steps (2026-09-17)
+
+### Done, on `saeedjamshaid/fumadocs-portal`
+
+- Step 1 (`cead557`): dependencies, engine bump, `portal-template/`.
+- Step 2 (`e34e878`): `PortalConfig`, `PortalSourceContext`, the three
+  services, the authorization gate, `portal generate`, `portal serve`, per-page
+  head tags, sitemap and robots.
+- Step 3 (`3a6d892` to `b581c75`): command removals with hidden stubs,
+  quickstart scaffolding the new layout, the reserved `search` slug, tests, the
+  CI test matrix, the `1.x` release branch, project docs and README.
+- Review fixes (`e0907b2` to `8ca60cb`): crawler off; server-only module
+  split with import protection (the blank page under `serve` and the inert
+  pages under `generate`); payload trim (root-route tree loader and
+  `slimOpenAPIPageProps`); eslint ignores for the scratch directories. Suite at
+  328 tests including the gated end-to-end build.
+- Verified in headless Chrome, not only by reading HTML: a generated operation
+  page hydrates with no console errors, and `portal serve` renders the Petstore
+  sample's home and operation pages.
+
+### Remaining before the PR merges
+
+1. **Open the PR against `dev`.** The `Tests` workflow runs on
+   `pull_request` only, so the ubuntu/windows/macos x Node 22.12/24 matrix has
+   never run; everything so far is verified on Windows with Node 23.4. Expect
+   the dependency linking (junction on Windows, symlink elsewhere) and path
+   length to be where platform differences show up.
+2. **Squash commit with the `BREAKING CHANGE:` footer**: engine `>=22.12.0`;
+   `portal toc new`, `portal recipe new` and `portal copilot` removed (hidden
+   stubs exit 1); new `src/portal.json` layout; `portal serve` drops
+   `--destination` and `--no-reload`. Release notes also mention
+   `apimatic autocomplete --refresh-cache`, the deferred `$ref` file-read risk
+   (section 9) and that generated sites load Geist from Google Fonts.
+3. **Sample repository** `sample-docs-as-code-portal`: the new-layout branch is
+   still to be created (external). Quickstart no longer downloads the sample,
+   but `PortalQuickstartAction.defaultSpecUrl` still points at its `master`
+   branch for the default spec, and the docs reference it.
+4. **Dependency update policy.** No Renovate or Dependabot configuration exists
+   in the repository, so the grouping described in section 7 is not in place.
+   Decide whether to add one; until then the pinned runtime set only moves by
+   hand.
+5. **Packaging check.** `files` in `package.json` lists `./portal-template`
+   (verified by hand 2026-09-17); the `npm pack --dry-run` assertion from
+   section 8 is not automated.
+
+### Follow-ups, not blocking the release
+
+- **Browser-level smoke test in CI.** The hydration regression was invisible to
+  every HTML-reading test. The end-to-end suite now greps the client bundle for
+  the loader's error string, which catches that one leak, not the class. A
+  headless-Chrome check exists as a scratch script (serve `dist/client`, spawn
+  Chrome asynchronously with `--dump-dom`, and for the dev server add a
+  virtual time budget and load twice); consider a gated e2e step on runners
+  that ship a browser.
+- **Dev-server output.** `PortalDevServerService` stops relaying Vite's output
+  once it sees the `Local:` line, so anything Vite reports afterwards is lost.
+  Keep relaying, or at least surface errors.
+- **Untagged operations** are grouped under `unknown`
+  (`/api/<spec>/unknown/<operationId>`) in URLs and the sidebar. Choose a
+  fallback group name.
+- **Sidebar tree dominates at scale.** Whole-spec prerenders measured 2026-09-17:
+  Stripe (594 operations) 2.2 GB in 375 s, GitHub (1,511 pages) 2.4 GB in 229 s.
+  A GitHub page is 1,971 KB: 1,453 KB of inlined router state (almost all the
+  sidebar tree; the trimmed document is ~44 KB) plus 470 KB of sidebar markup,
+  with 48 KB for the page itself. Loading the tree from its single cache file
+  instead of dehydrating it into every page would cut GitHub-sized output by
+  roughly two thirds; the sidebar markup would still repeat. SSR and pure SPA
+  builds of the same specs are 11 to 14 MB but need a Node server (SSR, plus
+  the ~235 MB dependency install at runtime) or ship no page data at all (SPA).
+- **Second payload copy.** Each page still carries its trimmed document twice
+  (inline router state and cache file). Dropping the inline copy means the
+  client fetches the cache file during hydration; it roughly halves the output
+  for spec-heavy portals at the cost of a fetch before the page is interactive.
+  The sidebar tree is also dehydrated into every page's HTML and into the SPA
+  shell that becomes `404.html` (87 KB at 150 operations); kept so a host that
+  rewrites unknown paths to the shell can still render the layout.
+- **Trim limitation.** A `$ref` into another path item (`#/paths/...`) rather
+  than into `components` would be left dangling. Not seen in practice, since
+  bundlers hoist such references; the unit tests cover components,
+  `discriminator.mapping` and JSON-pointer-escaped names.
+- Section 9 items stand: `$ref` file-read/SSRF deferred, Google Fonts at
+  runtime, try-it playground needs CORS on the customer's API.
