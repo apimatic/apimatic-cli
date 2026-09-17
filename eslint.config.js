@@ -1,57 +1,59 @@
-import js from "@eslint/js";
-import tseslint from "@typescript-eslint/eslint-plugin";
-import tsparser from "@typescript-eslint/parser";
+import js from '@eslint/js';
+import tseslint from '@typescript-eslint/eslint-plugin';
+import tsparser from '@typescript-eslint/parser';
 
 export default [
   js.configs.recommended,
   {
-    files: ["**/*.ts", "**/*.tsx"],
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: tsparser,
       ecmaVersion: 2021,
-      sourceType: "module",
+      sourceType: 'module',
       globals: {
-        process: "readonly",
-        setTimeout: "readonly",
-        clearTimeout: "readonly",
-        URL: "readonly",
-        Blob: "readonly",
-        AbortController: "readonly",
-        AbortSignal: "readonly",
-        NodeJS: true,
-      },
+        process: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        URL: 'readonly',
+        Blob: 'readonly',
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        NodeJS: true
+      }
     },
     plugins: {
-      "@typescript-eslint": tseslint,
+      '@typescript-eslint': tseslint
     },
     rules: {
-      ...tseslint.configs.recommended.rules,
-    },
+      ...tseslint.configs.recommended.rules
+    }
   },
   {
     // Test files use Mocha's global TDD/BDD functions and chai assertion
     // expressions (e.g. `expect(x).to.be.true`), which the base config would
     // otherwise flag as undefined globals / unused expressions.
-    files: ["test/**/*.ts"],
+    files: ['test/**/*.ts'],
     languageOptions: {
       globals: {
-        describe: "readonly",
-        it: "readonly",
-        before: "readonly",
-        beforeEach: "readonly",
-        after: "readonly",
-        afterEach: "readonly",
-      },
+        describe: 'readonly',
+        it: 'readonly',
+        before: 'readonly',
+        beforeEach: 'readonly',
+        after: 'readonly',
+        afterEach: 'readonly'
+      }
     },
     rules: {
-      "@typescript-eslint/no-unused-expressions": "off",
-      "@typescript-eslint/no-explicit-any": "off",
-    },
+      '@typescript-eslint/no-unused-expressions': 'off',
+      '@typescript-eslint/no-explicit-any': 'off'
+    }
   },
   {
     ignores: [
-      "lib",
-      "node_modules"
+      'lib',
+      'node_modules',
+      // Built by Vite inside a temp project, not by this package's toolchain.
+      'portal-template'
     ]
-  },
+  }
 ];

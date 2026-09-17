@@ -1,0 +1,4 @@
+lib
+node_modules
+# Built by Vite inside a temp project, not by this package's toolchain.
+portal-template
