@@ -95,4 +95,17 @@ const enabled = process.env.APIMATIC_E2E === '1';
     const offenders = scripts.filter((name) => read('assets/' + name).includes('Failed to resolve input'));
     expect(offenders).to.deep.equal([]);
   });
+
+  it('writes the sidebar tree to one cache file instead of into every page payload', () => {
+    const cache = '__tsr/staticServerFnCache';
+    const withTree = fs
+      .readdirSync(path.join(output.toString(), cache))
+      .filter((name) => read(cache + '/' + name).includes('"pageTree"'));
+    expect(withTree).to.have.length(1);
+  });
+
+  it('keeps an operation page small', () => {
+    const page = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
+    expect(fs.statSync(path.join(output.toString(), page)).size).to.be.below(100 * 1024);
+  });
 });

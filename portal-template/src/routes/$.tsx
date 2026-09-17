@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from '@tanstack/react-router';
+import { createFileRoute, getRouteApi, notFound } from '@tanstack/react-router';
 import { DocsLayout } from 'fumadocs-ui/layouts/notebook';
 import { createServerFn } from '@tanstack/react-start';
 import { docs } from '@/lib/source';
@@ -20,6 +20,9 @@ import { staticFunctionMiddleware } from '@tanstack/start-static-server-function
 import { Suspense, use, type ReactNode } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
+import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
+
+const rootRoute = getRouteApi('__root__');
 
 export const Route = createFileRoute('/$')({
   component: Page,
@@ -50,12 +53,11 @@ const serverLoader = createServerFn({
   .middleware([staticFunctionMiddleware])
   .handler(async ({ data: slugs }) => {
     const page = source.getPage(slugs);
-    const pageTree = await source.serializePageTree(source.getPageTree());
 
     if (!page) {
       // A project without content/index.md(x) still gets a landing page.
       if (slugs.length === 0) {
-        return { type: 'home' as const, title: portal.title, description: portal.description, pageTree };
+        return { type: 'home' as const, title: portal.title, description: portal.description };
       }
       throw notFound();
     }
@@ -65,8 +67,7 @@ const serverLoader = createServerFn({
         type: 'openapi' as const,
         title: page.data.title,
         description: page.data.description ?? null,
-        pageTree,
-        props: page.data.getOpenAPIPageProps(),
+        props: slimOpenAPIPageProps(page.data.getOpenAPIPageProps()),
       };
     }
 
@@ -76,7 +77,6 @@ const serverLoader = createServerFn({
       description: page.data.description ?? null,
       path: page.path,
       markdownUrl: getPageMarkdownUrl(page).url,
-      pageTree,
     };
   });
 
@@ -116,6 +116,7 @@ function Home({ title, description }: { title: string; description: string | nul
 
 function Page() {
   const page = useFumadocsLoader(Route.useLoaderData());
+  const { pageTree } = useFumadocsLoader(rootRoute.useLoaderData());
   let content: ReactNode;
 
   if (page.type === 'home') {
@@ -140,7 +141,7 @@ function Page() {
 
   const base = baseOptions();
   return (
-    <DocsLayout {...base} nav={{ ...base.nav, mode: 'top' }} tree={page.pageTree}>
+    <DocsLayout {...base} nav={{ ...base.nav, mode: 'top' }} tree={pageTree}>
       {content}
     </DocsLayout>
   );
