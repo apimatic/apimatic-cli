@@ -1,50 +1,38 @@
+import { parse as parseYaml } from 'yaml';
 import { getAuthInfo } from '../../client-utils/auth-manager.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
-import { ZipService } from '../../infrastructure/zip-service.js';
 import { PortalQuickstartPrompts } from '../../prompts/portal/quickstart.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { LoginAction } from '../auth/login.js';
 import { ActionResult } from '../action-result.js';
 import { PortalServeAction } from './serve.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ValidateAction } from '../api/validate.js';
-import { BuildContext } from '../../types/build-context.js';
-import { TempContext } from '../../types/temp-context.js';
-import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
-import { FilePath } from '../../types/file/filePath.js';
 import { SpecContext } from '../../types/spec-context.js';
-import { FeaturesToRemove, ValidationService } from '../../infrastructure/services/validation-service.js';
-import { FileName } from '../../types/file/fileName.js';
-import { ApiService } from '../../infrastructure/services/api-service.js';
-import { DEFAULT_COPILOT_WELCOME_MESSAGE } from './copilot.js';
-import { mapLanguages } from '../../types/sdk/generate.js';
+import { PortalConfig } from '../../types/portal/portal-config.js';
+import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
+import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 
 const defaultPort: number = 23513 as const;
-const defaultBaseUrl = new UrlPath(`http://localhost:${defaultPort}`);
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
-  private readonly zipService: ZipService = new ZipService();
   private readonly fileService: FileService = new FileService();
+  private readonly fileDownloadService = new FileDownloadService();
+  private readonly authorizationService = new PortalAuthorizationService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
-  private readonly fileDownloadService = new FileDownloadService();
-  private readonly apiService = new ApiService();
-  private readonly buildFileUrl = new UrlPath(
-    `https://github.com/apimatic/sample-docs-as-code-portal/archive/refs/heads/master.zip`
-  );
   private readonly defaultSpecUrl = new UrlPath(
     `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
   );
-  private readonly repositoryFolderName = 'sample-docs-as-code-portal-master/src' as const;
-  private readonly validationService: ValidationService;
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {
     this.configDir = configDir;
     this.commandMetadata = commandMetadata;
-    this.validationService = new ValidationService(this.configDir);
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
@@ -56,24 +44,16 @@ export class PortalQuickstartAction {
       }
     }
 
-    return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
-      // Fetch account info before anything else so the plan is known up front: it
-      // gates the on-prem generation exit below, feeds the language step the allowed
-      // SDK languages, and resolves the API Copilot key later. A lookup failure is fatal.
-      const accountInfo = await this.apiService.getAccountInfo(this.configDir, this.commandMetadata.shell, null);
-      if (accountInfo.isErr()) {
-        this.prompts.accountInfoFetchFailed(accountInfo.error);
-        return ActionResult.failed();
-      }
-      // Quickstart generates the portal locally (on-prem); a plan that doesn't allow
-      // on-prem generation can't run it, so stop before importing or pruning a spec.
-      if (!accountInfo.value.isOnPremGenerationAllowed) {
-        this.prompts.onPremGenerationNotAllowedOnPlan();
-        return ActionResult.cancelled();
-      }
-      const allowedLanguages = mapLanguages(accountInfo.value.allowedLanguages);
+    // Checked before any question is asked: the flow ends in `portal serve`, which refuses
+    // without this entitlement, and finding that out after four prompts would be rude.
+    const authorization = await this.authorizationService.authorize(this.configDir, this.commandMetadata.shell, null);
+    if (authorization.isErr()) {
+      this.prompts.authorizationFailed(authorization.error);
+      return ActionResult.cancelled();
+    }
 
-      // Step 1/4
+    return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
+      // Step 1/3
       this.prompts.importSpecStep();
 
       let specPath: FilePath | undefined;
@@ -104,7 +84,7 @@ export class PortalQuickstartAction {
         }
       }
 
-      // Step 2/4
+      // Step 2/3
       this.prompts.validateSpecStep();
       const validateAction = new ValidateAction(this.configDir, this.commandMetadata);
       const validationResult = await validateAction.execute(specPath, false);
@@ -120,51 +100,14 @@ export class PortalQuickstartAction {
         );
         if (downloadFileResult.isErr()) {
           this.prompts.serviceError(downloadFileResult.error);
-        } else {
-          const specContext = new SpecContext(tempDirectory);
-          specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
+          return ActionResult.failed();
         }
+        const specContext = new SpecContext(tempDirectory);
+        specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
       }
 
-      if (validationResult.isSuccess()) {
-        const unallowed = validationResult.getValue();
-        if (unallowed && (unallowed.Features?.length > 0 || unallowed.EndpointCount > unallowed.EndpointLimit)) {
-          const config: FeaturesToRemove = {
-            features: unallowed.Features.filter((name) => !!name),
-            endpointsToKeep: unallowed.EndpointLimit
-          };
-
-          const stripUnallowedFeaturesResult = await this.validationService.stripUnallowedFeatures(specPath, config);
-          if (stripUnallowedFeaturesResult.isErr()) {
-            this.prompts.splitSpecDetected(unallowed);
-            return ActionResult.failed();
-          } else {
-            this.prompts.stripUnallowedFeaturesStep(unallowed);
-            const specContext = new SpecContext(tempDirectory);
-            specPath = await specContext.save(stripUnallowedFeaturesResult.value, new FileName('pruned-spec.zip'));
-          }
-        }
-      }
-
-      // Step 3/4
-      this.prompts.selectLanguagesStep();
-      let languages: string[];
-      if (allowedLanguages.length === 0) {
-        // With no SDK languages on the plan there's nothing to select, so skip the
-        // menu and build the portal with HTTP documentation only.
-        this.prompts.httpOnlyPortalOnPlan();
-        languages = ['http'];
-      } else {
-        const selectedLanguages = await this.prompts.selectLanguagesPrompt(allowedLanguages);
-        if (!selectedLanguages) {
-          this.prompts.noLanguagesSelected();
-          return ActionResult.cancelled();
-        }
-        languages = selectedLanguages;
-      }
-
-      // Step 4/4
-      this.prompts.selectInputDirectoryStep();
+      // Step 3/3
+      this.prompts.createPortalStep();
       let inputDirectory: DirectoryPath | undefined;
       while (true) {
         inputDirectory = await this.prompts.inputDirectoryPathPrompt();
@@ -175,7 +118,6 @@ export class PortalQuickstartAction {
 
         if (!(await this.fileService.directoryExists(inputDirectory))) {
           this.prompts.inputDirectoryPathDoesNotExist(inputDirectory);
-          // TODO: Prompt user if he wants to create the directory
           continue;
         }
 
@@ -186,80 +128,15 @@ export class PortalQuickstartAction {
         break;
       }
 
-      // Resolve the API Copilot key to enable, if any, before setting up the source
-      // directory. An account with no key continues silently (no Copilot); cancelling
-      // the multi-key selection aborts quickstart. (Account info was already fetched
-      // above for the language step.) Whether Copilot is actually on the plan is only
-      // known after the prune below, so the "enabled" caution is deferred until then.
-      let copilotKey: string | undefined;
-      const copilotKeys = accountInfo.value.ApiCopilotKeys ?? [];
-      if (copilotKeys.length === 1) {
-        copilotKey = copilotKeys[0];
-      } else if (copilotKeys.length > 1) {
-        copilotKey = await this.prompts.selectCopilotKey(copilotKeys);
-        if (!copilotKey) {
-          this.prompts.noCopilotKeySelected();
-          return ActionResult.cancelled();
-        }
-      }
-
-      const masterBuildFile = await this.prompts.downloadBuildDirectory(
-        this.fileDownloadService.downloadFile(this.buildFileUrl)
-      );
-      if (masterBuildFile.isErr()) {
-        this.prompts.serviceError(masterBuildFile.error);
-        return ActionResult.failed();
-      }
-      const tempContext = new TempContext(tempDirectory);
-      const masterBuildFilePath = await tempContext.save(masterBuildFile.value.stream);
-      await this.zipService.unArchive(masterBuildFilePath, tempDirectory);
-      const extractedFolder = tempDirectory.join(this.repositoryFolderName);
-
-      // Clean up the workflow dir from the template before copying
-      const tempBuildContext = new BuildContext(extractedFolder);
-      await tempBuildContext.deleteWorkflowDir();
-
-      // Copy the template into the final destination
       const sourceDirectory = inputDirectory.join('src');
-      await this.fileService.copyDirectoryContents(extractedFolder, sourceDirectory);
+      await this.scaffold(sourceDirectory, specPath);
 
-      // Update the build file in its final location via BuildContext,
-      // mirroring exactly how CopilotAction reads and writes the build file
-      const buildContext = new BuildContext(sourceDirectory);
-      const baseConfig = (await buildContext.getBuildFileContents()).withPortalLanguages(languages);
-      const buildConfig = copilotKey
-        ? baseConfig.withApiCopilotForPortal(copilotKey, DEFAULT_COPILOT_WELCOME_MESSAGE, defaultBaseUrl)
-        : baseConfig;
-      await buildContext.updateBuildFileContents(buildConfig);
-
-      // Prune the build file to what the plan allows (SDK languages + AI features)
-      // before serving. Fail closed: a prune failure aborts rather than serving a
-      // build the plan can't generate.
-      const pruneResult = await this.validationService.pruneBuildFile(buildContext.buildConfigFilePath());
-      if (pruneResult.isErr()) {
-        this.prompts.serviceError(pruneResult.error);
-        return ActionResult.failed();
-      }
-      const { buildFile: prunedConfig, report } = pruneResult.value;
-      await buildContext.updateBuildFileContents(prunedConfig);
-      this.prompts.buildFilePruned(report);
-
-      // Only surface the Copilot caution if Copilot survived the prune — i.e. it's
-      // actually on the plan. If it was stripped, buildFilePruned already reported it.
-      if (prunedConfig.hasApiCopilot() && copilotKey) {
-        this.prompts.copilotEnabled(copilotKey);
-      }
-
-      const specDirectory = sourceDirectory.join('spec');
-      const specContext = new SpecContext(specDirectory);
-      await specContext.replaceDefaultSpec(specPath);
-
-      const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
-      this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
+      const structure = await this.fileService.getDirectory(sourceDirectory);
+      this.prompts.printDirectoryStructure(inputDirectory, structure);
 
       const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
       const result = await portalServeAction.execute(sourceDirectory, defaultPort, true, () => {
-        this.prompts.nextSteps(prunedConfig.hasAiIntegration());
+        this.prompts.nextSteps();
       });
 
       if (result.isFailed()) {
@@ -269,4 +146,60 @@ export class PortalQuickstartAction {
       return ActionResult.success();
     });
   };
+
+  /** Writes the smallest source tree `portal generate` and `portal serve` accept. */
+  private async scaffold(sourceDirectory: DirectoryPath, specPath: FilePath): Promise<void> {
+    const specContext = new SpecContext(sourceDirectory.join('spec'));
+    await specContext.install(specPath);
+
+    const config = await this.describeApi(specPath);
+    await this.fileService.writeContents(
+      new FilePath(sourceDirectory, new FileName('portal.json')),
+      JSON.stringify(config, null, 2) + '\n'
+    );
+
+    const contentDirectory = sourceDirectory.join('content');
+    await this.fileService.createDirectoryIfNotExists(contentDirectory);
+    await this.fileService.writeContents(
+      new FilePath(contentDirectory, new FileName('index.md')),
+      [
+        '---',
+        'title: Welcome',
+        `description: Getting started with ${config.title}`,
+        '---',
+        '',
+        `Welcome to the ${config.title} documentation.`,
+        '',
+        'Replace this page with your own introduction, and add more Markdown pages beside it.',
+        ''
+      ].join('\n')
+    );
+    // Orders the sidebar: named pages first, then everything else alphabetically.
+    await this.fileService.writeContents(
+      new FilePath(contentDirectory, new FileName('meta.json')),
+      JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
+    );
+  }
+
+  // Saves the user a question: a valid OpenAPI document already carries the portal's title
+  // and description. A split spec arrives as an archive, which falls back to the default.
+  private async describeApi(specPath: FilePath): Promise<PortalConfig> {
+    const fallback = PortalConfig.create('My API');
+    try {
+      if (await this.fileService.isZipFile(specPath)) {
+        return fallback;
+      }
+      const contents = await this.fileService.getContents(specPath);
+      const document = specPath.toString().toLowerCase().endsWith('.json') ? JSON.parse(contents) : parseYaml(contents);
+      const info = document?.info;
+      const title = typeof info?.title === 'string' && info.title.trim().length > 0 ? info.title.trim() : null;
+      const description =
+        typeof info?.description === 'string' && info.description.trim().length > 0
+          ? info.description.trim().split('\n')[0].slice(0, 300)
+          : null;
+      return title === null ? fallback : PortalConfig.create(title, description);
+    } catch {
+      return fallback;
+    }
+  }
 }

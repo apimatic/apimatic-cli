@@ -1,18 +1,18 @@
-import { Command } from "@oclif/core";
-import { format, intro, outro } from "../prompts/format.js";
-import { TelemetryService } from "../infrastructure/services/telemetry-service.js";
-import { DirectoryPath } from "../types/file/directoryPath.js";
-import { CommandMetadata } from "../types/common/command-metadata.js";
-import { QuickstartInitiatedEvent } from "../types/events/quickstart-initiated.js";
-import { QuickstartAction } from "../actions/quickstart.js";
-import { QuickstartCompletedEvent } from "../types/events/quickstart-completed.js";
+import { Command } from '@oclif/core';
+import { format, intro, outro } from '../prompts/format.js';
+import { TelemetryService } from '../infrastructure/services/telemetry-service.js';
+import { DirectoryPath } from '../types/file/directoryPath.js';
+import { CommandMetadata } from '../types/common/command-metadata.js';
+import { QuickstartInitiatedEvent } from '../types/events/quickstart-initiated.js';
+import { QuickstartAction } from '../actions/quickstart.js';
+import { QuickstartCompletedEvent } from '../types/events/quickstart-completed.js';
 
 export default class Quickstart extends Command {
-  static description = "Get started with your first SDK or API Portal in four easy steps.";
+  static description = 'Get started with your first SDK or API Portal in a few easy steps.';
 
-  static summary = "Create your first API Portal, Context Plugins and SDKs, or a standalone SDK, using APIMatic.";
+  static summary = 'Create your first API Documentation Portal, or your first SDK, using APIMatic.';
 
-  static cmdTxt = format.cmd("apimatic", "quickstart");
+  static cmdTxt = format.cmd('apimatic', 'quickstart');
 
   static examples = [this.cmdTxt];
 
@@ -25,7 +25,7 @@ export default class Quickstart extends Command {
 
     await telemetryService.trackEvent(new QuickstartInitiatedEvent(), commandMetadata.shell);
 
-    intro("Quickstart");
+    intro('Quickstart');
     const action = new QuickstartAction(this.getConfigDir(), commandMetadata);
     const result = await action.execute();
     outro(result);
