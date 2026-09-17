@@ -1,5 +1,5 @@
 import { llms } from 'fumadocs-core/source';
-import { source } from './source';
+import { source } from './source.server';
 import { portal } from './portal';
 
 type PortalPage = ReturnType<typeof source.getPages>[number];
