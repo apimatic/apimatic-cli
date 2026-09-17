@@ -99,7 +99,7 @@ from Google Fonts at runtime, Fumadocs page actions) except where noted.
   server both work with all three outside the template root, and `static/`
   files land in the output through Vite's `publicDir`). One constraint: the
   `dir` of Fumadocs' `defineDocs` macro must be a string literal (the build
-  fails otherwise, verified), so the CLI writes `src/lib/content-dir.ts`
+  fails otherwise, verified), so the CLI substitutes the placeholder in `src/lib/source.ts`
   (or substitutes a placeholder in `source.ts`) with the literal path when it
   prepares the temp project. Spec paths, static dir, title, description and
   logo come from `portal.config.json`.

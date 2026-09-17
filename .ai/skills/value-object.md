@@ -94,7 +94,7 @@ These patterns exist in the current codebase and are flagged for awareness:
 |---|---|
 | `src/types/file/directoryPath.ts:31` | `leafName()` returns `string` — should return `FileName` |
 | `src/types/sdk-context.ts` | `sdkLanguageDirectory` getter exposes `DirectoryPath` — needs justification comment if kept |
-| `src/types/toc-context.ts` | `tocPath` getter exposes `FilePath` — prefer returning it only from the `save()` operation result |
+
 
 ---
 

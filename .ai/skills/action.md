@@ -73,10 +73,10 @@ Actions live at `src/actions/` and are the single use-case orchestrators for eac
 | Standard action (multiple params + overwrite guard) | `src/actions/api/transform.ts` |
 | Standard action (Context + TempContext + service) | `src/actions/portal/generate.ts` |
 | Standard action (SDK generation + version selection) | `src/actions/sdk/generate.ts` |
-| Standard action (interactive prompts + neverthrow) | `src/actions/portal/copilot.ts` |
+| Standard action (gate + services + withDirPath) | `src/actions/portal/generate.ts` |
 | Minimal action (configDir only, no services) | `src/actions/auth/logout.ts` |
 | Minimal action (configDir + commandMetadata, no auth) | `src/actions/auth/status.ts` |
-| Minimal action (shorthand constructor) | `src/actions/portal/toc/new-toc.ts` |
+| Minimal action (shorthand constructor) | `src/actions/auth/status.ts` |
 | Delegation action (routes to sub-actions) | `src/actions/quickstart.ts` |
 | Multi-step flow (withDirPath + multiple cancellation points) | `src/actions/sdk/quickstart.ts` |
 | Multi-step flow (interactive wizard + withDirPath) | `src/actions/portal/quickstart.ts` |
@@ -92,8 +92,8 @@ Use when creating a new Action class. Choose the variant that matches the action
 
 ### What to determine
 
-1. **Topic** — action group folder (e.g., `api`, `sdk`, `portal`). Can be nested: `portal/toc`, `portal/recipe`
-2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `new-toc`)
+1. **Topic** — action group folder (e.g., `api`, `sdk`, `portal`). Can be nested: `sdk/publish`, `publishing/profile`
+2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `save-changes`)
 3. **Class name** — PascalCase with `Action` suffix (e.g., `ValidateAction`, `PortalNewTocAction`)
 4. **Variant** — one of:
    - `standard` — full constructor with configDir, commandMetadata, authKey; services, withDirPath, prompts
@@ -112,7 +112,7 @@ Use when creating a new Action class. Choose the variant that matches the action
 
 **Path:** `src/actions/{topic}/{name}.ts`
 
-For nested topics like `portal/toc`, add one more `../` to all relative import paths.
+For nested topics like `sdk/publish`, add one more `../` to all relative import paths.
 
 ```typescript
 import { DirectoryPath } from "../../types/file/directoryPath.js";

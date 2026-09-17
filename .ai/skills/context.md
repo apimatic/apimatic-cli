@@ -82,9 +82,9 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 | Input context (validate + file ops) | `src/types/spec-context.ts` | Good — zip detection internal |
 | Temp context (zip + save stream) | `src/types/temp-context.ts` | Good — UUID naming internal |
 | Temp context (download + resolve) | `src/types/resource-context.ts` | Good — URL/file decision internal |
-| Composite (delegates to BuildContext) | `src/types/versioned-build-context.ts` | Good — typed result object |
+| Composite (delegates to other contexts) | `src/types/build-context.ts` | Good — hands back a SpecContext, not a path |
 | Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory`, has methods that only use infrastructure services without touching domain state |
-| Input context (leaky — avoid pattern) | `src/types/toc-context.ts` | Avoid — exposes `tocPath` |
+| Input context (validate + typed result) | `src/types/portal-source-context.ts` | Good — reports problems, exposes no paths |
 
 ---
 
@@ -228,7 +228,7 @@ export class {PascalName}Context {
 
 **Use when:** the context has domain logic but no file/network I/O.
 
-**Based on:** `src/types/recipe-context.ts`
+**Based on:** `src/types/portal/portal-config.ts`
 
 ```typescript
 // No infrastructure imports — pure logic only
