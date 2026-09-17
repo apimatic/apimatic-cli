@@ -24,6 +24,15 @@ export default defineConfig(async () => {
         // found in the rendered pages, and a specification whose descriptions link to its
         // author's own site ("/docs/connect") would fail the whole build with a 404.
         prerender: { crawlLinks: false },
+        // Modules named *.server.* read the specification off disk. A client import of one
+        // used to ship that code to the browser, where it threw before React could hydrate
+        // and left every page inert. Fail the build instead of mocking the import.
+        importProtection: {
+          behavior: 'error',
+          // Added to the plugin's own rule for *.server.* files, so the library entry points
+          // that read files are refused by name wherever they are imported from.
+          client: { specifiers: ['fumadocs-openapi/server', 'fumadocs-core/search/server'] },
+        },
       }),
       react(),
     ],

@@ -87,4 +87,12 @@ const enabled = process.env.APIMATIC_E2E === '1';
   it('marks each page canonical at its own address', () => {
     expect(read('index.html')).to.contain('<link rel="canonical" href="https://docs.test/"');
   });
+
+  it('keeps the server-side specification loader out of the browser bundle', () => {
+    // The loader reads the specification off disk. Shipped to the browser once, it threw
+    // before React could hydrate and left every page of the portal inert.
+    const scripts = fs.readdirSync(path.join(output.toString(), 'assets')).filter((name) => name.endsWith('.js'));
+    const offenders = scripts.filter((name) => read('assets/' + name).includes('Failed to resolve input'));
+    expect(offenders).to.deep.equal([]);
+  });
 });

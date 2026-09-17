@@ -1,6 +1,6 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import { source } from '@/lib/source';
-import { renderHome, renderPage } from '@/lib/llms';
+import { source } from '@/lib/source.server';
+import { renderHome, renderPage } from '@/lib/llms.server';
 import { decodeMarkdownUrl } from '@/lib/shared';
 
 const headers = { 'Content-Type': 'text/markdown' };

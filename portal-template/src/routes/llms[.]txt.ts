@@ -1,4 +1,4 @@
-import { renderIndex } from '@/lib/llms';
+import { renderIndex } from '@/lib/llms.server';
 import { createFileRoute } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/llms.txt')({
