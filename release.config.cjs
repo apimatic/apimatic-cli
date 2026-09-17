@@ -9,6 +9,9 @@ module.exports = {
   // migration is needed. (Previously `beta` used `channel: false` to point
   // `latest` at the beta because no stable channel existed; `main` now owns it.)
   branches: [
+    // Keeps a release path for 1.x fixes once 2.0.0 prereleases exist on the other
+    // branches; without it a patch to the shipped major has nowhere to go.
+    "1.x",
     "main",
     {
       name: "beta",

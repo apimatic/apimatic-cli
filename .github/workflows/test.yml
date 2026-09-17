@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [alpha, dev, beta, main, "1.x"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing should not hide the result on the others.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['22.12', '24']
+
+    steps:
+      - name: checkout cli
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: enable corepack
+        run: corepack enable
+
+      - name: configure pnpm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: build
+        run: pnpm build
+
+      # The portal build runs Vite in a temp project whose node_modules is one link per
+      # dependency, so it is the step most likely to break per platform.
+      - name: test
+        run: pnpm test
+        env:
+          APIMATIC_E2E: '1'
