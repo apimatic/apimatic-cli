@@ -27,7 +27,7 @@ export class PortalQuickstartAction {
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly defaultSpecUrl = new UrlPath(
-    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
+    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/v2/src/spec/petstore.json`
   );
 
   constructor(configDir: DirectoryPath, commandMetadata: CommandMetadata) {

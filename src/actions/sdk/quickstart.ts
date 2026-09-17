@@ -28,10 +28,10 @@ export class SdkQuickstartAction {
   private readonly apiService = new ApiService();
   private readonly validationService = new ValidationService(this.configDir);
   private readonly metadataFileUrl = new UrlPath(
-    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/APIMATIC-META.json`
+    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/v2/src/spec/APIMATIC-META.json`
   );
   private readonly defaultSpecUrl = new UrlPath(
-    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/master/src/spec/openapi.json`
+    `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/v2/src/spec/petstore.json`
   );
 
   constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
@@ -194,15 +194,17 @@ export class SdkQuickstartAction {
 
       const sdkDirectory = inputDirectory.join('sdk');
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
-      const result = await sdkGenerateAction.execute(sourceDirectory, 
-        sdkDirectory, 
-        language as Language, 
-        true, 
-        false, 
-        false, 
+      const result = await sdkGenerateAction.execute(
+        sourceDirectory,
+        sdkDirectory,
+        language as Language,
+        true,
+        false,
+        false,
         false,
         CodegenOption.v3,
-        false);
+        false
+      );
       if (result.isFailed()) {
         return ActionResult.failed();
       }
