@@ -1,4 +1,4 @@
-import * as path from "path";
+import * as path from 'path';
 
 export class DirectoryPath {
   private readonly directoryPath: string;
@@ -7,7 +7,7 @@ export class DirectoryPath {
     this.directoryPath = path.resolve(directoryPath, ...subPaths);
   }
 
-  public static default = new DirectoryPath("./");
+  public static default = new DirectoryPath('./');
 
   public static createInput(input: string | undefined) {
     if (!input) {
@@ -26,6 +26,12 @@ export class DirectoryPath {
 
   public isEqual(other: DirectoryPath) {
     return this.directoryPath === other.directoryPath;
+  }
+
+  /** True when `other` is this directory or sits anywhere inside it. */
+  public contains(other: DirectoryPath) {
+    const relative = path.relative(this.directoryPath, other.directoryPath);
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
   }
 
   public leafName() {

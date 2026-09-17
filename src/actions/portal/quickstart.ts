@@ -257,9 +257,8 @@ export class PortalQuickstartAction {
       const buildDirectoryStructure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, buildDirectoryStructure);
 
-      const portalDirectory = inputDirectory.join('portal');
       const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
-      const result = await portalServeAction.execute(sourceDirectory, portalDirectory, defaultPort, true, false, () => {
+      const result = await portalServeAction.execute(sourceDirectory, defaultPort, true, () => {
         this.prompts.nextSteps(prunedConfig.hasAiIntegration());
       });
 

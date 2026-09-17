@@ -1,76 +1,66 @@
-import { log } from "@clack/prompts";
-import { format as f } from "../format.js";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { once } from "events";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { noteWrapped } from "../prompt.js";
+import { log, spinner } from '@clack/prompts';
+import { once } from 'events';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { format as f } from '../format.js';
+import { noteWrapped } from '../prompt.js';
+import { reportAuthorizationFailure } from './authorization.js';
+import { reportSourceProblem } from './source.js';
+
+const LOG_TAIL_LINES = 15;
 
 export class PortalServePrompts {
-  public usingFallbackPort(currentPort: number, availablePort: number) {
-    const message = `Port ${f.var(currentPort.toString())} is already in use. The portal will use port ${f.var(
-      availablePort.toString()
-    )} instead.`;
+  public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
+    reportSourceProblem(problem, sourceDirectory);
+  }
+
+  public authorizationFailed(failure: PortalAuthorizationFailure) {
+    reportAuthorizationFailure(failure);
+  }
+
+  public runtimeUnsupported(reason: string) {
+    log.error(reason);
+  }
+
+  public usingFallbackPort(requestedPort: number, availablePort: number) {
+    const message =
+      `Port ${f.var(requestedPort.toString())} is already in use. ` +
+      `The portal will use port ${f.var(availablePort.toString())} instead.`;
     log.step(message);
   }
 
-  public serverStartFailed(port: number) {
-    const message =
-      `Could not start the portal server on port ${f.var(port.toString())}; ` +
-      `it may have just been taken by another process. Please try again.`;
-    log.error(message);
+  /** The first start of a project pre-bundles dependencies and can take a minute. */
+  public startSpinner() {
+    const indicator = spinner({ indicator: 'timer' });
+    return {
+      start: () => indicator.start('Starting the portal preview'),
+      succeed: () => indicator.stop('Portal preview ready.', 0),
+      fail: (message: string) => indicator.stop(message, 1)
+    };
   }
 
-  public noPortalSource(buildDirectory: DirectoryPath) {
-    const message =
-      `No portal source found at ${f.path(buildDirectory)}. ` +
-      `Run ${f.cmdAlt("apimatic", "portal", "quickstart")} to set one up.`;
-    log.error(message);
+  public startFailed(output: string) {
+    const tail = output.trimEnd().split('\n').slice(-LOG_TAIL_LINES).join('\n');
+    if (tail.length > 0) {
+      log.message(tail);
+    }
   }
 
-  public invalidBuildConfig(buildDirectory: DirectoryPath) {
-    const message =
-      `Could not read the build configuration in ${f.path(buildDirectory)}. ` +
-      `Ensure ${f.var("APIMATIC-BUILD.json")} exists and is valid JSON.`;
-    log.error(message);
+  public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
+    log.message(`The portal is running at ${f.link(url.toString())}`);
+    noteWrapped(
+      `Edits to ${f.path(sourceDirectory)} appear in the browser automatically.\n\nPress CTRL+C to stop the server.`,
+      'Live preview'
+    );
   }
 
-  public baseUrlPortUpdated(updatedUrl: UrlPath) {
-    const message = `Updated the base URL in ${f.var("APIMATIC-BUILD.json")} to ${f.var(updatedUrl.toString())} to match the serve port.`;
-    log.info(message);
-  }
-
-  public portalServed(urlPath: UrlPath) {
-    const message = `The portal is running at ${f.link(urlPath.toString())}`;
-    log.message(message);
-  }
-
-  public promptForExit() {
-    const message = "Press CTRL+C to stop the server.";
-    log.message(message);
-  }
-
-  public changesDetected() {
-    const message = "Changes detected...";
-    log.info(message);
-  }
-
-  public watcherError() {
-    const message = `An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at ${f.var(
-      "support@apimatic.io"
-    )}`;
-    log.error(message);
+  public stopping() {
+    log.info('Stopping the portal preview.');
   }
 
   public async blockExecution() {
-    await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
-  }
-
-  public hotReloadEnabled(srcDirectory: DirectoryPath) {
-    noteWrapped(
-      `Hot reload is enabled.
-
-Watching the directory ${f.path(srcDirectory)} for any changes`,
-      `Note`
-    );
+    await Promise.race([once(process, 'SIGINT'), once(process, 'SIGTERM')]);
   }
 }
