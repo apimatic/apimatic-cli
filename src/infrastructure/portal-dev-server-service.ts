@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { setTimeout as delay } from 'node:timers/promises';
 import { execa, ResultPromise } from 'execa';
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../types/file/urlPath.js';
@@ -9,6 +10,9 @@ const STARTUP_TIMEOUT_MS = 3 * 60 * 1000;
 
 /** How much of a running server's output is kept, in case it is the explanation of a crash. */
 const OUTPUT_TAIL_CHUNKS = 64;
+
+/** How long the last of a dead server's output is waited for before reporting what arrived. */
+const DRAIN_TIMEOUT_MS = 2000;
 
 // Vite colourises this line and bolds the port inside the URL, so the colour codes have to
 // come out before it reads as one address. The trailing newline proves the line is complete
@@ -81,16 +85,32 @@ export class PortalDevServerService {
    */
   private watchForExit(subprocess: ResultPromise): Promise<string> {
     const tail: string[] = [];
-    subprocess.all?.on('data', (chunk: Buffer) => {
+    const output = subprocess.all;
+    output?.on('data', (chunk: Buffer) => {
       tail.push(chunk.toString().replace(COLOUR_SEQUENCE_PATTERN, ''));
       if (tail.length > OUTPUT_TAIL_CHUNKS) {
         tail.shift();
       }
     });
-    return subprocess.then(
-      () => tail.join(''),
-      () => tail.join('')
-    );
+
+    // The process resolves before the last of its output has been delivered, so waiting only
+    // on that loses the very lines that explain the exit. Bounded, because a stream that
+    // never ends must not leave the CLI waiting for one.
+    const drained = new Promise<void>((resolve) => {
+      if (!output) {
+        resolve();
+        return;
+      }
+      output.once('end', resolve);
+      output.once('close', resolve);
+      output.once('error', resolve);
+    });
+
+    const collect = async (): Promise<string> => {
+      await Promise.race([drained, delay(DRAIN_TIMEOUT_MS)]);
+      return tail.join('');
+    };
+    return subprocess.then(collect, collect);
   }
 
   private waitForUrl(subprocess: ResultPromise): Promise<Result<UrlPath, PortalDevServerFailure>> {

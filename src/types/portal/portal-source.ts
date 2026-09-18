@@ -31,7 +31,8 @@ export type PortalSourceProblem =
   | { kind: 'invalidConfig'; errors: string[] }
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
-  | { kind: 'noSpecs' };
+  | { kind: 'noSpecs' }
+  | { kind: 'missingLogo'; logoPath: string };
 
 /**
  * What a pre-2.0 `APIMATIC-BUILD.json` can contribute to a `portal.json`, so the user is

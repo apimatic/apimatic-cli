@@ -61,6 +61,34 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  describe('logo', () => {
+    // parse() checks the shape of `logo`; that the image is actually there it cannot know,
+    // and a logo that is not there is a broken image on every page of a successful build.
+    it('reports a configured logo that is not on disk', async () => {
+      write('portal.json', JSON.stringify({ title: 'Calc', logo: 'static/images/logo.png' }));
+      write('spec/api.json', OPENAPI);
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem).to.deep.equal({ kind: 'missingLogo', logoPath: 'static/images/logo.png' });
+    });
+
+    it('accepts a logo that is', async () => {
+      write('portal.json', JSON.stringify({ title: 'Calc', logo: 'static/images/logo.png' }));
+      write('spec/api.json', OPENAPI);
+      write('static/images/logo.png', 'x');
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('says nothing about a logo when none is configured', async () => {
+      write('portal.json', JSON.stringify({ title: 'Calc' }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+  });
+
   describe('spec discovery', () => {
     beforeEach(() => write('portal.json', JSON.stringify({ title: 'Calc' })));
 

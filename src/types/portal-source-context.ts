@@ -71,6 +71,14 @@ export class PortalSourceContext {
       return err({ kind: 'invalidConfig', errors: config.error });
     }
 
+    // The shape of `logo` is checked by `parse`; that the file is actually there is not,
+    // and a logo that is not there renders as a broken image on every page of a build that
+    // otherwise reports success.
+    const logoPath = config.value.logoPath();
+    if (logoPath !== null && !(await this.fileService.fileExists(this.resolveInSource(logoPath)))) {
+      return err({ kind: 'missingLogo', logoPath });
+    }
+
     const specs = await this.specs();
     if (specs.isErr()) {
       return err(specs.error);
@@ -87,6 +95,16 @@ export class PortalSourceContext {
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory)
     });
+  }
+
+  /** A `/`-separated path relative to `src/`, as `PortalConfig` reports it, as a file path. */
+  private resolveInSource(relativePath: string): FilePath {
+    const segments = relativePath.split('/');
+    const fileName = new FileName(segments.pop() ?? '');
+    return new FilePath(
+      segments.reduce((directory, segment) => directory.join(segment), this.sourceDirectory),
+      fileName
+    );
   }
 
   /** Files at the top of `static/` that the build would otherwise have generated itself. */
