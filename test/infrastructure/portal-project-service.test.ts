@@ -118,6 +118,34 @@ describe('PortalProjectService', () => {
       expect(module).to.contain(JSON.stringify(contentDirectory.toString().split(path.sep).join('/')));
     });
 
+    // The stylesheet needs the same literal: Tailwind's own detection is rooted at the temp
+    // project, which the user's content directory sits outside of, so without this no class
+    // used only on their pages survives into the build.
+    it('substitutes the content directory into the stylesheet Tailwind scans', async () => {
+      const contentDirectory = new DirectoryPath(root).join('content');
+      fs.mkdirSync(contentDirectory.toString(), { recursive: true });
+
+      (await service.prepare(project, sourceFor({ contentDirectory })))._unsafeUnwrap();
+
+      const stylesheet = fs.readFileSync(path.join(project.toString(), 'src/styles/app.css'), 'utf8');
+      expect(stylesheet).to.not.contain('__APIMATIC_CONTENT_DIR__');
+      expect(stylesheet).to.contain(contentDirectory.toString().split(path.sep).join('/'));
+    });
+
+    // The identity is substituted as a literal rather than imported, because a JSON module is
+    // retained whole once client code imports it -- which shipped this machine's absolute
+    // spec, content and static paths to every visitor's browser.
+    it('substitutes the portal identity into the module the browser receives', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+
+      const module = fs.readFileSync(path.join(project.toString(), 'src/lib/portal.ts'), 'utf8');
+      expect(module).to.not.contain('__APIMATIC_PORTAL_IDENTITY__');
+      expect(module).to.contain('"title":"My API"');
+      // The build machine's paths stay behind portal.server.ts.
+      expect(module).to.not.contain(root.split(path.sep).join('/'));
+      expect(module).to.not.contain('specs');
+    });
+
     it('creates an empty content directory when the project has none, so the build has one to read', async () => {
       (await service.prepare(project, sourceFor()))._unsafeUnwrap();
 

@@ -70,6 +70,11 @@ describe('PortalDevServerService', () => {
     const output = await server.exited;
 
     expect(output).to.contain('reached the end');
+    // The other half of the claim: only a tail is kept. Without the cap a session left
+    // running for hours holds every line the dev server ever printed, and this test would
+    // not notice -- draining and bounding are separate things.
+    expect(output).to.not.contain('noisy line 0\n');
+    expect(output.length).to.be.lessThan(200_000);
   });
 
   it('reports a server that exits before printing an address', async () => {
