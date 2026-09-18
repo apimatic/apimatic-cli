@@ -80,7 +80,7 @@ export class SdkQuickstartAction {
           );
           if (downloadFileResult.isErr()) {
             this.prompts.specDownloadFailed(inputPath, downloadFileResult.error);
-            if (sampleUrl !== null && inputPath.toString() === sampleUrl.toString()) {
+            if (sampleUrl !== null && inputPath.isEqual(sampleUrl)) {
               sampleUrl = null;
             }
           } else {

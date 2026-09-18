@@ -149,9 +149,10 @@ export class PortalProjectService {
       specs[spec.slug] = this.toPosix(spec.file.toString());
     }
 
-    // Only these four reach the browser. The rest of the configuration addresses this
-    // machine, and a JSON module is retained whole once client code imports it, so the
-    // identity is substituted into `portal.ts` as a literal instead.
+    // Only the portal's identity reaches the browser; everything else in the configuration
+    // addresses this machine and stays behind `portal.server.ts`. A JSON module is retained
+    // whole once client code imports it, so the identity is substituted into `portal.ts` as
+    // a literal instead. (Stated as a rule rather than a count, which went stale once.)
     const identity = {
       title: source.config.siteTitle(),
       description: source.config.siteDescription(),
