@@ -5,11 +5,9 @@ import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { format as f } from '../format.js';
-import { noteWrapped } from '../prompt.js';
+import { logTail, noteWrapped } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportSourceProblem } from './source.js';
-
-const LOG_TAIL_LINES = 15;
 
 export class PortalServePrompts {
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
@@ -42,7 +40,7 @@ export class PortalServePrompts {
   }
 
   public startFailed(output: string) {
-    const tail = output.trimEnd().split('\n').slice(-LOG_TAIL_LINES).join('\n');
+    const tail = logTail(output);
     if (tail.length > 0) {
       log.message(tail);
     }
