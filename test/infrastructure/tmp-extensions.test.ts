@@ -84,7 +84,7 @@ describe('withBuildDirectory', () => {
           // Stands in for a second run still building in the same folder.
           fs.mkdirSync(path.join(fallback, 'another-run'), { recursive: true });
         },
-        'Z:Temp'
+        'Z:\\Temp'
       );
 
       expect(fs.existsSync(path.join(fallback, '.gitignore')), 'the marker survives').to.be.true;
