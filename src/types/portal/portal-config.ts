@@ -28,12 +28,11 @@ const RENAMED_FIELDS: Record<string, string> = {
 // `create`; user input goes through `parse`, which names every invalid field.
 export class PortalConfig {
   private constructor(
-    public readonly title: string,
-    public readonly description: string | null,
+    private readonly title: string,
+    private readonly description: string | null,
     private readonly logo: string | null,
     private readonly siteUrl: UrlPath | null,
-    /** Whether each page offers to open itself in an external AI assistant. */
-    public readonly aiPageActions: boolean
+    private readonly aiPageActions: boolean
   ) {}
 
   public static create(
@@ -126,6 +125,21 @@ export class PortalConfig {
    */
   public static isValidLogo(value: string): boolean {
     return value.trim().length > 0 && PortalConfig.isInsideStatic(value);
+  }
+
+  /** What the portal calls itself: the site name, the page titles and the nav bar. */
+  public siteTitle(): string {
+    return this.title;
+  }
+
+  /** One line about the portal, or null when it has none. */
+  public siteDescription(): string | null {
+    return this.description;
+  }
+
+  /** Whether each page offers to open itself in an external AI assistant. */
+  public offersAiPageActions(): boolean {
+    return this.aiPageActions;
   }
 
   /** Path of the logo relative to `src/` with forward slashes, or null when none is configured. */

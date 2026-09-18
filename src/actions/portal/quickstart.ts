@@ -194,10 +194,10 @@ export class PortalQuickstartAction {
         'title: Welcome',
         // JSON is valid YAML. Quoting through it keeps a title carrying ': ' or '#' from
         // breaking the front matter, which fails the whole build rather than one page.
-        `description: ${JSON.stringify(`Getting started with ${config.title}`)}`,
+        `description: ${JSON.stringify(`Getting started with ${config.siteTitle()}`)}`,
         '---',
         '',
-        `Welcome to the ${config.title} documentation.`,
+        `Welcome to the ${config.siteTitle()} documentation.`,
         '',
         'Replace this page with your own introduction, and add more Markdown pages beside it.',
         ''

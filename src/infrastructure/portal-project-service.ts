@@ -153,11 +153,11 @@ export class PortalProjectService {
     // machine, and a JSON module is retained whole once client code imports it, so the
     // identity is substituted into `portal.ts` as a literal instead.
     const identity = {
-      title: source.config.title,
-      description: source.config.description,
+      title: source.config.siteTitle(),
+      description: source.config.siteDescription(),
       logoUrl: source.config.logoSiteUrl(),
       siteUrl: source.config.siteOrigin()?.toString() ?? null,
-      aiPageActions: source.config.aiPageActions
+      aiPageActions: source.config.offersAiPageActions()
     };
 
     const configuration = {

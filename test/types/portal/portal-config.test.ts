@@ -9,14 +9,14 @@ describe('PortalConfig', () => {
     it('accepts a document with only a title', () => {
       const config = parse({ title: 'My API' })._unsafeUnwrap();
 
-      expect(config.title).to.equal('My API');
-      expect(config.description).to.be.null;
+      expect(config.siteTitle()).to.equal('My API');
+      expect(config.siteDescription()).to.be.null;
       expect(config.logoPath()).to.be.null;
       expect(config.siteOrigin()).to.be.null;
     });
 
     it('trims surrounding whitespace', () => {
-      expect(parse({ title: '  My API  ' })._unsafeUnwrap().title).to.equal('My API');
+      expect(parse({ title: '  My API  ' })._unsafeUnwrap().siteTitle()).to.equal('My API');
     });
 
     it('rejects a missing, empty or blank title', () => {
@@ -36,12 +36,12 @@ describe('PortalConfig', () => {
     // Each page offers to open itself in ChatGPT, Claude, Cursor or Scira. A portal
     // published under someone else's brand carries that endorsement, so it can be refused.
     it('is on unless the document turns it off', () => {
-      expect(parse({ title: 'Calc' })._unsafeUnwrap().aiPageActions).to.be.true;
-      expect(parse({ title: 'Calc', aiPageActions: true })._unsafeUnwrap().aiPageActions).to.be.true;
+      expect(parse({ title: 'Calc' })._unsafeUnwrap().offersAiPageActions()).to.be.true;
+      expect(parse({ title: 'Calc', aiPageActions: true })._unsafeUnwrap().offersAiPageActions()).to.be.true;
     });
 
     it('is off when the document says so', () => {
-      expect(parse({ title: 'Calc', aiPageActions: false })._unsafeUnwrap().aiPageActions).to.be.false;
+      expect(parse({ title: 'Calc', aiPageActions: false })._unsafeUnwrap().offersAiPageActions()).to.be.false;
     });
 
     it('rejects a value that is not a boolean', () => {
@@ -62,13 +62,14 @@ describe('PortalConfig', () => {
 
   describe('description', () => {
     it('trims surrounding whitespace', () => {
-      expect(parse({ title: 'x', description: '  Docs  ' })._unsafeUnwrap().description).to.equal('Docs');
+      expect(parse({ title: 'x', description: '  Docs  ' })._unsafeUnwrap().siteDescription()).to.equal('Docs');
     });
 
     // It reached the site description and the og:description of every page as whitespace.
     it('treats a blank description as none at all', () => {
       for (const description of ['', '   ', '\n\t']) {
-        expect(parse({ title: 'x', description })._unsafeUnwrap().description, JSON.stringify(description)).to.be.null;
+        expect(parse({ title: 'x', description })._unsafeUnwrap().siteDescription(), JSON.stringify(description)).to.be
+          .null;
       }
     });
   });

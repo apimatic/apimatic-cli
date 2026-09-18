@@ -13,7 +13,7 @@ import { FileName } from '../../../src/types/file/fileName';
 // interactive wizard.
 type Internals = {
   scaffold(sourceDirectory: DirectoryPath, specPath: FilePath): Promise<void>;
-  describeApi(specPath: FilePath): Promise<{ title: string; description: string | null }>;
+  describeApi(specPath: FilePath): Promise<{ siteTitle(): string; siteDescription(): string | null }>;
   unsupportedSpecFormat(specPath: FilePath): Promise<string | null>;
 };
 
@@ -106,7 +106,7 @@ describe('PortalQuickstartAction', () => {
     it('reduces a title spanning several lines to one', async () => {
       const config = await action().describeApi(writeSpec({ title: 'Swagger\nPetstore', version: '1' }));
 
-      expect(config.title).to.equal('Swagger Petstore');
+      expect(config.siteTitle()).to.equal('Swagger Petstore');
     });
 
     it('caps a long description rather than stopping at its first line break', async () => {
@@ -116,22 +116,22 @@ describe('PortalQuickstartAction', () => {
         writeSpec({ title: 'API', version: '1', description: description.replace('summary. ', 'summary.\n') })
       );
 
-      expect(config.description).to.have.length.greaterThan(200);
-      expect(config.description).to.have.length.at.most(300);
-      expect(config.description).to.not.include('\n');
+      expect(config.siteDescription()).to.have.length.greaterThan(200);
+      expect(config.siteDescription()).to.have.length.at.most(300);
+      expect(config.siteDescription()).to.not.include('\n');
     });
 
     it('falls back to a placeholder when the document names no title', async () => {
       const config = await action().describeApi(writeSpec({ version: '1' }));
 
-      expect(config.title).to.equal('My API');
-      expect(config.description).to.be.null;
+      expect(config.siteTitle()).to.equal('My API');
+      expect(config.siteDescription()).to.be.null;
     });
 
     it('ignores a title that is only whitespace', async () => {
       const config = await action().describeApi(writeSpec({ title: '  \n  ', version: '1' }));
 
-      expect(config.title).to.equal('My API');
+      expect(config.siteTitle()).to.equal('My API');
     });
   });
 });

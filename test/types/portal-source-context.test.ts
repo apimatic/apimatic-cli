@@ -47,7 +47,7 @@ describe('PortalSourceContext', () => {
 
       const source = (await resolve())._unsafeUnwrap();
 
-      expect(source.config.title).to.equal('Calc');
+      expect(source.config.siteTitle()).to.equal('Calc');
       expect(source.specs).to.have.lengthOf(1);
     });
 
@@ -243,7 +243,7 @@ describe('PortalSourceContext', () => {
 
       const problem = (await resolve())._unsafeUnwrapErr() as { migration: { suggestedConfig: { title: string } } };
 
-      expect(problem.migration.suggestedConfig.title).to.equal('My API');
+      expect(problem.migration.suggestedConfig.siteTitle()).to.equal('My API');
     });
 
     it('reports a versioned portal as unsupported', async () => {
@@ -268,7 +268,9 @@ describe('PortalSourceContext', () => {
       };
 
       expect(problem.migration).to.not.be.null;
-      expect((problem.migration as { suggestedConfig: { title: string } }).suggestedConfig.title).to.equal('Acme');
+      expect((problem.migration as { suggestedConfig: { title: string } }).suggestedConfig.siteTitle()).to.equal(
+        'Acme'
+      );
     });
 
     it('offers no migration for a build file it cannot parse', async () => {
