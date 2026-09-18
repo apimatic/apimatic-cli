@@ -1,37 +1,42 @@
-import { isCancel, log, select, text } from "@clack/prompts";
-import { Result } from "neverthrow";
-import { format as f, getTree } from "../format.js";
-import { noteWrapped, withSpinner } from "../prompt.js";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { createResourceInputFromInput, ResourceInput } from "../../types/file/resource-input.js";
-import { FileDownloadResponse } from "../../infrastructure/services/file-download-service.js";
-import { ServiceError } from "../../infrastructure/service-error.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { removeQuotes } from "../../utils/string-utils.js";
-import { Directory } from "../../types/file/directory.js";
-import { Language, LANGUAGE_CHOICES } from "../../types/sdk/generate.js";
-import { UnallowedFeaturesResponse } from "../../infrastructure/services/validation-service.js";
+import { isCancel, log, select, text } from '@clack/prompts';
+import { Result } from 'neverthrow';
+import { format as f, getTree } from '../format.js';
+import { noteWrapped, withSpinner } from '../prompt.js';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { createResourceInputFromInput, ResourceInput } from '../../types/file/resource-input.js';
+import { FileDownloadResponse } from '../../infrastructure/services/file-download-service.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { removeQuotes } from '../../utils/string-utils.js';
+import { Directory } from '../../types/file/directory.js';
+import { Language, LANGUAGE_CHOICES } from '../../types/sdk/generate.js';
+import { UnallowedFeaturesResponse } from '../../infrastructure/services/validation-service.js';
 
 const vscodeExtensionUrl =
-  "https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode";
-const sdkCustomizationUrl = "https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/";
-const pricingUrl = "https://www.apimatic.io/pricing";
+  'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode';
+const sdkCustomizationUrl = 'https://docs.apimatic.io/generate-sdks/codegen-settings/codegen-settings-overview/';
+const pricingUrl = 'https://www.apimatic.io/pricing';
 
 export class SdkQuickstartPrompts {
   public importSpecStep() {
     log.info(`Step 1 of 4: Import your OpenAPI Definition`);
   }
 
-  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<ResourceInput | undefined> {
+  /** `defaultSpecUrl` is null once the sample has failed to download; it is not offered again. */
+  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<ResourceInput | undefined> {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
-      placeholder:
-        "Provide absolute URL/local path or press Enter to use a sample OpenAPI Definition file from APIMatic.",
-      defaultValue: defaultSpecUrl.toString(),
+      placeholder: defaultSpecUrl
+        ? 'Provide absolute URL/local path or press Enter to use a sample OpenAPI Definition file from APIMatic.'
+        : 'Provide an absolute URL or local path to your OpenAPI Definition file.',
+      ...(defaultSpecUrl === null ? {} : { defaultValue: defaultSpecUrl.toString() }),
 
       validate: (value) => {
+        if (!value && defaultSpecUrl === null) {
+          return 'Please enter a file path or URL.';
+        }
         if (value && !createResourceInputFromInput(value)) {
-          return "Please enter a valid file path or URL.";
+          return 'Please enter a valid file path or URL.';
         }
       }
     });
@@ -44,68 +49,73 @@ export class SdkQuickstartPrompts {
   }
 
   public splitSpecDetected(unallowed: UnallowedFeaturesResponse): void {
-    const featuresList = unallowed.Features.map((f) => `  • ${f}`).join("\n");
+    const featuresList = unallowed.Features.map((f) => `  • ${f}`).join('\n');
 
-    let endpointMessage = "";
+    let endpointMessage = '';
     if (unallowed.EndpointLimit < unallowed.EndpointCount) {
       endpointMessage = `\nEndpoint limit exceeded: ${unallowed.EndpointCount} endpoints found, but your plan allows ${unallowed.EndpointLimit}\n`;
     }
 
     const message = [
-      "Your API Specification includes components not available on your current subscription plan:",
-      "",
+      'Your API Specification includes components not available on your current subscription plan:',
+      '',
       featuresList,
       endpointMessage,
-      "To continue:",
-      "- Remove these components from your API Specification and re-run this command.",
-      "- Combine your split API Specification files into a single file. We can automatically remove unsupported components from single-file specs.",
+      'To continue:',
+      '- Remove these components from your API Specification and re-run this command.',
+      '- Combine your split API Specification files into a single file. We can automatically remove unsupported components from single-file specs.',
       `- Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
-    ].join("\n");
+    ].join('\n');
 
     log.info(message);
   }
 
   public stripUnallowedFeaturesStep(unallowed: UnallowedFeaturesResponse): void {
-    const featuresList = unallowed.Features.map((f) => `  • ${f}`).join("\n");
+    const featuresList = unallowed.Features.map((f) => `  • ${f}`).join('\n');
 
-    let endpointMessage = "";
+    let endpointMessage = '';
     if (unallowed.EndpointLimit < unallowed.EndpointCount) {
       const endpointsToRemove = unallowed.EndpointCount - unallowed.EndpointLimit;
       endpointMessage = `\n${endpointsToRemove} endpoint(s) will be removed from your spec\n`;
     }
 
     const message = [
-      "Your API Specification includes components not available on your current subscription plan.",
+      'Your API Specification includes components not available on your current subscription plan.',
       "We'll automatically remove these components before proceeding:",
       featuresList,
       endpointMessage,
-      "",
+      '',
       "You won't see these components in the generated SDKs or documentation.",
       `Want to keep them? Upgrade your subscription to unlock additional features: ${f.link(pricingUrl)}`
-    ].join("\n");
+    ].join('\n');
 
     log.info(message);
   }
 
   public specFileDoesNotExist() {
-    log.error("The specified file does not exist or is not a valid file. Please enter a valid file path.");
+    log.error('The specified file does not exist or is not a valid file. Please enter a valid file path.');
   }
 
   public noSpecSpecified() {
-    log.error("No API Definition was provided.");
+    log.error('No API Definition was provided.');
   }
 
   public downloadSpecFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner(
-      "Downloading API Definition",
+      'Downloading API Definition',
       `API Definition downloaded`,
-      "Unable to download API Definition",
+      'Unable to download API Definition',
       fn
     );
   }
 
   public serviceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
+  }
+
+  /** Names the address that failed: without it the same message repeats for every retry. */
+  public specDownloadFailed(url: UrlPath, serviceError: ServiceError) {
+    log.error(`${serviceError.errorMessage} Could not download ${f.link(url.toString())}.`);
   }
 
   public validateSpecStep() {
@@ -121,10 +131,10 @@ export class SdkQuickstartPrompts {
       message: `How would you like to proceed?`,
       options: [
         {
-          value: "no",
+          value: 'no',
           label: `1. Fix the issues using APIMatic's interactive VS Code Extension: ${vscodeExtensionUrl}`
         },
-        { value: "yes", label: `2. Use an example API Definition instead (recommended)` }
+        { value: 'yes', label: `2. Use an example API Definition instead (recommended)` }
       ]
     });
 
@@ -132,7 +142,7 @@ export class SdkQuickstartPrompts {
       return false;
     }
 
-    return useDefaultSpec === "yes";
+    return useDefaultSpec === 'yes';
   }
 
   public fixYourSpec() {
@@ -154,7 +164,7 @@ export class SdkQuickstartPrompts {
     }
 
     const language = await select({
-      message: "Choose the programming language for your SDK:",
+      message: 'Choose the programming language for your SDK:',
       options: available.map(({ label, value }) => ({ label, value }))
     });
 
@@ -169,7 +179,7 @@ export class SdkQuickstartPrompts {
     const message = [
       "You're on the Free plan.",
       `Upgrade your subscription to get started: ${f.link(pricingUrl)}`
-    ].join("\n");
+    ].join('\n');
     log.warn(message);
   }
 
@@ -177,13 +187,13 @@ export class SdkQuickstartPrompts {
     return [
       `The following languages aren't included in your current subscription plan:`,
       ...languages.map((language) => `  • ${language}`),
-      "",
+      '',
       `Upgrade your subscription to unlock them: ${f.link(pricingUrl)}`
-    ].join("\n");
+    ].join('\n');
   }
 
   public noLanguageSelected() {
-    log.error("No programming language was selected.");
+    log.error('No programming language was selected.');
   }
 
   public accountInfoFetchFailed(serviceError: ServiceError) {
@@ -196,21 +206,21 @@ export class SdkQuickstartPrompts {
 
   public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
     const inputDirectory = await text({
-      message: "Enter the directory path where you would like to setup the SDK (Requires an empty directory):",
-      placeholder: "Provide absolute path to the directory or press Enter to use the current directory.",
-      defaultValue: "./"
+      message: 'Enter the directory path where you would like to setup the SDK (Requires an empty directory):',
+      placeholder: 'Provide absolute path to the directory or press Enter to use the current directory.',
+      defaultValue: './'
     });
 
     if (isCancel(inputDirectory)) {
       return undefined;
     }
 
-    const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? "");
+    const cleanedPath = removeQuotes((inputDirectory as string)?.trim() ?? '');
     return new DirectoryPath(cleanedPath);
   }
 
   public noInputDirectoryProvided() {
-    log.error("No directory was specified.");
+    log.error('No directory was specified.');
   }
 
   public inputDirectoryPathDoesNotExist(inputDirectory: DirectoryPath) {
@@ -227,35 +237,35 @@ export class SdkQuickstartPrompts {
 
   public downloadMetadataFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
     return withSpinner(
-      "Setting up source directory",
+      'Setting up source directory',
       `Source directory set up successfully`,
-      "Unable to set up source directory",
+      'Unable to set up source directory',
       fn
     );
   }
 
   public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
-    const heading = `${f.var("src")} directory containing source files created at ${f.path(inputDirectory)}\n`;
+    const heading = `${f.var('src')} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());
     log.info(heading + message);
   }
 
   public sdkOpenedInEditor() {
-    log.info("Opened the SDK directory in VS Code. To get started with your SDK, review the README file.");
+    log.info('Opened the SDK directory in VS Code. To get started with your SDK, review the README file.');
   }
 
   public nextSteps(language: Language, inputDirectory: DirectoryPath): void {
     const inputDirectoryFlag = !inputDirectory.isEqual(DirectoryPath.default)
-      ? `${f.flag("input", inputDirectory.toString())} `
-      : "";
+      ? `${f.flag('input', inputDirectory.toString())} `
+      : '';
     const message = `Run the command
-'${f.cmdAlt("apimatic", "sdk", "generate")} ${inputDirectoryFlag}${f.flag("language", language)}'
+'${f.cmdAlt('apimatic', 'sdk', 'generate')} ${inputDirectoryFlag}${f.flag('language', language)}'
 to regenerate your SDK.
 
 Explore API Portals and Context Plugins next to enhance your API experience.
 
 To learn more about customizing your SDK, visit:
 ${f.link(sdkCustomizationUrl)}`;
-    noteWrapped(message, "Next Steps");
+    noteWrapped(message, 'Next Steps');
   }
 }

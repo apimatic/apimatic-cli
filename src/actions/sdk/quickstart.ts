@@ -64,8 +64,11 @@ export class SdkQuickstartAction {
       this.prompts.importSpecStep();
 
       let specPath: FilePath | undefined;
+      // Dropped once the CLI's own sample has failed: re-offering the address the user just
+      // watched fail, pre-filled, is the one suggestion that cannot work.
+      let sampleUrl: UrlPath | null = this.defaultSpecUrl;
       while (!specPath) {
-        const inputPath = await this.prompts.specPathPrompt(this.defaultSpecUrl);
+        const inputPath = await this.prompts.specPathPrompt(sampleUrl);
         if (!inputPath) {
           this.prompts.noSpecSpecified();
           return ActionResult.cancelled();
@@ -76,7 +79,10 @@ export class SdkQuickstartAction {
             this.fileDownloadService.downloadFile(inputPath)
           );
           if (downloadFileResult.isErr()) {
-            this.prompts.serviceError(downloadFileResult.error);
+            this.prompts.specDownloadFailed(inputPath, downloadFileResult.error);
+            if (sampleUrl !== null && inputPath.toString() === sampleUrl.toString()) {
+              sampleUrl = null;
+            }
           } else {
             const specContext = new SpecContext(tempDirectory);
             specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);

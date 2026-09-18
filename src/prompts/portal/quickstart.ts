@@ -21,13 +21,19 @@ export class PortalQuickstartPrompts {
     log.info(`Step 1 of 3: Import your OpenAPI Definition`);
   }
 
-  public async specPathPrompt(defaultSpecUrl: UrlPath): Promise<ResourceInput | undefined> {
+  /** `defaultSpecUrl` is null once the sample has failed to download; it is not offered again. */
+  public async specPathPrompt(defaultSpecUrl: UrlPath | null): Promise<ResourceInput | undefined> {
     const spec = await text({
       message: `Provide a local path or a public URL for your OpenAPI Definition file:`,
-      placeholder: 'Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.',
-      defaultValue: defaultSpecUrl.toString(),
+      placeholder: defaultSpecUrl
+        ? 'Provide absolute URL/local path or press Enter to use a sample OpenAPI file from APIMatic.'
+        : 'Provide an absolute URL or local path to your OpenAPI Definition file.',
+      ...(defaultSpecUrl === null ? {} : { defaultValue: defaultSpecUrl.toString() }),
 
       validate: (value) => {
+        if (!value && defaultSpecUrl === null) {
+          return 'Please enter a file path or URL.';
+        }
         if (value && !createResourceInputFromInput(value)) {
           return 'Please enter a valid file path or URL.';
         }
@@ -135,6 +141,11 @@ export class PortalQuickstartPrompts {
 
   public serviceError(serviceError: ServiceError) {
     log.error(serviceError.errorMessage);
+  }
+
+  /** Names the address that failed: without it the same message repeats for every retry. */
+  public specDownloadFailed(url: UrlPath, serviceError: ServiceError) {
+    log.error(`${serviceError.errorMessage} Could not download ${f.link(url.toString())}.`);
   }
 
   public printDirectoryStructure(inputDirectory: DirectoryPath, directory: Directory) {
