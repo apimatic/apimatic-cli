@@ -32,6 +32,42 @@ describe('PortalConfig', () => {
     expect(errors).to.have.lengthOf(4);
   });
 
+  describe('unknown settings', () => {
+    // A mistyped setting is the one mistake that otherwise builds a portal that is quietly
+    // wrong -- no logo, no site URL -- with nothing said about it.
+    it('rejects a setting it does not know', () => {
+      const errors = parse({ title: 'Calc', favicon: 'x.ico' })._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal(["'favicon' is not a portal.json setting."]);
+    });
+
+    it('names the setting a pre-2.0 name was renamed to', () => {
+      const errors = parse({ title: 'Calc', logoUrl: 'static/images/logo.png' })._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal(["'logoUrl' is not a portal.json setting; did you mean 'logo'?"]);
+    });
+
+    it('reports every unknown setting, alongside the invalid ones', () => {
+      const errors = parse({ pageTitle: 'Calc', theme: {} })._unsafeUnwrapErr();
+
+      expect(errors).to.have.lengthOf(3);
+      expect(errors).to.include("'pageTitle' is not a portal.json setting; did you mean 'title'?");
+      expect(errors).to.include("'theme' is not a portal.json setting.");
+      expect(errors).to.include("'title' is required and must be a non-empty string.");
+    });
+
+    it('accepts a document using only the settings it knows', () => {
+      const config = parse({
+        title: 'Calc',
+        description: 'A calculator.',
+        logo: 'static/images/logo.png',
+        siteUrl: 'https://docs.test'
+      });
+
+      expect(config.isOk()).to.be.true;
+    });
+  });
+
   it('rejects a document that is not a JSON object', () => {
     expect(PortalConfig.parse('nonsense')._unsafeUnwrapErr()).to.deep.equal(['portal.json is not valid JSON.']);
     expect(PortalConfig.parse('[]')._unsafeUnwrapErr()).to.deep.equal(['portal.json must contain a JSON object.']);

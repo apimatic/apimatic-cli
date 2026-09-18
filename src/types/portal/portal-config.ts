@@ -11,6 +11,18 @@ export interface PortalConfigData {
 
 const STATIC_PREFIX = 'static/';
 
+const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl']);
+
+// Pre-2.0 names and near misses. A mistyped setting is the one mistake that otherwise
+// produces a portal that builds and is quietly wrong, and `logoUrl` is both the v1 name the
+// migration hint puts in front of the user and the likeliest slip.
+const RENAMED_FIELDS: Record<string, string> = {
+  logoUrl: 'logo',
+  pageTitle: 'title',
+  url: 'siteUrl',
+  site: 'siteUrl'
+};
+
 // Immutable wrapper around the parsed `src/portal.json`. Construct trusted values with
 // `create`; user input goes through `parse`, which names every invalid field.
 export class PortalConfig {
@@ -43,6 +55,18 @@ export class PortalConfig {
 
     const errors: string[] = [];
     const { title, description, logo, siteUrl } = data as Record<string, unknown>;
+
+    for (const field of Object.keys(data as Record<string, unknown>)) {
+      if (KNOWN_FIELDS.has(field)) {
+        continue;
+      }
+      const intended = RENAMED_FIELDS[field];
+      errors.push(
+        intended
+          ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
+          : `'${field}' is not a portal.json setting.`
+      );
+    }
 
     if (typeof title !== 'string' || title.trim().length === 0) {
       errors.push("'title' is required and must be a non-empty string.");
