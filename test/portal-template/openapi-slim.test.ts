@@ -51,7 +51,7 @@ describe('slimOpenAPIPageProps', () => {
     const slim = bundledOf(slimOpenAPIPageProps(propsFor({ operations: [{ path: '/pets', method: 'get' }] })));
 
     expect(Object.keys(slim.paths)).to.deep.equal(['/pets']);
-    expect(slim.paths['/pets']).to.equal(document.paths['/pets']);
+    expect(slim.paths['/pets']).to.deep.equal(document.paths['/pets']);
   });
 
   it('keeps the components those items reach, following references through references', () => {
@@ -119,5 +119,176 @@ describe('slimOpenAPIPageProps', () => {
 
     expect(slim).to.not.have.property('webhooks');
     expect(slim).to.not.have.property('components');
+  });
+
+  it('drops a components section left empty once nothing is reached', () => {
+    const noneReached = {
+      openapi: '3.1.0',
+      info: document.info,
+      paths: { '/x': { get: {} } },
+      components: { schemas: { Unused: { type: 'string' } } }
+    };
+    const slim = bundledOf(
+      slimOpenAPIPageProps({ document: 'x', payload: { bundled: noneReached as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+    );
+
+    expect(slim).to.not.have.property('components');
+  });
+
+  describe('narrowing a path item to the rendered operation', () => {
+    // Fumadocs renders one operation per page and reads only pathItem[method], so a sibling
+    // method would otherwise carry its whole schema closure onto every page of the path.
+    const multi = {
+      openapi: '3.1.0',
+      info: document.info,
+      paths: {
+        '/pets/{id}': {
+          summary: 'One pet',
+          parameters: [{ $ref: '#/components/parameters/Id' }],
+          get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/GetBody' } } } } } },
+          delete: { responses: { '204': { content: { 'application/json': { schema: { $ref: '#/components/schemas/DeleteBody' } } } } } }
+        }
+      },
+      components: {
+        parameters: { Id: { name: 'id', in: 'path' } },
+        schemas: { GetBody: { type: 'object' }, DeleteBody: { type: 'object' } }
+      }
+    };
+
+    const slimFor = (method: string) =>
+      bundledOf(
+        slimOpenAPIPageProps({
+          document: 'multi',
+          payload: { bundled: multi as never },
+          operations: [{ path: '/pets/{id}', method }]
+        } as unknown as Props)
+      );
+
+    it('keeps the rendered method and drops its siblings', () => {
+      const slim = slimFor('delete');
+
+      expect(slim.paths['/pets/{id}']).to.have.property('delete');
+      expect(slim.paths['/pets/{id}']).to.not.have.property('get');
+    });
+
+    it('keeps the path-level fields the renderer reads from the same item', () => {
+      const item = slimFor('delete').paths['/pets/{id}'] as Record<string, unknown>;
+
+      expect(item.summary).to.equal('One pet');
+      expect(item.parameters).to.deep.equal(multi.paths['/pets/{id}'].parameters);
+    });
+
+    it('leaves only the schemas the rendered method reaches', () => {
+      const schemas = slimFor('delete').components.schemas;
+
+      expect(Object.keys(schemas)).to.deep.equal(['DeleteBody']);
+    });
+
+    it('passes a path item that is itself a reference through untouched', () => {
+      const referenced = {
+        openapi: '3.1.0',
+        info: document.info,
+        paths: { '/x': { $ref: '#/components/pathItems/Shared' } },
+        components: { pathItems: { Shared: { get: {} } } }
+      };
+      const slim = bundledOf(
+        slimOpenAPIPageProps({
+          document: 'ref',
+          payload: { bundled: referenced as never },
+          operations: [{ path: '/x', method: 'get' }]
+        } as unknown as Props)
+      );
+
+      expect(slim.paths['/x']).to.deep.equal({ $ref: '#/components/pathItems/Shared' });
+      expect(slim.components.pathItems).to.have.property('Shared');
+    });
+  });
+
+  it('keeps the whole component a reference addresses a node inside', () => {
+    // `#/components/schemas/Pet/properties/id` is legal and passes through bundling
+    // untouched; matching the tail as part of the name dropped Pet and left the
+    // reference with nothing to resolve against.
+    const deep = {
+      openapi: '3.1.0',
+      info: document.info,
+      paths: { '/x': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet/properties/id' } } } } } } } },
+      components: { schemas: { Pet: { properties: { id: { type: 'string' } } }, Unused: { type: 'string' } } }
+    };
+    const slim = bundledOf(
+      slimOpenAPIPageProps({ document: 'deep', payload: { bundled: deep as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+    );
+
+    expect(Object.keys(slim.components.schemas)).to.deep.equal(['Pet']);
+  });
+
+  describe('documents bundled from several files', () => {
+    // The bundler embeds external documents under `x-ext` and rewrites file and URL
+    // references to point inside it, so nothing there matches `#/components/`.
+    const bundledExternal = {
+      openapi: '3.1.0',
+      info: document.info,
+      paths: {
+        '/alpha': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/hash1/components/schemas/Alpha' } } } } } } },
+        '/beta': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/hash2/components/schemas/Beta' } } } } } } }
+      },
+      'x-ext': {
+        hash1: {
+          components: {
+            schemas: {
+              Alpha: { properties: { next: { $ref: '#/x-ext/hash1/components/schemas/AlphaTail' } } },
+              AlphaTail: { type: 'string' },
+              AlphaUnused: { type: 'string' }
+            }
+          }
+        },
+        hash2: { components: { schemas: { Beta: { type: 'object' } } } }
+      }
+    };
+
+    const slimAlpha = () =>
+      bundledOf(
+        slimOpenAPIPageProps({
+          document: 'ext',
+          payload: { bundled: bundledExternal as never },
+          operations: [{ path: '/alpha', method: 'get' }]
+        } as unknown as Props)
+      ) as unknown as { 'x-ext': Record<string, never> };
+
+    it('keeps the embedded node a reference addresses, at the same pointer', () => {
+      const external = slimAlpha()['x-ext'];
+
+      expect(external.hash1.components.schemas.Alpha).to.deep.equal(bundledExternal['x-ext'].hash1.components.schemas.Alpha);
+    });
+
+    it('follows references between embedded documents', () => {
+      const schemas = slimAlpha()['x-ext'].hash1.components.schemas;
+
+      expect(Object.keys(schemas).sort()).to.deep.equal(['Alpha', 'AlphaTail']);
+    });
+
+    it('drops the embedded documents the page never reaches', () => {
+      expect(slimAlpha()['x-ext']).to.not.have.property('hash2');
+    });
+  });
+
+  it('terminates on self-referential and mutually recursive schemas', () => {
+    const recursive = {
+      openapi: '3.1.0',
+      info: document.info,
+      paths: { '/x': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Node' } } } } } } } },
+      components: {
+        schemas: {
+          Node: { properties: { self: { $ref: '#/components/schemas/Node' }, a: { $ref: '#/components/schemas/A' } } },
+          A: { properties: { b: { $ref: '#/components/schemas/B' } } },
+          B: { properties: { a: { $ref: '#/components/schemas/A' } } }
+        }
+      }
+    };
+
+    const slim = bundledOf(
+      slimOpenAPIPageProps({ document: 'rec', payload: { bundled: recursive as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+    );
+
+    expect(Object.keys(slim.components.schemas).sort()).to.deep.equal(['A', 'B', 'Node']);
   });
 });
