@@ -2,11 +2,31 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { expect } from 'chai';
+import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
 
 const repositoryRoot = process.cwd();
 const templateRoot = path.join(repositoryRoot, 'portal-template');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
+
+/** Every package specifier the template imports, from its modules and its stylesheet. */
+function templateImports(): string[] {
+  const specifiers: string[] = [];
+  for (const file of templateFiles().filter((name) => /\.(tsx?|css)$/.test(name))) {
+    const source = fs.readFileSync(path.join(templateRoot, file), 'utf8');
+    const patterns = file.endsWith('.css')
+      ? [/@import\s+['"]([^'"]+)['"]/g]
+      : [/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g];
+    for (const pattern of patterns) {
+      for (const match of source.matchAll(pattern)) {
+        const specifier = match[1];
+        if (/^(\.|@\/|node:|https?:)/.test(specifier)) continue;
+        specifiers.push(specifier);
+      }
+    }
+  }
+  return specifiers;
+}
 
 function templateFiles(): string[] {
   return fs
@@ -16,29 +36,33 @@ function templateFiles(): string[] {
 }
 
 /**
- * The template is built inside a temp project whose node_modules holds one link per
- * dependency the CLI declares. Anything it imports that the CLI does not depend on would
- * resolve here, where every package is installed, and fail only on a user's machine.
+ * The template is built inside a temp project whose node_modules holds one link per entry in
+ * TEMPLATE_DEPENDENCIES -- not one per dependency the CLI declares. Anything the template
+ * imports that is not linked resolves here, where every package is installed, and fails only
+ * on a user's machine.
  */
 describe('portal template packaging', () => {
-  it('imports only packages the CLI declares as dependencies', () => {
-    const declared = new Set(Object.keys(manifest.dependencies));
+  it('imports only packages the temp project links', () => {
+    const linked = new Set(TEMPLATE_DEPENDENCIES);
     const offenders = new Set<string>();
 
-    for (const file of templateFiles().filter((name) => /\.tsx?$/.test(name))) {
-      const source = fs.readFileSync(path.join(templateRoot, file), 'utf8');
-      for (const match of source.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)) {
-        const specifier = match[1];
-        if (specifier.startsWith('.') || specifier.startsWith('@/') || specifier.startsWith('node:')) continue;
-        // Subpath exports such as `fumadocs-ui/mdx` resolve through their own package.
-        const packageName = specifier.startsWith('@')
-          ? specifier.split('/').slice(0, 2).join('/')
-          : specifier.split('/')[0];
-        if (!declared.has(packageName)) offenders.add(packageName);
-      }
+    for (const specifier of templateImports()) {
+      // Subpath exports such as `fumadocs-ui/mdx` resolve through their own package.
+      const packageName = specifier.startsWith('@')
+        ? specifier.split('/').slice(0, 2).join('/')
+        : specifier.split('/')[0];
+      if (!linked.has(packageName)) offenders.add(packageName);
     }
 
-    expect([...offenders], 'template imports packages the CLI does not depend on').to.be.empty;
+    expect([...offenders], 'template imports packages the temp project does not link').to.be.empty;
+  });
+
+  // The converse: a linked package that the CLI stops depending on would be missing at build
+  // time for everyone, with nothing here to notice.
+  it('links only packages the CLI declares as dependencies', () => {
+    const declared = new Set(Object.keys(manifest.dependencies));
+
+    expect(TEMPLATE_DEPENDENCIES.filter((name) => !declared.has(name))).to.be.empty;
   });
 
   it('is listed in the published files', () => {

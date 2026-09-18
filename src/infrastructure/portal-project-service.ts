@@ -15,7 +15,7 @@ const MINIMUM_NODE_VERSION = [22, 12, 0] as const;
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
-const TEMPLATE_DEPENDENCIES = [
+export const TEMPLATE_DEPENDENCIES = [
   '@tailwindcss/vite',
   '@tanstack/react-router',
   '@tanstack/react-start',
