@@ -48,14 +48,34 @@ export class PortalServePrompts {
 
   public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
+    // Only the body of a page the server already knows about reloads: the page tree and the
+    // configuration are read once, when the project is prepared.
     noteWrapped(
-      `Edits to ${f.path(sourceDirectory)} appear in the browser automatically.\n\nPress CTRL+C to stop the server.`,
+      [
+        `Edits to the Markdown pages in ${f.path(
+          sourceDirectory.join('content')
+        )} appear in the browser automatically.`,
+        '',
+        `Adding or removing a page, editing ${f.var('meta.json')} or ${f.var('portal.json')}, or changing which`,
+        `documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        '',
+        'Press CTRL+C to stop the server.'
+      ].join('\n'),
       'Live preview'
     );
   }
 
   public stopping() {
     log.info('Stopping the portal preview.');
+  }
+
+  /** The preview stopped on its own: whatever it printed on the way out is the explanation. */
+  public previewStopped(output: string) {
+    log.error('The portal preview stopped unexpectedly.');
+    const tail = logTail(output);
+    if (tail.length > 0) {
+      log.message(tail);
+    }
   }
 
   public async blockExecution() {

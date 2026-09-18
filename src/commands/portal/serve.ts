@@ -8,7 +8,9 @@ import { format, intro, outro } from '../../prompts/format.js';
 export default class PortalServe extends Command {
   static readonly summary = 'Preview your API Documentation Portal with live reload.';
 
-  static readonly description = `Serves the portal described by 'src/portal.json' from your machine and reloads the browser as you edit.
+  static readonly description = `Serves the portal described by 'src/portal.json' from your machine, reloading the browser as you edit the Markdown pages in 'src/content'.
+
+Adding or removing a page, editing 'meta.json' or 'portal.json', or changing which documents are in 'src/spec', needs the preview restarted.
 
 Nothing is written to disk; run 'apimatic portal generate' to produce the static files.`;
 

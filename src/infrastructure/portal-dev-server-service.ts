@@ -7,6 +7,9 @@ import { PortalProjectPaths, PortalProjectService } from './portal-project-servi
 /** Cold starts spend most of this budget pre-bundling dependencies for the first time. */
 const STARTUP_TIMEOUT_MS = 3 * 60 * 1000;
 
+/** How much of a running server's output is kept, in case it is the explanation of a crash. */
+const OUTPUT_TAIL_CHUNKS = 64;
+
 // Vite colourises this line and bolds the port inside the URL, so the colour codes have to
 // come out before it reads as one address. The trailing newline proves the line is complete
 // and not a half-delivered chunk.
@@ -19,6 +22,12 @@ const COLOUR_SEQUENCE_PATTERN = new RegExp(String.raw`${String.fromCodePoint(27)
 
 export interface PortalDevServer {
   url: UrlPath;
+  /**
+   * Resolves with what the server printed after startup if it stops on its own. Without it
+   * the CLI kept advertising an address nothing was listening on, and then fell off the
+   * event loop and exited with Node's own code for an unsettled top-level await.
+   */
+  exited: Promise<string>;
   /** Resolves once the server process has exited. */
   stop: () => Promise<void>;
 }
@@ -60,8 +69,28 @@ export class PortalDevServerService {
 
     return ok({
       url: started.value,
+      exited: this.watchForExit(subprocess),
       stop: () => this.terminate(subprocess)
     });
+  }
+
+  /**
+   * Keeps reading the server's output after startup. Detaching instead left the pipe to fill
+   * and block the server once it had printed enough, and threw away the very output that
+   * explains a crash; only the tail is kept, so a long session cannot grow without bound.
+   */
+  private watchForExit(subprocess: ResultPromise): Promise<string> {
+    const tail: string[] = [];
+    subprocess.all?.on('data', (chunk: Buffer) => {
+      tail.push(chunk.toString().replace(COLOUR_SEQUENCE_PATTERN, ''));
+      if (tail.length > OUTPUT_TAIL_CHUNKS) {
+        tail.shift();
+      }
+    });
+    return subprocess.then(
+      () => tail.join(''),
+      () => tail.join('')
+    );
   }
 
   private waitForUrl(subprocess: ResultPromise): Promise<Result<UrlPath, PortalDevServerFailure>> {

@@ -90,7 +90,17 @@ export class PortalServeAction {
       }
 
       this.clearStandardInput();
-      await this.prompts.blockExecution();
+
+      // Whichever comes first: the user stopping the preview, or the preview stopping on its
+      // own. Waiting only on the signal left a crashed server advertised as running.
+      const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
+      const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
+      const outcome = await Promise.race([interrupted, stopped]);
+
+      if (outcome.kind === 'exited') {
+        this.prompts.previewStopped(outcome.output);
+        return ActionResult.failed();
+      }
 
       this.prompts.stopping();
       await server.value.stop();
