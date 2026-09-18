@@ -47,7 +47,7 @@ describe('PortalDevServerService', () => {
   it('resolves `exited` with what the server printed when it stops on its own', async () => {
     const binary = script(
       `process.stdout.write('  Local:   http://localhost:4322/\\n');\n` +
-        `setTimeout(() => { process.stdout.write('the server fell over\\n'); process.exit(1); }, 150);\n`
+        `setTimeout(() => { process.stdout.write('the server fell over\\n'); process.exitCode = 1; }, 150);\n`
     );
 
     const server = (await new PortalDevServerService().start(project(binary), 4322))._unsafeUnwrap();
@@ -58,11 +58,12 @@ describe('PortalDevServerService', () => {
 
   it('keeps reading output after startup rather than letting the pipe fill', async () => {
     // A server that prints far more than a pipe buffer holds would block if nothing drained it.
+    // No process.exit(): on POSIX a pipe is written asynchronously and exiting discards
+    // whatever is still queued, which would truncate the child rather than test the reader.
     const binary = script(
       `process.stdout.write('  Local:   http://localhost:4323/\\n');\n` +
         `for (let i = 0; i < 20000; i += 1) process.stdout.write('noisy line ' + i + '\\n');\n` +
-        `process.stdout.write('reached the end\\n');\n` +
-        `process.exit(0);\n`
+        `process.stdout.write('reached the end\\n');\n`
     );
 
     const server = (await new PortalDevServerService().start(project(binary), 4323))._unsafeUnwrap();
@@ -72,7 +73,7 @@ describe('PortalDevServerService', () => {
   });
 
   it('reports a server that exits before printing an address', async () => {
-    const binary = script(`process.stderr.write('Error: Port 4324 is already in use\\n'); process.exit(1);\n`);
+    const binary = script(`process.stderr.write('Error: Port 4324 is already in use\\n'); process.exitCode = 1;\n`);
 
     const started = await new PortalDevServerService().start(project(binary), 4324);
 
