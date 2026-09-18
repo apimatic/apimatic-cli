@@ -166,12 +166,12 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr().kind).to.equal('noSpecs');
     });
 
-    it('moves a spec aside rather than let it collide with the search route', async () => {
-      // A spec mounted at /api/search would make the build write a file where that
-      // route's directory already stands, failing with an EISDIR that names no spec.
+    // The search index moved to /api/search.json, a file, which cannot collide with the
+    // directory a spec section is mounted at. Reserving the name cost such a spec its own.
+    it('leaves a spec named after the search route with its own name', async () => {
       write('spec/search.json', OPENAPI);
 
-      expect((await resolve())._unsafeUnwrap().specs[0].slug).to.equal('search-2');
+      expect((await resolve())._unsafeUnwrap().specs[0].slug).to.equal('search');
     });
 
     it('gives colliding file names distinct slugs so neither section is lost', async () => {

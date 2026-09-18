@@ -11,10 +11,11 @@ import { stripByteOrderMark } from '../utils/string-utils.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
-// `/api/search` is the portal's own search index. A spec whose name slugs to `search`
-// would make the build write a file where that route's directory already stands, failing
-// with an unexplained EISDIR. Claiming the name here sends such a spec to `search-2`.
-const RESERVED_SPEC_SLUGS = ['search'];
+// The portal's own routes under /api/ are files with extensions -- /api/search.json -- so
+// none of them can collide with a spec section, which is always a directory. Nothing is
+// reserved: `search` was, back when the index was served from /api/search, and it cost a
+// specification legitimately named search.json its own name for no reason.
+const RESERVED_SPEC_SLUGS: string[] = [];
 
 // Names the build writes at the root of the site. The static directory is copied there
 // first, so a file of the same name replaces the generated one without a word.
