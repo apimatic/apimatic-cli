@@ -21,6 +21,7 @@ describe('prerenderPages', () => {
       description: null,
       logoUrl: null,
       siteUrl,
+      aiPageActions: true,
       specs: {},
       contentDir,
       staticDir: null

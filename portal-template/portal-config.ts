@@ -8,6 +8,8 @@ export interface PortalConfig {
   logoUrl: string | null;
   /** Origin the portal is hosted at (no trailing slash), or null when unknown. */
   siteUrl: string | null;
+  /** Whether each page offers to open itself in an AI assistant. */
+  aiPageActions: boolean;
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
   /** Absolute path of the content directory (always exists, may be empty). */
