@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { setTimeout as delay } from 'node:timers/promises';
+import { sleep } from './timer-extensions.js';
 import { execa, ResultPromise } from 'execa';
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../types/file/urlPath.js';
@@ -111,7 +111,16 @@ export class PortalDevServerService {
     });
 
     const collect = async (): Promise<string> => {
-      await Promise.race([drained, delay(DRAIN_TIMEOUT_MS)]);
+      // Cancelled once the output has arrived: `Promise.race` settles on the winner but
+      // leaves the loser running, and a pending timer holds the event loop open. Nothing in
+      // the CLI calls process.exit(), so the whole of `portal serve` used to sit for another
+      // two seconds after Ctrl+C with nothing left to do.
+      const expiry = new AbortController();
+      try {
+        await Promise.race([drained, sleep(DRAIN_TIMEOUT_MS, expiry.signal)]);
+      } finally {
+        expiry.abort();
+      }
       return tail.join('');
     };
     return subprocess.then(collect, collect);
