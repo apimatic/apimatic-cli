@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import { defineConfig } from 'vite';
@@ -36,6 +37,14 @@ export default defineConfig(async () => {
       }),
       react(),
     ],
-    resolve: { tsconfigPaths: true, alias: { tslib: 'tslib/tslib.es6.js' } },
+    resolve: {
+      tsconfigPaths: true,
+      alias: [
+        { find: 'tslib', replacement: 'tslib/tslib.es6.js' },
+        // Anchored, so `shiki/core` and the per-language modules the replacement itself
+        // imports still resolve to the real package. See `src/lib/shiki-bundle.ts`.
+        { find: /^shiki$/, replacement: fileURLToPath(new URL('./src/lib/shiki-bundle.ts', import.meta.url)) },
+      ],
+    },
   };
 });

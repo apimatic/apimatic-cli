@@ -106,6 +106,18 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(withTree).to.have.length(1);
   });
 
+  it('ships only the syntax grammars a portal can contain', () => {
+    // Shiki's full catalogue is around 400 chunks and ten megabytes of grammars for
+    // languages no generated portal is written in, fetched by nobody and uploaded on every
+    // deploy. `src/lib/shiki-bundle.ts` replaces it; this is what notices if that stops
+    // taking effect.
+    const assets = fs.readdirSync(path.join(output.toString(), 'assets'));
+    const unusable = assets.filter((name) => /^(cobol|wolfram|emacs-lisp|abap|ballerina|apl)-/.test(name));
+
+    expect(unusable, 'grammars for languages a portal cannot contain').to.deep.equal([]);
+    expect(assets.length, 'asset count').to.be.below(150);
+  });
+
   it('keeps an operation page small', () => {
     const page = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
     expect(fs.statSync(path.join(output.toString(), page)).size).to.be.below(100 * 1024);
