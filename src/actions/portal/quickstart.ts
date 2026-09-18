@@ -165,7 +165,9 @@ export class PortalQuickstartAction {
       [
         '---',
         'title: Welcome',
-        `description: Getting started with ${config.title}`,
+        // JSON is valid YAML. Quoting through it keeps a title carrying ': ' or '#' from
+        // breaking the front matter, which fails the whole build rather than one page.
+        `description: ${JSON.stringify(`Getting started with ${config.title}`)}`,
         '---',
         '',
         `Welcome to the ${config.title} documentation.`,
@@ -192,14 +194,33 @@ export class PortalQuickstartAction {
       const contents = await this.fileService.getContents(specPath);
       const document = specPath.toString().toLowerCase().endsWith('.json') ? JSON.parse(contents) : parseYaml(contents);
       const info = document?.info;
-      const title = typeof info?.title === 'string' && info.title.trim().length > 0 ? info.title.trim() : null;
-      const description =
-        typeof info?.description === 'string' && info.description.trim().length > 0
-          ? info.description.trim().split('\n')[0].slice(0, 300)
-          : null;
-      return title === null ? fallback : PortalConfig.create(title, description);
+      // Both values are written into generated files, so each is reduced to one line first.
+      // Taking only the description's first line instead left the 300-character cap
+      // unreachable for the common specification whose description is wrapped prose.
+      const title = this.oneLine(info?.title);
+      const description = this.oneLine(info?.description);
+      return title === null ? fallback : PortalConfig.create(title, description && this.cap(description, 300));
     } catch {
       return fallback;
     }
+  }
+
+  private oneLine(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const collapsed = value.replace(/\s+/g, ' ').trim();
+    return collapsed.length > 0 ? collapsed : null;
+  }
+
+  // Cuts on a word boundary when one is near enough the limit, so the site description does
+  // not end mid-word.
+  private cap(value: string, limit: number): string {
+    if (value.length <= limit) {
+      return value;
+    }
+    const cut = value.slice(0, limit);
+    const lastSpace = cut.lastIndexOf(' ');
+    return (lastSpace > limit - 40 ? cut.slice(0, lastSpace) : cut).trimEnd();
   }
 }
