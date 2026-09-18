@@ -52,7 +52,11 @@ export class PortalDevServerService {
     // URL reported to the user is always the one that was reserved.
     const subprocess = execa(
       process.execPath,
-      [project.viteBinary.toString(), 'dev', '--port', String(port), '--strictPort'],
+      // Bound explicitly to the IPv4 loopback. Left to itself the server listens on `::1`
+      // only, while printing `localhost`, so wherever that name resolves to 127.0.0.1 --
+      // IPv6 disabled, a hosts entry, some container images -- the address the CLI reports
+      // and opens refuses the connection although the preview is healthy.
+      [project.viteBinary.toString(), 'dev', '--port', String(port), '--strictPort', '--host', '127.0.0.1'],
       {
         cwd: project.projectDirectory.toString(),
         env: this.projectService.childEnvironment(),
