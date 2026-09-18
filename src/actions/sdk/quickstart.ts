@@ -107,11 +107,13 @@ export class SdkQuickstartAction {
           this.fileDownloadService.downloadFile(this.defaultSpecUrl)
         );
         if (downloadFileResult.isErr()) {
+          // Without this the run carried on with the document validation has already
+          // rejected, and generated an SDK from it.
           this.prompts.serviceError(downloadFileResult.error);
-        } else {
-          const specContext = new SpecContext(tempDirectory);
-          specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
+          return ActionResult.failed();
         }
+        const specContext = new SpecContext(tempDirectory);
+        specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
       }
 
       if (validationResult.isSuccess()) {
