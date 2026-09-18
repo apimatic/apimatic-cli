@@ -38,11 +38,12 @@
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
     "scripts": {
+        "prepare": "husky install",
         "build": "rimraf lib tsconfig.tsbuildinfo oclif.manifest.json && tsc",
         "build:watch": "rimraf oclif.manifest.json && tsc --watch",
         "apimatic": "node ./bin/run.js",
         "prepack": "oclif manifest",
-        "posttest": "eslint . --ext .ts",
+        "posttest": "eslint .",
         "prettier": "prettier \"src/**/*.{js,ts}\"",
         "format": "prettier --write \"src/**/*.{js,ts}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
