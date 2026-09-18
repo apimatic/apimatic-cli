@@ -1,7 +1,20 @@
 {
+  // The suite runs through tsx, which strips types without checking them, so nothing here
+  // was type-checked at all: this file used to inherit the root `include` of `src/**/*` and
+  // so compiled the source twice and not one test. Fixture drift and stale casts went
+  // unnoticed until they reached production code. `pretest` runs this before the suite.
   "extends": "../tsconfig",
   "compilerOptions": {
     "noEmit": true,
-    "composite": true
-  }
+    // Tests sit outside the root project's `src` rootDir, and import their subjects without
+    // the `.js` extension that nodenext resolution demands. Both are fine for a check that
+    // never emits; `pnpm build` still holds the source to the stricter settings.
+    "rootDir": "..",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    // Matches portal-template/tsconfig.json, whose modules the template tests import.
+    "target": "es2022",
+    "lib": ["es2022", "dom"]
+  },
+  "include": ["**/*.ts"]
 }

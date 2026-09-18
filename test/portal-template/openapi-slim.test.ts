@@ -44,7 +44,16 @@ function propsFor(overrides: Partial<Props>): Props {
   return { document: 'pets', payload: { bundled: document as never }, ...overrides } as Props;
 }
 
-const bundledOf = (props: Props) => props.payload.bundled as unknown as typeof document;
+/**
+ * What the tests walk through the slimmed document. Deliberately loose: each case builds its
+ * own fixture, so a return type inferred from one of them makes every path and component the
+ * others declare a type error. These are fixtures being asserted on, not a contract.
+ */
+interface JsonTree {
+  [key: string]: JsonTree;
+}
+
+const bundledOf = (props: Props) => props.payload.bundled as unknown as JsonTree;
 
 describe('slimOpenAPIPageProps', () => {
   it('keeps only the path items the page renders', () => {
@@ -92,7 +101,7 @@ describe('slimOpenAPIPageProps', () => {
 
     const slim = slimOpenAPIPageProps(props);
 
-    expect(slim.document).to.equal('pets');
+    expect((slim as { document?: string }).document).to.equal('pets');
     expect((slim as { hasHead?: boolean }).hasHead).to.be.true;
     expect(slim.payload.proxyUrl).to.equal('/proxy');
   });
@@ -252,7 +261,7 @@ describe('slimOpenAPIPageProps', () => {
           payload: { bundled: bundledExternal as never },
           operations: [{ path: '/alpha', method: 'get' }]
         } as unknown as Props)
-      ) as unknown as { 'x-ext': Record<string, never> };
+      ) as unknown as { 'x-ext': JsonTree };
 
     it('keeps the embedded node a reference addresses, at the same pointer', () => {
       const external = slimAlpha()['x-ext'];

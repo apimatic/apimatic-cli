@@ -4,6 +4,7 @@ import path from 'path';
 import { expect } from 'chai';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalConfig } from '../../src/types/portal/portal-config';
+import { PortalMigration, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
@@ -20,6 +21,22 @@ describe('PortalSourceContext', () => {
   };
 
   const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
+
+  /**
+   * The migration hint behind a `missingConfig` problem, as its own type. These tests used to
+   * cast the problem to a hand-written shape instead, so they asserted against a structure
+   * nothing checked -- one still called `suggestedConfig` a `{ title: string }` long after it
+   * became a `PortalConfig`, and said nothing when the two drifted apart.
+   */
+  const migrationOf = (problem: PortalSourceProblem): PortalMigration => {
+    if (problem.kind !== 'missingConfig') {
+      throw new Error(`expected a 'missingConfig' problem, got '${problem.kind}'`);
+    }
+    if (problem.migration === null) {
+      throw new Error('expected a migration hint, got none');
+    }
+    return problem.migration;
+  };
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-source-'));
@@ -224,13 +241,8 @@ describe('PortalSourceContext', () => {
         })
       );
 
-      const problem = (await resolve())._unsafeUnwrapErr();
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.kind).to.equal('missingConfig');
-      const migration = (problem as { migration: NonNullable<unknown> }).migration as {
-        suggestedConfig: unknown;
-        unsupportedFields: string[];
-      };
       expect(JSON.parse(JSON.stringify(migration.suggestedConfig))).to.deep.equal({
         title: 'My Portal',
         logo: 'static/images/logo.png'
@@ -241,17 +253,17 @@ describe('PortalSourceContext', () => {
     it('falls back to a placeholder title when the old file has none', async () => {
       write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal: {} }));
 
-      const problem = (await resolve())._unsafeUnwrapErr() as { migration: { suggestedConfig: { title: string } } };
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.migration.suggestedConfig.siteTitle()).to.equal('My API');
+      expect(migration.suggestedConfig.siteTitle()).to.equal('My API');
     });
 
     it('reports a versioned portal as unsupported', async () => {
       write('APIMATIC-BUILD.json', JSON.stringify({ generateVersionedPortal: {} }));
 
-      const problem = (await resolve())._unsafeUnwrapErr() as { migration: { unsupportedFields: string[] } };
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.migration.unsupportedFields).to.deep.equal(['generateVersionedPortal']);
+      expect(migration.unsupportedFields).to.deep.equal(['generateVersionedPortal']);
     });
 
     it('offers no migration for a build file that configures no portal', async () => {
@@ -263,14 +275,9 @@ describe('PortalSourceContext', () => {
     it('still offers a migration when the build file carries a byte-order mark', async () => {
       write('APIMATIC-BUILD.json', '﻿' + JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
 
-      const problem = (await resolve())._unsafeUnwrapErr() as {
-        migration: { suggestedConfig: { title: string } } | null;
-      };
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.migration).to.not.be.null;
-      expect((problem.migration as { suggestedConfig: { title: string } }).suggestedConfig.siteTitle()).to.equal(
-        'Acme'
-      );
+      expect(migration.suggestedConfig.siteTitle()).to.equal('Acme');
     });
 
     it('offers no migration for a build file it cannot parse', async () => {
@@ -287,20 +294,18 @@ describe('PortalSourceContext', () => {
         JSON.stringify({ generatePortal: { pageTitle: 'Acme', tableOfContentsPath: 'content/toc.yml' } })
       );
 
-      const problem = (await resolve())._unsafeUnwrapErr() as {
-        migration: { hadTableOfContents: boolean; unsupportedFields: string[] };
-      };
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.migration.hadTableOfContents).to.be.true;
-      expect(problem.migration.unsupportedFields).to.not.include('tableOfContentsPath');
+      expect(migration.hadTableOfContents).to.be.true;
+      expect(migration.unsupportedFields).to.not.include('tableOfContentsPath');
     });
 
     it('does not flag one for a build file that never had it', async () => {
       write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
 
-      const problem = (await resolve())._unsafeUnwrapErr() as { migration: { hadTableOfContents: boolean } };
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.migration.hadTableOfContents).to.be.false;
+      expect(migration.hadTableOfContents).to.be.false;
     });
 
     it('names a logo it cannot carry over instead of listing it as unsupported', async () => {
@@ -309,12 +314,10 @@ describe('PortalSourceContext', () => {
         JSON.stringify({ generatePortal: { pageTitle: 'Acme', logoUrl: 'images/logo.png' } })
       );
 
-      const problem = (await resolve())._unsafeUnwrapErr() as {
-        migration: { unmigratableLogo: string | null; unsupportedFields: string[] };
-      };
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.migration.unmigratableLogo).to.equal('images/logo.png');
-      expect(problem.migration.unsupportedFields).to.not.include('logoUrl');
+      expect(migration.unmigratableLogo).to.equal('images/logo.png');
+      expect(migration.unsupportedFields).to.not.include('logoUrl');
     });
 
     it('carries a logo already inside static/ over, with nothing to report', async () => {
@@ -323,9 +326,9 @@ describe('PortalSourceContext', () => {
         JSON.stringify({ generatePortal: { pageTitle: 'Acme', logoUrl: 'static/images/logo.png' } })
       );
 
-      const problem = (await resolve())._unsafeUnwrapErr() as { migration: { unmigratableLogo: string | null } };
+      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(problem.migration.unmigratableLogo).to.be.null;
+      expect(migration.unmigratableLogo).to.be.null;
     });
 
     // The suggestion is printed for the user to paste, so anything it can produce has to be
@@ -351,9 +354,9 @@ describe('PortalSourceContext', () => {
         it(`accepts its own suggestion for ${JSON.stringify(generatePortal)}`, async () => {
           write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal }));
 
-          const problem = (await resolve())._unsafeUnwrapErr() as { migration: { suggestedConfig: unknown } };
+          const migration = migrationOf((await resolve())._unsafeUnwrapErr());
           // Exactly what the prompt prints for the user to paste.
-          const suggestion = JSON.stringify(problem.migration.suggestedConfig, null, 2);
+          const suggestion = JSON.stringify(migration.suggestedConfig, null, 2);
 
           expect(PortalConfig.parse(suggestion).isOk(), suggestion).to.be.true;
         });

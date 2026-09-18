@@ -42,6 +42,7 @@
         "build:watch": "rimraf oclif.manifest.json && tsc --watch",
         "apimatic": "node ./bin/run.js",
         "prepack": "oclif manifest",
+        "pretest": "tsc -p test/tsconfig.json",
         "posttest": "eslint .",
         "prettier": "prettier \"src/**/*.{js,ts}\"",
         "format": "prettier --write \"src/**/*.{js,ts}\"",

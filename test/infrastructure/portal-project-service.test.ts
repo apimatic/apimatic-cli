@@ -25,6 +25,7 @@ describe('PortalProjectService', () => {
     ],
     contentDirectory: null,
     staticDirectory: null,
+    shadowedFiles: [],
     ...overrides
   });
 
