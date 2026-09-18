@@ -38,6 +38,19 @@ describe('PortalSourceContext', () => {
       expect(problem).to.deep.equal({ kind: 'missingConfig', migration: null });
     });
 
+    // Editors on Windows write one, and the YAML parser strips it, so without this the same
+    // document is accepted as .yaml and refused as .json.
+    it('reads inputs written with a byte-order mark', async () => {
+      const mark = '﻿';
+      write('portal.json', mark + JSON.stringify({ title: 'Calc' }));
+      write('spec/api.json', mark + OPENAPI);
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.config.title).to.equal('Calc');
+      expect(source.specs).to.have.lengthOf(1);
+    });
+
     it('passes the field errors through when the config is invalid', async () => {
       write('portal.json', '{}');
       write('spec/api.json', OPENAPI);
@@ -199,6 +212,17 @@ describe('PortalSourceContext', () => {
       write('APIMATIC-BUILD.json', JSON.stringify({ generateSdk: {} }));
 
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig', migration: null });
+    });
+
+    it('still offers a migration when the build file carries a byte-order mark', async () => {
+      write('APIMATIC-BUILD.json', '﻿' + JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
+
+      const problem = (await resolve())._unsafeUnwrapErr() as {
+        migration: { suggestedConfig: { title: string } } | null;
+      };
+
+      expect(problem.migration).to.not.be.null;
+      expect((problem.migration as { suggestedConfig: { title: string } }).suggestedConfig.title).to.equal('Acme');
     });
 
     it('offers no migration for a build file it cannot parse', async () => {

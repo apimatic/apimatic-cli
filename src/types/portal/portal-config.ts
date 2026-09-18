@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../file/urlPath.js';
+import { stripByteOrderMark } from '../../utils/string-utils.js';
 
 export interface PortalConfigData {
   title: string;
@@ -32,7 +33,7 @@ export class PortalConfig {
   public static parse(json: string): Result<PortalConfig, string[]> {
     let data: unknown;
     try {
-      data = JSON.parse(json);
+      data = JSON.parse(stripByteOrderMark(json));
     } catch {
       return err(['portal.json is not valid JSON.']);
     }

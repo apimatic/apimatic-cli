@@ -6,6 +6,7 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import { stripByteOrderMark } from '../utils/string-utils.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
@@ -115,7 +116,9 @@ export class PortalSourceContext {
       const contents = await this.fileService.getContents(file);
       // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
       // so each extension gets the parser built for it.
-      const document = file.toString().toLowerCase().endsWith('.json') ? JSON.parse(contents) : parseYaml(contents);
+      const document = file.toString().toLowerCase().endsWith('.json')
+        ? JSON.parse(stripByteOrderMark(contents))
+        : parseYaml(contents);
       return typeof document === 'object' && document !== null && !Array.isArray(document)
         ? (document as Record<string, unknown>)
         : {};
@@ -168,7 +171,7 @@ export class PortalSourceContext {
 
     let data: Record<string, unknown>;
     try {
-      data = JSON.parse(await this.fileService.getContents(this.legacyBuildFile));
+      data = JSON.parse(stripByteOrderMark(await this.fileService.getContents(this.legacyBuildFile)));
     } catch {
       return null;
     }
