@@ -1,16 +1,15 @@
-import fs from "fs";
-import fsExtra from "fs-extra";
-import * as path from "path";
-import { pipeline } from "stream";
-import { promisify } from "util";
-import { FilePath } from "../types/file/filePath.js";
-import { DirectoryPath } from "../types/file/directoryPath.js";
-import { Directory } from "../types/file/directory.js";
-import { FileName } from "../types/file/fileName.js";
-import { sleep } from "./timer-extensions.js";
+import fs from 'fs';
+import fsExtra from 'fs-extra';
+import * as path from 'path';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
+import { FilePath } from '../types/file/filePath.js';
+import { DirectoryPath } from '../types/file/directoryPath.js';
+import { Directory } from '../types/file/directory.js';
+import { FileName } from '../types/file/fileName.js';
+import { sleep } from './timer-extensions.js';
 
 export class FileService {
-
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(file.toString());
@@ -50,9 +49,9 @@ export class FileService {
   public async directoryEmpty(dir: DirectoryPath): Promise<boolean> {
     try {
       const files = await fsExtra.readdir(dir.toString());
-      return files.filter((file) => !file.startsWith(".")).length === 0;
+      return files.filter((file) => !file.startsWith('.')).length === 0;
     } catch (error) {
-      return error instanceof Error && "code" in error && error.code === "ENOENT";
+      return error instanceof Error && 'code' in error && error.code === 'ENOENT';
     }
   }
 
@@ -84,7 +83,9 @@ export class FileService {
       entries.map(async (entry) => {
         const fullPath = path.join(directoryPath.toString(), entry);
         const stat = await fsExtra.stat(fullPath);
-        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : { fileName: new FileName(entry) };
+        return stat.isDirectory()
+          ? await this.getDirectory(new DirectoryPath(fullPath))
+          : { fileName: new FileName(entry) };
       })
     );
     return new Directory(directoryPath, results);
@@ -138,7 +139,11 @@ export class FileService {
           const stat = await fsExtra.stat(sourcePath);
 
           if (stat.isDirectory()) {
-            return this.copyDirectoryExcluding(new DirectoryPath(sourcePath), new DirectoryPath(destPath), excludeNames);
+            return this.copyDirectoryExcluding(
+              new DirectoryPath(sourcePath),
+              new DirectoryPath(destPath),
+              excludeNames
+            );
           }
 
           return fsExtra.copyFile(sourcePath, destPath);
@@ -165,7 +170,12 @@ export class FileService {
     const deadline = Date.now() + timeoutMs;
     const deleteFailurePersistsMaxDelay = Date.now() + 5 * 1000;
     let actionPerformed = false;
-    while (Date.now() < deadline && await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
+    while (
+      Date.now() < deadline &&
+      (await this.deleteDirectory(dirPath)
+        .then(() => false)
+        .catch(() => true))
+    ) {
       if (!actionPerformed && Date.now() > deleteFailurePersistsMaxDelay) {
         onDeleteFailurePersists();
         actionPerformed = true;
@@ -174,25 +184,12 @@ export class FileService {
     }
   }
 
-  public getRelativePath(filePath: FilePath, basePath: DirectoryPath): string {
-    const filePathStr = filePath.toString();
-    const basePathStr = basePath.toString();
-
-    if (filePathStr.startsWith(basePathStr)) {
-      const relativePath = filePathStr.substring(basePathStr.length).replace(/^[/\\]/, "");
-      return relativePath.replace(/\\/g, "/");
-    }
-
-    // Normalize the full path if it doesn't start with basePath
-    return filePathStr.replace(/\\/g, "/");
-  }
-
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }
 
   public async getContents(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), "utf-8");
+    return await fsExtra.readFile(filePath.toString(), 'utf-8');
   }
 
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
@@ -205,7 +202,7 @@ export class FileService {
   }
 
   public async writeContents(filePath: FilePath, contents: string) {
-    await fsExtra.writeFile(filePath.toString(), contents, "utf-8");
+    await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
   public async copy(source: FilePath, destination: FilePath) {
@@ -217,7 +214,7 @@ export class FileService {
   }
 
   public async readFile(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), "utf-8");
+    return await fsExtra.readFile(filePath.toString(), 'utf-8');
   }
 
   public async isZipFile(filePath: FilePath): Promise<boolean> {

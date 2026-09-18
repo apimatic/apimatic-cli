@@ -5,9 +5,8 @@ export interface BuildConfigData {
 }
 
 // Immutable wrapper around the parsed APIMATIC-BUILD.json. All build-config reads go
-// through accessor methods and all changes go through with*/update methods that
-// return a NEW BuildConfig — the wrapped data is never mutated after construction.
-// Construct via `BuildConfig.parse`; persist via `BuildContext`.
+// through accessor methods and the wrapped data is never mutated after construction.
+// Construct via `BuildConfig.parse`.
 //
 // Since version 2 the portal is configured by `src/portal.json` and built locally, so
 // this file only describes SDK and plugin generation.

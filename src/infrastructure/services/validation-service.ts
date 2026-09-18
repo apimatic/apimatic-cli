@@ -16,8 +16,6 @@ import { err, ok, Result } from 'neverthrow';
 import { FilePath } from '../../types/file/filePath.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import FormData from 'form-data';
-import { ZipService } from '../zip-service.js';
-import { FileService } from '../file-service.js';
 import { handleServiceError, ServiceError } from '../service-error.js';
 import axios from 'axios';
 import { envInfo } from '../env-info.js';
@@ -57,8 +55,6 @@ export interface ValidateApiResponse {
 
 export class ValidationService {
   private readonly apiBaseUrl = 'https://api.apimatic.io' as const;
-  private readonly zipService = new ZipService();
-  private readonly fileService = new FileService();
 
   constructor(private readonly configDir: DirectoryPath) {}
 
