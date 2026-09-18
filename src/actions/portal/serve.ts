@@ -57,6 +57,7 @@ export class PortalServeAction {
       this.prompts.sourceProblem(source.error, sourceDirectory);
       return ActionResult.failed();
     }
+    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {

@@ -1,12 +1,13 @@
 import { isCancel, confirm, log, spinner } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportSourceProblem } from './source.js';
+import { reportShadowedFiles, reportSourceProblem } from './source.js';
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
@@ -44,6 +45,10 @@ export class PortalGeneratePrompts {
 
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
     reportSourceProblem(problem, sourceDirectory);
+  }
+
+  public filesShadowedByStatic(shadowed: FileName[]) {
+    reportShadowedFiles(shadowed);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

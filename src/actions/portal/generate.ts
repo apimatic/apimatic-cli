@@ -64,6 +64,7 @@ export class GenerateAction {
       this.prompts.sourceProblem(source.error, sourceDirectory);
       return ActionResult.failed();
     }
+    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
 
     const portalContext = new PortalContext(portalDirectory);
     if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {

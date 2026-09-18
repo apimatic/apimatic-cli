@@ -15,6 +15,11 @@ export interface PortalSource {
   specs: PortalSpec[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
+  /**
+   * Files in `static/` that land on a name the build also generates. The user's copy wins,
+   * silently, so the names are carried out to be reported rather than discovered later.
+   */
+  shadowedFiles: FileName[];
 }
 
 /**

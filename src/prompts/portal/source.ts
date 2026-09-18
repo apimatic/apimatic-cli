@@ -1,6 +1,7 @@
 import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalMigration, PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { FileName } from '../../types/file/fileName.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
 
@@ -44,6 +45,19 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       return;
     }
   }
+}
+
+/**
+ * The static directory is copied to the root of the site before the generated files are
+ * written there, so a file of the same name replaces one the build would have produced. That
+ * is a reasonable thing to want, and it used to happen without a word.
+ */
+export function reportShadowedFiles(shadowed: FileName[]): void {
+  if (shadowed.length === 0) {
+    return;
+  }
+  const names = shadowed.map((fileName) => f.var(fileName.toString())).join(', ');
+  log.warn(`${names} in ${f.var('static')} replaces the file the portal would have generated.`);
 }
 
 function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryPath): void {

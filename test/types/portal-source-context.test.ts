@@ -153,6 +153,24 @@ describe('PortalSourceContext', () => {
       expect(source.staticDirectory).to.be.null;
     });
 
+    // The static directory is copied to the site root before the generated files are
+    // written there, so a file of the same name silently replaces one of them.
+    it('names the static files that replace ones the build generates', async () => {
+      write('static/robots.txt', 'User-agent: *');
+      write('static/sitemap.xml', '<urlset/>');
+      write('static/logo.png', 'x');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.shadowedFiles.map(String).sort()).to.deep.equal(['robots.txt', 'sitemap.xml']);
+    });
+
+    it('reports nothing when the static directory holds only its own files', async () => {
+      write('static/logo.png', 'x');
+
+      expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
+    });
+
     it('reports them once they exist', async () => {
       write('content/index.md', '# hi');
       write('static/logo.png', 'x');

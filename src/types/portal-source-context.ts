@@ -15,6 +15,18 @@ const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 // with an unexplained EISDIR. Claiming the name here sends such a spec to `search-2`.
 const RESERVED_SPEC_SLUGS = ['search'];
 
+// Names the build writes at the root of the site. The static directory is copied there
+// first, so a file of the same name replaces the generated one without a word.
+const GENERATED_ROOT_FILES = [
+  'robots.txt',
+  'sitemap.xml',
+  'llms.txt',
+  'llms-full.txt',
+  'index.html',
+  '404.html',
+  '_shell.html'
+];
+
 // `generatePortal` settings the v1 `portal.json` can express; everything else in the old
 // build file is reported as unsupported by the migration hint.
 const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl']);
@@ -64,12 +76,25 @@ export class PortalSourceContext {
       return err(specs.error);
     }
 
+    const staticDirectory = (await this.fileService.directoryExists(this.staticDirectory))
+      ? this.staticDirectory
+      : null;
+
     return ok({
       config: config.value,
       specs: specs.value,
       contentDirectory: (await this.fileService.directoryExists(this.contentDirectory)) ? this.contentDirectory : null,
-      staticDirectory: (await this.fileService.directoryExists(this.staticDirectory)) ? this.staticDirectory : null
+      staticDirectory,
+      shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory)
     });
+  }
+
+  /** Files at the top of `static/` that the build would otherwise have generated itself. */
+  private async shadowedFiles(staticDirectory: DirectoryPath): Promise<FileName[]> {
+    const directory = await this.fileService.getDirectory(staticDirectory);
+    return directory.items
+      .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
+      .filter((fileName) => GENERATED_ROOT_FILES.includes(fileName.toString().toLowerCase()));
   }
 
   private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
