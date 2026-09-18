@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
+import { createRequire } from 'node:module';
 import { expect } from 'chai';
 import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
 
@@ -92,5 +93,57 @@ describe('portal template packaging', () => {
 
   it('carries no nested .gitignore, which would drop files from the package', () => {
     expect(templateFiles().filter((file) => path.basename(file) === '.gitignore')).to.be.empty;
+  });
+
+  // The trimmed bundle replaces Shiki's entry point, and with it the alias table Shiki
+  // resolves `ts` or `yml` through. A tag it cannot name reaches Fumadocs as an unknown
+  // language and is rendered as plain text, so every spelling of a bundled language has to
+  // be a key here -- and has to be the spelling Shiki itself uses, not one invented.
+  describe('the trimmed syntax bundle', () => {
+    const source = () => fs.readFileSync(path.join(templateRoot, 'src/lib/shiki-bundle.ts'), 'utf8');
+
+    /** The language ids the bundle imports a grammar for. */
+    const bundledIds = (): string[] => [...source().matchAll(/shiki\/dist\/langs\/([\w-]+)\.mjs/g)].map((m) => m[1]);
+
+    const keys = (): Set<string> => {
+      const text = source();
+      const block = /const aliases[^{]*{([\s\S]*?)\n};/.exec(text);
+      const aliasKeys = [...(block?.[1] ?? '').matchAll(/^\s*'?([\w#-]+)'?\s*:/gm)].map((m) => m[1]);
+      return new Set([...bundledIds(), ...aliasKeys]);
+    };
+
+    it('names every grammar it imports by a file that exists', async () => {
+      const shiki = path.dirname(createRequire(import.meta.url).resolve('shiki/package.json'));
+
+      for (const id of bundledIds()) {
+        expect(fs.existsSync(path.join(shiki, 'dist/langs', `${id}.mjs`)), id).to.be.true;
+      }
+    });
+
+    it('accepts every alias Shiki gives the languages it bundles', async () => {
+      const { bundledLanguagesInfo } = (await import('shiki/bundle/full')) as {
+        bundledLanguagesInfo: { id: string; aliases?: string[] }[];
+      };
+      const present = keys();
+
+      const missing: string[] = [];
+      for (const id of bundledIds()) {
+        const info = bundledLanguagesInfo.find((entry) => entry.id === id);
+        for (const alias of info?.aliases ?? []) {
+          if (!present.has(alias)) missing.push(`${alias} (${id})`);
+        }
+      }
+
+      expect(missing, 'aliases Shiki knows that this bundle would render as plain text').to.be.empty;
+    });
+
+    it('points every alias at a language it actually bundles', () => {
+      const block = /const aliases[^{]*{([\s\S]*?)\n};/.exec(source());
+      const targets = [...(block?.[1] ?? '').matchAll(/:\s*'([\w-]+)'/g)].map((m) => m[1]);
+      const bundled = new Set(bundledIds());
+
+      expect(targets).to.not.be.empty;
+      expect(targets.filter((target) => !bundled.has(target))).to.be.empty;
+    });
   });
 });
