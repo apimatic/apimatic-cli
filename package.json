@@ -38,7 +38,6 @@
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
     "scripts": {
-        "prepare": "husky install",
         "build": "rimraf lib tsconfig.tsbuildinfo oclif.manifest.json && tsc",
         "build:watch": "rimraf oclif.manifest.json && tsc --watch",
         "apimatic": "node ./bin/run.js",
