@@ -41,7 +41,10 @@ export function slimOpenAPIPageProps(props: OpenAPIPageProps_Spec): OpenAPIPageP
 
   const keptPaths = pick(paths, operations);
   const keptWebhooks = pick(webhooks, hooks);
-  const reached = reachable({ components, external }, [keptPaths, keptWebhooks]);
+  // `rest` is a root too: it survives into the output whole, and a reference inside it --
+  // a vendor extension, a document-level field -- has to keep resolving. Visiting it only
+  // collects; nothing is retained for having been looked at.
+  const reached = reachable({ components, external }, [rest, keptPaths, keptWebhooks]);
 
   return {
     ...props,
@@ -113,11 +116,18 @@ function reachable(sections: Sections, roots: unknown[]): Sections {
   const { components, external } = sections;
   const keptComponents: Components = {};
   const keptExternal: Record<string, unknown> = {};
-  // Security schemes are looked up by name from `security`, never through a reference.
-  if (components?.securitySchemes) keptComponents.securitySchemes = components.securitySchemes;
 
   const seenExternal = new Set<string>();
   const queue: unknown[] = [...roots];
+
+  // Security schemes are looked up by name from `security`, never through a reference, so
+  // they are kept whole rather than reached. They are still walked: in a document bundled
+  // from several files a scheme carries `#/x-ext/...` references of its own, and keeping
+  // the scheme without them left it resolving to nothing on every operation page.
+  if (components?.securitySchemes) {
+    keptComponents.securitySchemes = components.securitySchemes;
+    queue.push(components.securitySchemes);
+  }
 
   const visitComponent = (kind: string, name: string): void => {
     const target = components?.[kind]?.[name];

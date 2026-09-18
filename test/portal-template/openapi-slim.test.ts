@@ -278,6 +278,76 @@ describe('slimOpenAPIPageProps', () => {
     it('drops the embedded documents the page never reaches', () => {
       expect(slimAlpha()['x-ext']).to.not.have.property('hash2');
     });
+
+    // The cycle guard for #/components has a test of its own; the one for x-ext had none,
+    // and a document split across files reaches its schemas only through this path.
+    it('terminates on a self-referential and mutually recursive embedded schema', () => {
+      const cyclic = {
+        openapi: '3.1.0',
+        info: document.info,
+        paths: {
+          '/x': {
+            get: {
+              responses: { '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/h/components/schemas/Node' } } } } }
+            }
+          }
+        },
+        'x-ext': {
+          h: {
+            components: {
+              schemas: {
+                Node: {
+                  properties: {
+                    self: { $ref: '#/x-ext/h/components/schemas/Node' },
+                    a: { $ref: '#/x-ext/h/components/schemas/A' }
+                  }
+                },
+                A: { properties: { b: { $ref: '#/x-ext/h/components/schemas/B' } } },
+                B: { properties: { a: { $ref: '#/x-ext/h/components/schemas/A' } } }
+              }
+            }
+          }
+        }
+      };
+
+      const slim = bundledOf(
+        slimOpenAPIPageProps({
+          document: 'cyc',
+          payload: { bundled: cyclic as never },
+          operations: [{ path: '/x', method: 'get' }]
+        } as unknown as Props)
+      ) as unknown as { 'x-ext': JsonTree };
+
+      expect(Object.keys(slim['x-ext'].h.components.schemas).sort()).to.deep.equal(['A', 'B', 'Node']);
+    });
+
+    // A scheme is kept because `security` names it, not because anything references it --
+    // but in a split document the scheme itself holds references, and keeping it without
+    // them left the auth section of every operation page resolving to nothing.
+    it('follows references out of a security scheme it kept by name', () => {
+      const withScheme = {
+        openapi: '3.1.0',
+        info: document.info,
+        security: [{ oauth: [] }],
+        paths: { '/x': { get: { responses: { '200': { description: 'ok' } } } } },
+        components: {
+          securitySchemes: {
+            oauth: { type: 'oauth2', 'x-detail': { $ref: '#/x-ext/h/components/schemas/Scopes' } }
+          }
+        },
+        'x-ext': { h: { components: { schemas: { Scopes: { type: 'object' }, Unused: { type: 'string' } } } } }
+      };
+
+      const slim = bundledOf(
+        slimOpenAPIPageProps({
+          document: 'sec',
+          payload: { bundled: withScheme as never },
+          operations: [{ path: '/x', method: 'get' }]
+        } as unknown as Props)
+      ) as unknown as { 'x-ext': JsonTree };
+
+      expect(Object.keys(slim['x-ext'].h.components.schemas)).to.deep.equal(['Scopes']);
+    });
   });
 
   it('terminates on self-referential and mutually recursive schemas', () => {
