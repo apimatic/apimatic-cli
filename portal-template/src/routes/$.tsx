@@ -1,4 +1,4 @@
-import { createFileRoute, getRouteApi, notFound } from '@tanstack/react-router';
+import { createFileRoute, getRouteApi, isNotFound, isRedirect, notFound } from '@tanstack/react-router';
 import { DocsLayout } from 'fumadocs-ui/layouts/notebook';
 import { createServerFn } from '@tanstack/react-start';
 import { docs } from '@/lib/source';
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/$')({
   component: Page,
   loader: async ({ params }) => {
     const slugs = params._splat?.split('/').filter((segment) => segment.length > 0) ?? [];
-    const data = await serverLoader({ data: slugs });
+    const data = await loadPage(slugs);
 
     if (data.type === 'docs') {
       await docs.getPage(data.path)?.preload();
@@ -79,6 +79,27 @@ const serverLoader = createServerFn({
       markdownUrl: getPageMarkdownUrl(page).url,
     };
   });
+
+// The condition `staticFunctionMiddleware` itself uses to answer from the prerendered cache
+// instead of calling the handler.
+const answeredFromStaticCache = process.env.NODE_ENV === 'production' && typeof document !== 'undefined';
+
+/**
+ * An unknown URL has no prerendered response, and the middleware fetches one without checking
+ * the status: it parses whatever the host returns for a missing file, so `.json()` throws
+ * before the router can act on the `notFound()` the handler would have raised, and the error
+ * boundary renders in place of the not-found page. Only the cache path is rewritten — where
+ * the handler never runs, a failed fetch can only mean the page does not exist. Everywhere
+ * else, including the prerender pass and `portal serve`, a real failure still surfaces.
+ */
+async function loadPage(slugs: string[]) {
+  try {
+    return await serverLoader({ data: slugs });
+  } catch (error) {
+    if (!answeredFromStaticCache || isNotFound(error) || isRedirect(error)) throw error;
+    throw notFound();
+  }
+}
 
 function Content({ path, markdownUrl }: Readonly<{ path: string; markdownUrl: string }>) {
   const page = docs.getPage(path);
