@@ -110,9 +110,13 @@ export class PortalProjectService {
       }
     }
 
-    // Large specs push the prerender pass past Node's default heap.
+    // Large specs push the prerender pass past Node's default heap. V8 honours the last
+    // occurrence of the flag, so appending unconditionally overrode a limit the user had
+    // raised on purpose -- and lowered it on a machine whose default is already higher.
     const nodeOptions = process.env.NODE_OPTIONS ?? '';
-    environment.NODE_OPTIONS = `${nodeOptions} --max-old-space-size=4096`.trim();
+    environment.NODE_OPTIONS = /--max[-_]old[-_]space[-_]size/.test(nodeOptions)
+      ? nodeOptions
+      : `${nodeOptions} --max-old-space-size=4096`.trim();
     return environment;
   }
 

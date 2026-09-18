@@ -151,5 +151,21 @@ describe('PortalProjectService', () => {
         else process.env.NODE_OPTIONS = original;
       }
     });
+
+    // V8 honours the last occurrence, so appending unconditionally overrode a limit the
+    // user had raised deliberately -- NODE_OPTIONS is the only way in, since the child is
+    // spawned with extendEnv false.
+    it('leaves a heap limit the user set alone', () => {
+      const original = process.env.NODE_OPTIONS;
+      try {
+        for (const set of ['--max-old-space-size=8192', '--enable-source-maps --max-old-space-size=8192']) {
+          process.env.NODE_OPTIONS = set;
+          expect(service.childEnvironment().NODE_OPTIONS, set).to.equal(set);
+        }
+      } finally {
+        if (original === undefined) delete process.env.NODE_OPTIONS;
+        else process.env.NODE_OPTIONS = original;
+      }
+    });
   });
 });
