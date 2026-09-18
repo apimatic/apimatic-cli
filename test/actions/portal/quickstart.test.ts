@@ -26,9 +26,9 @@ describe('PortalQuickstartAction', () => {
       shell: 'bash'
     }) as unknown as Internals;
 
-  const writeSpec = (info: Record<string, unknown>): FilePath => {
+  const writeSpec = (info: Record<string, unknown>, prefix = ''): FilePath => {
     const name = 'spec.json';
-    fs.writeFileSync(path.join(root, name), JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
+    fs.writeFileSync(path.join(root, name), prefix + JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
     return new FilePath(new DirectoryPath(root), new FileName(name));
   };
 
@@ -132,6 +132,26 @@ describe('PortalQuickstartAction', () => {
       const config = await action().describeApi(writeSpec({ title: '  \n  ', version: '1' }));
 
       expect(config.siteTitle()).to.equal('My API');
+    });
+
+    // Windows editors and PowerShell redirection both write one. The format check below
+    // already stripped it, so such a document was accepted and then described as "My API".
+    it('reads a document written with a byte-order mark', async () => {
+      const config = await action().describeApi(
+        writeSpec({ title: 'Swagger Petstore', version: '1', description: 'Pets.' }, '﻿')
+      );
+
+      expect(config.siteTitle()).to.equal('Swagger Petstore');
+      expect(config.siteDescription()).to.equal('Pets.');
+    });
+
+    it('reads a YAML document written with a byte-order mark', async () => {
+      const name = 'spec.yaml';
+      fs.writeFileSync(path.join(root, name), '﻿openapi: 3.0.0\ninfo:\n  title: Swagger Petstore\n  version: "1"\n');
+
+      const config = await action().describeApi(new FilePath(new DirectoryPath(root), new FileName(name)));
+
+      expect(config.siteTitle()).to.equal('Swagger Petstore');
     });
   });
 });

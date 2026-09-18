@@ -218,8 +218,7 @@ export class PortalQuickstartAction {
       if (await this.fileService.isZipFile(specPath)) {
         return fallback;
       }
-      const contents = await this.fileService.getContents(specPath);
-      const document = specPath.name().hasExtension('.json') ? JSON.parse(contents) : parseYaml(contents);
+      const document = this.parseSpec(specPath, await this.fileService.getContents(specPath));
       const info = document?.info;
       // Both values are written into generated files, so each is reduced to one line first.
       // Taking only the description's first line instead left the 300-character cap
@@ -241,10 +240,7 @@ export class PortalQuickstartAction {
       if (await this.fileService.isZipFile(specPath)) {
         return null;
       }
-      const contents = await this.fileService.getContents(specPath);
-      const document = specPath.name().hasExtension('.json')
-        ? JSON.parse(stripByteOrderMark(contents))
-        : parseYaml(contents);
+      const document = this.parseSpec(specPath, await this.fileService.getContents(specPath));
 
       const openapi = document?.openapi;
       if (typeof openapi === 'string') {
@@ -261,6 +257,20 @@ export class PortalQuickstartAction {
       // Unreadable here means the build will say so with the file in front of it.
       return null;
     }
+  }
+
+  /**
+   * The specification as an object, however it was written. Both readers below need this,
+   * and only one of them used to strip the byte-order mark that a Windows editor or a
+   * PowerShell redirection leaves at the front of the file -- so such a document passed the
+   * format check and was then described as "My API", its real title silently discarded.
+   */
+  private parseSpec(
+    specPath: FilePath,
+    contents: string
+  ): { info?: Record<string, unknown> } & Record<string, unknown> {
+    const text = stripByteOrderMark(contents);
+    return specPath.name().hasExtension('.json') ? JSON.parse(text) : parseYaml(text);
   }
 
   private oneLine(value: unknown): string | null {
