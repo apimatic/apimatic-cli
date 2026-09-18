@@ -152,7 +152,8 @@ export class PortalProjectService {
       title: source.config.title,
       description: source.config.description,
       logoUrl: source.config.logoSiteUrl(),
-      siteUrl: source.config.siteOrigin()?.toString() ?? null
+      siteUrl: source.config.siteOrigin()?.toString() ?? null,
+      aiPageActions: source.config.aiPageActions
     };
 
     const configuration = {

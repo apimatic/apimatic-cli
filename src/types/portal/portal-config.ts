@@ -7,11 +7,12 @@ export interface PortalConfigData {
   description?: string;
   logo?: string;
   siteUrl?: string;
+  aiPageActions?: boolean;
 }
 
 const STATIC_PREFIX = 'static/';
 
-const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl']);
+const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPageActions']);
 
 // Pre-2.0 names and near misses. A mistyped setting is the one mistake that otherwise
 // produces a portal that builds and is quietly wrong, and `logoUrl` is both the v1 name the
@@ -30,16 +31,19 @@ export class PortalConfig {
     public readonly title: string,
     public readonly description: string | null,
     private readonly logo: string | null,
-    private readonly siteUrl: UrlPath | null
+    private readonly siteUrl: UrlPath | null,
+    /** Whether each page offers to open itself in an external AI assistant. */
+    public readonly aiPageActions: boolean
   ) {}
 
   public static create(
     title: string,
     description: string | null = null,
     logo: string | null = null,
-    siteUrl: UrlPath | null = null
+    siteUrl: UrlPath | null = null,
+    aiPageActions = true
   ): PortalConfig {
-    return new PortalConfig(title, description, logo, siteUrl);
+    return new PortalConfig(title, description, logo, siteUrl, aiPageActions);
   }
 
   public static parse(json: string): Result<PortalConfig, string[]> {
@@ -54,7 +58,7 @@ export class PortalConfig {
     }
 
     const errors: string[] = [];
-    const { title, description, logo, siteUrl } = data as Record<string, unknown>;
+    const { title, description, logo, siteUrl, aiPageActions } = data as Record<string, unknown>;
 
     for (const field of Object.keys(data as Record<string, unknown>)) {
       if (KNOWN_FIELDS.has(field)) {
@@ -84,6 +88,10 @@ export class PortalConfig {
       }
     }
 
+    if (aiPageActions !== undefined && typeof aiPageActions !== 'boolean') {
+      errors.push("'aiPageActions' must be true or false.");
+    }
+
     let parsedSiteUrl: UrlPath | null = null;
     if (siteUrl !== undefined) {
       parsedSiteUrl = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
@@ -102,7 +110,8 @@ export class PortalConfig {
         (title as string).trim(),
         (description as string | undefined) ?? null,
         (logo as string | undefined) ?? null,
-        parsedSiteUrl
+        parsedSiteUrl,
+        (aiPageActions as boolean | undefined) ?? true
       )
     );
   }
@@ -137,7 +146,9 @@ export class PortalConfig {
       title: this.title,
       ...(this.description !== null ? { description: this.description } : {}),
       ...(this.logo !== null ? { logo: this.logo } : {}),
-      ...(this.siteUrl !== null ? { siteUrl: this.siteUrl.toString() } : {})
+      ...(this.siteUrl !== null ? { siteUrl: this.siteUrl.toString() } : {}),
+      // Only when it differs from the default, so the migration hint stays minimal.
+      ...(this.aiPageActions ? {} : { aiPageActions: false })
     };
   }
 

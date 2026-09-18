@@ -32,6 +32,34 @@ describe('PortalConfig', () => {
     expect(errors).to.have.lengthOf(4);
   });
 
+  describe('aiPageActions', () => {
+    // Each page offers to open itself in ChatGPT, Claude, Cursor or Scira. A portal
+    // published under someone else's brand carries that endorsement, so it can be refused.
+    it('is on unless the document turns it off', () => {
+      expect(parse({ title: 'Calc' })._unsafeUnwrap().aiPageActions).to.be.true;
+      expect(parse({ title: 'Calc', aiPageActions: true })._unsafeUnwrap().aiPageActions).to.be.true;
+    });
+
+    it('is off when the document says so', () => {
+      expect(parse({ title: 'Calc', aiPageActions: false })._unsafeUnwrap().aiPageActions).to.be.false;
+    });
+
+    it('rejects a value that is not a boolean', () => {
+      expect(parse({ title: 'Calc', aiPageActions: 'no' })._unsafeUnwrapErr()).to.deep.equal([
+        "'aiPageActions' must be true or false."
+      ]);
+    });
+
+    it('serialises only when it differs from the default', () => {
+      expect(JSON.parse(JSON.stringify(parse({ title: 'Calc' })._unsafeUnwrap()))).to.not.have.property(
+        'aiPageActions'
+      );
+      expect(
+        JSON.parse(JSON.stringify(parse({ title: 'Calc', aiPageActions: false })._unsafeUnwrap()))
+      ).to.have.property('aiPageActions', false);
+    });
+  });
+
   describe('unknown settings', () => {
     // A mistyped setting is the one mistake that otherwise builds a portal that is quietly
     // wrong -- no logo, no site URL -- with nothing said about it.

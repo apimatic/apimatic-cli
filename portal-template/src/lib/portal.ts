@@ -5,6 +5,8 @@ export interface Portal {
   logoUrl: string | null;
   /** Origin the portal is hosted at (no trailing slash), or null when unknown. */
   siteUrl: string | null;
+  /** Whether each page offers to open itself in an external AI assistant. */
+  aiPageActions: boolean;
 }
 
 // The CLI substitutes the placeholder with the portal's identity when it prepares the build,
