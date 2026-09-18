@@ -160,7 +160,7 @@ describe('PortalProjectService', () => {
       try {
         for (const set of ['--max-old-space-size=8192', '--enable-source-maps --max-old-space-size=8192']) {
           process.env.NODE_OPTIONS = set;
-          expect(service.childEnvironment().NODE_OPTIONS, set).to.equal(set);
+          expect(service.childEnvironment().NODE_OPTIONS, `NODE_OPTIONS was ${set}`).to.equal(set);
         }
       } finally {
         if (original === undefined) delete process.env.NODE_OPTIONS;

@@ -84,7 +84,7 @@ describe('prerenderPages', () => {
     const urls = await urlsFor('https://docs.test');
 
     for (const generated of ['/llms.txt.md', '/llms-full.txt.md', '/sitemap.xml.md', '/robots.txt.md', '/api/search.md']) {
-      expect(urls, generated).to.not.include(generated);
+      expect(urls, `asked for a Markdown twin of ${generated}`).to.not.include(generated);
     }
   });
 });
