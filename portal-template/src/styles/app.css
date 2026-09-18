@@ -6,6 +6,11 @@
 
 @source not '../../dist';
 
+/* Tailwind's automatic detection is rooted at this project, and the user's Markdown lives
+   outside it, so a utility class written in a page produced no CSS at all. The CLI
+   substitutes the placeholder with the content directory before the build. */
+@source '__APIMATIC_CONTENT_DIR__';
+
 @theme {
   --default-font-family: 'Geist';
   --default-mono-font-family: 'Geist Mono';

@@ -171,13 +171,15 @@ export class PortalProjectService {
     await this.substitute(portalModule, PORTAL_IDENTITY_PLACEHOLDER, JSON.stringify(identity));
 
     // The content directory reaches the template as a literal because Fumadocs' `defineDocs`
-    // macro rejects anything it cannot read at compile time.
+    // macro rejects anything it cannot read at compile time. Tailwind needs the same path to
+    // scan the user's pages at all: its automatic detection is rooted at this project, which
+    // the content directory sits outside of.
+    const contentLiteral = JSON.stringify(this.toPosix(contentDirectory.toString()));
     const sourceModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('source.ts'));
-    await this.substitute(
-      sourceModule,
-      CONTENT_DIRECTORY_PLACEHOLDER,
-      JSON.stringify(this.toPosix(contentDirectory.toString()))
-    );
+    await this.substitute(sourceModule, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);
+
+    const stylesheet = new FilePath(projectDirectory.join('src').join('styles'), new FileName('app.css'));
+    await this.substitute(stylesheet, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);
   }
 
   private async substitute(file: FilePath, placeholder: string, literal: string): Promise<void> {
