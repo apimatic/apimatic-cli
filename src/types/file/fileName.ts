@@ -6,16 +6,21 @@ export class FileName {
   }
 
   public isMarkDown() {
-    return this.name.endsWith(".md");
+    return this.hasExtension('.md');
+  }
+
+  /** Whether the name ends in `extension`, compared without regard to case. */
+  public hasExtension(extension: string): boolean {
+    return this.name.toLowerCase().endsWith(extension.toLowerCase());
   }
 
   public normalize(): FileName {
-    const nameWithoutExt = this.name.replace(/\.[^/.]+$/, "");
+    const nameWithoutExt = this.name.replace(/\.[^/.]+$/, '');
     const normalized = nameWithoutExt
       .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/(^-|-$)/g, "");
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/(^-|-$)/g, '');
     return new FileName(normalized);
   }
 

@@ -219,7 +219,7 @@ export class PortalQuickstartAction {
         return fallback;
       }
       const contents = await this.fileService.getContents(specPath);
-      const document = specPath.toString().toLowerCase().endsWith('.json') ? JSON.parse(contents) : parseYaml(contents);
+      const document = specPath.name().hasExtension('.json') ? JSON.parse(contents) : parseYaml(contents);
       const info = document?.info;
       // Both values are written into generated files, so each is reduced to one line first.
       // Taking only the description's first line instead left the 300-character cap
@@ -242,7 +242,7 @@ export class PortalQuickstartAction {
         return null;
       }
       const contents = await this.fileService.getContents(specPath);
-      const document = specPath.toString().toLowerCase().endsWith('.json')
+      const document = specPath.name().hasExtension('.json')
         ? JSON.parse(stripByteOrderMark(contents))
         : parseYaml(contents);
 

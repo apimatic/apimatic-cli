@@ -151,9 +151,7 @@ export class PortalSourceContext {
     return (
       directory.items
         .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
-        .filter((fileName) =>
-          SPEC_EXTENSIONS.some((extension) => fileName.toString().toLowerCase().endsWith(extension))
-        )
+        .filter((fileName) => SPEC_EXTENSIONS.some((extension) => fileName.hasExtension(extension)))
         // Ordered by code point rather than collation. This sort decides which of two names
         // that normalise to the same slug keeps it, and which document becomes the default
         // server, so a host with a different locale would otherwise publish different URLs
@@ -167,7 +165,7 @@ export class PortalSourceContext {
       const contents = await this.fileService.getContents(file);
       // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
       // so each extension gets the parser built for it.
-      const document = file.toString().toLowerCase().endsWith('.json')
+      const document = file.name().hasExtension('.json')
         ? JSON.parse(stripByteOrderMark(contents))
         : parseYaml(contents);
       return typeof document === 'object' && document !== null && !Array.isArray(document)
