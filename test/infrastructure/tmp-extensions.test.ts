@@ -67,4 +67,30 @@ describe('withBuildDirectory', () => {
       expect(fs.existsSync(fallback)).to.be.false;
     }
   );
+
+  // The fallback folder is shared by every invocation for a project, so one run finishing
+  // used to delete the marker a concurrent one still depends on -- putting that run's live
+  // build tree into the user's git status.
+  (process.platform === 'win32' ? it : it.skip)(
+    'leaves the shared folder alone while another run is in it',
+    async () => {
+      const project = fs.mkdtempSync(path.join(os.tmpdir(), 'build-shared-'));
+      const source = new DirectoryPath(project).join('src');
+      const fallback = path.join(project, BUILD_DIRECTORY_NAME);
+
+      await withBuildDirectory(
+        source,
+        async () => {
+          // Stands in for a second run still building in the same folder.
+          fs.mkdirSync(path.join(fallback, 'another-run'), { recursive: true });
+        },
+        'Z:Temp'
+      );
+
+      expect(fs.existsSync(path.join(fallback, '.gitignore')), 'the marker survives').to.be.true;
+      expect(fs.existsSync(path.join(fallback, 'another-run')), "the other run's directory survives").to.be.true;
+
+      fs.rmSync(project, { recursive: true, force: true });
+    }
+  );
 });

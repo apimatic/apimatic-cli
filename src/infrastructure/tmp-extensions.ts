@@ -61,8 +61,27 @@ export async function withBuildDirectory<T>(
     return await withDir((results) => fn(new DirectoryPath(results.path)), { tmpdir: base, unsafeCleanup: true });
   } finally {
     if (base !== systemTemp) {
-      await fs.rm(path.join(base, '.gitignore'), { force: true });
-      await fs.rmdir(base).catch(() => undefined);
+      await removeBuildDirectoryBase(base);
     }
+  }
+}
+
+/**
+ * The project-side fallback folder is shared by every invocation for that project, so it is
+ * only taken down once nothing else is in it: removing the marker unconditionally made a
+ * `portal generate` finishing beside a running `portal serve` put the live build tree into
+ * the user's `git status`. Failures are swallowed, since a portal that has been written must
+ * not be reported as a crash because the folder could not be tidied up.
+ */
+async function removeBuildDirectoryBase(base: string): Promise<void> {
+  try {
+    const remaining = await fs.readdir(base);
+    if (remaining.some((entry) => entry !== '.gitignore')) {
+      return;
+    }
+    await fs.rm(path.join(base, '.gitignore'), { force: true });
+    await fs.rmdir(base);
+  } catch {
+    // Another run is using it, or it is already gone.
   }
 }
