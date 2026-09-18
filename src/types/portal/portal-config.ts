@@ -82,6 +82,15 @@ export class PortalConfig {
     );
   }
 
+  /**
+   * Whether a value would survive `parse` as `logo`. The migration hint carries a pre-2.0
+   * `logoUrl` over only when it does, so the `portal.json` it prints is never one the next
+   * command rejects.
+   */
+  public static isValidLogo(value: string): boolean {
+    return value.trim().length > 0 && PortalConfig.isInsideStatic(value);
+  }
+
   /** Path of the logo relative to `src/` with forward slashes, or null when none is configured. */
   public logoPath(): string | null {
     return this.logo === null ? null : PortalConfig.normalize(this.logo);

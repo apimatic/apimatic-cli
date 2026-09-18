@@ -35,4 +35,10 @@ export type PortalSourceProblem =
 export interface PortalMigration {
   suggestedConfig: PortalConfig;
   unsupportedFields: string[];
+  /**
+   * A `logoUrl` that has a 2.0 equivalent but cannot be carried over as it stands, because
+   * `logo` addresses the `static/` directory. Kept so the user is told what to do with the
+   * image rather than finding the setting listed as unsupported.
+   */
+  unmigratableLogo: string | null;
 }

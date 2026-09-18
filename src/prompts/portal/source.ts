@@ -15,7 +15,7 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       if (problem.migration === null) {
         log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
       } else {
-        reportMigration(problem.migration);
+        reportMigration(problem.migration, sourceDirectory);
       }
       return;
     }
@@ -46,7 +46,7 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
   }
 }
 
-function reportMigration(migration: PortalMigration): void {
+function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryPath): void {
   const starter = JSON.stringify(migration.suggestedConfig, null, 2);
   const lines = [
     `This project still uses ${f.var('APIMATIC-BUILD.json')}, which no longer configures the portal.`,
@@ -54,6 +54,15 @@ function reportMigration(migration: PortalMigration): void {
     `Create ${f.var('portal.json')} next to it with:`,
     starter
   ];
+
+  if (migration.unmigratableLogo !== null) {
+    lines.push(
+      '',
+      `The logo at ${f.var(migration.unmigratableLogo)} is not carried over: ${f.var('logo')} addresses ` +
+        `the ${f.var('static')} directory. Move the image under ${f.path(sourceDirectory.join('static'))} ` +
+        `and add it as ${f.var('"logo": "static/<path>"')}.`
+    );
+  }
 
   if (migration.unsupportedFields.length > 0) {
     lines.push(

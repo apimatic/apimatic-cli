@@ -178,12 +178,21 @@ export class PortalSourceContext {
     if (typeof portal !== 'object' || portal === null) {
       return versionedPortal === undefined
         ? null
-        : { suggestedConfig: PortalConfig.create('My API'), unsupportedFields: ['generateVersionedPortal'] };
+        : {
+            suggestedConfig: PortalConfig.create('My API'),
+            unsupportedFields: ['generateVersionedPortal'],
+            unmigratableLogo: null
+          };
     }
 
     const portalFields = portal as Record<string, unknown>;
-    const title = typeof portalFields.pageTitle === 'string' ? portalFields.pageTitle : 'My API';
-    const logo = typeof portalFields.logoUrl === 'string' ? portalFields.logoUrl : null;
+    // Both fields come from a file the CLI has never validated, so each is held to what
+    // `PortalConfig.parse` accepts before it reaches the trusted factory.
+    const pageTitle = typeof portalFields.pageTitle === 'string' ? portalFields.pageTitle.trim() : '';
+    const title = pageTitle.length > 0 ? pageTitle : 'My API';
+
+    const logoUrl = typeof portalFields.logoUrl === 'string' ? portalFields.logoUrl : null;
+    const logo = logoUrl !== null && PortalConfig.isValidLogo(logoUrl) ? logoUrl : null;
 
     const unsupportedFields = Object.keys(portalFields)
       .filter((field) => !MIGRATABLE_PORTAL_FIELDS.has(field))
@@ -194,7 +203,8 @@ export class PortalSourceContext {
 
     return {
       suggestedConfig: PortalConfig.create(title, null, logo),
-      unsupportedFields
+      unsupportedFields,
+      unmigratableLogo: logoUrl !== null && logo === null ? logoUrl : null
     };
   }
 }

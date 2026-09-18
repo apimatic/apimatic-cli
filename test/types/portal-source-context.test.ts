@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
+import { PortalConfig } from '../../src/types/portal/portal-config';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
@@ -204,6 +205,63 @@ describe('PortalSourceContext', () => {
       write('APIMATIC-BUILD.json', '{ broken');
 
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig', migration: null });
+    });
+
+    it('names a logo it cannot carry over instead of listing it as unsupported', async () => {
+      write(
+        'APIMATIC-BUILD.json',
+        JSON.stringify({ generatePortal: { pageTitle: 'Acme', logoUrl: 'images/logo.png' } })
+      );
+
+      const problem = (await resolve())._unsafeUnwrapErr() as {
+        migration: { unmigratableLogo: string | null; unsupportedFields: string[] };
+      };
+
+      expect(problem.migration.unmigratableLogo).to.equal('images/logo.png');
+      expect(problem.migration.unsupportedFields).to.not.include('logoUrl');
+    });
+
+    it('carries a logo already inside static/ over, with nothing to report', async () => {
+      write(
+        'APIMATIC-BUILD.json',
+        JSON.stringify({ generatePortal: { pageTitle: 'Acme', logoUrl: 'static/images/logo.png' } })
+      );
+
+      const problem = (await resolve())._unsafeUnwrapErr() as { migration: { unmigratableLogo: string | null } };
+
+      expect(problem.migration.unmigratableLogo).to.be.null;
+    });
+
+    // The suggestion is printed for the user to paste, so anything it can produce has to be
+    // something `PortalConfig.parse` accepts -- otherwise the migration hint dead-ends on the
+    // very next command.
+    describe('every suggestion it can produce is a config the CLI accepts', () => {
+      const oldPortals: Record<string, unknown>[] = [
+        { pageTitle: 'Acme', logoUrl: 'static/images/logo.png' },
+        { pageTitle: 'Acme', logoUrl: 'images/logo.png' },
+        { pageTitle: 'Acme', logoUrl: 'https://cdn.example.com/logo.png' },
+        { pageTitle: 'Acme', logoUrl: 'static/../../secrets.png' },
+        { pageTitle: 'Acme', logoUrl: 'static/' },
+        { pageTitle: 'Acme', logoUrl: '   ' },
+        { pageTitle: 'Acme', logoUrl: 42 },
+        { pageTitle: '' },
+        { pageTitle: '   ' },
+        { pageTitle: 7 },
+        {},
+        { pageTitle: 'Acme', logoUrl: 'images/l.png', portalStyle: 'default', enableApiCopilot: true }
+      ];
+
+      oldPortals.forEach((generatePortal) => {
+        it(`accepts its own suggestion for ${JSON.stringify(generatePortal)}`, async () => {
+          write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal }));
+
+          const problem = (await resolve())._unsafeUnwrapErr() as { migration: { suggestedConfig: unknown } };
+          // Exactly what the prompt prints for the user to paste.
+          const suggestion = JSON.stringify(problem.migration.suggestedConfig, null, 2);
+
+          expect(PortalConfig.parse(suggestion).isOk(), suggestion).to.be.true;
+        });
+      });
     });
   });
 });
