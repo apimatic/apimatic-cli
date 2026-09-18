@@ -33,14 +33,33 @@ export async function prerenderPages(config: PortalConfig): Promise<{ path: stri
 async function contentUrls(contentDir: string): Promise<string[]> {
   const entries = await readdir(contentDir, { recursive: true, withFileTypes: true }).catch(() => []);
 
-  return entries
+  const files = entries
     .filter((entry) => entry.isFile() && CONTENT_EXTENSIONS.has(path.extname(entry.name)))
     .map((entry) => {
       const relative = path.relative(contentDir, path.join(entry.parentPath, entry.name));
+      const file = relative.split(path.sep).join('/');
       // Same slug rules the content source applies, rather than a second implementation
       // of them: "(group)" folders drop out, "index" collapses into its parent.
-      return '/' + getSlugs(relative.split(path.sep).join('/')).join('/');
+      return { slugs: getSlugs(file), isIndex: path.basename(file, path.extname(file)) === 'index' };
     });
+
+  // `guides.md` and `guides/index.md` both collapse to "guides". The content source settles
+  // that by taking the non-index files first and appending "index" to the loser, so the same
+  // order has to be applied here: mapping each file on its own emitted one URL for the two
+  // of them, and the page the source had moved to /guides/index was never written, while the
+  // sidebar, the sitemap and llms.txt all went on linking to it.
+  const taken = new Set<string>();
+  const claim = (slugs: string[]): string => {
+    const key = slugs.join('/');
+    taken.add(key);
+    return '/' + key;
+  };
+
+  const urls = files.filter((file) => !file.isIndex).map((file) => claim(file.slugs));
+  for (const file of files.filter((file) => file.isIndex)) {
+    urls.push(claim(taken.has(file.slugs.join('/')) ? [...file.slugs, 'index'] : file.slugs));
+  }
+  return urls;
 }
 
 async function openApiUrls(specs: Record<string, string>): Promise<string[]> {
