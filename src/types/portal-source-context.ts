@@ -6,6 +6,7 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import { specFormatOf } from './portal/spec-format.js';
 import { stripByteOrderMark } from '../utils/string-utils.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -129,7 +130,7 @@ export class PortalSourceContext {
         return err({ kind: 'unreadableSpec', fileName });
       }
 
-      const format = this.specFormat(document);
+      const format = specFormatOf(document);
       if (!format.supported) {
         if (format.format === null) {
           continue;
@@ -181,28 +182,6 @@ export class PortalSourceContext {
 
   // A document without a version key is not a spec at all (APIMATIC-META.json, a `$ref`
   // target); those are skipped silently. A recognisable but unsupported format is named.
-  private specFormat(
-    document: Record<string, unknown>
-  ): { supported: true } | { supported: false; format: string | null } {
-    const openapi = document.openapi;
-    if (typeof openapi === 'string') {
-      return openapi.startsWith('3.') ? { supported: true } : { supported: false, format: `OpenAPI ${openapi}` };
-    }
-    if (document.swagger !== undefined) {
-      return { supported: false, format: `Swagger ${this.versionLabel(document.swagger)}` };
-    }
-    if (document.asyncapi !== undefined) {
-      return { supported: false, format: `AsyncAPI ${this.versionLabel(document.asyncapi)}` };
-    }
-    return { supported: false, format: null };
-  }
-
-  // Version keys are strings in well-formed documents; anything else is named rather than
-  // stringified into `[object Object]`.
-  private versionLabel(version: unknown): string {
-    return typeof version === 'string' || typeof version === 'number' ? `${version}` : '(unknown version)';
-  }
-
   private uniqueSlug(fileName: FileName, used: Set<string>): string {
     const base = fileName.normalize().toString() || 'api';
     let slug = base;

@@ -54,6 +54,18 @@ export class PortalQuickstartPrompts {
     );
   }
 
+  /**
+   * For a document that names no format at all -- a Postman collection, an arbitrary JSON
+   * file. The build skips such a file, so accepting it here scaffolded a project whose
+   * preview then reported that it held no specification.
+   */
+  public specNotRecognised(specPath: FilePath) {
+    log.error(
+      `${f.path(specPath)} is not an OpenAPI document: it names no ${f.var('openapi')} version. ` +
+        `Portals are generated from OpenAPI 3.x documents.`
+    );
+  }
+
   /** Asked of this machine before anything is written, not after the project exists. */
   public runtimeUnsupported(reason: string) {
     log.error(reason);

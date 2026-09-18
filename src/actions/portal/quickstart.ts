@@ -15,6 +15,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ValidateAction } from '../api/validate.js';
 import { SpecContext } from '../../types/spec-context.js';
 import { PortalConfig } from '../../types/portal/portal-config.js';
+import { SpecFormat, specFormatOf } from '../../types/portal/spec-format.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
@@ -84,7 +85,7 @@ export class PortalQuickstartAction {
           );
           if (downloadFileResult.isErr()) {
             this.prompts.specDownloadFailed(inputPath, downloadFileResult.error);
-            if (sampleUrl !== null && inputPath.toString() === sampleUrl.toString()) {
+            if (sampleUrl !== null && inputPath.isEqual(sampleUrl)) {
               sampleUrl = null;
             }
           } else {
@@ -127,9 +128,13 @@ export class PortalQuickstartAction {
       // here rather than by `portal serve` below, which used to refuse only after the
       // project had been written -- and the directory prompt then refuses a non-empty one,
       // so the user had to delete the tree the wizard itself had just created.
-      const unsupportedFormat = await this.unsupportedSpecFormat(specPath);
-      if (unsupportedFormat !== null) {
-        this.prompts.specFormatUnsupported(specPath, unsupportedFormat);
+      const format = await this.specFormat(specPath);
+      if (!format.supported) {
+        if (format.format === null) {
+          this.prompts.specNotRecognised(specPath);
+        } else {
+          this.prompts.specFormatUnsupported(specPath, format.format);
+        }
         return ActionResult.failed();
       }
 
@@ -232,30 +237,23 @@ export class PortalQuickstartAction {
   }
 
   /**
-   * Names the format when the document is not one a portal can be built from, or null when
-   * it is. A split specification arrives as an archive and is left to the build to judge.
+   * Whether the document is one a portal can be built from, by the same rule the build
+   * applies. This used to be a second implementation of it, and the two disagreed on the one
+   * case neither can name: a document with no version key at all -- a Postman collection,
+   * say -- was accepted here and skipped there, so the wizard scaffolded the project and the
+   * preview it went on to launch then refused it for holding no specification.
+   *
+   * A split specification arrives as an archive and is left to the build to judge.
    */
-  private async unsupportedSpecFormat(specPath: FilePath): Promise<string | null> {
+  private async specFormat(specPath: FilePath): Promise<SpecFormat> {
     try {
       if (await this.fileService.isZipFile(specPath)) {
-        return null;
+        return { supported: true };
       }
-      const document = this.parseSpec(specPath, await this.fileService.getContents(specPath));
-
-      const openapi = document?.openapi;
-      if (typeof openapi === 'string') {
-        return openapi.startsWith('3.') ? null : `OpenAPI ${openapi}`;
-      }
-      if (document?.swagger !== undefined) {
-        return `Swagger ${document.swagger}`;
-      }
-      if (document?.asyncapi !== undefined) {
-        return `AsyncAPI ${document.asyncapi}`;
-      }
-      return null;
+      return specFormatOf(this.parseSpec(specPath, await this.fileService.getContents(specPath)));
     } catch {
       // Unreadable here means the build will say so with the file in front of it.
-      return null;
+      return { supported: true };
     }
   }
 

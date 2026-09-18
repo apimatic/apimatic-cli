@@ -7,6 +7,7 @@ import { PortalQuickstartAction } from '../../../src/actions/portal/quickstart';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FilePath } from '../../../src/types/file/filePath';
 import { FileName } from '../../../src/types/file/fileName';
+import { SpecFormat } from '../../../src/types/portal/spec-format';
 
 // `scaffold` and `describeApi` are private: what they write is the contract, and the front
 // matter they produce is parsed by the build, so it is asserted here rather than through the
@@ -14,7 +15,7 @@ import { FileName } from '../../../src/types/file/fileName';
 type Internals = {
   scaffold(sourceDirectory: DirectoryPath, specPath: FilePath): Promise<void>;
   describeApi(specPath: FilePath): Promise<{ siteTitle(): string; siteDescription(): string | null }>;
-  unsupportedSpecFormat(specPath: FilePath): Promise<string | null>;
+  specFormat(specPath: FilePath): Promise<SpecFormat>;
 };
 
 describe('PortalQuickstartAction', () => {
@@ -83,21 +84,26 @@ describe('PortalQuickstartAction', () => {
   // once `portal serve` runs left the user with a scaffolded directory the wizard then
   // refuses to reuse, because it requires an empty one.
   describe('refusing a document before anything is written', () => {
-    const cases: [string, Record<string, unknown>, string | null][] = [
-      ['OpenAPI 3.0.4', { openapi: '3.0.4' }, null],
-      ['OpenAPI 3.1.0', { openapi: '3.1.0' }, null],
-      ['Swagger 2.0', { swagger: '2.0' }, 'Swagger 2.0'],
-      ['OpenAPI 2.0.0', { openapi: '2.0.0' }, 'OpenAPI 2.0.0'],
-      ['AsyncAPI 2.6.0', { asyncapi: '2.6.0' }, 'AsyncAPI 2.6.0']
+    // `format: null` is a document that names no version at all. The build skips such a
+    // file, so the wizard has to refuse it too -- it used to accept it, scaffold the
+    // project, and leave the preview to report that there was no specification in it.
+    const cases: [string, Record<string, unknown>, SpecFormat][] = [
+      ['OpenAPI 3.0.4', { openapi: '3.0.4' }, { supported: true }],
+      ['OpenAPI 3.1.0', { openapi: '3.1.0' }, { supported: true }],
+      ['Swagger 2.0', { swagger: '2.0' }, { supported: false, format: 'Swagger 2.0' }],
+      ['OpenAPI 2.0.0', { openapi: '2.0.0' }, { supported: false, format: 'OpenAPI 2.0.0' }],
+      ['AsyncAPI 2.6.0', { asyncapi: '2.6.0' }, { supported: false, format: 'AsyncAPI 2.6.0' }],
+      ['a Postman collection', { item: [], info: { schema: 'postman' } }, { supported: false, format: null }],
+      ['a document with no version key', { paths: {} }, { supported: false, format: null }]
     ];
 
     cases.forEach(([label, document, expected]) => {
-      it(`${expected === null ? 'accepts' : 'names'} ${label}`, async () => {
+      it(`${expected.supported ? 'accepts' : 'refuses'} ${label}`, async () => {
         const name = 'spec.json';
         fs.writeFileSync(path.join(root, name), JSON.stringify({ ...document, info: {}, paths: {} }));
         const specPath = new FilePath(new DirectoryPath(root), new FileName(name));
 
-        expect(await action().unsupportedSpecFormat(specPath)).to.equal(expected);
+        expect(await action().specFormat(specPath)).to.deep.equal(expected);
       });
     });
   });
