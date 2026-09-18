@@ -8,6 +8,11 @@ The official CLI for APIMatic.
 [![Downloads/week](https://img.shields.io/npm/dw/@apimatic/cli.svg)](https://npmjs.org/package/@apimatic/cli)
 [![License](https://img.shields.io/npm/l/@apimatic/cli.svg)](https://github.com/apimatic/apimatic-cli/blob/master/package.json)
 
+# Requirements
+
+Node.js 22.12 or newer, for every command. npm only warns when your Node is older, so the
+install succeeds and the CLI then refuses to build a portal.
+
 # Getting Started
 
 To get started with APIMatic's CLI using a step by step wizard, run the following command: 
@@ -15,6 +20,20 @@ To get started with APIMatic's CLI using a step by step wizard, run the followin
 ```sh-session
 $ apimatic quickstart
 ```
+
+# Upgrading from 1.x
+
+Documentation portals are now built on your machine from a `src/` directory, and
+`APIMATIC-BUILD.json` no longer configures them:
+
+- Describe the portal in `src/portal.json` (`title`, `description`, `logo`, `siteUrl`).
+  Running `apimatic portal generate` on a 1.x project prints one to start from.
+- Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
+  files in `src/static/`.
+- Page order comes from the `meta.json` files beside your pages; `toc.yml` is no longer read.
+- `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
+  longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
+  to drop the removed commands from shell completion.
 
 # Usage
 <!-- usage -->
