@@ -14,7 +14,7 @@ import {
 import { baseOptions } from '@/lib/layout.shared';
 import { getPageMarkdownUrl } from '@/lib/shared';
 import { portal } from '@/lib/portal';
-import { canonicalLink } from '@/lib/seo';
+import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { Suspense, use, type ReactNode } from 'react';
@@ -39,9 +39,22 @@ export const Route = createFileRoute('/$')({
     const title = loaderData && loaderData.type !== 'home' ? `${loaderData.title} | ${portal.title}` : portal.title;
     const description = loaderData?.description ?? portal.description;
     const splat = params._splat?.replace(/\/$/, '') ?? '';
+    const pageUrl = splat.length > 0 ? `/${splat}` : '/';
+    const absolute = absoluteUrl(pageUrl);
     return {
-      meta: [{ title }, ...(description ? [{ name: 'description', content: description }] : [])],
-      links: canonicalLink(splat.length > 0 ? `/${splat}` : '/'),
+      // Without the og:* pair, pasting a documentation link into Slack, Teams or LinkedIn
+      // produced a bare URL. They are built from the values the page already computed.
+      meta: [
+        { title },
+        ...(description ? [{ name: 'description', content: description }] : []),
+        { property: 'og:title', content: title },
+        ...(description ? [{ property: 'og:description', content: description }] : []),
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: portal.title },
+        ...(absolute ? [{ property: 'og:url', content: absolute }] : []),
+        { name: 'twitter:card', content: 'summary' },
+      ],
+      links: canonicalLink(pageUrl),
     };
   },
 });

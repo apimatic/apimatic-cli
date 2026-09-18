@@ -22,7 +22,12 @@ export const Route = createRootRoute({
       { title: portal.title },
       ...(portal.description ? [{ name: 'description', content: portal.description }] : []),
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    // The portal already supplies a logo for the navigation bar; without this the browser
+    // tab showed the blank-document icon on every page.
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      ...(portal.logoUrl ? [{ rel: 'icon', href: portal.logoUrl }] : []),
+    ],
   }),
   component: RootComponent,
 });
