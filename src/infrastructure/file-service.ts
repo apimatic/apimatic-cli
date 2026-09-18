@@ -46,6 +46,10 @@ export class FileService {
     }
   }
 
+  /**
+   * Hidden entries do not count: scaffolding into a directory that holds only a `.git` is
+   * the normal way to start a project, so the prompts say "apart from hidden files".
+   */
   public async directoryEmpty(dir: DirectoryPath): Promise<boolean> {
     try {
       const files = await fsExtra.readdir(dir.toString());

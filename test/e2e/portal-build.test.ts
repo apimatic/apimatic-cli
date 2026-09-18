@@ -77,7 +77,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
   });
 
   it('writes a search index and the llms files', () => {
-    expect(exists('api/search')).to.be.true;
+    expect(exists('api/search.json')).to.be.true;
     expect(read('llms.txt')).to.contain('Welcome');
   });
 

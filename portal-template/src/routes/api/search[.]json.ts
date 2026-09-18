@@ -4,6 +4,6 @@ import { createFromSource } from 'fumadocs-core/search/server';
 
 const server = createFromSource(source, { language: 'english' });
 
-export const Route = createFileRoute('/api/search')({
+export const Route = createFileRoute('/api/search.json')({
   server: { handlers: { GET: () => server.staticGET() } },
 });

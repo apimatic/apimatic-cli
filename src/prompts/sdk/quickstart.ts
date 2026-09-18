@@ -206,7 +206,8 @@ export class SdkQuickstartPrompts {
 
   public async inputDirectoryPathPrompt(): Promise<DirectoryPath | undefined> {
     const inputDirectory = await text({
-      message: 'Enter the directory path where you would like to setup the SDK (Requires an empty directory):',
+      message:
+        'Enter the directory path where you would like to setup the SDK (must be empty, apart from hidden files such as .git):',
       placeholder: 'Provide absolute path to the directory or press Enter to use the current directory.',
       defaultValue: './'
     });
