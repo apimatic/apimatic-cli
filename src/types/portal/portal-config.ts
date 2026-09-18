@@ -78,6 +78,9 @@ export class PortalConfig {
     if (description !== undefined && typeof description !== 'string') {
       errors.push("'description' must be a string.");
     }
+    // A blank one is the same as none; without this it shipped as the site description and
+    // as the og:description of every page.
+    const trimmedDescription = typeof description === 'string' ? description.trim() : null;
     if (logo !== undefined) {
       if (typeof logo !== 'string' || logo.trim().length === 0) {
         errors.push("'logo' must be a non-empty string.");
@@ -108,7 +111,7 @@ export class PortalConfig {
     return ok(
       new PortalConfig(
         (title as string).trim(),
-        (description as string | undefined) ?? null,
+        trimmedDescription !== null && trimmedDescription.length > 0 ? trimmedDescription : null,
         (logo as string | undefined) ?? null,
         parsedSiteUrl,
         (aiPageActions as boolean | undefined) ?? true

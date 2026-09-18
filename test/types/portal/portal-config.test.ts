@@ -60,6 +60,19 @@ describe('PortalConfig', () => {
     });
   });
 
+  describe('description', () => {
+    it('trims surrounding whitespace', () => {
+      expect(parse({ title: 'x', description: '  Docs  ' })._unsafeUnwrap().description).to.equal('Docs');
+    });
+
+    // It reached the site description and the og:description of every page as whitespace.
+    it('treats a blank description as none at all', () => {
+      for (const description of ['', '   ', '\n\t']) {
+        expect(parse({ title: 'x', description })._unsafeUnwrap().description, JSON.stringify(description)).to.be.null;
+      }
+    });
+  });
+
   describe('unknown settings', () => {
     // A mistyped setting is the one mistake that otherwise builds a portal that is quietly
     // wrong -- no logo, no site URL -- with nothing said about it.

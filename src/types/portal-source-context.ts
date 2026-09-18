@@ -148,10 +148,18 @@ export class PortalSourceContext {
       return [];
     }
     const directory = await this.fileService.getDirectory(this.specDirectory);
-    return directory.items
-      .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
-      .filter((fileName) => SPEC_EXTENSIONS.some((extension) => fileName.toString().toLowerCase().endsWith(extension)))
-      .sort((left, right) => left.toString().localeCompare(right.toString()));
+    return (
+      directory.items
+        .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
+        .filter((fileName) =>
+          SPEC_EXTENSIONS.some((extension) => fileName.toString().toLowerCase().endsWith(extension))
+        )
+        // Ordered by code point rather than collation. This sort decides which of two names
+        // that normalise to the same slug keeps it, and which document becomes the default
+        // server, so a host with a different locale would otherwise publish different URLs
+        // from the same `src/`.
+        .sort((left, right) => (left.toString() < right.toString() ? -1 : Number(left.toString() > right.toString())))
+    );
   }
 
   private async readDocument(file: FilePath): Promise<Record<string, unknown> | undefined> {
