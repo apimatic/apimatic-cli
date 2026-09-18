@@ -14,6 +14,11 @@ export class FileName {
     return this.name.toLowerCase().endsWith(extension.toLowerCase());
   }
 
+  /** Whether this is `name`, compared without regard to case. */
+  public is(name: string): boolean {
+    return this.name.toLowerCase() === name.toLowerCase();
+  }
+
   public normalize(): FileName {
     const nameWithoutExt = this.name.replace(/\.[^/.]+$/, '');
     const normalized = nameWithoutExt

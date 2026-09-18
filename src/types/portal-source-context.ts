@@ -107,12 +107,15 @@ export class PortalSourceContext {
     );
   }
 
-  /** Files at the top of `static/` that the build would otherwise have generated itself. */
+  /**
+   * Files at the top of `static/` that the build would otherwise have generated itself.
+   * Only the top level is read: nothing below it can land on one of these names, and walking
+   * the whole tree to find that out meant one unreadable entry -- a dead symlink, an
+   * unreadable folder -- threw out of `resolve`, which reports everything else as a Result.
+   */
   private async shadowedFiles(staticDirectory: DirectoryPath): Promise<FileName[]> {
-    const directory = await this.fileService.getDirectory(staticDirectory);
-    return directory.items
-      .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
-      .filter((fileName) => GENERATED_ROOT_FILES.includes(fileName.toString().toLowerCase()));
+    const fileNames = await this.fileService.getFileNames(staticDirectory);
+    return fileNames.filter((fileName) => GENERATED_ROOT_FILES.some((generated) => fileName.is(generated)));
   }
 
   private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {

@@ -216,6 +216,34 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
     });
 
+    // Only the root of the site collides, so only the top of static/ is read. Reading the
+    // whole tree also meant a large assets folder was walked and stat'd on every build.
+    it('ignores a generated name sitting below the top of the static directory', async () => {
+      write('static/docs/robots.txt', 'User-agent: *');
+
+      expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
+    });
+
+    // The whole-tree walk stat'd every entry with nothing to catch a failure, so one dead
+    // link threw ENOENT out of a method whose every other outcome is a Result.
+    it('survives an entry in the static directory that cannot be read', async function () {
+      write('static/robots.txt', 'User-agent: *');
+      const dangling = path.join(root, 'static', 'assets');
+      const target = path.join(root, 'gone');
+      fs.mkdirSync(target);
+      try {
+        fs.symlinkSync(target, dangling, 'junction');
+      } catch {
+        // Creating links is a privileged operation on some Windows runners.
+        this.skip();
+      }
+      fs.rmSync(target, { recursive: true, force: true });
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.shadowedFiles.map(String)).to.deep.equal(['robots.txt']);
+    });
+
     it('reports them once they exist', async () => {
       write('content/index.md', '# hi');
       write('static/logo.png', 'x');
