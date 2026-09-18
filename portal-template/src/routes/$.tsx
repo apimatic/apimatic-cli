@@ -110,6 +110,11 @@ async function loadPage(slugs: string[]) {
     return await serverLoader({ data: slugs });
   } catch (error) {
     if (!answeredFromStaticCache || isNotFound(error) || isRedirect(error)) throw error;
+    // A missing page is the ordinary reason to land here, but not the only one: a network
+    // failure, or a host answering with its own error page, fails the same way. Rendering
+    // "not found" for those is the better of two bad pages, and saying what actually
+    // happened is the difference between a puzzle and a report a user can act on.
+    console.error('Falling back to the not-found page; loading this page failed with:', error);
     throw notFound();
   }
 }
