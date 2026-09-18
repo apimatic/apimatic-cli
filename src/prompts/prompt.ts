@@ -5,8 +5,23 @@ import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from '@clack
 import { Result } from 'neverthrow';
 import { stripAnsi } from '../utils/string-utils.js';
 
-export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
+/** A fixed message, or one built from what the operation returned. */
+type SpinnerMessage<T> = string | ((value: T) => string);
+
+export interface SpinnerOptions {
+  /** `timer` shows elapsed time, for work measured in tens of seconds rather than a moment. */
+  indicator?: 'dots' | 'timer';
+}
+
+export async function withSpinner<T, E>(
+  intro: string,
+  success: SpinnerMessage<T>,
+  failure: SpinnerMessage<E>,
+  fn: Promise<Result<T, E>>,
+  options: SpinnerOptions = {}
+) {
   const s = spinner({
+    ...(options.indicator === 'timer' ? { indicator: 'timer' as const } : {}),
     cancelMessage: 'cancelled',
     errorMessage: 'failed',
     frames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
@@ -14,8 +29,8 @@ export async function withSpinner<T, E>(intro: string, success: string, failure:
   s.start(intro);
   const result = await fn;
   result.match(
-    () => s.stop(success, 0),
-    () => s.stop(failure, 1)
+    (value) => s.stop(typeof success === 'function' ? success(value) : success, 0),
+    (error) => s.stop(typeof failure === 'function' ? failure(error) : failure, 1)
   );
   return result;
 }

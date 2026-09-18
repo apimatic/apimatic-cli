@@ -79,18 +79,14 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const indicator = this.prompts.buildSpinner();
-      indicator.start();
-      const build = await this.buildService.build(project.value);
+      const build = await this.prompts.buildPortal(this.buildService.build(project.value));
 
       if (build.isErr()) {
-        indicator.fail(build.error.message);
         // Written before the temp directory is removed, so the log outlives the build.
         const logPath = await portalContext.saveBuildLog(build.error.log);
         this.prompts.buildFailed(build.error.log, logPath);
         return ActionResult.failed();
       }
-      indicator.succeed(build.value.pageCount);
 
       await portalContext.save(build.value.output, zipPortal);
 

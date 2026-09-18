@@ -1,12 +1,14 @@
-import { log, spinner } from '@clack/prompts';
+import { log } from '@clack/prompts';
 import { once } from 'node:events';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
+import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
-import { logTail, noteWrapped } from '../prompt.js';
+import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportShadowedFiles, reportSourceProblem } from './source.js';
 
@@ -35,13 +37,10 @@ export class PortalServePrompts {
   }
 
   /** The first start of a project pre-bundles dependencies and can take a minute. */
-  public startSpinner() {
-    const indicator = spinner({ indicator: 'timer' });
-    return {
-      start: () => indicator.start('Starting the portal preview'),
-      succeed: () => indicator.stop('Portal preview ready.', 0),
-      fail: (message: string) => indicator.stop(message, 1)
-    };
+  public startPreview(fn: Promise<Result<PortalDevServer, PortalDevServerFailure>>) {
+    return withSpinner('Starting the portal preview', 'Portal preview ready.', (failure) => failure.message, fn, {
+      indicator: 'timer'
+    });
   }
 
   public startFailed(output: string) {

@@ -1,11 +1,13 @@
-import { isCancel, confirm, log, spinner } from '@clack/prompts';
+import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
+import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
-import { logTail, noteWrapped } from '../prompt.js';
+import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportShadowedFiles, reportSourceProblem } from './source.js';
 
@@ -63,13 +65,14 @@ export class PortalGeneratePrompts {
    * A portal build runs for tens of seconds with no output of its own, so the spinner
    * carries an elapsed timer rather than a static message.
    */
-  public buildSpinner() {
-    const indicator = spinner({ indicator: 'timer' });
-    return {
-      start: () => indicator.start('Building the portal'),
-      succeed: (pageCount: number) => indicator.stop(`Built ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`, 0),
-      fail: (message: string) => indicator.stop(message, 1)
-    };
+  public buildPortal(fn: Promise<Result<PortalBuildResult, PortalBuildFailure>>) {
+    return withSpinner(
+      'Building the portal',
+      ({ pageCount }) => `Built ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`,
+      (failure) => failure.message,
+      fn,
+      { indicator: 'timer' }
+    );
   }
 
   public buildFailed(output: string, logPath: FilePath) {

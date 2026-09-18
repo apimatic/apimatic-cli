@@ -71,16 +71,12 @@ export class PortalServeAction {
         return ActionResult.failed();
       }
 
-      const indicator = this.prompts.startSpinner();
-      indicator.start();
-      const server = await this.devServerService.start(project.value, servePort);
+      const server = await this.prompts.startPreview(this.devServerService.start(project.value, servePort));
 
       if (server.isErr()) {
-        indicator.fail(server.error.message);
         this.prompts.startFailed(server.error.log);
         return ActionResult.failed();
       }
-      indicator.succeed();
 
       this.prompts.portalServed(server.value.url, sourceDirectory);
       if (openInBrowser) {
