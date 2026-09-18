@@ -277,6 +277,30 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig', migration: null });
     });
 
+    // `portal toc new`'s own removal message tells the user that meta.json replaced toc.yml,
+    // so listing it as having no equivalent said the opposite.
+    it('flags a table of contents rather than calling it unsupported', async () => {
+      write(
+        'APIMATIC-BUILD.json',
+        JSON.stringify({ generatePortal: { pageTitle: 'Acme', tableOfContentsPath: 'content/toc.yml' } })
+      );
+
+      const problem = (await resolve())._unsafeUnwrapErr() as {
+        migration: { hadTableOfContents: boolean; unsupportedFields: string[] };
+      };
+
+      expect(problem.migration.hadTableOfContents).to.be.true;
+      expect(problem.migration.unsupportedFields).to.not.include('tableOfContentsPath');
+    });
+
+    it('does not flag one for a build file that never had it', async () => {
+      write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
+
+      const problem = (await resolve())._unsafeUnwrapErr() as { migration: { hadTableOfContents: boolean } };
+
+      expect(problem.migration.hadTableOfContents).to.be.false;
+    });
+
     it('names a logo it cannot carry over instead of listing it as unsupported', async () => {
       write(
         'APIMATIC-BUILD.json',

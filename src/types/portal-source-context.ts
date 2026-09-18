@@ -29,7 +29,7 @@ const GENERATED_ROOT_FILES = [
 
 // `generatePortal` settings the v1 `portal.json` can express; everything else in the old
 // build file is reported as unsupported by the migration hint.
-const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl']);
+const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl', 'tableOfContentsPath']);
 
 /**
  * The `src/` directory of a portal project: `portal.json`, the OpenAPI documents in
@@ -235,7 +235,8 @@ export class PortalSourceContext {
         : {
             suggestedConfig: PortalConfig.create('My API'),
             unsupportedFields: ['generateVersionedPortal'],
-            unmigratableLogo: null
+            unmigratableLogo: null,
+            hadTableOfContents: false
           };
     }
 
@@ -258,7 +259,8 @@ export class PortalSourceContext {
     return {
       suggestedConfig: PortalConfig.create(title, null, logo),
       unsupportedFields,
-      unmigratableLogo: logoUrl !== null && logo === null ? logoUrl : null
+      unmigratableLogo: logoUrl !== null && logo === null ? logoUrl : null,
+      hadTableOfContents: portalFields.tableOfContentsPath !== undefined
     };
   }
 }

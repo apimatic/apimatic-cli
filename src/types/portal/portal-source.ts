@@ -47,4 +47,10 @@ export interface PortalMigration {
    * image rather than finding the setting listed as unsupported.
    */
   unmigratableLogo: string | null;
+  /**
+   * Whether the pre-2.0 file described its navigation with a table of contents. That has a
+   * 2.0 equivalent -- the `meta.json` files beside the pages -- so listing it as unsupported
+   * told the user the opposite of what the removed `portal toc new` command tells them.
+   */
+  hadTableOfContents: boolean;
 }

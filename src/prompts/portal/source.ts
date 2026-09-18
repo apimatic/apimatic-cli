@@ -85,6 +85,14 @@ function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryP
     );
   }
 
+  if (migration.hadTableOfContents) {
+    lines.push(
+      '',
+      `Navigation is no longer described by ${f.var('toc.yml')}. Pages are ordered by the ` +
+        `${f.var('meta.json')} files in your content directory, and API operations are grouped by their tags.`
+    );
+  }
+
   if (migration.unsupportedFields.length > 0) {
     lines.push(
       '',
