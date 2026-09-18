@@ -3,6 +3,7 @@ import { isCancel, log, select, text } from '@clack/prompts';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { format as f, getTree } from '../format.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { removeQuotes } from '../../utils/string-utils.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { Directory } from '../../types/file/directory.js';
@@ -43,6 +44,19 @@ export class PortalQuickstartPrompts {
       return undefined;
     }
     return createResourceInputFromInput(spec);
+  }
+
+  /** Refused before anything is written, so the user is not left with a half-made project. */
+  public specFormatUnsupported(specPath: FilePath, format: string) {
+    log.error(
+      `${f.path(specPath)} is ${format}. Portals are generated from OpenAPI 3.x documents; ` +
+        `convert it with ${f.cmdAlt('apimatic', 'api', 'transform')} first.`
+    );
+  }
+
+  /** Asked of this machine before anything is written, not after the project exists. */
+  public runtimeUnsupported(reason: string) {
+    log.error(reason);
   }
 
   public specFileDoesNotExist() {

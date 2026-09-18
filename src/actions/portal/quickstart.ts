@@ -1,4 +1,5 @@
 import { parse as parseYaml } from 'yaml';
+import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { getAuthInfo } from '../../client-utils/auth-manager.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
@@ -16,6 +17,7 @@ import { SpecContext } from '../../types/spec-context.js';
 import { PortalConfig } from '../../types/portal/portal-config.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
+import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
 
 const defaultPort: number = 23513 as const;
 
@@ -24,6 +26,7 @@ export class PortalQuickstartAction {
   private readonly fileService: FileService = new FileService();
   private readonly fileDownloadService = new FileDownloadService();
   private readonly authorizationService = new PortalAuthorizationService();
+  private readonly projectService = new PortalProjectService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly defaultSpecUrl = new UrlPath(
@@ -36,6 +39,14 @@ export class PortalQuickstartAction {
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
+    // Asked of this machine before anything is written: the flow ends in `portal serve`,
+    // which refuses on an older Node, and it used to refuse after scaffolding the project.
+    const runtimeProblem = this.projectService.runtimeProblem();
+    if (runtimeProblem !== null) {
+      this.prompts.runtimeUnsupported(runtimeProblem);
+      return ActionResult.failed();
+    }
+
     const storedAuth = await getAuthInfo(this.configDir.toString());
     if (!storedAuth?.authKey) {
       const loginResult = await new LoginAction(this.configDir, this.commandMetadata).execute();
@@ -110,6 +121,16 @@ export class PortalQuickstartAction {
         }
         const specContext = new SpecContext(tempDirectory);
         specPath = await specContext.save(downloadFileResult.value.stream, downloadFileResult.value.filename);
+      }
+
+      // The validation above accepts Swagger 2.0, which a portal cannot be built from. Asked
+      // here rather than by `portal serve` below, which used to refuse only after the
+      // project had been written -- and the directory prompt then refuses a non-empty one,
+      // so the user had to delete the tree the wizard itself had just created.
+      const unsupportedFormat = await this.unsupportedSpecFormat(specPath);
+      if (unsupportedFormat !== null) {
+        this.prompts.specFormatUnsupported(specPath, unsupportedFormat);
+        return ActionResult.failed();
       }
 
       // Step 3/3
@@ -208,6 +229,37 @@ export class PortalQuickstartAction {
       return title === null ? fallback : PortalConfig.create(title, description && this.cap(description, 300));
     } catch {
       return fallback;
+    }
+  }
+
+  /**
+   * Names the format when the document is not one a portal can be built from, or null when
+   * it is. A split specification arrives as an archive and is left to the build to judge.
+   */
+  private async unsupportedSpecFormat(specPath: FilePath): Promise<string | null> {
+    try {
+      if (await this.fileService.isZipFile(specPath)) {
+        return null;
+      }
+      const contents = await this.fileService.getContents(specPath);
+      const document = specPath.toString().toLowerCase().endsWith('.json')
+        ? JSON.parse(stripByteOrderMark(contents))
+        : parseYaml(contents);
+
+      const openapi = document?.openapi;
+      if (typeof openapi === 'string') {
+        return openapi.startsWith('3.') ? null : `OpenAPI ${openapi}`;
+      }
+      if (document?.swagger !== undefined) {
+        return `Swagger ${document.swagger}`;
+      }
+      if (document?.asyncapi !== undefined) {
+        return `AsyncAPI ${document.asyncapi}`;
+      }
+      return null;
+    } catch {
+      // Unreadable here means the build will say so with the file in front of it.
+      return null;
     }
   }
 

@@ -14,6 +14,7 @@ import { FileName } from '../../../src/types/file/fileName';
 type Internals = {
   scaffold(sourceDirectory: DirectoryPath, specPath: FilePath): Promise<void>;
   describeApi(specPath: FilePath): Promise<{ title: string; description: string | null }>;
+  unsupportedSpecFormat(specPath: FilePath): Promise<string | null>;
 };
 
 describe('PortalQuickstartAction', () => {
@@ -74,6 +75,29 @@ describe('PortalQuickstartAction', () => {
 
         const markdown = fs.readFileSync(path.join(source.toString(), 'content', 'index.md'), 'utf8');
         expect(frontMatterOf(markdown).description).to.equal(`Getting started with ${title}`);
+      });
+    });
+  });
+
+  // The validation step accepts documents a portal cannot be built from. Refusing them only
+  // once `portal serve` runs left the user with a scaffolded directory the wizard then
+  // refuses to reuse, because it requires an empty one.
+  describe('refusing a document before anything is written', () => {
+    const cases: [string, Record<string, unknown>, string | null][] = [
+      ['OpenAPI 3.0.4', { openapi: '3.0.4' }, null],
+      ['OpenAPI 3.1.0', { openapi: '3.1.0' }, null],
+      ['Swagger 2.0', { swagger: '2.0' }, 'Swagger 2.0'],
+      ['OpenAPI 2.0.0', { openapi: '2.0.0' }, 'OpenAPI 2.0.0'],
+      ['AsyncAPI 2.6.0', { asyncapi: '2.6.0' }, 'AsyncAPI 2.6.0']
+    ];
+
+    cases.forEach(([label, document, expected]) => {
+      it(`${expected === null ? 'accepts' : 'names'} ${label}`, async () => {
+        const name = 'spec.json';
+        fs.writeFileSync(path.join(root, name), JSON.stringify({ ...document, info: {}, paths: {} }));
+        const specPath = new FilePath(new DirectoryPath(root), new FileName(name));
+
+        expect(await action().unsupportedSpecFormat(specPath)).to.equal(expected);
       });
     });
   });
