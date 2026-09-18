@@ -35,6 +35,7 @@ const TEMPLATE_DEPENDENCIES = [
 ];
 
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
+const PORTAL_IDENTITY_PLACEHOLDER = "'__APIMATIC_PORTAL_IDENTITY__'";
 
 export interface PortalProjectPaths {
   /** Directory the child process runs in. */
@@ -144,11 +145,18 @@ export class PortalProjectService {
       specs[spec.slug] = this.toPosix(spec.file.toString());
     }
 
-    const configuration = {
+    // Only these four reach the browser. The rest of the configuration addresses this
+    // machine, and a JSON module is retained whole once client code imports it, so the
+    // identity is substituted into `portal.ts` as a literal instead.
+    const identity = {
       title: source.config.title,
       description: source.config.description,
       logoUrl: source.config.logoSiteUrl(),
-      siteUrl: source.config.siteOrigin()?.toString() ?? null,
+      siteUrl: source.config.siteOrigin()?.toString() ?? null
+    };
+
+    const configuration = {
+      ...identity,
       specs,
       contentDir: this.toPosix(contentDirectory.toString()),
       staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
@@ -159,16 +167,26 @@ export class PortalProjectService {
       JSON.stringify(configuration, null, 2)
     );
 
+    const portalModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('portal.ts'));
+    await this.substitute(portalModule, PORTAL_IDENTITY_PLACEHOLDER, JSON.stringify(identity));
+
     // The content directory reaches the template as a literal because Fumadocs' `defineDocs`
     // macro rejects anything it cannot read at compile time.
     const sourceModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('source.ts'));
-    const contents = await this.fileService.getContents(sourceModule);
-    const literal = JSON.stringify(this.toPosix(contentDirectory.toString()));
-    // Replacement supplied as a function: a path containing `$&` or `$1` would otherwise be
+    await this.substitute(
+      sourceModule,
+      CONTENT_DIRECTORY_PLACEHOLDER,
+      JSON.stringify(this.toPosix(contentDirectory.toString()))
+    );
+  }
+
+  private async substitute(file: FilePath, placeholder: string, literal: string): Promise<void> {
+    const contents = await this.fileService.getContents(file);
+    // Replacement supplied as a function: a value containing `$&` or `$1` would otherwise be
     // rewritten by the replacement-pattern syntax.
     await this.fileService.writeContents(
-      sourceModule,
-      contents.replace(CONTENT_DIRECTORY_PLACEHOLDER, () => literal)
+      file,
+      contents.replace(placeholder, () => literal)
     );
   }
 
