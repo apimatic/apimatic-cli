@@ -198,8 +198,11 @@ export class PortalConfig {
     };
   }
 
+  // Sonar asks for `replaceAll` here. It cannot be used: the root tsconfig compiles `src`
+  // against `lib: es2018`, where the method does not exist, and raising that is a decision
+  // for the whole CLI rather than part of a lint fix.
   private static normalize(relativePath: string): string {
-    return relativePath.replaceAll('\\', '/').replace(/^\.\//, '');
+    return relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
   }
 
   private static isInsideStatic(relativePath: string): boolean {
