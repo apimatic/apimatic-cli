@@ -18,11 +18,8 @@ const COMMANDS: CommandMapping[] = [
   { id: 'auth status', fileParts: ['commands', 'auth', 'status.js'] },
   { id: 'plugin generate', fileParts: ['commands', 'plugin', 'generate.js'] },
   { id: 'plugin publish', fileParts: ['commands', 'plugin', 'publish.js'] },
-  { id: 'portal copilot', fileParts: ['commands', 'portal', 'copilot.js'] },
-  { id: 'portal generate', fileParts: ['commands', 'portal', 'generate.js'], exportName: 'PortalGenerate' },
-  { id: 'portal recipe new', fileParts: ['commands', 'portal', 'recipe', 'new.js'] },
+  { id: 'portal generate', fileParts: ['commands', 'portal', 'generate.js'] },
   { id: 'portal serve', fileParts: ['commands', 'portal', 'serve.js'] },
-  { id: 'portal toc new', fileParts: ['commands', 'portal', 'toc', 'new.js'] },
   { id: 'publishing profile list', fileParts: ['commands', 'publishing', 'profile', 'list.js'] },
   { id: 'quickstart', fileParts: ['commands', 'quickstart.js'] },
   { id: 'sdk generate', fileParts: ['commands', 'sdk', 'generate.js'] },
@@ -48,7 +45,9 @@ describe('all command examples parse', () => {
       });
 
       it('has examples', () => {
-        expect(examples, `Command ${id} has no examples`).to.be.an('array');
+        // Not merely an array: an unresolved export yields an empty one, which would let
+        // the parse check below pass while testing nothing at all.
+        expect(examples, `Command ${id} has no examples`).to.be.an('array').that.is.not.empty;
       });
 
       describe('parse examples', function () {

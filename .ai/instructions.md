@@ -45,7 +45,7 @@ Command → Action → Application → Prompts / Infrastructure → Types
 
 1. **Commands** (`src/commands/`) — oclif `Command` subclasses. Parse flags, build `CommandMetadata`, call `intro()` → `action.execute()` → `outro(result)`. No business logic.
 2. **Actions** (`src/actions/`) — One per command. Orchestrate use-case: validate inputs via Context objects, coordinate services, return `ActionResult<T>`. Never throw to Command.
-3. **Application** (`src/application/`) — Complex reusable domain algorithms (e.g., TOC generators, recipe generators). Pure transformations: data in → data out. No prompts, no API calls.
+3. **Application** (`src/application/`) — Complex reusable domain algorithms. Pure transformations: data in → data out. No prompts, no API calls. (No such algorithms exist today; the directory reappears when one does.)
 4. **Prompts** (`src/prompts/`) — All terminal UI via `@clack/prompts`. One class per command mirroring `actions/`. Uses `withSpinner` for async operations. No business logic.
 5. **Infrastructure** (`src/infrastructure/`) — I/O adapters: `FileService`, `ZipService`, `NetworkService`, API services in `services/`. All return `Result<T, ServiceError>` (neverthrow).
 
@@ -89,7 +89,7 @@ Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by co
 ## Testing
 
 - **Framework**: mocha + chai (expect style) + sinon + nock + mock-fs
-- **Test location**: mirrors source — `test/commands/`, `test/actions/`, `test/application/`
+- **Test location**: mirrors source — `test/commands/`, `test/actions/`, `test/types/`, `test/infrastructure/`
 - **HTTP mocking**: nock for API calls
 - **Run via tsx** (not ts-node) for ESM compatibility
 

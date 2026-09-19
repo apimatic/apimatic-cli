@@ -1,0 +1,247 @@
+import { err, ok, Result } from 'neverthrow';
+import { parse as parseYaml } from 'yaml';
+import { FileService } from '../infrastructure/file-service.js';
+import { DirectoryPath } from './file/directoryPath.js';
+import { FileName } from './file/fileName.js';
+import { FilePath } from './file/filePath.js';
+import { PortalConfig } from './portal/portal-config.js';
+import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import { specFormatOf } from './portal/spec-format.js';
+import { stripByteOrderMark } from '../utils/string-utils.js';
+
+const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
+
+// The portal's own routes under /api/ are files with extensions -- /api/search.json -- so
+// none of them can collide with a spec section, which is always a directory. Nothing is
+// reserved: `search` was, back when the index was served from /api/search, and it cost a
+// specification legitimately named search.json its own name for no reason.
+const RESERVED_SPEC_SLUGS: string[] = [];
+
+// Names the build writes at the root of the site. The static directory is copied there
+// first, so a file of the same name replaces the generated one without a word.
+const GENERATED_ROOT_FILES = [
+  'robots.txt',
+  'sitemap.xml',
+  'llms.txt',
+  'llms-full.txt',
+  'index.html',
+  '404.html',
+  '_shell.html'
+];
+
+// `generatePortal` settings the v1 `portal.json` can express; everything else in the old
+// build file is reported as unsupported by the migration hint.
+const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl', 'tableOfContentsPath']);
+
+/**
+ * The `src/` directory of a portal project: `portal.json`, the OpenAPI documents in
+ * `spec/`, and the optional `content/` and `static/` directories.
+ */
+export class PortalSourceContext {
+  private readonly fileService = new FileService();
+
+  constructor(private readonly sourceDirectory: DirectoryPath) {}
+
+  private get configFile(): FilePath {
+    return new FilePath(this.sourceDirectory, new FileName('portal.json'));
+  }
+
+  private get legacyBuildFile(): FilePath {
+    return new FilePath(this.sourceDirectory, new FileName('APIMATIC-BUILD.json'));
+  }
+
+  private get specDirectory(): DirectoryPath {
+    return this.sourceDirectory.join('spec');
+  }
+
+  private get contentDirectory(): DirectoryPath {
+    return this.sourceDirectory.join('content');
+  }
+
+  private get staticDirectory(): DirectoryPath {
+    return this.sourceDirectory.join('static');
+  }
+
+  /** Reads and validates the whole source directory, or reports the first problem found. */
+  public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
+    if (!(await this.fileService.fileExists(this.configFile))) {
+      return err({ kind: 'missingConfig', migration: await this.migration() });
+    }
+
+    const config = PortalConfig.parse(await this.fileService.getContents(this.configFile));
+    if (config.isErr()) {
+      return err({ kind: 'invalidConfig', errors: config.error });
+    }
+
+    // The shape of `logo` is checked by `parse`; that the file is actually there is not,
+    // and a logo that is not there renders as a broken image on every page of a build that
+    // otherwise reports success.
+    const logoPath = config.value.logoPath();
+    if (logoPath !== null && !(await this.fileService.fileExists(this.resolveInSource(logoPath)))) {
+      return err({ kind: 'missingLogo', logoPath });
+    }
+
+    const specs = await this.specs();
+    if (specs.isErr()) {
+      return err(specs.error);
+    }
+
+    const staticDirectory = (await this.fileService.directoryExists(this.staticDirectory))
+      ? this.staticDirectory
+      : null;
+
+    return ok({
+      config: config.value,
+      specs: specs.value,
+      contentDirectory: (await this.fileService.directoryExists(this.contentDirectory)) ? this.contentDirectory : null,
+      staticDirectory,
+      shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory)
+    });
+  }
+
+  /** A `/`-separated path relative to `src/`, as `PortalConfig` reports it, as a file path. */
+  private resolveInSource(relativePath: string): FilePath {
+    const segments = relativePath.split('/');
+    const fileName = new FileName(segments.pop() ?? '');
+    return new FilePath(
+      segments.reduce((directory, segment) => directory.join(segment), this.sourceDirectory),
+      fileName
+    );
+  }
+
+  /**
+   * Files at the top of `static/` that the build would otherwise have generated itself.
+   * Only the top level is read: nothing below it can land on one of these names, and walking
+   * the whole tree to find that out meant one unreadable entry -- a dead symlink, an
+   * unreadable folder -- threw out of `resolve`, which reports everything else as a Result.
+   */
+  private async shadowedFiles(staticDirectory: DirectoryPath): Promise<FileName[]> {
+    const fileNames = await this.fileService.getFileNames(staticDirectory);
+    return fileNames.filter((fileName) => GENERATED_ROOT_FILES.some((generated) => fileName.is(generated)));
+  }
+
+  private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
+    const specs: PortalSpec[] = [];
+    const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
+
+    for (const fileName of await this.specFileNames()) {
+      const file = new FilePath(this.specDirectory, fileName);
+      const document = await this.readDocument(file);
+      if (document === undefined) {
+        return err({ kind: 'unreadableSpec', fileName });
+      }
+
+      const format = specFormatOf(document);
+      if (!format.supported) {
+        if (format.format === null) {
+          continue;
+        }
+        return err({ kind: 'unsupportedSpec', fileName, format: format.format });
+      }
+
+      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file });
+    }
+
+    if (specs.length === 0) {
+      return err({ kind: 'noSpecs' });
+    }
+    return ok(specs);
+  }
+
+  private async specFileNames(): Promise<FileName[]> {
+    if (!(await this.fileService.directoryExists(this.specDirectory))) {
+      return [];
+    }
+    const directory = await this.fileService.getDirectory(this.specDirectory);
+    return (
+      directory.items
+        .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
+        .filter((fileName) => SPEC_EXTENSIONS.some((extension) => fileName.hasExtension(extension)))
+        // Ordered by code point rather than collation. This sort decides which of two names
+        // that normalise to the same slug keeps it, and which document becomes the default
+        // server, so a host with a different locale would otherwise publish different URLs
+        // from the same `src/`.
+        .sort((left, right) => (left.toString() < right.toString() ? -1 : Number(left.toString() > right.toString())))
+    );
+  }
+
+  private async readDocument(file: FilePath): Promise<Record<string, unknown> | undefined> {
+    try {
+      const contents = await this.fileService.getContents(file);
+      // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
+      // so each extension gets the parser built for it.
+      const document = file.name().hasExtension('.json')
+        ? JSON.parse(stripByteOrderMark(contents))
+        : parseYaml(contents);
+      return typeof document === 'object' && document !== null && !Array.isArray(document)
+        ? (document as Record<string, unknown>)
+        : {};
+    } catch {
+      return undefined;
+    }
+  }
+
+  // A document without a version key is not a spec at all (APIMATIC-META.json, a `$ref`
+  // target); those are skipped silently. A recognisable but unsupported format is named.
+  private uniqueSlug(fileName: FileName, used: Set<string>): string {
+    const base = fileName.normalize().toString() || 'api';
+    let slug = base;
+    let suffix = 2;
+    while (used.has(slug)) {
+      slug = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    used.add(slug);
+    return slug;
+  }
+
+  /** What a pre-2.0 build file offers towards a `portal.json`, or null when there is none. */
+  private async migration(): Promise<PortalMigration | null> {
+    if (!(await this.fileService.fileExists(this.legacyBuildFile))) {
+      return null;
+    }
+
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(stripByteOrderMark(await this.fileService.getContents(this.legacyBuildFile)));
+    } catch {
+      return null;
+    }
+
+    const portal = data.generatePortal;
+    const versionedPortal = data.generateVersionedPortal;
+    if (typeof portal !== 'object' || portal === null) {
+      return versionedPortal === undefined
+        ? null
+        : {
+            suggestedConfig: PortalConfig.create('My API'),
+            unsupportedFields: ['generateVersionedPortal'],
+            unmigratableLogo: null,
+            hadTableOfContents: false
+          };
+    }
+
+    const portalFields = portal as Record<string, unknown>;
+    // Both fields come from a file the CLI has never validated, so each is held to what
+    // `PortalConfig.parse` accepts before it reaches the trusted factory.
+    const pageTitle = typeof portalFields.pageTitle === 'string' ? portalFields.pageTitle.trim() : '';
+    const title = pageTitle.length > 0 ? pageTitle : 'My API';
+
+    const logoUrl = typeof portalFields.logoUrl === 'string' ? portalFields.logoUrl : null;
+    const logo = logoUrl !== null && PortalConfig.isValidLogo(logoUrl) ? logoUrl : null;
+
+    const unsupportedFields = Object.keys(portalFields)
+      .filter((field) => !MIGRATABLE_PORTAL_FIELDS.has(field))
+      .sort((a, b) => a.localeCompare(b));
+    if (versionedPortal !== undefined) {
+      unsupportedFields.push('generateVersionedPortal');
+    }
+
+    return {
+      suggestedConfig: PortalConfig.create(title, null, logo),
+      unsupportedFields,
+      unmigratableLogo: logoUrl !== null && logo === null ? logoUrl : null,
+      hadTableOfContents: portalFields.tableOfContentsPath !== undefined
+    };
+  }
+}

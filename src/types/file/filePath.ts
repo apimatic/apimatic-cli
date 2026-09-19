@@ -1,6 +1,6 @@
-import path from "path";
-import { FileName } from "./fileName.js";
-import { DirectoryPath } from "./directoryPath.js";
+import path from 'path';
+import { FileName } from './fileName.js';
+import { DirectoryPath } from './directoryPath.js';
 
 export class FilePath {
   private readonly fileName: FileName;
@@ -9,6 +9,11 @@ export class FilePath {
   constructor(path: DirectoryPath, name: FileName) {
     this.fileName = name;
     this.directoryPath = path;
+  }
+
+  /** The leaf name, so callers can ask about it without unwrapping the whole path. */
+  public name(): FileName {
+    return this.fileName;
   }
 
   public replaceDirectory(newDirectory: DirectoryPath): FilePath {

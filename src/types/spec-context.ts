@@ -1,14 +1,13 @@
-import { FileService } from "../infrastructure/file-service.js";
-import { DirectoryPath } from "./file/directoryPath.js";
-import { FilePath } from "./file/filePath.js";
-import { FileName } from "./file/fileName.js";
-import { ZipService } from "../infrastructure/zip-service.js";
+import { FileService } from '../infrastructure/file-service.js';
+import { DirectoryPath } from './file/directoryPath.js';
+import { FilePath } from './file/filePath.js';
+import { FileName } from './file/fileName.js';
+import { ZipService } from '../infrastructure/zip-service.js';
 
 export class SpecContext {
   private readonly fileService = new FileService();
   private readonly zipService = new ZipService();
   private readonly specDirectory: DirectoryPath;
-
 
   constructor(specDirectory: DirectoryPath) {
     this.specDirectory = specDirectory;
@@ -18,8 +17,9 @@ export class SpecContext {
     return !(await this.fileService.directoryEmpty(this.specDirectory));
   }
 
-  public async replaceDefaultSpec(specPath: FilePath) {
-    await this.fileService.deleteFile(new FilePath(this.specDirectory, new FileName("openapi.json")));
+  /** Adds a specification to this directory, unpacking it when it is a split-spec archive. */
+  public async install(specPath: FilePath) {
+    await this.fileService.createDirectoryIfNotExists(this.specDirectory);
     if (await this.fileService.isZipFile(specPath)) {
       await this.zipService.unArchive(specPath, this.specDirectory);
     } else {

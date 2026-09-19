@@ -1,25 +1,22 @@
-import { Server } from "node:http";
-import { err, ok, Result } from "neverthrow";
-import { createServer as createLiveReloadServer } from "livereload";
-import connectLiveReload from "connect-livereload";
-import express, { Express } from "express";
-import chokidar from "chokidar";
-import { PortalServePrompts } from "../../prompts/portal/serve.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { ActionResult } from "../action-result.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { GenerateAction } from "./generate.js";
-import { NetworkService } from "../../infrastructure/network-service.js";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { LauncherService } from "../../infrastructure/launcher-service.js";
-import { DebounceService } from "../../infrastructure/debounce-service.js";
-import { BuildContext } from "../../types/build-context.js";
+import { PortalServePrompts } from '../../prompts/portal/serve.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ActionResult } from '../action-result.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { withBuildDirectory } from '../../infrastructure/tmp-extensions.js';
+import { NetworkService } from '../../infrastructure/network-service.js';
+import { LauncherService } from '../../infrastructure/launcher-service.js';
+import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
+import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
 
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
-  private readonly application: Express = express();
+  private readonly authorizationService = new PortalAuthorizationService();
+  private readonly projectService = new PortalProjectService();
+  private readonly devServerService = new PortalDevServerService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -30,177 +27,87 @@ export class PortalServeAction {
     this.authKey = authKey;
   }
 
-  public async execute(
-    buildDirectory: DirectoryPath,
-    portalDirectory: DirectoryPath,
+  public readonly execute = async (
+    sourceDirectory: DirectoryPath,
     port: number,
     openInBrowser: boolean,
-    hotReload: boolean,
     onAfterServe?: () => void
-  ): Promise<ActionResult> {
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.exists())) {
-      this.prompts.noPortalSource(buildDirectory);
+  ): Promise<ActionResult> => {
+    const runtimeProblem = this.projectService.runtimeProblem();
+    if (runtimeProblem !== null) {
+      this.prompts.runtimeUnsupported(runtimeProblem);
       return ActionResult.failed();
     }
-    let buildConfig;
-    try {
-      buildConfig = await buildContext.getBuildFileContents();
-    } catch {
-      this.prompts.invalidBuildConfig(buildDirectory);
+
+    // Checked once, at startup: the preview then runs unattended for as long as the user
+    // keeps editing, and re-checking on every reload would be a request per keystroke.
+    const authorization = await this.authorizationService.authorize(
+      this.configDir,
+      this.commandMetadata.shell,
+      this.authKey
+    );
+    if (authorization.isErr()) {
+      this.prompts.authorizationFailed(authorization.error);
       return ActionResult.failed();
     }
+
+    const sourceContext = new PortalSourceContext(sourceDirectory);
+    const source = await sourceContext.resolve();
+    if (source.isErr()) {
+      this.prompts.sourceProblem(source.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-    if (servePort != port) {
+    if (servePort !== port) {
       this.prompts.usingFallbackPort(port, servePort);
     }
-    const serveUrl = new UrlPath(`http://localhost:${servePort}`);
 
-    // Update the configured localhost base URL to the actual serve URL BEFORE
-    // generation bakes it into the portal artifacts; otherwise the portal would load
-    // its content from the wrong port and fail to render.
-    const updatedBuildConfig = buildConfig.updateBuildConfigBaseUrl(serveUrl);
-    if (updatedBuildConfig !== buildConfig) {
-      await buildContext.updateBuildFileContents(updatedBuildConfig);
-      this.prompts.baseUrlPortUpdated(serveUrl);
-    }
+    return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
+      const project = await this.projectService.prepare(tempDirectory, source.value);
+      if (project.isErr()) {
+        this.prompts.runtimeUnsupported(project.error);
+        return ActionResult.failed();
+      }
 
-    const generatePortalAction = new GenerateAction(this.configDir, this.commandMetadata, this.authKey);
-    const result = await generatePortalAction.execute(buildDirectory, portalDirectory, true, false);
-    if (result.isFailed()) {
-      return ActionResult.failed();
-    }
+      const server = await this.prompts.startPreview(this.devServerService.start(project.value, servePort));
 
-    const liveReloadPort = await this.networkService.getServerPort([35729, 35730, 35731, 35732]);
-    const liveReloadServer = createLiveReloadServer({ port: liveReloadPort });
+      if (server.isErr()) {
+        this.prompts.startFailed(server.error.log);
+        return ActionResult.failed();
+      }
 
-    // livereload attaches its "error" handler to the inner WebSocket server, not to the
-    // HTTP server it binds the port on, so a failed bind (e.g. the port was taken in the
-    // gap since getServerPort) emits an unhandled "error" that would crash the process.
-    // Guard the HTTP server the same way as the main server below.
-    const liveReloadHttpServer = (liveReloadServer as unknown as { config: { server: Server } }).config.server;
-    if ((await this.waitForServerListening(liveReloadHttpServer)).isErr()) {
-      liveReloadServer.close();
-      this.prompts.serverStartFailed(liveReloadPort);
-      return ActionResult.failed();
-    }
-
-    const server = this.application
-      .use(connectLiveReload())
-      .use(express.static(portalDirectory.toString(), { extensions: ["html"] }))
-      .listen(servePort);
-
-    if ((await this.waitForServerListening(server)).isErr()) {
-      liveReloadServer.close();
-      this.prompts.serverStartFailed(servePort);
-      return ActionResult.failed();
-    }
-
-    this.prompts.portalServed(serveUrl);
-    if (openInBrowser) {
-      await this.launcherService.openUrlInBrowser(serveUrl);
-    }
-    this.prompts.promptForExit();
-
-    if (!hotReload) {
+      this.prompts.portalServed(server.value.url, sourceDirectory);
+      if (openInBrowser) {
+        await this.launcherService.openUrlInBrowser(server.value.url);
+      }
       if (onAfterServe) {
         onAfterServe();
       }
 
       this.clearStandardInput();
-      await this.prompts.blockExecution();
 
-      liveReloadServer.close();
-      server.close();
-      return ActionResult.success();
-    }
+      // Whichever comes first: the user stopping the preview, or the preview stopping on its
+      // own. Waiting only on the signal left a crashed server advertised as running.
+      const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
+      const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
+      const outcome = await Promise.race([interrupted, stopped]);
 
-    this.prompts.hotReloadEnabled(buildDirectory);
+      if (outcome.kind === 'exited') {
+        this.prompts.previewStopped(outcome.output);
+        return ActionResult.failed();
+      }
 
-    const watcher = chokidar.watch(buildDirectory.toString(), {
-      ignored: [/(^|[/\\])\..+/],
-      ignoreInitial: true,
-      persistent: true,
-      awaitWriteFinish: true,
-      atomic: true
+      this.prompts.stopping();
+      await server.value.stop();
+      return ActionResult.stopped();
     });
+  };
 
-    const deletedDirectories = new Set<string>();
-    const debounceService: DebounceService = new DebounceService();
-
-    watcher
-      .on("all", async (event, path) => {
-        // triggers folder deletion as a single event
-        if (event == "unlinkDir") {
-          deletedDirectories.add(path);
-        }
-        if (event == "unlink") {
-          for (const dir of deletedDirectories) {
-            if (path.startsWith(dir)) {
-              return;
-            }
-          }
-        }
-
-        await debounceService.batchSingleRequest(async () => {
-          this.prompts.changesDetected();
-          // Re-reconcile on every hot-reload cycle: portalSettings.baseUrl takes
-          // precedence over generatePortal.baseUrl and may have been added or changed
-          // since serve started. If a mismatch is found the file is rewritten, which
-          // triggers a second watcher event — the debounce queues it, and the second
-          // cycle sees no mismatch and generates cleanly.
-          try {
-            const latestConfig = await buildContext.getBuildFileContents();
-            const reconciledConfig = latestConfig.updateBuildConfigBaseUrl(serveUrl);
-            if (reconciledConfig !== latestConfig) {
-              await buildContext.updateBuildFileContents(reconciledConfig);
-              this.prompts.baseUrlPortUpdated(serveUrl);
-            }
-          } catch {
-            // Build file temporarily unreadable (e.g. mid-save); skip reconciliation
-            // this cycle. GenerateAction will surface the error if the file is broken.
-          }
-          await generatePortalAction.execute(buildDirectory, portalDirectory, true, false, false);
-          liveReloadServer.refresh(portalDirectory.toString());
-          this.clearStandardInput();
-        });
-      })
-      .on("error", async () => {
-        this.prompts.watcherError();
-      });
-
-    // Wait for SIGINT or SIGTERM
-    this.clearStandardInput();
-    await this.prompts.blockExecution();
-
-    await watcher.close();
-    debounceService.close();
-    liveReloadServer.close();
-    server.close();
-    return ActionResult.success();
-  }
-
-  // Resolves ok once the server is bound, or err with the bind error (e.g. EADDRINUSE)
-  // so a failed listen is reported cleanly instead of crashing via an unhandled "error".
-  private waitForServerListening(server: Server): Promise<Result<void, Error>> {
-    return new Promise((resolve) => {
-      const onListening = () => {
-        server.removeListener("error", onError);
-        resolve(ok(undefined));
-      };
-      const onError = (error: Error) => {
-        server.removeListener("listening", onListening);
-        resolve(err(error));
-      };
-      server.once("listening", onListening);
-      server.once("error", onError);
-    });
-  }
-
-  // This clears the standard input to allow interrupts like CTRL+C to work properly.
+  // Clack leaves stdin in raw mode, which swallows CTRL+C until it is released.
   private clearStandardInput() {
-    if (process.platform !== "darwin" && process.stdin.isTTY) {
+    if (process.platform !== 'darwin' && process.stdin.isTTY) {
       process.stdin.setRawMode(false);
       process.stdin.pause();
     }

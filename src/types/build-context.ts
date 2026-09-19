@@ -1,10 +1,10 @@
-import { FileService } from "../infrastructure/file-service.js";
-import { DirectoryPath } from "./file/directoryPath.js";
-import { FilePath } from "./file/filePath.js";
-import { FileName } from "./file/fileName.js";
-import { BuildConfig } from "./build/build.js";
-import { SpecContext } from "./spec-context.js";
-import { TempContext } from "./temp-context.js";
+import { FileService } from '../infrastructure/file-service.js';
+import { DirectoryPath } from './file/directoryPath.js';
+import { FilePath } from './file/filePath.js';
+import { FileName } from './file/fileName.js';
+import { BuildConfig } from './build/build.js';
+import { SpecContext } from './spec-context.js';
+import { TempContext } from './temp-context.js';
 
 export class BuildContext {
   private readonly fileService = new FileService();
@@ -16,12 +16,7 @@ export class BuildContext {
 
   private get buildFile(): FilePath {
     // TODO: add checks for build file path
-    return new FilePath(this.buildDirectory, new FileName("APIMATIC-BUILD.json"));
-  }
-
-  /** The APIMATIC-BUILD.json path within this build directory, for callers that hand it to a service. */
-  public buildConfigFilePath(): FilePath {
-    return this.buildFile;
+    return new FilePath(this.buildDirectory, new FileName('APIMATIC-BUILD.json'));
   }
 
   public async validate(): Promise<boolean> {
@@ -44,17 +39,9 @@ export class BuildContext {
     return BuildConfig.parse(buildFileContent);
   }
 
-  public async updateBuildFileContents(buildConfig: BuildConfig) {
-    await this.fileService.writeContents(this.buildFile, JSON.stringify(buildConfig, null, 2));
-  }
-
-  public async deleteWorkflowDir() {
-    await this.fileService.deleteDirectory(this.buildDirectory.join(".github"));
-  }
-
   public async getBuildZipPath(tempDir: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {
     const tempContext = new TempContext(tempDir);
-    const tempBuildDir = tempDir.join("build");
+    const tempBuildDir = tempDir.join('build');
     await this.fileService.copyDirectoryContents(this.buildDirectory, tempBuildDir);
     if (packageSettingsDirectory) {
       await this.fileService.copyDirectoryContents(packageSettingsDirectory, tempBuildDir.join('package-settings'));
@@ -63,11 +50,11 @@ export class BuildContext {
   }
 
   public getSpecContext(): SpecContext {
-    return new SpecContext(this.buildDirectory.join("spec"));
+    return new SpecContext(this.buildDirectory.join('spec'));
   }
 
   public async hasSdkSourceTree(language: string): Promise<boolean> {
-    const sourceTreePath = FilePath.create(this.buildDirectory.join("sdk-source-tree").join(`.${language}`).toString());
+    const sourceTreePath = FilePath.create(this.buildDirectory.join('sdk-source-tree').join(`.${language}`).toString());
     if (!sourceTreePath) {
       return false;
     }
@@ -75,11 +62,11 @@ export class BuildContext {
   }
 
   public getSdkSourceTree(language: string): FilePath {
-    return FilePath.create(this.buildDirectory.join("sdk-source-tree").join(`.${language}`).toString())!;
+    return FilePath.create(this.buildDirectory.join('sdk-source-tree').join(`.${language}`).toString())!;
   }
 
   public async isVersionedBuild(): Promise<boolean> {
-    if (!await this.validate()) {
+    if (!(await this.validate())) {
       return false;
     }
     return (await this.getBuildFileContents()).isVersioned();
@@ -91,7 +78,7 @@ export class BuildContext {
       return undefined;
     }
     const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
-    if (!await this.fileService.directoryExists(versionsDirectory)) {
+    if (!(await this.fileService.directoryExists(versionsDirectory))) {
       return undefined;
     }
     const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
@@ -104,29 +91,29 @@ export class BuildContext {
       return undefined;
     }
     const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
-    if (!await this.fileService.directoryExists(versionsDirectory)) {
+    if (!(await this.fileService.directoryExists(versionsDirectory))) {
       return undefined;
     }
     const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
     return versionsDirs.length === 1 ? versionsDirs[0] : undefined;
   }
 
-  public async getSelectedVersionedBuildDirectory(versionSelector: (versions: string[]) => Promise<string | undefined>): Promise<DirectoryPath | undefined> {
+  public async getSelectedVersionedBuildDirectory(
+    versionSelector: (versions: string[]) => Promise<string | undefined>
+  ): Promise<DirectoryPath | undefined> {
     const buildConfig = await this.getBuildFileContents();
     if (!buildConfig.isVersioned()) {
       return undefined;
     }
     const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
-    if (!await this.fileService.directoryExists(versionsDirectory)) {
+    if (!(await this.fileService.directoryExists(versionsDirectory))) {
       return undefined;
     }
     const versionsDirs = await this.fileService.getSubDirectoriesPaths(versionsDirectory);
-    const selectedVersion = await versionSelector(versionsDirs.map(dir => dir.leafName()));
+    const selectedVersion = await versionSelector(versionsDirs.map((dir) => dir.leafName()));
     if (!selectedVersion) {
       return undefined;
     }
-    return versionsDirs.find(dir => dir.leafName() === selectedVersion);
-
+    return versionsDirs.find((dir) => dir.leafName() === selectedVersion);
   }
 }
-

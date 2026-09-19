@@ -1,21 +1,36 @@
-import type { Writable } from "node:stream";
-import pc from "picocolors";
-import { getColumns } from "@clack/core";
-import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from "@clack/prompts";
-import { Result } from "neverthrow";
-import { stripAnsi } from "../utils/string-utils.js";
+import type { Writable } from 'node:stream';
+import pc from 'picocolors';
+import { getColumns } from '@clack/core';
+import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from '@clack/prompts';
+import { Result } from 'neverthrow';
+import { stripAnsi } from '../utils/string-utils.js';
 
-export async function withSpinner<T, E>(intro: string, success: string, failure: string, fn: Promise<Result<T, E>>) {
+/** A fixed message, or one built from what the operation returned. */
+type SpinnerMessage<T> = string | ((value: T) => string);
+
+export interface SpinnerOptions {
+  /** `timer` shows elapsed time, for work measured in tens of seconds rather than a moment. */
+  indicator?: 'dots' | 'timer';
+}
+
+export async function withSpinner<T, E>(
+  intro: string,
+  success: SpinnerMessage<T>,
+  failure: SpinnerMessage<E>,
+  fn: Promise<Result<T, E>>,
+  options: SpinnerOptions = {}
+) {
   const s = spinner({
-    cancelMessage: "cancelled",
-    errorMessage: "failed",
-    frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    ...(options.indicator === 'timer' ? { indicator: 'timer' as const } : {}),
+    cancelMessage: 'cancelled',
+    errorMessage: 'failed',
+    frames: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
   });
   s.start(intro);
   const result = await fn;
   result.match(
-    () => s.stop(success, 0),
-    () => s.stop(failure, 1)
+    (value) => s.stop(typeof success === 'function' ? success(value) : success, 0),
+    (error) => s.stop(typeof failure === 'function' ? failure(error) : failure, 1)
   );
   return result;
 }
@@ -23,7 +38,7 @@ export async function withSpinner<T, E>(intro: string, success: string, failure:
 export const noteWrapped = (message: string, title: string) => {
   const output: Writable = process.stdout;
   const columns = getColumns(output) || 80;
-  const messages = message.split("\n");
+  const messages = message.split('\n');
   const messageHasOverFlow = messages.some((msg) => {
     const clean = stripAnsi(msg);
     return clean.length + 6 > columns;
@@ -32,7 +47,7 @@ export const noteWrapped = (message: string, title: string) => {
     const startLine = S_BAR_H.repeat(columns - title.length - 4);
     log.step(`${title} ${pc.gray(startLine)}`);
     log.message(message);
-    output.write(pc.gray(S_CONNECT_LEFT + S_BAR_H.repeat(columns - 1)) + "\n");
+    output.write(pc.gray(S_CONNECT_LEFT + S_BAR_H.repeat(columns - 1)) + '\n');
   } else {
     const opts: NoteOptions = {
       format: (line) => line
@@ -51,12 +66,7 @@ export function buildTableWithHeading(
     .join('\n\n');
 }
 
-function buildTable(
-  headers: string[],
-  rows: string[][],
-  rowSeparators = false,
-  columnStyles?: ColumnStyle[]
-): string {
+function buildTable(headers: string[], rows: string[][], rowSeparators = false, columnStyles?: ColumnStyle[]): string {
   const COL_PAD = 2;
   const MIN_COL_WIDTH = 4;
   const coloredHeaders = headers.map((h) => pc.bold(pc.white(h)));
@@ -105,3 +115,19 @@ function pad(text: string, width: number): string {
 }
 
 type ColumnStyle = 'primary' | 'secondary' | 'item';
+/** Last lines of a failed build, enough to show the cause without flooding the terminal. */
+const LOG_TAIL_LINES = 15;
+
+// A bundler puts the message and the offending file first and its own stack last, so a plain
+// tail of the log shows the least useful part of it. Frames inside installed packages are
+// dropped first; they also carry the store paths of the CLI's own dependencies.
+const INTERNAL_FRAME = /^\s+at\s.*(?:[\\/]node_modules[\\/]|\(node:)/;
+
+/** The part of a child process's output worth putting in front of the user. */
+export function logTail(output: string): string {
+  const lines = output.trimEnd().split('\n');
+  const meaningful = lines.filter((line) => !INTERNAL_FRAME.test(line));
+  // Some failures are nothing but frames; showing them beats showing nothing.
+  const source = meaningful.some((line) => line.trim().length > 0) ? meaningful : lines;
+  return source.slice(-LOG_TAIL_LINES).join('\n').trim();
+}

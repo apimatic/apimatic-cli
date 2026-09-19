@@ -1,18 +1,19 @@
-import axios from "axios";
-import { AuthInfo, getAuthInfo } from "../../client-utils/auth-manager.js";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { SubscriptionInfo } from "../../types/api/account.js";
-import { envInfo } from "../env-info.js";
-import { err, ok, Result } from "neverthrow";
-import { handleServiceError, ServiceError } from "../service-error.js";
+import axios from 'axios';
+import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { SubscriptionInfo } from '../../types/api/account.js';
+import { envInfo } from '../env-info.js';
+import { err, ok, Result } from 'neverthrow';
+import { handleServiceError, ServiceError } from '../service-error.js';
 
 export class ApiService {
-  private readonly apiBaseUrl = "https://api.apimatic.io" as const;
+  private readonly apiBaseUrl = 'https://api.apimatic.io' as const;
 
   public async getAccountInfo(
     configDir: DirectoryPath,
     shell: string,
-    authKey: string | null
+    authKey: string | null,
+    timeoutMs?: number
   ): Promise<Result<SubscriptionInfo, ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     if (authInfo === null && !authKey) {
@@ -21,7 +22,7 @@ export class ApiService {
 
     try {
       const token = authKey || authInfo?.authKey;
-      const response = await this.axiosInstance(shell, token).get("/account/profile");
+      const response = await this.axiosInstance(shell, token, timeoutMs).get('/account/profile');
 
       if (response.status === 200) {
         return ok(response.data as SubscriptionInfo);
@@ -32,24 +33,28 @@ export class ApiService {
     }
   }
 
-  public async sendTelemetry(payload: string, authKey: string, shell: string): Promise<Result<string, string | ServiceError>> {
+  public async sendTelemetry(
+    payload: string,
+    authKey: string,
+    shell: string
+  ): Promise<Result<string, string | ServiceError>> {
     try {
-      const response = await this.axiosInstance(shell, authKey).post("/telemetry/track", payload, {
-        headers: { "Content-Type": "application/json" }
+      const response = await this.axiosInstance(shell, authKey).post('/telemetry/track', payload, {
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (response.status === 200) {
-        return ok("telemetry sent");
+        return ok('telemetry sent');
       }
-      return err("Failed to send telemetry data");
+      return err('Failed to send telemetry data');
     } catch (error: unknown) {
       return err(handleServiceError(error));
     }
   }
 
-  private axiosInstance(shell: string, apiKey: string | undefined) {
+  private axiosInstance(shell: string, apiKey: string | undefined, timeoutMs?: number) {
     const headers: Record<string, string> = {
-      "User-Agent": envInfo.getUserAgent(shell)
+      'User-Agent': envInfo.getUserAgent(shell)
     };
 
     if (apiKey) {
@@ -58,7 +63,8 @@ export class ApiService {
 
     return axios.create({
       baseURL: envInfo.getBaseUrl() ?? this.apiBaseUrl,
-      headers
+      headers,
+      ...(timeoutMs === undefined ? {} : { timeout: timeoutMs })
     });
   }
 }

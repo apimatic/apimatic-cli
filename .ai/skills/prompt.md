@@ -80,8 +80,8 @@ Use when creating a new Prompts class. Choose the variant that matches the comma
 
 ### What to determine
 
-1. **Topic** — folder path matching the action (e.g., `auth`, `api`, `sdk`, `portal`, `portal/toc`)
-2. **Name** — file name, lowercase hyphenated (e.g., `login`, `generate`, `new-toc`)
+1. **Topic** — folder path matching the action (e.g., `auth`, `api`, `sdk`, `portal`, `sdk/publish`)
+2. **Name** — file name, lowercase hyphenated (e.g., `login`, `generate`, `save-changes`)
 3. **Class name** — PascalCase with `Prompts` suffix (e.g., `LoginPrompts`, `SdkGeneratePrompts`)
 4. **Variant** — one of:
    - `simple` — log methods and optional spinner; no interactive prompts
@@ -128,7 +128,7 @@ export class {PascalName}Prompts {
 **Notes:**
 - Omit `withSpinner` import entirely if the command has no async service call.
 - Add `import { format as f } from "../format.js"` when any message includes a dynamic value.
-- Adjust `../` depth: one more level per nesting (e.g., `portal/toc/` uses `../../`).
+- Adjust `../` depth: one more level per nesting (e.g., `sdk/publish/` uses `../../`).
 
 ### Standard Template
 

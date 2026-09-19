@@ -1,0 +1,20 @@
+This directory is the build project the APIMatic CLI copies into a temporary
+directory to generate a documentation portal. It is distributed under the MIT
+licence, with the rest of @apimatic/cli.
+
+It is derived from the Fumadocs and TanStack Start starter templates, and at
+build time it runs against the packages below. Each is MIT licensed and carries
+its own copyright:
+
+  Fumadocs (fumadocs-core, fumadocs-ui, fumadocs-mdx, fumadocs-openapi)
+    Copyright (c) 2023 Fuma Nama
+
+  TanStack Start and TanStack Router (@tanstack/react-start, @tanstack/react-router,
+  @tanstack/start-static-server-functions)
+    Copyright (c) 2021-present Tanner Linsley
+
+  Shiki, Tailwind CSS, React and Vite are likewise MIT licensed; see their own
+  packages for the full notices.
+
+The generated portal additionally loads the Geist typeface from Google Fonts at
+runtime.

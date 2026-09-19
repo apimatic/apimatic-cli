@@ -1,46 +1,27 @@
-import { Command, Flags } from "@oclif/core";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FlagsProvider } from "../../types/flags-provider.js";
-import { CopilotAction } from "../../actions/portal/copilot.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { format, intro, outro } from "../../prompts/format.js";
+import { Command } from '@oclif/core';
+import { ActionResult } from '../../actions/action-result.js';
+import { format, intro, outro } from '../../prompts/format.js';
+import { reportRemovedCommand } from '../../prompts/portal/removed.js';
 
 export default class PortalCopilot extends Command {
-  static summary = "Configure API Copilot for your API Documentation portal";
+  // Kept only so the command answers for itself for one major version; it does no work.
+  static readonly hidden = true;
 
-  static description =
-    `Displays available API Copilots associated with your account and allows you to select which one to integrate with your portal. Each APIMatic account includes one Copilot by default. The selected Copilot will be added to your ${format.var("APIMATIC-BUILD.json")} file`;
+  static readonly summary = 'Removed in version 2.';
 
-  static flags = {
-    ...FlagsProvider.input,
-    disable: Flags.boolean({
-      default: false,
-      description: "marks the API Copilot as disabled in the configuration"
-    }),
-    ...FlagsProvider.force,
-    ...FlagsProvider.authKey
-  };
+  static readonly description = 'Configuring API Copilot from the CLI was removed in version 2.';
 
-  static cmdTxt = format.cmd("apimatic", "portal", "copilot");
-  static examples = [
-    `${this.cmdTxt} ${format.flag("input", './')}`,
-    `${this.cmdTxt} ${format.flag("input", './')} ${format.flag("disable")}`
-  ];
+  static readonly cmdTxt = format.cmd('apimatic', 'portal', 'copilot');
 
   async run(): Promise<void> {
-    const {
-      flags: { input, "auth-key": authKey, disable, force }
-    } = await this.parse(PortalCopilot);
-
-    const commandMetadata: CommandMetadata = {
-      commandName: PortalCopilot.id,
-      shell: this.config.shell
-    };
-
-    intro("Configure API Copilot");
-    const buildDirectory = DirectoryPath.createInput(input).join("src");
-    const copilotConfigAction = new CopilotAction(new DirectoryPath(this.config.configDir), commandMetadata, authKey);
-    const result = await copilotConfigAction.execute(buildDirectory, force, !disable);
-    outro(result);
+    intro('Portal Copilot');
+    reportRemovedCommand(
+      'apimatic portal copilot',
+      `Portals are now built on your machine from ${format.var(
+        'src/portal.json'
+      )}, which has no API Copilot setting yet.\n` +
+        `Run ${format.cmdAlt('apimatic', 'portal', 'generate')} to build a portal without it.`
+    );
+    outro(ActionResult.failed('Removed'));
   }
 }
