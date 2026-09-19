@@ -74,7 +74,9 @@ describe('PortalDevServerService', () => {
     // running for hours holds every line the dev server ever printed, and this test would
     // not notice -- draining and bounding are separate things.
     expect(output).to.not.contain('noisy line 0\n');
-    expect(output.length).to.be.lessThan(200_000);
+    // The bound is in characters, so it holds on every platform. Counting chunks instead
+    // made this same output 4 KB on a Windows runner and 280 KB on a POSIX one.
+    expect(output.length).to.be.lessThan(150_000);
   });
 
   it('reports a server that exits before printing an address', async () => {

@@ -8,8 +8,13 @@ import { PortalProjectPaths, PortalProjectService } from './portal-project-servi
 /** Cold starts spend most of this budget pre-bundling dependencies for the first time. */
 const STARTUP_TIMEOUT_MS = 3 * 60 * 1000;
 
-/** How much of a running server's output is kept, in case it is the explanation of a crash. */
-const OUTPUT_TAIL_CHUNKS = 64;
+/**
+ * How much of a running server's output is kept, in case it is the explanation of a crash.
+ * Counted in characters rather than chunks: a chunk is however much the pipe delivered at
+ * once, which differs by platform and by Node version, so a bound of 64 chunks came to 4 KB
+ * on one runner and 280 KB on another for the same output.
+ */
+const OUTPUT_TAIL_BYTES = 64 * 1024;
 
 /** How long the last of a dead server's output is waited for before reporting what arrived. */
 const DRAIN_TIMEOUT_MS = 2000;
@@ -89,11 +94,16 @@ export class PortalDevServerService {
    */
   private watchForExit(subprocess: ResultPromise): Promise<string> {
     const tail: string[] = [];
+    let kept = 0;
     const output = subprocess.all;
     output?.on('data', (chunk: Buffer) => {
-      tail.push(chunk.toString().replace(COLOUR_SEQUENCE_PATTERN, ''));
-      if (tail.length > OUTPUT_TAIL_CHUNKS) {
-        tail.shift();
+      const text = chunk.toString().replace(COLOUR_SEQUENCE_PATTERN, '');
+      tail.push(text);
+      kept += text.length;
+      // The last chunk always survives, however big it is: it is the one most likely to hold
+      // the message that explains the exit.
+      while (tail.length > 1 && kept > OUTPUT_TAIL_BYTES) {
+        kept -= (tail.shift() as string).length;
       }
     });
 
