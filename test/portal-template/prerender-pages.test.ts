@@ -88,4 +88,17 @@ describe('prerenderPages', () => {
       expect(urls, `asked for a Markdown twin of ${generated}`).to.not.include(generated);
     }
   });
+
+  // The suffixing loop adds to the set it reads, so it reads a copy; see the comment there.
+  it('suffixes each page once, however many pages there are', async () => {
+    write('index.md');
+    write('guides.md');
+    write('reference/auth.md');
+
+    const urls = await urlsFor('https://docs.test');
+
+    expect(urls.filter((url) => url.endsWith('.md.md'))).to.be.empty;
+    expect(urls).to.include('/guides.md');
+    expect(urls).to.include('/reference/auth.md');
+  });
 });

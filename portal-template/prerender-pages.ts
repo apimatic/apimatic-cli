@@ -22,6 +22,11 @@ export async function prerenderPages(config: PortalConfig): Promise<{ path: stri
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
   for (const url of await openApiUrls(config.specs)) urls.add(url);
 
+  // Iterates a copy on purpose, because the loop adds to `urls` as it goes. A `Set` visits
+  // entries added during iteration, so iterating `urls` itself would reach the `.md` URLs
+  // this loop creates and suffix those in turn -- `/guides.md.md` and on, never terminating.
+  // A linter calling the copy redundant is wrong: the cost of taking its advice is a build
+  // that hangs, not a test that fails.
   for (const url of [...urls]) {
     if (url === '/') urls.add('/index.md');
     else if (!/\.(txt|xml|json)$/.test(url)) urls.add(`${url}.md`);

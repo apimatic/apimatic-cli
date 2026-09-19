@@ -192,6 +192,7 @@ export class PortalQuickstartAction {
 
     const contentDirectory = sourceDirectory.join('content');
     await this.fileService.createDirectoryIfNotExists(contentDirectory);
+    const summary = `Getting started with ${config.siteTitle()}`;
     await this.fileService.writeContents(
       new FilePath(contentDirectory, new FileName('index.md')),
       [
@@ -199,7 +200,7 @@ export class PortalQuickstartAction {
         'title: Welcome',
         // JSON is valid YAML. Quoting through it keeps a title carrying ': ' or '#' from
         // breaking the front matter, which fails the whole build rather than one page.
-        `description: ${JSON.stringify(`Getting started with ${config.siteTitle()}`)}`,
+        `description: ${JSON.stringify(summary)}`,
         '---',
         '',
         `Welcome to the ${config.siteTitle()} documentation.`,

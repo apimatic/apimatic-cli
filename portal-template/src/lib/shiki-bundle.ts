@@ -1,6 +1,9 @@
 import { createBundledHighlighter } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
-import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
+
+// Re-exported untouched: Fumadocs imports it from the `shiki` entry point this file stands
+// in for, though the bundle itself builds its highlighter on the JavaScript engine.
+export { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 
 type LanguageImport = () => Promise<unknown>;
 
@@ -97,4 +100,4 @@ export const createHighlighter = createBundledHighlighter({
   engine: () => createJavaScriptRegexEngine()
 });
 
-export { createJavaScriptRegexEngine, createOnigurumaEngine };
+export { createJavaScriptRegexEngine };

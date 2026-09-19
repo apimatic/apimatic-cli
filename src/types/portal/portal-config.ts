@@ -46,6 +46,44 @@ export class PortalConfig {
   }
 
   public static parse(json: string): Result<PortalConfig, string[]> {
+    const document = PortalConfig.parseObject(json);
+    if (document.isErr()) {
+      return err(document.error);
+    }
+
+    const data = document.value;
+    const { title, description, logo, siteUrl, aiPageActions } = data;
+    const parsedSiteUrl = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
+
+    // Every field is reported at once rather than stopping at the first, so one edit fixes
+    // the file. One checker per setting, in the order they are reported.
+    const errors = [
+      ...PortalConfig.unknownFieldErrors(data),
+      ...PortalConfig.titleErrors(title),
+      ...PortalConfig.descriptionErrors(description),
+      ...PortalConfig.logoErrors(logo),
+      ...PortalConfig.aiPageActionsErrors(aiPageActions),
+      ...PortalConfig.siteUrlErrors(siteUrl, parsedSiteUrl)
+    ];
+    if (errors.length > 0) {
+      return err(errors);
+    }
+
+    // A blank description is the same as none; without this it shipped as the site
+    // description and as the og:description of every page.
+    const trimmedDescription = typeof description === 'string' ? description.trim() : '';
+    return ok(
+      new PortalConfig(
+        (title as string).trim(),
+        trimmedDescription.length > 0 ? trimmedDescription : null,
+        (logo as string | undefined) ?? null,
+        parsedSiteUrl,
+        (aiPageActions as boolean | undefined) ?? true
+      )
+    );
+  }
+
+  private static parseObject(json: string): Result<Record<string, unknown>, string[]> {
     let data: unknown;
     try {
       data = JSON.parse(stripByteOrderMark(json));
@@ -55,67 +93,58 @@ export class PortalConfig {
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {
       return err(['portal.json must contain a JSON object.']);
     }
+    return ok(data as Record<string, unknown>);
+  }
 
-    const errors: string[] = [];
-    const { title, description, logo, siteUrl, aiPageActions } = data as Record<string, unknown>;
-
-    for (const field of Object.keys(data as Record<string, unknown>)) {
-      if (KNOWN_FIELDS.has(field)) {
-        continue;
-      }
-      const intended = RENAMED_FIELDS[field];
-      errors.push(
-        intended
+  private static unknownFieldErrors(data: Record<string, unknown>): string[] {
+    return Object.keys(data)
+      .filter((field) => !KNOWN_FIELDS.has(field))
+      .map((field) => {
+        const intended = RENAMED_FIELDS[field];
+        return intended
           ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
-          : `'${field}' is not a portal.json setting.`
-      );
-    }
+          : `'${field}' is not a portal.json setting.`;
+      });
+  }
 
-    if (typeof title !== 'string' || title.trim().length === 0) {
-      errors.push("'title' is required and must be a non-empty string.");
-    }
-    if (description !== undefined && typeof description !== 'string') {
-      errors.push("'description' must be a string.");
-    }
-    // A blank one is the same as none; without this it shipped as the site description and
-    // as the og:description of every page.
-    const trimmedDescription = typeof description === 'string' ? description.trim() : null;
-    if (logo !== undefined) {
-      if (typeof logo !== 'string' || logo.trim().length === 0) {
-        errors.push("'logo' must be a non-empty string.");
-      } else if (!PortalConfig.isInsideStatic(logo)) {
-        errors.push(
-          `'logo' must be a path relative to 'src' inside the 'static' directory, for example '${STATIC_PREFIX}images/logo.png'.`
-        );
-      }
-    }
+  private static titleErrors(title: unknown): string[] {
+    return typeof title === 'string' && title.trim().length > 0
+      ? []
+      : ["'title' is required and must be a non-empty string."];
+  }
 
-    if (aiPageActions !== undefined && typeof aiPageActions !== 'boolean') {
-      errors.push("'aiPageActions' must be true or false.");
-    }
+  private static descriptionErrors(description: unknown): string[] {
+    return description === undefined || typeof description === 'string' ? [] : ["'description' must be a string."];
+  }
 
-    let parsedSiteUrl: UrlPath | null = null;
-    if (siteUrl !== undefined) {
-      parsedSiteUrl = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
-      if (parsedSiteUrl === null) {
-        errors.push(
+  private static logoErrors(logo: unknown): string[] {
+    if (logo === undefined) {
+      return [];
+    }
+    if (typeof logo !== 'string' || logo.trim().length === 0) {
+      return ["'logo' must be a non-empty string."];
+    }
+    if (!PortalConfig.isInsideStatic(logo)) {
+      return [
+        `'logo' must be a path relative to 'src' inside the 'static' directory, for example '${STATIC_PREFIX}images/logo.png'.`
+      ];
+    }
+    return [];
+  }
+
+  private static aiPageActionsErrors(aiPageActions: unknown): string[] {
+    return aiPageActions === undefined || typeof aiPageActions === 'boolean'
+      ? []
+      : ["'aiPageActions' must be true or false."];
+  }
+
+  /** `parsed` is null both for a value that is not a string and for one that is not an origin. */
+  private static siteUrlErrors(siteUrl: unknown, parsed: UrlPath | null): string[] {
+    return siteUrl === undefined || parsed !== null
+      ? []
+      : [
           "'siteUrl' must be the address the portal is hosted at, without a path, for example 'https://docs.example.com'."
-        );
-      }
-    }
-
-    if (errors.length > 0) {
-      return err(errors);
-    }
-    return ok(
-      new PortalConfig(
-        (title as string).trim(),
-        trimmedDescription !== null && trimmedDescription.length > 0 ? trimmedDescription : null,
-        (logo as string | undefined) ?? null,
-        parsedSiteUrl,
-        (aiPageActions as boolean | undefined) ?? true
-      )
-    );
+        ];
   }
 
   /**
@@ -170,7 +199,7 @@ export class PortalConfig {
   }
 
   private static normalize(relativePath: string): string {
-    return relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
+    return relativePath.replaceAll('\\', '/').replace(/^\.\//, '');
   }
 
   private static isInsideStatic(relativePath: string): boolean {

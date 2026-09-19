@@ -188,7 +188,7 @@ function writePointer(root: Record<string, unknown>, segments: string[], value: 
     if (next === null || typeof next !== 'object') node[segment] = {};
     node = node[segment] as Record<string, unknown>;
   }
-  node[segments[segments.length - 1]] = value;
+  node[segments.at(-1) as string] = value;
 }
 
 /** A component named `a/b` is referenced as `a~1b`, and may also be percent-encoded. */
