@@ -113,10 +113,15 @@ describe('PortalAuthorizationService', () => {
     storeKey('stored-key');
     nock(BASE_URL).get('/account/profile').reply(500);
 
-    const failure = (await authorize())._unsafeUnwrapErr();
+    const failure = (await authorize())._unsafeUnwrapErr() as {
+      kind: string;
+      error: { code: ServiceErrorCode };
+      host: string;
+    };
 
     expect(failure.kind).to.equal('unverifiable');
-    expect((failure as { error: { code: ServiceErrorCode } }).error.code).to.equal(ServiceErrorCode.ServerError);
+    expect(failure.error.code).to.equal(ServiceErrorCode.ServerError);
+    expect(failure.host).to.equal('portal-authorization.test');
   });
 
   it('fails closed when the API cannot be reached at all', async () => {

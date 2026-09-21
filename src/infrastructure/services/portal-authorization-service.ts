@@ -13,7 +13,7 @@ const PROFILE_TIMEOUT_MS = 10_000;
  */
 export type PortalAuthorizationFailure =
   | { kind: 'unauthenticated' }
-  | { kind: 'unverifiable'; error: ServiceError }
+  | { kind: 'unverifiable'; error: ServiceError; host: string }
   | { kind: 'notEntitled' };
 
 /** Checks the account may generate a portal on this machine, before any build work starts. */
@@ -32,7 +32,7 @@ export class PortalAuthorizationService {
       return err(
         account.error.code === ServiceErrorCode.UnAuthorized
           ? { kind: 'unauthenticated' }
-          : { kind: 'unverifiable', error: account.error }
+          : { kind: 'unverifiable', error: account.error, host: this.apiService.apiHost() }
       );
     }
 

@@ -52,6 +52,16 @@ export class ApiService {
     }
   }
 
+  /** The host requests go to, for a message that names where a check was made. */
+  public apiHost(): string {
+    const baseUrl = envInfo.getBaseUrl() ?? this.apiBaseUrl;
+    try {
+      return new URL(baseUrl).host;
+    } catch {
+      return baseUrl;
+    }
+  }
+
   private axiosInstance(shell: string, apiKey: string | undefined, timeoutMs?: number) {
     const headers: Record<string, string> = {
       'User-Agent': envInfo.getUserAgent(shell)
