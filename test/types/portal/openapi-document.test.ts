@@ -103,6 +103,13 @@ describe('OpenApiDocument', () => {
       expect(config.siteDescription()).to.be.null;
     });
 
+    it('keeps the description when only the title is missing', () => {
+      const config = withInfo({ version: '1', description: 'Pets, and how to get them.' }).suggestedConfig();
+
+      expect(config.siteTitle()).to.equal('My API');
+      expect(config.siteDescription()).to.equal('Pets, and how to get them.');
+    });
+
     it('ignores a title that is only whitespace', () => {
       expect(withInfo({ title: '  \n  ', version: '1' }).suggestedConfig().siteTitle()).to.equal('My API');
     });

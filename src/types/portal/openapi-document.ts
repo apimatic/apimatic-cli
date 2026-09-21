@@ -58,10 +58,7 @@ export class OpenApiDocument {
   public suggestedConfig(): PortalConfig {
     const info = this.document.info;
     const fields = typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {};
-    const title = oneLine(fields.title);
-    if (title === null) {
-      return PortalConfig.placeholder;
-    }
+    const title = oneLine(fields.title) ?? PortalConfig.placeholder.siteTitle();
     const description = oneLine(fields.description);
     return PortalConfig.create(title, description === null ? null : cap(description, DESCRIPTION_LIMIT));
   }
