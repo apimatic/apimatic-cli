@@ -58,6 +58,9 @@ export class PortalConfig {
     return new PortalConfig(title, description, logo, siteUrl, aiPageActions);
   }
 
+  /** What a portal is called until something names it: a specification, or the user. */
+  public static readonly placeholder = new PortalConfig('My API', null, null, null, true);
+
   public static parse(json: string): Result<PortalConfig, string[]> {
     const document = PortalConfig.parseObject(json);
     if (document.isErr()) {

@@ -1,11 +1,8 @@
-import { parse as parseYaml } from 'yaml';
-import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { getAuthInfo } from '../../client-utils/auth-manager.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PortalQuickstartPrompts } from '../../prompts/portal/quickstart.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { LoginAction } from '../auth/login.js';
@@ -14,8 +11,8 @@ import { PortalServeAction } from './serve.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ValidateAction } from '../api/validate.js';
 import { SpecContext } from '../../types/spec-context.js';
-import { PortalConfig } from '../../types/portal/portal-config.js';
-import { SpecFormat, specFormatOf } from '../../types/portal/spec-format.js';
+import { OpenApiDocument, SpecFormat } from '../../types/portal/openapi-document.js';
+import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
@@ -156,7 +153,7 @@ export class PortalQuickstartAction {
       }
 
       const sourceDirectory = inputDirectory.join('src');
-      await this.scaffold(sourceDirectory, specPath);
+      await new PortalSourceContext(sourceDirectory).scaffold(specPath);
 
       const structure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, structure);
@@ -174,106 +171,17 @@ export class PortalQuickstartAction {
     });
   };
 
-  /** Writes the smallest source tree `portal generate` and `portal serve` accept. */
-  private async scaffold(sourceDirectory: DirectoryPath, specPath: FilePath): Promise<void> {
-    const specContext = new SpecContext(sourceDirectory.join('spec'));
-    await specContext.install(specPath);
-
-    const config = await this.describeApi(specPath);
-    await this.fileService.writeContents(
-      new FilePath(sourceDirectory, new FileName('portal.json')),
-      JSON.stringify(config, null, 2) + '\n'
-    );
-
-    const contentDirectory = sourceDirectory.join('content');
-    await this.fileService.createDirectoryIfNotExists(contentDirectory);
-    const summary = `Getting started with ${config.siteTitle()}`;
-    await this.fileService.writeContents(
-      new FilePath(contentDirectory, new FileName('index.md')),
-      [
-        '---',
-        'title: Welcome',
-        // JSON is valid YAML. Quoting through it keeps a title carrying ': ' or '#' from
-        // breaking the front matter, which fails the whole build rather than one page.
-        `description: ${JSON.stringify(summary)}`,
-        '---',
-        '',
-        `Welcome to the ${config.siteTitle()} documentation.`,
-        '',
-        'Replace this page with your own introduction, and add more Markdown pages beside it.',
-        ''
-      ].join('\n')
-    );
-    // Orders the sidebar: named pages first, then everything else alphabetically.
-    await this.fileService.writeContents(
-      new FilePath(contentDirectory, new FileName('meta.json')),
-      JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
-    );
-  }
-
-  // Saves the user a question: a valid OpenAPI document already carries the portal's title
-  // and description. A split spec arrives as an archive, which falls back to the default.
-  private async describeApi(specPath: FilePath): Promise<PortalConfig> {
-    const fallback = PortalConfig.create('My API');
-    try {
-      if (await this.fileService.isZipFile(specPath)) {
-        return fallback;
-      }
-      const document = this.parseSpec(specPath, await this.fileService.getContents(specPath));
-      const info = document?.info;
-      // Both are written into generated files, so each is collapsed to one line first --
-      // taking only the first line left the 300-character cap unreachable for wrapped prose.
-      const title = this.oneLine(info?.title);
-      const description = this.oneLine(info?.description);
-      return title === null ? fallback : PortalConfig.create(title, description && this.cap(description, 300));
-    } catch {
-      return fallback;
-    }
-  }
-
-  /**
-   * Whether the document is one a portal can be built from, by the same rule the build
-   * applies -- a second implementation of it disagreed on documents carrying no version key,
-   * which the wizard accepted and the preview it then launched refused. A split specification
-   * arrives as an archive and is left to the build to judge.
-   */
+  // A split specification arrives as an archive, and a file that cannot be read is left to
+  // the build too, which says so with the file in front of it.
   private async specFormat(specPath: FilePath): Promise<SpecFormat> {
     try {
       if (await this.fileService.isZipFile(specPath)) {
         return { supported: true };
       }
-      return specFormatOf(this.parseSpec(specPath, await this.fileService.getContents(specPath)));
+      const document = OpenApiDocument.parse(specPath.name(), await this.fileService.getContents(specPath));
+      return document === undefined ? { supported: true } : document.format();
     } catch {
-      // Unreadable here means the build will say so with the file in front of it.
       return { supported: true };
     }
-  }
-
-  /** The specification as an object, shared so both readers below agree on how it is read. */
-  private parseSpec(
-    specPath: FilePath,
-    contents: string
-  ): { info?: Record<string, unknown> } & Record<string, unknown> {
-    const text = stripByteOrderMark(contents);
-    return specPath.name().hasExtension('.json') ? JSON.parse(text) : parseYaml(text);
-  }
-
-  private oneLine(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
-    }
-    const collapsed = value.replace(/\s+/g, ' ').trim();
-    return collapsed.length > 0 ? collapsed : null;
-  }
-
-  // Cuts on a word boundary when one is near enough the limit, so the site description does
-  // not end mid-word.
-  private cap(value: string, limit: number): string {
-    if (value.length <= limit) {
-      return value;
-    }
-    const cut = value.slice(0, limit);
-    const lastSpace = cut.lastIndexOf(' ');
-    return (lastSpace > limit - 40 ? cut.slice(0, lastSpace) : cut).trimEnd();
   }
 }

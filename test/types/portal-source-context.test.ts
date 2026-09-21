@@ -2,10 +2,14 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import { parse as parseYaml } from 'yaml';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalConfig } from '../../src/types/portal/portal-config';
 import { PortalMigration, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { FileName } from '../../src/types/file/fileName';
+import { FilePath } from '../../src/types/file/filePath';
+import { ZipService } from '../../src/infrastructure/zip-service';
 
 const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1' }, paths: {} });
 
@@ -365,6 +369,100 @@ describe('PortalSourceContext', () => {
           const suggestion = JSON.stringify(migration.suggestedConfig, null, 2);
 
           expect(PortalConfig.parse(suggestion).isOk(), suggestion).to.be.true;
+        });
+      });
+    });
+  });
+
+  describe('scaffold', () => {
+    let source: DirectoryPath;
+
+    /** A specification outside the source directory, where the wizard downloads it to. */
+    const writeSpec = (info: Record<string, unknown>, name = 'petstore.json'): FilePath => {
+      write(path.join('downloads', name), JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
+      return new FilePath(new DirectoryPath(root).join('downloads'), new FileName(name));
+    };
+
+    const scaffold = (specPath: FilePath) => new PortalSourceContext(source).scaffold(specPath);
+    const read = (relative: string) => fs.readFileSync(path.join(source.toString(), relative), 'utf8');
+
+    const frontMatterOf = (markdown: string): Record<string, unknown> => {
+      const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(markdown);
+      expect(match, `no front matter in:\n${markdown}`).to.not.be.null;
+      return parseYaml((match as RegExpExecArray)[1]);
+    };
+
+    beforeEach(() => {
+      source = new DirectoryPath(root).join('project').join('src');
+    });
+
+    it('writes a source directory it accepts itself', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+      expect(resolved.config.siteTitle()).to.equal('Petstore');
+      expect(resolved.specs.map((spec) => spec.slug)).to.deep.equal(['petstore']);
+      expect(resolved.contentDirectory).to.not.be.null;
+    });
+
+    it('describes the portal from the specification', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+
+      expect(JSON.parse(read('portal.json'))).to.deep.equal({ title: 'Petstore', description: 'All the pets.' });
+    });
+
+    it('orders the sidebar with the welcome page first', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      expect(JSON.parse(read('content/meta.json'))).to.deep.equal({ pages: ['index', '...'] });
+    });
+
+    it('falls back to a placeholder title for a specification it cannot read', async () => {
+      write('downloads/broken.json', '{ not json');
+
+      await scaffold(new FilePath(new DirectoryPath(root).join('downloads'), new FileName('broken.json')));
+
+      expect(JSON.parse(read('portal.json'))).to.deep.equal({ title: 'My API' });
+    });
+
+    it('unpacks a split specification into the spec directory', async () => {
+      write('split/openapi.json', JSON.stringify({ openapi: '3.0.0', info: { title: 'Split', version: '1' } }));
+      write('split/paths/pets.json', '{}');
+      const archive = new FilePath(new DirectoryPath(root), new FileName('spec.zip'));
+      await new ZipService().archive(new DirectoryPath(root).join('split'), archive);
+
+      await scaffold(archive);
+
+      expect(fs.existsSync(path.join(source.toString(), 'spec', 'openapi.json'))).to.be.true;
+      expect(fs.existsSync(path.join(source.toString(), 'spec', 'paths', 'pets.json'))).to.be.true;
+      // The parts of an archive are left to the build to read, so nothing names the portal yet.
+      expect(JSON.parse(read('portal.json'))).to.deep.equal({ title: 'My API' });
+    });
+
+    describe('the welcome page front matter', () => {
+      const titles = [
+        'Swagger Petstore',
+        'Swagger Petstore: Extended',
+        'Swagger Petstore:',
+        'Swagger Petstore:Extended',
+        'Petstore #1',
+        'Petstore - v2',
+        'The "Best" API',
+        'C:\\petstore',
+        "Ann's API",
+        '@petstore',
+        'yes',
+        '1.0',
+        '[bracketed]',
+        '{braced}',
+        'a: b: c'
+      ];
+
+      titles.forEach((title) => {
+        it(`parses, and keeps the title intact, for ${JSON.stringify(title)}`, async () => {
+          await scaffold(writeSpec({ title, version: '1' }));
+
+          expect(frontMatterOf(read('content/index.md')).description).to.equal(`Getting started with ${title}`);
         });
       });
     });

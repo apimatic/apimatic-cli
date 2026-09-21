@@ -1,12 +1,12 @@
 import { err, ok, Result } from 'neverthrow';
-import { parse as parseYaml } from 'yaml';
 import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
-import { specFormatOf } from './portal/spec-format.js';
+import { SpecContext } from './spec-context.js';
 import { stripByteOrderMark } from '../utils/string-utils.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -96,6 +96,50 @@ export class PortalSourceContext {
     });
   }
 
+  /**
+   * Writes the smallest source tree `portal generate` and `portal serve` accept, with a
+   * `portal.json` described from the specification itself.
+   */
+  public async scaffold(specPath: FilePath): Promise<void> {
+    await new SpecContext(this.specDirectory).install(specPath);
+
+    const config = await this.suggestedConfig(specPath);
+    await this.fileService.writeContents(this.configFile, JSON.stringify(config, null, 2) + '\n');
+
+    await this.fileService.createDirectoryIfNotExists(this.contentDirectory);
+    const summary = `Getting started with ${config.siteTitle()}`;
+    await this.fileService.writeContents(
+      new FilePath(this.contentDirectory, new FileName('index.md')),
+      [
+        '---',
+        'title: Welcome',
+        // JSON is valid YAML. Quoting through it keeps a title carrying ': ' or '#' from
+        // breaking the front matter, which fails the whole build rather than one page.
+        `description: ${JSON.stringify(summary)}`,
+        '---',
+        '',
+        `Welcome to the ${config.siteTitle()} documentation.`,
+        '',
+        'Replace this page with your own introduction, and add more Markdown pages beside it.',
+        ''
+      ].join('\n')
+    );
+    // Orders the sidebar: named pages first, then everything else alphabetically.
+    await this.fileService.writeContents(
+      new FilePath(this.contentDirectory, new FileName('meta.json')),
+      JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
+    );
+  }
+
+  // A split specification arrives as an archive, whose parts are left to the build to read.
+  private async suggestedConfig(specPath: FilePath): Promise<PortalConfig> {
+    if (await this.fileService.isZipFile(specPath)) {
+      return PortalConfig.placeholder;
+    }
+    const document = await this.readDocument(specPath);
+    return document === undefined ? PortalConfig.placeholder : document.suggestedConfig();
+  }
+
   /** A `/`-separated path relative to `src/`, as `PortalConfig` reports it, as a file path. */
   private resolveInSource(relativePath: string): FilePath {
     const segments = relativePath.split('/');
@@ -127,7 +171,7 @@ export class PortalSourceContext {
         return err({ kind: 'unreadableSpec', fileName });
       }
 
-      const format = specFormatOf(document);
+      const format = document.format();
       if (!format.supported) {
         if (format.format === null) {
           continue;
@@ -157,17 +201,9 @@ export class PortalSourceContext {
       .sort((left, right) => left.compare(right));
   }
 
-  private async readDocument(file: FilePath): Promise<Record<string, unknown> | undefined> {
+  private async readDocument(file: FilePath): Promise<OpenApiDocument | undefined> {
     try {
-      const contents = await this.fileService.getContents(file);
-      // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
-      // so each extension gets the parser built for it.
-      const document = file.name().hasExtension('.json')
-        ? JSON.parse(stripByteOrderMark(contents))
-        : parseYaml(contents);
-      return typeof document === 'object' && document !== null && !Array.isArray(document)
-        ? (document as Record<string, unknown>)
-        : {};
+      return OpenApiDocument.parse(file.name(), await this.fileService.getContents(file));
     } catch {
       return undefined;
     }
@@ -206,7 +242,7 @@ export class PortalSourceContext {
       return versionedPortal === undefined
         ? null
         : {
-            suggestedConfig: PortalConfig.create('My API'),
+            suggestedConfig: PortalConfig.placeholder,
             unsupportedFields: ['generateVersionedPortal'],
             unmigratableLogo: null,
             hadTableOfContents: false
@@ -217,7 +253,7 @@ export class PortalSourceContext {
     // Both fields come from a file the CLI has never validated, so each is held to what
     // `PortalConfig.parse` accepts before it reaches the trusted factory.
     const pageTitle = typeof portalFields.pageTitle === 'string' ? portalFields.pageTitle.trim() : '';
-    const title = pageTitle.length > 0 ? pageTitle : 'My API';
+    const title = pageTitle.length > 0 ? pageTitle : PortalConfig.placeholder.siteTitle();
 
     const logoUrl = typeof portalFields.logoUrl === 'string' ? portalFields.logoUrl : null;
     const logo = logoUrl !== null && PortalConfig.isValidLogo(logoUrl) ? logoUrl : null;
