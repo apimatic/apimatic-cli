@@ -66,6 +66,8 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(read('index.html')).to.contain('Hello from the fixture.');
   });
 
+  // Addresses come from page slugs rather than tree position, so lifting the single
+  // specification's section out of the sidebar must leave every operation where it was.
   it('writes a page per operation in the specification', () => {
     expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
   });
@@ -115,13 +117,24 @@ const enabled = process.env.APIMATIC_E2E === '1';
   // `meta.files` restriction and the transformer over real on-disk storage.
   it('orders the sidebar by nav.json, with the API reference where the token names it', () => {
     const tree = read(treeCacheFiles()[0]);
-    const order = ['Welcome', 'Api', 'Authentication'].map((name) => tree.indexOf(`"${name}"`));
+    const order = ['Welcome', 'API Reference', 'Authentication'].map((name) => tree.indexOf(`"${name}"`));
 
     expect(
       order.every((at) => at !== -1),
       tree.slice(0, 600)
     ).to.be.true;
     expect(order).to.deep.equal([...order].sort((left, right) => left - right));
+  });
+
+  // With one specification the section's name only restates the portal title, so the level
+  // is lifted away and the tag folders sit directly under the reference.
+  it('leaves no section level in the sidebar for a single specification', () => {
+    const tree = read(treeCacheFiles()[0]);
+
+    // The tag group, which the specification names; and the section, which is named after
+    // the specification's file and is the level that should be gone.
+    expect(tree).to.contain('"Simple Calculator"');
+    expect(tree).to.not.contain('"Apimatic calculator"');
   });
 
   it('ships only the syntax grammars a portal can contain', () => {

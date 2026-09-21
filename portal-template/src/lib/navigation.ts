@@ -30,6 +30,8 @@ const API_REFERENCE_TOKEN = 'apimatic:api';
 
 const NAVIGATION_FILE_STEM = 'nav';
 
+const API_REFERENCE_TITLE = 'API Reference';
+
 /**
  * The key the generated pages are passed to `loader()` under, which the storage stamps onto
  * every file of that source. No such source exists yet, so `apimatic:pages` resolves to
@@ -61,6 +63,9 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       // sorts folders by path, so `api` lands above a user folder called anything later in
       // the alphabet, and a generated page lands in the middle of the user's pages.
       node.children = reorder(this, node, folderPath, readOrder(this, folderPath) ?? []);
+      if (folderPath === apiBaseDir) {
+        applyApiStructure(node);
+      }
       return node;
     }
   };
@@ -79,6 +84,24 @@ function readOrder(context: NavigationContext, folderPath: string): string[] | u
 
   const pages = (file.data as { pages?: unknown }).pages;
   return Array.isArray(pages) ? pages.filter((entry): entry is string => typeof entry === 'string') : undefined;
+}
+
+/**
+ * Titles the wrapper and, for a single specification, lifts its section away.
+ *
+ * Fumadocs names an untitled folder by uppercasing its first character only, so `api` would
+ * render as "Api", which reads as a typo. The section below it is named after the
+ * specification's file, which with one document only restates the portal's own title; with
+ * two or more the names tell them apart and are worth a level. Adding a second document
+ * therefore inserts a level rather than renaming anything.
+ */
+function applyApiStructure(node: Folder): void {
+  node.name = API_REFERENCE_TITLE;
+
+  const [only] = node.children;
+  if (node.children.length === 1 && only.type === 'folder') {
+    node.children = only.children;
+  }
 }
 
 function reorder(context: NavigationContext, node: Folder, folderPath: string, order: string[]): Node[] {

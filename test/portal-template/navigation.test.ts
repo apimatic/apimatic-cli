@@ -39,7 +39,7 @@ describe('navigationTransformer', () => {
 
   describe('with no nav.json', () => {
     it('keeps Fumadocs’ order for the user’s own pages', () => {
-      expect(treeOf({ docs: CONTENT, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Api']);
+      expect(treeOf({ docs: CONTENT, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
     });
 
     // Fumadocs sorts folders by path, so `api` lands above any user folder named later in
@@ -47,7 +47,7 @@ describe('navigationTransformer', () => {
     it('still puts the API reference last, below a user folder that sorts after it', () => {
       const docs = [...CONTENT, page('guides/intro.mdx', 'Intro')];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'Api']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'API Reference']);
     });
 
     it('still collects the injected pages at the anchor rather than among the user’s pages', () => {
@@ -58,7 +58,7 @@ describe('navigationTransformer', () => {
         'Authentication',
         'Tutorials',
         'SDKs',
-        'Api'
+        'API Reference'
       ]);
     });
 
@@ -66,7 +66,7 @@ describe('navigationTransformer', () => {
     it('applies the root defaults when only a nested directory has a file', () => {
       const docs = [...CONTENT, page('guides/intro.mdx', 'Intro'), nav('guides/nav.json', ['intro'])];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'Api']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'API Reference']);
     });
   });
 
@@ -77,14 +77,14 @@ describe('navigationTransformer', () => {
       for (const data of [null, 'hi', ['index']]) {
         const docs = [...CONTENT, { type: 'meta' as const, path: 'nav.json', data: data as never }];
 
-        expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Api']);
+        expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
       }
     });
 
     it('leaves the order alone when pages is not an array of strings', () => {
       const docs = [...CONTENT, { type: 'meta' as const, path: 'nav.json', data: { pages: 'index' } }];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Api']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
     });
   });
 
@@ -145,26 +145,26 @@ describe('navigationTransformer', () => {
     it('goes where the token names it', () => {
       const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:api', 'authentication'])];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Api', 'Authentication']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'API Reference', 'Authentication']);
     });
 
     it('is last when the token is absent, rather than sorted among the pages', () => {
       const docs = [...CONTENT, nav('nav.json', ['authentication', 'index'])];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Authentication', 'Welcome', 'Api']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Authentication', 'Welcome', 'API Reference']);
     });
 
     // Otherwise a rest token in the middle would drop the whole reference above the pages.
     it('stays last even when the rest token sits before the named pages', () => {
       const docs = [...CONTENT, nav('nav.json', ['...', 'index'])];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Authentication', 'Welcome', 'Api']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Authentication', 'Welcome', 'API Reference']);
     });
 
     it('is never dropped, whatever the file says', () => {
       const docs = [...CONTENT, nav('nav.json', ['index'])];
 
-      expect(treeOf({ docs, openapi: API })).to.contain('Api');
+      expect(treeOf({ docs, openapi: API })).to.contain('API Reference');
     });
 
     // `content/api/` lands on the same virtual path as the sections, so the two merge into
@@ -173,8 +173,8 @@ describe('navigationTransformer', () => {
       const docs = [...CONTENT, page('api/overview.mdx', 'Overview'), nav('nav.json', ['apimatic:api', 'index'])];
       const tree = build({ docs, openapi: API }).pageTree.children;
 
-      expect(names(tree)).to.deep.equal(['Api', 'Welcome', 'Authentication']);
-      expect(names(childrenOf(tree, 'Api'))).to.contain('Overview');
+      expect(names(tree)).to.deep.equal(['API Reference', 'Welcome', 'Authentication']);
+      expect(names(childrenOf(tree, 'API Reference'))).to.contain('Overview');
     });
 
     // A folder the user simply has not listed belongs with their pages. Appending it after
@@ -182,7 +182,44 @@ describe('navigationTransformer', () => {
     it('stays below a page the file does not name, even when the token names it last', () => {
       const docs = [...CONTENT, page('guides/intro.mdx', 'Intro'), nav('nav.json', ['index', 'apimatic:api'])];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'Api']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'API Reference']);
+    });
+  });
+
+  describe('the API reference structure', () => {
+    const TWO_SPECS = [
+      page('petstore/pet/addPet.mdx', 'Add a pet'),
+      page('billing-api/invoices/list.mdx', 'List invoices')
+    ];
+
+    it('titles the wrapper, which Fumadocs would otherwise render as "Api"', () => {
+      expect(treeOf({ docs: CONTENT, openapi: API })).to.contain('API Reference');
+    });
+
+    // The section's name only restates the portal's own title when there is one document.
+    it('lifts the single specification away, leaving its tag folders directly under it', () => {
+      const tree = build({ docs: CONTENT, openapi: API }).pageTree.children;
+
+      expect(names(childrenOf(tree, 'API Reference'))).to.deep.equal(['Pet', 'Store']);
+    });
+
+    // With two the names tell them apart, so adding one inserts a level, renaming nothing.
+    it('keeps a folder per specification once there is more than one', () => {
+      const tree = build({ docs: CONTENT, openapi: TWO_SPECS }).pageTree.children;
+
+      expect(names(childrenOf(tree, 'API Reference'))).to.deep.equal(['Billing api', 'Petstore']);
+    });
+
+    it('leaves page addresses alone, because they come from slugs and not from the tree', () => {
+      const built = build({ docs: CONTENT, openapi: API });
+
+      expect(built.getPages().map((each) => each.url)).to.contain('/api/petstore/pet/addPet');
+    });
+
+    it('is still positioned as one node by the token after being restructured', () => {
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:api', 'index', 'authentication'])];
+
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['API Reference', 'Welcome', 'Authentication']);
     });
   });
 
@@ -196,7 +233,7 @@ describe('navigationTransformer', () => {
         'Welcome',
         'SDKs',
         'Authentication',
-        'Api'
+        'API Reference'
       ]);
     });
 
@@ -209,7 +246,7 @@ describe('navigationTransformer', () => {
         'Authentication',
         'Welcome',
         'SDKs',
-        'Api'
+        'API Reference'
       ]);
     });
 
@@ -218,7 +255,7 @@ describe('navigationTransformer', () => {
 
       expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
         'SDKs',
-        'Api',
+        'API Reference',
         'Welcome',
         'Authentication'
       ]);
@@ -231,14 +268,14 @@ describe('navigationTransformer', () => {
         'Authentication',
         'Welcome',
         'SDKs',
-        'Api'
+        'API Reference'
       ]);
     });
 
     it('resolve to nothing when there is no generated source, which is the case today', () => {
       const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:pages', 'authentication'])];
 
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Api']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
     });
   });
 
@@ -273,7 +310,7 @@ describe('navigationTransformer', () => {
       expect(accepts('apimatic:api')).to.be.true;
 
       const docs = [...CONTENT, nav('nav.json', ['apimatic:api', 'index', 'authentication'])];
-      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Api', 'Welcome', 'Authentication']);
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['API Reference', 'Welcome', 'Authentication']);
     });
 
     it('accepts and applies the injected pages token', () => {
