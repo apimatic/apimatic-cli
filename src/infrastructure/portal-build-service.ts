@@ -58,8 +58,7 @@ export class PortalBuildService {
 
   private async countPages(output: DirectoryPath): Promise<number> {
     const directory = await this.fileService.getDirectory(output);
-    return directory
-      .getAllFiles()
-      .filter((file) => file.toString().endsWith('.html') && !file.toString().endsWith(SHELL_FILE)).length;
+    const isPage = (file: FilePath) => file.name().hasExtension('.html') && !file.name().is(SHELL_FILE);
+    return directory.getAllFiles().filter(isPage).length;
   }
 }

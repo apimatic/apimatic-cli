@@ -19,6 +19,13 @@ export class FileName {
     return this.name.toLowerCase() === name.toLowerCase();
   }
 
+  // By code point rather than collation: callers sort on this to decide which of two names
+  // keeps a slug they both normalise to, and a locale-sensitive order would settle that
+  // differently from one machine to the next.
+  public compare(other: FileName): number {
+    return this.name < other.name ? -1 : Number(this.name > other.name);
+  }
+
   public normalize(): FileName {
     const nameWithoutExt = this.name.replace(/\.[^/.]+$/, '');
     const normalized = nameWithoutExt
