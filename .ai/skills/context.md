@@ -24,7 +24,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - **DON'T** expose derived file names — methods like `getScriptFileName()` leak internal naming logic.
 - **DON'T** add public properties for internal state — constructor parameters are `private readonly`, not exposed.
 - **DON'T** use `console.log` or any prompt output — contexts are silent.
-- **DON'T** use `Result<T, E>` unless the context does network I/O (rare).
+- **DON'T** use `Result<T, E>` for a plain file operation — return `boolean`, `undefined` or the value. A context returns a `Result` only when it does network I/O (rare) or reports a structured problem the prompts switch on, as `PortalSourceContext.resolve()` does with `PortalSourceProblem`.
 - **DON'T** use raw string paths — always wrap in `DirectoryPath`, `FilePath`, `FileName`.
 - **DON'T** add methods that only use infrastructure services (`fileService`, `zipService`) without touching domain-specific private fields — these are stateless utilities, not context behavior. Every public method must use at least one constructor-derived private field (e.g., `sdkDirectory`, `language`). If a method takes all its inputs as parameters and never reads context state, it belongs in a service or a different context.
 - **DON'T** embed the context's own domain subject in method names — if the class is `SdkContext`, a method named `cleanUpSdkDirectory()` is redundant. Prefer concise behavioral verbs: `cleanUp()`, `getChanges()`, `save()`.
@@ -67,7 +67,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 - [ ] `new FilePath(directory, new FileName("name"))` for file path construction
 - [ ] `directory.join("subdir")` for subdirectory derivation
 - [ ] No `console.log`, no prompt output — contexts are silent
-- [ ] No `Result` unless context does network I/O (rare)
+- [ ] `Result` only for network I/O or for a structured problem type the prompts switch on
 - [ ] Every public method uses at least one domain-specific private field — methods using only infrastructure services don't belong here
 - [ ] No public properties that expose constructor parameters
 - [ ] Method names do not embed the context's own domain subject — names are concise behavioral verbs (`cleanUp()` not `cleanUpSdkReviewDirectory()`)
