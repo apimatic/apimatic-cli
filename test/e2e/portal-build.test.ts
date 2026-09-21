@@ -52,6 +52,15 @@ const enabled = process.env.APIMATIC_E2E === '1';
   const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
   const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
 
+  /** The prerendered server-function cache entries carrying the sidebar tree. */
+  const treeCacheFiles = () => {
+    const cache = '__tsr/staticServerFnCache';
+    return fs
+      .readdirSync(path.join(output.toString(), cache))
+      .map((name) => `${cache}/${name}`)
+      .filter((relative) => read(relative).includes('"pageTree"'));
+  };
+
   it('writes a home page carrying the content page', () => {
     expect(exists('index.html')).to.be.true;
     expect(read('index.html')).to.contain('Hello from the fixture.');
@@ -99,11 +108,20 @@ const enabled = process.env.APIMATIC_E2E === '1';
   });
 
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
-    const cache = '__tsr/staticServerFnCache';
-    const withTree = fs
-      .readdirSync(path.join(output.toString(), cache))
-      .filter((name) => read(cache + '/' + name).includes('"pageTree"'));
-    expect(withTree).to.have.length(1);
+    expect(treeCacheFiles()).to.have.length(1);
+  });
+
+  // The only end-to-end proof that `nav.json` reaches the build: the Vite glob, the macro's
+  // `meta.files` restriction and the transformer over real on-disk storage.
+  it('orders the sidebar by nav.json, with the API reference where the token names it', () => {
+    const tree = read(treeCacheFiles()[0]);
+    const order = ['Welcome', 'Api', 'Authentication'].map((name) => tree.indexOf(`"${name}"`));
+
+    expect(
+      order.every((at) => at !== -1),
+      tree.slice(0, 600)
+    ).to.be.true;
+    expect(order).to.deep.equal([...order].sort((left, right) => left - right));
   });
 
   it('ships only the syntax grammars a portal can contain', () => {

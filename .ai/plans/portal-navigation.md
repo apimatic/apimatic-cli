@@ -158,6 +158,15 @@ second absolute-path placeholder into the template, exactly as
 directory. Reusing the placeholder mechanism rather than a relative literal
 removes any question about what a relative `dir` resolves against.
 
+**It must also add the generated page's name to the root's `childNames`.** Found
+while implementing step 4. Section 6 says a `nav.json` may name an injected page
+individually, and the transformer already does that. The CLI would refuse it:
+`PortalSourceContext.navigation` builds `childNames` by walking `src/content/`
+alone, so the generated page is not a name it knows and the entry is reported as
+"not a page or folder in this directory". Latent while no generated page exists;
+the moment one does, the two halves disagree and the build fails before the
+transformer runs.
+
 `languages` in `portal.json` becomes **required**, so the page always has
 content and an empty collection never arises. That is a breaking change to the
 `portal.json` schema. It is free if it lands before the next major releases,

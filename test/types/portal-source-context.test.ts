@@ -630,7 +630,17 @@ describe('PortalSourceContext', () => {
     it('orders the sidebar with the welcome page first', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
-      expect(JSON.parse(read('content/meta.json'))).to.deep.equal({ pages: ['index', '...'] });
+      expect(JSON.parse(read('content/nav.json'))).to.deep.equal({ pages: ['index', '...'] });
+    });
+
+    // It used to write meta.json, which the build no longer reads: a freshly scaffolded
+    // project would have warned about its own file on the very next command.
+    it('writes a navigation file the build reads, and nothing it ignores', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+
+      expect(scaffolded.ignoredNavigationFiles).to.deep.equal([]);
     });
 
     it('falls back to a placeholder title for a specification it cannot read', async () => {

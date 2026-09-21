@@ -158,6 +158,18 @@ describe('PortalNavigation', () => {
     });
   });
 
+  // The warning about a leftover meta.json asks the user to rename it. Whoever does that
+  // carries its Fumadocs keys across, and calling those a misspelling of 'pages' would be
+  // a dead end.
+  it('explains a Fumadocs folder-metadata key rather than calling it a typo', () => {
+    const errors = PortalNavigation.parse('{"title":"Guides","pages":["index"]}', contextFor())._unsafeUnwrapErr();
+
+    expect(errors).to.have.lengthOf(1);
+    expect(errors[0]).to.contain("'title' is not a nav.json setting");
+    expect(errors[0]).to.contain('named after its directory');
+    expect(errors[0]).to.not.contain('did you mean');
+  });
+
   // `JSON.parse` will happily hand back a document keyed by a prototype member.
   describe('fields named after Object.prototype members', () => {
     for (const field of ['toString', 'constructor', 'hasOwnProperty']) {

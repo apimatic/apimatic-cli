@@ -8,4 +8,9 @@ import { defineDocs } from 'fumadocs-mdx/macro';
 export const docs = defineDocs({
   dir: '__APIMATIC_CONTENT_DIR__',
   docs: { async: true, postprocess: { includeProcessedMarkdown: true } },
+  // Restricted to our own file, replacing the default of every .json and .yaml in the
+  // content directory. Without it a leftover `meta.json` is loaded as a folder's metadata
+  // and applied before the transformer runs -- and since a metadata file hides whatever it
+  // does not name, the transformer could not put those pages back.
+  meta: { files: ['**/nav.json'] }
 });

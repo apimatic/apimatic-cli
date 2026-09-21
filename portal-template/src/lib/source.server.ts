@@ -3,11 +3,16 @@ import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
 import { openapiPlugin } from 'fumadocs-openapi/server';
 import { docsRoute } from './shared';
 import { docs } from './source';
+import { navigationTransformer } from './navigation';
 import { openApiSource } from './openapi.server';
 
 // Reads every OpenAPI document off disk, so this only runs at build time, inside server
 // functions and server route handlers. Importing it from client code fails the build.
 export const source = loader(
   { docs: docs.toFumadocsSource(), openapi: await openApiSource() },
-  { baseUrl: docsRoute, plugins: [lucideIconsPlugin(), openapiPlugin()] }
+  {
+    baseUrl: docsRoute,
+    plugins: [lucideIconsPlugin(), openapiPlugin()],
+    pageTree: { transformers: [navigationTransformer()] }
+  }
 );

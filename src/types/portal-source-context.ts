@@ -158,7 +158,7 @@ export class PortalSourceContext {
     );
     // Orders the sidebar: named pages first, then everything else alphabetically.
     await this.fileService.writeContents(
-      new FilePath(this.contentDirectory, new FileName('meta.json')),
+      new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
       JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
     );
   }

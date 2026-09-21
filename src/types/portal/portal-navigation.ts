@@ -32,6 +32,19 @@ const RENAMED_FIELDS = new Map<string, string>([
   ['toc', 'pages']
 ]);
 
+// Fumadocs' own folder-metadata keys. Someone renaming a `meta.json` as the CLI's warning
+// asks them to will carry these across, and "did you mean 'pages'?" would be a poor answer:
+// they are not misspellings, they are a thing `nav.json` deliberately does not do.
+const FUMADOCS_ONLY_FIELDS = new Set([
+  'title',
+  'icon',
+  'description',
+  'defaultOpen',
+  'collapsible',
+  'root',
+  'pagesIndex'
+]);
+
 export type NavigationEntry =
   | { kind: 'rest' }
   | { kind: 'injectedPages' }
@@ -181,9 +194,17 @@ export class PortalNavigation {
       .filter((field) => !KNOWN_FIELDS.has(field))
       .map((field) => {
         const intended = RENAMED_FIELDS.get(field);
-        return intended !== undefined
-          ? `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting; did you mean '${intended}'?`
-          : `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting.`;
+        if (intended !== undefined) {
+          return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting; did you mean '${intended}'?`;
+        }
+        if (FUMADOCS_ONLY_FIELDS.has(field)) {
+          return (
+            `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. ` +
+            `${NAVIGATION_FILE_NAME} sets the order of pages and nothing else; a folder is named ` +
+            `after its directory, or after the title of its index page.`
+          );
+        }
+        return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting.`;
       });
   }
 
