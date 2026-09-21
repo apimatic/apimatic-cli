@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'node:module';
+import { execa } from 'execa';
 import { expect } from 'chai';
 import { PortalBuildService } from '../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
@@ -18,6 +20,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 
   let root: string;
+  let project: DirectoryPath;
   let output: DirectoryPath;
 
   before(async () => {
@@ -25,7 +28,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
     const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
-    const project = new DirectoryPath(root).join('build');
+    project = new DirectoryPath(root).join('build');
     fs.mkdirSync(project.toString(), { recursive: true });
     const prepared = (await new PortalProjectService().prepare(project, source))._unsafeUnwrap();
 
@@ -113,5 +116,29 @@ const enabled = process.env.APIMATIC_E2E === '1';
   it('keeps an operation page small', () => {
     const page = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
     expect(fs.statSync(path.join(output.toString(), page)).size).to.be.below(100 * 1024);
+  });
+
+  // Vite strips types without checking them, and nothing else in the repository imports the
+  // routes and components, so this is the one place the template is held to its types. It
+  // runs here because the build has just generated the route tree the router imports.
+  it('type-checks against the packages it is built with', async () => {
+    const require = createRequire(import.meta.url);
+    const typesDirectory = path.join(project.toString(), 'node_modules', '@types');
+    fs.mkdirSync(typesDirectory, { recursive: true });
+    // React's types are development dependencies of the CLI, so the prepared project does not
+    // link them the way it links the packages the build runs with.
+    for (const name of ['react', 'react-dom']) {
+      const target = path.dirname(require.resolve(`@types/${name}/package.json`));
+      fs.symlinkSync(target, path.join(typesDirectory, name), process.platform === 'win32' ? 'junction' : 'dir');
+    }
+
+    const tsc = require.resolve('typescript/bin/tsc');
+    const result = await execa(
+      process.execPath,
+      [tsc, '-p', path.join(project.toString(), 'tsconfig.json'), '--noEmit', '--pretty', 'false'],
+      { cwd: project.toString(), reject: false, all: true }
+    );
+
+    expect(result.exitCode, result.all).to.equal(0);
   });
 });

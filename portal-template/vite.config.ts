@@ -12,7 +12,7 @@ export default defineConfig(async () => {
   const pages = await prerenderPages(portalConfig);
 
   return {
-    publicDir: portalConfig.staticDir ?? false,
+    publicDir: portalConfig.staticDir ?? (false as const),
     plugins: [
       fumadocsMdx(),
       tailwindcss(),
