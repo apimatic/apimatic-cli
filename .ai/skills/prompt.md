@@ -10,7 +10,7 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 - **DO** omit the constructor — prompts classes are always stateless with no fields.
 - **DO** import only the `@clack/prompts` functions actually used (e.g., `{ log, confirm, isCancel }`).
 - **DO** alias the format import: `import { format as f } from "../format.js"` (add one more `../` per nesting level).
-- **DO** use `withSpinner(intro, success, failure, fn)` from `../prompt.js` for all async `Result` operations.
+- **DO** use `withSpinner(intro, success, failure, fn, options?)` from `../prompt.js` for all async `Result` operations. `success` and `failure` are strings, or functions of the value or error when the message depends on it; pass `{ indicator: 'timer' }` for work measured in tens of seconds.
 - **DO** always check `isCancel()` on interactive prompts (`confirm`, `select`, `text`, `multiselect`) before using the value.
 - **DO** return `false` from `confirm` methods on cancel — not `undefined`.
 - **DO** return `undefined` from `select`, `text`, and `multiselect` methods on cancel.

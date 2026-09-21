@@ -56,6 +56,8 @@ export const noteWrapped = (message: string, title: string) => {
   }
 };
 
+type ColumnStyle = 'primary' | 'secondary' | 'item';
+
 export function buildTableWithHeading(
   groups: { heading: string; rows: string[][] }[],
   headers: string[],
@@ -114,7 +116,6 @@ function pad(text: string, width: number): string {
   return text + ' '.repeat(Math.max(0, width - stripAnsi(text).length));
 }
 
-type ColumnStyle = 'primary' | 'secondary' | 'item';
 /** Last lines of a failed build, enough to show the cause without flooding the terminal. */
 const LOG_TAIL_LINES = 15;
 

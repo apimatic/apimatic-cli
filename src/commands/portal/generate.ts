@@ -21,13 +21,13 @@ The portal is built on your machine and written as static files you can host any
   ];
 
   static flags = {
-    ...FlagsProvider.input,
-    ...FlagsProvider.destination('portal', 'portal'),
-    ...FlagsProvider.force,
     zip: Flags.boolean({
       default: false,
       description: 'write the generated portal as a .zip archive.'
     }),
+    ...FlagsProvider.input,
+    ...FlagsProvider.destination('portal', 'portal'),
+    ...FlagsProvider.force,
     ...FlagsProvider.authKey
   };
 

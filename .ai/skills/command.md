@@ -62,7 +62,7 @@ These three layers are always created together and mirror each other in path str
 - **DO** use named export: `export class {PascalName}Prompts`.
 - **DO** import only the `@clack/prompts` functions actually used (e.g., `{ log, confirm, isCancel }`).
 - **DO** alias the format import: `import { format as f } from "../format.js"`.
-- **DO** use `withSpinner(startMsg, successMsg, failureMsg, promise)` for async operations — it takes `Promise<Result<T, E>>`.
+- **DO** use `withSpinner(startMsg, successMsg, failureMsg, promise, options?)` for async operations — it takes `Promise<Result<T, E>>`; the messages may be functions of the value or error, and `{ indicator: 'timer' }` shows elapsed time.
 - **DO** always check `isCancel()` on interactive prompts (`confirm`, `select`, `text`, `multiselect`) and return `false` or `undefined` on cancel.
 - **DO** use `confirm({ message: "...", initialValue: false })` for overwrite confirmations.
 - **DO** use format helpers for all dynamic content: `f.var("name")` for names, `f.path(dirOrFile)` for paths, `f.link(url)` for URLs.
