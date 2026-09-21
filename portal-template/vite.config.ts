@@ -10,9 +10,10 @@ import { prerenderPages } from './prerender-pages.ts';
 export default defineConfig(async () => {
   const portalConfig = await readPortalConfig();
   const pages = await prerenderPages(portalConfig);
+  const publicDir: string | false = portalConfig.staticDir ?? false;
 
   return {
-    publicDir: portalConfig.staticDir ?? (false as const),
+    publicDir,
     plugins: [
       fumadocsMdx(),
       tailwindcss(),
