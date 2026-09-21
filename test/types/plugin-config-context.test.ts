@@ -353,7 +353,6 @@ describe('PluginConfigContext', () => {
 
       expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
     });
-
   });
 
   describe('upsertMetadata', () => {
@@ -551,6 +550,170 @@ describe('PluginConfigContext', () => {
 
       expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrapErr()).to.equal('unreadable');
       expect(fs.readFileSync(path.join('src', 'plugin-config.json'), 'utf-8')).to.equal(original);
+    });
+  });
+
+  describe('publishedLanguages', () => {
+    const publishedIn = async (languages: object) => {
+      withConfig({ languages });
+      const state = await context.getPluginConfigState();
+      if (state.state !== 'present') {
+        expect.fail(`expected a present config, got ${state.state}`);
+      }
+      return state.publishedLanguages();
+    };
+
+    it('names a language published as source only', async () => {
+      expect(await publishedIn({ csharp: SOURCE_ONLY_ENTRY })).to.deep.equal([Language.CSHARP]);
+    });
+
+    it('names a language published as package only', async () => {
+      expect(await publishedIn({ csharp: PACKAGE_ONLY_ENTRY })).to.deep.equal([Language.CSHARP]);
+    });
+
+    it('omits a language carrying neither half', async () => {
+      expect(await publishedIn({ csharp: UNPUBLISHED_ENTRY })).to.be.empty;
+    });
+
+    it('names only the published half of a mixed config', async () => {
+      const published = await publishedIn({
+        csharp: UNPUBLISHED_ENTRY,
+        typescript: { package: { name: '@acme/sdk', version: '1.2.3' }, codegenVersion: CodeGenerationVersion.V4 }
+      });
+
+      expect(published).to.deep.equal([Language.TYPESCRIPT]);
+    });
+
+    it('keeps a key that is not a language it knows out of the result', async () => {
+      expect(await publishedIn({ cobol: { source: CSHARP_ENTRY.source } })).to.be.empty;
+    });
+
+    it('agrees with hasPublishedSdks, which is defined over it', async () => {
+      for (const languages of [{}, { csharp: UNPUBLISHED_ENTRY }, { csharp: CSHARP_ENTRY }]) {
+        withConfig({ languages });
+        const state = await context.getPluginConfigState();
+        if (state.state !== 'present') {
+          expect.fail(`expected a present config, got ${state.state}`);
+        }
+
+        expect(state.hasPublishedSdks(), JSON.stringify(languages)).to.equal(state.publishedLanguages().length > 0);
+      }
+    });
+  });
+
+  describe('upsertLocalLanguages', () => {
+    it('records an entry naming neither a source nor a package, which is what asks for a bundle', async () => {
+      withConfig({ languages: {} });
+
+      const result = await context.upsertLocalLanguages([Language.CSHARP], CodeGenerationVersion.V4);
+
+      expect(result.isOk()).to.be.true;
+      expect(writtenConfig().languages.csharp).to.deep.equal({ codegenVersion: 'v4' });
+    });
+
+    it('records the codegen version, so the entry is never bare', async () => {
+      withConfig({ languages: {} });
+
+      await context.upsertLocalLanguages([Language.PYTHON], CodeGenerationVersion.V4);
+
+      expect(writtenConfig().languages.python).to.not.deep.equal({});
+      expect(writtenConfig().languages.python).to.have.property('codegenVersion', 'v4');
+    });
+
+    it('writes every language it is given in one pass', async () => {
+      withConfig({ languages: {} });
+
+      await context.upsertLocalLanguages(
+        [Language.CSHARP, Language.PYTHON, Language.TYPESCRIPT],
+        CodeGenerationVersion.V4
+      );
+
+      expect(writtenConfig().languages).to.deep.equal({
+        csharp: { codegenVersion: 'v4' },
+        python: { codegenVersion: 'v4' },
+        typescript: { codegenVersion: 'v4' }
+      });
+    });
+
+    it('creates the file when the project has none yet', async () => {
+      mockFs({ src: {} });
+
+      expect((await context.upsertLocalLanguages([Language.CSHARP], CodeGenerationVersion.V4)).isOk()).to.be.true;
+      expect(writtenConfig()).to.deep.equal({ languages: { csharp: { codegenVersion: 'v4' } } });
+    });
+
+    it('leaves a published language exactly as it found it', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
+
+      await context.upsertLocalLanguages([Language.CSHARP], CodeGenerationVersion.V4);
+
+      expect(writtenConfig().languages.csharp).to.deep.equal(CSHARP_ENTRY);
+    });
+
+    it('leaves a source-only language alone while bundling the one beside it', async () => {
+      withConfig({ languages: { csharp: SOURCE_ONLY_ENTRY } });
+
+      await context.upsertLocalLanguages([Language.CSHARP, Language.PYTHON], CodeGenerationVersion.V4);
+
+      expect(writtenConfig().languages).to.deep.equal({
+        csharp: SOURCE_ONLY_ENTRY,
+        python: { codegenVersion: 'v4' }
+      });
+    });
+
+    it('takes over a language recorded earlier with neither half', async () => {
+      withConfig({ languages: { csharp: { codegenVersion: CodeGenerationVersion.V3 } } });
+
+      await context.upsertLocalLanguages([Language.CSHARP], CodeGenerationVersion.V4);
+
+      expect(writtenConfig().languages.csharp).to.deep.equal({ codegenVersion: 'v4' });
+    });
+
+    it('leaves metadata and languages it was not given alone', async () => {
+      withConfig({ ...METADATA, license: 'MIT', languages: { csharp: CSHARP_ENTRY } });
+
+      await context.upsertLocalLanguages([Language.PYTHON], CodeGenerationVersion.V4);
+
+      const config = writtenConfig();
+      expect(config).to.include({ ...METADATA, license: 'MIT' });
+      expect(config.languages.csharp).to.deep.equal(CSHARP_ENTRY);
+    });
+
+    it('preserves fields this CLI version does not model', async () => {
+      withConfig({ pluginKey: 'hand-written', homepage: 'https://acme.com', languages: {} });
+
+      await context.upsertLocalLanguages([Language.CSHARP], CodeGenerationVersion.V4);
+
+      const config = writtenConfig();
+      expect(config.pluginKey).to.equal('hand-written');
+      expect(config.homepage).to.equal('https://acme.com');
+    });
+
+    it('writes nothing when it is given no languages', async () => {
+      withConfig({ ...METADATA, languages: { csharp: CSHARP_ENTRY } });
+
+      await context.upsertLocalLanguages([], CodeGenerationVersion.V4);
+
+      expect(writtenConfig().languages).to.deep.equal({ csharp: CSHARP_ENTRY });
+    });
+
+    it('refuses to overwrite a file it could not read', async () => {
+      mockFs({ src: { 'plugin-config.json': '{ not json' } });
+
+      const result = await context.upsertLocalLanguages([Language.CSHARP], CodeGenerationVersion.V4);
+
+      expect(result._unsafeUnwrapErr()).to.equal('unreadable');
+      expect(fs.readFileSync(path.join('src', 'plugin-config.json'), 'utf-8')).to.equal('{ not json');
+    });
+
+    it('hands back a state that already reports what it wrote', async () => {
+      withConfig({ ...METADATA, languages: {} });
+
+      const state = (await context.upsertLocalLanguages([Language.CSHARP], CodeGenerationVersion.V4))._unsafeUnwrap();
+
+      expect(state.hasMetadata()).to.be.true;
+      expect(state.hasPublishedSdks()).to.be.false;
+      expect(state.publishedLanguages()).to.be.empty;
     });
   });
 });

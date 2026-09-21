@@ -18,11 +18,9 @@ import { err, ok, Result } from 'neverthrow';
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 const MALFORMED_PLUGIN_ID =
-  `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` +
-  `for example 'acme-payments'`;
+  `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` + `for example 'acme-payments'`;
 
-const MALFORMED_PLUGIN_VERSION =
-  `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
+const MALFORMED_PLUGIN_VERSION = `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
@@ -46,12 +44,18 @@ export class PluginConfigPresent {
   }
 
   public hasPublishedSdks(): boolean {
-    const languages = this.config.languages;
-    if (typeof languages !== 'object' || languages === null) {
-      return false;
-    }
+    return this.publishedLanguages().length > 0;
+  }
 
-    return Object.values(languages).some((entry) => entry?.source || entry?.package);
+  /**
+   * A language is published once its entry names where the SDK lives. Walking the known languages
+   * rather than the config's own keys keeps a hand-written key out of a `Language[]`.
+   */
+  public publishedLanguages(): Language[] {
+    return Object.values(Language).filter((language) => {
+      const entry = this.config.languages?.[language];
+      return Boolean(entry?.source || entry?.package);
+    });
   }
 
   public hasMetadata(): boolean {
@@ -87,7 +91,7 @@ export class PluginConfigPresent {
     entry: PluginLanguageEntry<Language>
   ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
     if (entry.package && entry.source) {
-      return ok();  // if both package and source are given, there is no possible mismatch
+      return ok(); // if both package and source are given, there is no possible mismatch
     }
 
     const existingEntry = this.config.languages?.[language];
@@ -170,6 +174,31 @@ export class PluginConfigContext {
         package: entry.package ?? existingEntry?.package
       };
       return { ...config, languages };
+    });
+  }
+
+  /**
+   * Records the languages whose SDK codegen bundles inside the plugin. The entry names no source
+   * and no package, and that absence is what asks for the bundle — so a language that is already
+   * published is skipped rather than blanked, which would turn a real plugin into a preview one.
+   * One merge covers the whole set: a write per language would re-read the file each time.
+   */
+  public async upsertLocalLanguages(
+    languages: Language[],
+    codegenVersion: CodeGenerationVersion
+  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
+    return await this.merge((config) => {
+      const merged: PluginLanguages = { ...config.languages };
+
+      for (const language of languages) {
+        const existing = merged[language];
+        if (existing?.source || existing?.package) {
+          continue;
+        }
+        merged[language] = { codegenVersion };
+      }
+
+      return { ...config, languages: merged };
     });
   }
 
