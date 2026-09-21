@@ -1,10 +1,28 @@
-import { isCancel, confirm, log } from "@clack/prompts";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f } from "../format.js";
-import { Result } from "neverthrow";
-import { FilePath } from "../../types/file/filePath.js";
-import {ServiceError } from "../../infrastructure/service-error.js";
-import { noteWrapped, withSpinner } from "../prompt.js";
+import { isCancel, confirm, log } from '@clack/prompts';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
+import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
+import { PortalSaveProblem } from '../../types/portal-context.js';
+import { Result } from 'neverthrow';
+import { format as f } from '../format.js';
+import { logTail, noteWrapped, withSpinner } from '../prompt.js';
+import { reportAuthorizationFailure } from './authorization.js';
+import { reportCollidingPages, reportShadowedFiles, reportSourceProblem } from './source.js';
+
+function describeSaveProblem(problem: PortalSaveProblem): string {
+  switch (problem.kind) {
+    case 'stagingFailed':
+      return `The portal could not be written (${problem.reason}). The previous portal is unchanged.`;
+    case 'replaceFailed':
+      return (
+        `The previous portal could not be replaced (${problem.reason}). ` +
+        `Whatever could not be moved into place is still at ${f.path(problem.stagedAt)}; move it up a level by hand.`
+      );
+  }
+}
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
@@ -21,52 +39,85 @@ export class PortalGeneratePrompts {
   }
 
   public directoryCannotBeSame(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} and ${f.var("portal")} directories must be different. Current value: ${f.path(
+    const message = `The ${f.var('src')} and ${f.var('portal')} directories must be different. Current value: ${f.path(
       directory
     )}`;
     log.error(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
-    log.error(message);
-  }
-
   public portalDirectoryNotEmpty() {
-    const message = `Please enter a different destination folder or remove the existing files and try again.`;
+    log.error('Please enter a different destination folder or remove the existing files and try again.');
+  }
+
+  public destinationContainsSource(sourceDirectory: DirectoryPath, portalDirectory: DirectoryPath) {
+    const message =
+      `The destination ${f.path(portalDirectory)} contains your source directory ` +
+      `${f.path(sourceDirectory)}, and everything in the destination is replaced by the ` +
+      `generated portal. Choose a destination outside it, such as ` +
+      `${f.flag('destination', './portal')}.`;
     log.error(message);
   }
 
-  public generatePortal(fn: Promise<Result<NodeJS.ReadableStream, ServiceError | NodeJS.ReadableStream>>) {
+  public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
+    reportSourceProblem(problem, sourceDirectory);
+  }
+
+  public filesShadowedByStatic(shadowed: FileName[]) {
+    reportShadowedFiles(shadowed);
+  }
+
+  public pagesCollidingWithSpecs(slugs: string[]) {
+    reportCollidingPages(slugs);
+  }
+
+  public authorizationFailed(failure: PortalAuthorizationFailure) {
+    reportAuthorizationFailure(failure);
+  }
+
+  public runtimeUnsupported(reason: string) {
+    log.error(reason);
+  }
+
+  /**
+   * A portal build runs for tens of seconds with no output of its own, so the spinner
+   * carries an elapsed timer rather than a static message.
+   */
+  public buildPortal(fn: Promise<Result<PortalBuildResult, PortalBuildFailure>>) {
     return withSpinner(
-      "Generating API Portal",
-      "Portal generated successfully.",
-      "Portal Generation failed.",
-      fn
+      'Building the portal',
+      ({ pageCount }) => `Built ${pageCount} ${pageCount === 1 ? 'page' : 'pages'}.`,
+      (failure) => failure.message,
+      fn,
+      { indicator: 'timer' }
     );
   }
 
-  public portalGenerationError(error: string) {
-    log.error(error);
+  public buildFailed(output: string, logPath: FilePath | null) {
+    const tail = logTail(output);
+    if (tail.length > 0) {
+      log.message(tail);
+    }
+    if (logPath === null) {
+      log.error('The full build log could not be written beside the portal.');
+    } else {
+      log.error(`The full build log is at ${f.path(logPath)}.`);
+    }
   }
 
-  public portalGenerationSdkMergeFailed(sdkMergeFailedErrors: string[]) {
-    log.error(`Saved changes couldn't be applied to one or more SDKs.`);
-    const language = sdkMergeFailedErrors.length === 1 ? sdkMergeFailedErrors[0] : "<language>";
-    log.error(`Merge conflicts found in:\n- ${sdkMergeFailedErrors.join("\n- ")}`);
-    const message = `Review and resolve the conflicts first by running:
-'${f.cmdAlt("apimatic", "sdk", "generate")} ${f.flag("language", language)}'
-After resolving merge conflicts, retry ${f.cmdAlt("apimatic", "portal", "generate")}.`;
-    noteWrapped(message, "Next Steps");
-  }
-
-  public portalGenerationErrorWithReport(reportPath: FilePath) {
-    const message = `An error occurred during portal generation.
-A report has been written at the destination path ${f.path(reportPath)}`;
-    log.error(message);
+  public savePortal(fn: Promise<Result<void, PortalSaveProblem>>) {
+    return withSpinner('Writing the portal', 'Portal written.', describeSaveProblem, fn);
   }
 
   public portalGenerated(portal: DirectoryPath) {
     log.info(`Portal artifacts can be found at ${f.path(portal)}.`);
+  }
+
+  public nextSteps(portal: DirectoryPath, zipped: boolean) {
+    const message = zipped
+      ? `Unpack ${f.var('portal.zip')} in ${f.path(portal)} onto any static host.\n` +
+        `Configure ${f.var('404.html')} as the error document so deep links resolve.`
+      : `Upload the contents of ${f.path(portal)} to any static host.\n` +
+        `Configure ${f.var('404.html')} as the error document so deep links resolve.`;
+    noteWrapped(message, 'Next steps');
   }
 }

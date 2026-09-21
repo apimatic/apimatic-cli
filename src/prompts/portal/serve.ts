@@ -1,76 +1,92 @@
-import { log } from "@clack/prompts";
-import { format as f } from "../format.js";
-import { UrlPath } from "../../types/file/urlPath.js";
-import { once } from "events";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { noteWrapped } from "../prompt.js";
+import { log } from '@clack/prompts';
+import { once } from 'node:events';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FileName } from '../../types/file/fileName.js';
+import { UrlPath } from '../../types/file/urlPath.js';
+import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
+import { Result } from 'neverthrow';
+import { format as f } from '../format.js';
+import { logTail, noteWrapped, withSpinner } from '../prompt.js';
+import { reportAuthorizationFailure } from './authorization.js';
+import { reportCollidingPages, reportShadowedFiles, reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
-  public usingFallbackPort(currentPort: number, availablePort: number) {
-    const message = `Port ${f.var(currentPort.toString())} is already in use. The portal will use port ${f.var(
-      availablePort.toString()
-    )} instead.`;
+  public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
+    reportSourceProblem(problem, sourceDirectory);
+  }
+
+  public filesShadowedByStatic(shadowed: FileName[]) {
+    reportShadowedFiles(shadowed);
+  }
+
+  public pagesCollidingWithSpecs(slugs: string[]) {
+    reportCollidingPages(slugs);
+  }
+
+  public authorizationFailed(failure: PortalAuthorizationFailure) {
+    reportAuthorizationFailure(failure);
+  }
+
+  public runtimeUnsupported(reason: string) {
+    log.error(reason);
+  }
+
+  public usingFallbackPort(requestedPort: number, availablePort: number) {
+    const message =
+      `Port ${f.var(requestedPort.toString())} is already in use. ` +
+      `The portal will use port ${f.var(availablePort.toString())} instead.`;
     log.step(message);
   }
 
-  public serverStartFailed(port: number) {
-    const message =
-      `Could not start the portal server on port ${f.var(port.toString())}; ` +
-      `it may have just been taken by another process. Please try again.`;
-    log.error(message);
+  /** The first start of a project pre-bundles dependencies and can take a minute. */
+  public startPreview(fn: Promise<Result<PortalDevServer, PortalDevServerFailure>>) {
+    return withSpinner('Starting the portal preview', 'Portal preview ready.', (failure) => failure.message, fn, {
+      indicator: 'timer'
+    });
   }
 
-  public noPortalSource(buildDirectory: DirectoryPath) {
-    const message =
-      `No portal source found at ${f.path(buildDirectory)}. ` +
-      `Run ${f.cmdAlt("apimatic", "portal", "quickstart")} to set one up.`;
-    log.error(message);
+  public startFailed(output: string) {
+    const tail = logTail(output);
+    if (tail.length > 0) {
+      log.message(tail);
+    }
   }
 
-  public invalidBuildConfig(buildDirectory: DirectoryPath) {
-    const message =
-      `Could not read the build configuration in ${f.path(buildDirectory)}. ` +
-      `Ensure ${f.var("APIMATIC-BUILD.json")} exists and is valid JSON.`;
-    log.error(message);
+  public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
+    log.message(`The portal is running at ${f.link(url.toString())}`);
+    // Only the body of a page the server already knows about reloads: the page tree and the
+    // configuration are read once, when the project is prepared.
+    noteWrapped(
+      [
+        `Edits to the Markdown pages in ${f.path(
+          sourceDirectory.join('content')
+        )} appear in the browser automatically.`,
+        '',
+        `Adding or removing a page, editing ${f.var('meta.json')} or ${f.var('portal.json')}, or changing which`,
+        `documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        '',
+        'Press CTRL+C to stop the server.'
+      ].join('\n'),
+      'Live preview'
+    );
   }
 
-  public baseUrlPortUpdated(updatedUrl: UrlPath) {
-    const message = `Updated the base URL in ${f.var("APIMATIC-BUILD.json")} to ${f.var(updatedUrl.toString())} to match the serve port.`;
-    log.info(message);
+  public stopping() {
+    log.info('Stopping the portal preview.');
   }
 
-  public portalServed(urlPath: UrlPath) {
-    const message = `The portal is running at ${f.link(urlPath.toString())}`;
-    log.message(message);
-  }
-
-  public promptForExit() {
-    const message = "Press CTRL+C to stop the server.";
-    log.message(message);
-  }
-
-  public changesDetected() {
-    const message = "Changes detected...";
-    log.info(message);
-  }
-
-  public watcherError() {
-    const message = `An unexpected error occurred while watching your build folder for changes. Please try again later. If the issue persists, contact our team at ${f.var(
-      "support@apimatic.io"
-    )}`;
-    log.error(message);
+  /** The preview stopped on its own: whatever it printed on the way out is the explanation. */
+  public previewStopped(output: string) {
+    log.error('The portal preview stopped unexpectedly.');
+    const tail = logTail(output);
+    if (tail.length > 0) {
+      log.message(tail);
+    }
   }
 
   public async blockExecution() {
-    await Promise.race([once(process, "SIGINT"), once(process, "SIGTERM")]);
-  }
-
-  public hotReloadEnabled(srcDirectory: DirectoryPath) {
-    noteWrapped(
-      `Hot reload is enabled.
-
-Watching the directory ${f.path(srcDirectory)} for any changes`,
-      `Note`
-    );
+    await Promise.race([once(process, 'SIGINT'), once(process, 'SIGTERM')]);
   }
 }

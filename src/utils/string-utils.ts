@@ -35,3 +35,10 @@ export function stripAnsi(str: string) {
   }
   return result;
 }
+
+// Editors on Windows, and PowerShell redirection, write a byte-order mark. `JSON.parse`
+// rejects it while the YAML parser strips it, so without this the same document is accepted
+// as `.yaml` and refused as `.json`.
+export function stripByteOrderMark(contents: string): string {
+  return contents.codePointAt(0) === 0xfeff ? contents.slice(1) : contents;
+}

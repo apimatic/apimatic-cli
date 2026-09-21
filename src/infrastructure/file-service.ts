@@ -1,16 +1,15 @@
-import fs from "fs";
-import fsExtra from "fs-extra";
-import * as path from "path";
-import { pipeline } from "stream";
-import { promisify } from "util";
-import { FilePath } from "../types/file/filePath.js";
-import { DirectoryPath } from "../types/file/directoryPath.js";
-import { Directory } from "../types/file/directory.js";
-import { FileName } from "../types/file/fileName.js";
-import { sleep } from "./timer-extensions.js";
+import fs from 'fs';
+import fsExtra from 'fs-extra';
+import * as path from 'path';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
+import { FilePath } from '../types/file/filePath.js';
+import { DirectoryPath } from '../types/file/directoryPath.js';
+import { Directory } from '../types/file/directory.js';
+import { FileName } from '../types/file/fileName.js';
+import { sleep } from './timer-extensions.js';
 
 export class FileService {
-
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
       const stat = await fsExtra.stat(file.toString());
@@ -47,12 +46,16 @@ export class FileService {
     }
   }
 
+  /**
+   * Hidden entries do not count: scaffolding into a directory that holds only a `.git` is
+   * the normal way to start a project, so the prompts say "apart from hidden files".
+   */
   public async directoryEmpty(dir: DirectoryPath): Promise<boolean> {
     try {
       const files = await fsExtra.readdir(dir.toString());
-      return files.filter((file) => !file.startsWith(".")).length === 0;
+      return files.filter((file) => !file.startsWith('.')).length === 0;
     } catch (error) {
-      return error instanceof Error && "code" in error && error.code === "ENOENT";
+      return error instanceof Error && 'code' in error && error.code === 'ENOENT';
     }
   }
 
@@ -84,39 +87,66 @@ export class FileService {
       entries.map(async (entry) => {
         const fullPath = path.join(directoryPath.toString(), entry);
         const stat = await fsExtra.stat(fullPath);
-        return stat.isDirectory() ? await this.getDirectory(new DirectoryPath(fullPath)) : { fileName: new FileName(entry) };
+        return stat.isDirectory()
+          ? await this.getDirectory(new DirectoryPath(fullPath))
+          : { fileName: new FileName(entry) };
       })
     );
     return new Directory(directoryPath, results);
   }
 
-  public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
-    try {
-      const entries = await fsExtra.readdir(dir.toString());
-      const directories: DirectoryPath[] = [];
+  /**
+   * The names of the files directly inside `dir`. `getDirectory` walks the whole tree and
+   * stats every entry, which is wasted work when only the top level is wanted, and throws on
+   * an entry it cannot stat -- out of callers that have no way to report it.
+   */
+  public async getFileNames(dir: DirectoryPath): Promise<FileName[]> {
+    return (await this.listEntries(dir)).fileNames;
+  }
 
-      for (const entry of entries) {
-        const fullPath = dir.join(entry).toString();
-        const stat = await fsExtra.stat(fullPath);
-        if (stat.isDirectory()) {
-          directories.push(new DirectoryPath(fullPath));
+  public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
+    return (await this.listEntries(dir)).subDirectories;
+  }
+
+  // The direct children of `dir`, split into files and directories; both empty when it cannot
+  // be read. A symlink counts as what it points at: skipping it silently drops an entry the
+  // user did put there.
+  private async listEntries(dir: DirectoryPath): Promise<{ fileNames: FileName[]; subDirectories: DirectoryPath[] }> {
+    const fileNames: FileName[] = [];
+    const subDirectories: DirectoryPath[] = [];
+    try {
+      for (const entry of await fsExtra.readdir(dir.toString(), { withFileTypes: true })) {
+        const isDirectory = entry.isSymbolicLink()
+          ? (await fsExtra.stat(dir.join(entry.name).toString()).catch(() => null))?.isDirectory() ?? false
+          : entry.isDirectory();
+        if (isDirectory) {
+          subDirectories.push(dir.join(entry.name));
+        } else {
+          fileNames.push(new FileName(entry.name));
         }
       }
-
-      return directories;
     } catch {
-      return [];
+      // Unreadable: reported as empty, the caller has nothing to do about it.
     }
+    return { fileNames, subDirectories };
   }
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
+    await this.forEachEntry(source, destination, (from, to) => fsExtra.copy(from, to));
+  }
+
+  public async moveDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
+    await this.forEachEntry(source, destination, (from, to) => fsExtra.move(from, to, { overwrite: true }));
+  }
+
+  private async forEachEntry(
+    source: DirectoryPath,
+    destination: DirectoryPath,
+    operation: (from: string, to: string) => Promise<void>
+  ) {
     const entries = await fsExtra.readdir(source.toString());
     await Promise.all(
-      entries.map(async (entry) => {
-        const srcEntry = path.join(source.toString(), entry);
-        const destEntry = path.join(destination.toString(), entry);
-        await fsExtra.copy(srcEntry, destEntry);
-      })
+      entries.map((entry) => operation(path.join(source.toString(), entry), path.join(destination.toString(), entry)))
     );
   }
 
@@ -138,7 +168,11 @@ export class FileService {
           const stat = await fsExtra.stat(sourcePath);
 
           if (stat.isDirectory()) {
-            return this.copyDirectoryExcluding(new DirectoryPath(sourcePath), new DirectoryPath(destPath), excludeNames);
+            return this.copyDirectoryExcluding(
+              new DirectoryPath(sourcePath),
+              new DirectoryPath(destPath),
+              excludeNames
+            );
           }
 
           return fsExtra.copyFile(sourcePath, destPath);
@@ -165,7 +199,12 @@ export class FileService {
     const deadline = Date.now() + timeoutMs;
     const deleteFailurePersistsMaxDelay = Date.now() + 5 * 1000;
     let actionPerformed = false;
-    while (Date.now() < deadline && await this.deleteDirectory(dirPath).then(() => false).catch(() => true)) {
+    while (
+      Date.now() < deadline &&
+      (await this.deleteDirectory(dirPath)
+        .then(() => false)
+        .catch(() => true))
+    ) {
       if (!actionPerformed && Date.now() > deleteFailurePersistsMaxDelay) {
         onDeleteFailurePersists();
         actionPerformed = true;
@@ -174,25 +213,12 @@ export class FileService {
     }
   }
 
-  public getRelativePath(filePath: FilePath, basePath: DirectoryPath): string {
-    const filePathStr = filePath.toString();
-    const basePathStr = basePath.toString();
-
-    if (filePathStr.startsWith(basePathStr)) {
-      const relativePath = filePathStr.substring(basePathStr.length).replace(/^[/\\]/, "");
-      return relativePath.replace(/\\/g, "/");
-    }
-
-    // Normalize the full path if it doesn't start with basePath
-    return filePathStr.replace(/\\/g, "/");
-  }
-
   public async getStream(filePath: FilePath) {
     return fs.createReadStream(filePath.toString());
   }
 
   public async getContents(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), "utf-8");
+    return await fsExtra.readFile(filePath.toString(), 'utf-8');
   }
 
   public async writeFile(filePath: FilePath, stream: NodeJS.ReadableStream) {
@@ -205,7 +231,7 @@ export class FileService {
   }
 
   public async writeContents(filePath: FilePath, contents: string) {
-    await fsExtra.writeFile(filePath.toString(), contents, "utf-8");
+    await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
   }
 
   public async copy(source: FilePath, destination: FilePath) {
@@ -217,7 +243,7 @@ export class FileService {
   }
 
   public async readFile(filePath: FilePath): Promise<string> {
-    return await fsExtra.readFile(filePath.toString(), "utf-8");
+    return await fsExtra.readFile(filePath.toString(), 'utf-8');
   }
 
   public async isZipFile(filePath: FilePath): Promise<boolean> {

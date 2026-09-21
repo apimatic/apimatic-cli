@@ -1,7 +1,19 @@
 {
+  // The suite runs through tsx, which strips types without checking them, so `pretest` runs
+  // this config before the suite. `include` is set here because inheriting the root
+  // `src/**/*` compiles the source twice and not one test.
   "extends": "../tsconfig",
   "compilerOptions": {
     "noEmit": true,
-    "composite": true
-  }
+    // Tests sit outside the root project's `src` rootDir, and import their subjects without
+    // the `.js` extension that nodenext resolution demands. Both are fine for a check that
+    // never emits; `pnpm build` still holds the source to the stricter settings.
+    "rootDir": "..",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    // Matches portal-template/tsconfig.json, whose modules the template tests import.
+    "target": "es2022",
+    "lib": ["es2022", "dom"]
+  },
+  "include": ["**/*.ts"]
 }
