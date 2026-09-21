@@ -61,6 +61,7 @@ export class PortalServeAction {
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
     this.prompts.pagesCollidingWithSpecs(source.value.collidingSlugs);
+    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles);
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {

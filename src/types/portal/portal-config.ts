@@ -30,12 +30,15 @@ const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPage
 
 // Pre-2.0 names and near misses. A mistyped setting is the one mistake that otherwise
 // produces a portal that builds and is quietly wrong.
-const RENAMED_FIELDS: Record<string, string> = {
-  logoUrl: 'logo',
-  pageTitle: 'title',
-  url: 'siteUrl',
-  site: 'siteUrl'
-};
+// A Map rather than an object literal: `JSON.parse` happily produces a document whose keys
+// are `toString` or `constructor`, and indexing a literal with those returns a prototype
+// member, which would be printed back as the suggested spelling.
+const RENAMED_FIELDS = new Map<string, string>([
+  ['logoUrl', 'logo'],
+  ['pageTitle', 'title'],
+  ['url', 'siteUrl'],
+  ['site', 'siteUrl']
+]);
 
 // Immutable wrapper around the parsed `src/portal.json`. Construct trusted values with
 // `create`; user input goes through `parse`, which names every invalid field.
@@ -107,8 +110,8 @@ export class PortalConfig {
     return Object.keys(data)
       .filter((field) => !KNOWN_FIELDS.has(field))
       .map((field) => {
-        const intended = RENAMED_FIELDS[field];
-        return intended
+        const intended = RENAMED_FIELDS.get(field);
+        return intended !== undefined
           ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
           : `'${field}' is not a portal.json setting.`;
       });

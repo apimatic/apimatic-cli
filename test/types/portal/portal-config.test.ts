@@ -87,6 +87,13 @@ describe('PortalConfig', () => {
       expect(errors).to.deep.equal(["'logoUrl' is not a portal.json setting; did you mean 'logo'?"]);
     });
 
+    // `JSON.parse` will happily hand back a document keyed by a prototype member.
+    it('does not quote a prototype member back as the intended setting', () => {
+      const errors = PortalConfig.parse('{"title":"Calc","toString":"x"}')._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal(["'toString' is not a portal.json setting."]);
+    });
+
     it('reports every unknown setting, alongside the invalid ones', () => {
       const errors = parse({ pageTitle: 'Calc', theme: {} })._unsafeUnwrapErr();
 

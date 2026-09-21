@@ -291,6 +291,173 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  describe('nav.json', () => {
+    beforeEach(() => {
+      write('portal.json', JSON.stringify({ title: 'Calc' }));
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', '# Home');
+      write('content/authentication.md', '# Auth');
+    });
+
+    /** The errors behind an `invalidNavigation` problem, as their own type. */
+    const navigationErrors = (problem: PortalSourceProblem): string[] => {
+      if (problem.kind !== 'invalidNavigation') {
+        throw new Error(`expected an 'invalidNavigation' problem, got '${problem.kind}'`);
+      }
+      return problem.errors;
+    };
+
+    it('accepts a file naming the pages beside it, and both tokens at the root', async () => {
+      write(
+        'content/nav.json',
+        JSON.stringify({ pages: ['index', 'apimatic:pages', 'authentication', 'apimatic:api'] })
+      );
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('resolves with no navigation file at all', async () => {
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('names the file and the entry when a page does not exist', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.deep.equal(["content/nav.json: 'missing' is not a page or folder in this directory."]);
+    });
+
+    it('validates a nested file against its own directory', async () => {
+      write('content/guides/intro.md', '# Intro');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['intro'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // A folder's index page is what the folder itself links to, not one of its children.
+    it('refuses index in a nested file while keeping it at the content root', async () => {
+      write('content/guides/index.md', '# Guides');
+      write('content/guides/intro.md', '# Intro');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['index', 'intro'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain("content/guides/nav.json: 'index' is the page this folder links to");
+    });
+
+    it('refuses a page named in the wrong directory', async () => {
+      write('content/guides/intro.md', '# Intro');
+      // 'authentication' is a sibling of the content root's nav.json, not of this one.
+      write('content/guides/nav.json', JSON.stringify({ pages: ['authentication'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/guides/nav.json: 'authentication' is not a page or folder");
+    });
+
+    it('refuses an apimatic token outside the content root', async () => {
+      write('content/guides/intro.md', '# Intro');
+      write('content/guides/nav.json', JSON.stringify({ pages: ['intro', 'apimatic:api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/guides/nav.json: 'apimatic:api' can only be used");
+    });
+
+    it('collects the errors of every file in the tree', async () => {
+      write('content/guides/intro.md', '# Intro');
+      write('content/nav.json', JSON.stringify({ pages: ['nope'] }));
+      write('content/guides/nav.json', JSON.stringify({ pages: ['also-nope'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(2);
+      expect(errors.join('\n')).to.contain('content/nav.json');
+      expect(errors.join('\n')).to.contain('content/guides/nav.json');
+    });
+
+    it('addresses a page by its name without the extension, for both md and mdx', async () => {
+      write('content/tour.mdx', '# Tour');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'tour', 'authentication'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('warns about a leftover meta.json without failing the build', async () => {
+      write('content/meta.json', JSON.stringify({ pages: ['index'] }));
+      write('content/guides/intro.md', '# Intro');
+      write('content/guides/meta.json', JSON.stringify({ pages: ['intro'] }));
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.ignoredNavigationFiles.sort()).to.deep.equal(['content/guides/meta.json', 'content/meta.json']);
+    });
+
+    // Fumadocs builds no folder node for a directory with no pages under it, so an entry
+    // naming one would resolve to nothing.
+    it('refuses a directory that holds no pages', async () => {
+      write('content/assets/logo.png', 'x');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'assets'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("'assets' is not a page or folder in this directory");
+    });
+
+    it('accepts a directory whose pages are nested below it', async () => {
+      write('content/guides/deep/intro.md', '# Intro');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The docs glob matches by code point, so `Guide.MD` is not a page in the build either.
+    it('does not offer a page whose extension differs in case', async () => {
+      write('content/Guide.MD', '# Guide');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'Guide'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("'Guide' is not a page or folder in this directory");
+    });
+
+    it('hands each resolve its own list rather than a shared one', async () => {
+      write('content/meta.json', JSON.stringify({ pages: ['index'] }));
+
+      const first = (await resolve())._unsafeUnwrap();
+      first.ignoredNavigationFiles.push('polluted');
+
+      expect((await resolve())._unsafeUnwrap().ignoredNavigationFiles).to.deep.equal(['content/meta.json']);
+    });
+
+    it('reports no ignored files when there are none', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+
+      expect((await resolve())._unsafeUnwrap().ignoredNavigationFiles).to.deep.equal([]);
+    });
+
+    // The build matches `**/nav.json` by code point, so a case variant orders nothing. It is
+    // reported rather than validated, because validating it would describe a file nothing reads.
+    it('reports a case variant of nav.json instead of applying it', async () => {
+      write('content/Nav.json', JSON.stringify({ pages: ['nonsense'] }));
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.ignoredNavigationFiles).to.deep.equal(['content/Nav.json']);
+    });
+
+    // The file is not loaded by the build at all, so it cannot make a nav.json invalid.
+    it('does not validate a leftover meta.json', async () => {
+      write('content/meta.json', JSON.stringify({ pages: ['nonsense'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+  });
+
   describe('migration from APIMATIC-BUILD.json', () => {
     it('suggests a config from the old page title and logo, and names what is unsupported', async () => {
       write(

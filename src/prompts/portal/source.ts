@@ -25,6 +25,11 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
       return;
     }
+    case 'invalidNavigation': {
+      log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
+      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      return;
+    }
     case 'unreadableSpec': {
       log.error(`${f.var(problem.fileName.toString())} could not be read as JSON or YAML.`);
       return;
@@ -60,6 +65,18 @@ export function reportShadowedFiles(shadowed: FileName[]): void {
   }
   const names = shadowed.map((fileName) => f.var(fileName.toString())).join(', ');
   log.warn(`${names} in ${f.var('static')} replaces the file the portal would have generated.`);
+}
+
+export function reportIgnoredNavigationFiles(files: string[]): void {
+  if (files.length === 0) {
+    return;
+  }
+  const names = files.map((file) => f.var(file)).join(', ');
+  const [verb, pronoun] = files.length === 1 ? ['is', 'it'] : ['are', 'them'];
+  log.warn(
+    `${names} ${verb} not read. Pages are ordered by ${f.var('nav.json')}: rename ${pronoun} to ` +
+      `order that directory, or delete ${pronoun}.`
+  );
 }
 
 export function reportCollidingPages(slugs: string[]): void {

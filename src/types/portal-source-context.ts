@@ -2,11 +2,13 @@ import path from 'node:path';
 import { getSlugs } from 'fumadocs-core/source';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
+import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
+import { LEGACY_NAVIGATION_FILE_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
 import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 import { stripByteOrderMark } from '../utils/string-utils.js';
@@ -33,6 +35,17 @@ const GENERATED_ROOT_FILES = [
 // `generatePortal` settings the v1 `portal.json` can express; everything else in the old
 // build file is reported as unsupported by the migration hint.
 const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl', 'tableOfContentsPath']);
+
+const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
+
+/** Extensions the docs collection compiles, and so the ones an entry can address. */
+const PAGE_EXTENSIONS = ['.md', '.mdx'];
+
+/** What one walk of the content tree found: see `PortalSourceContext.navigation`. */
+interface NavigationScan {
+  errors: string[];
+  ignoredFiles: string[];
+}
 
 /**
  * The `src/` directory of a portal project: `portal.json`, the OpenAPI documents in
@@ -93,13 +106,25 @@ export class PortalSourceContext {
       ? this.contentDirectory
       : null;
 
+    // Walked once and shared: both the navigation scan and the slug collision check read the
+    // whole content tree, and `getDirectory` stats every entry in it.
+    const contentTree = contentDirectory === null ? null : await this.contentTree(contentDirectory);
+
+    // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
+    // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
+    const navigation = await this.navigation(contentTree);
+    if (navigation.errors.length > 0) {
+      return err({ kind: 'invalidNavigation', errors: navigation.errors });
+    }
+
     return ok({
       config: config.value,
       specs: specs.value,
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
-      collidingSlugs: contentDirectory === null ? [] : await this.collidingSlugs(contentDirectory, specs.value)
+      collidingSlugs: contentTree === null ? [] : this.collidingSlugs(contentTree, specs.value),
+      ignoredNavigationFiles: navigation.ignoredFiles
     });
   }
 
@@ -158,6 +183,116 @@ export class PortalSourceContext {
   }
 
   /**
+   * Every `nav.json` in the content tree, validated against the directory it orders, plus
+   * the `meta.json` files the build no longer reads. One walk, because both come from the
+   * same tree, and a directory has to be seen before its file can be checked against it.
+   */
+  private async navigation(contentTree: Directory | null): Promise<NavigationScan> {
+    const errors: string[] = [];
+    const ignoredFiles: string[] = [];
+    if (contentTree === null) {
+      return { errors, ignoredFiles };
+    }
+
+    const visit = async (directory: Directory, isContentRoot: boolean): Promise<void> => {
+      const childNames: string[] = [];
+      let navigationFile: FileName | undefined;
+
+      for (const item of directory.items) {
+        // A directory with no page anywhere beneath it becomes no node in the page tree, so
+        // naming it would resolve to nothing.
+        if (item instanceof Directory) {
+          if (PortalSourceContext.containsPage(item)) {
+            childNames.push(item.directoryPath.leafName());
+          }
+          continue;
+        }
+        // `compare` is by code point, so this matches the build's glob exactly. A file named
+        // `Nav.json` is read by neither, and is reported below rather than sitting inert.
+        if (item.fileName.compare(NAVIGATION_FILE) === 0) {
+          navigationFile = item.fileName;
+          continue;
+        }
+        if (item.fileName.is(NAVIGATION_FILE_NAME) || item.fileName.is(LEGACY_NAVIGATION_FILE_NAME)) {
+          ignoredFiles.push(this.relativeToSource(new FilePath(directory.directoryPath, item.fileName)));
+          continue;
+        }
+        // An entry addresses a page by the name it is reached at, which is the file name
+        // without its extension -- the same way the content source derives a slug.
+        const pageName = PortalSourceContext.pageName(item.fileName);
+        if (pageName !== undefined) {
+          childNames.push(pageName.toString());
+        }
+      }
+
+      if (navigationFile !== undefined) {
+        const file = new FilePath(directory.directoryPath, navigationFile);
+        // Read inside the walk, so one unreadable file is reported rather than thrown out of
+        // `resolve`, which always answers with a Result.
+        let contents: string;
+        try {
+          contents = await this.fileService.getContents(file);
+        } catch {
+          errors.push(`${this.relativeToSource(file)} could not be read.`);
+          contents = '';
+        }
+        if (contents !== '') {
+          const parsed = PortalNavigation.parse(contents, {
+            label: this.relativeToSource(file),
+            isContentRoot,
+            childNames
+          });
+          if (parsed.isErr()) {
+            errors.push(...parsed.error);
+          }
+        }
+      }
+
+      for (const item of directory.items) {
+        if (item instanceof Directory) {
+          await visit(item, false);
+        }
+      }
+    };
+
+    await visit(contentTree, true);
+    return { errors, ignoredFiles };
+  }
+
+  /**
+   * The name an entry addresses a page by, or undefined when the file is not a page. Matched
+   * by code point, like the docs glob: `Guide.MD` is no more a page to the build than here.
+   */
+  private static pageName(fileName: FileName): FileName | undefined {
+    const stem = fileName.withoutExtension();
+    return PAGE_EXTENSIONS.some((extension) => fileName.compare(new FileName(`${stem}${extension}`)) === 0)
+      ? stem
+      : undefined;
+  }
+
+  private static containsPage(directory: Directory): boolean {
+    return directory.items.some((item) =>
+      item instanceof Directory
+        ? PortalSourceContext.containsPage(item)
+        : PortalSourceContext.pageName(item.fileName) !== undefined
+    );
+  }
+
+  /** The content tree, or null when it cannot be walked, as `contentAddresses` also allowed. */
+  private async contentTree(contentDirectory: DirectoryPath): Promise<Directory | null> {
+    try {
+      return await this.fileService.getDirectory(contentDirectory);
+    } catch {
+      return null;
+    }
+  }
+
+  /** How a file inside the source directory is named in a message. */
+  private relativeToSource(file: FilePath): string {
+    return path.relative(this.sourceDirectory.toString(), file.toString()).split(path.sep).join('/');
+  }
+
+  /**
    * Files at the top of `static/` that the build would otherwise have generated itself. Only
    * the top level is read: nothing below it can land on one of these names, and walking the
    * whole tree let one unreadable entry throw out of `resolve`, which otherwise returns a Result.
@@ -174,9 +309,9 @@ export class PortalSourceContext {
    * without a word. Compared without regard to case: the prerender writes both pages to one
    * path on a case-insensitive disk.
    */
-  private async collidingSlugs(contentDirectory: DirectoryPath, specs: PortalSpec[]): Promise<string[]> {
+  private collidingSlugs(contentTree: Directory, specs: PortalSpec[]): string[] {
     const claimed = new Set<string>();
-    for (const address of await this.contentAddresses(contentDirectory)) {
+    for (const address of this.contentAddresses(contentTree)) {
       if (address.length === 2 && address[0].toLowerCase() === 'api') {
         claimed.add(address[1].toLowerCase());
       }
@@ -186,14 +321,10 @@ export class PortalSourceContext {
 
   // The content source's own slug rules rather than a second implementation of them:
   // `(group)` folders drop out and `index` collapses into its parent.
-  private async contentAddresses(contentDirectory: DirectoryPath): Promise<string[][]> {
-    let files: FilePath[];
-    try {
-      files = (await this.fileService.getDirectory(contentDirectory)).getAllFiles();
-    } catch {
-      return [];
-    }
-    return files
+  private contentAddresses(contentTree: Directory): string[][] {
+    const contentDirectory = contentTree.directoryPath;
+    return contentTree
+      .getAllFiles()
       .filter((file) => file.name().hasExtension('.md') || file.name().hasExtension('.mdx'))
       .map((file) => getSlugs(path.relative(contentDirectory.toString(), file.toString()).split(path.sep).join('/')));
   }

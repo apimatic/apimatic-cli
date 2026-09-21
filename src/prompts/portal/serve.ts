@@ -10,7 +10,12 @@ import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportCollidingPages, reportShadowedFiles, reportSourceProblem } from './source.js';
+import {
+  reportCollidingPages,
+  reportIgnoredNavigationFiles,
+  reportShadowedFiles,
+  reportSourceProblem
+} from './source.js';
 
 export class PortalServePrompts {
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
@@ -23,6 +28,10 @@ export class PortalServePrompts {
 
   public pagesCollidingWithSpecs(slugs: string[]) {
     reportCollidingPages(slugs);
+  }
+
+  public ignoredNavigationFiles(files: string[]) {
+    reportIgnoredNavigationFiles(files);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

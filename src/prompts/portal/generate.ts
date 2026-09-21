@@ -10,7 +10,12 @@ import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportCollidingPages, reportShadowedFiles, reportSourceProblem } from './source.js';
+import {
+  reportCollidingPages,
+  reportIgnoredNavigationFiles,
+  reportShadowedFiles,
+  reportSourceProblem
+} from './source.js';
 
 function describeSaveProblem(problem: PortalSaveProblem): string {
   switch (problem.kind) {
@@ -68,6 +73,10 @@ export class PortalGeneratePrompts {
 
   public pagesCollidingWithSpecs(slugs: string[]) {
     reportCollidingPages(slugs);
+  }
+
+  public ignoredNavigationFiles(files: string[]) {
+    reportIgnoredNavigationFiles(files);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

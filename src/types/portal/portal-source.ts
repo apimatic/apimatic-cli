@@ -18,12 +18,19 @@ export interface PortalSource {
   shadowedFiles: FileName[];
   /** Spec slugs that a page under `content/api/` also claims, so the two share an address. */
   collidingSlugs: string[];
+  /**
+   * Files in the content tree that look like navigation but are not read, relative to
+   * `src/`: a leftover `meta.json`, or a case variant the build's glob does not match.
+   * Reported rather than left to sit there doing nothing.
+   */
+  ignoredNavigationFiles: string[];
 }
 
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig'; migration: PortalMigration | null }
   | { kind: 'invalidConfig'; errors: string[] }
+  | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
   | { kind: 'noSpecs' }
@@ -40,7 +47,7 @@ export interface PortalMigration {
   unmigratableLogo: string | null;
   /**
    * Whether the pre-2.0 file described its navigation with a table of contents. Reported
-   * separately because that has a 2.0 equivalent: the `meta.json` files beside the pages.
+   * separately because that has a 2.0 equivalent: the `nav.json` files beside the pages.
    */
   hadTableOfContents: boolean;
 }
