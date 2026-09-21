@@ -14,8 +14,9 @@ Fumadocs' own prop names, Mintlify's `docs.json`, Starlight and Docusaurus.
 Give `portal.json` the shape it will keep, and make the portal brandable: logo,
 favicon, colour preset, primary colour, fonts, light/dark mode, layout, header
 links, and top-level sections rendered as tabs. Every key is optional except
-`sdks.languages`, which must name at least one language; a file holding that
-and `site.url` builds a correct single-spec portal.
+`sdks.languages`, which must name at least one language, and `site.name` when
+the project holds more than one spec. A file holding the languages and
+`site.url` builds a correct single-spec portal.
 
 The `portal.json` schema is unreleased, so restructuring it is free until 2.0
 ships and a breaking change after. That is why the whole key structure lands in
@@ -48,6 +49,8 @@ a hidden sidebar on the Home tab (section 12).
 | Raw tokens | `advanced.tokens.{light,dark}` are validated by name and passed through in this release, because the same generated stylesheet carries them for free. The contrast gate is post-MVP. |
 | Colour formats | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `hsl()` for `brand.colors.primary`, because the foreground derivation has to parse it. Raw tokens accept any CSS colour string. |
 | Defaults | Applied twice, deliberately: the scaffold writes them into the file ("ship populated"), and `resolve()` fills them for a hand-written minimal file. An explicit default and an absent key produce the same portal. |
+| Generated files, not substitution | The CLI writes two files the template imports: `portal.identity.json` (client-safe, read by `portal.ts`) and `src/styles/theme.css`. Re-applying a config edit under `portal serve` is then a plain write of those two files, and the only substitutions left are the content-directory literals prepare makes once. |
+| Operation filtering | `showDeprecated` and `showInternal` are applied to the bundled document before pages are generated, not to the generated pages. Fumadocs bundles once; the filtered document is handed back as a document object. |
 
 Rejected, with reasons:
 
@@ -69,11 +72,19 @@ Rejected, with reasons:
 - **Free-text Google Fonts family names.** A typo only shows as a fallback font
   at runtime, and the weight axis differs per family so the URL cannot be
   derived reliably.
-- **Pre-filtering the OpenAPI document before Fumadocs bundles it.** The
-  document-object input form carries no base path for relative `$ref`s to
-  resolve against, and the portal plan relies on Fumadocs bundling cross-file
-  references. Filtering happens on the generated source files instead
-  (section 7).
+- **Filtering the document before Fumadocs bundles it.** The document-object
+  input form carries no base path for relative `$ref`s to resolve against, and
+  the portal plan relies on Fumadocs bundling cross-file references. The
+  filter runs on the bundled document instead, where every reference is
+  already internal (section 7).
+- **Filtering the generated pages after `staticSource`.** Works, but leaves
+  emptied tag folders whose `meta.json` has to be found and removed too, and
+  the pages' own `payload.bundled` would still carry the hidden operations.
+  Filtering the document first makes both problems not arise.
+- **Substituting a literal into `portal.ts` for the identity.** Chosen in the
+  portal plan because `portal.config.json` held the build machine's paths and a
+  JSON module is retained whole. A separate client-safe file has nothing to
+  leak, and a file is what a watcher can rewrite.
 - **`brand.preset` as its own key.** The preset is a palette; beside the
   primary it seeds under `brand.colors` it reads as one decision and avoids the
   preset / theme / layout muddle.
@@ -134,7 +145,7 @@ Rejected, with reasons:
 | `sections[].groupBy` | enum | `tag` | `api` only. `tag`, `route`, `none`; Fumadocs' own values. Changes operation URLs: `tag` yields `/api/<spec>/<tag>/<operation>`, `route` `/api/<spec>/<path>/<method>`, `none` `/api/<spec>/<operation>`. |
 | `sections[].showDeprecated` | boolean | `true` | `api` only. `true` keeps deprecated operations, struck through in the sidebar as Fumadocs already renders them. |
 | `sections[].showInternal` | boolean | `false` | `api` only. Operations carrying `x-internal: true`. |
-| `sdks.languages` | string[] | none, required | At least one entry; a missing or empty list is reported like any other error. The navigation plan owns the accepted values and the entitlement check. |
+| `sdks.languages` | string[] | none, required | At least one entry, each a value of the `Language` enum in `src/types/sdk/generate.ts`: `csharp`, `java`, `php`, `python`, `ruby`, `typescript`, `go`. A missing or empty list, or an unknown id, is reported like any other error. The navigation plan owns the entitlement check. |
 | `ai.pageActions` | boolean | `true` | Today's top-level `aiPageActions`, moved. |
 | `advanced.tokens.light`, `.dark` | map | `{}` | Keys must match `--color-fd-*` and be one of the token names in section 10. Values pass through. |
 
@@ -150,9 +161,11 @@ as `PortalConfig.parse` does today.
 ## 4. How each key reaches the portal
 
 The split the navigation plan's section 9 asked for already exists: the browser
-gets a literal substituted into `portal-template/src/lib/portal.ts`; everything
-that addresses the build machine stays in `portal.config.json` behind
-`portal.server.ts`. This plan widens both.
+gets an identity with nothing machine-specific in it; everything that addresses
+the build machine stays in `portal.config.json` behind `portal.server.ts`. This
+plan widens both, and moves the identity from a literal substituted into
+`portal.ts` to a `portal.identity.json` that `portal.ts` imports, so a config
+edit under `portal serve` is a file write Vite hot-reloads.
 
 Browser identity: `name`, `description`, `siteUrl`, `logo` (`{light, dark}` or
 null), `faviconUrl`, `layout`, `colorMode`, `links`, `sections`
@@ -162,24 +175,25 @@ Server-only: `specs`, `contentDir`, `staticDir`, `api` (`groupBy`,
 `showDeprecated`, `showInternal`), and later `sdks.languages`.
 
 Generated stylesheet: the CLI writes `src/styles/theme.css` into the build
-project and substitutes three import lines in `app.css` (section 6). Nothing
-about colour or font is decided in the template at runtime.
+project; `app.css` imports it last and is otherwise fixed apart from the
+content-directory `@source` line prepare already substitutes (section 6).
+Nothing about colour or font is decided in the template at runtime.
 
 | Key | Applied where | Fumadocs mechanism |
 |---|---|---|
 | `site.*` | `__root.tsx`, `$.tsx` head, `seo.ts`, `llms.server.ts` | As today. |
 | `brand.logo` | `layout.shared.tsx` `nav.title` | Two `<img>` with `dark:hidden` / `hidden dark:block`; the `dark` variant is defined by Fumadocs' `base.css`. |
 | `brand.favicon` | `__root.tsx` `links` | `<link rel="icon">` with `type` from the extension. |
-| `brand.colors.preset` | `app.css` import | `@import 'fumadocs-ui/css/<preset>.css'` replaces today's fixed `neutral.css` line. |
-| `brand.colors.primary` | `theme.css` | `:root { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the same under `.dark`. Unlayered `:root` rules win over the preset's `@theme` layer (verify, section 12). |
-| `brand.fonts` | `app.css` import, `theme.css` | Google Fonts `@import` line, then `@theme { --default-font-family; --default-mono-font-family }`. `system` emits no import and the OS stacks. |
+| `brand.colors.preset` | `theme.css` | `@import 'fumadocs-ui/css/<preset>.css'` at the top of the generated file; today's fixed `neutral.css` line leaves `app.css`. |
+| `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks are always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the presets' `.dark` block and comes later, so a light-only value would win in dark mode. |
+| `brand.fonts` | `__root.tsx` head, `theme.css` | A `<link rel="stylesheet">` to the Google Fonts URL from the identity, then `@theme { --default-font-family; --default-mono-font-family }`. `system` emits no link and the OS stacks. A link rather than a CSS `@import` because a remote import nested inside an imported stylesheet would land mid-file after bundling, where browsers ignore it. |
 | `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
-| `navigation.layout` | new `src/lib/layout.tsx` | One switch that exports the layout and page components for the chosen layout (section 6). Glass also adds `@import 'fumadocs-ui/css/generated/glass.css'`. |
+| `navigation.layout` | new `src/lib/layout.tsx`, `theme.css` | One switch that exports the layout and page components for the chosen layout (section 6). For glass, `theme.css` also imports `fumadocs-ui/css/generated/glass.css`. |
 | `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
 | `navigation.sections` | page-tree transformer, `source.server.ts` | Root folders (section 5). |
 | `sections[api].*` | shared OpenAPI source module | `groupBy` passes through to `staticSource`; the two `show*` flags filter its files (section 7). |
 | `ai.pageActions` | `$.tsx` | As today. |
-| `advanced.tokens` | `theme.css` | Appended to the same `:root` / `.dark` blocks after the primary. |
+| `advanced.tokens` | `theme.css` | Appended to the same `:root:not(.dark)` / `.dark` blocks after the primary, so a light-only token never reaches dark mode. |
 
 ## 5. Sections as root folders
 
@@ -197,7 +211,7 @@ and (later) the generated SDK page. It regroups them into one synthetic
 
 | Section | Children | Tab URL |
 |---|---|---|
-| `home` | the index page | `/` |
+| `home` | the index page, or a synthetic page node for `/` when the content has no index (see below) | `/` |
 | `guides` | every other content node, in `nav.json` order | first page |
 | `api` | what the navigation plan's section 7 produces for the `api` folder: tag folders for one spec, spec folders for several | first operation |
 | `sdks` | the generated SDK page or pages | its URL |
@@ -224,20 +238,27 @@ Rules:
 - A section left out of the array is appended after the listed ones with its
   default label (section 3). Nodes never sit outside every root folder, which
   is the state section 2 rejects for Home.
+- The fallback home page gets a tree node. `$.tsx` already renders a landing
+  page at `/` when the content has no `index.md`, but that page has no node in
+  the tree, so it would sit outside every root folder and show no tabs. When no
+  index page exists, the hook adds a synthetic `page` node named after the Home
+  label with URL `/` to the Home folder. The route keeps rendering the fallback;
+  the node only gives it tab context.
 - `label` is the folder `name`; `id` seeds `$id`, which the builder would
   otherwise only assign to folders it created itself, so React keys and the
   tree context's root tracking stay stable across renders.
-- The hook reads `sections` from the same identity literal the browser gets
-  (`portal.ts`); server modules may import client-safe ones.
+- The hook reads `sections` from the same identity file the browser gets,
+  through `portal.ts`; server modules may import client-safe ones.
 - Sections do not change URLs. Fumadocs derives them from slugs, not tree
   position, so a guide stays at `/authentication` and an operation at
   `/api/petstore/pet/addPet`. Only `groupBy` moves operation URLs (section 3).
 - The `nav.json` at the content root orders the Guides children. Its
   `apimatic:` tokens are errors (section 13).
 
-The Home CTA renders in `$.tsx` under the title of the index page, as an anchor
-styled with `buttonVariants` from `fumadocs-ui/components/ui/button`, when
-`sections` contains `home` with a `cta`.
+The Home CTA renders in `$.tsx` under the title of the index page and of the
+fallback home alike, as an anchor styled with `buttonVariants` from
+`fumadocs-ui/components/ui/button`, when `sections` contains `home` with a
+`cta`.
 
 ## 6. Template changes
 
@@ -249,26 +270,33 @@ styled with `buttonVariants` from `fumadocs-ui/components/ui/button`, when
   and `tableOfContent`. The same module computes the explicit `tabs` list from
   section 5. All four modules are imported statically; if the bundle
   grows by more than a few hundred kilobytes, the import specifiers become a
-  fourth substitution instead (measure in section 12).
-- **`app.css`**: three placeholder lines. The Google Fonts import (first line,
-  empty for `system`), the preset import, and the glass import (empty otherwise).
-  A fixed `@import './theme.css'` follows the Fumadocs and OpenAPI presets so its
-  rules come last.
-- **`src/styles/theme.css`** (written by the CLI): `@theme` with the two font
-  families, `:root` with the light primary trio and light tokens, `.dark` with
-  the dark trio and dark tokens.
-- **`__root.tsx`**: favicon link; `RootProvider` theme props from `colorMode`.
+  prepare-time substitution instead (measure in section 12).
+- **`app.css`**: loses the Google Fonts and `neutral.css` lines and gains a
+  fixed `@import './theme.css'` after the Fumadocs and OpenAPI presets, so the
+  generated rules come last. Its only substitution stays the content-directory
+  `@source` line prepare makes once.
+- **`src/styles/theme.css`** (written by the CLI, rewritten on re-apply): the
+  preset import, the glass import when the layout is glass, `@theme` with the
+  two font families, `:root:not(.dark)` with the light primary trio and light
+  tokens, `.dark` with the dark trio and dark tokens.
+- **`portal.identity.json`** (written by the CLI, rewritten on re-apply) and
+  **`portal.ts`**, which imports it and exports it typed as `Portal`. The file
+  holds the identity fields from section 4 and nothing else, which is what makes
+  a whole-module JSON import safe here.
+- **`__root.tsx`**: favicon link; the Google Fonts stylesheet link;
+  `RootProvider` theme props from `colorMode`.
 - **`layout.shared.tsx`**: two logos, `links`, `themeSwitch.enabled`.
 - **`$.tsx`**: components from `layout.tsx`; the CTA on the index page.
 - **`source.server.ts`** and the navigation plan's transformer module: the
   `root` hook from section 5.
-- **`src/lib/openapi-source.server.ts`** (new): the single place that calls
-  `staticSource` with the configured `groupBy` and applies the two filters.
-  Both `openapi.server.ts` and `prerender-pages.ts` call it; today each builds
-  the source itself, and they would drift. `prerender-pages.ts` runs inside
-  the Vite config, where the `@/` alias does not apply and imports carry the
-  `.ts` extension, so it imports the module by relative path. The `.server`
-  suffix keeps TanStack's import protection on it.
+- **`src/lib/openapi-source.server.ts`** (new): the single place that bundles
+  each document, filters it (section 7), and calls `staticSource` on the result
+  with the configured `groupBy`. Both `openapi.server.ts` and
+  `prerender-pages.ts` call it; today each builds the source itself, and they
+  would drift. `prerender-pages.ts` runs inside the Vite config, where the `@/`
+  alias does not apply and imports carry the `.ts` extension, so it imports the
+  module by relative path. The `.server` suffix keeps TanStack's import
+  protection on it.
 - **`src/prompts/portal/serve.ts`**: the note that says `portal.json` edits need
   a restart changes with section 8.
 
@@ -278,19 +306,21 @@ Fumadocs stores `deprecated` on each generated page's `_openapi` metadata and
 renders it struck through, so `showDeprecated: true` costs nothing. It has no
 notion of `x-internal`.
 
-The shared source module post-processes the files `staticSource` returns:
+The shared source module filters the document, not the pages:
 
-1. For each page file, read its operations from `getOpenAPIPageProps()` and look
-   each up in the bundled document. Drop the page when every operation is
-   deprecated and `showDeprecated` is false, or carries `x-internal: true` and
-   `showInternal` is false. The template generates one operation per page, so
-   "every" is one; the rule is written this way so a later `per: 'tag'` option
-   does not silently keep pages it should drop.
-2. Drop the generated `meta.json` of any tag folder left with no pages, so no
-   empty folder renders.
+1. Create the server on the file path as today and take `getSchema(id).bundled`,
+   the document with every external reference already folded into
+   `#/components` or `x-ext`.
+2. Walk `paths` and `webhooks`. Remove an operation when it is `deprecated` and
+   `showDeprecated` is false, or carries `x-internal: true` and `showInternal`
+   is false. Remove a path item left with no operations.
+3. Create a second server with the filtered document as its `input` value,
+   which `createOpenAPI` accepts, and call `staticSource` on that one.
 
-`llms.server.ts`, `sitemap.server.ts` and the search index read the loader, so
-a filtered page disappears from them without further work. The prerender list
+Because the page generator never sees a removed operation, no page, sidebar row
+or emptied tag folder exists for it, and each page's own `payload.bundled` is
+the filtered document too. `llms.server.ts`, `sitemap.server.ts` and the search
+index read the loader, so they follow without further work. The prerender list
 does not: `prerender-pages.ts` builds its own source today, which is why
 section 6 routes it through the shared module.
 
@@ -312,30 +342,36 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   favicon exist. Anything worth a warning rides the Ok value the way
   `shadowedFiles` does, since the types layer cannot print; both actions report
   it through their prompts.
-- **Stylesheet.** A `PortalStylesheet` value object renders `theme.css` and the
-  three import lines from a completed config, so the CSS is unit-testable
-  without a build.
-- **Project service.** Writes `theme.css`, substitutes the three `app.css`
-  lines, the identity literal and the widened server-only file.
+- **Stylesheet.** A `PortalStylesheet` value object renders `theme.css`, its
+  import lines included, and the Google Fonts URL for the head link from a
+  completed config, so the CSS is unit-testable without a build.
+- **Project service.** Writes `theme.css`, `portal.identity.json` and the
+  widened server-only file. The content-directory substitutions into
+  `source.ts` and `app.css` stay as they are. The identity substitution into
+  `portal.ts` goes away.
 - **`portal serve` re-applies `portal.json`.** Today the project is prepared
   once and a config edit needs a restart, which was tolerable for a title and a
   logo and is not for colour and font tweaks. A new infrastructure service
   watches the file and reports each change as a `Result`; the serve action
-  re-parses on change, and on success asks `PortalProjectService` to apply the
-  new config, which rewrites `theme.css`, the `app.css` import lines and the
-  identity literal for Vite to hot-reload. Because `substitute` consumes its
-  placeholder, re-applying starts from fresh copies of the two template files
-  rather than the substituted ones. On failure the prompts print the same
-  errors `generate` would and the last good state stays. Changes to the API
-  section options and to the specs still need a restart, because
-  `vite.config.ts` reads them once; the prompt says so when those keys change.
+  re-parses on change, and on success asks `PortalProjectService` to rewrite
+  `theme.css` and `portal.identity.json`, which Vite hot-reloads. Nothing is
+  re-substituted, so the content-directory literals prepare wrote are never at
+  risk. On failure the prompts print the same errors `generate` would and the
+  last good state stays. Changes to the API section options and to the specs
+  still need a restart, because `vite.config.ts` reads them once; the prompt
+  says so when those keys change.
 - **Quickstart.** `scaffold` writes a populated `portal.json`: `$schema`, the
   derived `site` fields, every brand and navigation default spelled out, all
   five sections, and `sdks.languages` from the wizard's language step, which the
   portal path dropped in the portal plan and brings back here since the key is
   required. `site.url` stays absent and the closing note names it.
 - **Migration hint.** Extended from three fields to the table below. Fields with
-  no v2 home stay in the unsupported list.
+  no v2 home stay in the unsupported list. Reporting moves from top-level keys
+  to leaves: today `Object.keys(generatePortal)` minus the migrated set is the
+  unsupported list, which would name `portalSettings` as unsupported while
+  migrating values inside it. The hint walks `portalSettings.theme` and lists
+  what it did not carry over by dotted path, and lists every other
+  `portalSettings.*` key the same way.
 
 | Pre-2.0 field | v2 key |
 |---|---|
@@ -345,6 +381,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 | `logoUrlDark` | `brand.logo.dark` (same rule) |
 | `faviconUrl` | `brand.favicon` (same rule) |
 | `portalSettings.theme.colors.primaryColor.{light,dark}` | `brand.colors.primary` (when the value parses) |
+| `portalSettings.theme.colorMode` | `brand.colorMode` when the old object resolves to light, dark or both; its exact shape is read off the build schema during implementation, and anything else is unsupported |
 | `portalSettings.theme.cssStyles.fontFamily` | `brand.fonts.body` (when the name is on the shortlist) |
 | `languageConfig` keys | `sdks.languages` (mapped to the navigation plan's language ids) |
 | `tableOfContentsPath` | still the `nav.json` note |
@@ -355,7 +392,8 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   dependency) and `PortalConfig.parse` and asserts they agree on validity. The
   `$schema` URL is `https://cdn.jsdelivr.net/npm/@apimatic/cli@2/portal.schema.json`.
 - **Prompts.** New source problems: a missing dark logo or favicon named with its
-  key; `site.name` required for several specs; the `api` section warning.
+  key; `site.name` required for several specs; the serve watcher's re-applied,
+  rejected and restart-needed messages.
 
 ## 9. Tests
 
@@ -366,7 +404,9 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 - `Color`: parsing, luminance against known values, the foreground choice on
   both sides of the crossover.
 - `PortalStylesheet`: the emitted CSS for each preset, `system` fonts emitting
-  no import, glass adding its import, tokens landing after the primary.
+  no link, glass adding its import, tokens landing after the primary, the light
+  block scoped with `:not(.dark)`, both blocks present when the primary is one
+  string.
 - Completion: name and description derived from one spec, `site.name` required
   for two, missing files reported.
 - Migration: each row of the table in section 8, plus a value that does not
@@ -375,10 +415,11 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 - Template units, in `test/portal-template/`: the `root` hook on a synthetic
   tree (five sections to five root folders in array order, empty sections
   dropped, a single section inlined into the root, a section left out of the
-  array appended with its default label, Home holding the index, injected pages
-  recognised by slug), the explicit tab list (a URL found through nested
-  folders, `$folder` bound), and the OpenAPI filter (deprecated and internal
-  pages removed, an emptied tag folder's meta removed, `showDeprecated: true`
+  array appended with its default label, Home holding the index, a synthetic
+  Home node when there is no index, injected pages recognised by slug), the
+  explicit tab list (a URL found through nested folders, `$folder` bound), and
+  the document filter (deprecated and internal operations removed, an emptied
+  path item removed, `x-ext` references intact, `showDeprecated: true`
   untouched).
 - End-to-end, extending `test/e2e/portal-build.test.ts`: the default fixture
   with the scaffolded config; the emitted CSS carries the preset's tokens and
@@ -442,7 +483,9 @@ Read from the pinned `fumadocs-ui@16.15.8`, `fumadocs-core@16.15.8`,
   (the template passes `tag`). Tags whose `kind` is neither absent nor `nav`
   are skipped when grouping. `deprecated` is copied onto each page's `_openapi`
   meta and the loader plugin wraps the sidebar name in `line-through`. Nothing
-  reads `x-internal`. `input` accepts a file path, URL or document object.
+  reads `x-internal`. `input` accepts a file path, URL or document object, and
+  `getSchema(id)` returns `{ bundled }`, the same document each page's
+  `getOpenAPIPageProps().payload.bundled` carries.
 - **Fonts.** `app.css` already loads Geist and Geist Mono from Google Fonts and
   sets `--default-font-family` / `--default-mono-font-family` in `@theme`.
 - **Pre-2.0 build schema** (`titan.apimatic.io/api/build/schema`): `logoUrlDark`,
@@ -476,9 +519,19 @@ decided in section 2 (`sdks.languages` required, unlisted sections appended).
 The PM's draft reads omission as removal; that expectation is the one to
 amend, not the navigation plan.
 
-- An unlayered `:root { --color-fd-primary }` after the preset import beats the
-  preset's `@theme` declaration under Tailwind 4's layering. Expected yes;
-  confirm in the built CSS.
+- An unlayered `:root:not(.dark) { --color-fd-primary }` after the preset
+  import beats the preset's `@theme` declaration under Tailwind 4's layering,
+  and stays out of dark mode. Expected yes; confirm in the built CSS in both
+  modes.
+- A bare-specifier `@import 'fumadocs-ui/css/<preset>.css'` at the top of
+  `theme.css`, itself imported from `app.css`, resolves through the linked
+  `node_modules` under Tailwind 4's Vite plugin.
+- A bundled document handed back to `createOpenAPI` as a document object
+  round-trips: `x-ext` references stay resolvable and the pages match those the
+  file-path server produced for an unfiltered spec.
+- The client bundle carries `portal.identity.json` whole and nothing else from
+  the CLI-written files; extend the navigation plan's absolute-path grep over
+  `dist/client` to assert it.
 - Synthetic root folders survive `serializePageTree` / `deserializePageTree`
   and `$id`-based tab matching on the client.
 - Bundle delta from importing all four layouts statically (section 6).
@@ -501,7 +554,11 @@ amend, not the navigation plan.
   least one entry (confirmed 2026-09-21).
 - Section 6: the defaults paragraph describes tabs, not one flat list. The
   "nothing can disappear" rule now also covers sections: one left out of the
-  array is appended, not hidden.
+  array is appended, not hidden. Its claim that the fallback home page was
+  never implemented is stale: `$.tsx` renders one, and this plan's section 5
+  gives it a tree node.
+- Section 9: the identity is a client-safe JSON file, not a literal, so the
+  absolute-path assertion over `dist/client` covers that file's contents.
 - Section 11: the SDK page's slug is reserved and fixed, because the `root`
   hook in this plan's section 5 recognises injected pages by it.
 - Section 7: the API structure is applied inside the `api` root folder; the
@@ -513,5 +570,6 @@ amend, not the navigation plan.
 - Section 3: replace the v1 `portal.json` schema with a pointer to this plan.
 - Section 9: the Google Fonts risk now covers a shortlist and has a `system`
   opt-out.
-- Section 4: the template's fixed `neutral.css` import and Geist lines become
-  substitutions.
+- Section 4: the template's fixed `neutral.css` import and Geist lines move
+  into the generated `theme.css` and a head link; the identity literal in
+  `portal.ts` becomes a JSON import.
