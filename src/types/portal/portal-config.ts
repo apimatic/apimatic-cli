@@ -10,6 +10,20 @@ export interface PortalConfigData {
   aiPageActions?: boolean;
 }
 
+/**
+ * What the browser bundle is told about the portal. Nothing here may address the machine the
+ * portal was built on; `portal-template/src/lib/portal.ts` declares the same fields.
+ */
+export interface PortalIdentity {
+  title: string;
+  description: string | null;
+  /** Site-relative, and inside the static directory. */
+  logoUrl: string | null;
+  /** Origin only, with no trailing slash. */
+  siteUrl: string | null;
+  aiPageActions: boolean;
+}
+
 const STATIC_PREFIX = 'static/';
 
 const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPageActions']);
@@ -180,6 +194,16 @@ export class PortalConfig {
 
   public siteOrigin(): UrlPath | null {
     return this.siteUrl;
+  }
+
+  public identity(): PortalIdentity {
+    return {
+      title: this.title,
+      description: this.description,
+      logoUrl: this.logoSiteUrl(),
+      siteUrl: this.siteUrl === null ? null : this.siteUrl.toString(),
+      aiPageActions: this.aiPageActions
+    };
   }
 
   public toJSON(): PortalConfigData {

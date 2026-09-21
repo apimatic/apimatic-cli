@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
+import { UrlPath } from '../../../src/types/file/urlPath';
 
 describe('PortalConfig', () => {
   const parse = (value: unknown) => PortalConfig.parse(JSON.stringify(value));
@@ -177,5 +178,35 @@ describe('PortalConfig', () => {
 
   it('omits absent optional fields when serialised', () => {
     expect(JSON.parse(JSON.stringify(PortalConfig.create('My API')))).to.deep.equal({ title: 'My API' });
+  });
+
+  describe('identity', () => {
+    it('resolves the logo to its site URL and the address to its origin', () => {
+      const config = PortalConfig.create(
+        'My API',
+        'Docs',
+        'static/images/logo.png',
+        new UrlPath('https://docs.example.com'),
+        false
+      );
+
+      expect(config.identity()).to.deep.equal({
+        title: 'My API',
+        description: 'Docs',
+        logoUrl: '/images/logo.png',
+        siteUrl: 'https://docs.example.com',
+        aiPageActions: false
+      });
+    });
+
+    it('reports absent settings as null rather than leaving them out', () => {
+      expect(PortalConfig.create('My API').identity()).to.deep.equal({
+        title: 'My API',
+        description: null,
+        logoUrl: null,
+        siteUrl: null,
+        aiPageActions: true
+      });
+    });
   });
 });

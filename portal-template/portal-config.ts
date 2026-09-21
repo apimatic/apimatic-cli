@@ -1,15 +1,8 @@
 import { readFile } from 'node:fs/promises';
+import type { Portal } from './src/lib/portal.ts';
 
 /** Written by the CLI next to this file before every build or dev-server start. */
-export interface PortalConfig {
-  title: string;
-  description: string | null;
-  /** Site-relative, and inside the static directory. */
-  logoUrl: string | null;
-  /** Origin only, with no trailing slash. */
-  siteUrl: string | null;
-  /** Whether each page offers to open itself in an AI assistant. */
-  aiPageActions: boolean;
+export interface PortalConfig extends Portal {
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
   /** Absolute. Always exists, and may be empty. */

@@ -4,6 +4,7 @@ import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
 import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
+import { PortalConfig } from '../src/types/portal/portal-config';
 
 const repositoryRoot = process.cwd();
 const templateRoot = path.join(repositoryRoot, 'portal-template');
@@ -88,6 +89,17 @@ describe('portal template packaging', () => {
 
     // Without this the build would read whatever path the template was authored with.
     expect(source).to.contain("'__APIMATIC_CONTENT_DIR__'");
+  });
+
+  // The two sides are compiled apart, so nothing else holds the browser's `Portal` interface to
+  // the object the CLI substitutes into it.
+  it('declares exactly the identity fields the CLI writes', () => {
+    const source = fs.readFileSync(path.join(templateRoot, 'src/lib/portal.ts'), 'utf8');
+    const block = /export interface Portal \{([\s\S]*?)\n\}/.exec(source);
+    const declared = [...(block?.[1] ?? '').matchAll(/^\s*(\w+):/gm)].map((match) => match[1]).sort();
+
+    expect(declared).to.not.be.empty;
+    expect(declared).to.deep.equal(Object.keys(PortalConfig.create('Acme').identity()).sort());
   });
 
   it('carries no nested .gitignore, which would drop files from the package', () => {
