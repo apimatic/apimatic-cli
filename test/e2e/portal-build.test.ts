@@ -25,8 +25,6 @@ const enabled = process.env.APIMATIC_E2E === '1';
     // directory sit on different drives, and a build across drives loses the content pages.
     root = fs.mkdtempSync(path.join(await ensureBuildDirectoryBase(fixture), 'portal-e2e-'));
 
-    // Drives the same path the command does: read the source directory, prepare the
-    // project, build it, save it.
     const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
     const project = new DirectoryPath(root).join('build');
@@ -91,8 +89,8 @@ const enabled = process.env.APIMATIC_E2E === '1';
   });
 
   it('keeps the server-side specification loader out of the browser bundle', () => {
-    // The loader reads the specification off disk. Shipped to the browser once, it threw
-    // before React could hydrate and left every page of the portal inert.
+    // The loader reads the specification off disk; shipped to the browser it throws before
+    // React can hydrate, leaving every page inert.
     const scripts = fs.readdirSync(path.join(output.toString(), 'assets')).filter((name) => name.endsWith('.js'));
     const offenders = scripts.filter((name) => read('assets/' + name).includes('Failed to resolve input'));
     expect(offenders).to.deep.equal([]);
@@ -107,10 +105,8 @@ const enabled = process.env.APIMATIC_E2E === '1';
   });
 
   it('ships only the syntax grammars a portal can contain', () => {
-    // Shiki's full catalogue is around 400 chunks and ten megabytes of grammars for
-    // languages no generated portal is written in, fetched by nobody and uploaded on every
-    // deploy. `src/lib/shiki-bundle.ts` replaces it; this is what notices if that stops
-    // taking effect.
+    // Shiki's full catalogue is some 400 chunks and ten megabytes of unused grammars.
+    // `src/lib/shiki-bundle.ts` replaces it; this notices if that stops taking effect.
     const assets = fs.readdirSync(path.join(output.toString(), 'assets'));
     const unusable = assets.filter((name) => /^(cobol|wolfram|emacs-lisp|abap|ballerina|apl)-/.test(name));
 

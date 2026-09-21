@@ -56,8 +56,7 @@ export class PortalQuickstartPrompts {
 
   /**
    * For a document that names no format at all -- a Postman collection, an arbitrary JSON
-   * file. The build skips such a file, so accepting it here scaffolded a project whose
-   * preview then reported that it held no specification.
+   * file. The build skips such a file, so the wizard cannot accept it either.
    */
   public specNotRecognised(specPath: FilePath) {
     log.error(

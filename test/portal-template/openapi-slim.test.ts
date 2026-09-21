@@ -46,8 +46,7 @@ function propsFor(overrides: Partial<Props>): Props {
 
 /**
  * What the tests walk through the slimmed document. Deliberately loose: each case builds its
- * own fixture, so a return type inferred from one of them makes every path and component the
- * others declare a type error. These are fixtures being asserted on, not a contract.
+ * own fixture, so a type inferred from one makes what the others declare an error.
  */
 interface JsonTree {
   [key: string]: JsonTree;
@@ -214,9 +213,8 @@ describe('slimOpenAPIPageProps', () => {
   });
 
   it('keeps the whole component a reference addresses a node inside', () => {
-    // `#/components/schemas/Pet/properties/id` is legal and passes through bundling
-    // untouched; matching the tail as part of the name dropped Pet and left the
-    // reference with nothing to resolve against.
+    // `#/components/schemas/Pet/properties/id` is legal and passes through bundling untouched,
+    // so matching the tail as part of the name would drop Pet and leave this unresolvable.
     const deep = {
       openapi: '3.1.0',
       info: document.info,
@@ -279,8 +277,7 @@ describe('slimOpenAPIPageProps', () => {
       expect(slimAlpha()['x-ext']).to.not.have.property('hash2');
     });
 
-    // The cycle guard for #/components has a test of its own; the one for x-ext had none,
-    // and a document split across files reaches its schemas only through this path.
+    // A document split across files reaches its schemas only through this path.
     it('terminates on a self-referential and mutually recursive embedded schema', () => {
       const cyclic = {
         openapi: '3.1.0',
@@ -321,9 +318,8 @@ describe('slimOpenAPIPageProps', () => {
       expect(Object.keys(slim['x-ext'].h.components.schemas).sort()).to.deep.equal(['A', 'B', 'Node']);
     });
 
-    // A scheme is kept because `security` names it, not because anything references it --
-    // but in a split document the scheme itself holds references, and keeping it without
-    // them left the auth section of every operation page resolving to nothing.
+    // A scheme is kept because `security` names it, not because anything references it -- but
+    // in a split document the scheme holds references of its own, which have to come with it.
     it('follows references out of a security scheme it kept by name', () => {
       const withScheme = {
         openapi: '3.1.0',

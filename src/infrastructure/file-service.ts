@@ -96,16 +96,14 @@ export class FileService {
   }
 
   /**
-   * The names of the files directly inside `dir`, without descending into it. `getDirectory`
-   * walks the whole tree and stats every entry, which is wasted work when only the top level
-   * is wanted and fatal when one entry cannot be stat'd: a dead symlink, or a directory the
-   * user cannot read, throws out of a caller that has no way to report it.
+   * The names of the files directly inside `dir`. `getDirectory` walks the whole tree and
+   * stats every entry, which is wasted work when only the top level is wanted, and throws on
+   * an entry it cannot stat -- out of callers that have no way to report it.
    */
   public async getFileNames(dir: DirectoryPath): Promise<FileName[]> {
     try {
       const entries = await fsExtra.readdir(dir.toString(), { withFileTypes: true });
-      // A symlink counts: what it points at is the user's business, and refusing to look
-      // costs nothing here but silently drops a file they did put there.
+      // A symlink counts: skipping it silently drops a file the user did put there.
       return entries
         .filter((entry) => entry.isFile() || entry.isSymbolicLink())
         .map((entry) => new FileName(entry.name));

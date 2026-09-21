@@ -15,8 +15,7 @@ const STATIC_PREFIX = 'static/';
 const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPageActions']);
 
 // Pre-2.0 names and near misses. A mistyped setting is the one mistake that otherwise
-// produces a portal that builds and is quietly wrong, and `logoUrl` is both the v1 name the
-// migration hint puts in front of the user and the likeliest slip.
+// produces a portal that builds and is quietly wrong.
 const RENAMED_FIELDS: Record<string, string> = {
   logoUrl: 'logo',
   pageTitle: 'title',
@@ -56,7 +55,7 @@ export class PortalConfig {
     const parsedSiteUrl = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
 
     // Every field is reported at once rather than stopping at the first, so one edit fixes
-    // the file. One checker per setting, in the order they are reported.
+    // the file.
     const errors = [
       ...PortalConfig.unknownFieldErrors(data),
       ...PortalConfig.titleErrors(title),
@@ -148,20 +147,17 @@ export class PortalConfig {
   }
 
   /**
-   * Whether a value would survive `parse` as `logo`. The migration hint carries a pre-2.0
-   * `logoUrl` over only when it does, so the `portal.json` it prints is never one the next
-   * command rejects.
+   * Whether a value would survive `parse` as `logo`, so the `portal.json` the migration hint
+   * prints is never one the next command rejects.
    */
   public static isValidLogo(value: string): boolean {
     return value.trim().length > 0 && PortalConfig.isInsideStatic(value);
   }
 
-  /** What the portal calls itself: the site name, the page titles and the nav bar. */
   public siteTitle(): string {
     return this.title;
   }
 
-  /** One line about the portal, or null when it has none. */
   public siteDescription(): string | null {
     return this.description;
   }
@@ -182,7 +178,6 @@ export class PortalConfig {
     return logoPath === null ? null : logoPath.substring(STATIC_PREFIX.length - 1);
   }
 
-  /** Address the portal is hosted at, used for canonical links and the sitemap. */
   public siteOrigin(): UrlPath | null {
     return this.siteUrl;
   }
@@ -198,9 +193,8 @@ export class PortalConfig {
     };
   }
 
-  // Sonar asks for `replaceAll` here. It cannot be used: the root tsconfig compiles `src`
-  // against `lib: es2018`, where the method does not exist, and raising that is a decision
-  // for the whole CLI rather than part of a lint fix.
+  // Not `replaceAll`, which Sonar asks for: the root tsconfig compiles `src` against
+  // `lib: es2018`, where the method does not exist.
   private static normalize(relativePath: string): string {
     return relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
   }

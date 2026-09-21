@@ -81,12 +81,11 @@ describe('PortalQuickstartAction', () => {
   });
 
   // The validation step accepts documents a portal cannot be built from. Refusing them only
-  // once `portal serve` runs left the user with a scaffolded directory the wizard then
-  // refuses to reuse, because it requires an empty one.
+  // once `portal serve` runs leaves a scaffolded directory the wizard then refuses to reuse,
+  // because it requires an empty one.
   describe('refusing a document before anything is written', () => {
-    // `format: null` is a document that names no version at all. The build skips such a
-    // file, so the wizard has to refuse it too -- it used to accept it, scaffold the
-    // project, and leave the preview to report that there was no specification in it.
+    // `format: null` is a document that names no version at all. The build skips such a file,
+    // so the wizard has to refuse it rather than leave the preview to report an empty portal.
     const cases: [string, Record<string, unknown>, SpecFormat][] = [
       ['OpenAPI 3.0.4', { openapi: '3.0.4' }, { supported: true }],
       ['OpenAPI 3.1.0', { openapi: '3.1.0' }, { supported: true }],
@@ -140,8 +139,8 @@ describe('PortalQuickstartAction', () => {
       expect(config.siteTitle()).to.equal('My API');
     });
 
-    // Windows editors and PowerShell redirection both write one. The format check below
-    // already stripped it, so such a document was accepted and then described as "My API".
+    // Windows editors and PowerShell redirection both write one, and the format check strips
+    // it, so this reader has to as well or the document is accepted and named "My API".
     it('reads a document written with a byte-order mark', async () => {
       const config = await action().describeApi(
         writeSpec({ title: 'Swagger Petstore', version: '1', description: 'Pets.' }, '﻿')

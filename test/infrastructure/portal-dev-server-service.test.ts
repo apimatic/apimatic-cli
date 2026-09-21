@@ -42,8 +42,7 @@ describe('PortalDevServerService', () => {
     await server.stop();
   });
 
-  // Without this the CLI kept advertising an address nothing was listening on, and then fell
-  // off the event loop and exited with Node's own code for an unsettled top-level await.
+  // Without this the CLI goes on advertising an address nothing is listening on.
   it('resolves `exited` with what the server printed when it stops on its own', async () => {
     const binary = script(
       `process.stdout.write('  Local:   http://localhost:4322/\\n');\n` +
@@ -70,12 +69,11 @@ describe('PortalDevServerService', () => {
     const output = await server.exited;
 
     expect(output).to.contain('reached the end');
-    // The other half of the claim: only a tail is kept. Without the cap a session left
-    // running for hours holds every line the dev server ever printed, and this test would
-    // not notice -- draining and bounding are separate things.
+    // The other half of the claim: only a tail is kept. Draining and bounding are separate,
+    // so without this a session left running for hours holds every line ever printed.
     expect(output).to.not.contain('noisy line 0\n');
-    // The bound is in characters, so it holds on every platform. Counting chunks instead
-    // made this same output 4 KB on a Windows runner and 280 KB on a POSIX one.
+    // The bound is in characters, so it holds on every platform: counting chunks made this
+    // same output 4 KB on a Windows runner and 280 KB on a POSIX one.
     expect(output.length).to.be.lessThan(150_000);
   });
 

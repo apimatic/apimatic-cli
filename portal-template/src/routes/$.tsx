@@ -42,8 +42,8 @@ export const Route = createFileRoute('/$')({
     const pageUrl = splat.length > 0 ? `/${splat}` : '/';
     const absolute = absoluteUrl(pageUrl);
     return {
-      // Without the og:* pair, pasting a documentation link into Slack, Teams or LinkedIn
-      // produced a bare URL. They are built from the values the page already computed.
+      // Without the og:* pair, a documentation link pasted into Slack, Teams or LinkedIn
+      // unfurls as a bare URL.
       meta: [
         { title },
         ...(description ? [{ name: 'description', content: description }] : []),
@@ -99,21 +99,19 @@ const answeredFromStaticCache = process.env.NODE_ENV === 'production' && typeof 
 
 /**
  * An unknown URL has no prerendered response, and the middleware fetches one without checking
- * the status: it parses whatever the host returns for a missing file, so `.json()` throws
- * before the router can act on the `notFound()` the handler would have raised, and the error
- * boundary renders in place of the not-found page. Only the cache path is rewritten — where
- * the handler never runs, a failed fetch can only mean the page does not exist. Everywhere
- * else, including the prerender pass and `portal serve`, a real failure still surfaces.
+ * the status, so `.json()` throws on whatever the host returns for a missing file and the
+ * error boundary renders in place of the not-found page. Only the cache path is rewritten,
+ * where a failed fetch can only mean the page does not exist; everywhere else -- the prerender
+ * pass, `portal serve` -- a real failure still surfaces.
  */
 async function loadPage(slugs: string[]) {
   try {
     return await serverLoader({ data: slugs });
   } catch (error) {
     if (!answeredFromStaticCache || isNotFound(error) || isRedirect(error)) throw error;
-    // A missing page is the ordinary reason to land here, but not the only one: a network
-    // failure, or a host answering with its own error page, fails the same way. Rendering
-    // "not found" for those is the better of two bad pages, and saying what actually
-    // happened is the difference between a puzzle and a report a user can act on.
+    // A missing page is the ordinary reason to land here, but a network failure or a host
+    // answering with its own error page fails the same way, so the cause is named rather
+    // than assumed.
     console.error('Falling back to the not-found page; loading this page failed with:', error);
     throw notFound();
   }

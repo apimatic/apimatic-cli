@@ -113,8 +113,8 @@ export class SdkQuickstartAction {
           this.fileDownloadService.downloadFile(this.defaultSpecUrl)
         );
         if (downloadFileResult.isErr()) {
-          // Without this the run carried on with the document validation has already
-          // rejected, and generated an SDK from it.
+          // Without this the run carries on and generates an SDK from a document that
+          // validation has already rejected.
           this.prompts.serviceError(downloadFileResult.error);
           return ActionResult.failed();
         }

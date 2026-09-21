@@ -118,9 +118,8 @@ describe('PortalProjectService', () => {
       expect(module).to.contain(JSON.stringify(contentDirectory.toString().split(path.sep).join('/')));
     });
 
-    // The stylesheet needs the same literal: Tailwind's own detection is rooted at the temp
-    // project, which the user's content directory sits outside of, so without this no class
-    // used only on their pages survives into the build.
+    // The stylesheet needs the same literal: Tailwind's detection is rooted at the temp
+    // project, so without this no class used only on the user's pages survives the build.
     it('substitutes the content directory into the stylesheet Tailwind scans', async () => {
       const contentDirectory = new DirectoryPath(root).join('content');
       fs.mkdirSync(contentDirectory.toString(), { recursive: true });
@@ -132,9 +131,8 @@ describe('PortalProjectService', () => {
       expect(stylesheet).to.contain(contentDirectory.toString().split(path.sep).join('/'));
     });
 
-    // The identity is substituted as a literal rather than imported, because a JSON module is
-    // retained whole once client code imports it -- which shipped this machine's absolute
-    // spec, content and static paths to every visitor's browser.
+    // Substituted as a literal rather than imported: a JSON module is retained whole once
+    // client code imports it, shipping this machine's absolute paths to the browser.
     it('substitutes the portal identity into the module the browser receives', async () => {
       (await service.prepare(project, sourceFor()))._unsafeUnwrap();
 
@@ -181,8 +179,8 @@ describe('PortalProjectService', () => {
       }
     });
 
-    // V8 honours the last occurrence, so appending unconditionally overrode a limit the
-    // user had raised deliberately -- NODE_OPTIONS is the only way in, since the child is
+    // V8 honours the last occurrence, so appending unconditionally would override a limit the
+    // user raised deliberately -- and NODE_OPTIONS is their only way in, since the child is
     // spawned with extendEnv false.
     it('leaves a heap limit the user set alone', () => {
       const original = process.env.NODE_OPTIONS;

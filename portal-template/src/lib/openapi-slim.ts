@@ -9,19 +9,17 @@ type Wanted = { key: string; method?: string };
 const COMPONENT_REF = /^#\/components\/([^/]+)\/([^/]+)/;
 
 // The bundler embeds every external document under `x-ext` and rewrites file and URL
-// references to point inside it, at whatever depth the original reference reached. These
-// never take the `#/components/` shape, so they need their own rule.
+// references to point inside it. These never take the `#/components/` shape above.
 const EXTERNAL_REF = /^#\/x-ext\/(.+)$/;
 
 const METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 /**
- * Cuts the bundled document down to what this page can reach: the operations it renders,
- * the components and embedded external documents they reference (transitively), and the
- * document-level fields the client reads (info, servers, security, tags).
- *
- * Without this every page carries the whole specification twice, inlined in its HTML and
- * again in the server-function cache, so the output grows with pages × document size.
+ * Cuts the bundled document down to what this page can reach: the operations it renders, the
+ * components and embedded external documents they reference (transitively), and the
+ * document-level fields the client reads. Without this every page carries the whole
+ * specification twice -- inlined in its HTML and again in the server-function cache -- so the
+ * output grows with pages × document size.
  */
 export function slimOpenAPIPageProps(props: OpenAPIPageProps_Spec): OpenAPIPageProps_Spec {
   const bundled = props.payload.bundled as Document & {
@@ -41,9 +39,8 @@ export function slimOpenAPIPageProps(props: OpenAPIPageProps_Spec): OpenAPIPageP
 
   const keptPaths = pick(paths, operations);
   const keptWebhooks = pick(webhooks, hooks);
-  // `rest` is a root too: it survives into the output whole, and a reference inside it --
-  // a vendor extension, a document-level field -- has to keep resolving. Visiting it only
-  // collects; nothing is retained for having been looked at.
+  // `rest` is a root too: it survives into the output whole, so a reference inside it has to
+  // keep resolving. Visiting only collects; nothing is retained for having been looked at.
   const reached = reachable({ components, external }, [rest, keptPaths, keptWebhooks]);
 
   return {
@@ -82,10 +79,9 @@ function pick(
 }
 
 /**
- * Drops the operations the page does not render. Fumadocs renders one operation per page and
- * reads only `pathItem[method]`, so without this a page carries every sibling method on its
- * path and the whole schema closure each one reaches. Fields that are not methods stay: the
- * renderer reads path-level `parameters` and `servers` from the same item.
+ * Drops the operations the page does not render. Fumadocs reads only `pathItem[method]`, so
+ * without this a page carries every sibling method and the schema closure each one reaches.
+ * Non-method fields stay: the renderer reads path-level `parameters` and `servers` here too.
  */
 function narrowToMethods(item: unknown, methods: Set<string>): unknown {
   if (methods.size === 0 || item === null || typeof item !== 'object' || Array.isArray(item)) return item;
@@ -121,9 +117,8 @@ function reachable(sections: Sections, roots: unknown[]): Sections {
   const queue: unknown[] = [...roots];
 
   // Security schemes are looked up by name from `security`, never through a reference, so
-  // they are kept whole rather than reached. They are still walked: in a document bundled
-  // from several files a scheme carries `#/x-ext/...` references of its own, and keeping
-  // the scheme without them left it resolving to nothing on every operation page.
+  // they are kept whole rather than reached. Still walked, because a scheme in a document
+  // bundled from several files carries `#/x-ext/...` references of its own.
   if (components?.securitySchemes) {
     keptComponents.securitySchemes = components.securitySchemes;
     queue.push(components.securitySchemes);

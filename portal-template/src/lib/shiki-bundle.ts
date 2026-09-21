@@ -8,17 +8,12 @@ export { createOnigurumaEngine } from 'shiki/engine/oniguruma';
 type LanguageImport = () => Promise<unknown>;
 
 /**
- * Stands in for the `shiki` entry point, which Fumadocs imports to build its highlighter
- * (see the alias in `vite.config.ts`). That entry carries Shiki's whole catalogue -- every
- * grammar reached through a dynamic import, so the bundler emits a chunk for each -- and a
- * portal with one page and one endpoint shipped roughly ten megabytes of grammars for
- * languages nothing on the site is written in, fetched by nobody, uploaded on every deploy.
- *
- * Only the languages a generated portal can actually contain are bundled: the ones APIMatic
- * generates SDKs for, what request samples and `x-codeSamples` use, and what people write
- * Markdown code blocks in. Fumadocs falls back to plain text for anything outside the map it
- * is given, so a page using a language that is not here still renders -- unhighlighted,
- * rather than broken.
+ * Stands in for the `shiki` entry point Fumadocs imports to build its highlighter (see the
+ * alias in `vite.config.ts`). That entry carries Shiki's whole catalogue as dynamic imports,
+ * so the bundler emits a chunk per grammar and a one-endpoint portal ships some ten megabytes
+ * of them for languages nothing on the site is written in. Only what a generated portal can
+ * contain is bundled; Fumadocs falls back to plain text for anything outside this map, so an
+ * unlisted language renders unhighlighted rather than broken.
  */
 const languages = {
   // The seven the CLI generates SDKs for (src/types/sdk/generate.ts).
@@ -52,15 +47,11 @@ const languages = {
 } satisfies Record<string, LanguageImport>;
 
 /**
- * The tags people actually write. Shiki's own bundle carries an alias table beside its
- * grammars and resolves `ts` or `yml` through it; a hand-built map has no such table, so an
- * alias reaches Fumadocs as an unknown language and is replaced with `text` -- the sample
- * renders as flat grey. Each alias names the grammar it stands for and shares that grammar's
- * import, exactly as Shiki's `bundledLanguagesAlias` does, so the bundler still emits one
- * chunk per language rather than one per spelling.
- *
- * Taken from Shiki's `bundledLanguagesInfo` rather than guessed. `test/portal-template.test.ts`
- * holds them to it.
+ * Shiki's own bundle resolves `ts` or `yml` through an alias table beside its grammars; a
+ * hand-built map has none, so an alias reaches Fumadocs as an unknown language and is replaced
+ * with `text`. Each shares its grammar's import, as Shiki's `bundledLanguagesAlias` does, so
+ * the bundler still emits one chunk per language rather than one per spelling. Taken from
+ * Shiki's `bundledLanguagesInfo`; `test/portal-template.test.ts` holds them to it.
  */
 const aliases: Record<string, keyof typeof languages> = {
   'c#': 'csharp',

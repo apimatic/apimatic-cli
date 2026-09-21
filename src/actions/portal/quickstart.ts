@@ -40,8 +40,8 @@ export class PortalQuickstartAction {
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
-    // Asked of this machine before anything is written: the flow ends in `portal serve`,
-    // which refuses on an older Node, and it used to refuse after scaffolding the project.
+    // Asked before anything is written: the flow ends in `portal serve`, which refuses on an
+    // older Node, and refusing after the project is scaffolded leaves a tree to clean up.
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
       this.prompts.runtimeUnsupported(runtimeProblem);
@@ -56,8 +56,7 @@ export class PortalQuickstartAction {
       }
     }
 
-    // Checked before any question is asked: the flow ends in `portal serve`, which refuses
-    // without this entitlement, and finding that out after four prompts would be rude.
+    // Checked before any question is asked: `portal serve` refuses without this entitlement.
     const authorization = await this.authorizationService.authorize(this.configDir, this.commandMetadata.shell, null);
     if (authorization.isErr()) {
       this.prompts.authorizationFailed(authorization.error);
@@ -65,7 +64,6 @@ export class PortalQuickstartAction {
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
-      // Step 1/3
       this.prompts.importSpecStep();
 
       let specPath: FilePath | undefined;
@@ -102,7 +100,6 @@ export class PortalQuickstartAction {
         }
       }
 
-      // Step 2/3
       this.prompts.validateSpecStep();
       const validateAction = new ValidateAction(this.configDir, this.commandMetadata);
       const validationResult = await validateAction.execute(specPath, false);
@@ -125,9 +122,8 @@ export class PortalQuickstartAction {
       }
 
       // The validation above accepts Swagger 2.0, which a portal cannot be built from. Asked
-      // here rather than by `portal serve` below, which used to refuse only after the
-      // project had been written -- and the directory prompt then refuses a non-empty one,
-      // so the user had to delete the tree the wizard itself had just created.
+      // here rather than by `portal serve` below, which refuses only once the project is
+      // written -- and the directory prompt then rejects the non-empty tree it just created.
       const format = await this.specFormat(specPath);
       if (!format.supported) {
         if (format.format === null) {
@@ -138,7 +134,6 @@ export class PortalQuickstartAction {
         return ActionResult.failed();
       }
 
-      // Step 3/3
       this.prompts.createPortalStep();
       let inputDirectory: DirectoryPath | undefined;
       while (true) {
@@ -226,9 +221,8 @@ export class PortalQuickstartAction {
       }
       const document = this.parseSpec(specPath, await this.fileService.getContents(specPath));
       const info = document?.info;
-      // Both values are written into generated files, so each is reduced to one line first.
-      // Taking only the description's first line instead left the 300-character cap
-      // unreachable for the common specification whose description is wrapped prose.
+      // Both are written into generated files, so each is collapsed to one line first --
+      // taking only the first line left the 300-character cap unreachable for wrapped prose.
       const title = this.oneLine(info?.title);
       const description = this.oneLine(info?.description);
       return title === null ? fallback : PortalConfig.create(title, description && this.cap(description, 300));
@@ -239,12 +233,9 @@ export class PortalQuickstartAction {
 
   /**
    * Whether the document is one a portal can be built from, by the same rule the build
-   * applies. This used to be a second implementation of it, and the two disagreed on the one
-   * case neither can name: a document with no version key at all -- a Postman collection,
-   * say -- was accepted here and skipped there, so the wizard scaffolded the project and the
-   * preview it went on to launch then refused it for holding no specification.
-   *
-   * A split specification arrives as an archive and is left to the build to judge.
+   * applies -- a second implementation of it disagreed on documents carrying no version key,
+   * which the wizard accepted and the preview it then launched refused. A split specification
+   * arrives as an archive and is left to the build to judge.
    */
   private async specFormat(specPath: FilePath): Promise<SpecFormat> {
     try {
@@ -259,10 +250,9 @@ export class PortalQuickstartAction {
   }
 
   /**
-   * The specification as an object, however it was written. Both readers below need this,
-   * and only one of them used to strip the byte-order mark that a Windows editor or a
-   * PowerShell redirection leaves at the front of the file -- so such a document passed the
-   * format check and was then described as "My API", its real title silently discarded.
+   * The specification as an object, however it was written. Shared so both readers below
+   * agree on stripping the byte-order mark a Windows editor or a PowerShell redirection
+   * leaves at the front of the file.
    */
   private parseSpec(
     specPath: FilePath,

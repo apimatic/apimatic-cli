@@ -22,11 +22,9 @@ export async function prerenderPages(config: PortalConfig): Promise<{ path: stri
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
   for (const url of await openApiUrls(config.specs)) urls.add(url);
 
-  // Iterates a copy on purpose, because the loop adds to `urls` as it goes. A `Set` visits
-  // entries added during iteration, so iterating `urls` itself would reach the `.md` URLs
-  // this loop creates and suffix those in turn -- `/guides.md.md` and on, never terminating.
-  // A linter calling the copy redundant is wrong: the cost of taking its advice is a build
-  // that hangs, not a test that fails.
+  // The copy is load-bearing, not redundant: this loop adds to `urls`, and a `Set` visits
+  // entries added during iteration, so iterating `urls` itself would suffix the `.md` URLs it
+  // creates in turn -- `/guides.md.md` and on, never terminating.
   for (const url of [...urls]) {
     if (url === '/') urls.add('/index.md');
     else if (!/\.(txt|xml|json)$/.test(url)) urls.add(`${url}.md`);
@@ -43,16 +41,14 @@ async function contentUrls(contentDir: string): Promise<string[]> {
     .map((entry) => {
       const relative = path.relative(contentDir, path.join(entry.parentPath, entry.name));
       const file = relative.split(path.sep).join('/');
-      // Same slug rules the content source applies, rather than a second implementation
-      // of them: "(group)" folders drop out, "index" collapses into its parent.
+      // The content source's own slug rules, not a second implementation: "(group)" folders
+      // drop out, "index" collapses into its parent.
       return { slugs: getSlugs(file), isIndex: path.basename(file, path.extname(file)) === 'index' };
     });
 
   // `guides.md` and `guides/index.md` both collapse to "guides". The content source settles
   // that by taking the non-index files first and appending "index" to the loser, so the same
-  // order has to be applied here: mapping each file on its own emitted one URL for the two
-  // of them, and the page the source had moved to /guides/index was never written, while the
-  // sidebar, the sitemap and llms.txt all went on linking to it.
+  // order has to hold here or the page it moves to /guides/index is never written.
   const taken = new Set<string>();
   const claim = (slugs: string[]): string => {
     const key = slugs.join('/');

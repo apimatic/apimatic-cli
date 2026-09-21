@@ -68,9 +68,8 @@ describe('withBuildDirectory', () => {
     }
   );
 
-  // The fallback folder is shared by every invocation for a project, so one run finishing
-  // used to delete the marker a concurrent one still depends on -- putting that run's live
-  // build tree into the user's git status.
+  // The fallback folder is shared by every invocation for a project, so one run finishing must
+  // not delete the marker a concurrent one still depends on.
   (process.platform === 'win32' ? it : it.skip)(
     'leaves the shared folder alone while another run is in it',
     async () => {

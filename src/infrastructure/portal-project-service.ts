@@ -38,7 +38,6 @@ const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
 const PORTAL_IDENTITY_PLACEHOLDER = "'__APIMATIC_PORTAL_IDENTITY__'";
 
 export interface PortalProjectPaths {
-  /** Directory the child process runs in. */
   projectDirectory: DirectoryPath;
   /** Vite's CLI entry point, resolved from the CLI's own dependencies. */
   viteBinary: FilePath;
@@ -111,8 +110,8 @@ export class PortalProjectService {
     }
 
     // Large specs push the prerender pass past Node's default heap. V8 honours the last
-    // occurrence of the flag, so appending unconditionally overrode a limit the user had
-    // raised on purpose -- and lowered it on a machine whose default is already higher.
+    // occurrence of the flag, so appending unconditionally would override a limit the user
+    // raised on purpose, and lower it on a machine whose default is already higher.
     const nodeOptions = process.env.NODE_OPTIONS ?? '';
     environment.NODE_OPTIONS = /--max[-_]old[-_]space[-_]size/.test(nodeOptions)
       ? nodeOptions
@@ -151,8 +150,7 @@ export class PortalProjectService {
 
     // Only the portal's identity reaches the browser; everything else in the configuration
     // addresses this machine and stays behind `portal.server.ts`. A JSON module is retained
-    // whole once client code imports it, so the identity is substituted into `portal.ts` as
-    // a literal instead. (Stated as a rule rather than a count, which went stale once.)
+    // whole once client code imports it, so this is substituted into `portal.ts` as a literal.
     const identity = {
       title: source.config.siteTitle(),
       description: source.config.siteDescription(),
@@ -176,10 +174,9 @@ export class PortalProjectService {
     const portalModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('portal.ts'));
     await this.substitute(portalModule, PORTAL_IDENTITY_PLACEHOLDER, JSON.stringify(identity));
 
-    // The content directory reaches the template as a literal because Fumadocs' `defineDocs`
-    // macro rejects anything it cannot read at compile time. Tailwind needs the same path to
-    // scan the user's pages at all: its automatic detection is rooted at this project, which
-    // the content directory sits outside of.
+    // A literal because Fumadocs' `defineDocs` macro rejects anything it cannot read at
+    // compile time. Tailwind needs the same path to scan the user's pages: its automatic
+    // detection is rooted at this project, which the content directory sits outside of.
     const contentLiteral = JSON.stringify(this.toPosix(contentDirectory.toString()));
     const sourceModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('source.ts'));
     await this.substitute(sourceModule, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);

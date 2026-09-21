@@ -38,9 +38,8 @@ function templateFiles(): string[] {
 
 /**
  * The template is built inside a temp project whose node_modules holds one link per entry in
- * TEMPLATE_DEPENDENCIES -- not one per dependency the CLI declares. Anything the template
- * imports that is not linked resolves here, where every package is installed, and fails only
- * on a user's machine.
+ * TEMPLATE_DEPENDENCIES, not one per dependency the CLI declares. Anything unlinked still
+ * resolves here, where every package is installed, and fails only on a user's machine.
  */
 describe('portal template packaging', () => {
   it('imports only packages the temp project links', () => {
@@ -95,10 +94,8 @@ describe('portal template packaging', () => {
     expect(templateFiles().filter((file) => path.basename(file) === '.gitignore')).to.be.empty;
   });
 
-  // The trimmed bundle replaces Shiki's entry point, and with it the alias table Shiki
-  // resolves `ts` or `yml` through. A tag it cannot name reaches Fumadocs as an unknown
-  // language and is rendered as plain text, so every spelling of a bundled language has to
-  // be a key here -- and has to be the spelling Shiki itself uses, not one invented.
+  // The trimmed bundle replaces Shiki's entry point, and with it the alias table `ts` or `yml`
+  // resolve through, so every spelling has to be a key here -- and Shiki's own spelling.
   describe('the trimmed syntax bundle', () => {
     const source = () => fs.readFileSync(path.join(templateRoot, 'src/lib/shiki-bundle.ts'), 'utf8');
 

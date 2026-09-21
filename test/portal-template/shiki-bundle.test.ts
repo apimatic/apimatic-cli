@@ -2,10 +2,9 @@ import { expect } from 'chai';
 import { createHighlighter } from '../../portal-template/src/lib/shiki-bundle';
 
 /**
- * The trimmed bundle stands in for Shiki's entry point, so it is the whole of what the
- * portal can highlight. Driven here directly rather than through a build: the pages that
- * carry `x-codeSamples` highlight them in the browser, which no assertion on the prerendered
- * HTML reaches -- checking the output of a build would have said nothing either way.
+ * The trimmed bundle stands in for Shiki's entry point, so it is the whole of what the portal
+ * can highlight. Driven directly rather than through a build, because `x-codeSamples` are
+ * highlighted in the browser, where no assertion on the prerendered HTML reaches them.
  */
 describe('the trimmed Shiki bundle', function () {
   this.timeout(60_000);
@@ -32,8 +31,7 @@ describe('the trimmed Shiki bundle', function () {
     });
   });
 
-  // These are the spellings people actually write. Before the alias table was restored each
-  // of them was an unknown language to this bundle.
+  // These are the spellings people actually write; the bundle resolves them through `aliases`.
   aliases.forEach((lang) => {
     it(`highlights the alias ${lang}`, async () => {
       expect(tokenColours(await highlight(lang))).to.be.greaterThan(1);
@@ -41,8 +39,7 @@ describe('the trimmed Shiki bundle', function () {
   });
 
   // Fumadocs catches this and falls back to plain text, which is why an unbundled language
-  // renders unstyled instead of breaking the page -- and why the aliases above had to be
-  // restored rather than left to that fallback.
+  // renders unstyled instead of breaking the page.
   it('refuses a language it does not bundle, rather than pretending to know it', async () => {
     let refused = false;
     try {

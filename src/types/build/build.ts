@@ -4,12 +4,9 @@ export interface BuildConfigData {
   [key: string]: unknown;
 }
 
-// Immutable wrapper around the parsed APIMATIC-BUILD.json. All build-config reads go
-// through accessor methods and the wrapped data is never mutated after construction.
-// Construct via `BuildConfig.parse`.
-//
-// Since version 2 the portal is configured by `src/portal.json` and built locally, so
-// this file only describes SDK and plugin generation.
+// Immutable wrapper around the parsed APIMATIC-BUILD.json. Since version 2 the portal is
+// configured by `src/portal.json` and built locally, so this file only describes SDK and
+// plugin generation.
 export class BuildConfig {
   private constructor(private readonly data: BuildConfigData) {}
 
@@ -26,7 +23,6 @@ export class BuildConfig {
     return this.data;
   }
 
-  /** True when this build produces a multi-versioned set of artifacts. */
   public isVersioned(): boolean {
     return this.data.generateVersionedPortal != null;
   }

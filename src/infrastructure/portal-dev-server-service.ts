@@ -9,32 +9,29 @@ import { PortalProjectPaths, PortalProjectService } from './portal-project-servi
 const STARTUP_TIMEOUT_MS = 3 * 60 * 1000;
 
 /**
- * How much of a running server's output is kept, in case it is the explanation of a crash.
- * Counted in characters rather than chunks: a chunk is however much the pipe delivered at
- * once, which differs by platform and by Node version, so a bound of 64 chunks came to 4 KB
- * on one runner and 280 KB on another for the same output.
+ * How much of a running server's output is kept, in case it explains a crash. Counted in
+ * characters, not chunks: chunk size varies by platform and Node version, so the same output
+ * bounded at 64 chunks came to 4 KB on one runner and 280 KB on another.
  */
 const OUTPUT_TAIL_BYTES = 64 * 1024;
 
 /** How long the last of a dead server's output is waited for before reporting what arrived. */
 const DRAIN_TIMEOUT_MS = 2000;
 
-// Vite colourises this line and bolds the port inside the URL, so the colour codes have to
-// come out before it reads as one address. The trailing newline proves the line is complete
-// and not a half-delivered chunk.
+// Vite bolds the port inside the URL, so colour codes have to come out before this reads as
+// one address. The trailing newline proves the line is whole, not a half-delivered chunk.
 const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)\/?[ \t]*[\r\n]/i;
 
-// Colour sequences only. `stripAnsi` in utils also drops newlines, which are exactly what
-// marks the end of the line the URL is printed on. Built from a code point so the escape
-// character never appears literally in this source.
+// Colour sequences only: `stripAnsi` in utils also drops the newline that marks the end of
+// the line the URL is printed on. Built from a code point to keep the escape character from
+// appearing literally in this source.
 const COLOUR_SEQUENCE_PATTERN = new RegExp(String.raw`${String.fromCodePoint(27)}\[[0-9;]*[a-zA-Z]`, 'g');
 
 export interface PortalDevServer {
   url: UrlPath;
   /**
-   * Resolves with what the server printed after startup if it stops on its own. Without it
-   * the CLI kept advertising an address nothing was listening on, and then fell off the
-   * event loop and exited with Node's own code for an unsettled top-level await.
+   * Resolves with what the server printed after startup if it stops on its own, so the CLI
+   * stops advertising an address nothing is listening on.
    */
   exited: Promise<string>;
   /** Resolves once the server process has exited. */
@@ -58,9 +55,8 @@ export class PortalDevServerService {
     const subprocess = execa(
       process.execPath,
       // Bound explicitly to the IPv4 loopback. Left to itself the server listens on `::1`
-      // only, while printing `localhost`, so wherever that name resolves to 127.0.0.1 --
-      // IPv6 disabled, a hosts entry, some container images -- the address the CLI reports
-      // and opens refuses the connection although the preview is healthy.
+      // only while printing `localhost`, so wherever that name resolves to 127.0.0.1 the
+      // address the CLI reports refuses the connection although the preview is healthy.
       [project.viteBinary.toString(), 'dev', '--port', String(port), '--strictPort', '--host', '127.0.0.1'],
       {
         cwd: project.projectDirectory.toString(),
@@ -88,9 +84,8 @@ export class PortalDevServerService {
   }
 
   /**
-   * Keeps reading the server's output after startup. Detaching instead left the pipe to fill
-   * and block the server once it had printed enough, and threw away the very output that
-   * explains a crash; only the tail is kept, so a long session cannot grow without bound.
+   * Keeps reading the server's output after startup: detaching lets the pipe fill and block
+   * the server once it has printed enough. Only the tail is kept, so a long session is bounded.
    */
   private watchForExit(subprocess: ResultPromise): Promise<string> {
     const tail: string[] = [];
@@ -100,16 +95,14 @@ export class PortalDevServerService {
       const text = chunk.toString().replace(COLOUR_SEQUENCE_PATTERN, '');
       tail.push(text);
       kept += text.length;
-      // The last chunk always survives, however big it is: it is the one most likely to hold
-      // the message that explains the exit.
+      // The last chunk always survives, however big: it most likely holds the exit message.
       while (tail.length > 1 && kept > OUTPUT_TAIL_BYTES) {
         kept -= (tail.shift() as string).length;
       }
     });
 
-    // The process resolves before the last of its output has been delivered, so waiting only
-    // on that loses the very lines that explain the exit. Bounded, because a stream that
-    // never ends must not leave the CLI waiting for one.
+    // The process resolves before the last of its output is delivered, so waiting only on
+    // that loses the lines explaining the exit. Bounded, in case the stream never ends.
     const drained = new Promise<void>((resolve) => {
       if (!output) {
         resolve();
@@ -121,10 +114,9 @@ export class PortalDevServerService {
     });
 
     const collect = async (): Promise<string> => {
-      // Cancelled once the output has arrived: `Promise.race` settles on the winner but
-      // leaves the loser running, and a pending timer holds the event loop open. Nothing in
-      // the CLI calls process.exit(), so the whole of `portal serve` used to sit for another
-      // two seconds after Ctrl+C with nothing left to do.
+      // Cancelled once the output has arrived: `Promise.race` leaves the loser running, and
+      // a pending timer holds the event loop open. Nothing here calls process.exit(), so the
+      // timer alone kept `portal serve` alive for two seconds after Ctrl+C.
       const expiry = new AbortController();
       try {
         await Promise.race([drained, sleep(DRAIN_TIMEOUT_MS, expiry.signal)]);

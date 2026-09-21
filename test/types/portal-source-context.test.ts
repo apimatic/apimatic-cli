@@ -22,12 +22,7 @@ describe('PortalSourceContext', () => {
 
   const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
 
-  /**
-   * The migration hint behind a `missingConfig` problem, as its own type. These tests used to
-   * cast the problem to a hand-written shape instead, so they asserted against a structure
-   * nothing checked -- one still called `suggestedConfig` a `{ title: string }` long after it
-   * became a `PortalConfig`, and said nothing when the two drifted apart.
-   */
+  /** The migration hint behind a `missingConfig` problem, as its own type. */
   const migrationOf = (problem: PortalSourceProblem): PortalMigration => {
     if (problem.kind !== 'missingConfig') {
       throw new Error(`expected a 'missingConfig' problem, got '${problem.kind}'`);
@@ -166,8 +161,8 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr().kind).to.equal('noSpecs');
     });
 
-    // The search index moved to /api/search.json, a file, which cannot collide with the
-    // directory a spec section is mounted at. Reserving the name cost such a spec its own.
+    // The search index is served from /api/search.json, a file, which cannot collide with
+    // the directory a spec section is mounted at.
     it('leaves a spec named after the search route with its own name', async () => {
       write('spec/search.json', OPENAPI);
 
@@ -216,16 +211,15 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
     });
 
-    // Only the root of the site collides, so only the top of static/ is read. Reading the
-    // whole tree also meant a large assets folder was walked and stat'd on every build.
+    // Only the root of the site collides, so only the top of static/ is read -- a whole-tree
+    // walk also stat's every entry of a large assets folder on each build.
     it('ignores a generated name sitting below the top of the static directory', async () => {
       write('static/docs/robots.txt', 'User-agent: *');
 
       expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
     });
 
-    // The whole-tree walk stat'd every entry with nothing to catch a failure, so one dead
-    // link threw ENOENT out of a method whose every other outcome is a Result.
+    // One dead link must not throw ENOENT out of a method whose every other outcome is a Result.
     it('survives an entry in the static directory that cannot be read', async function () {
       write('static/robots.txt', 'User-agent: *');
       const dangling = path.join(root, 'static', 'assets');
@@ -315,7 +309,7 @@ describe('PortalSourceContext', () => {
     });
 
     // `portal toc new`'s own removal message tells the user that meta.json replaced toc.yml,
-    // so listing it as having no equivalent said the opposite.
+    // so it must not also be listed as having no equivalent.
     it('flags a table of contents rather than calling it unsupported', async () => {
       write(
         'APIMATIC-BUILD.json',
@@ -359,9 +353,8 @@ describe('PortalSourceContext', () => {
       expect(migration.unmigratableLogo).to.be.null;
     });
 
-    // The suggestion is printed for the user to paste, so anything it can produce has to be
-    // something `PortalConfig.parse` accepts -- otherwise the migration hint dead-ends on the
-    // very next command.
+    // The suggestion is printed for the user to paste, so anything it produces has to be
+    // something `PortalConfig.parse` accepts, or the hint dead-ends on the next command.
     describe('every suggestion it can produce is a config the CLI accepts', () => {
       const oldPortals: Record<string, unknown>[] = [
         { pageTitle: 'Acme', logoUrl: 'static/images/logo.png' },

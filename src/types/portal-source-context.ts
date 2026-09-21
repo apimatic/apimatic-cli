@@ -11,10 +11,8 @@ import { stripByteOrderMark } from '../utils/string-utils.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
-// The portal's own routes under /api/ are files with extensions -- /api/search.json -- so
-// none of them can collide with a spec section, which is always a directory. Nothing is
-// reserved: `search` was, back when the index was served from /api/search, and it cost a
-// specification legitimately named search.json its own name for no reason.
+// Empty on purpose: the portal's own routes under /api/ are files with extensions --
+// /api/search.json -- so none can collide with a spec section, which is always a directory.
 const RESERVED_SPEC_SLUGS: string[] = [];
 
 // Names the build writes at the root of the site. The static directory is copied there
@@ -73,9 +71,8 @@ export class PortalSourceContext {
       return err({ kind: 'invalidConfig', errors: config.error });
     }
 
-    // The shape of `logo` is checked by `parse`; that the file is actually there is not,
-    // and a logo that is not there renders as a broken image on every page of a build that
-    // otherwise reports success.
+    // `parse` checks the shape of `logo`, not that the file is there -- and a missing logo
+    // renders as a broken image on every page of a build that otherwise reports success.
     const logoPath = config.value.logoPath();
     if (logoPath !== null && !(await this.fileService.fileExists(this.resolveInSource(logoPath)))) {
       return err({ kind: 'missingLogo', logoPath });
@@ -110,10 +107,9 @@ export class PortalSourceContext {
   }
 
   /**
-   * Files at the top of `static/` that the build would otherwise have generated itself.
-   * Only the top level is read: nothing below it can land on one of these names, and walking
-   * the whole tree to find that out meant one unreadable entry -- a dead symlink, an
-   * unreadable folder -- threw out of `resolve`, which reports everything else as a Result.
+   * Files at the top of `static/` that the build would otherwise have generated itself. Only
+   * the top level is read: nothing below it can land on one of these names, and walking the
+   * whole tree let one unreadable entry throw out of `resolve`, which otherwise returns a Result.
    */
   private async shadowedFiles(staticDirectory: DirectoryPath): Promise<FileName[]> {
     const fileNames = await this.fileService.getFileNames(staticDirectory);
@@ -157,10 +153,9 @@ export class PortalSourceContext {
       directory.items
         .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
         .filter((fileName) => SPEC_EXTENSIONS.some((extension) => fileName.hasExtension(extension)))
-        // Ordered by code point rather than collation. This sort decides which of two names
-        // that normalise to the same slug keeps it, and which document becomes the default
-        // server, so a host with a different locale would otherwise publish different URLs
-        // from the same `src/`.
+        // By code point rather than collation: this sort decides which of two names that
+        // normalise to the same slug keeps it, and which document becomes the default server,
+        // so a locale-sensitive comparison would publish different URLs from the same `src/`.
         .sort((left, right) => (left.toString() < right.toString() ? -1 : Number(left.toString() > right.toString())))
     );
   }

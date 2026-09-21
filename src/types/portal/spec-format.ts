@@ -5,12 +5,7 @@
  */
 export type SpecFormat = { supported: true } | { supported: false; format: string | null };
 
-/**
- * The one rule for judging a specification. `portal quickstart` used to carry its own copy,
- * which differed on exactly the case neither reader can name: a document with no version key
- * was accepted by the wizard and skipped by the build, so the project was scaffolded and the
- * preview it launched then refused it for having no specification at all.
- */
+/** The one rule for judging a specification, shared by the wizard and the build. */
 export function specFormatOf(document: Record<string, unknown>): SpecFormat {
   const openapi = document.openapi;
   if (typeof openapi === 'string') {

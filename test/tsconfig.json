@@ -1,8 +1,7 @@
 {
-  // The suite runs through tsx, which strips types without checking them, so nothing here
-  // was type-checked at all: this file used to inherit the root `include` of `src/**/*` and
-  // so compiled the source twice and not one test. Fixture drift and stale casts went
-  // unnoticed until they reached production code. `pretest` runs this before the suite.
+  // The suite runs through tsx, which strips types without checking them, so `pretest` runs
+  // this config before the suite. `include` is set here because inheriting the root
+  // `src/**/*` compiles the source twice and not one test.
   "extends": "../tsconfig",
   "compilerOptions": {
     "noEmit": true,

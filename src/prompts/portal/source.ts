@@ -56,8 +56,7 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
 
 /**
  * The static directory is copied to the root of the site before the generated files are
- * written there, so a file of the same name replaces one the build would have produced. That
- * is a reasonable thing to want, and it used to happen without a word.
+ * written there, so a file of the same name replaces one the build would have produced.
  */
 export function reportShadowedFiles(shadowed: FileName[]): void {
   if (shadowed.length === 0) {
