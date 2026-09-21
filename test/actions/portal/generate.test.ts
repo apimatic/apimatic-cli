@@ -136,6 +136,18 @@ describe('GenerateAction', () => {
     expect(inPortal('old.html')).to.be.true;
   });
 
+  it('counts a staging folder left by an unfinished save as a portal to overwrite', async () => {
+    fs.mkdirSync(path.join(portalDirectory.toString(), '.apimatic-staging'), { recursive: true });
+    fs.writeFileSync(path.join(portalDirectory.toString(), '.apimatic-staging', 'index.html'), '');
+    prompts.overwritePortal.resolves(false);
+
+    const result = await execute();
+
+    expect(result.isCancelled()).to.be.true;
+    expect(prompts.overwritePortal.calledOnce).to.be.true;
+    expect(inPortal('.apimatic-staging/index.html')).to.be.true;
+  });
+
   it('does not ask when forced', async () => {
     writeOldPortal();
 

@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { getSlugs } from 'fumadocs-core/source';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { DirectoryPath } from './file/directoryPath.js';
@@ -166,36 +168,34 @@ export class PortalSourceContext {
   }
 
   /**
-   * Each specification is mounted at `/api/<slug>`, and a page at `content/api/<slug>.md` or
-   * a folder at `content/api/<slug>/` resolves to the same address. The merged loader keeps
-   * one of the two without a word, so the clash is named here instead. Compared without
-   * regard to case: the prerender writes both to one path on a case-insensitive disk.
+   * Each specification is mounted at `/api/<slug>`, and a content page whose address is
+   * exactly that -- `content/api/<slug>.md`, `content/api/<slug>/index.md`, either inside a
+   * `(group)` folder -- takes the same place in the merged loader, which keeps one of the two
+   * without a word. Compared without regard to case: the prerender writes both pages to one
+   * path on a case-insensitive disk.
    */
   private async collidingSlugs(contentDirectory: DirectoryPath, specs: PortalSpec[]): Promise<string[]> {
-    const claimed = await this.addressesClaimedUnder(contentDirectory.join('api'));
+    const claimed = new Set<string>();
+    for (const address of await this.contentAddresses(contentDirectory)) {
+      if (address.length === 2 && address[0].toLowerCase() === 'api') {
+        claimed.add(address[1].toLowerCase());
+      }
+    }
     return specs.map((spec) => spec.slug).filter((slug) => claimed.has(slug.toLowerCase()));
   }
 
-  // A `(group)` folder is dropped from the address by fumadocs, so its pages sit one level up.
-  private async addressesClaimedUnder(directory: DirectoryPath): Promise<Set<string>> {
-    const claimed = new Set<string>();
-    const { fileNames, subDirectories } = await this.fileService.listEntries(directory);
-    for (const fileName of fileNames) {
-      if (fileName.hasExtension('.md') || fileName.hasExtension('.mdx')) {
-        claimed.add(fileName.withoutExtension().toString().toLowerCase());
-      }
+  // The content source's own slug rules rather than a second implementation of them:
+  // `(group)` folders drop out and `index` collapses into its parent.
+  private async contentAddresses(contentDirectory: DirectoryPath): Promise<string[][]> {
+    let files: FilePath[];
+    try {
+      files = (await this.fileService.getDirectory(contentDirectory)).getAllFiles();
+    } catch {
+      return [];
     }
-    for (const subDirectory of subDirectories) {
-      const name = subDirectory.leafName();
-      if (/^\(.*\)$/.test(name)) {
-        for (const address of await this.addressesClaimedUnder(subDirectory)) {
-          claimed.add(address);
-        }
-      } else {
-        claimed.add(name.toLowerCase());
-      }
-    }
-    return claimed;
+    return files
+      .filter((file) => file.name().hasExtension('.md') || file.name().hasExtension('.mdx'))
+      .map((file) => getSlugs(path.relative(contentDirectory.toString(), file.toString()).split(path.sep).join('/')));
   }
 
   private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {

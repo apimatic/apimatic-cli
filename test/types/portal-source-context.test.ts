@@ -221,6 +221,19 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal(['api']);
     });
 
+    it('lets a folder under content/api sit beside a specification when it has no index page', async () => {
+      write('content/api/api/authentication.md', '# Authentication');
+
+      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal([]);
+    });
+
+    it('does not mistake content/api/index.md for a page named index', async () => {
+      write('spec/index.json', OPENAPI);
+      write('content/api/index.md', '# API reference');
+
+      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal([]);
+    });
+
     it('reports no collision for pages under content/api with other names', async () => {
       write('content/api/overview.md', '# Overview');
 

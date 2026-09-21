@@ -4,17 +4,18 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { ZipService } from '../infrastructure/zip-service.js';
+import { errorMessage } from '../utils/error-utils.js';
 
 /** Emitted by the SPA build; also serves as the not-found page on static hosts. */
 const SHELL_FILE = new FileName('_shell.html');
 const NOT_FOUND_FILE = new FileName('404.html');
 const ZIP_FILE = new FileName('portal.zip');
-const STAGING_DIRECTORY = new FileName('.apimatic-staging');
+const STAGING_DIRECTORY = '.apimatic-staging';
 
 /**
  * Why the finished site did not reach the portal directory. `stagingFailed` leaves the
  * previous portal as it was; `replaceFailed` happened while it was being swapped out, so
- * the complete new site is kept at `stagedAt` for the user to move by hand.
+ * whatever did not make it into place is kept at `stagedAt` for the user to move by hand.
  */
 export type PortalSaveProblem =
   | { kind: 'stagingFailed'; reason: string }
@@ -27,15 +28,22 @@ export class PortalContext {
   constructor(private readonly portalDirectory: DirectoryPath) {}
 
   private get stagingDirectory(): DirectoryPath {
-    return this.portalDirectory.join(STAGING_DIRECTORY.toString());
+    return this.portalDirectory.join(STAGING_DIRECTORY);
   }
 
   private get buildLogPath(): FilePath {
     return new FilePath(this.portalDirectory.join('apimatic-debug'), new FileName('build.log'));
   }
 
+  /**
+   * Whether anything is there to overwrite. A staging directory left by a save that could
+   * not finish counts, hidden as it is: it may hold the only complete copy of the site.
+   */
   public async exists() {
-    return !(await this.fileService.directoryEmpty(this.portalDirectory));
+    return (
+      !(await this.fileService.directoryEmpty(this.portalDirectory)) ||
+      (await this.fileService.directoryExists(this.stagingDirectory))
+    );
   }
 
   /**
@@ -54,17 +62,19 @@ export class PortalContext {
       }
     } catch (error) {
       await this.fileService.deleteDirectory(this.stagingDirectory).catch(() => undefined);
-      return err({ kind: 'stagingFailed', reason: reasonOf(error) });
+      return err({ kind: 'stagingFailed', reason: errorMessage(error) });
     }
 
     try {
-      await this.fileService.cleanDirectoryExcluding(this.portalDirectory, [STAGING_DIRECTORY]);
+      await this.fileService.cleanDirectoryExcluding(this.portalDirectory, [new FileName(STAGING_DIRECTORY)]);
       await this.fileService.moveDirectoryContents(this.stagingDirectory, this.portalDirectory);
-      await this.fileService.deleteDirectory(this.stagingDirectory);
-      return ok(undefined);
     } catch (error) {
-      return err({ kind: 'replaceFailed', reason: reasonOf(error), stagedAt: this.stagingDirectory });
+      return err({ kind: 'replaceFailed', reason: errorMessage(error), stagedAt: this.stagingDirectory });
     }
+
+    // Empty by now; a folder that cannot be removed (still open in Explorer) is not a failed save.
+    await this.fileService.deleteDirectory(this.stagingDirectory).catch(() => undefined);
+    return ok(undefined);
   }
 
   /**
@@ -88,8 +98,4 @@ export class PortalContext {
       await this.fileService.copy(shell, new FilePath(builtDirectory, NOT_FOUND_FILE));
     }
   }
-}
-
-function reasonOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

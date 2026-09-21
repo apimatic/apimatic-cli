@@ -19,7 +19,7 @@ function describeSaveProblem(problem: PortalSaveProblem): string {
     case 'replaceFailed':
       return (
         `The previous portal could not be replaced (${problem.reason}). ` +
-        `The new portal is complete at ${f.path(problem.stagedAt)}; move its contents up a level by hand.`
+        `Whatever could not be moved into place is still at ${f.path(problem.stagedAt)}; move it up a level by hand.`
       );
   }
 }

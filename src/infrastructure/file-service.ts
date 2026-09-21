@@ -104,39 +104,31 @@ export class FileService {
     return (await this.listEntries(dir)).fileNames;
   }
 
-  /** The direct children of `dir`, split into files and directories; both empty when it cannot be read. */
-  public async listEntries(dir: DirectoryPath): Promise<{ fileNames: FileName[]; subDirectories: DirectoryPath[] }> {
-    try {
-      const entries = await fsExtra.readdir(dir.toString(), { withFileTypes: true });
-      return {
-        // A symlink counts: skipping it silently drops a file the user did put there.
-        fileNames: entries
-          .filter((entry) => entry.isFile() || entry.isSymbolicLink())
-          .map((entry) => new FileName(entry.name)),
-        subDirectories: entries.filter((entry) => entry.isDirectory()).map((entry) => dir.join(entry.name))
-      };
-    } catch {
-      return { fileNames: [], subDirectories: [] };
-    }
+  public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
+    return (await this.listEntries(dir)).subDirectories;
   }
 
-  public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
+  // The direct children of `dir`, split into files and directories; both empty when it cannot
+  // be read. A symlink counts as what it points at: skipping it silently drops an entry the
+  // user did put there.
+  private async listEntries(dir: DirectoryPath): Promise<{ fileNames: FileName[]; subDirectories: DirectoryPath[] }> {
+    const fileNames: FileName[] = [];
+    const subDirectories: DirectoryPath[] = [];
     try {
-      const entries = await fsExtra.readdir(dir.toString());
-      const directories: DirectoryPath[] = [];
-
-      for (const entry of entries) {
-        const fullPath = dir.join(entry).toString();
-        const stat = await fsExtra.stat(fullPath);
-        if (stat.isDirectory()) {
-          directories.push(new DirectoryPath(fullPath));
+      for (const entry of await fsExtra.readdir(dir.toString(), { withFileTypes: true })) {
+        const isDirectory = entry.isSymbolicLink()
+          ? (await fsExtra.stat(dir.join(entry.name).toString()).catch(() => null))?.isDirectory() ?? false
+          : entry.isDirectory();
+        if (isDirectory) {
+          subDirectories.push(dir.join(entry.name));
+        } else {
+          fileNames.push(new FileName(entry.name));
         }
       }
-
-      return directories;
     } catch {
-      return [];
+      // Unreadable: reported as empty, the caller has nothing to do about it.
     }
+    return { fileNames, subDirectories };
   }
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {

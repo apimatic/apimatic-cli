@@ -13,16 +13,15 @@ import {
 } from './plugin/plugin-config.js';
 import { SemVersion } from './publish/version.js';
 import { err, ok, Result } from 'neverthrow';
+import { errorMessage } from '../utils/error-utils.js';
 
 /** Also the rule the metadata prompt validates against, so a plugin ID is legal as a repository name. */
 export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 const MALFORMED_PLUGIN_ID =
-  `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` +
-  `for example 'acme-payments'`;
+  `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` + `for example 'acme-payments'`;
 
-const MALFORMED_PLUGIN_VERSION =
-  `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
+const MALFORMED_PLUGIN_VERSION = `its 'pluginVersion' must be a version in the format major.minor.patch, for example '0.1.0'`;
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
@@ -87,7 +86,7 @@ export class PluginConfigPresent {
     entry: PluginLanguageEntry<Language>
   ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
     if (entry.package && entry.source) {
-      return ok();  // if both package and source are given, there is no possible mismatch
+      return ok(); // if both package and source are given, there is no possible mismatch
     }
 
     const existingEntry = this.config.languages?.[language];
@@ -247,7 +246,7 @@ export class PluginConfigContext {
 
       return { config: parsed as PluginConfigData };
     } catch (error) {
-      return { reason: error instanceof Error ? error.message : String(error) };
+      return { reason: errorMessage(error) };
     }
   }
 
