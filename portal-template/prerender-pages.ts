@@ -1,8 +1,8 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
-import { createOpenAPI } from 'fumadocs-openapi/server';
 import type { PortalConfig } from './portal-config.ts';
+import { openApiSection } from './src/lib/openapi-section.server';
 
 const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
 
@@ -65,12 +65,7 @@ async function contentUrls(contentDir: string): Promise<string[]> {
 
 async function openApiUrls(specs: Record<string, string>): Promise<string[]> {
   const sources = Object.fromEntries(
-    await Promise.all(
-      Object.entries(specs).map(async ([id, file]) => {
-        const server = createOpenAPI({ input: { [id]: file } });
-        return [id, await server.staticSource({ baseDir: `api/${id}`, groupBy: 'tag', meta: true })];
-      })
-    )
+    await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file)]))
   );
   if (Object.keys(sources).length === 0) return [];
   return loader(sources, { baseUrl: '/' })

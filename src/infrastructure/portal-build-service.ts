@@ -49,6 +49,9 @@ export class PortalBuildService {
     }
 
     const pageCount = await this.countPages(output);
+    if (pageCount === null) {
+      return err({ message: 'The portal build output could not be read.', log });
+    }
     if (pageCount === 0) {
       return err({ message: 'The portal build produced no pages.', log });
     }
@@ -56,9 +59,13 @@ export class PortalBuildService {
     return ok({ output, pageCount });
   }
 
-  private async countPages(output: DirectoryPath): Promise<number> {
-    const directory = await this.fileService.getDirectory(output);
-    const isPage = (file: FilePath) => file.name().hasExtension('.html') && !file.name().is(SHELL_FILE);
-    return directory.getAllFiles().filter(isPage).length;
+  private async countPages(output: DirectoryPath): Promise<number | null> {
+    try {
+      const directory = await this.fileService.getDirectory(output);
+      const isPage = (file: FilePath) => file.name().hasExtension('.html') && !file.name().is(SHELL_FILE);
+      return directory.getAllFiles().filter(isPage).length;
+    } catch {
+      return null;
+    }
   }
 }

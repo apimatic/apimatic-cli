@@ -13,6 +13,7 @@ const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
 // Empty on purpose: the portal's own routes under /api/ are files with extensions --
 // /api/search.json -- so none can collide with a spec section, which is always a directory.
+// Pages the user puts under content/api/ can, and `collidingSlugs` reports those.
 const RESERVED_SPEC_SLUGS: string[] = [];
 
 // Names the build writes at the root of the site. The static directory is copied there
@@ -86,13 +87,17 @@ export class PortalSourceContext {
     const staticDirectory = (await this.fileService.directoryExists(this.staticDirectory))
       ? this.staticDirectory
       : null;
+    const contentDirectory = (await this.fileService.directoryExists(this.contentDirectory))
+      ? this.contentDirectory
+      : null;
 
     return ok({
       config: config.value,
       specs: specs.value,
-      contentDirectory: (await this.fileService.directoryExists(this.contentDirectory)) ? this.contentDirectory : null,
+      contentDirectory,
       staticDirectory,
-      shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory)
+      shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
+      collidingSlugs: contentDirectory === null ? [] : await this.collidingSlugs(contentDirectory, specs.value)
     });
   }
 
@@ -160,6 +165,39 @@ export class PortalSourceContext {
     return fileNames.filter((fileName) => GENERATED_ROOT_FILES.some((generated) => fileName.is(generated)));
   }
 
+  /**
+   * Each specification is mounted at `/api/<slug>`, and a page at `content/api/<slug>.md` or
+   * a folder at `content/api/<slug>/` resolves to the same address. The merged loader keeps
+   * one of the two without a word, so the clash is named here instead. Compared without
+   * regard to case: the prerender writes both to one path on a case-insensitive disk.
+   */
+  private async collidingSlugs(contentDirectory: DirectoryPath, specs: PortalSpec[]): Promise<string[]> {
+    const claimed = await this.addressesClaimedUnder(contentDirectory.join('api'));
+    return specs.map((spec) => spec.slug).filter((slug) => claimed.has(slug.toLowerCase()));
+  }
+
+  // A `(group)` folder is dropped from the address by fumadocs, so its pages sit one level up.
+  private async addressesClaimedUnder(directory: DirectoryPath): Promise<Set<string>> {
+    const claimed = new Set<string>();
+    const { fileNames, subDirectories } = await this.fileService.listEntries(directory);
+    for (const fileName of fileNames) {
+      if (fileName.hasExtension('.md') || fileName.hasExtension('.mdx')) {
+        claimed.add(fileName.withoutExtension().toString().toLowerCase());
+      }
+    }
+    for (const subDirectory of subDirectories) {
+      const name = subDirectory.leafName();
+      if (/^\(.*\)$/.test(name)) {
+        for (const address of await this.addressesClaimedUnder(subDirectory)) {
+          claimed.add(address);
+        }
+      } else {
+        claimed.add(name.toLowerCase());
+      }
+    }
+    return claimed;
+  }
+
   private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
     const specs: PortalSpec[] = [];
     const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
@@ -171,6 +209,8 @@ export class PortalSourceContext {
         return err({ kind: 'unreadableSpec', fileName });
       }
 
+      // A document without a version key is not a spec at all (APIMATIC-META.json, a `$ref`
+      // target); those are skipped silently. A recognisable but unsupported format is named.
       const format = document.format();
       if (!format.supported) {
         if (format.format === null) {
@@ -209,8 +249,6 @@ export class PortalSourceContext {
     }
   }
 
-  // A document without a version key is not a spec at all (APIMATIC-META.json, a `$ref`
-  // target); those are skipped silently. A recognisable but unsupported format is named.
   private uniqueSlug(fileName: FileName, used: Set<string>): string {
     const base = fileName.normalize().toString() || 'api';
     let slug = base;

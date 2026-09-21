@@ -44,7 +44,7 @@ const TIMING_DEFAULTS = {
 /** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
 export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
-export class PortalService {
+export class SdkGenerationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;
   private readonly apiBaseUrl = 'https://api.apimatic.io' as const;
   private readonly fileService = new FileService();

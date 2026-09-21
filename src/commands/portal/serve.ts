@@ -1,9 +1,11 @@
 import { Command, Flags } from '@oclif/core';
-import { PortalServeAction } from '../../actions/portal/serve.js';
+import { DEFAULT_PORTAL_PORT, PortalServeAction } from '../../actions/portal/serve.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
+
+const defaultPortText = String(DEFAULT_PORTAL_PORT);
 
 export default class PortalServe extends Command {
   static readonly summary = 'Preview your API Documentation Portal with live reload.';
@@ -18,15 +20,15 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
 
   static readonly examples = [
     PortalServe.cmdTxt,
-    `${PortalServe.cmdTxt} ${format.flag('input', './')} ${format.flag('port', '23513')} ${format.flag('open')}`
+    `${PortalServe.cmdTxt} ${format.flag('input', './')} ${format.flag('port', defaultPortText)} ${format.flag('open')}`
   ];
 
   static flags = {
     port: Flags.integer({
       char: 'p',
       description: 'port to serve the portal on.',
-      default: 23513,
-      helpValue: '23513'
+      default: DEFAULT_PORTAL_PORT,
+      helpValue: defaultPortText
     }),
     open: Flags.boolean({
       char: 'o',
@@ -42,8 +44,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
       flags: { input, port, open, 'auth-key': authKey }
     } = await this.parse(PortalServe);
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
+    const sourceDirectory = DirectoryPath.createInput(input).join('src');
     const commandMetadata: CommandMetadata = {
       commandName: PortalServe.id,
       shell: this.config.shell

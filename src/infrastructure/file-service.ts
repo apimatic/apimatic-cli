@@ -101,14 +101,22 @@ export class FileService {
    * an entry it cannot stat -- out of callers that have no way to report it.
    */
   public async getFileNames(dir: DirectoryPath): Promise<FileName[]> {
+    return (await this.listEntries(dir)).fileNames;
+  }
+
+  /** The direct children of `dir`, split into files and directories; both empty when it cannot be read. */
+  public async listEntries(dir: DirectoryPath): Promise<{ fileNames: FileName[]; subDirectories: DirectoryPath[] }> {
     try {
       const entries = await fsExtra.readdir(dir.toString(), { withFileTypes: true });
-      // A symlink counts: skipping it silently drops a file the user did put there.
-      return entries
-        .filter((entry) => entry.isFile() || entry.isSymbolicLink())
-        .map((entry) => new FileName(entry.name));
+      return {
+        // A symlink counts: skipping it silently drops a file the user did put there.
+        fileNames: entries
+          .filter((entry) => entry.isFile() || entry.isSymbolicLink())
+          .map((entry) => new FileName(entry.name)),
+        subDirectories: entries.filter((entry) => entry.isDirectory()).map((entry) => dir.join(entry.name))
+      };
     } catch {
-      return [];
+      return { fileNames: [], subDirectories: [] };
     }
   }
 
@@ -132,13 +140,21 @@ export class FileService {
   }
 
   public async copyDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
+    await this.forEachEntry(source, destination, (from, to) => fsExtra.copy(from, to));
+  }
+
+  public async moveDirectoryContents(source: DirectoryPath, destination: DirectoryPath) {
+    await this.forEachEntry(source, destination, (from, to) => fsExtra.move(from, to, { overwrite: true }));
+  }
+
+  private async forEachEntry(
+    source: DirectoryPath,
+    destination: DirectoryPath,
+    operation: (from: string, to: string) => Promise<void>
+  ) {
     const entries = await fsExtra.readdir(source.toString());
     await Promise.all(
-      entries.map(async (entry) => {
-        const srcEntry = path.join(source.toString(), entry);
-        const destEntry = path.join(destination.toString(), entry);
-        await fsExtra.copy(srcEntry, destEntry);
-      })
+      entries.map((entry) => operation(path.join(source.toString(), entry), path.join(destination.toString(), entry)))
     );
   }
 

@@ -189,6 +189,42 @@ describe('PortalSourceContext', () => {
 
       expect(source.contentDirectory).to.be.null;
       expect(source.staticDirectory).to.be.null;
+      expect(source.collidingSlugs).to.deep.equal([]);
+    });
+
+    it('names a page under content/api that shares its address with a specification', async () => {
+      write('content/api/api.md', '# Overview');
+      write('content/api/guides.md', '# Guides');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.collidingSlugs).to.deep.equal(['api']);
+    });
+
+    it('names a folder under content/api that shares its address with a specification', async () => {
+      write('content/api/api/index.md', '# Overview');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.collidingSlugs).to.deep.equal(['api']);
+    });
+
+    it('treats a page that differs from the slug only by case as a collision', async () => {
+      write('content/api/API.md', '# Overview');
+
+      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal(['api']);
+    });
+
+    it('looks through route-group folders, which fumadocs drops from the address', async () => {
+      write('content/api/(guides)/api.md', '# Overview');
+
+      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal(['api']);
+    });
+
+    it('reports no collision for pages under content/api with other names', async () => {
+      write('content/api/overview.md', '# Overview');
+
+      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal([]);
     });
 
     it('names the static files that replace ones the build generates', async () => {

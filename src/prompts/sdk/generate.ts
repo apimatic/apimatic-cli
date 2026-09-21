@@ -1,17 +1,17 @@
-import { isCancel, confirm, log, select } from "@clack/prompts";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { format as f } from "../format.js";
-import { Result } from "neverthrow";
-import { withSpinner } from "../prompt.js";
-import { ServiceError } from "../../infrastructure/service-error.js";
-import { GeneratedSdkResult } from "../../infrastructure/services/portal-service.js";
-import { CodeGenerationVersion, CodegenOption } from "../../types/sdk/generate.js";
+import { isCancel, confirm, log, select } from '@clack/prompts';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { format as f } from '../format.js';
+import { Result } from 'neverthrow';
+import { withSpinner } from '../prompt.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
+import { GeneratedSdkResult } from '../../infrastructure/services/sdk-generation-service.js';
+import { CodeGenerationVersion, CodegenOption } from '../../types/sdk/generate.js';
 
 export class SdkGeneratePrompts {
   public warnIfStabilityIgnored(codegenOption: CodegenOption, stabilityWasProvided: boolean) {
     if (stabilityWasProvided && codegenOption.isV3()) {
       log.warn(
-        `${f.flag("stability")} has no effect with ${f.flag("codegen-version", CodeGenerationVersion.V3)}. ` +
+        `${f.flag('stability')} has no effect with ${f.flag('codegen-version', CodeGenerationVersion.V3)}. ` +
           `The V3 code generator always produces a stable SDK.`
       );
     }
@@ -32,13 +32,12 @@ export class SdkGeneratePrompts {
 
   public sameBuildAndSdkDir(directory: DirectoryPath) {
     const message =
-      `The ${f.var("src")} and ${f.var("sdk")} directories must be different. ` +
-      `Current value: ${f.path(directory)}`;
+      `The ${f.var('src')} and ${f.var('sdk')} directories must be different. ` + `Current value: ${f.path(directory)}`;
     log.error(message);
   }
 
   public srcDirectoryEmpty(directory: DirectoryPath) {
-    const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
+    const message = `The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }
 
@@ -53,11 +52,11 @@ export class SdkGeneratePrompts {
   }
 
   public generateSDK(fn: Promise<Result<GeneratedSdkResult, ServiceError>>) {
-    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
+    return withSpinner('Generating SDK', 'SDK generated successfully.', 'SDK Generation failed.', fn);
   }
 
   public generateV4SDK(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
-    return withSpinner("Generating SDK", "SDK generated successfully.", "SDK Generation failed.", fn);
+    return withSpinner('Generating SDK', 'SDK generated successfully.', 'SDK Generation failed.', fn);
   }
 
   public sdkGenerationServiceError(serviceError: ServiceError) {
@@ -65,12 +64,12 @@ export class SdkGeneratePrompts {
   }
 
   public invalidVersionedDocsDirectory(directory: DirectoryPath) {
-    const message = `The ${f.var("versioned_docs")} directory is either empty or invalid: ${f.path(directory)}`;
+    const message = `The ${f.var('versioned_docs')} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
-    log.warn(`The ${f.flag("api-version")} is only applicable with a versioned build.`);
+    log.warn(`The ${f.flag('api-version')} is only applicable with a versioned build.`);
   }
 
   public versionNotFound() {
@@ -80,7 +79,7 @@ export class SdkGeneratePrompts {
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {
     const version = await select({
-      message: "Select an API version for SDK generation:",
+      message: 'Select an API version for SDK generation:',
       options: versions.map((v) => ({ label: v, value: v }))
     });
 

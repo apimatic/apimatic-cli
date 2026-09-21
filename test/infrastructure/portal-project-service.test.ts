@@ -26,6 +26,7 @@ describe('PortalProjectService', () => {
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],
+    collidingSlugs: [],
     ...overrides
   });
 

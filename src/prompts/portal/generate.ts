@@ -5,11 +5,24 @@ import { FilePath } from '../../types/file/filePath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
+import { PortalSaveProblem } from '../../types/portal-context.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportShadowedFiles, reportSourceProblem } from './source.js';
+import { reportCollidingPages, reportShadowedFiles, reportSourceProblem } from './source.js';
+
+function describeSaveProblem(problem: PortalSaveProblem): string {
+  switch (problem.kind) {
+    case 'stagingFailed':
+      return `The portal could not be written (${problem.reason}). The previous portal is unchanged.`;
+    case 'replaceFailed':
+      return (
+        `The previous portal could not be replaced (${problem.reason}). ` +
+        `The new portal is complete at ${f.path(problem.stagedAt)}; move its contents up a level by hand.`
+      );
+  }
+}
 
 export class PortalGeneratePrompts {
   public async overwritePortal(directory: DirectoryPath): Promise<boolean> {
@@ -53,6 +66,10 @@ export class PortalGeneratePrompts {
     reportShadowedFiles(shadowed);
   }
 
+  public pagesCollidingWithSpecs(slugs: string[]) {
+    reportCollidingPages(slugs);
+  }
+
   public authorizationFailed(failure: PortalAuthorizationFailure) {
     reportAuthorizationFailure(failure);
   }
@@ -75,12 +92,20 @@ export class PortalGeneratePrompts {
     );
   }
 
-  public buildFailed(output: string, logPath: FilePath) {
+  public buildFailed(output: string, logPath: FilePath | null) {
     const tail = logTail(output);
     if (tail.length > 0) {
       log.message(tail);
     }
-    log.error(`The full build log is at ${f.path(logPath)}.`);
+    if (logPath === null) {
+      log.error('The full build log could not be written beside the portal.');
+    } else {
+      log.error(`The full build log is at ${f.path(logPath)}.`);
+    }
+  }
+
+  public savePortal(fn: Promise<Result<void, PortalSaveProblem>>) {
+    return withSpinner('Writing the portal', 'Portal written.', describeSaveProblem, fn);
   }
 
   public portalGenerated(portal: DirectoryPath) {

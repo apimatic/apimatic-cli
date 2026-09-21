@@ -1,4 +1,4 @@
-import { PortalService } from '../../infrastructure/services/portal-service.js';
+import { SdkGenerationService } from '../../infrastructure/services/sdk-generation-service.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
@@ -13,7 +13,7 @@ import { SemVersion } from '../../types/publish/version.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
-  private readonly portalService: PortalService = new PortalService();
+  private readonly sdkGenerationService: SdkGenerationService = new SdkGenerationService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -112,7 +112,7 @@ export class GenerateAction {
         this.prompts.sdkCustomizationsNotSupportedForV4();
 
         const response = await this.prompts.generateV4SDK(
-          this.portalService.generateV4Sdk(
+          this.sdkGenerationService.generateV4Sdk(
             buildZipPath,
             language,
             codegenOption.stabilityLevel(),
@@ -121,7 +121,7 @@ export class GenerateAction {
             this.authKey
           )
         );
-        
+
         if (response.isErr()) {
           this.prompts.sdkGenerationServiceError(response.error);
           return ActionResult.failed();
@@ -134,7 +134,7 @@ export class GenerateAction {
       }
 
       const response = await this.prompts.generateSDK(
-        this.portalService.generateSdk(
+        this.sdkGenerationService.generateSdk(
           buildZipPath,
           language,
           this.configDir,

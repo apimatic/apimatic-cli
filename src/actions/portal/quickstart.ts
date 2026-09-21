@@ -7,7 +7,7 @@ import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { LoginAction } from '../auth/login.js';
 import { ActionResult } from '../action-result.js';
-import { PortalServeAction } from './serve.js';
+import { DEFAULT_PORTAL_PORT, PortalServeAction } from './serve.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ValidateAction } from '../api/validate.js';
 import { SpecContext } from '../../types/spec-context.js';
@@ -16,8 +16,6 @@ import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
-
-const defaultPort: number = 23513 as const;
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -57,7 +55,7 @@ export class PortalQuickstartAction {
     const authorization = await this.authorizationService.authorize(this.configDir, this.commandMetadata.shell, null);
     if (authorization.isErr()) {
       this.prompts.authorizationFailed(authorization.error);
-      return ActionResult.cancelled();
+      return ActionResult.failed();
     }
 
     return await withDirPath<ActionResult>(async (tempDirectory: DirectoryPath): Promise<ActionResult> => {
@@ -159,7 +157,7 @@ export class PortalQuickstartAction {
       this.prompts.printDirectoryStructure(inputDirectory, structure);
 
       const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
-      const result = await portalServeAction.execute(sourceDirectory, defaultPort, true, () => {
+      const result = await portalServeAction.execute(sourceDirectory, DEFAULT_PORTAL_PORT, true, () => {
         this.prompts.nextSteps();
       });
 

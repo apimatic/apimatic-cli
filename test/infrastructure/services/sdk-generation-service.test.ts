@@ -6,14 +6,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
 import { Status } from '@apimatic/sdk';
-import { PortalService } from '../../../src/infrastructure/services/portal-service';
+import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FilePath } from '../../../src/types/file/filePath';
 import { Language, Stability } from '../../../src/types/sdk/generate';
 import { ServiceError, ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { envInfo } from '../../../src/infrastructure/env-info';
 
-describe('PortalService generation status polling', () => {
+describe('SdkGenerationService generation status polling', () => {
   const GENERATION_ID = '11111111-2222-3333-4444-555555555555';
   const AUTH_KEY = 'test-auth-key';
   const metadata = { commandName: 'portal generate', shell: 'bash' };
@@ -22,7 +22,7 @@ describe('PortalService generation status polling', () => {
   let workDir: string;
   let buildPath: FilePath;
   let configDir: DirectoryPath;
-  let service: PortalService;
+  let service: SdkGenerationService;
   let respondToStatus: (res: http.ServerResponse, attempt: number) => void;
   const statusRequests: { url: string; headers: http.IncomingHttpHeaders }[] = [];
 
@@ -91,7 +91,7 @@ describe('PortalService generation status polling', () => {
     // No config.json here, so the explicit authKey is used.
     configDir = new DirectoryPath(workDir);
     // Near-zero poll interval so the suite is not paced by the 3s production default.
-    service = new PortalService({ pollIntervalMs: 1 });
+    service = new SdkGenerationService({ pollIntervalMs: 1 });
   });
 
   after(async () => {
@@ -171,7 +171,7 @@ describe('PortalService generation status polling', () => {
   // Each flow names itself in the timeout message, so each one's wiring is pinned separately.
   // Before the shared poller these three polled a stuck generation forever.
   describe('giving up on a generation that never finishes', () => {
-    const impatient = () => new PortalService({ pollIntervalMs: 1, generationTimeoutMs: 15 });
+    const impatient = () => new SdkGenerationService({ pollIntervalMs: 1, generationTimeoutMs: 15 });
 
     beforeEach(() => {
       respondToStatus = statusBody({ status: Status.InProgress });
@@ -203,7 +203,7 @@ describe('PortalService generation status polling', () => {
       // whose poll hangs. Only the request timeout can, which is why one is set.
       respondToStatus = () => {};
 
-      const bounded = new PortalService({ pollIntervalMs: 1, generationTimeoutMs: 5_000, requestTimeoutMs: 30 });
+      const bounded = new SdkGenerationService({ pollIntervalMs: 1, generationTimeoutMs: 5_000, requestTimeoutMs: 30 });
 
       const result = await bounded.generateSdk(buildPath, Language.TYPESCRIPT, configDir, metadata, AUTH_KEY);
 

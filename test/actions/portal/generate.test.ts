@@ -9,6 +9,7 @@ import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
+import { FileService } from '../../../src/infrastructure/file-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
@@ -53,6 +54,7 @@ describe('GenerateAction', () => {
     prompts = sinon.stub(PortalGeneratePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.buildPortal.callsFake((fn) => fn);
+    prompts.savePortal.callsFake((fn) => fn);
     prompts.overwritePortal.resolves(true);
 
     runtimeProblem = sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null);
@@ -162,6 +164,42 @@ describe('GenerateAction', () => {
     expect(inPortal('portal.zip')).to.be.true;
     expect(inPortal('index.html')).to.be.false;
     expect(prompts.nextSteps.calledOnceWith(portalDirectory, true)).to.be.true;
+  });
+
+  it('keeps the previous portal when the new one cannot be written', async () => {
+    writeOldPortal();
+    sinon.stub(FileService.prototype, 'copyDirectoryContents').rejects(new Error('ENOSPC: no space left on device'));
+
+    const result = await execute(FIXTURE, true);
+
+    expect(result.isFailed()).to.be.true;
+    expect(inPortal('old.html')).to.be.true;
+    expect(inPortal('index.html')).to.be.false;
+    expect(inPortal('.apimatic-staging')).to.be.false;
+    expect(prompts.portalGenerated.called).to.be.false;
+  });
+
+  it('keeps the staged site when the previous portal cannot be replaced', async () => {
+    writeOldPortal();
+    sinon.stub(FileService.prototype, 'cleanDirectoryExcluding').rejects(new Error('EBUSY: resource busy or locked'));
+
+    const result = await execute(FIXTURE, true);
+
+    expect(result.isFailed()).to.be.true;
+    expect(inPortal('old.html')).to.be.true;
+    expect(inPortal('.apimatic-staging/index.html')).to.be.true;
+    expect(inPortal('.apimatic-staging/404.html')).to.be.true;
+    expect(prompts.portalGenerated.called).to.be.false;
+  });
+
+  it('still reports a failed build when the build log cannot be written', async () => {
+    build.resolves(err({ message: 'The portal build failed.', log: 'error: boom' }));
+    sinon.stub(FileService.prototype, 'writeContents').rejects(new Error('EACCES: permission denied'));
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(prompts.buildFailed.calledOnceWith('error: boom', null)).to.be.true;
   });
 
   it('keeps the build log beside the portal when the build fails', async () => {

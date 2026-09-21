@@ -65,6 +65,7 @@ export class GenerateAction {
       return ActionResult.failed();
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
+    this.prompts.pagesCollidingWithSpecs(source.value.collidingSlugs);
 
     const portalContext = new PortalContext(portalDirectory);
     if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
@@ -88,7 +89,10 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      await portalContext.save(build.value.output, zipPortal);
+      const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
+      if (saved.isErr()) {
+        return ActionResult.failed();
+      }
 
       this.prompts.portalGenerated(portalDirectory);
       this.prompts.nextSteps(portalDirectory, zipPortal);

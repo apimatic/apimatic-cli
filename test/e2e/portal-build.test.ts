@@ -8,7 +8,7 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { ensureBuildDirectoryBase } from '../../src/infrastructure/tmp-extensions';
+import { ensureBuildDirectoryBase, removeBuildDirectoryBase } from '../../src/infrastructure/tmp-extensions';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
@@ -19,12 +19,14 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 
+  let base: string;
   let root: string;
   let project: DirectoryPath;
   let output: DirectoryPath;
 
   before(async () => {
-    root = fs.mkdtempSync(path.join(await ensureBuildDirectoryBase(fixture), 'portal-e2e-'));
+    base = await ensureBuildDirectoryBase(fixture);
+    root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
 
     const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
 
@@ -39,11 +41,12 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(build.value.pageCount).to.be.greaterThan(1);
 
     output = new DirectoryPath(root).join('portal');
-    await new PortalContext(output).save(build.value.output, false);
+    (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
   });
 
-  after(() => {
+  after(async () => {
     fs.rmSync(root, { recursive: true, force: true });
+    await removeBuildDirectoryBase(base);
   });
 
   const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');

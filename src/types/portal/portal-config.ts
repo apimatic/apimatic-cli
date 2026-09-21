@@ -68,35 +68,26 @@ export class PortalConfig {
     }
 
     const data = document.value;
-    const { title, description, logo, siteUrl, aiPageActions } = data;
-    const parsedSiteUrl = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
 
     // Every field is reported at once rather than stopping at the first, so one edit fixes
-    // the file.
-    const errors = [
-      ...PortalConfig.unknownFieldErrors(data),
-      ...PortalConfig.titleErrors(title),
-      ...PortalConfig.descriptionErrors(description),
-      ...PortalConfig.logoErrors(logo),
-      ...PortalConfig.aiPageActionsErrors(aiPageActions),
-      ...PortalConfig.siteUrlErrors(siteUrl, parsedSiteUrl)
-    ];
-    if (errors.length > 0) {
-      return err(errors);
+    // the file. Each validator hands back the typed value it accepted, so the constructor
+    // below is fed only what validation proved.
+    const unknownFields = PortalConfig.unknownFieldErrors(data);
+    const fields = Result.combineWithAllErrors([
+      PortalConfig.validTitle(data.title),
+      PortalConfig.validDescription(data.description),
+      PortalConfig.validLogo(data.logo),
+      PortalConfig.validSiteUrl(data.siteUrl),
+      PortalConfig.validAiPageActions(data.aiPageActions)
+    ]);
+    if (fields.isErr()) {
+      return err([...unknownFields, ...fields.error]);
+    }
+    if (unknownFields.length > 0) {
+      return err(unknownFields);
     }
 
-    // A blank description is the same as none; without this it shipped as the site
-    // description and as the og:description of every page.
-    const trimmedDescription = typeof description === 'string' ? description.trim() : '';
-    return ok(
-      new PortalConfig(
-        (title as string).trim(),
-        trimmedDescription.length > 0 ? trimmedDescription : null,
-        (logo as string | undefined) ?? null,
-        parsedSiteUrl,
-        (aiPageActions as boolean | undefined) ?? true
-      )
-    );
+    return ok(new PortalConfig(...fields.value));
   }
 
   private static parseObject(json: string): Result<Record<string, unknown>, string[]> {
@@ -123,44 +114,57 @@ export class PortalConfig {
       });
   }
 
-  private static titleErrors(title: unknown): string[] {
+  private static validTitle(title: unknown): Result<string, string> {
     return typeof title === 'string' && title.trim().length > 0
-      ? []
-      : ["'title' is required and must be a non-empty string."];
+      ? ok(title.trim())
+      : err("'title' is required and must be a non-empty string.");
   }
 
-  private static descriptionErrors(description: unknown): string[] {
-    return description === undefined || typeof description === 'string' ? [] : ["'description' must be a string."];
+  // A blank description is the same as none; without this it shipped as the site
+  // description and as the og:description of every page.
+  private static validDescription(description: unknown): Result<string | null, string> {
+    if (description === undefined) {
+      return ok(null);
+    }
+    if (typeof description !== 'string') {
+      return err("'description' must be a string.");
+    }
+    const trimmed = description.trim();
+    return ok(trimmed.length > 0 ? trimmed : null);
   }
 
-  private static logoErrors(logo: unknown): string[] {
+  private static validLogo(logo: unknown): Result<string | null, string> {
     if (logo === undefined) {
-      return [];
+      return ok(null);
     }
     if (typeof logo !== 'string' || logo.trim().length === 0) {
-      return ["'logo' must be a non-empty string."];
+      return err("'logo' must be a non-empty string.");
     }
     if (!PortalConfig.isInsideStatic(logo)) {
-      return [
+      return err(
         `'logo' must be a path relative to 'src' inside the 'static' directory, for example '${STATIC_PREFIX}images/logo.png'.`
-      ];
+      );
     }
-    return [];
+    return ok(logo);
   }
 
-  private static aiPageActionsErrors(aiPageActions: unknown): string[] {
-    return aiPageActions === undefined || typeof aiPageActions === 'boolean'
-      ? []
-      : ["'aiPageActions' must be true or false."];
+  private static validAiPageActions(aiPageActions: unknown): Result<boolean, string> {
+    if (aiPageActions === undefined) {
+      return ok(true);
+    }
+    return typeof aiPageActions === 'boolean' ? ok(aiPageActions) : err("'aiPageActions' must be true or false.");
   }
 
-  /** `parsed` is null both for a value that is not a string and for one that is not an origin. */
-  private static siteUrlErrors(siteUrl: unknown, parsed: UrlPath | null): string[] {
-    return siteUrl === undefined || parsed !== null
-      ? []
-      : [
+  private static validSiteUrl(siteUrl: unknown): Result<UrlPath | null, string> {
+    if (siteUrl === undefined) {
+      return ok(null);
+    }
+    const parsed = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
+    return parsed === null
+      ? err(
           "'siteUrl' must be the address the portal is hosted at, without a path, for example 'https://docs.example.com'."
-        ];
+        )
+      : ok(parsed);
   }
 
   /**
@@ -192,7 +196,7 @@ export class PortalConfig {
   /** URL of the logo on the generated site (the `static/` prefix is the site root). */
   public logoSiteUrl(): string | null {
     const logoPath = this.logoPath();
-    return logoPath === null ? null : logoPath.substring(STATIC_PREFIX.length - 1);
+    return logoPath === null ? null : `/${logoPath.slice(STATIC_PREFIX.length)}`;
   }
 
   public siteOrigin(): UrlPath | null {

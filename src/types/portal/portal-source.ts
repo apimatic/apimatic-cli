@@ -16,6 +16,8 @@ export interface PortalSource {
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
+  /** Spec slugs that a page under `content/api/` also claims, so the two share an address. */
+  collidingSlugs: string[];
 }
 
 /** Why a source directory cannot be built; each variant maps to its own message. */

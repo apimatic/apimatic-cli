@@ -60,9 +60,7 @@ export async function withBuildDirectory<T>(
   try {
     return await withDir((results) => fn(new DirectoryPath(results.path)), { tmpdir: base, unsafeCleanup: true });
   } finally {
-    if (base !== systemTemp) {
-      await removeBuildDirectoryBase(base);
-    }
+    await removeBuildDirectoryBase(base, systemTemp);
   }
 }
 
@@ -72,7 +70,10 @@ export async function withBuildDirectory<T>(
  * beside a running `portal serve` puts that live build tree into the user's `git status`.
  * Failures are swallowed: a portal that has been written is not a crash.
  */
-async function removeBuildDirectoryBase(base: string): Promise<void> {
+export async function removeBuildDirectoryBase(base: string, systemTemp: string = os.tmpdir()): Promise<void> {
+  if (base === systemTemp) {
+    return;
+  }
   try {
     const remaining = await fs.readdir(base);
     if (remaining.some((entry) => entry !== '.gitignore')) {

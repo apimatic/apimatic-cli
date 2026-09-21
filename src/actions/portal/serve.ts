@@ -10,6 +10,8 @@ import { PortalAuthorizationService } from '../../infrastructure/services/portal
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
 
+export const DEFAULT_PORTAL_PORT = 23513;
+
 export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
@@ -58,6 +60,7 @@ export class PortalServeAction {
       return ActionResult.failed();
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
+    this.prompts.pagesCollidingWithSpecs(source.value.collidingSlugs);
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {

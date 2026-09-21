@@ -100,7 +100,20 @@ export class PortalProjectService {
    * reach the build, and any stray `VITE_*` variable would be inlined into the output.
    */
   public childEnvironment(): Record<string, string> {
-    const allowed = ['PATH', 'Path', 'HOME', 'USERPROFILE', 'TEMP', 'TMP', 'SYSTEMROOT', 'SystemRoot', 'SystemDrive'];
+    const allowed = [
+      'PATH',
+      'Path',
+      'HOME',
+      'USERPROFILE',
+      'TMPDIR',
+      'TEMP',
+      'TMP',
+      'LANG',
+      'LC_ALL',
+      'SYSTEMROOT',
+      'SystemRoot',
+      'SystemDrive'
+    ];
     const environment: Record<string, string> = {};
     for (const name of allowed) {
       const value = process.env[name];

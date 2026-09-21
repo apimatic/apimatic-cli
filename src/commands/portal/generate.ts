@@ -37,7 +37,7 @@ The portal is built on your machine and written as static files you can host any
     } = await this.parse(PortalGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
+    const sourceDirectory = workingDirectory.join('src');
     const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('portal');
     const commandMetadata: CommandMetadata = {
       commandName: PortalGenerate.id,

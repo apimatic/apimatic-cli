@@ -26,9 +26,13 @@ export class FileName {
     return this.name < other.name ? -1 : Number(this.name > other.name);
   }
 
+  public withoutExtension(): FileName {
+    return new FileName(this.name.replace(/\.[^/.]+$/, ''));
+  }
+
   public normalize(): FileName {
-    const nameWithoutExt = this.name.replace(/\.[^/.]+$/, '');
-    const normalized = nameWithoutExt
+    const normalized = this.withoutExtension()
+      .toString()
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-')
