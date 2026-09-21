@@ -2,8 +2,6 @@ import { expect } from 'chai';
 import { logTail } from '../../src/prompts/prompt';
 
 describe('logTail', () => {
-  // A bundler reports the message and the offending file first and its own stack last, so a
-  // plain tail of the log showed the least useful part of the failure.
   const failure = [
     'vite building for production...',
     'error during build:',

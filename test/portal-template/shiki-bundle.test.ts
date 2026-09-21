@@ -31,15 +31,12 @@ describe('the trimmed Shiki bundle', function () {
     });
   });
 
-  // These are the spellings people actually write; the bundle resolves them through `aliases`.
   aliases.forEach((lang) => {
     it(`highlights the alias ${lang}`, async () => {
       expect(tokenColours(await highlight(lang))).to.be.greaterThan(1);
     });
   });
 
-  // Fumadocs catches this and falls back to plain text, which is why an unbundled language
-  // renders unstyled instead of breaking the page.
   it('refuses a language it does not bundle, rather than pretending to know it', async () => {
     let refused = false;
     try {

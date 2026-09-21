@@ -4,17 +4,16 @@ import { readFile } from 'node:fs/promises';
 export interface PortalConfig {
   title: string;
   description: string | null;
-  /** Site-relative URL of the logo inside the static directory, or null. */
+  /** Site-relative, and inside the static directory. */
   logoUrl: string | null;
-  /** Origin the portal is hosted at (no trailing slash), or null when unknown. */
+  /** Origin only, with no trailing slash. */
   siteUrl: string | null;
   /** Whether each page offers to open itself in an AI assistant. */
   aiPageActions: boolean;
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
-  /** Absolute path of the content directory (always exists, may be empty). */
+  /** Absolute. Always exists, and may be empty. */
   contentDir: string;
-  /** Absolute path of the static directory, or null when the project has none. */
   staticDir: string | null;
 }
 

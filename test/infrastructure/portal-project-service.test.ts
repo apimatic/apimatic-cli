@@ -118,8 +118,6 @@ describe('PortalProjectService', () => {
       expect(module).to.contain(JSON.stringify(contentDirectory.toString().split(path.sep).join('/')));
     });
 
-    // The stylesheet needs the same literal: Tailwind's detection is rooted at the temp
-    // project, so without this no class used only on the user's pages survives the build.
     it('substitutes the content directory into the stylesheet Tailwind scans', async () => {
       const contentDirectory = new DirectoryPath(root).join('content');
       fs.mkdirSync(contentDirectory.toString(), { recursive: true });
@@ -131,15 +129,12 @@ describe('PortalProjectService', () => {
       expect(stylesheet).to.contain(contentDirectory.toString().split(path.sep).join('/'));
     });
 
-    // Substituted as a literal rather than imported: a JSON module is retained whole once
-    // client code imports it, shipping this machine's absolute paths to the browser.
     it('substitutes the portal identity into the module the browser receives', async () => {
       (await service.prepare(project, sourceFor()))._unsafeUnwrap();
 
       const module = fs.readFileSync(path.join(project.toString(), 'src/lib/portal.ts'), 'utf8');
       expect(module).to.not.contain('__APIMATIC_PORTAL_IDENTITY__');
       expect(module).to.contain('"title":"My API"');
-      // The build machine's paths stay behind portal.server.ts.
       expect(module).to.not.contain(root.split(path.sep).join('/'));
       expect(module).to.not.contain('specs');
     });
@@ -179,9 +174,6 @@ describe('PortalProjectService', () => {
       }
     });
 
-    // V8 honours the last occurrence, so appending unconditionally would override a limit the
-    // user raised deliberately -- and NODE_OPTIONS is their only way in, since the child is
-    // spawned with extendEnv false.
     it('leaves a heap limit the user set alone', () => {
       const original = process.env.NODE_OPTIONS;
       try {

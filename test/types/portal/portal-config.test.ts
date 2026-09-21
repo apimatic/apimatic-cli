@@ -65,7 +65,6 @@ describe('PortalConfig', () => {
       expect(parse({ title: 'x', description: '  Docs  ' })._unsafeUnwrap().siteDescription()).to.equal('Docs');
     });
 
-    // It reached the site description and the og:description of every page as whitespace.
     it('treats a blank description as none at all', () => {
       for (const description of ['', '   ', '\n\t']) {
         expect(parse({ title: 'x', description })._unsafeUnwrap().siteDescription(), JSON.stringify(description)).to.be
@@ -75,8 +74,6 @@ describe('PortalConfig', () => {
   });
 
   describe('unknown settings', () => {
-    // A mistyped setting is the one mistake that otherwise builds a portal that is quietly
-    // wrong -- no logo, no site URL -- with nothing said about it.
     it('rejects a setting it does not know', () => {
       const errors = parse({ title: 'Calc', favicon: 'x.ico' })._unsafeUnwrapErr();
 
@@ -150,7 +147,6 @@ describe('PortalConfig', () => {
     });
 
     it('rejects an address carrying a path, query or fragment', () => {
-      // Anything below the origin would produce canonical links that do not resolve.
       for (const siteUrl of ['https://x.test/docs', 'https://x.test/?a=1', 'https://x.test/#top']) {
         expect(errorsOf(parse({ title: 'x', siteUrl })), siteUrl).to.have.lengthOf(1);
       }

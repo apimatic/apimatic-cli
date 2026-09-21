@@ -50,8 +50,6 @@ describe('PortalSourceContext', () => {
       expect(problem).to.deep.equal({ kind: 'missingConfig', migration: null });
     });
 
-    // Editors on Windows write one, and the YAML parser strips it, so without this the same
-    // document is accepted as .yaml and refused as .json.
     it('reads inputs written with a byte-order mark', async () => {
       const mark = '﻿';
       write('portal.json', mark + JSON.stringify({ title: 'Calc' }));
@@ -74,8 +72,6 @@ describe('PortalSourceContext', () => {
   });
 
   describe('logo', () => {
-    // parse() checks the shape of `logo`; that the image is actually there it cannot know,
-    // and a logo that is not there is a broken image on every page of a successful build.
     it('reports a configured logo that is not on disk', async () => {
       write('portal.json', JSON.stringify({ title: 'Calc', logo: 'static/images/logo.png' }));
       write('spec/api.json', OPENAPI);
@@ -161,8 +157,6 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr().kind).to.equal('noSpecs');
     });
 
-    // The search index is served from /api/search.json, a file, which cannot collide with
-    // the directory a spec section is mounted at.
     it('leaves a spec named after the search route with its own name', async () => {
       write('spec/search.json', OPENAPI);
 
@@ -193,8 +187,6 @@ describe('PortalSourceContext', () => {
       expect(source.staticDirectory).to.be.null;
     });
 
-    // The static directory is copied to the site root before the generated files are
-    // written there, so a file of the same name silently replaces one of them.
     it('names the static files that replace ones the build generates', async () => {
       write('static/robots.txt', 'User-agent: *');
       write('static/sitemap.xml', '<urlset/>');
@@ -211,15 +203,12 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
     });
 
-    // Only the root of the site collides, so only the top of static/ is read -- a whole-tree
-    // walk also stat's every entry of a large assets folder on each build.
     it('ignores a generated name sitting below the top of the static directory', async () => {
       write('static/docs/robots.txt', 'User-agent: *');
 
       expect((await resolve())._unsafeUnwrap().shadowedFiles).to.deep.equal([]);
     });
 
-    // One dead link must not throw ENOENT out of a method whose every other outcome is a Result.
     it('survives an entry in the static directory that cannot be read', async function () {
       write('static/robots.txt', 'User-agent: *');
       const dangling = path.join(root, 'static', 'assets');
@@ -308,8 +297,6 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig', migration: null });
     });
 
-    // `portal toc new`'s own removal message tells the user that meta.json replaced toc.yml,
-    // so it must not also be listed as having no equivalent.
     it('flags a table of contents rather than calling it unsupported', async () => {
       write(
         'APIMATIC-BUILD.json',
@@ -353,8 +340,6 @@ describe('PortalSourceContext', () => {
       expect(migration.unmigratableLogo).to.be.null;
     });
 
-    // The suggestion is printed for the user to paste, so anything it produces has to be
-    // something `PortalConfig.parse` accepts, or the hint dead-ends on the next command.
     describe('every suggestion it can produce is a config the CLI accepts', () => {
       const oldPortals: Record<string, unknown>[] = [
         { pageTitle: 'Acme', logoUrl: 'static/images/logo.png' },

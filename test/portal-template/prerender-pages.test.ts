@@ -49,9 +49,6 @@ describe('prerenderPages', () => {
     expect(urls).to.include('/index.md');
   });
 
-  // `guides.md` and `guides/index.md` both collapse to "guides"; the content source settles
-  // it by appending "index" to the index file. Emitting one URL for the two left the page
-  // the source had moved with no file, while the sidebar and sitemap linked to it.
   it('gives a colliding index file the URL the content source moves it to', async () => {
     write('guides.md');
     write('guides/index.md');
@@ -89,7 +86,6 @@ describe('prerenderPages', () => {
     }
   });
 
-  // The suffixing loop adds to the set it reads, so it reads a copy; see the comment there.
   it('suffixes each page once, however many pages there are', async () => {
     write('index.md');
     write('guides.md');

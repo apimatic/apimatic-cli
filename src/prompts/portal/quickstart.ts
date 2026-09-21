@@ -46,7 +46,6 @@ export class PortalQuickstartPrompts {
     return createResourceInputFromInput(spec);
   }
 
-  /** Refused before anything is written, so the user is not left with a half-made project. */
   public specFormatUnsupported(specPath: FilePath, format: string) {
     log.error(
       `${f.path(specPath)} is ${format}. Portals are generated from OpenAPI 3.x documents; ` +
@@ -54,10 +53,7 @@ export class PortalQuickstartPrompts {
     );
   }
 
-  /**
-   * For a document that names no format at all -- a Postman collection, an arbitrary JSON
-   * file. The build skips such a file, so the wizard cannot accept it either.
-   */
+  /** For a document that names no format at all: a Postman collection, an arbitrary JSON file. */
   public specNotRecognised(specPath: FilePath) {
     log.error(
       `${f.path(specPath)} is not an OpenAPI document: it names no ${f.var('openapi')} version. ` +
@@ -65,7 +61,6 @@ export class PortalQuickstartPrompts {
     );
   }
 
-  /** Asked of this machine before anything is written, not after the project exists. */
   public runtimeUnsupported(reason: string) {
     log.error(reason);
   }

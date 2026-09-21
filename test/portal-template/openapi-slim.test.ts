@@ -144,8 +144,6 @@ describe('slimOpenAPIPageProps', () => {
   });
 
   describe('narrowing a path item to the rendered operation', () => {
-    // Fumadocs renders one operation per page and reads only pathItem[method], so a sibling
-    // method would otherwise carry its whole schema closure onto every page of the path.
     const multi = {
       openapi: '3.1.0',
       info: document.info,
@@ -213,8 +211,6 @@ describe('slimOpenAPIPageProps', () => {
   });
 
   it('keeps the whole component a reference addresses a node inside', () => {
-    // `#/components/schemas/Pet/properties/id` is legal and passes through bundling untouched,
-    // so matching the tail as part of the name would drop Pet and leave this unresolvable.
     const deep = {
       openapi: '3.1.0',
       info: document.info,
@@ -229,8 +225,6 @@ describe('slimOpenAPIPageProps', () => {
   });
 
   describe('documents bundled from several files', () => {
-    // The bundler embeds external documents under `x-ext` and rewrites file and URL
-    // references to point inside it, so nothing there matches `#/components/`.
     const bundledExternal = {
       openapi: '3.1.0',
       info: document.info,
@@ -318,8 +312,6 @@ describe('slimOpenAPIPageProps', () => {
       expect(Object.keys(slim['x-ext'].h.components.schemas).sort()).to.deep.equal(['A', 'B', 'Node']);
     });
 
-    // A scheme is kept because `security` names it, not because anything references it -- but
-    // in a split document the scheme holds references of its own, which have to come with it.
     it('follows references out of a security scheme it kept by name', () => {
       const withScheme = {
         openapi: '3.1.0',

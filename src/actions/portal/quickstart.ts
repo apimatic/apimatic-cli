@@ -249,11 +249,7 @@ export class PortalQuickstartAction {
     }
   }
 
-  /**
-   * The specification as an object, however it was written. Shared so both readers below
-   * agree on stripping the byte-order mark a Windows editor or a PowerShell redirection
-   * leaves at the front of the file.
-   */
+  /** The specification as an object, shared so both readers below agree on how it is read. */
   private parseSpec(
     specPath: FilePath,
     contents: string

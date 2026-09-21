@@ -21,8 +21,6 @@ const enabled = process.env.APIMATIC_E2E === '1';
   let output: DirectoryPath;
 
   before(async () => {
-    // The same rule the commands follow: on a Windows runner the workspace and the temp
-    // directory sit on different drives, and a build across drives loses the content pages.
     root = fs.mkdtempSync(path.join(await ensureBuildDirectoryBase(fixture), 'portal-e2e-'));
 
     const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
@@ -89,8 +87,6 @@ const enabled = process.env.APIMATIC_E2E === '1';
   });
 
   it('keeps the server-side specification loader out of the browser bundle', () => {
-    // The loader reads the specification off disk; shipped to the browser it throws before
-    // React can hydrate, leaving every page inert.
     const scripts = fs.readdirSync(path.join(output.toString(), 'assets')).filter((name) => name.endsWith('.js'));
     const offenders = scripts.filter((name) => read('assets/' + name).includes('Failed to resolve input'));
     expect(offenders).to.deep.equal([]);

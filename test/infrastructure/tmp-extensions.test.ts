@@ -19,7 +19,6 @@ describe('buildDirectoryBase', () => {
   });
 
   it('falls back to a folder beside the source when the temp directory is on another drive', () => {
-    // Vite cannot express a relative path across drives, so the content pages would vanish.
     expect(buildDirectoryBase(source, 'C:\\Users\\me\\AppData\\Local\\Temp', 'win32')).to.equal(
       path.win32.join('D:\\work\\my-api', BUILD_DIRECTORY_NAME)
     );
@@ -68,8 +67,6 @@ describe('withBuildDirectory', () => {
     }
   );
 
-  // The fallback folder is shared by every invocation for a project, so one run finishing must
-  // not delete the marker a concurrent one still depends on.
   (process.platform === 'win32' ? it : it.skip)(
     'leaves the shared folder alone while another run is in it',
     async () => {

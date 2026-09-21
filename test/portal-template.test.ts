@@ -94,8 +94,6 @@ describe('portal template packaging', () => {
     expect(templateFiles().filter((file) => path.basename(file) === '.gitignore')).to.be.empty;
   });
 
-  // The trimmed bundle replaces Shiki's entry point, and with it the alias table `ts` or `yml`
-  // resolve through, so every spelling has to be a key here -- and Shiki's own spelling.
   describe('the trimmed syntax bundle', () => {
     const source = () => fs.readFileSync(path.join(templateRoot, 'src/lib/shiki-bundle.ts'), 'utf8');
 
