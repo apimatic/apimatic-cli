@@ -2,9 +2,13 @@
 
 Status: design agreed 2026-09-18, revised twice the same day: once after an
 adversarial review of the first draft, once after the open questions were
-settled. Nothing implemented. Follows on from `.ai/plans/fumadocs-portal.md`,
-which is implemented on `saeedjamshaid/fumadocs-portal` and whose section 3
-this plan amends. Section 11 lists what is still open.
+settled. Follows on from `.ai/plans/fumadocs-portal.md`, which merged as #343
+and whose section 3 this plan amends. Section 11 lists what is still open.
+
+Implementation started 2026-09-21 on `saeedjamshaid/portal-navigation`, cut
+from `dev` once #343 merged. Step 1 is done: both unknowns are retired and
+section 15 records what the spike found. Step 2 turned out to be already
+fixed by #343 (section 9), so the work resumes at step 3.
 
 Two revisions worth knowing about when reading older notes:
 
@@ -232,6 +236,10 @@ at the anchor when there is no rest token.
 - A `nav.json` that omits `index`: the home page still appears. Worth stating
   because the fallback home page described in the portal plan's section 3 was
   never implemented, so `/` depends on the user's own `index` page surviving.
+- A `nav.json` below the content root that names `index`: refused, because a
+  folder's index page is the folder's own link rather than one of its children
+  and no position among them would be applied (section 10). At the content
+  root `index` is an ordinary child and is ordered like any other page.
 - Before the SDK page ships: `apimatic:pages` resolves to nothing and is not an
   error, so a `nav.json` written today keeps working when the page arrives.
 
@@ -315,6 +323,21 @@ than tree position. An operation still resolves at `/api/petstore/pet/addPet`.
 
 ## 9. Config split, and an absolute-path leak that already exists
 
+**Superseded 2026-09-21: #343 fixed this before this plan reached it**, by a
+different route than the one below. Rather than splitting the file in two, it
+substitutes a `__APIMATIC_PORTAL_IDENTITY__` literal into `portal.ts` the same
+way `source.ts` already took the content directory, and moved `specs` behind a
+new `portal.server.ts`. `vite.config.ts` and `prerender-pages.ts` read the JSON
+through `node:fs`, and `vite.config.ts` refuses a client import of any
+`*.server.*` module outright. So no client module imports `portal.config.json`
+any more and the outcome this section wanted is achieved.
+
+What is left of this section is the regression test alone: assert that no
+absolute build path appears in `dist/client` (section 14). The rest of the
+section is kept as the record of why the fix was needed.
+
+The original finding follows.
+
 `portal.config.json` today holds `specs`, `contentDir` and `staticDir`, all
 absolute paths on the author's machine. `portal-template/src/lib/portal.ts`
 imports that file as a default import, and both `routes/__root.tsx` and
@@ -354,6 +377,12 @@ Read from the pinned `fumadocs-core@16.15.8`, `fumadocs-mdx@15.4.0`,
 `fumadocs-openapi@11.4.1` and `vite@8.2.2` on 2026-09-18. Recorded so none of
 it is rediscovered, and so an upgrade knows what to re-check.
 
+Everything below down to the Vite entry was read from the source. The entries
+marked **(ran it)** were additionally observed in a running dev server on
+2026-09-21, against the `test-source` fixture prepared through
+`PortalProjectService.prepare`, with a spike transformer and a route dumping
+`source.pageTree`. Same pinned versions.
+
 - **All sources share one flat virtual filesystem.**
   `createContentStorageBuilder` scans every source into a single map, prefixing
   each file with that source's `baseDir`. Content lands at the virtual root;
@@ -366,7 +395,61 @@ it is rediscovered, and so an upgrade knows what to re-check.
 - **Transformers expose `file`, `folder`, `separator` and `root` hooks**, each
   with `this.storage`, `this.builder` and `this.options`. `folder` fires after
   a directory's children are built, and the root folder is one of them. This is
-  the whole basis of section 5.
+  the whole basis of section 5. **(ran it)**
+- **The root `folder` hook fires twice, and the second time is a trap.**
+  **(ran it)** `generateFallback` defaults to true, which registers
+  `transformerFallback`. It records every file that became a node through its
+  own `file` hook, then builds a second tree from whatever is left over. A
+  metadata file never becomes a node, so `nav.json` is *always* left over and
+  the fallback pass therefore *always* runs. Our `folder` hook is called again
+  for the root, with an empty child list and a storage holding `nav.json`
+  alone, and every entry in `pages` fails to match. Harmless as long as the
+  transformer permutes what it is given, but it must not treat an unmatched
+  entry as an error at transform time, and it should skip the pass outright:
+  the context carries `custom._fallback === true`, which is how the fallback
+  transformer itself detects re-entry.
+- **`resolveFlattenPath(joinPath(folderPath, 'nav'), 'meta')` behaves as
+  section 5 needs.** **(ran it)** At the content root it resolves to
+  `nav.json`; for a directory with no nav file it returns the path unchanged,
+  so `storage.read` returns `undefined` and the hook falls through. The
+  extension is never hard-coded.
+- **`$ref` survives on tree nodes.** **(ran it)** `Item.$ref` is the page's
+  virtual path (`index.md`), `Folder.$ref.folder` is the folder's
+  (`api/petstore`). Both are what section 5 matches entries against.
+- **Editing `nav.json` reloads the tree during `portal serve`.** **(ran it)**
+  Changing the array to `["authentication", "...", "index"]` moved the sidebar
+  from `Welcome | Authentication | SDKs | Api` to
+  `Authentication | SDKs | Api | Welcome` with no restart: named entries in
+  order, the remainder spliced in at the rest token, `index` last. This is the
+  behaviour section 5 was designed around.
+- **Two `defineDocs` collections coexist in one template.** **(ran it)** A
+  second collection over a separate directory, passed to `loader()` with no
+  `baseDir`, put its page at the virtual root beside the user's content and
+  served it at `/sdks`. Section 4 depends on this.
+- **`files: ['**/nav.json']` is a real restriction, not a nominal one.**
+  **(ran it)** With it, a `meta.json` sitting beside `nav.json` changes nothing
+  about the tree. Without it, that same `meta.json` is honoured and collapses
+  the sidebar to `index` alone, because a metadata file with no rest token
+  hides everything it does not name. `meta.json` wins over `nav.json` because a
+  folder's metadata is only ever read as `meta.meta`. This is the negative
+  control behind section 5's "ignoring is real, not nominal".
+- **The API wrapper renders as "Api".** **(ran it)** Confirms the rename in
+  section 7 is needed rather than cosmetic.
+- **A folder's `index` page is not one of its children.** **(ran it)** Below
+  the content root, `buildFolder` puts `index.md` in the folder node's `index`
+  property, and the folder then takes that page's title as its own name. It
+  never appears in `children`, so a transformer that permutes `children` can
+  neither find it nor lose it. Observed with `content/guides/`: a `nav.json`
+  of `["intro", "index", "advanced"]` ordered the two real children and left
+  `index` unmatched. The content root is exempt, because a root folder gets no
+  index node and lists `index` as an ordinary child.
+
+  Two consequences. The CLI refuses `index` in a `nav.json` below the content
+  root, since no position there could be honoured (section 6). And if the
+  ordering is ever wanted, the mechanism is Fumadocs' own: an explicitly named
+  entry claims a node at priority 2, which outranks the priority 0 of the
+  index slot and moves the page into `children` -- at the cost of the folder
+  no longer linking to it. Deliberately not done.
 - **Stored files are indexed by path and format.** The builder walks the
   storage once and maps `<path without extension>.<format>` to the full path,
   which is what `resolveFlattenPath` looks up. A folder's metadata is only ever
@@ -470,13 +553,8 @@ Navigation change:
   the content tree; warn on a leftover `meta.json`.
 - New value object for a validated navigation, per `.ai/skills/value-object.md`,
   parsing in the style of `PortalConfig.parse` and reporting every bad entry.
-- `src/infrastructure/portal-project-service.ts`: split `writeConfiguration`
-  into the client-safe and server-only files from section 9.
-- `portal-template/portal-config.ts`: split the interface to match, keeping the
-  `node:fs` read for the server-only file.
-- `portal-template/src/lib/portal.ts`: import only the client-safe file.
-- `portal-template/src/lib/openapi.server.ts`: read `specs` from the
-  server-only file.
+- ~~The four config-split entries that were here~~ are done: #343 covered them
+  (section 9). Only the `dist/client` assertion in section 14 remains.
 - `portal-template/src/lib/source.server.ts`: the transformer registered
   through `pageTree.transformers`, and `files: ['**/nav.json']` on the metadata
   collection in `source.ts`.
@@ -518,20 +596,22 @@ Second change, additionally:
 
 ## 15. Risks
 
-- **The hot reload this design is built on is unconfirmed.** Section 5 chose a
-  transformer over the first draft's generated metadata specifically so that
-  editing `nav.json` reloads during `portal serve`. The reasoning is sound, in
-  that the file is a member of a watched collection, but it has not been run.
-  If it turns out not to reload, the main advantage over the rejected approach
-  disappears and the choice deserves revisiting. Verify this first, before
-  anything is built on top of it.
-- **Two `defineDocs` collections in one template is unconfirmed**, and the SDK
-  page depends on it. Cheap to check, and worth checking in the same pass.
-- **The transformer leans on two things Fumadocs does not document as public
+- ~~**The hot reload this design is built on is unconfirmed.**~~ **Retired
+  2026-09-21 (step 1).** Editing `nav.json` reorders the sidebar with no
+  restart, so the transformer keeps the advantage it was chosen for. See
+  section 10.
+- ~~**Two `defineDocs` collections in one template is unconfirmed.**~~
+  **Retired 2026-09-21 (step 1).** They coexist, and the second collection's
+  page lands at the virtual root as section 4 assumes. See section 10.
+- **The transformer leans on three things Fumadocs does not document as public
   API**: `$ref` surviving on tree nodes, which depends on `noRef` staying at
-  its default, and `builder.resolveFlattenPath` remaining reachable from a
-  transformer context. A Fumadocs upgrade could take either away. The
-  end-to-end sidebar assertion in section 14 is what would catch it.
+  its default, `builder.resolveFlattenPath` remaining reachable from a
+  transformer context, and `custom._fallback` remaining the way to detect the
+  fallback pass. All three were observed working on 2026-09-21, and a Fumadocs
+  upgrade could take any of them away. The end-to-end sidebar assertion in
+  section 14 is what would catch the first two; a fallback pass that stopped
+  being skipped would not fail a test, which is why the transformer must also
+  be harmless when it runs.
 - **Restricting the metadata collection to our file alone** means any future
   Fumadocs feature that expects to read other metadata files stops working
   silently. Accepted, because without the restriction a stale `meta.json` is
@@ -539,8 +619,8 @@ Second change, additionally:
   on each upgrade.
 - **Required `languages` is a breaking change** to `portal.json`, free only
   while the next major is unreleased (section 4).
-- **The config split touches files the open PR already rewrites**, so the two
-  conflict textually if they proceed in parallel (section 16).
+- ~~**The config split touches files the open PR already rewrites.**~~ Moot:
+  #343 merged, and it did the config work itself (section 9).
 
 ## 16. Delivery
 
@@ -548,6 +628,12 @@ Second change, additionally:
 committed on `saeedjamshaid/fumadocs-portal` so it travels with the work it
 follows on from, but no implementation happens there. Once #343 merges, the
 execution branch is cut from `dev`.
+
+**Done 2026-09-21.** #343 was squash-merged to `dev` as `073d09a`, and
+`saeedjamshaid/portal-navigation` is cut from that commit. Waiting turned out
+to be worth more than the wall-clock argument below: #343 also did the
+section 9 config work, which this plan would otherwise have duplicated and
+then had to reconcile.
 
 As of 2026-09-18 that branch is 37 commits ahead of `origin/dev` and #343 has
 not merged. Every file the navigation work touches is already rewritten on it,
@@ -565,6 +651,15 @@ Stacking would have made an already-large PR larger and mixed a reviewed
 feature with an unreviewed one, for no gain in wall-clock time given #343 is
 already open.
 
+**The branch is not mergeable before step 6.** Found while implementing step 3
+and not anticipated above. The steps in section 17 are each reviewable on their
+own, but they are not each shippable: until the transformer and the scaffold
+change land, `meta.json` is still what orders the sidebar and `nav.json` is
+read by nothing, so the CLI's warning tells the user to rename the one file
+that currently works. Adding `files: ['**/nav.json']` early does not fix it
+either, since `nav.json` only means anything once the transformer exists. Merge
+the whole change or none of it.
+
 **Breaking change footer.** Replacing `meta.json` with `nav.json` needs no
 footer of its own as long as it lands before the next major ships, since the
 old name was never released. It becomes a breaking change if it lands after.
@@ -581,11 +676,12 @@ reaches the README.
 Ordered so that the riskiest unknowns are retired before anything is built on
 them, and so each step stands alone.
 
-1. **Retire the two unknowns.** Confirm `nav.json` edits reload during
-   `portal serve`, and that two `defineDocs` collections coexist. No production
-   code. If the first fails, stop and revisit section 5.
-2. **Config split and the leak fix.** Sections 9 and 13, plus the `dist/client`
-   assertion. Independent of navigation, and valuable on its own.
+1. ~~**Retire the two unknowns.**~~ **Done 2026-09-21.** Both hold; section 10
+   records them, along with three things the spike found that this plan had
+   not anticipated.
+2. ~~**Config split and the leak fix.**~~ **Done by #343** (section 9). The
+   `dist/client` assertion it was to carry moves to step 6 with the other
+   tests, since nothing can regress until the template changes.
 3. **The format and its validation.** The `nav.json` value object, discovery
    through the content tree, and the `meta.json` warning. CLI only, no template
    changes, so it is testable without a build.
@@ -594,7 +690,8 @@ them, and so each step stands alone.
 5. **API structure.** The "API Reference" title and single-spec inlining, in
    the same transformer.
 6. **Surfacing.** Quickstart scaffold, the removal message in
-   `portal toc new`, fixture renames, README if needed.
+   `portal toc new`, fixture renames, the `dist/client` assertion from step 2,
+   README if needed.
 
 The second change then follows on its own: `languages` as a required property,
 the generated SDK page, and the collision failure.
