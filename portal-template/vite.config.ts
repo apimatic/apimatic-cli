@@ -32,10 +32,10 @@ export default defineConfig(async () => {
           behavior: 'error',
           // Added to the plugin's own rule for *.server.* files, so the library entry points
           // that read files are refused by name wherever they are imported from.
-          client: { specifiers: ['fumadocs-openapi/server', 'fumadocs-core/search/server'] },
-        },
+          client: { specifiers: ['fumadocs-openapi/server', 'fumadocs-core/search/server'] }
+        }
       }),
-      react(),
+      react()
     ],
     resolve: {
       tsconfigPaths: true,
@@ -43,8 +43,8 @@ export default defineConfig(async () => {
         { find: 'tslib', replacement: 'tslib/tslib.es6.js' },
         // Anchored, so `shiki/core` and the per-language modules the replacement itself
         // imports still resolve to the real package. See `src/lib/shiki-bundle.ts`.
-        { find: /^shiki$/, replacement: fileURLToPath(new URL('./src/lib/shiki-bundle.ts', import.meta.url)) },
-      ],
-    },
+        { find: /^shiki$/, replacement: fileURLToPath(new URL('./src/lib/shiki-bundle.ts', import.meta.url)) }
+      ]
+    }
   };
 });

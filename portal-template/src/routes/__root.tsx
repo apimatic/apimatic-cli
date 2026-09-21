@@ -20,16 +20,13 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: portal.title },
-      ...(portal.description ? [{ name: 'description', content: portal.description }] : []),
+      ...(portal.description ? [{ name: 'description', content: portal.description }] : [])
     ],
     // The portal already supplies a logo for the navigation bar; without this the browser
     // tab showed the blank-document icon on every page.
-    links: [
-      { rel: 'stylesheet', href: appCss },
-      ...(portal.logoUrl ? [{ rel: 'icon', href: portal.logoUrl }] : []),
-    ],
+    links: [{ rel: 'stylesheet', href: appCss }, ...(portal.logoUrl ? [{ rel: 'icon', href: portal.logoUrl }] : [])]
   }),
-  component: RootComponent,
+  component: RootComponent
 });
 
 function RootComponent() {

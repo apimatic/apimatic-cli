@@ -44,8 +44,8 @@
         "prepack": "oclif manifest",
         "pretest": "tsc -p test/tsconfig.json",
         "posttest": "eslint .",
-        "prettier": "prettier \"src/**/*.{js,ts}\"",
-        "format": "prettier --write \"src/**/*.{js,ts}\"",
+        "prettier": "prettier \"src/**/*.{js,ts}\" \"portal-template/**/*.{ts,tsx}\"",
+        "format": "prettier --write \"src/**/*.{js,ts}\" \"portal-template/**/*.{ts,tsx}\"",
         "lint": "eslint \"src/**/*.{js,ts}\"",
         "lint:fix": "eslint --fix \"src/**/*.{js,ts}\" --quiet",
         "readme": "oclif readme",
@@ -176,6 +176,6 @@
     },
     "lint-staged": {
         "*.js": "eslint --cache --fix",
-        "*.{js,ts}": "prettier --write"
+        "*.{js,ts,tsx}": "prettier --write"
     }
 }

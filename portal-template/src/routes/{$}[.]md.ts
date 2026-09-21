@@ -15,7 +15,7 @@ export const Route = createFileRoute('/{$}.md')({
         // Mirrors the generated landing page served at "/" when there is no index page.
         if (slugs.length === 0) return new Response(renderHome(), { headers });
         throw notFound();
-      },
-    },
-  },
+      }
+    }
+  }
 });

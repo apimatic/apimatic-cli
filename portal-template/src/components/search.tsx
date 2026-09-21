@@ -8,7 +8,7 @@ import {
   SearchDialogInput,
   SearchDialogList,
   SearchDialogOverlay,
-  type SharedProps,
+  type SharedProps
 } from 'fumadocs-ui/components/dialog/search';
 import { useDocsSearch } from 'fumadocs-core/search/client';
 import { staticClient } from 'fumadocs-core/search/client/orama-static';
@@ -21,8 +21,8 @@ export default function DefaultSearchDialog(props: SharedProps) {
     // it went out as application/octet-stream, which some of them attach or refuse.
     client: staticClient({
       from: '/api/search.json',
-      locale,
-    }),
+      locale
+    })
   });
 
   return (

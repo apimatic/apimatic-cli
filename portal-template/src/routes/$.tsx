@@ -9,7 +9,7 @@ import {
   DocsPage,
   DocsTitle,
   MarkdownCopyButton,
-  ViewOptionsPopover,
+  ViewOptionsPopover
 } from 'fumadocs-ui/layouts/notebook/page';
 import { baseOptions } from '@/lib/layout.shared';
 import { getPageMarkdownUrl } from '@/lib/shared';
@@ -52,15 +52,15 @@ export const Route = createFileRoute('/$')({
         { property: 'og:type', content: 'website' },
         { property: 'og:site_name', content: portal.title },
         ...(absolute ? [{ property: 'og:url', content: absolute }] : []),
-        { name: 'twitter:card', content: 'summary' },
+        { name: 'twitter:card', content: 'summary' }
       ],
-      links: canonicalLink(pageUrl),
+      links: canonicalLink(pageUrl)
     };
-  },
+  }
 });
 
 const serverLoader = createServerFn({
-  method: 'GET',
+  method: 'GET'
 })
   .validator((slugs: string[]) => slugs)
   .middleware([staticFunctionMiddleware])
@@ -80,7 +80,7 @@ const serverLoader = createServerFn({
         type: 'openapi' as const,
         title: page.data.title,
         description: page.data.description ?? null,
-        props: slimOpenAPIPageProps(page.data.getOpenAPIPageProps()),
+        props: slimOpenAPIPageProps(page.data.getOpenAPIPageProps())
       };
     }
 
@@ -89,7 +89,7 @@ const serverLoader = createServerFn({
       title: page.data.title,
       description: page.data.description ?? null,
       path: page.path,
-      markdownUrl: getPageMarkdownUrl(page).url,
+      markdownUrl: getPageMarkdownUrl(page).url
     };
   });
 

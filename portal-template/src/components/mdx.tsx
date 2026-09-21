@@ -5,7 +5,7 @@ type MDXComponents = Record<string, unknown>;
 export function getMDXComponents(components?: MDXComponents) {
   return {
     ...defaultMdxComponents,
-    ...components,
+    ...components
   };
 }
 
