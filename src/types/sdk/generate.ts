@@ -102,3 +102,11 @@ export const CODEGEN_OPTIONS: Readonly<Record<Language, Readonly<NonEmptyArray<C
 export function getCodegenOptions(language: Language): Readonly<NonEmptyArray<CodegenOption>> {
   return CODEGEN_OPTIONS[language];
 }
+
+/**
+ * Derived rather than listed so a language reaching v4 is offered everywhere at once. Ordering is
+ * the enum's; callers that display the set decide their own order.
+ */
+export function v4Languages(): Language[] {
+  return Object.values(Language).filter((language) => CODEGEN_OPTIONS[language].some((option) => option.isV4()));
+}
