@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
-import { stripByteOrderMark } from '../../utils/string-utils.js';
+
+const BYTE_ORDER_MARK = 0xfeff;
 
 /** Everything in this directory that no other entry names. */
 const REST_TOKEN = '...';
@@ -177,9 +178,19 @@ export class PortalNavigation {
   }
 
   private static parseObject(json: string, context: NavigationContext): Result<Record<string, unknown>, string[]> {
+    // Unlike `portal.json`, this file is not read by the CLI alone: the build reads it again
+    // from the content directory with a bare `JSON.parse`, which a byte-order mark breaks.
+    // Accepting the mark here would pass a file the build then refuses with an opaque error.
+    if (json.codePointAt(0) === BYTE_ORDER_MARK) {
+      return err([
+        `${context.label} starts with a byte-order mark, which the build cannot read. ` +
+          `Save the file as UTF-8 without a BOM.`
+      ]);
+    }
+
     let data: unknown;
     try {
-      data = JSON.parse(stripByteOrderMark(json));
+      data = JSON.parse(json);
     } catch {
       return err([`${context.label} is not valid JSON.`]);
     }

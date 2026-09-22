@@ -41,13 +41,6 @@ describe('PortalNavigation', () => {
       expect(PortalNavigation.parse('{}', contextFor())._unsafeUnwrap().order()).to.deep.equal([]);
     });
 
-    it('reads a file written with a byte-order mark', () => {
-      const mark = '﻿';
-      const navigation = PortalNavigation.parse(mark + '{"pages":["index"]}', contextFor())._unsafeUnwrap();
-
-      expect(navigation.order()).to.deep.equal([{ kind: 'child', name: 'index' }]);
-    });
-
     it('ignores surrounding whitespace in an entry', () => {
       expect(parse(['  index  '])._unsafeUnwrap().order()).to.deep.equal([{ kind: 'child', name: 'index' }]);
     });
@@ -99,6 +92,16 @@ describe('PortalNavigation', () => {
     it('refuses a document that is not an object', () => {
       expect(PortalNavigation.parse('[]', contextFor())._unsafeUnwrapErr()).to.deep.equal([
         'content/nav.json must contain a JSON object.'
+      ]);
+    });
+
+    // The build re-reads the file itself with a plain JSON.parse, which the mark breaks, so
+    // tolerating it here would only move the failure somewhere with a worse message.
+    it('refuses a file written with a byte-order mark', () => {
+      const mark = '﻿';
+
+      expect(PortalNavigation.parse(mark + '{"pages":["index"]}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
+        'content/nav.json starts with a byte-order mark, which the build cannot read. Save the file as UTF-8 without a BOM.'
       ]);
     });
 
