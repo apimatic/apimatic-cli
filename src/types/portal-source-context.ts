@@ -237,17 +237,20 @@ export class PortalSourceContext {
       const childErrors: string[] = [];
       let holdsPage = false;
       let navigationFile: FileName | undefined;
+      let holdsApiDirectory = false;
 
       for (const item of directory.items) {
         // A directory with no page anywhere beneath it becomes no node in the page tree, so
         // naming it would resolve to nothing. Fumadocs would build one for a directory that
         // holds only a `nav.json`, but the template drops it again to keep to this rule.
         if (item instanceof Directory) {
-          const child = await visit(item, false, isContentRoot && item.directoryPath.leafName() === API_REFERENCE_NAME);
+          const isApiChild = isContentRoot && item.directoryPath.leafName() === API_REFERENCE_NAME;
+          const child = await visit(item, false, isApiChild);
           childErrors.push(...child.errors);
           if (child.holdsPage) {
             childNames.push(item.directoryPath.leafName());
             holdsPage = true;
+            holdsApiDirectory ||= isApiChild;
           }
           continue;
         }
@@ -270,6 +273,16 @@ export class PortalSourceContext {
           pageNames.add(pageName);
           holdsPage = true;
         }
+      }
+
+      // The reference is mounted at `content/api` whether or not the user keeps a directory
+      // there, so a page of that name at the content root is a second child of the root. The
+      // folder is listed beside it only then: the template resolves an entry to a folder
+      // before a page, so `api` would position the reference and leave the page among the
+      // unnamed ones without a word. With no such page, the name stays unlisted, and the
+      // entry is answered with `apimatic:api` instead.
+      if (isContentRoot && pageNames.has(API_REFERENCE_NAME) && !holdsApiDirectory) {
+        childNames.push(API_REFERENCE_NAME);
       }
 
       // The reference pages are mounted in this directory, one folder per specification, and

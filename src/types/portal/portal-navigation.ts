@@ -168,9 +168,16 @@ export class PortalNavigation {
     // as it does in Fumadocs' own metadata. The page could then never be positioned, which
     // is the quietly wrong sidebar this file exists to refuse.
     if (context.childNames.filter((name) => name === entry).length > 1) {
+      // At the content root the folder of that name is the API reference, which is mounted
+      // there whether or not a directory exists to see. "Both a page and a folder" would send
+      // the user looking for one.
       return err(
-        `${context.label}: '${entry}' is both a page and a folder in this directory, and the entry ` +
-          `positions the folder. Rename the page to position it.`
+        context.isContentRoot && entry === API_REFERENCE_NAME
+          ? `${context.label}: '${entry}' is where the API reference is mounted, so the entry positions ` +
+              `the reference rather than the page of that name. Rename the page to position it, and use ` +
+              `'${API_REFERENCE_TOKEN}' for the reference.`
+          : `${context.label}: '${entry}' is both a page and a folder in this directory, and the entry ` +
+              `positions the folder. Rename the page to position it.`
       );
     }
 

@@ -127,6 +127,18 @@ describe('PortalNavigation', () => {
       expect(errorsFor(['api'], { isContentRoot: false })[0]).to.not.contain('apimatic:api');
     });
 
+    // The reference is mounted at content/api with or without a directory there, and the
+    // template resolves an entry to a folder before a page, so the entry would position the
+    // reference and leave the page among the unnamed ones.
+    it('refuses api at the root when a page of that name is a second child', () => {
+      const errors = errorsFor(['index', 'api'], { childNames: ['index', 'api', 'api'] });
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain("'api' is where the API reference is mounted");
+      expect(errors[0]).to.contain('Rename the page to position it');
+      expect(errors[0]).to.not.contain('both a page and a folder');
+    });
+
     it('names the file when the JSON is broken', () => {
       expect(PortalNavigation.validate('{', contextFor())._unsafeUnwrapErr()).to.deep.equal([
         'content/nav.json is not valid JSON.'

@@ -414,6 +414,36 @@ describe('PortalSourceContext', () => {
       expect(errors[0]).to.contain("content/nav.json: 'guides' is both a page and a folder");
     });
 
+    // The reference is mounted at content/api with no directory there to see, so nothing in
+    // the tree makes `api` look like two children. Listing it is what turns the entry the
+    // template would honour as the reference into an error rather than a silent reordering.
+    it('refuses api at the root when a page carries the name the reference is mounted at', async () => {
+      write('content/api.md', '# My API notes');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain("content/nav.json: 'api' is where the API reference is mounted");
+    });
+
+    it('still answers api with the token when no page carries the name', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("The API reference is positioned with 'apimatic:api'.");
+    });
+
+    // A real content/api/ directory is the reference folder rather than a second one, so the
+    // name is listed once and the entry positions it, as it did before.
+    it('accepts api at the root when a directory of that name holds the user’s own pages', async () => {
+      write('content/api/overview.md', '# Overview');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
     // The specification's folder is one child; a page of the same name beside it is another.
     it('refuses a specification’s name when a page under content/api carries it too', async () => {
       write('content/api/api.md', '# Landing');
