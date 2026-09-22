@@ -118,7 +118,11 @@ function applyApiStructure(context: NavigationContext, node: Folder): void {
   const sections = node.children.filter((child) => isSpecSection(context, child));
   if (sections.length === 1) {
     const [only] = sections;
-    node.children = node.children.flatMap((child) => (child === only ? only.children : [child]));
+    // The section's index page, if a user gave it one, sits on the folder rather than among
+    // its children, and would be lost with the folder. Lifted first, as Fumadocs itself
+    // expands a folder into its index followed by its children.
+    const lifted = only.index === undefined ? only.children : [only.index, ...only.children];
+    node.children = node.children.flatMap((child) => (child === only ? lifted : [child]));
   }
 }
 

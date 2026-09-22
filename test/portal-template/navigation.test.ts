@@ -219,6 +219,15 @@ describe('navigationTransformer', () => {
 
     // Only the sections decide the lift. A page under content/api shares the folder, and adding
     // one must not push every operation down a level.
+    // A page at content/api/<slug>/index.md becomes the section folder's index, which sits on
+    // the folder rather than among its children and would go with the folder.
+    it('keeps the section’s index page when lifting it', () => {
+      const docs = [...CONTENT, page('api/petstore/index.mdx', 'Petstore overview')];
+      const tree = build({ docs, openapi: API }).pageTree.children;
+
+      expect(names(childrenOf(tree, 'API Reference'))).to.deep.equal(['Petstore overview', 'Pet', 'Store']);
+    });
+
     it('still lifts the single specification when the user has pages under content/api', () => {
       const docs = [...CONTENT, page('api/overview.mdx', 'Overview')];
       const tree = build({ docs, openapi: API }).pageTree.children;
