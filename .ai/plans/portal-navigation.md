@@ -219,7 +219,7 @@ in the content directory, and a leftover `meta.json` would be honoured as a
 folder's metadata before the transformer ever ran. Since a metadata file
 without a rest token hides unlisted pages, the transformer could not recover
 them, so "ignore the leftover file" would be nominal rather than real. With the
-restriction, the file is never loaded, the CLI's warning is accurate, and
+restriction, the file is never loaded, ignoring it costs nothing, and
 unrelated JSON in the content directory stops being validated against a schema
 that has nothing to do with it.
 
@@ -573,7 +573,8 @@ Amend once this is implemented, not before:
 Navigation change:
 
 - `src/types/portal-source-context.ts`: discover and read `nav.json` through
-  the content tree; warn on a leftover `meta.json`.
+  the content tree; report a `nav.json` in the wrong case. (A warning on a
+  leftover `meta.json` was built here and then removed, see section 2.)
 - New value object for a validated navigation, per `.ai/skills/value-object.md`,
   parsing in the style of `PortalConfig.parse` and reporting every bad entry.
 - ~~The four config-split entries that were here~~ are done: #343 covered them
@@ -611,11 +612,11 @@ Second change, additionally:
 - API structure: one spec inlined under the "API Reference" wrapper, two specs
   keeping their filename-derived folders.
 - Collection restriction: a `meta.json` beside a `nav.json` changes nothing
-  about the built tree, and the CLI warns about it.
+  about the built tree, and the CLI says nothing about it (section 2).
 - Fixtures: rename `test-source/src/content/meta.json` and
-  `test/resources/portal-inputs/default/content/meta.json` to `nav.json`, and
-  add a fixture that still has a `meta.json` so the warning path is covered
-  rather than assumed.
+  `test/resources/portal-inputs/default/content/meta.json` to `nav.json`. The
+  source-context tests write a stray `meta.json` and assert it is neither
+  validated nor reported.
 - End-to-end, extending `test/e2e/portal-build.test.ts`: assert the built
   sidebar order for the `test-source` fixture, that operation URLs are
   unchanged by the restructure, and that no absolute build path appears

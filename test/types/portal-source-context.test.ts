@@ -644,12 +644,15 @@ describe('PortalSourceContext', () => {
       expect(JSON.parse(read('content/nav.json'))).to.deep.equal({ pages: ['index', '...'] });
     });
 
-    // A freshly scaffolded project must not warn about its own files on the very next command.
+    // A freshly scaffolded project must not carry a file the build never reads, such as a
+    // `meta.json`, which the CLI would not remark on and the sidebar would not honour.
     it('writes a navigation file the build reads, and nothing it ignores', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
+      const contentFiles = fs.readdirSync(path.join(source.toString(), 'content')).sort();
       const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
 
+      expect(contentFiles).to.deep.equal(['index.md', 'nav.json']);
       expect(scaffolded.ignoredNavigationFiles).to.deep.equal([]);
     });
 

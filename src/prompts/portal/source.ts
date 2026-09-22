@@ -75,8 +75,10 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
     return;
   }
   const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
-  const [verb, pronoun] = files.length === 1 ? ['is', 'it'] : ['are', 'them'];
-  log.warn(`${names} ${verb} not read. Name ${pronoun} ${f.var('nav.json')}, in lower case, to order the pages.`);
+  const verb = files.length === 1 ? 'is' : 'are';
+  // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
+  // beside it, and the two would then need merging rather than renaming.
+  log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
 }
 
 export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryPath): void {

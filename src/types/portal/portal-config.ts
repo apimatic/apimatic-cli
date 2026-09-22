@@ -70,10 +70,14 @@ export class PortalConfig {
     // Every field is reported at once rather than stopping at the first, so one edit fixes
     // the file. Each validator hands back the typed value it accepted, so the constructor
     // below is fed only what validation proved.
-    const unknownFields = unknownFieldErrors(data, KNOWN_FIELDS, RENAMED_FIELDS, (field, intended) =>
-      intended !== undefined
-        ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
-        : `'${field}' is not a portal.json setting.`
+    const unknownFields = unknownFieldErrors(
+      data,
+      KNOWN_FIELDS,
+      (field, intended) =>
+        intended !== undefined
+          ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
+          : `'${field}' is not a portal.json setting.`,
+      RENAMED_FIELDS
     );
     const fields = Result.combineWithAllErrors([
       PortalConfig.validTitle(data.title),

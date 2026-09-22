@@ -21,12 +21,10 @@ export const INDEX_NAME = 'index';
 export const NAVIGATION_FILE_NAME = 'nav.json';
 
 // A misspelled field would otherwise be stripped by Fumadocs' own schema and leave the
-// sidebar in its default order with nothing said, so every unknown field is reported.
-const KNOWN_FIELDS = new Set(['pages', 'title']);
-
-// The file has two settings, so a misspelling is answered by naming both rather than
+// sidebar in its default order with nothing said, so every unknown field is reported. The
+// file has so few settings that a misspelling is answered by listing them all rather than
 // guessing at the one it meant.
-const NO_RENAMED_FIELDS: ReadonlyMap<string, string> = new Map();
+const KNOWN_FIELDS = new Set(['pages', 'title']);
 
 /** Where a `nav.json` sits, and what its entries are allowed to address. */
 export interface NavigationContext {
@@ -57,7 +55,7 @@ export class PortalNavigation {
       return err(document.error);
     }
 
-    const unknownFields = unknownFieldErrors(document.value, KNOWN_FIELDS, NO_RENAMED_FIELDS, (field) =>
+    const unknownFields = unknownFieldErrors(document.value, KNOWN_FIELDS, (field) =>
       PortalNavigation.describeUnknownField(field, context)
     );
 
@@ -244,10 +242,10 @@ export class PortalNavigation {
   }
 
   private static describeUnknownField(field: string, context: NavigationContext): string {
-    return (
-      `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. ` +
-      `The settings are 'pages' and 'title'.`
-    );
+    // Listed from the same set the check uses, so a setting added later is named here too.
+    const settings = [...KNOWN_FIELDS].map((name) => `'${name}'`);
+    const listed = `${settings.slice(0, -1).join(', ')} and ${settings[settings.length - 1]}`;
+    return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. The settings are ${listed}.`;
   }
 
   /** A near miss is nearly always a typo or a forgotten extension, so name the candidate. */

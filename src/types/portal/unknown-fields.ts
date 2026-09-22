@@ -9,12 +9,14 @@
  *
  * @param describe the message for one unknown field, given the field it was taken to mean
  *   when `renamed` has it.
+ * @param renamed plausible misspellings mapped to the field each one means; a file with no
+ *   such list leaves it out and `describe` is never given an intended field.
  */
 export function unknownFieldErrors(
   data: Record<string, unknown>,
   known: ReadonlySet<string>,
-  renamed: ReadonlyMap<string, string>,
-  describe: (field: string, intended: string | undefined) => string
+  describe: (field: string, intended: string | undefined) => string,
+  renamed: ReadonlyMap<string, string> = new Map()
 ): string[] {
   return Object.keys(data)
     .filter((field) => !known.has(field))
