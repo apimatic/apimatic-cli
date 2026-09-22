@@ -6,9 +6,10 @@ settled. Follows on from `.ai/plans/fumadocs-portal.md`, which merged as #343
 and whose section 3 this plan amends. Section 11 lists what is still open.
 
 Implementation started 2026-09-21 on `saeedjamshaid/portal-navigation`, cut
-from `dev` once #343 merged. Step 1 is done: both unknowns are retired and
-section 15 records what the spike found. Step 2 turned out to be already
-fixed by #343 (section 9), so the work resumes at step 3.
+from `dev` once #343 merged, and **finished 2026-09-22**: all six steps of
+section 17 are done. Step 1 retired both unknowns (section 15 records what the
+spike found), step 2 turned out to be already fixed by #343 (section 9), and
+steps 3 to 6 were each committed on their own.
 
 Two revisions worth knowing about when reading older notes:
 
@@ -521,6 +522,18 @@ marked **(ran it)** were additionally observed in a running dev server on
 2. **When the second change lands relative to the next major release.**
    Required `languages` is free before it and a second breaking change after
    (section 4).
+3. **The content directory's absolute path is published.** Found in step 6, by
+   the very assertion section 14 asked for. `defineDocs({ dir })` compiles the
+   directory into the client bundle as its `base`, so a built portal carries a
+   string like `C:/Users/<name>/<project>/src/content` in `assets/dist-*.js`.
+   The specification paths do not leak — `portal.server.ts` holds those and the
+   assertion proves it — so this is the one thing #343's split did not cover,
+   and section 9 assumed it had. `src/lib/source.ts` cannot move behind
+   `.server`, because the browser imports it to lazy load page bodies, and a
+   relative `dir` is not a drop-in: `PortalProjectService` substitutes the same
+   literal into the stylesheet, where it resolves against a different
+   directory. The e2e test records it as pending rather than asserting it.
+   Decide whether a published portal may name the build machine at all.
 
 Deferred, to be decided when the SDK page is built rather than now:
 
@@ -563,16 +576,22 @@ Navigation change:
 - New value object for a validated navigation, per `.ai/skills/value-object.md`,
   parsing in the style of `PortalConfig.parse` and reporting every bad entry.
 - ~~The four config-split entries that were here~~ are done: #343 covered them
-  (section 9). Only the `dist/client` assertion in section 14 remains.
+  (section 9). The `dist/client` assertion it was to carry landed in step 6.
 - `portal-template/src/lib/source.server.ts`: the transformer registered
   through `pageTree.transformers`, and `files: ['**/nav.json']` on the metadata
   collection in `source.ts`.
 - New template module for the transformer itself.
 - `src/actions/portal/quickstart.ts`, `scaffold`: write `nav.json`, not
   `meta.json`.
-- `src/commands/portal/toc/new.ts`: its removal message tells users that pages
-  are ordered by `meta.json` files in the content directory. It must name
-  `nav.json` instead.
+- ~~`src/commands/portal/toc/new.ts`: its removal message must name
+  `nav.json`.~~ **Stale, found in step 6.** #343 removed `portal toc new`,
+  `portal recipe new` and `portal copilot` outright rather than leaving hidden
+  stubs, so there is no file and no message. The same mistake is corrected in
+  section 16.
+- `src/commands/portal/serve.ts` and `src/prompts/portal/serve.ts`: both tell
+  the user that editing the order file needs the preview restarted, which is
+  the opposite of what the transformer buys (section 15). It reloads; adding
+  or removing a page and editing `portal.json` still do not.
 
 Second change, additionally:
 
@@ -599,7 +618,9 @@ Second change, additionally:
 - End-to-end, extending `test/e2e/portal-build.test.ts`: assert the built
   sidebar order for the `test-source` fixture, that operation URLs are
   unchanged by the restructure, and that no absolute build path appears
-  anywhere in `dist/client` (section 9).
+  anywhere in `dist/client` (section 9). **The last of these does not hold**:
+  the specification paths and the project directory stay out, and that much is
+  asserted, but the content directory is published. Section 11, question 3.
 - Second change: collision between the generated page and a user page fails the
   build naming both files.
 
@@ -661,7 +682,7 @@ feature with an unreviewed one, for no gain in wall-clock time given #343 is
 already open.
 
 **The branch is not mergeable before step 6.** Found while implementing step 3
-and not anticipated above. The steps in section 17 are each reviewable on their
+and not anticipated above; **resolved 2026-09-22** when step 6 landed. The steps in section 17 are each reviewable on their
 own, but they are not each shippable: until the transformer and the scaffold
 change land, `meta.json` is still what orders the sidebar and `nav.json` is
 read by nothing, so the CLI's warning tells the user to rename the one file
@@ -677,8 +698,10 @@ stronger reason not to let either drift.
 
 **README.** `portal generate` and `portal serve` have generated sections in the
 README. If either description gains a mention of `nav.json`, run `pnpm readme`
-in the same change. `portal toc new` is hidden, so its corrected message never
-reaches the README.
+in the same change. ~~`portal toc new` is hidden, so its corrected message
+never reaches the README.~~ **Wrong, found in step 6:** that command does not
+exist at all. What the README does carry by hand is the 2.0 change list, which
+named `meta.json`; step 6 corrects it alongside the generated section.
 
 ## 17. Implementation steps
 
@@ -691,16 +714,20 @@ them, and so each step stands alone.
 2. ~~**Config split and the leak fix.**~~ **Done by #343** (section 9). The
    `dist/client` assertion it was to carry moves to step 6 with the other
    tests, since nothing can regress until the template changes.
-3. **The format and its validation.** The `nav.json` value object, discovery
-   through the content tree, and the `meta.json` warning. CLI only, no template
-   changes, so it is testable without a build.
-4. **The transformer.** Ordering, both tokens, and `files: ['**/nav.json']` on
-   the metadata collection.
-5. **API structure.** The "API Reference" title and single-spec inlining, in
-   the same transformer.
-6. **Surfacing.** Quickstart scaffold, the removal message in
-   `portal toc new`, fixture renames, the `dist/client` assertion from step 2,
-   README if needed.
+3. ~~**The format and its validation.**~~ **Done 2026-09-21.** The `nav.json`
+   value object, discovery through the content tree, and the `meta.json`
+   warning. CLI only, no template changes, so it is testable without a build.
+4. ~~**The transformer.**~~ **Done 2026-09-22.** Ordering, both tokens, and
+   `files: ['**/nav.json']` on the metadata collection.
+5. ~~**API structure.**~~ **Done 2026-09-22.** The "API Reference" title and
+   single-spec inlining, in the same transformer.
+6. ~~**Surfacing.**~~ **Done 2026-09-22.** Fixture renames, the `dist/client`
+   assertion from step 2 — which failed and became section 11's third open
+   question — the serve copy, the `APIMATIC-BUILD.json` migration
+   note, the README by hand and through `pnpm readme`, and section 12's
+   amendments to `.ai/plans/fumadocs-portal.md`. The quickstart scaffold was
+   already covered by step 3, and `portal toc new` turned out not to exist
+   (section 13).
 
 The second change then follows on its own: `languages` as a required property,
 the generated SDK page, and the collision failure.

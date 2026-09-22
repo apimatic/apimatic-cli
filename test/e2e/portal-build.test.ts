@@ -109,6 +109,51 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(offenders).to.deep.equal([]);
   });
 
+  /** Published files naming one of these build-machine directories, in any spelling. */
+  const filesNaming = (...directories: string[]) => {
+    // Three spellings of each: a bundler normalises separators either way, and a Windows
+    // path embedded in a string literal has its backslashes escaped.
+    const secrets = directories.flatMap((absolute) => {
+      const native = absolute.replace(/\//g, '\\');
+      return [native, native.replace(/\\/g, '\\\\'), absolute.replace(/\\/g, '/')];
+    });
+
+    const walk = (directory: string): string[] =>
+      fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const child = path.join(directory, entry.name);
+        return entry.isDirectory() ? walk(child) : [child];
+      });
+
+    return (
+      walk(output.toString())
+        // Images and fonts cannot carry a path the build put there, and reading them as text
+        // only invites a false match.
+        .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
+        .filter((file) => {
+          const content = fs.readFileSync(file, 'utf8');
+          return secrets.some((secret) => content.includes(secret));
+        })
+        .map((file) => path.relative(output.toString(), file))
+    );
+  };
+
+  // The `.server` split exists so the build machine's filesystem stays out of what is
+  // published: `portal.server.ts` holds the absolute path of every specification, and the
+  // prepared project's own location has no business in the output either.
+  it('publishes neither the specification paths nor the project directory', () => {
+    expect(filesNaming(project.toString(), fixture.join('spec').toString())).to.deep.equal([]);
+  });
+
+  // Known gap, found when this assertion was written. `defineDocs({ dir })` compiles the
+  // content directory's absolute path into the client bundle as its `base`, and
+  // `src/lib/source.ts` cannot move behind `.server` because the browser imports it to lazy
+  // load page bodies. Handing the macro a relative directory is not a drop-in either: the
+  // same literal is substituted into the stylesheet, where it resolves against a different
+  // directory. Pending rather than deleted, so the gap is recorded where it would be fixed.
+  it.skip('publishes no absolute path from the build machine at all', () => {
+    expect(filesNaming(fixture.join('content').toString())).to.deep.equal([]);
+  });
+
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
     expect(treeCacheFiles()).to.have.length(1);
   });

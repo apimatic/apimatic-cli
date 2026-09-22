@@ -65,16 +65,17 @@ export class PortalServePrompts {
 
   public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
-    // Only the body of a page the server already knows about reloads: the page tree and the
-    // configuration are read once, when the project is prepared.
+    // The content directory is watched, so a page's body and the order in its `nav.json` both
+    // reload. What is fixed is the set of pages and the configuration: the portal's identity
+    // and the list of specifications are substituted into the project when it is prepared.
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(
-          sourceDirectory.join('content')
-        )} appear in the browser automatically.`,
+        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, and to the order in a ${f.var(
+          'nav.json'
+        )}, appear in the browser automatically.`,
         '',
-        `Adding or removing a page, editing ${f.var('meta.json')} or ${f.var('portal.json')}, or changing which`,
-        `documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        `Adding or removing a page, editing ${f.var('portal.json')}, or changing which documents`,
+        `are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),

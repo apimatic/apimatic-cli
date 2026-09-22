@@ -39,7 +39,7 @@ src/
   APIMATIC-BUILD.json   untouched; SDK/plugin commands only
   portal.json           portal-only config
   spec/                 one or more OpenAPI 3.x JSON/YAML files; one sidebar section each
-  content/              .md/.mdx pages with frontmatter; optional meta.json per folder (Fumadocs format)
+  content/              .md/.mdx pages with frontmatter; optional nav.json per folder (page order)
   static/               served verbatim at the site root
 ```
 
@@ -52,7 +52,10 @@ src/
 `title` is required. `logo` is a path relative to `src/` and must point inside
 `static/`; the CLI rewrites it to the site URL (`static/images/logo.png` becomes
 `/images/logo.png`). Validation errors name the field. A `languages` section
-will be added later and checked against the subscription (section 6). Fields
+was to be added later and checked against the subscription (section 6); it
+becomes a *required* property instead, in the change that follows the
+navigation work, so that it lands before the next major rather than as a second
+breaking change (`.ai/plans/portal-navigation.md`, section 4). Fields
 of the old `generatePortal` block that have no v1 equivalent (`navTitle`,
 `logoLink`, `headIncludes`, `themeOverrides`, ...) are listed by the migration
 hint so the loss is visible; they return only when explicitly specified.
@@ -65,19 +68,29 @@ for sectioning and are not copied into the output. Swagger 2.0 and
 non-OpenAPI formats fail validation with a message naming the file. At least
 one OpenAPI document is required. Everything else follows vanilla Fumadocs
 behaviour (decided: minimum rules only): untagged operations land in a group
-named "unknown", the section title is the spec filename, `meta.json` entries
-with no matching page are silently ignored, a `$ref` to a missing file fails
-the build with the bundler's error, and cross-file `$ref`s are bundled by
-Fumadocs.
+named "unknown", the section title is the spec filename, a `$ref` to a missing
+file fails the build with the bundler's error, and cross-file `$ref`s are
+bundled by Fumadocs. Navigation is the one place this no longer holds: a
+`nav.json` entry matching no page fails the build naming the entry, rather than
+being dropped the way Fumadocs drops it (`.ai/plans/portal-navigation.md`).
+With a single specification the section level is also lifted away, so the tag
+groups sit directly under "API Reference".
 
 Content: `.md` and `.mdx` are both accepted (`.mdx` is executable authoring,
 as in every MDX-based tool; `<include>` targets are confined to `src/content/`).
-If `content/index.md` or `index.mdx` is absent, the CLI generates a home page
-from `title` and `description` so `/` always resolves. Folders without
-`meta.json` are ordered alphabetically by Fumadocs.
+The quickstart scaffolds a `content/index.md`, but nothing regenerates one: a
+portal whose content directory has no index page has no `/`. This paragraph
+promised a generated fallback home page and it was never built; the promise is
+dropped rather than restated, since `/` resolving is worth its own decision
+rather than a line in a layout section. Folders without `nav.json` are ordered
+alphabetically by Fumadocs.
 
-Sidebar order: content pages in `meta.json` order first, then one section per
-spec file in filename order, grouped by tag inside each spec.
+Sidebar order: set by `nav.json` per folder, with the whole API reference
+positioned as one node by the `apimatic:api` token. Unnamed pages keep
+Fumadocs' alphabetical order, and with no `nav.json` at all the reference sits
+last. Inside the reference there is one section per spec file in filename
+order, grouped by tag — except for a single specification, whose section level
+is inlined. See `.ai/plans/portal-navigation.md`.
 
 ## 4. Template (`portal-template/`)
 
