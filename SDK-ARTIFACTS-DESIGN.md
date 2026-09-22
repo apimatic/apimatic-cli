@@ -100,9 +100,9 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | # | Decision |
 |---|---|
 | D27 | **All three commands generate fresh artifacts on every run** — `quickstart`, `portal generate` and `portal serve` alike, as the CLI has always done. There is no cache and no skip flag. |
-| D28 | **A failed call fails the command.** No curl-only fallback. `languages` must name at least one language, so a docs-only user still generates SDKs for every language they enabled; a user with a `plugin` property gets plugins too. |
+| D28 | **A failed call fails the command.** No curl-only fallback. `languages` must carry at least one key, so a docs-only user still generates SDKs for every language they enabled; a user with a `plugin` property gets plugins too. |
 | D29 | **`apimatic.json` lives inside `src/`.** Today's `src/portal.json` becomes the `portal` property inside it. |
-| D30 | **Absent `languages` is a validation error.** Curl-only portals may be allowed later; they are not allowed now. |
+| D30 | **Absent or empty `languages` is a validation error.** Curl-only portals may be allowed later; they are not allowed now. |
 | D31 | **`src/` *is* the build directory**, zipped exactly the way the SDK and plugin flows zip theirs. codegen-v2 learns to read `apimatic.json`. |
 | D32 | <a id="d32"></a>**Entitlement keys off field presence**: a `plugin` property means the context-plugin check applies, a `portal` property means the docs-as-code check applies. `apimatic.json` always exists; `plugin` is optional. **Ship in two PRs** — the endpoint without any subscription check first, so dev-environment iteration is not blocked, then the checks. |
 | D33 | **Artifact zip layout as in [§4.4](#44-response-the-artifact-zip)**, with `plugin/` and `docs/` reserved for later. |
@@ -173,14 +173,18 @@ the first.
 
 ```jsonc
 {
-  "languages": ["typescript", "csharp", "python"],  // >= 1, from the Language enum
+  "languages": {                                     // >= 1 key, each from the Language enum
+    "typescript": { "publishing": { "…": "…" } },    // value = per-language settings, unread here
+    "csharp":     { "…": "…" }
+  },
   "portal":  { /* today's portal.json */ },          // presence => docs-as-code entitlement applies
   "plugin":  { /* today's plugin-config.json */ }    // optional; presence => generate a plugin
 }
 ```
 
-`languages` is the whole of the language request. `ValidateApimaticConfig` rejects an
-absent or empty array, and rejects a name outside the enum by naming the valid set.
+`languages` **keys** are the whole of the language request, in source order — which is the
+configured order [D19](#wire-format) sorts tabs by. `ValidateApimaticConfig` rejects an
+absent or empty object, and rejects a key outside the enum by naming the valid set.
 
 ### 4.3 Status
 
@@ -323,7 +327,7 @@ endpoint is more than a copy of one.
 
 `CanGenerateSdk` is true for **C#, TypeScript and Python** only. Java, PHP, Ruby and Go
 throw `NoSdkGenerator()` from `CreateBlueprint`; Go cannot even be a plugin language. So a
-`languages` array is validated against `CanGenerateSdk`, not against the seven-member enum.
+`languages` key is validated against `CanGenerateSdk`, not against the seven-member enum.
 
 ---
 
