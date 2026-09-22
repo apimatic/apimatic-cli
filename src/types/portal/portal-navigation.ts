@@ -95,24 +95,17 @@ export class PortalNavigation {
     // Every bad entry is reported at once rather than stopping at the first, so one edit
     // fixes the file.
     const errors = [...settingErrors];
-    // Keyed by the node an entry positions rather than its text: at the content root, a
-    // folder called `api` is the API reference, so naming it and the token names one node
-    // twice, and the template would honour whichever came first without a word.
-    const seen = new Map<string, string>();
+    // One entry, one node: `apimatic:api` is the only way to position the reference, so no
+    // two spellings can reach the same node and the text is the key.
+    const seen = new Set<string>();
 
     for (const raw of pages as string[]) {
       const entry = raw.trim();
-      const node = context.isContentRoot && entry === API_REFERENCE_NAME ? API_REFERENCE_TOKEN : entry;
-      const earlier = seen.get(node);
-      if (earlier !== undefined) {
-        errors.push(
-          earlier === entry
-            ? `${context.label}: '${entry}' is listed more than once.`
-            : `${context.label}: '${earlier}' and '${entry}' both position the API reference; keep one of them.`
-        );
+      if (seen.has(entry)) {
+        errors.push(`${context.label}: '${entry}' is listed more than once.`);
         continue;
       }
-      seen.set(node, entry);
+      seen.add(entry);
 
       const checked = PortalNavigation.checkEntry(entry, context);
       if (checked.isErr()) {
@@ -164,20 +157,26 @@ export class PortalNavigation {
       );
     }
 
+    // `content/api` is where the reference is mounted, so the node of that name is the
+    // reference whatever else shares the directory -- and it is positioned by its token, not
+    // by the name of its mount point. One spelling, so no file can name it twice, and a user
+    // who puts their own pages under `content/api/` is not quietly ordering the reference.
+    if (context.isContentRoot && entry === API_REFERENCE_NAME) {
+      const page = context.childNames.filter((name) => name === entry).length > 1;
+      return err(
+        `${context.label}: '${entry}' is where the API reference is mounted, so it is positioned with ` +
+          `'${API_REFERENCE_TOKEN}' rather than by name.` +
+          (page ? ` A page called '${entry}' cannot be positioned at all; rename it.` : '')
+      );
+    }
+
     // A page and a folder of one name are both children, and an entry positions the folder,
     // as it does in Fumadocs' own metadata. The page could then never be positioned, which
     // is the quietly wrong sidebar this file exists to refuse.
     if (context.childNames.filter((name) => name === entry).length > 1) {
-      // At the content root the folder of that name is the API reference, which is mounted
-      // there whether or not a directory exists to see. "Both a page and a folder" would send
-      // the user looking for one.
       return err(
-        context.isContentRoot && entry === API_REFERENCE_NAME
-          ? `${context.label}: '${entry}' is where the API reference is mounted, so the entry positions ` +
-              `the reference rather than the page of that name. Rename the page to position it, and use ` +
-              `'${API_REFERENCE_TOKEN}' for the reference.`
-          : `${context.label}: '${entry}' is both a page and a folder in this directory, and the entry ` +
-              `positions the folder. Rename the page to position it.`
+        `${context.label}: '${entry}' is both a page and a folder in this directory, and the entry ` +
+          `positions the folder. Rename the page to position it.`
       );
     }
 

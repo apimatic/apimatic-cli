@@ -435,11 +435,20 @@ describe('PortalSourceContext', () => {
       expect(errors[0]).to.contain("The API reference is positioned with 'apimatic:api'.");
     });
 
-    // A real content/api/ directory is the reference folder rather than a second one, so the
-    // name is listed once and the entry positions it, as it did before.
-    it('accepts api at the root when a directory of that name holds the user’s own pages', async () => {
+    // A real content/api/ directory is the reference's mount point rather than a folder of
+    // the user's own, so it is positioned by the token like any other portal that has one.
+    it('refuses api at the root when a directory of that name holds the user’s own pages', async () => {
       write('content/api/overview.md', '# Overview');
       write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("'api' is where the API reference is mounted");
+    });
+
+    it('accepts the token in its place, with the user’s pages under content/api left alone', async () => {
+      write('content/api/overview.md', '# Overview');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'apimatic:api'] }));
 
       expect((await resolve()).isOk()).to.be.true;
     });

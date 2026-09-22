@@ -108,35 +108,27 @@ describe('PortalNavigation', () => {
       ]);
     });
 
-    // With pages under content/api, the folder is the API reference: naming it and the token
-    // names one node twice, and the template would honour the first without a word.
-    it('refuses api and apimatic:api together at the root, whichever comes first', () => {
-      const withApi = { childNames: ['index', 'api'] };
-
-      expect(validate(['api', 'index'], withApi).isOk()).to.be.true;
-      expect(errorsFor(['api', 'index', 'apimatic:api'], withApi)).to.deep.equal([
-        "content/nav.json: 'api' and 'apimatic:api' both position the API reference; keep one of them."
-      ]);
-      expect(errorsFor(['apimatic:api', 'api'], withApi)).to.deep.equal([
-        "content/nav.json: 'apimatic:api' and 'api' both position the API reference; keep one of them."
+    // `content/api` is the reference's mount point, so the node there is the reference even
+    // when the user keeps pages of their own beside it. One spelling positions it.
+    it('refuses api at the root even when a directory of that name holds the user’s pages', () => {
+      expect(errorsFor(['api', 'index'], { childNames: ['index', 'api'] })).to.deep.equal([
+        "content/nav.json: 'api' is where the API reference is mounted, so it is positioned with 'apimatic:api' rather than by name."
       ]);
     });
 
-    it('names a folder called api below the root as an ordinary child', () => {
-      expect(validate(['api'], { isContentRoot: false, childNames: ['api'] }).isOk()).to.be.true;
-      expect(errorsFor(['api'], { isContentRoot: false })[0]).to.not.contain('apimatic:api');
-    });
-
-    // The reference is mounted at content/api with or without a directory there, and the
-    // template resolves an entry to a folder before a page, so the entry would position the
-    // reference and leave the page among the unnamed ones.
+    // The mount point is one node however the directory came to exist, so the answer cannot
+    // depend on which of the two put it there.
     it('refuses api at the root when a page of that name is a second child', () => {
       const errors = errorsFor(['index', 'api'], { childNames: ['index', 'api', 'api'] });
 
       expect(errors).to.have.lengthOf(1);
       expect(errors[0]).to.contain("'api' is where the API reference is mounted");
-      expect(errors[0]).to.contain('Rename the page to position it');
-      expect(errors[0]).to.not.contain('both a page and a folder');
+      expect(errors[0]).to.contain("A page called 'api' cannot be positioned at all; rename it.");
+    });
+
+    it('names a folder called api below the root as an ordinary child', () => {
+      expect(validate(['api'], { isContentRoot: false, childNames: ['api'] }).isOk()).to.be.true;
+      expect(errorsFor(['api'], { isContentRoot: false })[0]).to.not.contain('apimatic:api');
     });
 
     it('names the file when the JSON is broken', () => {
