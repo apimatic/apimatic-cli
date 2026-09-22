@@ -44,7 +44,7 @@ describe('PortalProjectService', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('reports no runtime problem on a supported Node with the dependencies installed', () => {
+  it('reports no runtime problem with the dependencies installed', () => {
     expect(service.runtimeProblem()).to.be.null;
   });
 
