@@ -80,6 +80,19 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   );
 }
 
+export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryPath): void {
+  if (files.length === 0) {
+    return;
+  }
+  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
+  const [verb, pronoun] = files.length === 1 ? ['sits', 'it'] : ['sit', 'them'];
+  log.warn(
+    `${names} ${verb} inside a specification's section under ${f.var('content/api')}, which lists only ` +
+      `its own reference pages, so ${pronoun} will not appear in the sidebar. Move ${pronoun} elsewhere ` +
+      `in ${f.var('content')}.`
+  );
+}
+
 export function reportCollidingPages(slugs: string[]): void {
   if (slugs.length === 0) {
     return;

@@ -66,6 +66,7 @@ export class GenerateAction {
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
     this.prompts.pagesCollidingWithSpecs(source.value.collidingSlugs);
+    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
     this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
 
     const portalContext = new PortalContext(portalDirectory);

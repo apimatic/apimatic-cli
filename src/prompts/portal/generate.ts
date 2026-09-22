@@ -12,6 +12,7 @@ import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import {
   reportCollidingPages,
+  reportHiddenPages,
   reportIgnoredNavigationFiles,
   reportShadowedFiles,
   reportSourceProblem
@@ -73,6 +74,10 @@ export class PortalGeneratePrompts {
 
   public pagesCollidingWithSpecs(slugs: string[]) {
     reportCollidingPages(slugs);
+  }
+
+  public pagesHiddenBySpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
+    reportHiddenPages(files, sourceDirectory);
   }
 
   public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {

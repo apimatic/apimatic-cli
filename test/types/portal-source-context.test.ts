@@ -30,6 +30,10 @@ describe('PortalSourceContext', () => {
   const ignored = (source: PortalSource): string[] =>
     source.ignoredNavigationFiles.map((file) => file.relativeTo(new DirectoryPath(root)));
 
+  /** The hidden pages as the warning names them, relative to the source directory. */
+  const hidden = (source: PortalSource): string[] =>
+    source.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
+
   /** The migration hint behind a `missingConfig` problem, as its own type. */
   const migrationOf = (problem: PortalSourceProblem): PortalMigration => {
     if (problem.kind !== 'missingConfig') {
@@ -225,10 +229,32 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal(['api']);
     });
 
-    it('lets a folder under content/api sit beside a specification when it has no index page', async () => {
+    // No collision: nothing shares the section's own address. Hidden instead: the section's
+    // generated metadata lists only the reference pages, so the page never reaches the sidebar.
+    it('reports a page inside a specification’s section as hidden rather than colliding', async () => {
       write('content/api/api/authentication.md', '# Authentication');
 
-      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal([]);
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(source.collidingSlugs).to.deep.equal([]);
+      expect(hidden(source)).to.deep.equal(['content/api/api/authentication.md']);
+    });
+
+    it('reports a page hidden however deep it sits in the section, and whatever its case', async () => {
+      write('content/api/API/pets/guide.mdx', '# Guide');
+      write('content/api/(group)/api/notes.md', '# Notes');
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([
+        'content/api/(group)/api/notes.md',
+        'content/api/API/pets/guide.mdx'
+      ]);
+    });
+
+    it('does not report pages under content/api in a folder that is no specification', async () => {
+      write('content/api/guides/intro.md', '# Intro');
+      write('content/api/overview.md', '# Overview');
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
     });
 
     it('does not mistake content/api/index.md for a page named index', async () => {

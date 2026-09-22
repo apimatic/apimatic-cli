@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { getSlugs } from 'fumadocs-core/source';
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
@@ -46,6 +45,15 @@ interface NavigationScan {
   errors: string[];
   ignoredFiles: FilePath[];
 }
+
+/** A page in the content tree with the address the content source gives it. */
+interface ContentPage {
+  file: FilePath;
+  address: string[];
+}
+
+/** The first segment of every reference page's address, and of a content page that shares it. */
+const API_SEGMENT = 'api';
 
 /** What the walk found in one directory and everything beneath it. */
 interface DirectoryScan {
@@ -131,6 +139,7 @@ export class PortalSourceContext {
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
       collidingSlugs: contentTree === null ? [] : this.collidingSlugs(contentTree, specs.value),
+      hiddenPages: contentTree === null ? [] : this.hiddenPages(contentTree, specs.value),
       ignoredNavigationFiles: navigation.ignoredFiles
     });
   }
@@ -309,22 +318,37 @@ export class PortalSourceContext {
    */
   private collidingSlugs(contentTree: Directory, specs: PortalSpec[]): string[] {
     const claimed = new Set<string>();
-    for (const address of this.contentAddresses(contentTree)) {
-      if (address.length === 2 && address[0].toLowerCase() === 'api') {
+    for (const { address } of this.contentPages(contentTree)) {
+      if (address.length === 2 && address[0].toLowerCase() === API_SEGMENT) {
         claimed.add(address[1].toLowerCase());
       }
     }
     return specs.map((spec) => spec.slug).filter((slug) => claimed.has(slug.toLowerCase()));
   }
 
+  /**
+   * Pages inside a specification's section, below `content/api/<slug>/`. The section and each
+   * tag folder come with generated metadata that lists only the reference pages, and metadata
+   * hides whatever it does not name, so these pages never reach the sidebar. Reported rather
+   * than refused: the build still succeeds, and the fix is to move the page.
+   */
+  private hiddenPages(contentTree: Directory, specs: PortalSpec[]): FilePath[] {
+    const slugs = new Set(specs.map((spec) => spec.slug.toLowerCase()));
+    return this.contentPages(contentTree)
+      .filter(
+        ({ address }) =>
+          address.length > 2 && address[0].toLowerCase() === API_SEGMENT && slugs.has(address[1].toLowerCase())
+      )
+      .map(({ file }) => file);
+  }
+
   // The content source's own slug rules rather than a second implementation of them:
   // `(group)` folders drop out and `index` collapses into its parent.
-  private contentAddresses(contentTree: Directory): string[][] {
-    const contentDirectory = contentTree.directoryPath;
+  private contentPages(contentTree: Directory): ContentPage[] {
     return contentTree
       .getAllFiles()
-      .filter((file) => file.name().hasExtension('.md') || file.name().hasExtension('.mdx'))
-      .map((file) => getSlugs(path.relative(contentDirectory.toString(), file.toString()).split(path.sep).join('/')));
+      .filter((file) => PortalSourceContext.pageName(file.name()) !== undefined)
+      .map((file) => ({ file, address: getSlugs(file.relativeTo(contentTree.directoryPath)) }));
   }
 
   private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {

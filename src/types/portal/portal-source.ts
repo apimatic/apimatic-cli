@@ -19,6 +19,11 @@ export interface PortalSource {
   /** Spec slugs that a page under `content/api/` also claims, so the two share an address. */
   collidingSlugs: string[];
   /**
+   * Pages below `content/api/<slug>/` for a specification `<slug>`. The section's generated
+   * metadata lists only the reference pages, so these never appear in the sidebar.
+   */
+  hiddenPages: FilePath[];
+  /**
    * Files in the content tree that look like navigation but are not read: a leftover
    * `meta.json`, or a case variant the build's glob does not match. Reported rather than
    * left to sit there doing nothing.
