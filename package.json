@@ -107,7 +107,7 @@
         "@types/chai": "^4.3.20",
         "@types/fast-levenshtein": "^0.0.4",
         "@types/fs-extra": "^9.0.13",
-        "@types/mocha": "^5.2.7",
+        "@types/mocha": "^10.0.10",
         "@types/mock-fs": "^4.13.4",
         "@types/node": "^24.13.4",
         "@types/prettier": "^2.7.3",
@@ -119,6 +119,7 @@
         "@types/yazl": "^3.3.0",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
+        "@typescript/native": "npm:typescript@^7.0.2",
         "chai": "^4.5.0",
         "eslint": "^9.21.0",
         "eslint-config-prettier": "^8.3.0",
@@ -135,9 +136,8 @@
         "simple-git": "^3.36.0",
         "sinon": "^21.0.0",
         "string-argv": "^0.3.1",
-        "ts-node": "^10.9.2",
         "tsx": "^4.20.3",
-        "typescript": "^5.2.2"
+        "typescript": "npm:@typescript/typescript6@^6.0.2"
     },
     "oclif": {
         "commands": "./lib/commands",

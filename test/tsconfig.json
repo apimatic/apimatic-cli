@@ -13,7 +13,11 @@
     "moduleResolution": "bundler",
     // Matches portal-template/tsconfig.json, whose modules the template tests import.
     "target": "es2022",
-    "lib": ["es2022", "dom"]
+    "lib": ["es2022", "dom"],
+    // TypeScript 6 dropped the automatic sweep of node_modules/@types, so the globals the
+    // suite relies on have to be named. The source project needs no such list: it reaches
+    // its types through `node:` imports.
+    "types": ["node", "mocha", "chai", "sinon", "mock-fs"]
   },
   "include": ["**/*.ts"]
 }
