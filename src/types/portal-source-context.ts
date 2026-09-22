@@ -229,14 +229,15 @@ export class PortalSourceContext {
         const file = new FilePath(directory.directoryPath, navigationFile);
         // Read inside the walk, so one unreadable file is reported rather than thrown out of
         // `resolve`, which always answers with a Result.
-        let contents: string;
+        let contents: string | undefined;
         try {
           contents = await this.fileService.getContents(file);
         } catch {
           errors.push(`${this.relativeToSource(file)} could not be read.`);
-          contents = '';
         }
-        if (contents !== '') {
+        // An empty file goes through too: the build parses it as JSON and fails on it, so the
+        // CLI has to refuse it here rather than treat it as no file.
+        if (contents !== undefined) {
           const parsed = PortalNavigation.parse(contents, {
             label: this.relativeToSource(file),
             isContentRoot,

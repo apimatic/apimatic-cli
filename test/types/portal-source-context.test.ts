@@ -320,6 +320,16 @@ describe('PortalSourceContext', () => {
       expect((await resolve()).isOk()).to.be.true;
     });
 
+    // The build parses the file as JSON whatever its size, so an empty one has to be refused
+    // here rather than pass as if it were absent.
+    it('refuses an empty file the same way as a broken one', async () => {
+      write('content/nav.json', '');
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.deep.equal(['content/nav.json is not valid JSON.']);
+    });
+
     it('names the file and the entry when a page does not exist', async () => {
       write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
 
