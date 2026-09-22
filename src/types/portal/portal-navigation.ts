@@ -1,4 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
+import { unknownFieldErrors } from './unknown-fields.js';
 
 const BYTE_ORDER_MARK = 0xfeff;
 
@@ -22,9 +23,6 @@ const KNOWN_FIELDS = new Set(['pages']);
 
 // Plausible names for the one field there is. A misspelled field would otherwise be stripped
 // by Fumadocs' own schema and leave the sidebar in its default order with nothing said.
-// A Map rather than an object literal: `JSON.parse` happily produces a document whose keys
-// are `toString` or `constructor`, and indexing a literal with those returns a prototype
-// member, which would be printed back as the suggested spelling.
 const RENAMED_FIELDS = new Map<string, string>([
   ['order', 'pages'],
   ['items', 'pages'],
@@ -77,7 +75,9 @@ export class PortalNavigation {
       return err(document.error);
     }
 
-    const unknownFields = PortalNavigation.unknownFieldErrors(document.value, context);
+    const unknownFields = unknownFieldErrors(document.value, KNOWN_FIELDS, RENAMED_FIELDS, (field, intended) =>
+      PortalNavigation.describeUnknownField(field, intended, context)
+    );
 
     const pages = document.value.pages;
     if (pages === undefined) {
@@ -200,23 +200,18 @@ export class PortalNavigation {
     return ok(data as Record<string, unknown>);
   }
 
-  private static unknownFieldErrors(data: Record<string, unknown>, context: NavigationContext): string[] {
-    return Object.keys(data)
-      .filter((field) => !KNOWN_FIELDS.has(field))
-      .map((field) => {
-        const intended = RENAMED_FIELDS.get(field);
-        if (intended !== undefined) {
-          return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting; did you mean '${intended}'?`;
-        }
-        if (FUMADOCS_ONLY_FIELDS.has(field)) {
-          return (
-            `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. ` +
-            `${NAVIGATION_FILE_NAME} sets the order of pages and nothing else; a folder is named ` +
-            `after its directory, or after the title of its index page.`
-          );
-        }
-        return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting.`;
-      });
+  private static describeUnknownField(field: string, intended: string | undefined, context: NavigationContext): string {
+    if (intended !== undefined) {
+      return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting; did you mean '${intended}'?`;
+    }
+    if (FUMADOCS_ONLY_FIELDS.has(field)) {
+      return (
+        `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. ` +
+        `${NAVIGATION_FILE_NAME} sets the order of pages and nothing else; a folder is named ` +
+        `after its directory, or after the title of its index page.`
+      );
+    }
+    return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting.`;
   }
 
   /** A near miss is nearly always a typo or a forgotten extension, so name the candidate. */

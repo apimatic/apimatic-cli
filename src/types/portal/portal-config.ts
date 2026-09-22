@@ -1,6 +1,7 @@
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../file/urlPath.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
+import { unknownFieldErrors } from './unknown-fields.js';
 
 export interface PortalConfigData {
   title: string;
@@ -28,11 +29,7 @@ const STATIC_PREFIX = 'static/';
 
 const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPageActions']);
 
-// Pre-2.0 names and near misses. A mistyped setting is the one mistake that otherwise
-// produces a portal that builds and is quietly wrong.
-// A Map rather than an object literal: `JSON.parse` happily produces a document whose keys
-// are `toString` or `constructor`, and indexing a literal with those returns a prototype
-// member, which would be printed back as the suggested spelling.
+// Pre-2.0 names and near misses, each mapped to the setting it means.
 const RENAMED_FIELDS = new Map<string, string>([
   ['logoUrl', 'logo'],
   ['pageTitle', 'title'],
@@ -75,7 +72,11 @@ export class PortalConfig {
     // Every field is reported at once rather than stopping at the first, so one edit fixes
     // the file. Each validator hands back the typed value it accepted, so the constructor
     // below is fed only what validation proved.
-    const unknownFields = PortalConfig.unknownFieldErrors(data);
+    const unknownFields = unknownFieldErrors(data, KNOWN_FIELDS, RENAMED_FIELDS, (field, intended) =>
+      intended !== undefined
+        ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
+        : `'${field}' is not a portal.json setting.`
+    );
     const fields = Result.combineWithAllErrors([
       PortalConfig.validTitle(data.title),
       PortalConfig.validDescription(data.description),
@@ -104,17 +105,6 @@ export class PortalConfig {
       return err(['portal.json must contain a JSON object.']);
     }
     return ok(data as Record<string, unknown>);
-  }
-
-  private static unknownFieldErrors(data: Record<string, unknown>): string[] {
-    return Object.keys(data)
-      .filter((field) => !KNOWN_FIELDS.has(field))
-      .map((field) => {
-        const intended = RENAMED_FIELDS.get(field);
-        return intended !== undefined
-          ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
-          : `'${field}' is not a portal.json setting.`;
-      });
   }
 
   private static validTitle(title: unknown): Result<string, string> {
