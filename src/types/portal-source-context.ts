@@ -123,7 +123,16 @@ export class PortalSourceContext {
 
     // Walked once and shared: both the navigation scan and the slug collision check read the
     // whole content tree, and `getDirectory` stats every entry in it.
-    const contentTree = contentDirectory === null ? null : await this.contentTree(contentDirectory);
+    // Not swallowed: a tree that cannot be walked would otherwise pass as one with no files,
+    // and a `nav.json` in it would go unvalidated to a build that drops bad entries silently.
+    let contentTree: Directory | null = null;
+    if (contentDirectory !== null) {
+      try {
+        contentTree = await this.fileService.getDirectory(contentDirectory);
+      } catch {
+        return err({ kind: 'unreadableContent' });
+      }
+    }
 
     // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
     // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
@@ -266,9 +275,9 @@ export class PortalSourceContext {
         // An empty file goes through too: the build parses it as JSON and fails on it, so the
         // CLI has to refuse it here rather than treat it as no file.
         if (contents !== undefined) {
-          const parsed = PortalNavigation.parse(contents, { label, isContentRoot, childNames });
-          if (parsed.isErr()) {
-            errors.push(...parsed.error);
+          const checked = PortalNavigation.validate(contents, { label, isContentRoot, childNames });
+          if (checked.isErr()) {
+            errors.push(...checked.error);
           }
         }
       }
@@ -288,15 +297,6 @@ export class PortalSourceContext {
     return PAGE_EXTENSIONS.some((extension) => fileName.hasExactExtension(extension))
       ? `${fileName.withoutExtension()}`
       : undefined;
-  }
-
-  /** The content tree, or null when it cannot be walked, as `contentAddresses` also allowed. */
-  private async contentTree(contentDirectory: DirectoryPath): Promise<Directory | null> {
-    try {
-      return await this.fileService.getDirectory(contentDirectory);
-    } catch {
-      return null;
-    }
   }
 
   /**

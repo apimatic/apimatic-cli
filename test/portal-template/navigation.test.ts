@@ -361,7 +361,7 @@ describe('navigationTransformer', () => {
    */
   describe('the token vocabulary both halves share', () => {
     const accepts = (entry: string) =>
-      PortalNavigation.parse(JSON.stringify({ pages: [entry, 'index'] }), {
+      PortalNavigation.validate(JSON.stringify({ pages: [entry, 'index'] }), {
         label: 'content/nav.json',
         isContentRoot: true,
         childNames: ['index', 'authentication']

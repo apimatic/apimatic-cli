@@ -2,7 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import sinon from 'sinon';
 import { parse as parseYaml } from 'yaml';
+import { FileService } from '../../src/infrastructure/file-service';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalConfig } from '../../src/types/portal/portal-config';
 import { PortalMigration, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
@@ -190,6 +192,26 @@ describe('PortalSourceContext', () => {
     beforeEach(() => {
       write('portal.json', JSON.stringify({ title: 'Calc' }));
       write('spec/api.json', OPENAPI);
+    });
+
+    // Swallowing the failure would pass the tree off as empty, and a nav.json in it would go
+    // unvalidated to a build that drops bad entries without a word.
+    it('reports a content tree that cannot be walked instead of treating it as empty', async () => {
+      write('content/index.md', '# Home');
+      // Only the content tree fails; the spec directory is walked the same way and must not.
+      const content = new DirectoryPath(root).join('content');
+      const original = FileService.prototype.getDirectory;
+      const getDirectory = sinon
+        .stub(FileService.prototype, 'getDirectory')
+        .callsFake(function (this: FileService, directory: DirectoryPath) {
+          return directory.isEqual(content) ? Promise.reject(new Error('EACCES')) : original.call(this, directory);
+        });
+
+      try {
+        expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'unreadableContent' });
+      } finally {
+        getDirectory.restore();
+      }
     });
 
     it('reports content and static as absent when they do not exist', async () => {

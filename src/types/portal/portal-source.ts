@@ -36,6 +36,7 @@ export type PortalSourceProblem =
   | { kind: 'missingConfig'; migration: PortalMigration | null }
   | { kind: 'invalidConfig'; errors: string[] }
   | { kind: 'invalidNavigation'; errors: string[] }
+  | { kind: 'unreadableContent' }
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
   | { kind: 'noSpecs' }

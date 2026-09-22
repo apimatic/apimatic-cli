@@ -56,12 +56,6 @@ const FUMADOCS_ONLY_FIELDS = new Set([
 // link, an exclusion, an extract of another folder's pages, and the reversed rest.
 const FUMADOCS_ENTRY_SYNTAX = [/^---.*---$/, /^\[.*\]\(.*\)$/, /^!/, /^\.\.\..+/, /^z\.\.\.a$/];
 
-export type NavigationEntry =
-  | { kind: 'rest' }
-  | { kind: 'injectedPages' }
-  | { kind: 'apiReference' }
-  | { kind: 'child'; name: string };
-
 /** Where a `nav.json` sits, and what its entries are allowed to address. */
 export interface NavigationContext {
   /** The file's path relative to `src/`, as messages name it. */
@@ -73,15 +67,13 @@ export interface NavigationContext {
 }
 
 /**
- * Immutable wrapper around a parsed `nav.json`. The template re-reads the file itself and
+ * The rules of a `nav.json`, applied to one file. The template re-reads the file itself and
  * orders the page tree from it, so nothing here travels into the build: this exists to
  * refuse a file that would otherwise produce a quietly wrong sidebar. Fumadocs drops an
  * entry it cannot resolve without a word, which is why the CLI validates instead.
  */
 export class PortalNavigation {
-  private constructor(private readonly entries: NavigationEntry[]) {}
-
-  public static parse(json: string, context: NavigationContext): Result<PortalNavigation, string[]> {
+  public static validate(json: string, context: NavigationContext): Result<void, string[]> {
     const document = PortalNavigation.parseObject(json, context);
     if (document.isErr()) {
       return err(document.error);
@@ -94,7 +86,7 @@ export class PortalNavigation {
     const pages = document.value.pages;
     if (pages === undefined) {
       // A file with no `pages` orders nothing, which is odd but not wrong.
-      return unknownFields.length > 0 ? err(unknownFields) : ok(new PortalNavigation([]));
+      return unknownFields.length > 0 ? err(unknownFields) : ok(undefined);
     }
     if (!Array.isArray(pages) || pages.some((entry) => typeof entry !== 'string')) {
       return err([...unknownFields, `${context.label}: 'pages' must be an array of strings.`]);
@@ -103,7 +95,6 @@ export class PortalNavigation {
     // Every bad entry is reported at once rather than stopping at the first, so one edit
     // fixes the file.
     const errors = [...unknownFields];
-    const entries: NavigationEntry[] = [];
     const seen = new Set<string>();
 
     for (const raw of pages as string[]) {
@@ -114,24 +105,22 @@ export class PortalNavigation {
       }
       seen.add(entry);
 
-      const parsed = PortalNavigation.parseEntry(entry, context);
-      if (parsed.isErr()) {
-        errors.push(parsed.error);
-        continue;
+      const checked = PortalNavigation.checkEntry(entry, context);
+      if (checked.isErr()) {
+        errors.push(checked.error);
       }
-      entries.push(parsed.value);
     }
 
-    return errors.length > 0 ? err(errors) : ok(new PortalNavigation(entries));
+    return errors.length > 0 ? err(errors) : ok(undefined);
   }
 
-  private static parseEntry(entry: string, context: NavigationContext): Result<NavigationEntry, string> {
+  private static checkEntry(entry: string, context: NavigationContext): Result<void, string> {
     if (entry === REST_TOKEN) {
-      return ok({ kind: 'rest' });
+      return ok(undefined);
     }
 
     if (entry.startsWith(APIMATIC_PREFIX)) {
-      return PortalNavigation.parseToken(entry, context);
+      return PortalNavigation.checkToken(entry, context);
     }
 
     if (entry.length === 0) {
@@ -178,10 +167,10 @@ export class PortalNavigation {
       );
     }
 
-    return ok({ kind: 'child', name: entry });
+    return ok(undefined);
   }
 
-  private static parseToken(entry: string, context: NavigationContext): Result<NavigationEntry, string> {
+  private static checkToken(entry: string, context: NavigationContext): Result<void, string> {
     if (entry !== INJECTED_PAGES_TOKEN && entry !== API_REFERENCE_TOKEN) {
       return err(
         `${context.label}: '${entry}' is not a ${NAVIGATION_FILE_NAME} token. ` +
@@ -196,7 +185,7 @@ export class PortalNavigation {
       );
     }
 
-    return ok(entry === INJECTED_PAGES_TOKEN ? { kind: 'injectedPages' } : { kind: 'apiReference' });
+    return ok(undefined);
   }
 
   private static parseObject(json: string, context: NavigationContext): Result<Record<string, unknown>, string[]> {
@@ -247,12 +236,5 @@ export class PortalNavigation {
       (name) => name.toLowerCase() === lowered || name.toLowerCase() === lowered.replace(/\.mdx?$/i, '')
     );
     return candidate === undefined ? '' : ` Did you mean '${candidate}'?`;
-  }
-
-  /** What the file asked for, in the order it asked. Nothing reads this but the tests: the
-   * template re-reads `nav.json` and builds the order itself, so `parse` exists for its
-   * errors. Kept so the parse can be asserted on rather than only its failures. */
-  public order(): readonly NavigationEntry[] {
-    return this.entries;
   }
 }

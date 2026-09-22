@@ -31,6 +31,13 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
       return;
     }
+    case 'unreadableContent': {
+      log.error(
+        `${f.path(sourceDirectory.join('content'))} could not be read. Check that every directory ` +
+          `beneath it can be listed, and that no link inside it points back into it.`
+      );
+      return;
+    }
     case 'unreadableSpec': {
       log.error(`${f.var(problem.fileName.toString())} could not be read as JSON or YAML.`);
       return;

@@ -9,40 +9,32 @@ describe('PortalNavigation', () => {
     ...overrides
   });
 
-  const parse = (pages: unknown, overrides: Partial<NavigationContext> = {}) =>
-    PortalNavigation.parse(JSON.stringify({ pages }), contextFor(overrides));
+  const validate = (pages: unknown, overrides: Partial<NavigationContext> = {}) =>
+    PortalNavigation.validate(JSON.stringify({ pages }), contextFor(overrides));
 
   const errorsFor = (pages: unknown, overrides: Partial<NavigationContext> = {}) =>
-    parse(pages, overrides)._unsafeUnwrapErr();
+    validate(pages, overrides)._unsafeUnwrapErr();
 
   describe('entries it accepts', () => {
-    it('reads pages, tokens and the rest entry in the order given', () => {
-      const navigation = parse(['index', 'apimatic:pages', 'authentication', '...', 'apimatic:api'])._unsafeUnwrap();
-
-      expect(navigation.order()).to.deep.equal([
-        { kind: 'child', name: 'index' },
-        { kind: 'injectedPages' },
-        { kind: 'child', name: 'authentication' },
-        { kind: 'rest' },
-        { kind: 'apiReference' }
-      ]);
+    it('accepts pages, both tokens and the rest entry together', () => {
+      expect(validate(['index', 'apimatic:pages', 'authentication', '...', 'apimatic:api']).isOk()).to.be.true;
     });
 
     it('accepts a subfolder by name', () => {
-      expect(parse(['guides'])._unsafeUnwrap().order()).to.deep.equal([{ kind: 'child', name: 'guides' }]);
+      expect(validate(['guides']).isOk()).to.be.true;
     });
 
     // The SDK page ships in a later change; a nav.json written today has to keep working.
     it('accepts the injected-pages token while it resolves to nothing', () => {
-      expect(parse(['apimatic:pages'])._unsafeUnwrap().order()).to.deep.equal([{ kind: 'injectedPages' }]);
+      expect(validate(['apimatic:pages']).isOk()).to.be.true;
     });
 
     it('treats a file with no pages as ordering nothing', () => {
-      expect(PortalNavigation.parse('{}', contextFor())._unsafeUnwrap().order()).to.deep.equal([]);
+      expect(PortalNavigation.validate('{}', contextFor()).isOk()).to.be.true;
     });
 
     it('ignores surrounding whitespace in an entry', () => {
-      expect(parse(['  index  '])._unsafeUnwrap().order()).to.deep.equal([{ kind: 'child', name: 'index' }]);
+      expect(validate(['  index  ']).isOk()).to.be.true;
     });
   });
 
@@ -101,18 +93,18 @@ describe('PortalNavigation', () => {
     });
 
     it('names a folder called api below the root as an ordinary child', () => {
-      expect(parse(['api'], { isContentRoot: false, childNames: ['api'] }).isOk()).to.be.true;
+      expect(validate(['api'], { isContentRoot: false, childNames: ['api'] }).isOk()).to.be.true;
       expect(errorsFor(['api'], { isContentRoot: false })[0]).to.not.contain('apimatic:api');
     });
 
     it('names the file when the JSON is broken', () => {
-      expect(PortalNavigation.parse('{', contextFor())._unsafeUnwrapErr()).to.deep.equal([
+      expect(PortalNavigation.validate('{', contextFor())._unsafeUnwrapErr()).to.deep.equal([
         'content/nav.json is not valid JSON.'
       ]);
     });
 
     it('refuses a document that is not an object', () => {
-      expect(PortalNavigation.parse('[]', contextFor())._unsafeUnwrapErr()).to.deep.equal([
+      expect(PortalNavigation.validate('[]', contextFor())._unsafeUnwrapErr()).to.deep.equal([
         'content/nav.json must contain a JSON object.'
       ]);
     });
@@ -122,7 +114,7 @@ describe('PortalNavigation', () => {
     it('refuses a file written with a byte-order mark', () => {
       const mark = '﻿';
 
-      expect(PortalNavigation.parse(mark + '{"pages":["index"]}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
+      expect(PortalNavigation.validate(mark + '{"pages":["index"]}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
         'content/nav.json starts with a byte-order mark, which the build cannot read. Save the file as UTF-8 without a BOM.'
       ]);
     });
@@ -130,10 +122,10 @@ describe('PortalNavigation', () => {
     it('names an unknown setting, and suggests pages for a near miss', () => {
       const context = contextFor();
 
-      expect(PortalNavigation.parse('{"order":["index"]}', context)._unsafeUnwrapErr()[0]).to.contain(
+      expect(PortalNavigation.validate('{"order":["index"]}', context)._unsafeUnwrapErr()[0]).to.contain(
         "'order' is not a nav.json setting; did you mean 'pages'?"
       );
-      expect(PortalNavigation.parse('{"colour":"red"}', context)._unsafeUnwrapErr()).to.deep.equal([
+      expect(PortalNavigation.validate('{"colour":"red"}', context)._unsafeUnwrapErr()).to.deep.equal([
         "content/nav.json: 'colour' is not a nav.json setting."
       ]);
     });
@@ -152,17 +144,13 @@ describe('PortalNavigation', () => {
     });
 
     it('still accepts ordinary entries', () => {
-      expect(
-        parse(['intro'], { ...nested, childNames: ['intro'] })
-          ._unsafeUnwrap()
-          .order()
-      ).to.deep.equal([{ kind: 'child', name: 'intro' }]);
+      expect(validate(['intro'], { ...nested, childNames: ['intro'] }).isOk()).to.be.true;
     });
   });
 
   describe('the index page', () => {
     it('is an ordinary child at the content root, where there is no folder to link', () => {
-      expect(parse(['index'])._unsafeUnwrap().order()).to.deep.equal([{ kind: 'child', name: 'index' }]);
+      expect(validate(['index']).isOk()).to.be.true;
     });
 
     // Below the root it becomes the folder's own link rather than a child, so a position
@@ -187,7 +175,7 @@ describe('PortalNavigation', () => {
   // carries its Fumadocs keys across, and calling those a misspelling of 'pages' would be
   // a dead end.
   it('explains a Fumadocs folder-metadata key rather than calling it a typo', () => {
-    const errors = PortalNavigation.parse('{"title":"Guides","pages":["index"]}', contextFor())._unsafeUnwrapErr();
+    const errors = PortalNavigation.validate('{"title":"Guides","pages":["index"]}', contextFor())._unsafeUnwrapErr();
 
     expect(errors).to.have.lengthOf(1);
     expect(errors[0]).to.contain("'title' is not a nav.json setting");
@@ -199,7 +187,7 @@ describe('PortalNavigation', () => {
   describe('fields named after Object.prototype members', () => {
     for (const field of ['toString', 'constructor', 'hasOwnProperty']) {
       it(`reports '${field}' as unknown without quoting a prototype member back`, () => {
-        const errors = PortalNavigation.parse(`{"${field}":"x"}`, contextFor())._unsafeUnwrapErr();
+        const errors = PortalNavigation.validate(`{"${field}":"x"}`, contextFor())._unsafeUnwrapErr();
 
         expect(errors).to.deep.equal([`content/nav.json: '${field}' is not a nav.json setting.`]);
         expect(errors[0]).to.not.contain('native code');
