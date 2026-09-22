@@ -9,6 +9,12 @@ import { Directory, DirectoryItem } from '../types/file/directory.js';
 import { FileName } from '../types/file/fileName.js';
 import { sleep } from './timer-extensions.js';
 
+/** `stat` follows a link, so a link to nothing fails as though the entry were not there. */
+function isDanglingLink(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
+}
+
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
@@ -82,10 +88,10 @@ export class FileService {
   }
 
   /**
-   * The whole tree beneath `directoryPath`. An entry that cannot be examined -- a link to
-   * nothing, a file only another user may see -- is left out rather than failing the walk,
-   * which is what a glob over the same tree would do with it; a directory that cannot be
-   * listed still throws, because nothing beneath it can be known.
+   * The whole tree beneath `directoryPath`. A link to nothing is left out rather than failing
+   * the walk, which is what a glob over the same tree would do with it. Any other failure
+   * still throws: a file that cannot be examined is a file the caller would otherwise never
+   * hear about, and a missing specification is worse than a failed build.
    */
   public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
     const entries = await fsExtra.readdir(directoryPath.toString());
@@ -95,8 +101,11 @@ export class FileService {
         let stat: fsExtra.Stats;
         try {
           stat = await fsExtra.stat(fullPath);
-        } catch {
-          return undefined;
+        } catch (error) {
+          if (isDanglingLink(error)) {
+            return undefined;
+          }
+          throw error;
         }
         return stat.isDirectory()
           ? await this.getDirectory(new DirectoryPath(fullPath))
