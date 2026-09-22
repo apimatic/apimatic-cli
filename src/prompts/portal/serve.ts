@@ -11,13 +11,7 @@ import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import {
-  reportCollidingPages,
-  reportHiddenPages,
-  reportIgnoredNavigationFiles,
-  reportShadowedFiles,
-  reportSourceProblem
-} from './source.js';
+import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
@@ -26,10 +20,6 @@ export class PortalServePrompts {
 
   public filesShadowedByStatic(shadowed: FileName[]) {
     reportShadowedFiles(shadowed);
-  }
-
-  public pagesCollidingWithSpecs(slugs: string[]) {
-    reportCollidingPages(slugs);
   }
 
   public pagesHiddenBySpecs(files: FilePath[], sourceDirectory: DirectoryPath) {

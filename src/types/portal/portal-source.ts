@@ -16,8 +16,6 @@ export interface PortalSource {
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
-  /** Spec slugs that a page under `content/api/` also claims, so the two share an address. */
-  collidingSlugs: string[];
   /**
    * Pages below `content/api/<slug>/` for a specification `<slug>`. The section's generated
    * metadata lists only the reference pages, so these never appear in the sidebar.

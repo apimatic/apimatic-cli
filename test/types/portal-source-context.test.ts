@@ -240,77 +240,51 @@ describe('PortalSourceContext', () => {
 
       expect(source.contentDirectory).to.be.null;
       expect(source.staticDirectory).to.be.null;
-      expect(source.collidingSlugs).to.deep.equal([]);
     });
 
-    it('names a page under content/api that shares its address with a specification', async () => {
-      write('content/api/api.md', '# Overview');
-      write('content/api/guides.md', '# Guides');
-
-      const source = (await resolve())._unsafeUnwrap();
-
-      expect(source.collidingSlugs).to.deep.equal(['api']);
-    });
-
-    it('names a folder under content/api that shares its address with a specification', async () => {
-      write('content/api/api/index.md', '# Overview');
-
-      const source = (await resolve())._unsafeUnwrap();
-
-      expect(source.collidingSlugs).to.deep.equal(['api']);
-    });
-
-    it('treats a page that differs from the slug only by case as a collision', async () => {
-      write('content/api/API.md', '# Overview');
-
-      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal(['api']);
-    });
-
-    it('looks through route-group folders, which fumadocs drops from the address', async () => {
-      write('content/api/(guides)/api.md', '# Overview');
-
-      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal(['api']);
-    });
-
-    // No collision: nothing shares the section's own address. Hidden instead: the section's
-    // generated metadata lists only the reference pages, so the page never reaches the sidebar.
-    it('reports a page inside a specification’s section as hidden rather than colliding', async () => {
+    // The section's generated metadata lists only the reference pages, and metadata hides
+    // whatever it does not name, so the page never reaches the sidebar.
+    it('reports a page inside a specification’s section as hidden', async () => {
       write('content/api/api/authentication.md', '# Authentication');
 
-      const source = (await resolve())._unsafeUnwrap();
-
-      expect(source.collidingSlugs).to.deep.equal([]);
-      expect(hidden(source)).to.deep.equal(['content/api/api/authentication.md']);
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal(['content/api/api/authentication.md']);
     });
 
-    it('reports a page hidden however deep it sits in the section, and whatever its case', async () => {
-      write('content/api/API/pets/guide.mdx', '# Guide');
-      write('content/api/(group)/api/notes.md', '# Notes');
+    it('reports a page hidden however deep it sits in the section', async () => {
+      write('content/api/api/pets/guide.mdx', '# Guide');
+      write('content/api/api/pets/(drafts)/notes.md', '# Notes');
 
       expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([
-        'content/api/(group)/api/notes.md',
-        'content/api/API/pets/guide.mdx'
+        'content/api/api/pets/(drafts)/notes.md',
+        'content/api/api/pets/guide.mdx'
       ]);
+    });
+
+    // The reference emits no page at the section's own address, so a page there is served
+    // and shown: as the section's landing page, or beside it.
+    it('does not report a page at the section’s own address', async () => {
+      write('content/api/api.md', '# Landing');
+      write('content/api/api/index.md', '# Overview');
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
+    });
+
+    // The page tree is keyed on the path as written: a differently cased directory, or a
+    // route group on the way, is another folder, and no metadata hides what is in it.
+    it('does not report pages whose directories only resolve to the section’s address', async () => {
+      write('content/API/api/guide.md', '# Guide');
+      write('content/api/API/guide.md', '# Guide');
+      write('content/api/(guides)/api/notes.md', '# Notes');
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
     });
 
     it('does not report pages under content/api in a folder that is no specification', async () => {
       write('content/api/guides/intro.md', '# Intro');
       write('content/api/overview.md', '# Overview');
-
-      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
-    });
-
-    it('does not mistake content/api/index.md for a page named index', async () => {
-      write('spec/index.json', OPENAPI);
       write('content/api/index.md', '# API reference');
 
-      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal([]);
-    });
-
-    it('reports no collision for pages under content/api with other names', async () => {
-      write('content/api/overview.md', '# Overview');
-
-      expect((await resolve())._unsafeUnwrap().collidingSlugs).to.deep.equal([]);
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
     });
 
     it('names the static files that replace ones the build generates', async () => {

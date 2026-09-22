@@ -100,18 +100,6 @@ export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryP
   );
 }
 
-export function reportCollidingPages(slugs: string[]): void {
-  if (slugs.length === 0) {
-    return;
-  }
-  const addresses = slugs.map((slug) => f.var(`/api/${slug}`)).join(', ');
-  const pages = slugs.length === 1 ? 'A page' : 'Pages';
-  log.warn(
-    `${pages} under ${f.var('content/api')} and a specification share the address ${addresses}; ` +
-      `only one of them is served. Rename or move the page.`
-  );
-}
-
 function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryPath): void {
   const starter = JSON.stringify(migration.suggestedConfig, null, 2);
   const lines = [
