@@ -236,7 +236,9 @@ function afterNamedContent(named: Node[], isInjectedChild: (child: Node) => bool
       return index + 1;
     }
   }
-  return named.length;
+  // Nothing named is the user's own, so everything named is what the CLI adds, and the
+  // user's pages keep their default place above all of it.
+  return 0;
 }
 
 function anchorIn(children: Node[]): number {

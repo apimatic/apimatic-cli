@@ -206,6 +206,19 @@ describe('navigationTransformer', () => {
 
     // A folder the user simply has not listed belongs with their pages. Appending it after
     // everything named would drop it below the whole reference.
+    // With nothing of the user's named, everything named is what the CLI adds, and the
+    // user's pages have no reason to drop below it.
+    it('stays below every unnamed page when the file names only tokens', () => {
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:pages', 'apimatic:api'])];
+
+      expect(treeOf({ docs, generated: [page('sdks.mdx', 'SDKs')], openapi: API })).to.deep.equal([
+        'Welcome',
+        'Authentication',
+        'SDKs',
+        'API Reference'
+      ]);
+    });
+
     it('stays below a page the file does not name, even when the token names it last', () => {
       const docs = [...CONTENT, page('guides/intro.mdx', 'Intro'), nav('nav.json', ['index', 'apimatic:api'])];
 
