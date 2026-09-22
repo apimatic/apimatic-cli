@@ -34,8 +34,7 @@ const API_REFERENCE_TITLE = 'API Reference';
 
 /**
  * The key the generated pages are passed to `loader()` under, which the storage stamps onto
- * every file of that source. No such source exists yet, so `apimatic:pages` resolves to
- * nothing; adding one is all it takes for the token to start positioning its pages.
+ * every file of that source.
  */
 const GENERATED_SOURCE = 'generated';
 
@@ -57,10 +56,9 @@ const OPENAPI_SOURCE = 'openapi';
 export function navigationTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
     folder(node, folderPath) {
-      // `generateFallback` builds a second tree out of the files that never became nodes. A
-      // metadata file is never one, so `nav.json` is always left over and this hook is
-      // always called again, for a root with no children. Ordering nothing is harmless, but
-      // skipping it keeps the intent clear.
+      // `generateFallback` builds a second tree out of the files that never became nodes,
+      // and a metadata file never does, so `nav.json` brings this hook back for a root with
+      // no children.
       if (this.custom?._fallback === true) {
         return node;
       }
