@@ -525,7 +525,7 @@ genuinely the user's.
 1. **Document, context and the write primitive.** Done, `fcf93ff`. Add
    `ApimaticConfigDocument`, `ApimaticConfigContext` and
    `FileService.replaceContents`, each with tests. Nothing uses them yet.
-2. **Plugin side.** Re-seat `PluginConfigContext` over the new context on the
+2. **Plugin side.** Done, `c9cfa13`. Re-seat `PluginConfigContext` over the new context on the
    same `src/`; delete the JSON-level checks it duplicated; split
    `PluginIdentityData` out and move `PLUGIN_ID_PATTERN` beside it; update
    `plugin-config-context.test.ts` to the block shapes. No signature changes
@@ -533,18 +533,19 @@ genuinely the user's.
    test its upload assertion, and the one whole-document case in
    `record-sdk.test.ts` its `schemaVersion`. Actions and prompts still say
    `plugin-config.json` at this point but the file is `apimatic.json`.
-3. **Portal side.** `PortalConfig.fromBlock`, `PortalSourceContext` reading and
+3. **Portal side.** Done, `cd49f6a`. `PortalConfig.fromBlock`, `PortalSourceContext` reading and
    scaffolding through `ApimaticConfigContext` (`{ schemaVersion, portal }`),
    the new source-context cases, the fixture's `portal.json` → `apimatic.json`,
    and `Directory.fileDescriptions`. Nothing here can be deferred: the portal
    is broken from the moment `resolve` reads the new file until `scaffold`
    writes it, and no quickstart test would say so (section 11, decision 22).
-4. **Wiring.** Every remaining prompt string and command description, the
+4. **Wiring.** Done, `64c3592`. Every remaining prompt string and command description, the
    near-miss message wording, the shared file-name constant, and the quickstart
    closing note.
 5. **Invariant test** from section 7: an invalid `portal` block does not stop
-   `PluginRecordSdkAction` from recording a language.
-6. **Docs and release.** README, plans, skills, the release note draft naming
+   `PluginRecordSdkAction` from recording a language. Done in the commit after
+   step 4.
+6. **Docs and release.** Done in the commit after step 5. README, plans, skills, the release note draft naming
    the move from `APIMATIC-BUILD.json`'s portal settings and
    `src/plugin-config.json` into the three blocks, and the PR description's
    note that the backend must read `apimatic.json` before this merges and its
@@ -552,3 +553,57 @@ genuinely the user's.
    commit is an ordinary `feat:`; the `BREAKING CHANGE:` footer belongs to the
    last PR of the series (section 2). The sample repository is a separate PR in
    its own repo.
+
+## 13. Drafts for the last PR of the series
+
+Kept here so the PR that carries the footer has them to hand. Both describe the
+whole series, not this PR alone.
+
+### Release notes
+
+**Breaking changes**
+
+- `src/plugin-config.json` is no longer read or written. What it held lives in
+  `src/apimatic.json`: the context plugin's identity in the `plugin` block, the
+  SDKs you have published in the `languages` block. After upgrading, run
+  `apimatic sdk publish` for each SDK and `apimatic plugin generate` once to
+  record them again, then delete the old file. The server reads `apimatic.json`
+  from the uploaded `src/`.
+- The documentation portal is described by the `portal` block of
+  `src/apimatic.json` (`title`, `description`, `logo`, `siteUrl`);
+  `APIMATIC-BUILD.json` no longer configures it. `apimatic quickstart` scaffolds
+  the file. Portals are built on your machine from `src/spec/`, `src/content/`
+  and `src/static/`.
+- `portal toc new`, `portal recipe new` and `portal copilot` are removed, and
+  `portal serve` no longer takes `--destination` or `--no-reload`. Run
+  `apimatic autocomplete --refresh-cache` to drop them from shell completion.
+
+**Footer** for the squash commit and the PR description:
+
+```
+BREAKING CHANGE: `src/plugin-config.json` is replaced by the `plugin` and
+`languages` blocks of `src/apimatic.json`, and the portal is configured by its
+`portal` block instead of `APIMATIC-BUILD.json`. `portal toc new`,
+`portal recipe new` and `portal copilot` are removed.
+```
+
+### PR description for this PR
+
+> One file, `src/apimatic.json`, replaces `src/portal.json` and
+> `src/plugin-config.json`. It holds `portal`, `plugin` and `languages`; the
+> portal reads the first, the plugin commands the other two, and a malformed
+> block one command owns never stops another. The writer keeps key order,
+> indentation and the trailing newline, and writes atomically.
+>
+> **Merge only once the backend reads `plugin` and `languages` from the
+> `apimatic.json` inside the uploaded `src/`.** Nothing is synthesized for it
+> and no compatibility is kept; a project with an old `plugin-config.json`
+> records its SDKs and identity again.
+>
+> **Do not merge `dev` into `main` until the series ends.** This commit is an
+> ordinary `feat:`; the `BREAKING CHANGE:` footer rides on the last PR, and
+> nothing on `dev` carries one today, so an early merge ships as 1.6.0.
+>
+> First of a series: next, quickstart adopts a directory that already holds an
+> `apimatic.json`; then `portal generate` and `plugin generate` require a
+> `languages` entry.

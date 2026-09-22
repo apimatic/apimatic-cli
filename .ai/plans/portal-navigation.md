@@ -19,8 +19,9 @@ Two revisions worth knowing about when reading older notes:
   structurally impossible, and removes most of the first draft's machinery.
 - **The injected content changed.** The first draft assumed two static
   generated pages. There is one, it is SDK-related, and its content is derived
-  from a new `languages` property in `portal.json`. It also no longer lands in
-  this change (section 1).
+  from the top-level `languages` block of `src/apimatic.json`, the file that
+  replaced `portal.json` on 2026-09-22 (`.ai/plans/apimatic-config.md`). It also
+  no longer lands in this change (section 1).
 
 ## 1. Goal and scope
 
@@ -28,8 +29,9 @@ Give the user control over sidebar order, and make room for Markdown pages the
 CLI generates and injects rather than pages the user wrote.
 
 One APIMatic-generated MDX page is injected at the content root. It does not
-exist in the user's `src/`, its content is derived from the `languages`
-property in `portal.json`, and the user may position it but not remove it.
+exist in the user's `src/`, its content is derived from the top-level `languages`
+block of `src/apimatic.json` — the map `sdk publish` writes, shared with the
+plugin commands — and the user may position it but not remove it.
 
 A second generated page is already planned, and more may follow. It is
 deliberately not specified here: the SDK page goes in end to end first, and the
@@ -168,11 +170,14 @@ alone, so the generated page is not a name it knows and the entry is reported as
 the moment one does, the two halves disagree and the build fails before the
 transformer runs.
 
-`languages` in `portal.json` becomes **required**, so the page always has
-content and an empty collection never arises. That is a breaking change to the
-`portal.json` schema. It is free if it lands before the next major releases,
-and a second breaking change if it lands after, which is the main argument for
-not letting this follow-up drift.
+`languages` in `apimatic.json` becomes **required** for `portal generate`, so
+the page always has content and an empty collection never arises. Amended
+2026-09-22: it is the shared top-level block `sdk publish` writes, not a list of
+ids, and the requirement lands in the last PR of the apimatic-config series
+(`.ai/plans/apimatic-config.md`, section 1). That is a breaking change to the
+schema. It is free if it lands before the next major releases, and a second
+breaking change if it lands after, which is the main argument for not letting
+this follow-up drift.
 
 Both collections are passed to `loader()` with no `baseDir`, so the generated
 page lands at the virtual root beside the user's content and is genuinely a
@@ -299,7 +304,7 @@ change lands. Its title below is a stand-in.
 
 ```
 Welcome                                       content/index.md
-SDKs                                          generated, from portal.json languages
+SDKs                                          generated, from apimatic.json languages
 Authentication                                content/authentication.md
 API Reference                                 api/
   Pet
@@ -593,7 +598,7 @@ Navigation change:
 - `src/commands/portal/serve.ts` and `src/prompts/portal/serve.ts`: both tell
   the user that editing the order file needs the preview restarted, which is
   the opposite of what the transformer buys (section 15). It reloads; adding
-  or removing a page and editing `portal.json` still do not.
+  or removing a page and editing `apimatic.json` still do not.
 
 Second change, additionally:
 
@@ -649,7 +654,7 @@ Second change, additionally:
   silently. Accepted, because without the restriction a stale `meta.json` is
   applied before the transformer runs (section 5), but it is worth re-reading
   on each upgrade.
-- **Required `languages` is a breaking change** to `portal.json`, free only
+- **Required `languages` is a breaking change** to `apimatic.json`, free only
   while the next major is unreleased (section 4).
 - ~~**The config split touches files the open PR already rewrites.**~~ Moot:
   #343 merged, and it did the config work itself (section 9).
