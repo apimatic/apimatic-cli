@@ -407,8 +407,8 @@ describe('PortalSourceContext', () => {
       expect(source.ignoredNavigationFiles.sort()).to.deep.equal(['content/guides/meta.json', 'content/meta.json']);
     });
 
-    // Fumadocs builds no folder node for a directory with no pages under it, so an entry
-    // naming one would resolve to nothing.
+    // The sidebar shows no folder for a directory with no pages under it, so an entry naming
+    // one would resolve to nothing.
     it('refuses a directory that holds no pages', async () => {
       write('content/assets/logo.png', 'x');
       write('content/nav.json', JSON.stringify({ pages: ['index', 'assets'] }));
@@ -416,6 +416,16 @@ describe('PortalSourceContext', () => {
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
       expect(errors[0]).to.contain("'assets' is not a page or folder in this directory");
+    });
+
+    // The template drops the empty folder Fumadocs would otherwise build for it.
+    it('refuses a directory that holds only a nav.json', async () => {
+      write('content/guides/nav.json', JSON.stringify({ pages: [] }));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.deep.equal(["content/nav.json: 'guides' is not a page or folder in this directory."]);
     });
 
     it('accepts a directory whose pages are nested below it', async () => {

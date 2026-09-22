@@ -63,6 +63,20 @@ describe('navigationTransformer', () => {
     });
 
     // The root has no file of its own here, so its defaults must not depend on one.
+    // Fumadocs builds a folder for the directory because its nav.json is in storage; the CLI
+    // treats a directory with no pages as no folder, and the sidebar has to agree with it.
+    it('drops a directory that holds a nav.json and no page', () => {
+      const docs = [...CONTENT, nav('guides/nav.json', ['intro'])];
+
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
+    });
+
+    it('keeps a folder whose only page is its index, which the folder itself links to', () => {
+      const docs = [...CONTENT, page('guides/index.mdx', 'Guides')];
+
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'API Reference']);
+    });
+
     it('applies the root defaults when only a nested directory has a file', () => {
       const docs = [...CONTENT, page('guides/intro.mdx', 'Intro'), nav('guides/nav.json', ['intro'])];
 

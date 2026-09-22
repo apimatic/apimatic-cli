@@ -65,6 +65,12 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
         return node;
       }
 
+      // A directory holding a `nav.json` and no page still gets a folder node, because the
+      // metadata file is in storage. The CLI treats such a directory as no folder, so the
+      // parent's file cannot name it; showing it empty would contradict that refusal. A
+      // folder whose only page is its index is not empty: the folder itself links to it.
+      node.children = node.children.filter((child) => !isEmptyFolder(child));
+
       // Ordered even with no file of its own: naming nothing still puts the injected pages
       // and the API reference at their defaults, and Fumadocs' own order would not. It
       // sorts folders by path, so `api` lands above a user folder called anything later in
@@ -228,6 +234,10 @@ function anchorIn(children: Node[]): number {
 
 function isApiReference(child: Node): boolean {
   return child.type === 'folder' && child.$ref?.folder === apiBaseDir;
+}
+
+function isEmptyFolder(child: Node): boolean {
+  return child.type === 'folder' && child.children.length === 0 && child.index === undefined;
 }
 
 /** Whether a page came from the generated source rather than the user's content directory. */

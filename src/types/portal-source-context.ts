@@ -200,7 +200,8 @@ export class PortalSourceContext {
 
       for (const item of directory.items) {
         // A directory with no page anywhere beneath it becomes no node in the page tree, so
-        // naming it would resolve to nothing.
+        // naming it would resolve to nothing. Fumadocs would build one for a directory that
+        // holds only a `nav.json`, but the template drops it again to keep to this rule.
         if (item instanceof Directory) {
           if (PortalSourceContext.containsPage(item)) {
             childNames.push(item.directoryPath.leafName());
