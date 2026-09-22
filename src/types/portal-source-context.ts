@@ -7,7 +7,7 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
-import { LEGACY_NAVIGATION_FILE_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
+import { IGNORED_NAVIGATION_FILE_NAMES, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
 import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 import { stripByteOrderMark } from '../utils/string-utils.js';
@@ -238,7 +238,7 @@ export class PortalSourceContext {
           navigationFile = item.fileName;
           continue;
         }
-        if (item.fileName.is(NAVIGATION_FILE_NAME) || item.fileName.is(LEGACY_NAVIGATION_FILE_NAME)) {
+        if (IGNORED_NAVIGATION_FILE_NAMES.some((name) => item.fileName.is(name))) {
           ignoredFiles.push(new FilePath(directory.directoryPath, item.fileName));
           continue;
         }
@@ -246,7 +246,7 @@ export class PortalSourceContext {
         // without its extension -- the same way the content source derives a slug.
         const pageName = PortalSourceContext.pageName(item.fileName);
         if (pageName !== undefined) {
-          childNames.push(pageName.toString());
+          childNames.push(pageName);
           holdsPage = true;
         }
       }
@@ -284,9 +284,9 @@ export class PortalSourceContext {
    * The name an entry addresses a page by, or undefined when the file is not a page. Matched
    * by code point, like the docs glob: `Guide.MD` is no more a page to the build than here.
    */
-  private static pageName(fileName: FileName): FileName | undefined {
+  private static pageName(fileName: FileName): string | undefined {
     return PAGE_EXTENSIONS.some((extension) => fileName.hasExactExtension(extension))
-      ? fileName.withoutExtension()
+      ? `${fileName.withoutExtension()}`
       : undefined;
   }
 

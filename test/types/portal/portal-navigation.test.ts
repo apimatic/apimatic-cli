@@ -83,6 +83,28 @@ describe('PortalNavigation', () => {
       expect(errorsFor([1])[0]).to.contain("'pages' must be an array of strings.");
     });
 
+    // The entries a renamed meta.json carries across, each explained rather than reported as
+    // a page that does not exist.
+    it('recognises Fumadocs meta.json entry syntax and says what nav.json does instead', () => {
+      for (const entry of ['---Guides---', '[Status](https://status.example.com)', '!draft', '...guides', 'z...a']) {
+        const [error] = errorsFor([entry]);
+
+        expect(error, entry).to.contain(`'${entry}' is Fumadocs meta.json syntax, which nav.json does not read.`);
+        expect(error, entry).to.contain("'...' stands for the rest");
+      }
+    });
+
+    it('points api at the token, since that is where the reference is mounted', () => {
+      expect(errorsFor(['api'])).to.deep.equal([
+        "content/nav.json: 'api' is not a page or folder in this directory. The API reference is positioned with 'apimatic:api'."
+      ]);
+    });
+
+    it('names a folder called api below the root as an ordinary child', () => {
+      expect(parse(['api'], { isContentRoot: false, childNames: ['api'] }).isOk()).to.be.true;
+      expect(errorsFor(['api'], { isContentRoot: false })[0]).to.not.contain('apimatic:api');
+    });
+
     it('names the file when the JSON is broken', () => {
       expect(PortalNavigation.parse('{', contextFor())._unsafeUnwrapErr()).to.deep.equal([
         'content/nav.json is not valid JSON.'

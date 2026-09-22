@@ -437,6 +437,23 @@ describe('PortalSourceContext', () => {
       expect(ignored(source).sort()).to.deep.equal(['content/guides/meta.json', 'content/meta.json']);
     });
 
+    // Fumadocs reads its own metadata as YAML too, and the default glob the build replaced
+    // would have loaded these; now nothing does, so they are named rather than left inert.
+    it('warns about metadata and navigation files in a format the build does not read', async () => {
+      write('content/meta.yaml', 'pages: [index]');
+      write('content/guides/intro.md', '# Intro');
+      write('content/guides/meta.yml', 'pages: [intro]');
+      write('content/guides/nav.yaml', 'pages: [intro]');
+
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(ignored(source).sort()).to.deep.equal([
+        'content/guides/meta.yml',
+        'content/guides/nav.yaml',
+        'content/meta.yaml'
+      ]);
+    });
+
     // The sidebar shows no folder for a directory with no pages under it, so an entry naming
     // one would resolve to nothing.
     it('refuses a directory that holds no pages', async () => {

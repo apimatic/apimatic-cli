@@ -24,9 +24,9 @@ export interface PortalSource {
    */
   hiddenPages: FilePath[];
   /**
-   * Files in the content tree that look like navigation but are not read: a leftover
-   * `meta.json`, or a case variant the build's glob does not match. Reported rather than
-   * left to sit there doing nothing.
+   * Files in the content tree that look like navigation but are not read: a leftover Fumadocs
+   * `meta` file in any format, or a `nav` file in a format or case the build's glob does not
+   * match. Reported rather than left to sit there doing nothing.
    */
   ignoredNavigationFiles: FilePath[];
 }
