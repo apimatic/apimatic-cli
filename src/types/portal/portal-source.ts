@@ -19,11 +19,11 @@ export interface PortalSource {
   /** Spec slugs that a page under `content/api/` also claims, so the two share an address. */
   collidingSlugs: string[];
   /**
-   * Files in the content tree that look like navigation but are not read, relative to
-   * `src/`: a leftover `meta.json`, or a case variant the build's glob does not match.
-   * Reported rather than left to sit there doing nothing.
+   * Files in the content tree that look like navigation but are not read: a leftover
+   * `meta.json`, or a case variant the build's glob does not match. Reported rather than
+   * left to sit there doing nothing.
    */
-  ignoredNavigationFiles: string[];
+  ignoredNavigationFiles: FilePath[];
 }
 
 /** Why a source directory cannot be built; each variant maps to its own message. */

@@ -44,7 +44,14 @@ const PAGE_EXTENSIONS = ['.md', '.mdx'];
 /** What one walk of the content tree found: see `PortalSourceContext.navigation`. */
 interface NavigationScan {
   errors: string[];
-  ignoredFiles: string[];
+  ignoredFiles: FilePath[];
+}
+
+/** What the walk found in one directory and everything beneath it. */
+interface DirectoryScan {
+  /** Whether a page sits anywhere beneath it, which is what makes it a folder in the sidebar. */
+  holdsPage: boolean;
+  errors: string[];
 }
 
 /**
@@ -188,14 +195,19 @@ export class PortalSourceContext {
    * same tree, and a directory has to be seen before its file can be checked against it.
    */
   private async navigation(contentTree: Directory | null): Promise<NavigationScan> {
-    const errors: string[] = [];
-    const ignoredFiles: string[] = [];
     if (contentTree === null) {
-      return { errors, ignoredFiles };
+      return { errors: [], ignoredFiles: [] };
     }
 
-    const visit = async (directory: Directory, isContentRoot: boolean): Promise<void> => {
+    const ignoredFiles: FilePath[] = [];
+
+    // Children first, because a directory counts as one of its parent's children only when
+    // a page sits somewhere beneath it, and the walk below already has to find out. Each
+    // directory's errors go ahead of its children's, so the report still reads top down.
+    const visit = async (directory: Directory, isContentRoot: boolean): Promise<DirectoryScan> => {
       const childNames: string[] = [];
+      const childErrors: string[] = [];
+      let holdsPage = false;
       let navigationFile: FileName | undefined;
 
       for (const item of directory.items) {
@@ -203,8 +215,11 @@ export class PortalSourceContext {
         // naming it would resolve to nothing. Fumadocs would build one for a directory that
         // holds only a `nav.json`, but the template drops it again to keep to this rule.
         if (item instanceof Directory) {
-          if (PortalSourceContext.containsPage(item)) {
+          const child = await visit(item, false);
+          childErrors.push(...child.errors);
+          if (child.holdsPage) {
             childNames.push(item.directoryPath.leafName());
+            holdsPage = true;
           }
           continue;
         }
@@ -215,7 +230,7 @@ export class PortalSourceContext {
           continue;
         }
         if (item.fileName.is(NAVIGATION_FILE_NAME) || item.fileName.is(LEGACY_NAVIGATION_FILE_NAME)) {
-          ignoredFiles.push(this.relativeToSource(new FilePath(directory.directoryPath, item.fileName)));
+          ignoredFiles.push(new FilePath(directory.directoryPath, item.fileName));
           continue;
         }
         // An entry addresses a page by the name it is reached at, which is the file name
@@ -223,42 +238,37 @@ export class PortalSourceContext {
         const pageName = PortalSourceContext.pageName(item.fileName);
         if (pageName !== undefined) {
           childNames.push(pageName.toString());
+          holdsPage = true;
         }
       }
 
+      const errors: string[] = [];
       if (navigationFile !== undefined) {
         const file = new FilePath(directory.directoryPath, navigationFile);
+        const label = file.relativeTo(this.sourceDirectory);
         // Read inside the walk, so one unreadable file is reported rather than thrown out of
         // `resolve`, which always answers with a Result.
         let contents: string | undefined;
         try {
           contents = await this.fileService.getContents(file);
         } catch {
-          errors.push(`${this.relativeToSource(file)} could not be read.`);
+          errors.push(`${label} could not be read.`);
         }
         // An empty file goes through too: the build parses it as JSON and fails on it, so the
         // CLI has to refuse it here rather than treat it as no file.
         if (contents !== undefined) {
-          const parsed = PortalNavigation.parse(contents, {
-            label: this.relativeToSource(file),
-            isContentRoot,
-            childNames
-          });
+          const parsed = PortalNavigation.parse(contents, { label, isContentRoot, childNames });
           if (parsed.isErr()) {
             errors.push(...parsed.error);
           }
         }
       }
 
-      for (const item of directory.items) {
-        if (item instanceof Directory) {
-          await visit(item, false);
-        }
-      }
+      return { holdsPage, errors: [...errors, ...childErrors] };
     };
 
-    await visit(contentTree, true);
-    return { errors, ignoredFiles };
+    const root = await visit(contentTree, true);
+    return { errors: root.errors, ignoredFiles };
   }
 
   /**
@@ -266,18 +276,9 @@ export class PortalSourceContext {
    * by code point, like the docs glob: `Guide.MD` is no more a page to the build than here.
    */
   private static pageName(fileName: FileName): FileName | undefined {
-    const stem = fileName.withoutExtension();
-    return PAGE_EXTENSIONS.some((extension) => fileName.compare(new FileName(`${stem}${extension}`)) === 0)
-      ? stem
+    return PAGE_EXTENSIONS.some((extension) => fileName.hasExactExtension(extension))
+      ? fileName.withoutExtension()
       : undefined;
-  }
-
-  private static containsPage(directory: Directory): boolean {
-    return directory.items.some((item) =>
-      item instanceof Directory
-        ? PortalSourceContext.containsPage(item)
-        : PortalSourceContext.pageName(item.fileName) !== undefined
-    );
   }
 
   /** The content tree, or null when it cannot be walked, as `contentAddresses` also allowed. */
@@ -287,11 +288,6 @@ export class PortalSourceContext {
     } catch {
       return null;
     }
-  }
-
-  /** How a file inside the source directory is named in a message. */
-  private relativeToSource(file: FilePath): string {
-    return path.relative(this.sourceDirectory.toString(), file.toString()).split(path.sep).join('/');
   }
 
   /**

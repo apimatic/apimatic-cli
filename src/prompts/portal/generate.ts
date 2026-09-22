@@ -75,8 +75,8 @@ export class PortalGeneratePrompts {
     reportCollidingPages(slugs);
   }
 
-  public ignoredNavigationFiles(files: string[]) {
-    reportIgnoredNavigationFiles(files);
+  public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
+    reportIgnoredNavigationFiles(files, sourceDirectory);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

@@ -2,6 +2,7 @@ import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalMigration, PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
 
@@ -67,11 +68,11 @@ export function reportShadowedFiles(shadowed: FileName[]): void {
   log.warn(`${names} in ${f.var('static')} replaces the file the portal would have generated.`);
 }
 
-export function reportIgnoredNavigationFiles(files: string[]): void {
+export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath): void {
   if (files.length === 0) {
     return;
   }
-  const names = files.map((file) => f.var(file)).join(', ');
+  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
   const [verb, pronoun] = files.length === 1 ? ['is', 'it'] : ['are', 'them'];
   log.warn(
     `${names} ${verb} not read. Pages are ordered by ${f.var('nav.json')}: rename ${pronoun} to ` +

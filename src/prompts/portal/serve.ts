@@ -2,6 +2,7 @@ import { log } from '@clack/prompts';
 import { once } from 'node:events';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
@@ -30,8 +31,8 @@ export class PortalServePrompts {
     reportCollidingPages(slugs);
   }
 
-  public ignoredNavigationFiles(files: string[]) {
-    reportIgnoredNavigationFiles(files);
+  public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
+    reportIgnoredNavigationFiles(files, sourceDirectory);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

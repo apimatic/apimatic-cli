@@ -5,7 +5,7 @@ import { expect } from 'chai';
 import { parse as parseYaml } from 'yaml';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalConfig } from '../../src/types/portal/portal-config';
-import { PortalMigration, PortalSourceProblem } from '../../src/types/portal/portal-source';
+import { PortalMigration, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
@@ -25,6 +25,10 @@ describe('PortalSourceContext', () => {
   };
 
   const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
+
+  /** The ignored navigation files as the warning names them, relative to the source directory. */
+  const ignored = (source: PortalSource): string[] =>
+    source.ignoredNavigationFiles.map((file) => file.relativeTo(new DirectoryPath(root)));
 
   /** The migration hint behind a `missingConfig` problem, as its own type. */
   const migrationOf = (problem: PortalSourceProblem): PortalMigration => {
@@ -404,7 +408,7 @@ describe('PortalSourceContext', () => {
 
       const source = (await resolve())._unsafeUnwrap();
 
-      expect(source.ignoredNavigationFiles.sort()).to.deep.equal(['content/guides/meta.json', 'content/meta.json']);
+      expect(ignored(source).sort()).to.deep.equal(['content/guides/meta.json', 'content/meta.json']);
     });
 
     // The sidebar shows no folder for a directory with no pages under it, so an entry naming
@@ -449,15 +453,15 @@ describe('PortalSourceContext', () => {
       write('content/meta.json', JSON.stringify({ pages: ['index'] }));
 
       const first = (await resolve())._unsafeUnwrap();
-      first.ignoredNavigationFiles.push('polluted');
+      first.ignoredNavigationFiles.length = 0;
 
-      expect((await resolve())._unsafeUnwrap().ignoredNavigationFiles).to.deep.equal(['content/meta.json']);
+      expect(ignored((await resolve())._unsafeUnwrap())).to.deep.equal(['content/meta.json']);
     });
 
     it('reports no ignored files when there are none', async () => {
       write('content/nav.json', JSON.stringify({ pages: ['index'] }));
 
-      expect((await resolve())._unsafeUnwrap().ignoredNavigationFiles).to.deep.equal([]);
+      expect(ignored((await resolve())._unsafeUnwrap())).to.deep.equal([]);
     });
 
     // The build matches `**/nav.json` by code point, so a case variant orders nothing. It is
@@ -467,7 +471,7 @@ describe('PortalSourceContext', () => {
 
       const source = (await resolve())._unsafeUnwrap();
 
-      expect(source.ignoredNavigationFiles).to.deep.equal(['content/Nav.json']);
+      expect(ignored(source)).to.deep.equal(['content/Nav.json']);
     });
 
     // The file is not loaded by the build at all, so it cannot make a nav.json invalid.
