@@ -29,10 +29,8 @@ const STATIC_PREFIX = 'static/';
 
 const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPageActions']);
 
-// Pre-2.0 names and near misses, each mapped to the setting it means.
+// Near misses, each mapped to the setting it means.
 const RENAMED_FIELDS = new Map<string, string>([
-  ['logoUrl', 'logo'],
-  ['pageTitle', 'title'],
   ['url', 'siteUrl'],
   ['site', 'siteUrl']
 ]);
