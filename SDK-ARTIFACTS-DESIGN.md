@@ -1,7 +1,6 @@
 # Code samples in the portal — the `/api/sdk-artifacts` contract
 
-**Status:** design settled, nothing implemented. Rewritten 2026-09-22, replacing the
-2026-09-17 draft in full.
+**Status:** design settled, nothing implemented.
 **Purpose:** the single place the CLI, apimatic-io and codegen-v2 agree on what crosses the
 wire, so the Azure Function can be written from it. Every claim under
 [Verified facts](#8-verified-facts) carries a `file:line` reference and can be re-checked.
@@ -64,20 +63,16 @@ end and has no Node build infrastructure; the CLI is already a Node program.
 
 ## 3. Decision log
 
-Numbered as settled. A superseded decision is kept, struck through, so a reader following
-an older discussion lands somewhere rather than nowhere.
+Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 
 ### Scope and transport
 
 | # | Decision |
 |---|---|
-| D1 | ~~The endpoint returns code samples only.~~ **Superseded by D26/D27**: one endpoint returns SDKs, code samples and (later) the plugin. |
 | D2 | **Samples-only payload; the CLI merges.** The server never returns a rewritten spec. The CLI already parses every spec file, and a Stripe-sized document is tens of MB to upload and download again for a few hundred KB of samples. |
-| D3 | **The CLI uploads a build zip**, not a bare spec. Refined by D31. |
-| D4 | ~~apimatic-io orchestrates the fan-out.~~ **Superseded by D26**: codegen-v2 orchestrates; apimatic-io is a pass-through front. |
+| D3 | **The CLI uploads a build zip**, not a bare spec. D31 names the directory. |
 | D5 | **Ship the samples codegen-v2 renders**, value-bearing where the stack supports it. |
 | D6 | **No subscription language gate for now** — all of v4 is beta. Add the check when anything reaches stable. |
-| D7 | ~~No caching; the annotated spec lives in the throwaway project dir.~~ Still true, but see D27: every run regenerates, so there is nothing to cache. |
 | D8 | **Raw axios in a dedicated service**, not a new `@apimatic/sdk` controller, until a v4 TypeScript SDK of apimatic-io exists. The precedent is already in the file we extend. |
 
 ### Wire format
@@ -85,12 +80,9 @@ an older discussion lands somewhere rather than nowhere.
 | # | Decision |
 |---|---|
 | D9 | **The CLI synthesizes the zip**, with the language request carried by a config file inside it, mirroring how `plugin-config.json` drives the plugin flow. |
-| D10 | ~~New route trio `api/portal/samples`.~~ **Superseded by D26**: `api/sdk-artifacts`. |
 | D11 | **Key a sample on `path` + `method`.** That is the document's own addressing and is guaranteed to be present and to match; `operationId` is optional in OpenAPI and codegen-v2 synthesizes one when it is absent. |
 | D12 | **Carry every declared example** on the wire, keyed by its OpenAPI `examples:` map key. |
 | D13 | **Copy the spec tree into the temp project and annotate the copy.** Relative `$ref`s then keep resolving. See D20 for refs that escape `src/spec/`. |
-| D14 | ~~Degrade to curl-only when sample generation fails.~~ **Superseded by D28**: all-or-nothing, the command fails. |
-| D15 | ~~Ship TypeScript-only in v1.~~ Superseded in practice — the design is language-agnostic and C#/Python arrive by adding files to the zip. |
 | D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. |
 | D17 | The Func wiring is the critical path and is what this document specifies. |
 | D18 | **One `x-codeSamples` array entry per (language × example).** Upstream `fumadocs-openapi` gives each entry its own `lang` and `label`, so every example gets a tab with no fork and no patch. |
@@ -98,12 +90,10 @@ an older discussion lands somewhere rather than nowhere.
 | D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
 | D22 | **Reuse codegen-v2's status vocabulary verbatim.** The CLI's poller then needs no change. |
-| D23 | ~~`portal serve` fetches at startup, with a `--no-samples` flag.~~ **Superseded by D27**: no flag; every run generates. |
 | D24 | **Webhooks stay curl-only.** The wire format reserves the space now — see D33. |
-| D25 | ~~`portal.json.languages`, absent meaning no samples.~~ **Superseded by D29/D30.** |
-| D26 | **The endpoint is `/api/sdk-artifacts`**, an all-or-nothing async orchestrator in codegen-v2 that takes a build directory and returns one zip of artifacts. "Portal input generation" is retired as a name; the thing that crosses the wire is a **code-sample catalog**. |
+| D26 | **The endpoint is `/api/sdk-artifacts`**, an all-or-nothing async orchestrator in codegen-v2 that takes a build directory and returns one zip of artifacts. The thing that crosses the wire is a **code-sample catalog**. |
 
-### Settled in the final round
+### Build input, artifacts and budgets
 
 <a id="d27"></a>
 
@@ -438,7 +428,7 @@ same enum values.
 ### 7.4 Command behaviour
 
 Every run generates fresh artifacts ([D27](#d27)), and a failure fails the command
-([D28](#settled-in-the-final-round)) — for `portal generate`, nothing is written; for
+([D28](#build-input-artifacts-and-budgets)) — for `portal generate`, nothing is written; for
 `portal serve`, the dev server never starts.
 
 Generation is **startup-only**, and that is free rather than enforced: the CLI has no file
