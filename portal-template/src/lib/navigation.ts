@@ -144,6 +144,10 @@ function firstPageIn(folder: Folder): Node | undefined {
 
 function reorder(context: NavigationContext, node: Folder, folderPath: string, order: string[]): Node[] {
   const remaining = new Set(node.children);
+  // Asked once per child: the token, both bands and the anchor all want to know, and each
+  // answer is a storage read.
+  const injectedChildren = new Set(node.children.filter((child) => isInjected(context, child)));
+  const isInjectedChild = (child: Node): boolean => injectedChildren.has(child);
   const named: Node[] = [];
   let restIndex: number | undefined;
 
@@ -169,7 +173,7 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
       }
     } else if (entry === INJECTED_PAGES_TOKEN) {
       if (isContentRoot) {
-        for (const page of [...remaining].filter((child) => isInjected(context, child))) {
+        for (const page of [...remaining].filter(isInjectedChild)) {
           claim(page);
         }
       }
@@ -184,14 +188,14 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
   // nobody touched.
   const rest = [...remaining];
   const api = rest.filter((child) => isApiReference(child));
-  const injected = rest.filter((child) => isInjected(context, child));
-  const content = rest.filter((child) => !isApiReference(child) && !isInjected(context, child));
+  const injected = rest.filter(isInjectedChild);
+  const content = rest.filter((child) => !isApiReference(child) && !isInjectedChild(child));
 
   // With no rest token, unnamed content joins the user's own pages: after the last one the
   // file named. Appending at the end instead would drop it below the whole API reference,
   // and inserting before the reference would lift it above one the file deliberately put
   // first.
-  const at = restIndex ?? afterNamedContent(context, named);
+  const at = restIndex ?? afterNamedContent(named, isInjectedChild);
   const ordered = [...named.slice(0, at), ...content, ...named.slice(at)];
 
   const anchor = anchorIn(ordered);
@@ -218,9 +222,9 @@ function matching(
   );
 }
 
-function afterNamedContent(context: NavigationContext, named: Node[]): number {
+function afterNamedContent(named: Node[], isInjectedChild: (child: Node) => boolean): number {
   for (let index = named.length - 1; index >= 0; index -= 1) {
-    if (!isApiReference(named[index]) && !isInjected(context, named[index])) {
+    if (!isApiReference(named[index]) && !isInjectedChild(named[index])) {
       return index + 1;
     }
   }
