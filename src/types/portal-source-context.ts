@@ -6,13 +6,7 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
-import {
-  API_REFERENCE_NAME,
-  IGNORED_NAVIGATION_FILE_NAMES,
-  INDEX_NAME,
-  NAVIGATION_FILE_NAME,
-  PortalNavigation
-} from './portal/portal-navigation.js';
+import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
 import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 import { stripByteOrderMark } from '../utils/string-utils.js';
@@ -37,8 +31,10 @@ const GENERATED_ROOT_FILES = [
   '_shell.html'
 ];
 
-// `generatePortal` settings the v1 `portal.json` can express; everything else in the old
-// build file is reported as unsupported by the migration hint.
+// `generatePortal` settings the migration hint accounts for: the first two are carried into
+// the suggested `portal.json`, and the table of contents is passed over without a word, since
+// the sidebar is now ordered from the pages themselves. Everything else in the old build file
+// is reported as unsupported.
 const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl', 'tableOfContentsPath']);
 
 const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
@@ -214,7 +210,7 @@ export class PortalSourceContext {
 
   /**
    * Every `nav.json` in the content tree, validated against the directory it orders, plus
-   * the `meta.json` files the build no longer reads. One walk, because both come from the
+   * any `nav.json` in a case the build does not match. One walk, because both come from the
    * same tree, and a directory has to be seen before its file can be checked against it.
    */
   private async navigation(contentTree: Directory | null, specs: PortalSpec[]): Promise<NavigationScan> {
@@ -257,13 +253,12 @@ export class PortalSourceContext {
           continue;
         }
         // `compare` is by code point, so this matches the build's glob exactly. A file named
-        // `Nav.json` is read by neither, and is reported below rather than sitting inert.
+        // `Nav.json` is read by neither, and is reported rather than left sitting inert.
         if (item.fileName.compare(NAVIGATION_FILE) === 0) {
           navigationFile = item.fileName;
           continue;
         }
-        const isCaseVariant = item.fileName.is(NAVIGATION_FILE_NAME) && item.fileName.compare(NAVIGATION_FILE) !== 0;
-        if (isCaseVariant || IGNORED_NAVIGATION_FILE_NAMES.some((name) => item.fileName.is(name))) {
+        if (item.fileName.is(NAVIGATION_FILE_NAME)) {
           ignoredFiles.push(new FilePath(directory.directoryPath, item.fileName));
           continue;
         }
@@ -475,8 +470,7 @@ export class PortalSourceContext {
         : {
             suggestedConfig: PortalConfig.placeholder,
             unsupportedFields: ['generateVersionedPortal'],
-            unmigratableLogo: null,
-            hadTableOfContents: false
+            unmigratableLogo: null
           };
     }
 
@@ -499,8 +493,7 @@ export class PortalSourceContext {
     return {
       suggestedConfig: PortalConfig.create(title, null, logo),
       unsupportedFields,
-      unmigratableLogo: logoUrl !== null && logo === null ? logoUrl : null,
-      hadTableOfContents: portalFields.tableOfContentsPath !== undefined
+      unmigratableLogo: logoUrl !== null && logo === null ? logoUrl : null
     };
   }
 }

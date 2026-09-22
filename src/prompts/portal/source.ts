@@ -81,10 +81,7 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   }
   const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
   const [verb, pronoun] = files.length === 1 ? ['is', 'it'] : ['are', 'them'];
-  log.warn(
-    `${names} ${verb} not read. Pages are ordered by a ${f.var('nav.json')} in the same directory: ` +
-      `move the order there, then delete ${pronoun}.`
-  );
+  log.warn(`${names} ${verb} not read. Name ${pronoun} ${f.var('nav.json')}, in lower case, to order the pages.`);
 }
 
 export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryPath): void {
@@ -115,15 +112,6 @@ function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryP
       `The logo at ${f.var(migration.unmigratableLogo)} is not carried over: ${f.var('logo')} addresses ` +
         `the ${f.var('static')} directory. Move the image under ${f.path(sourceDirectory.join('static'))} ` +
         `and add it as ${f.var('"logo": "static/<path>"')}.`
-    );
-  }
-
-  if (migration.hadTableOfContents) {
-    lines.push(
-      '',
-      `Navigation is no longer described by ${f.var('toc.yml')}. Pages are ordered by the ` +
-        `${f.var('nav.json')} files in your content directory, a group's name becomes the ` +
-        `${f.var('title')} of the ${f.var('nav.json')} in that folder, and API operations are grouped by their tags.`
     );
   }
 

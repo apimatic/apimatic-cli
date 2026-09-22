@@ -69,7 +69,7 @@ either can be added later without rework.
 | API structure | Keep the `api` wrapper folder, title it "API Reference" in the transformer, and inline the spec level when there is exactly one spec. |
 | Spec section labels | Derived from the spec filename, as today. Not from `info.title`. |
 | Name collisions | Fail the build, naming both files. |
-| Leftover `meta.json` | Warn and ignore. Ignoring is real, not nominal, because of the collection restriction above. |
+| Leftover `meta.json` | Ignore, silently. Ignoring is real, not nominal, because of the collection restriction above. (Revised 2026-09-22: the warning that named the file and asked for it to be renamed was removed, along with every other message that pointed from `toc.yml` or `meta.json` at `nav.json`. The CLI carries no migration messaging for navigation. A `nav.json` in the wrong case is still reported, because that is the new file itself.) |
 | Config split | Client-safe fields stay in `portal.config.json`; absolute paths move to a server-only file (section 9). |
 | Sequencing | Navigation first. The SDK page and a **required** `languages` property follow as a second change. |
 
@@ -223,9 +223,10 @@ restriction, the file is never loaded, the CLI's warning is accurate, and
 unrelated JSON in the content directory stops being validated against a schema
 that has nothing to do with it.
 
-The CLI warns about any `meta.json` found under `src/content/`, naming the file
-and the name to rename it to, and the quickstart scaffold writes `nav.json`
-instead (`PortalQuickstartAction.scaffold`).
+The CLI says nothing about a `meta.json` found under `src/content/`: it is one
+more file the build does not read (section 2 records why the warning first
+planned here was dropped). The quickstart scaffold writes `nav.json`
+(`PortalQuickstartAction.scaffold`).
 
 ## 6. Defaults
 

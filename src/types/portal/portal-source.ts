@@ -49,9 +49,4 @@ export interface PortalMigration {
    * `static/` directory. Kept so the user is told what to do with the image instead.
    */
   unmigratableLogo: string | null;
-  /**
-   * Whether the pre-2.0 file described its navigation with a table of contents. Reported
-   * separately because that has a 2.0 equivalent: the `nav.json` files beside the pages.
-   */
-  hadTableOfContents: boolean;
 }

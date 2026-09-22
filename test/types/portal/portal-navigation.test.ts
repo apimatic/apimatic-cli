@@ -85,24 +85,6 @@ describe('PortalNavigation', () => {
       expect(errorsFor([1])[0]).to.contain("'pages' must be an array of strings.");
     });
 
-    // The entries a renamed meta.json carries across, each explained rather than reported as
-    // a page that does not exist.
-    it('recognises Fumadocs meta.json entry syntax and says what nav.json does instead', () => {
-      for (const entry of [
-        '---',
-        '---Guides---',
-        '[Status](https://status.example.com)',
-        '!draft',
-        '...guides',
-        'z...a'
-      ]) {
-        const [error] = errorsFor([entry]);
-
-        expect(error, entry).to.contain(`'${entry}' is Fumadocs meta.json syntax, which nav.json does not read.`);
-        expect(error, entry).to.contain("'...' stands for the rest");
-      }
-    });
-
     it('points api at the token, since that is where the reference is mounted', () => {
       expect(errorsFor(['api'])).to.deep.equal([
         "content/nav.json: 'api' is not a page or folder in this directory. The API reference is positioned with 'apimatic:api'."
@@ -162,14 +144,9 @@ describe('PortalNavigation', () => {
       ]);
     });
 
-    it('names an unknown setting, and suggests pages for a near miss', () => {
-      const context = contextFor();
-
-      expect(PortalNavigation.validate('{"order":["index"]}', context)._unsafeUnwrapErr()[0]).to.contain(
-        "'order' is not a nav.json setting; did you mean 'pages'?"
-      );
-      expect(PortalNavigation.validate('{"colour":"red"}', context)._unsafeUnwrapErr()).to.deep.equal([
-        "content/nav.json: 'colour' is not a nav.json setting."
+    it('names an unknown setting and lists the settings there are', () => {
+      expect(PortalNavigation.validate('{"colour":"red"}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
+        "content/nav.json: 'colour' is not a nav.json setting. The settings are 'pages' and 'title'."
       ]);
     });
   });
@@ -212,18 +189,6 @@ describe('PortalNavigation', () => {
 
       expect(errorsFor(['index', 'nonsense'], nested)).to.have.lengthOf(2);
     });
-  });
-
-  // The warning about a leftover meta.json asks the user to rename it. Whoever does that
-  // carries its Fumadocs keys across, and calling those a misspelling of 'pages' would be
-  // a dead end.
-  it('explains a Fumadocs folder-metadata key rather than calling it a typo', () => {
-    const errors = PortalNavigation.validate('{"icon":"book","pages":["index"]}', contextFor())._unsafeUnwrapErr();
-
-    expect(errors).to.have.lengthOf(1);
-    expect(errors[0]).to.contain("'icon' is not a nav.json setting");
-    expect(errors[0]).to.contain("the order of pages and a folder's title");
-    expect(errors[0]).to.not.contain('did you mean');
   });
 
   describe('the folder title', () => {
@@ -272,14 +237,6 @@ describe('PortalNavigation', () => {
         "content/guides/nav.json: 'title' names this folder, but a directory with no page in it or below it is no folder in the sidebar. Add a page, or remove the setting."
       ]);
     });
-
-    it('suggests it for the names a toc.yml or a meta.json used', () => {
-      for (const field of ['group', 'name', 'label']) {
-        const errors = PortalNavigation.validate(`{"${field}":"Guides"}`, contextFor(nested))._unsafeUnwrapErr();
-
-        expect(errors[0], field).to.contain(`'${field}' is not a nav.json setting; did you mean 'title'?`);
-      }
-    });
   });
 
   // `JSON.parse` will happily hand back a document keyed by a prototype member.
@@ -288,7 +245,9 @@ describe('PortalNavigation', () => {
       it(`reports '${field}' as unknown without quoting a prototype member back`, () => {
         const errors = PortalNavigation.validate(`{"${field}":"x"}`, contextFor())._unsafeUnwrapErr();
 
-        expect(errors).to.deep.equal([`content/nav.json: '${field}' is not a nav.json setting.`]);
+        expect(errors).to.deep.equal([
+          `content/nav.json: '${field}' is not a nav.json setting. The settings are 'pages' and 'title'.`
+        ]);
         expect(errors[0]).to.not.contain('native code');
       });
     }

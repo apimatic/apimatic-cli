@@ -19,39 +19,14 @@ export const API_REFERENCE_NAME = 'api';
 export const INDEX_NAME = 'index';
 
 export const NAVIGATION_FILE_NAME = 'nav.json';
-/**
- * Files that look like navigation but that the build never reads: Fumadocs' own `meta` file
- * in each format it accepts, which `nav.json` replaced, and `nav` in a format the build does
- * not read. Warned about wherever they are found, compared without regard to case. A
- * `nav.json` in the wrong case is warned about too, but by name, since the right case is the
- * file itself.
- */
-export const IGNORED_NAVIGATION_FILE_NAMES = ['nav.yaml', 'nav.yml', 'meta.json', 'meta.yaml', 'meta.yml'];
 
+// A misspelled field would otherwise be stripped by Fumadocs' own schema and leave the
+// sidebar in its default order with nothing said, so every unknown field is reported.
 const KNOWN_FIELDS = new Set(['pages', 'title']);
 
-// Plausible names for each of the two fields. A misspelled field would otherwise be stripped
-// by Fumadocs' own schema and leave the sidebar in its default order with nothing said.
-// `group` and `items` are what `toc.yml` called a section and its contents.
-const RENAMED_FIELDS = new Map<string, string>([
-  ['order', 'pages'],
-  ['items', 'pages'],
-  ['page', 'pages'],
-  ['navigation', 'pages'],
-  ['toc', 'pages'],
-  ['group', 'title'],
-  ['name', 'title'],
-  ['label', 'title']
-]);
-
-// Fumadocs' own folder-metadata keys. Someone renaming a `meta.json` as the CLI's warning
-// asks them to will carry these across, and "did you mean 'pages'?" would be a poor answer:
-// they are not misspellings, they are a thing `nav.json` deliberately does not do.
-const FUMADOCS_ONLY_FIELDS = new Set(['icon', 'description', 'defaultOpen', 'collapsible', 'root', 'pagesIndex']);
-
-// The entry shapes Fumadocs' own `meta.json` accepts and `nav.json` does not: a separator, a
-// link, an exclusion, an extract of another folder's pages, and the reversed rest.
-const FUMADOCS_ENTRY_SYNTAX = [/^---(.*---)?$/, /^\[.*\]\(.*\)$/, /^!/, /^\.\.\..+/, /^z\.\.\.a$/];
+// The file has two settings, so a misspelling is answered by naming both rather than
+// guessing at the one it meant.
+const NO_RENAMED_FIELDS: ReadonlyMap<string, string> = new Map();
 
 /** Where a `nav.json` sits, and what its entries are allowed to address. */
 export interface NavigationContext {
@@ -82,8 +57,8 @@ export class PortalNavigation {
       return err(document.error);
     }
 
-    const unknownFields = unknownFieldErrors(document.value, KNOWN_FIELDS, RENAMED_FIELDS, (field, intended) =>
-      PortalNavigation.describeUnknownField(field, intended, context)
+    const unknownFields = unknownFieldErrors(document.value, KNOWN_FIELDS, NO_RENAMED_FIELDS, (field) =>
+      PortalNavigation.describeUnknownField(field, context)
     );
 
     const settingErrors = [...unknownFields, ...PortalNavigation.titleErrors(document.value.title, context)];
@@ -141,16 +116,6 @@ export class PortalNavigation {
 
     if (entry.length === 0) {
       return err(`${context.label}: 'pages' must not contain an empty entry.`);
-    }
-
-    // Someone renaming a `meta.json` as the CLI's warning asks them to carries its entries
-    // across; "not a page or folder" would be true of each and explain none of them.
-    if (FUMADOCS_ENTRY_SYNTAX.some((syntax) => syntax.test(entry))) {
-      return err(
-        `${context.label}: '${entry}' is Fumadocs meta.json syntax, which ${NAVIGATION_FILE_NAME} does not ` +
-          `read. An entry names a page or folder in this directory, '${REST_TOKEN}' stands for the ` +
-          `rest, and '${INJECTED_PAGES_TOKEN}' and '${API_REFERENCE_TOKEN}' position what the CLI adds.`
-      );
     }
 
     // Naming a nested path would claim the node out of its folder and leave the folder
@@ -278,17 +243,11 @@ export class PortalNavigation {
     return [];
   }
 
-  private static describeUnknownField(field: string, intended: string | undefined, context: NavigationContext): string {
-    if (intended !== undefined) {
-      return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting; did you mean '${intended}'?`;
-    }
-    if (FUMADOCS_ONLY_FIELDS.has(field)) {
-      return (
-        `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. ` +
-        `${NAVIGATION_FILE_NAME} sets the order of pages and a folder's title, and nothing else.`
-      );
-    }
-    return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting.`;
+  private static describeUnknownField(field: string, context: NavigationContext): string {
+    return (
+      `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. ` +
+      `The settings are 'pages' and 'title'.`
+    );
   }
 
   /** A near miss is nearly always a typo or a forgotten extension, so name the candidate. */

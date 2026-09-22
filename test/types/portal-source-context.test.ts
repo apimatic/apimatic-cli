@@ -530,33 +530,6 @@ describe('PortalSourceContext', () => {
       expect((await resolve()).isOk()).to.be.true;
     });
 
-    it('warns about a leftover meta.json without failing the build', async () => {
-      write('content/meta.json', JSON.stringify({ pages: ['index'] }));
-      write('content/guides/intro.md', '# Intro');
-      write('content/guides/meta.json', JSON.stringify({ pages: ['intro'] }));
-
-      const source = (await resolve())._unsafeUnwrap();
-
-      expect(ignored(source).sort()).to.deep.equal(['content/guides/meta.json', 'content/meta.json']);
-    });
-
-    // Fumadocs reads its own metadata as YAML too, and the default glob the build replaced
-    // would have loaded these; now nothing does, so they are named rather than left inert.
-    it('warns about metadata and navigation files in a format the build does not read', async () => {
-      write('content/meta.yaml', 'pages: [index]');
-      write('content/guides/intro.md', '# Intro');
-      write('content/guides/meta.yml', 'pages: [intro]');
-      write('content/guides/nav.yaml', 'pages: [intro]');
-
-      const source = (await resolve())._unsafeUnwrap();
-
-      expect(ignored(source).sort()).to.deep.equal([
-        'content/guides/meta.yml',
-        'content/guides/nav.yaml',
-        'content/meta.yaml'
-      ]);
-    });
-
     // The sidebar shows no folder for a directory with no pages under it, so an entry naming
     // one would resolve to nothing.
     it('refuses a directory that holds no pages', async () => {
@@ -596,12 +569,12 @@ describe('PortalSourceContext', () => {
     });
 
     it('hands each resolve its own list rather than a shared one', async () => {
-      write('content/meta.json', JSON.stringify({ pages: ['index'] }));
+      write('content/Nav.json', JSON.stringify({ pages: ['index'] }));
 
       const first = (await resolve())._unsafeUnwrap();
       first.ignoredNavigationFiles.length = 0;
 
-      expect(ignored((await resolve())._unsafeUnwrap())).to.deep.equal(['content/meta.json']);
+      expect(ignored((await resolve())._unsafeUnwrap())).to.deep.equal(['content/Nav.json']);
     });
 
     it('reports no ignored files when there are none', async () => {
@@ -620,11 +593,16 @@ describe('PortalSourceContext', () => {
       expect(ignored(source)).to.deep.equal(['content/Nav.json']);
     });
 
-    // The file is not loaded by the build at all, so it cannot make a nav.json invalid.
-    it('does not validate a leftover meta.json', async () => {
+    // The build loads `**/nav.json` alone, so any other JSON or YAML in the content directory
+    // is neither read nor remarked upon, whatever it contains.
+    it('says nothing about other JSON and YAML files in the content directory', async () => {
       write('content/meta.json', JSON.stringify({ pages: ['nonsense'] }));
+      write('content/guides/intro.md', '# Intro');
+      write('content/guides/nav.yaml', 'pages: [nonsense]');
 
-      expect((await resolve()).isOk()).to.be.true;
+      const source = (await resolve())._unsafeUnwrap();
+
+      expect(ignored(source)).to.deep.equal([]);
     });
   });
 
@@ -687,7 +665,9 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig', migration: null });
     });
 
-    it('flags a table of contents rather than calling it unsupported', async () => {
+    // The sidebar is ordered from the pages themselves now, so the old setting is neither
+    // carried over nor called unsupported.
+    it('passes over a table of contents without a word', async () => {
       write(
         'APIMATIC-BUILD.json',
         JSON.stringify({ generatePortal: { pageTitle: 'Acme', tableOfContentsPath: 'content/toc.yml' } })
@@ -695,16 +675,7 @@ describe('PortalSourceContext', () => {
 
       const migration = migrationOf((await resolve())._unsafeUnwrapErr());
 
-      expect(migration.hadTableOfContents).to.be.true;
       expect(migration.unsupportedFields).to.not.include('tableOfContentsPath');
-    });
-
-    it('does not flag one for a build file that never had it', async () => {
-      write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(migration.hadTableOfContents).to.be.false;
     });
 
     it('names a logo it cannot carry over instead of listing it as unsupported', async () => {
@@ -803,8 +774,7 @@ describe('PortalSourceContext', () => {
       expect(JSON.parse(read('content/nav.json'))).to.deep.equal({ pages: ['index', '...'] });
     });
 
-    // It used to write meta.json, which the build no longer reads: a freshly scaffolded
-    // project would have warned about its own file on the very next command.
+    // A freshly scaffolded project must not warn about its own files on the very next command.
     it('writes a navigation file the build reads, and nothing it ignores', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 
