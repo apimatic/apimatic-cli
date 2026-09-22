@@ -12,8 +12,8 @@ const API_REFERENCE_TOKEN = 'apimatic:api';
 
 const APIMATIC_PREFIX = 'apimatic:';
 
-/** The directory the reference is mounted at, and so the name someone guesses for it. */
-const API_REFERENCE_NAME = 'api';
+/** The directory the reference is mounted at, which `content/api/` shares, and so the name someone guesses for it. */
+export const API_REFERENCE_NAME = 'api';
 
 /** The page a folder below the content root links to, which is never one of its children. */
 const INDEX_NAME = 'index';
@@ -54,7 +54,7 @@ const FUMADOCS_ONLY_FIELDS = new Set([
 
 // The entry shapes Fumadocs' own `meta.json` accepts and `nav.json` does not: a separator, a
 // link, an exclusion, an extract of another folder's pages, and the reversed rest.
-const FUMADOCS_ENTRY_SYNTAX = [/^---.*---$/, /^\[.*\]\(.*\)$/, /^!/, /^\.\.\..+/, /^z\.\.\.a$/];
+const FUMADOCS_ENTRY_SYNTAX = [/^---(.*---)?$/, /^\[.*\]\(.*\)$/, /^!/, /^\.\.\..+/, /^z\.\.\.a$/];
 
 /** Where a `nav.json` sits, and what its entries are allowed to address. */
 export interface NavigationContext {

@@ -269,6 +269,15 @@ describe('PortalSourceContext', () => {
       expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
     });
 
+    // An index page is a folder's own link, and the folders directly below a section are the
+    // tag folders, which the CLI cannot tell from the user's without reading the specification.
+    it('does not report an index page one folder below the section, where the tag folders sit', async () => {
+      write('content/api/api/pets/index.md', '# Pets');
+      write('content/api/api/pets/deeper/index.md', '# Deeper');
+
+      expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal(['content/api/api/pets/deeper/index.md']);
+    });
+
     // The page tree is keyed on the path as written: a differently cased directory, or a
     // route group on the way, is another folder, and no metadata hides what is in it.
     it('does not report pages whose directories only resolve to the section’s address', async () => {
@@ -383,6 +392,25 @@ describe('PortalSourceContext', () => {
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
       expect(errors).to.deep.equal(["content/nav.json: 'missing' is not a page or folder in this directory."]);
+    });
+
+    // The reference is mounted in content/api, one folder per specification, so the nav.json
+    // there positions those folders as it does the user's own pages.
+    it('lets the nav.json in content/api name the specifications beside its pages', async () => {
+      write('spec/billing.json', OPENAPI);
+      write('content/api/overview.md', '# Overview');
+      write('content/api/nav.json', JSON.stringify({ pages: ['overview', 'api', 'billing'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('refuses a specification named anywhere but in content/api', async () => {
+      write('content/guides/intro.md', '# Intro');
+      write('content/guides/nav.json', JSON.stringify({ pages: ['intro', 'api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/guides/nav.json: 'api' is not a page or folder");
     });
 
     it('validates a nested file against its own directory', async () => {

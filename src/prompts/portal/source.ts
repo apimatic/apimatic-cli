@@ -82,8 +82,8 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
   const [verb, pronoun] = files.length === 1 ? ['is', 'it'] : ['are', 'them'];
   log.warn(
-    `${names} ${verb} not read. Pages are ordered by ${f.var('nav.json')}: rename ${pronoun} to ` +
-      `order that directory, or delete ${pronoun}.`
+    `${names} ${verb} not read. Pages are ordered by a ${f.var('nav.json')} in the same directory: ` +
+      `move the order there, then delete ${pronoun}.`
   );
 }
 

@@ -78,7 +78,14 @@ describe('PortalNavigation', () => {
     // The entries a renamed meta.json carries across, each explained rather than reported as
     // a page that does not exist.
     it('recognises Fumadocs meta.json entry syntax and says what nav.json does instead', () => {
-      for (const entry of ['---Guides---', '[Status](https://status.example.com)', '!draft', '...guides', 'z...a']) {
+      for (const entry of [
+        '---',
+        '---Guides---',
+        '[Status](https://status.example.com)',
+        '!draft',
+        '...guides',
+        'z...a'
+      ]) {
         const [error] = errorsFor([entry]);
 
         expect(error, entry).to.contain(`'${entry}' is Fumadocs meta.json syntax, which nav.json does not read.`);

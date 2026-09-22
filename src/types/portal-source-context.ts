@@ -6,7 +6,12 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
-import { IGNORED_NAVIGATION_FILE_NAMES, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
+import {
+  API_REFERENCE_NAME,
+  IGNORED_NAVIGATION_FILE_NAMES,
+  NAVIGATION_FILE_NAME,
+  PortalNavigation
+} from './portal/portal-navigation.js';
 import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 import { stripByteOrderMark } from '../utils/string-utils.js';
@@ -51,9 +56,6 @@ interface ContentPage {
   file: FilePath;
   segments: string[];
 }
-
-/** The directory the reference pages are mounted in, which `content/api/` shares. */
-const API_SEGMENT = 'api';
 
 /** The page that stands for its folder rather than sitting among the folder's pages. */
 const INDEX_NAME = 'index';
@@ -124,7 +126,7 @@ export class PortalSourceContext {
       ? this.contentDirectory
       : null;
 
-    // Walked once and shared: both the navigation scan and the slug collision check read the
+    // Walked once and shared: both the navigation scan and the hidden-page check read the
     // whole content tree, and `getDirectory` stats every entry in it.
     // Not swallowed: a tree that cannot be walked would otherwise pass as one with no files,
     // and a `nav.json` in it would go unvalidated to a build that drops bad entries silently.
@@ -139,7 +141,7 @@ export class PortalSourceContext {
 
     // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
     // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
-    const navigation = await this.navigation(contentTree);
+    const navigation = await this.navigation(contentTree, specs.value);
     if (navigation.errors.length > 0) {
       return err({ kind: 'invalidNavigation', errors: navigation.errors });
     }
@@ -217,7 +219,7 @@ export class PortalSourceContext {
    * the `meta.json` files the build no longer reads. One walk, because both come from the
    * same tree, and a directory has to be seen before its file can be checked against it.
    */
-  private async navigation(contentTree: Directory | null): Promise<NavigationScan> {
+  private async navigation(contentTree: Directory | null, specs: PortalSpec[]): Promise<NavigationScan> {
     if (contentTree === null) {
       return { errors: [], ignoredFiles: [] };
     }
@@ -227,7 +229,11 @@ export class PortalSourceContext {
     // Children first, because a directory counts as one of its parent's children only when
     // a page sits somewhere beneath it, and the walk below already has to find out. Each
     // directory's errors go ahead of its children's, so the report still reads top down.
-    const visit = async (directory: Directory, isContentRoot: boolean): Promise<DirectoryScan> => {
+    const visit = async (
+      directory: Directory,
+      isContentRoot: boolean,
+      isApiDirectory: boolean
+    ): Promise<DirectoryScan> => {
       const childNames: string[] = [];
       const childErrors: string[] = [];
       let holdsPage = false;
@@ -238,7 +244,7 @@ export class PortalSourceContext {
         // naming it would resolve to nothing. Fumadocs would build one for a directory that
         // holds only a `nav.json`, but the template drops it again to keep to this rule.
         if (item instanceof Directory) {
-          const child = await visit(item, false);
+          const child = await visit(item, false, isContentRoot && item.directoryPath.leafName() === API_REFERENCE_NAME);
           childErrors.push(...child.errors);
           if (child.holdsPage) {
             childNames.push(item.directoryPath.leafName());
@@ -262,6 +268,16 @@ export class PortalSourceContext {
         if (pageName !== undefined) {
           childNames.push(pageName);
           holdsPage = true;
+        }
+      }
+
+      // The reference pages are mounted in this directory, one folder per specification, and
+      // its `nav.json` positions those folders like any other child of its own.
+      if (isApiDirectory) {
+        for (const spec of specs) {
+          if (!childNames.includes(spec.slug)) {
+            childNames.push(spec.slug);
+          }
         }
       }
 
@@ -290,7 +306,7 @@ export class PortalSourceContext {
       return { holdsPage, errors: [...errors, ...childErrors] };
     };
 
-    const root = await visit(contentTree, true);
+    const root = await visit(contentTree, true, false);
     return { errors: root.errors, ignoredFiles };
   }
 
@@ -315,13 +331,6 @@ export class PortalSourceContext {
   }
 
   /**
-   * Each specification is mounted at `/api/<slug>`, and a content page whose address is
-   * exactly that -- `content/api/<slug>.md`, `content/api/<slug>/index.md`, either inside a
-   * `(group)` folder -- takes the same place in the merged loader, which keeps one of the two
-   * without a word. Compared without regard to case: the prerender writes both pages to one
-   * path on a case-insensitive disk.
-   */
-  /**
    * Pages inside a specification's section, below `content/api/<slug>/`. The section and each
    * tag folder come with generated metadata that lists only the reference pages, and metadata
    * hides whatever it does not name, so these pages never reach the sidebar. Reported rather
@@ -329,15 +338,22 @@ export class PortalSourceContext {
    *
    * Judged by the directories as written, not by the address: the page tree is keyed on the
    * path, so `content/API/<slug>/` or a `(group)` folder on the way is a different folder that
-   * no metadata hides. The section's own `index` page is its landing page and is shown.
+   * no metadata hides. An `index` page is a folder's own link rather than one of its pages, so
+   * the section's is shown, and so is one in a folder directly below it: that is where the tag
+   * folders sit, and the CLI cannot tell a tag folder from one the user made without reading
+   * the specification's tags, so it stays quiet rather than warn about a page that is shown.
    */
   private static hiddenPages(pages: ContentPage[], specs: PortalSpec[]): FilePath[] {
     const slugs = new Set(specs.map((spec) => spec.slug));
     return pages
       .filter(({ segments }) => {
         const [first, second, ...rest] = segments;
-        const isSectionIndex = rest.length === 1 && PortalSourceContext.pageName(new FileName(rest[0])) === INDEX_NAME;
-        return first === API_SEGMENT && slugs.has(second) && rest.length > 0 && !isSectionIndex;
+        if (first !== API_REFERENCE_NAME || !slugs.has(second) || rest.length === 0) {
+          return false;
+        }
+        const isFolderIndex =
+          rest.length <= 2 && PortalSourceContext.pageName(new FileName(rest[rest.length - 1])) === INDEX_NAME;
+        return !isFolderIndex;
       })
       .map(({ file }) => file);
   }
