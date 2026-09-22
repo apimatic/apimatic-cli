@@ -203,6 +203,29 @@ describe('navigationTransformer', () => {
       expect(names(childrenOf(tree, 'API Reference'))).to.deep.equal(['Pet', 'Store']);
     });
 
+    // Only the sections decide the lift. A page under content/api shares the folder, and adding
+    // one must not push every operation down a level.
+    it('still lifts the single specification when the user has pages under content/api', () => {
+      const docs = [...CONTENT, page('api/overview.mdx', 'Overview')];
+      const tree = build({ docs, openapi: API }).pageTree.children;
+
+      expect(names(childrenOf(tree, 'API Reference'))).to.deep.equal(['Overview', 'Pet', 'Store']);
+    });
+
+    it('lifts the section in place, where the api folder’s own nav.json put it', () => {
+      const docs = [...CONTENT, page('api/overview.mdx', 'Overview'), nav('api/nav.json', ['...', 'overview'])];
+      const tree = build({ docs, openapi: API }).pageTree.children;
+
+      expect(names(childrenOf(tree, 'API Reference'))).to.deep.equal(['Pet', 'Store', 'Overview']);
+    });
+
+    it('does not lift a folder the user made under content/api, which is no section', () => {
+      const docs = [...CONTENT, page('api/guides/intro.mdx', 'Intro')];
+      const tree = build({ docs }).pageTree.children;
+
+      expect(names(childrenOf(tree, 'API Reference'))).to.deep.equal(['Guides']);
+    });
+
     // With two the names tell them apart, so adding one inserts a level, renaming nothing.
     it('keeps a folder per specification once there is more than one', () => {
       const tree = build({ docs: CONTENT, openapi: TWO_SPECS }).pageTree.children;

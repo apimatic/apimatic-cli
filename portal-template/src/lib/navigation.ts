@@ -40,6 +40,13 @@ const API_REFERENCE_TITLE = 'API Reference';
 const GENERATED_SOURCE = 'generated';
 
 /**
+ * The key the reference pages are passed to `loader()` under in `source.server.ts`. It tells
+ * a specification's section apart from a folder the user made under `content/api/`, which
+ * lands in the same virtual directory.
+ */
+const OPENAPI_SOURCE = 'openapi';
+
+/**
  * Applies the order in each directory's `nav.json` to the page tree.
  *
  * The hook fires for every directory once its children are built, so this never resolves
@@ -64,7 +71,7 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       // the alphabet, and a generated page lands in the middle of the user's pages.
       node.children = reorder(this, node, folderPath, readOrder(this, folderPath) ?? []);
       if (folderPath === apiBaseDir) {
-        applyApiStructure(node);
+        applyApiStructure(this, node);
       }
       return node;
     }
@@ -94,14 +101,39 @@ function readOrder(context: NavigationContext, folderPath: string): string[] | u
  * specification's file, which with one document only restates the portal's own title; with
  * two or more the names tell them apart and are worth a level. Adding a second document
  * therefore inserts a level rather than renaming anything.
+ *
+ * Only the sections count. Pages the user puts under `content/api/` share this folder, and
+ * adding one must not push every operation down a level: the lifted tag folders take the
+ * section's place, with those pages staying beside them where the order already put them.
  */
-function applyApiStructure(node: Folder): void {
+function applyApiStructure(context: NavigationContext, node: Folder): void {
   node.name = API_REFERENCE_TITLE;
 
-  const [only] = node.children;
-  if (node.children.length === 1 && only.type === 'folder') {
-    node.children = only.children;
+  const sections = node.children.filter((child) => isSpecSection(context, child));
+  if (sections.length === 1) {
+    const [only] = sections;
+    node.children = node.children.flatMap((child) => (child === only ? only.children : [child]));
   }
+}
+
+/** Whether a folder holds one specification's reference pages rather than the user's own. */
+function isSpecSection(context: NavigationContext, child: Node): child is Folder {
+  if (child.type !== 'folder') {
+    return false;
+  }
+  const page = firstPageIn(child);
+  return page !== undefined && isFromSource(context, page, OPENAPI_SOURCE);
+}
+
+/** The first page beneath a folder, at any depth; a section's pages sit under its tag folders. */
+function firstPageIn(folder: Folder): Node | undefined {
+  for (const child of folder.children) {
+    const page = child.type === 'page' ? child : child.type === 'folder' ? firstPageIn(child) : undefined;
+    if (page !== undefined) {
+      return page;
+    }
+  }
+  return undefined;
 }
 
 function reorder(context: NavigationContext, node: Folder, folderPath: string, order: string[]): Node[] {
@@ -200,10 +232,15 @@ function isApiReference(child: Node): boolean {
 
 /** Whether a page came from the generated source rather than the user's content directory. */
 function isInjected(context: NavigationContext, child: Node): boolean {
+  return isFromSource(context, child, GENERATED_SOURCE);
+}
+
+/** Whether a page was passed to `loader()` under this key, which the storage stamps on it. */
+function isFromSource(context: NavigationContext, child: Node, source: string): boolean {
   if (child.type !== 'page' || child.$ref === undefined) {
     return false;
   }
-  return context.storage.read(child.$ref)?.type === GENERATED_SOURCE;
+  return context.storage.read(child.$ref)?.type === source;
 }
 
 function find(children: Iterable<Node>, predicate: (child: Node) => boolean): Node | undefined {
