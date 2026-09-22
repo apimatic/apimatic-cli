@@ -310,4 +310,17 @@ describe('PluginRecordSdkAction', () => {
     expect(pluginConfigUnreadable.firstCall.args[0]).to.equal(`its 'languages' is not a JSON object`);
     expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(contents);
   });
+
+  // The portal block is the portal's to judge. A publish that succeeded is recorded whatever
+  // state that block is in, which is the invariant the block partition exists for.
+  it('records the language past a portal block the portal would refuse, leaving it as written', async () => {
+    const portal = { title: '', favicon: 'x.ico' };
+    await fsExtra.writeJson(configPath(), { portal, languages: {} });
+
+    const result = await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
+
+    expect(result.isSuccess()).to.be.true;
+    expect(Object.keys(writtenConfig().languages)).to.deep.equal(['csharp']);
+    expect(fsExtra.readJsonSync(configPath()).portal).to.deep.equal(portal);
+  });
 });
