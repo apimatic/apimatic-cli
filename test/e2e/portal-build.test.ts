@@ -135,7 +135,10 @@ const enabled = process.env.APIMATIC_E2E === '1';
       fs.symlinkSync(target, path.join(typesDirectory, name), process.platform === 'win32' ? 'junction' : 'dir');
     }
 
-    const tsc = require.resolve('typescript/bin/tsc');
+    // The bare `typescript` dependency is the linter's TypeScript 6 copy and TypeScript 7 does
+    // not export its `bin` directory, so reach the compiler `build` runs through its manifest.
+    const manifest = require.resolve('@typescript/native/package.json');
+    const tsc = path.join(path.dirname(manifest), require(manifest).bin.tsc);
     const result = await execa(
       process.execPath,
       [tsc, '-p', path.join(project.toString(), 'tsconfig.json'), '--noEmit', '--pretty', 'false'],
