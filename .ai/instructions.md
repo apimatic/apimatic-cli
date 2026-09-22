@@ -115,10 +115,15 @@ Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by co
 
 ## Testing
 
-- **Framework**: mocha + chai (expect style) + sinon + nock + mock-fs
+- **Framework**: mocha + chai (expect style) + sinon + nock
 - **Test location**: mirrors source — `test/commands/`, `test/actions/`, `test/types/`, `test/infrastructure/`
 - **HTTP mocking**: nock for API calls
 - **Run via tsx** (not ts-node) for ESM compatibility
+- **Filesystem**: real directories under `os.tmpdir()`, made with `fs.mkdtempSync` and removed in
+  `afterEach`. Do not reach for `mock-fs`: Node 26.8 rewrote `fs.readFile` to open, read and close
+  in one thread-pool job, so the binding interception mock-fs relies on never fires. It throws at
+  import, and patching past that only makes reads fall through to the real disk unnoticed
+  (<https://github.com/tschaub/mock-fs/issues/447>).
 
 ## Skills
 

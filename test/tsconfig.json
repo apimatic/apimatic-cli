@@ -17,7 +17,7 @@
     // TypeScript 6 dropped the automatic sweep of node_modules/@types, so the globals the
     // suite relies on have to be named. The source project needs no such list: it reaches
     // its types through `node:` imports.
-    "types": ["node", "mocha", "chai", "sinon", "mock-fs"]
+    "types": ["node", "mocha", "chai", "sinon"]
   },
   "include": ["**/*.ts"]
 }
