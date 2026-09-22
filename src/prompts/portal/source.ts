@@ -122,7 +122,8 @@ function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryP
     lines.push(
       '',
       `Navigation is no longer described by ${f.var('toc.yml')}. Pages are ordered by the ` +
-        `${f.var('nav.json')} files in your content directory, and API operations are grouped by their tags.`
+        `${f.var('nav.json')} files in your content directory, a group's name becomes the ` +
+        `${f.var('title')} of the ${f.var('nav.json')} in that folder, and API operations are grouped by their tags.`
     );
   }
 

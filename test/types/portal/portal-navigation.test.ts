@@ -5,6 +5,7 @@ describe('PortalNavigation', () => {
   const contextFor = (overrides: Partial<NavigationContext> = {}): NavigationContext => ({
     label: 'content/nav.json',
     isContentRoot: true,
+    becomesFolder: true,
     childNames: ['index', 'authentication', 'guides'],
     ...overrides
   });
@@ -251,6 +252,17 @@ describe('PortalNavigation', () => {
       expect(errors).to.have.lengthOf(1);
       expect(errors[0]).to.contain('orders the content root, which is not one');
       expect(errors[0]).to.contain('portal.json');
+    });
+
+    // The template drops a folder with no page beneath it, so the name would reach nothing --
+    // the same silent setting the content root is refused for.
+    it('refuses a name in a directory that becomes no folder', () => {
+      const context = contextFor({ ...nested, becomesFolder: false });
+      const errors = PortalNavigation.validate('{"title":"Tutorials"}', context)._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal([
+        "content/guides/nav.json: 'title' names this folder, but a directory with no page in it or below it is no folder in the sidebar. Add a page, or remove the setting."
+      ]);
     });
 
     it('suggests it for the names a toc.yml or a meta.json used', () => {

@@ -59,6 +59,12 @@ export interface NavigationContext {
   label: string;
   /** Both `apimatic:` tokens resolve to nodes that live at the content root. */
   isContentRoot: boolean;
+  /**
+   * Whether this directory becomes a folder in the sidebar at all. A directory with no page
+   * anywhere beneath it does not, and the template drops the node Fumadocs builds for its
+   * `nav.json`, so a title here would name nothing.
+   */
+  becomesFolder: boolean;
   /** Pages and subfolders in the same directory; page names carry no extension. */
   childNames: string[];
 }
@@ -162,18 +168,19 @@ export class PortalNavigation {
     // by the name of its mount point. One spelling, so no file can name it twice, and a user
     // who puts their own pages under `content/api/` is not quietly ordering the reference.
     if (context.isContentRoot && entry === API_REFERENCE_NAME) {
-      const page = context.childNames.filter((name) => name === entry).length > 1;
       return err(
         `${context.label}: '${entry}' is where the API reference is mounted, so it is positioned with ` +
           `'${API_REFERENCE_TOKEN}' rather than by name.` +
-          (page ? ` A page called '${entry}' cannot be positioned at all; rename it.` : '')
+          (PortalNavigation.isSharedName(entry, context)
+            ? ` A page called '${entry}' cannot be positioned at all; rename it.`
+            : '')
       );
     }
 
     // A page and a folder of one name are both children, and an entry positions the folder,
     // as it does in Fumadocs' own metadata. The page could then never be positioned, which
     // is the quietly wrong sidebar this file exists to refuse.
-    if (context.childNames.filter((name) => name === entry).length > 1) {
+    if (PortalNavigation.isSharedName(entry, context)) {
       return err(
         `${context.label}: '${entry}' is both a page and a folder in this directory, and the entry ` +
           `positions the folder. Rename the page to position it.`
@@ -236,6 +243,11 @@ export class PortalNavigation {
     return ok(data as Record<string, unknown>);
   }
 
+  /** Whether a page and a folder in this directory both answer to the name. */
+  private static isSharedName(entry: string, context: NavigationContext): boolean {
+    return context.childNames.filter((name) => name === entry).length > 1;
+  }
+
   /**
    * A folder is named after its directory, or after the title of its index page; `title`
    * outranks both. The content root is no folder in the sidebar, so a name given there would
@@ -249,6 +261,15 @@ export class PortalNavigation {
       return [
         `${context.label}: 'title' names a folder, and this file orders the content root, ` +
           `which is not one. Set the portal's own name with 'title' in portal.json.`
+      ];
+    }
+    // A directory with no page beneath it becomes no folder, so the name would reach nothing
+    // -- the same silent setting the content root is refused for. The parent's file is
+    // already refused for naming such a directory, for the same reason.
+    if (!context.becomesFolder) {
+      return [
+        `${context.label}: 'title' names this folder, but a directory with no page in it or ` +
+          `below it is no folder in the sidebar. Add a page, or remove the setting.`
       ];
     }
     if (typeof title !== 'string' || title.trim().length === 0) {
@@ -273,12 +294,14 @@ export class PortalNavigation {
   /** A near miss is nearly always a typo or a forgotten extension, so name the candidate. */
   private static suggestion(entry: string, context: NavigationContext): string {
     const lowered = entry.toLowerCase();
-    // The reference is mounted at `/api`, so `api` is the natural guess at its name.
-    if (lowered === API_REFERENCE_NAME && context.isContentRoot) {
+    const withoutExtension = lowered.replace(/\.mdx?$/i, '');
+    // Matched without the extension too, so `api.md` is answered like `api` rather than
+    // pointed at a name that is refused the moment they write it.
+    if (withoutExtension === API_REFERENCE_NAME && context.isContentRoot) {
       return ` The API reference is positioned with '${API_REFERENCE_TOKEN}'.`;
     }
     const candidate = context.childNames.find(
-      (name) => name.toLowerCase() === lowered || name.toLowerCase() === lowered.replace(/\.mdx?$/i, '')
+      (name) => name.toLowerCase() === lowered || name.toLowerCase() === withoutExtension
     );
     return candidate === undefined ? '' : ` Did you mean '${candidate}'?`;
   }

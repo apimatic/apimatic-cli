@@ -69,11 +69,11 @@ export class PortalServePrompts {
     // the default order.
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, and to the order in a ${f.var(
-          'nav.json'
-        )}, appear in the browser automatically. A mistake in a ${f.var(
-          'nav.json'
-        )} is only reported when the preview starts; until then an entry that matches nothing is ignored.`,
+        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, and to the order and ` +
+          `folder titles in a ${f.var('nav.json')}, appear in the browser automatically. A mistake in a ${f.var(
+            'nav.json'
+          )} is only reported when the preview starts; until then an entry or a title that the build would ` +
+          `refuse is ignored here.`,
         '',
         `Adding or removing a page, editing ${f.var('portal.json')}, or changing which documents`,
         `are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,

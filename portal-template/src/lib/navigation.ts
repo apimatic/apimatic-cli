@@ -77,8 +77,11 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
         applyApiStructure(this, node);
       }
       // Last, so a name the user wrote outranks both the title Fumadocs takes from an index
-      // page and the default the API wrapper is given just above.
-      if (settings?.title !== undefined) {
+      // page and the default the API wrapper is given just above. Never at the content root,
+      // which is no folder in the sidebar: Fumadocs names the tree itself from this node, and
+      // the CLI refuses a title there, so honouring one would rename the preview and then
+      // fail the build -- the disagreement the token checks in `reorder` exist to avoid.
+      if (folderPath !== '' && settings?.title !== undefined) {
         node.name = settings.title;
       }
       return node;
@@ -104,12 +107,13 @@ function readSettings(context: NavigationContext, folderPath: string): Navigatio
   }
 
   const { pages, title } = file.data as { pages?: unknown; title?: unknown };
+  // A half-typed title reloads to here as an empty string, which would blank the folder in
+  // the sidebar with nothing to click. The CLI refuses one; the preview keeps the default
+  // name until the file is worth reading again.
+  const named = typeof title === 'string' ? title.trim() : '';
   return {
     pages: Array.isArray(pages) ? pages.filter((entry): entry is string => typeof entry === 'string') : undefined,
-    // A half-typed title reloads to here as an empty string, which would blank the folder in
-    // the sidebar with nothing to click. The CLI refuses one; the preview keeps the default
-    // name until the file is worth reading again.
-    title: typeof title === 'string' && title.trim().length > 0 ? title.trim() : undefined
+    title: named.length > 0 ? named : undefined
   };
 }
 

@@ -427,6 +427,18 @@ describe('navigationTransformer', () => {
       ]);
     });
 
+    // The CLI refuses a title at the content root, so the template has to ignore one: the
+    // root node is the tree itself, and honouring it would rename a preview that the build
+    // then fails. The same asymmetry the token checks in `reorder` exist for.
+    it('is ignored at the content root, which the CLI refuses a title for', () => {
+      const docs = [...CONTENT, titled('nav.json', 'My Portal', ['index', 'authentication'])];
+
+      const tree = build({ docs });
+
+      expect(tree.pageTree.name).to.not.equal('My Portal');
+      expect(names(tree.pageTree.children)).to.deep.equal(['Welcome', 'Authentication']);
+    });
+
     // The CLI refuses both, but `portal serve` reloads a half-typed file straight to the
     // transformer: a folder with no name at all is a sidebar row nobody can read.
     for (const [description, title] of [
@@ -459,6 +471,7 @@ describe('navigationTransformer', () => {
       PortalNavigation.validate(JSON.stringify({ pages: [entry, 'index'] }), {
         label: 'content/nav.json',
         isContentRoot: true,
+        becomesFolder: true,
         childNames: ['index', 'authentication']
       }).isOk();
 

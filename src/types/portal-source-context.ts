@@ -237,7 +237,6 @@ export class PortalSourceContext {
       const childErrors: string[] = [];
       let holdsPage = false;
       let navigationFile: FileName | undefined;
-      let holdsApiDirectory = false;
 
       for (const item of directory.items) {
         // A directory with no page anywhere beneath it becomes no node in the page tree, so
@@ -248,9 +247,12 @@ export class PortalSourceContext {
           const child = await visit(item, false, isApiChild);
           childErrors.push(...child.errors);
           if (child.holdsPage) {
-            childNames.push(item.directoryPath.leafName());
             holdsPage = true;
-            holdsApiDirectory ||= isApiChild;
+            // The reference's own directory is listed below instead: it is a child of the
+            // content root whether or not the user keeps pages in it.
+            if (!isApiChild) {
+              childNames.push(item.directoryPath.leafName());
+            }
           }
           continue;
         }
@@ -275,13 +277,13 @@ export class PortalSourceContext {
         }
       }
 
-      // The reference is mounted at `content/api` whether or not the user keeps a directory
-      // there, so a page of that name at the content root is a second child of the root. The
-      // folder is listed beside it only then: the template resolves an entry to a folder
-      // before a page, so `api` would position the reference and leave the page among the
-      // unnamed ones without a word. With no such page, the name stays unlisted, and the
-      // entry is answered with `apimatic:api` instead.
-      if (isContentRoot && pageNames.has(API_REFERENCE_NAME) && !holdsApiDirectory) {
+      // The reference is mounted at `content/api` whether or not a directory is there to see,
+      // so it is a child of the content root in every portal. Listed unconditionally, so one
+      // entry gets one answer whatever else shares the directory: without this, the same
+      // mistake read as "not a page or folder" in a project with no such directory and as the
+      // mount point in a project with one. A page of that name is a second child, and the
+      // clash is what says it can never be positioned.
+      if (isContentRoot) {
         childNames.push(API_REFERENCE_NAME);
       }
 
@@ -312,7 +314,15 @@ export class PortalSourceContext {
         // An empty file goes through too: the build parses it as JSON and fails on it, so the
         // CLI has to refuse it here rather than treat it as no file.
         if (contents !== undefined) {
-          const checked = PortalNavigation.validate(contents, { label, isContentRoot, childNames });
+          // The reference's own directory is a folder in the sidebar however few pages the
+          // user keeps in it, because the specification sections are mounted there.
+          const becomesFolder = holdsPage || isApiDirectory;
+          const checked = PortalNavigation.validate(contents, {
+            label,
+            isContentRoot,
+            becomesFolder,
+            childNames
+          });
           if (checked.isErr()) {
             errors.push(...checked.error);
           }

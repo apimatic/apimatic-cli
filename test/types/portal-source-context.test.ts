@@ -427,12 +427,18 @@ describe('PortalSourceContext', () => {
       expect(errors[0]).to.contain("content/nav.json: 'api' is where the API reference is mounted");
     });
 
-    it('still answers api with the token when no page carries the name', async () => {
+    // The mount point is a child of the root in every portal, so the same mistake gets the
+    // same answer rather than reading as a name that does not exist wherever the user
+    // happens to keep no directory of their own there.
+    it('refuses api at the root with nothing of that name on disk at all', async () => {
       write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
-      expect(errors[0]).to.contain("The API reference is positioned with 'apimatic:api'.");
+      expect(errors).to.deep.equal([
+        "content/nav.json: 'api' is where the API reference is mounted, so it is positioned with 'apimatic:api' rather than by name."
+      ]);
+      expect(errors[0]).to.not.contain('is not a page or folder');
     });
 
     // A real content/api/ directory is the reference's mount point rather than a folder of
