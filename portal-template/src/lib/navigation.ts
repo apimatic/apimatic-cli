@@ -56,13 +56,6 @@ const OPENAPI_SOURCE = 'openapi';
 export function navigationTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
     folder(node, folderPath) {
-      // `generateFallback` builds a second tree out of the files that never became nodes,
-      // and a metadata file never does, so `nav.json` brings this hook back for a root with
-      // no children.
-      if (this.custom?._fallback === true) {
-        return node;
-      }
-
       // A directory holding a `nav.json` and no page still gets a folder node, because the
       // metadata file is in storage. The CLI treats such a directory as no folder, so the
       // parent's file cannot name it; showing it empty would contradict that refusal. A
@@ -174,7 +167,7 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
       restIndex = named.length;
     } else if (entry === API_REFERENCE_TOKEN) {
       if (isContentRoot) {
-        claim(find(remaining, (child) => isApiReference(child)));
+        claim([...remaining].find((child) => isApiReference(child)));
       }
     } else if (entry === INJECTED_PAGES_TOKEN) {
       if (isContentRoot) {
@@ -183,7 +176,7 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
         }
       }
     } else {
-      claim(matching(context, remaining, folderPath, entry));
+      claim(matching(context, [...remaining], folderPath, entry));
     }
   }
 
@@ -213,19 +206,14 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
  * its default of false. When a page and a folder share the name, the folder wins, as it
  * does for the same entry in Fumadocs' own metadata.
  */
-function matching(
-  context: NavigationContext,
-  children: Iterable<Node>,
-  folderPath: string,
-  entry: string
-): Node | undefined {
+function matching(context: NavigationContext, children: Node[], folderPath: string, entry: string): Node | undefined {
   const target = PathUtils.joinPath(folderPath, entry);
-  const folder = find(children, (child) => child.type === 'folder' && child.$ref?.folder === target);
+  const folder = children.find((child) => child.type === 'folder' && child.$ref?.folder === target);
   if (folder !== undefined) {
     return folder;
   }
   const pagePath = context.builder.resolveFlattenPath(target, 'page');
-  return find(children, (child) => child.type === 'page' && child.$ref === pagePath);
+  return children.find((child) => child.type === 'page' && child.$ref === pagePath);
 }
 
 function afterNamedContent(named: Node[], isInjectedChild: (child: Node) => boolean): number {
@@ -265,11 +253,3 @@ function isFromSource(context: NavigationContext, child: Node, source: string): 
   return context.storage.read(child.$ref)?.type === source;
 }
 
-function find(children: Iterable<Node>, predicate: (child: Node) => boolean): Node | undefined {
-  for (const child of children) {
-    if (predicate(child)) {
-      return child;
-    }
-  }
-  return undefined;
-}

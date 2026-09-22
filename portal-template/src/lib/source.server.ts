@@ -13,6 +13,9 @@ export const source = loader(
   {
     baseUrl: docsRoute,
     plugins: [lucideIconsPlugin(), openapiPlugin()],
-    pageTree: { transformers: [navigationTransformer()] }
+    // No fallback tree: it is built from the files that became no node, and `nav.json` never
+    // does, so every build would otherwise grow a second tree that nothing renders and that
+    // the sidebar payload carries to every visitor.
+    pageTree: { transformers: [navigationTransformer()], generateFallback: false }
   }
 );

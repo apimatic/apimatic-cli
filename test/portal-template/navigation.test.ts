@@ -23,7 +23,11 @@ describe('navigationTransformer', () => {
     if (sources.docs) input.docs = { files: sources.docs };
     if (sources.generated) input.generated = { files: sources.generated };
     if (sources.openapi) input.openapi = { files: sources.openapi, baseDir: 'api' };
-    return loader(input, { baseUrl: '/', pageTree: { transformers: [navigationTransformer()] } });
+    // The same page-tree options as `source.server.ts`, so the tree under test is the one built.
+    return loader(input, {
+      baseUrl: '/',
+      pageTree: { transformers: [navigationTransformer()], generateFallback: false }
+    });
   };
 
   const names = (children: Node[]): string[] =>
