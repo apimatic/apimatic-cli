@@ -1,453 +1,559 @@
-# Portal v2 (fumadocs) — design notes
+# Code samples in the portal — the `/api/sdk-artifacts` contract
 
-**Status:** design in progress, nothing implemented. Written 2026-09-17.
-**Purpose:** hand-off document so another agent/engineer can pick this up without
-re-deriving the landscape. Everything under "Verified facts" was read from source;
-file:line references included so claims can be re-checked rather than trusted.
+**Status:** design settled, nothing implemented. Rewritten 2026-09-22, replacing the
+2026-09-17 draft in full.
+**Purpose:** the single place the CLI, apimatic-io and codegen-v2 agree on what crosses
+the wire, so the Azure Function can be written from it. Every claim under
+[Verified facts](#8-verified-facts) was read from source with a `file:line` reference,
+so it can be re-checked rather than trusted.
 
-> Naming is unsettled — see [Open questions](#open-questions). This doc says
-> "Portal v2" only because that is what the conversation used. It is a bad name
-> (see the "v2 collision" note) and should be replaced.
-
----
-
-## 1. Goal
-
-Generate an APIMatic developer portal as a **static site built with fumadocs**,
-replacing the current portal renderer. Code samples for the customer's SDK
-languages are embedded in the OpenAPI spec as `x-codeSamples` by **codegen-v2**,
-so the portal renders real SDK usage per endpoint rather than only generated
-HTTP snippets.
+> The previous version of this file described a Next.js static export built from a fork of
+> `apimatic-dx-portal-v2`, and said "nothing implemented". Both are now false: the portal
+> ships on `dev` (`073d09a`), built with Vite + upstream `fumadocs-openapi`. All of that
+> material has been deleted rather than annotated.
 
 ---
 
-## 2. Target architecture (as decided)
+## 1. Scope
 
-```
-apimatic portal generate (CLI, local machine)
-  │
-  ├─ 1. entitlement check ──────────▶ apimatic-io
-  │        "is docs-as-code portal generation allowed for this account?"
-  │        (no build-file upload, no pruning, no toc-data)
-  │
-  ├─ 2. fetch three artifacts ──────▶ apimatic-io ──▶ codegen-v2 (func-codegenv4)
-  │        a. SDK zip           (per language)
-  │        b. context plugin    
-  │        c. OpenAPI spec annotated with x-codeSamples
-  │
-  └─ 3. build the site LOCALLY
-           fumadocs is a direct dependency of the CLI
-           spec + samples ──▶ fumadocs-openapi generateFiles() ──▶ MDX + meta.json
-                          ──▶ next build (static export) ──▶ static site on disk
-```
+**In scope — this is what the document specifies.**
 
-**Key property:** the portal build runs on the **user's machine**, not on APIMatic
-infrastructure. This was chosen because the entire APIMatic backend estate is .NET
-(apimatic-io is .NET Framework 4.7.2; both codegens are dotnet-isolated Azure
-Functions) and has **no Node build infrastructure**, whereas the CLI is already a
-Node program (oclif, ESM, Node >= 20).
+- The code-sample catalog: what codegen-v2 renders, how it is keyed, how it is packaged.
+- `/api/sdk-artifacts`: the async endpoint that produces it, and the apimatic-io route
+  that fronts it.
+- The portal: how the CLI merges the catalog into the spec and how fumadocs renders it.
 
----
+**Out of scope — named here so nobody reads silence as omission.**
 
-## 3. Decisions made
-
-| # | Decision | Rationale |
-|---|---|---|
-| D1 | Portal is built **client-side, on the user's machine** | No Node build infra exists in APIMatic's .NET estate; the CLI is already Node |
-| D2 | Output is a **static site** | Preserves the on-prem promise: host on any web server, same as v1 |
-| D3 | **codegen-v2** produces the code samples and writes them into the OpenAPI spec as `x-codeSamples` | Single source of truth; avoids a separate snippet API |
-| D4 | **Old codegen (apimatic-codegen) is not used** for this path | Explicit product direction |
-| D5 | CLI consumes **three artifacts**: SDK, context plugin, annotated OpenAPI spec | No build file, no toc |
-| D6 | **fumadocs is a direct dependency of the CLI** | Simplest distribution; portal version pins to CLI version |
-| D7 | **No build-file pruning, no toc generation, no build-file schema** in this path | apimatic-io's only job is the entitlement check |
-| D8 | SDKs surface as a **per-language download button** in the docs | |
-| D9 | Context plugins surface as **one page with a single command**: `npx context-plugins install ${id-or-path-to-plugin}` | |
-| D10 | Anything fumadocs doesn't support is **dropped**, not re-homed | Keeps scope tight |
-| D11 | The dependency is **upstream `fumadocs-*` from npm**, not the `apimatic-dx-portal-v2` fork | Resolves Q-C. Consequences in §5.6 — they are not small |
-| D12 | A **minimal branding input survives** (6 fields, see §5.5) | Resolves Q-D. fumadocs supplies the mechanism but no input format |
-
----
-
-## 4. Verified facts about the current system
-
-All read from source. apimatic-io facts are at `origin/development` @ `607c1b079`.
-
-### 4.1 How a portal is generated *today* (v1)
-
-```
-apimatic portal generate
-  → zip <input>/src
-  → POST api.apimatic.io/api/portal/v2   [Authorization: X-Auth-Key <key>]
-  → POST func-codegen-{env}/api/portal   [X-APIMatic-UserId / -TenantId / -SubscriptionFeatures]
-  → poll GET /api/portal/v2/{id}/status  every 3s, 30-min budget
-     · Completed → HTTP 302 to the download URL
-     · ValidationError | SubscriptionError → { status, errors: { field: [msg] } }
-  → GET /api/portal/v2/{id}/download
-  → zip containing a STATIC SITE (index.html + static/; portal JS hosted at
-    https://dxjs.apimatic.io/v7/static/js/portal.v7.js)
-  → extracted into <input>/portal   (or <input>/portal/portal.zip with --zip)
-```
-
-- CLI orchestration: `src/actions/portal/generate.ts`, HTTP in
-  `src/infrastructure/services/portal-service.ts`, polling in
-  `src/infrastructure/generation-status-poller.ts`.
-- **422 is a real response**: the body is a zip containing
-  `apimatic-debug/apimatic-report.html`, which the CLI extracts and opens
-  (`src/types/portal-context.ts:39-43`).
-- The CLI **never builds HTML itself** today. It is a thin client over the
-  platform's portal generator. Nothing in the repo anticipates a second generator.
-
-### 4.2 codegen-v2 (repo `codegen-v2`, deployed as `func-codegenv4-*`)
-
-- C# / .NET 10, isolated-worker **Azure Functions** + Durable Functions.
-- Public surface: `POST api/generate`, `GET api/generate/{id}/status`,
-  `GET api/generate/{id}/download`, plus the same trio for `plugin`, plus `version`.
-- Input is a **multipart build ZIP** + `language` + `stability`. It reads only
-  `spec/`, `package-settings/<lang>.json` and `plugin-config.json` out of that zip
-  — **`APIMATIC-BUILD.json` is never read** (zero hits repo-wide).
-- Output is a **zip** (`sdk.zip`). Status tokens: `Queued`, `ExecutionStarted`,
-  `GeneratingArtifacts`, `Completed`, `Failed`, `ValidationError`, `Unknown`.
-- All HTTP triggers are `AuthorizationLevel.Anonymous` — **auth lives in
-  apimatic-io**, identity is forwarded as trusted `X-APIMatic-*` headers.
-- Optional webhook via `X-APIMatic-CallbackUrl`.
-
-**Language support (two different gates — do not confuse them):**
-
-| Gate | Where | Value |
-|---|---|---|
-| Service capability | `codegen-v2` `src/CodegenV2.Func/Domain/Enums/SdkLanguage.cs` — `CanGenerateSdk` | C#, TypeScript, Python = true; Java, PHP, Ruby, Go = false |
-| Public API gate | `apimatic-io` `Domain/Enums/CodeGeneratorVersion.cs` @ `607c1b079` | C#, Python, TypeScript — **all `Beta` stability only** |
-
-> ⚠️ **Integration gotcha:** the CLI's `--stability` flag defaults to `stable`, but
-> `GenerateSdkCommandValidator` rejects anything that isn't `Beta` for V4. Callers
-> must pass `--stability beta`.
-
-### 4.3 What codegen-v2 does NOT do today
-
-These are the gaps between the current service and the target design:
-
-1. **No OpenAPI emission.** Zero OpenAPI libraries in `Directory.Packages.props`
-   (no Microsoft.OpenApi, NSwag, Swagger, Redocly). Pipeline is one-way:
-   spec → `ImportManager` → APIMatic SDL → ASG → rendered SDK. Writing an
-   annotated OpenAPI document back out is a new capability.
-2. **No `x-codeSamples` anywhere.** Zero hits.
-3. **Samples carry no values.** Today's snippets are signature illustrations —
-   the TypeScript renderer's own comment says it names *"only what the caller must
-   supply and giving no value for any of it"*
-   (`src/CodegenV2.TypeScript/DocsRendering/ApiReferenceRenderer.cs:183-185`).
-4. **One POST generates one language.** N languages = N generations.
-5. **Named examples are parsed then dropped.** `Example(Name, Description, Value)`
-   is populated in `src/CodegenV2.Asg.SdlParser/{ParameterExtensions,FieldExtensions}.cs`
-   and read by **nothing** downstream. This is the natural seam for per-example
-   samples — the data already reaches the graph.
-6. **No portal concept at all.** Zero hits for "portal". Portal generation lives in
-   `apimatic-codegen`, which codegen-v2 itself calls as "CodegenV3Api" for the
-   legacy skills lane.
-
-### 4.4 apimatic-io
-
-- .NET Framework 4.7.2, ASP.NET MVC 5 + Web API 2, MongoDB, Autofac, MediatR, Hangfire.
-- Auth: `[WebApiAuthorize]` accepts `Authorization: Basic <base64>`,
-  `Authorization: X-Auth-Key <key>` (what the CLI uses), or cookie/JWT.
-  Tenancy is user → team → tenant; the tenant id is forwarded downstream as
-  `X-APIMatic-TenantId`. Entitlements are base64-JSON in `X-APIMatic-SubscriptionFeatures`.
-- **No feature flags.** The v1/v2 split is route-level: `api/sdk` → `CodegenApiService`
-  (old codegen), `api/sdk/v2` → `CodegenV2ApiService`. Precedent: a new capability
-  gets a new route, not a flag.
-- `GET api/portal/build/{apiGroupId}/draft` **exports a complete build package**
-  (`APIMATIC-BUILD.json` + `spec/` + `content/toc.yml` + `static/images`) — the
-  existing bridge from the hosted editor to docs-as-code. Not needed by the new
-  design, but worth knowing it exists.
-- **CLI version compatibility shim:** `Domain/Common/ApimaticCliVersion.cs` parses
-  the `User-Agent` prefix `APIMATIC CLI/`; callers older than `1.1.0-beta.6` get
-  different validation behaviour. Marked "do not clean up".
-
-### 4.5 apimatic-dx-portal-v2 (the fumadocs repo)
-
-- Fork of `fuma-nama/fumadocs`, slimmed down. Only the API-reference packages we
-  patch are in-repo: `packages/openapi` (**carries local patches**), `api-docs`,
-  `asyncapi`, `stf`. Everything else comes from npm.
-- **The fork is based on `fumadocs-openapi@11.1.1`** (`packages/openapi/package.json:3`),
-  against `fumadocs-core ^16.11.5` and `fumadocs-ui: npm:@fumadocs/base-ui@^16.11.5`.
-  The version was never bumped after forking, so the package advertises 11.1.1 while
-  containing local patches. **Upstream is now at 11.4.3** (registry, 2026-09-17), whose
-  peers are `fumadocs-core`/`fumadocs-ui` `^16.15.0` and React `^19.2.0`.
-- ⚠️ **"Local patches" undersells it.** Fork point for `packages/openapi` is upstream
-  commit `11e997399` (2026-07-09); since then the diff is **31 files, +1229/−253**.
-  See §5.6 for the breakdown and what D11 costs.
-- **Requires Node >= 24.14.0 and pnpm 11.5.3.** The CLI's current floor is Node 20 —
-  adopting the portal as a dependency raises it.
-- `apps/docs` reads content from `generated/` on the filesystem at runtime. There is
-  **no runtime remote-content fetching** — the `PORTAL_API_URL` block in
-  `lib/api.ts:75-84` is commented out.
-- `MULTI_TENANT_PLAN.md` is **stale** — a finalised-but-unimplemented plan from
-  2026-07 that the repo has since diverged from. Do not treat it as current.
-
-#### x-codeSamples contract (this is what codegen-v2 must emit)
-
-> 🔴 **Read this before using the contract below.** The `CodeSample` type and its
-> `sources` field are **APIMatic-local, not upstream**. Proof: the last
-> upstream-authored revision (`git show 11e997399:packages/openapi/src/types.ts`)
-> declares `'x-codeSamples'?: InlineCodeUsageGenerator[]` with no `CodeSample` type,
-> and the current published **upstream 11.4.3 `dist/types.d.ts` still does**, with no
-> `sources` anywhere in its typings. `sources` was added by APIMatic in `ae554cfd5`
-> ("feat: mre incorporated", 2026-07-31).
-> **`x-codeSamples`, `x-selectedCodeSample` and `x-exclusiveCodeSample` *are* upstream**
-> (`820cef2b2f`, 2026-06-07). Under D11 only the flat `source` form is available.
-
-Type at `packages/openapi/src/types.ts:18-26` (fork):
-
-```ts
-export type CodeSample = InlineCodeUsageGenerator & { sources?: Record<string, string> };
-// InlineCodeUsageGenerator = { id?: string; lang: string; label?: string;
-//                              source?: string | CodeUsageGeneratorFn | false }
-export type OperationObject = OpenAPIV3_2.OperationObject & {
-  'x-codeSamples'?: CodeSample[];
-  'x-selectedCodeSample'?: string;
-  'x-exclusiveCodeSample'?: string;
-};
-```
-
-- `source` — one snippet for the whole operation.
-- `sources` — a map **keyed by the `requestBody.content.<media>.examples` key**, so
-  the example selector rewrites the code tabs. Resolution:
-  `sources?.[exampleId] ?? source` (`src/ui/operation/usage-tabs.tsx:37-43`).
-- **Default registered sample ids** (`src/requests/generators/all.ts:10-19`):
-  `curl`, `js`, `go`, `python`, `java`, `csharp`, `rust`. Insertion order = tab order.
-  Note there is **no `typescript`, `php` or `ruby`** by default.
-- **Suppression:** a sample with a falsy `source` (e.g. `{ id: 'js', source: false }`)
-  **removes** that id from the registry (`packages/api-docs/src/codegen.ts:52-55`).
-  This is how you kill a built-in generated tab that would otherwise render beside
-  the authored ones.
-- ⚠️ **Partial `sources` coverage is a loud failure**: an example with no entry
-  resolves to `undefined`, which `addInline()` reads as "remove this generator", so
-  the tab **disappears**. Cover every example for a language, or fall back to a
-  single `source` for that language.
-
-A working reference build exists at
-`C:/Users/mrafn/Downloads/mre-build/codesamples-per-example-build` — 8 languages ×
-5 examples, with `js`/`rust` suppressed. It renders correctly.
-
----
-
-## 5. Known risks and constraints
-
-### 5.1 Static export removes more than the API routes
-
-Verified against the Next.js 16.2 docs. Unsupported under `output: 'export'`:
-dynamic routes without `generateStaticParams()`, Route Handlers that read `Request`,
-**Proxy/middleware**, rewrites/redirects/headers, ISR, image optimization with the
-default loader, Server Actions. Route Handlers survive only as `GET` returning a
-static response with no request reading.
-
-Mapped onto `apps/docs` as it exists today:
-
-| Feature | File | Under static export |
-|---|---|---|
-| API playground "Send" | `app/api/proxy/route.ts` | **Dies** — reads Request, 6 verbs |
-| Search | `app/api/search/route.ts` | **Dies** — reads `?query=` |
-| API Copilot chat | `app/api/chat/route.ts` | **Dies** — POST + streaming |
-| `.md` / `Accept:` negotiation | `proxy.ts` | **Dies** — Proxy unsupported |
-| ISR + revalidation webhook | `page.tsx:26`, `app/api/revalidate` | **Dies** |
-| SDK zips + static assets | `app/static/[...path]/route.ts` | **Dies** — must be emitted as real files |
-| `llms.mdx/[[...slug]]` | route handler | Survives **if** given `generateStaticParams` |
-| Customer logos | `next.config.ts:30` `images.remotePatterns` | Needs `images.unoptimized: true` |
-| `generateStaticParams() → []` | `page.tsx:222` | **Must enumerate every page** |
-
-Per D10 these are dropped unless fumadocs offers an equivalent. Note two have
-straightforward replacements if wanted later: fumadocs supports a **client-side
-static search index**, and API Copilot is already just a bridge to
-`{APIMATIC_COPILOT_HOST}/chat/{key}/{library}` which a browser can call directly.
-
-**D8 interacts with this:** the SDK download button can't be served by
-`app/static/[...path]` under static export — the zips must be emitted as real files
-into the output tree.
-
-### 5.2 Prerender size — the top engineering risk
-
-`apps/docs/app/docs/[[...slug]]/page.tsx:222` deliberately returns `[]` from
-`generateStaticParams`, with this comment:
-
-> No build-time prerendering: a portal can have thousands of API endpoint/model
-> pages, and each prerendered page embeds the full page tree (~1MB HTML + RSC),
-> which balloons the deploy to gigabytes.
-
-**A static export has no other mode** — it must prerender everything. This already
-caused a production problem once.
-
-Root cause is architectural, not a bug: `app/docs/layout.tsx:43` passes the entire
-tree as `<DocsLayout tree={source.getPageTree()}>`, and fumadocs renders the sidebar
-server-side from it. Every prerendered page therefore carries the navigation.
-
-**This is not yet measured for the new design.** Before committing to a milestone,
-generate a portal from a large real spec (candidates in
-`C:/APIMatic/repos/Customer-build-files/`) and measure actual output size. If it is
-a problem, the fix is to stop embedding the full tree in every page — lazy-load the
-sidebar client-side from one shared JSON, or trim the tree per section.
-
-#### Is this a fumadocs problem or a Next.js problem? (both, in different amounts)
-
-It decomposes into three layers. Only the middle one is Next.js-specific.
-
-| Layer | Cause | Framework-specific? |
-|---|---|---|
-| 1. Tree in every page | `<DocsLayout tree={source.getPageTree()}>` is a server-rendered prop | **No.** Any SSG target repeats the sidebar markup in every page |
-| 2. Tree serialised **twice** per page | Next.js App Router static export writes `.rsc` flight data beside every `.html` | **Yes** — worth roughly 2× |
-| 3. Fix: stop passing the whole tree | Shared JSON + client-side sidebar, or per-section trees | **No.** Works on every target |
-
-Layer 2 is verified in Next.js source: `exportAppPage`
-(`packages/next/src/export/routes/app-page.ts`) appends flight data to
-`htmlFilepath.replace(/\.html$/, RSC_SUFFIX)` with `RSC_SUFFIX = '.rsc'`
-(`packages/next/src/lib/constants.ts`), then appends the HTML. Where per-segment
-prefetch is enabled it additionally writes a `<page>.segments/**.segment.rsc` tree.
-So the sidebar is emitted at least twice per route, which is exactly what the
-in-repo comment's "HTML + RSC" phrasing refers to.
-
-**Fumadocs is no longer Next.js-only.** Since 15.2 it officially supports Next.js,
-Astro + React, and the Vite-based frameworks (TanStack Start, Waku, React Router)
-via `FrameworkProvider` from `fumadocs-core/framework/base`; the docs enumerate a
-build output path per framework (`.next/server/app/…`, `.output/public/…`,
-`build/client/…`, `dist/public/…`). So porting off Next.js **is** available.
-
-**But it is the wrong lever.** Leaving Next.js buys layer 2 — about 2×, not an
-order of magnitude — while costing the fork's `packages/openapi` patches and the
-`fumadocs-openapi` integration this design is built on. Layer 1 is the dominant
-term and layer 3 fixes it on any framework. Fix the tree; do not change framework
-to escape the size problem.
-
-There is a *separate* argument for a lighter framework — `next build` over
-thousands of pages on a customer's laptop is slow, and D1 puts that build on the
-user's machine. That is a build-time concern, not an output-size one, and should be
-argued on its own terms.
-
-### 5.3 The "v2" naming collision
-
-"v2" currently denotes at least four different things:
-
-| Name | What it actually is |
+| Concern | Owner / when |
 |---|---|
-| `codegen-v2` (repo) | Deployed as **`func-codegenv4-*`**, i.e. the v4 generator |
-| `apimatic-codegen` (repo) | The **v3** generator; codegen-v2 calls it `CodegenV3Api` |
-| `/portal/v2` (route) | The **API version** of the on-prem portal endpoint — not a portal product |
-| `--codegen-version v3\|v4` (CLI flag) | Yet another axis |
-| `dx-portal` | Already taken — apimatic-io's public name for the on-prem portal *API* (`apimatic.io/apidocs/dx-portal-api`) |
-
-Pick a product name that collides with none of these before it becomes load-bearing.
-
-### 5.4 Consequences of dropping the build file and toc (D5, D7)
-
-`fumadocs-openapi` does ship a spec→docs generator (`generateFiles` in
-`packages/openapi/src/generate-file.ts:95`) which emits MDX **and `meta.json`**, so
-navigation from a bare spec is genuinely supported. But dropping
-`APIMATIC-BUILD.json` and `content/toc.yml` also drops:
-
-- **Branding** — logo (light/dark), favicon, page title, nav title, theme colours.
-  A portal with no customer logo is a visible regression against v1.
-- **Custom content pages** — guides, getting-started, anything hand-written.
-- **Navigation control** — grouping/ordering beyond what tags give you.
-
-Decide explicitly whether this is acceptable for v1 of the product or whether a
-minimal branding input needs to survive.
+| `apimatic.json` itself — the file, its parser, the migration from `src/portal.json` | Another developer, later. This doc treats it as a fixed input. |
+| Bundling the SDK inside the plugin; `languages.<lang>: {}` becoming valid | codegen-v2, separately (apimatic-io#2216 M1) |
+| The `quickstart` rewrite and the v3 retirement | apimatic-io#2216 M3 |
+| Subscription / entitlement enforcement on the new endpoint | Deliberately a **second PR** — see [D32](#d32) |
+| `docs/<language>.json` (generated MDX pages) in the artifact zip | Future — the layout reserves room for it, see [§4.4](#44-response-the-artifact-zip) |
+| `plugin/plugin.zip` in the artifact zip | Future — same |
 
 ---
 
-### 5.5 Branding under D12 — fumadocs has the mechanism, not the input
+## 2. Shape of the thing
 
-Fumadocs does support branding, but it is **authored in source files**, not read from
-a config file. There is no JSON that fumadocs consumes for branding.
+```
+apimatic {quickstart | portal generate | portal serve}
+  │
+  │  zip src/  ──────────────────────────────────▶  apimatic-io
+  │                                                 POST api/sdk-artifacts
+  │                                                   │  X-APIMatic-UserId / TenantId
+  │                                                   ▼
+  │                                                 codegen-v2
+  │                                                 POST api/sdk-artifacts
+  │                                                   │
+  │                                                   ├─ ValidateSpecFile
+  │                                                   ├─ ValidateApimaticConfig
+  │                                                   ├─ fan out per language ──┐
+  │                                                   │    GenerateSdk          │
+  │                                                   │    GenerateCodeSamples  │
+  │                                                   └─ AggregateSdkArtifacts ─┘
+  │                                                        one zip
+  │  poll ◀────── status ──────────────────────────────────┤
+  │  download ◀── artifacts.zip ────────────────────────────┘
+  │
+  ├─ merge code-samples/<lang>.json into a COPY of the spec tree as x-codeSamples
+  ├─ place sdk/<lang>.zip where the portal's SDK page can serve it
+  └─ vite build (or vite dev) over the annotated copy ──▶ portal
+```
 
-| Branding | Fumadocs surface | Kind |
-|---|---|---|
-| Nav title / logo | `nav.title` in `lib/layout.shared.tsx` — a **ReactNode** | TSX |
-| Whole navbar | `nav.component` | TSX |
-| Theme colours | `--color-fd-*` CSS variables in `@theme` + `.dark` | CSS |
-| Colour presets | `@import 'fumadocs-ui/css/<theme>.css'` — neutral, ocean, dusk, catppuccin, ruby, purple, emerald | CSS |
-| **Favicon** | **Not fumadocs** — Next.js `metadata.icons` | Framework |
-| **Page title** | **Not fumadocs** — Next.js `metadata.title` | Framework |
-
-Because D1 puts the build on the user's machine, something must *write* those TSX/CSS
-files from customer values. That writer is exactly what D5/D7 removed — hence D12.
-
-**The contract already exists and is small.** `apps/docs/lib/portal-meta.ts:15-28`
-defines `GeneratedPortalMeta`: `title`, `navTitle`, `logo`, `logoDark`, `favicon`,
-`theme`. `apps/docs/lib/portal-config.ts` is the translator (build file →
-`generated/portal.config.json` + a written `app/theme.css`, mapping
-`portalSettings.theme.baseTheme` onto the fumadocs presets above). Applied at
-`app/layout.tsx:20-40` and `app/docs/layout.tsx:19-29`.
-
-Two details worth carrying over rather than rediscovering:
-
-- The favicon key must be **absent**, not `undefined` — Next applies the `app/icon`
-  file convention only while `metadata.icons` is unset (`app/layout.tsx:33-39`).
-- `logo: {light, dark}` is consumed by the fork-local `portal-chrome` slot, **not** by
-  upstream `nav.title`, which takes a single ReactNode. Under D11, light/dark logo
-  switching is hand-built (two `<img>`, CSS `dark:`). Trivial, but it is yours now.
-
-### 5.6 What D11 (upstream, not the fork) actually costs
-
-Verified by git archaeology against fork point `11e997399` (2026-07-09). The fork
-diff is **31 files, +1229/−253** in `packages/openapi` alone — plus ~18 files in
-`apps/docs` that reference the build manifest or branding fields, which is the entire
-portal-chrome layer and is lost in full.
-
-**Largely moot under D2 (static export).** The biggest cluster is the API playground —
-`playground/auth.tsx` (174), `components/oauth-dialog.tsx` (192), `oauth-popup.ts` (175),
-`resolve-auth-url.ts`, `download-name.ts`, `copyable-url.tsx`, `fetcher.ts`, plus four
-new test files. §5.1 already kills the playground's "Send" (it needs
-`app/api/proxy/route.ts`). The UI would still render and could fetch directly from the
-browser, but only where CORS allows — so this investment is *devalued*, not worthless.
-It is the best argument for D11.
-
-**Not moot — these are docs-rendering fixes that a static export still needs:**
-
-| Patch | Location | Why it matters |
-|---|---|---|
-| `*/*` and `application/*` media-type ranges | `src/requests/media/resolve-adapter.ts:81-87` (`7fedef14b`, broadened by `403ab5110`) | Real specs (Verizon ThingSpace) use `*/*` for JSON bodies; without it the **whole docs page throws** |
-| Binary + `text/*` family fallbacks | `resolve-adapter.ts:9-30`, `:60-79` (`403ab5110`) | Same class of failure on opaque binary bodies |
-| Server-selection cache validation | `src/ui/contexts/api.tsx:66-92` (`ce62a0eb4`) | A localStorage selection from a different document can resurrect an unresolvable server URL. Client-side, so it survives static export |
-| `externalDocs` under operation description | `2fe9bcafd` | Content loss |
-| `CodeSample.sources` | `src/types.ts:11-21`, `ui/operation/usage-tabs.tsx:31-43` (`ae554cfd5`) | Per-example samples — see Q-A |
-
-**So D11's real bill is: re-apply four small docs-rendering patches, rebuild the
-portal chrome and branding layer (D12), and accept per-operation-only code samples
-(Q-A) unless `sources` is upstreamed or re-patched.** None of these are large
-individually; the chrome rebuild is the biggest. Also note nothing was ever proposed
-upstream (no upstream remote is even configured), so none of it is likely to arrive on
-its own.
-
-**One genuine upside beyond the playground point:** published `fumadocs-openapi@11.4.3`
-declares **no `engines` field**, so the fork's Node >= 24.14.0 floor (§4.5) is a
-monorepo-build constraint, not an inherited one. D11 may let the CLI keep a lower Node
-floor. Verify against `next build` itself before relying on it.
-
-## 6. Open questions
-
-| # | Question | Owner |
-|---|---|---|
-| Q-A | **Per-example vs per-operation samples.** ⚠️ **Narrowed by D11:** `sources` does not exist upstream (§4.5 callout), so per-example requires re-patching `fumadocs-openapi` or upstreaming the feature. Per-operation (`source`) works on stock upstream today. The `Example` carrier already exists in the ASG but renderers emit no values. | **codegen-v2 team — TBD** |
-| Q-B | **Product name.** `portal-v2` and `fuma-portal` both proposed; both need team discussion. See §5.3. | **Team — TBD** |
-| Q-C | **"fumadocs as a direct dependency" — which package?** → **RESOLVED: upstream `fumadocs-*` from npm (D11).** Cost breakdown in §5.6. Implies the CLI owns a portal app template rather than inheriting `apps/docs`. | **Resolved 2026-09-17** |
-| Q-D | Does branding survive in some minimal form, given D5/D7? → **RESOLVED: yes, a 6-field input (D12).** fumadocs supplies the mechanism but no input format; see §5.5. | **Resolved 2026-09-17** |
-| Q-E | Prerender size on a large real spec — measure before committing. See §5.2. | **Unresolved** |
+**The portal build runs on the user's machine.** APIMatic's backend estate is .NET end to
+end and has no Node build infrastructure; the CLI is already a Node program. That has not
+changed and is not revisited here.
 
 ---
 
-## 7. Where things live
+## 3. Decision log
 
-| Concern | Path |
+Decisions are numbered as they were settled, across five rounds of design review. A
+superseded decision is kept, struck through, so a reader following an older discussion
+lands somewhere rather than nowhere.
+
+### Scope and transport
+
+| # | Decision |
 |---|---|
-| CLI portal command | `apimatic-cli/src/commands/portal/generate.ts` |
-| CLI portal orchestration | `apimatic-cli/src/actions/portal/generate.ts` |
-| CLI portal/SDK HTTP + polling | `apimatic-cli/src/infrastructure/services/portal-service.ts` |
-| CLI auth token file | `apimatic-cli/src/client-utils/auth-manager.ts` |
-| CLI base-URL env override | `apimatic-cli/src/infrastructure/env-info.ts` (`APIMATIC_BASE_URL`, `;`-separated triple) |
-| apimatic-io portal routes | `APIControllers/Portal/OnPremPortalV2ApiController.cs` |
-| apimatic-io → codegen-v2 client | `APIMatic.Web/Services/CodegenV2ApiService.cs` |
-| apimatic-io language gate | `APIMatic.Web/Domain/Enums/CodeGeneratorVersion.cs` |
-| codegen-v2 HTTP entry | `codegen-v2/src/CodegenV2.Func/Functions/Sdk/GenerateFunction.cs` |
-| codegen-v2 language capability | `codegen-v2/src/CodegenV2.Func/Domain/Enums/SdkLanguage.cs` |
-| codegen-v2 example carrier (unused) | `codegen-v2/src/CodegenV2.Asg/Common/Example.cs` |
-| fumadocs x-codeSamples type | `apimatic-dx-portal-v2/packages/openapi/src/types.ts` |
-| fumadocs sample merge/suppress | `apimatic-dx-portal-v2/packages/api-docs/src/codegen.ts:49-66` |
-| fumadocs spec→docs generator | `apimatic-dx-portal-v2/packages/openapi/src/generate-file.ts:95` |
-| Reference build with per-example samples | `C:/Users/mrafn/Downloads/mre-build/codesamples-per-example-build` |
+| D1 | ~~The endpoint returns code samples only.~~ **Superseded by D26/D27**: one endpoint returns SDKs, code samples and (later) the plugin. |
+| D2 | **Samples-only payload; the CLI merges.** The server never returns a rewritten spec. The CLI already parses every spec file, and a Stripe-sized document is tens of MB to upload and download again for a few hundred KB of samples. |
+| D3 | **The CLI uploads a build zip**, not a bare spec. Refined by D31. |
+| D4 | ~~apimatic-io orchestrates the fan-out.~~ **Superseded by D26**: codegen-v2 orchestrates; apimatic-io is a pass-through front. |
+| D5 | **Ship the samples codegen-v2 renders**, value-bearing where the stack supports it. |
+| D6 | **No subscription language gate for now** — all of v4 is beta. Add the check when anything reaches stable. |
+| D7 | ~~No caching; the annotated spec lives in the throwaway project dir.~~ Still true, but see D27: every run regenerates, so there is nothing to cache. |
+| D8 | **Raw axios in a dedicated service**, not a new `@apimatic/sdk` controller, until a v4 TypeScript SDK of apimatic-io exists. The precedent is already in the file we extend. |
+
+### Wire format
+
+| # | Decision |
+|---|---|
+| D9 | **The CLI synthesizes the zip**, with the language request carried by a config file inside it, mirroring how `plugin-config.json` drives the plugin flow. |
+| D10 | ~~New route trio `api/portal/samples`.~~ **Superseded by D26**: `api/sdk-artifacts`. |
+| D11 | **Key a sample on `path` + `method`.** That is the document's own addressing and is guaranteed to be present and to match; `operationId` is optional in OpenAPI and codegen-v2 synthesizes one when it is absent. |
+| D12 | **Carry every declared example** on the wire, keyed by its OpenAPI `examples:` map key. |
+| D13 | **Copy the spec tree into the temp project and annotate the copy.** Relative `$ref`s then keep resolving. See D20 for refs that escape `src/spec/`. |
+| D14 | ~~Degrade to curl-only when sample generation fails.~~ **Superseded by D28**: all-or-nothing, the command fails. |
+| D15 | ~~Ship TypeScript-only in v1.~~ Superseded in practice — the design is language-agnostic and C#/Python arrive by adding files to the zip. |
+| D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. That omission is what makes a new language cost the CLI zero. |
+| D17 | The Func wiring is the critical path and is what this document specifies. |
+| D18 | **One `x-codeSamples` array entry per (language × example).** Upstream `fumadocs-openapi` gives each entry its own `lang` and `label`, so every example gets a tab with no fork and no patch. |
+| D19 | **Tab order: curl first, then languages in configured order, examples in catalog order** — and all tabs of one language stay adjacent: `curl, TypeScript · minimal, TypeScript · full, C# · minimal, …`. |
+| D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
+| D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
+| D22 | **Reuse codegen-v2's status vocabulary verbatim.** The CLI's poller then needs no change. |
+| D23 | ~~`portal serve` fetches at startup, with a `--no-samples` flag.~~ **Superseded by D27**: no flag; every run generates. |
+| D24 | **Webhooks stay curl-only.** The wire format reserves the space now — see D33. |
+| D25 | ~~`portal.json.languages`, absent meaning no samples.~~ **Superseded by D29/D30.** |
+| D26 | **The endpoint is `/api/sdk-artifacts`**, an all-or-nothing async orchestrator in codegen-v2 that takes a build directory and returns one zip of artifacts. "Portal input generation" is retired as a name; the thing that crosses the wire is a **code-sample catalog**. |
+
+### Settled in the final round
+
+<a id="d27"></a>
+
+| # | Decision |
+|---|---|
+| D27 | **All three commands generate fresh artifacts on every run** — `quickstart`, `portal generate` and `portal serve` alike, as the CLI has always done. There is no cache and no skip flag. |
+| D28 | **A failed call fails the command.** No curl-only fallback. `languages` must name at least one language, so a docs-only user still generates SDKs for every language they enabled; a user with a `plugin` property gets plugins too. |
+| D29 | **`apimatic.json` lives inside `src/`.** Today's `src/portal.json` becomes the `portal` property inside it. |
+| D30 | **Absent `languages` is a validation error.** Curl-only portals may be allowed later; they are not allowed now. |
+| D31 | **`src/` *is* the build directory**, zipped exactly the way the SDK and plugin flows zip theirs. codegen-v2 learns to read `apimatic.json`. |
+| D32 | <a id="d32"></a>**Entitlement keys off field presence**: a `plugin` property means the context-plugin check applies, a `portal` property means the docs-as-code check applies. `apimatic.json` always exists; `plugin` is optional. **Ship in two PRs** — the endpoint without any subscription check first, so dev-environment iteration is not blocked, then the checks. |
+| D33 | **Artifact zip layout as in [§4.4](#44-response-the-artifact-zip)**, with `plugin/` and `docs/` reserved for later. |
+| D34 | **Func budget 25 min, CLI budget 30 min, poll interval 5s.** The client must always outlive the server, or it reports failures the server never had. |
+
+---
+
+## 4. The wire contract
+
+This section is the Func's specification. Everything in it is a statement about bytes on
+the wire, not about implementation.
+
+### 4.1 Routes
+
+**codegen-v2** — three functions, mirroring the two trios that exist today. Routes carry no
+`api/` prefix in the attribute; the Functions host adds it.
+
+```
+POST api/sdk-artifacts                 -> 202 { id }        multipart/form-data, file part `file`
+GET  api/sdk-artifacts/{id}/status     -> 200 { status, errors? }
+GET  api/sdk-artifacts/{id}/download   -> 200 application/zip
+```
+
+No query parameters. The language request travels inside the zip ([§4.2](#42-request-the-build-zip)).
+Return **202** on accept, matching the plugin trio; the SDK trio's 200 is the odd one out.
+
+**apimatic-io** — a fronting controller shaped like `ContextPluginApiController`, because
+the CLI cannot call codegen-v2 directly: its triggers are `AuthorizationLevel.Anonymous`
+and trust `X-APIMatic-*` headers that only apimatic-io may set.
+
+```
+POST api/sdk-artifacts                 -> 202 { id, links: { status, download } }
+GET  api/sdk-artifacts/{id}/status     -> 200 { status, errors? }  |  302 -> download
+GET  api/sdk-artifacts/{id}/download   -> 200 application/zip
+```
+
+Three details are load-bearing and all three already exist:
+
+- **Completion is a redirect.** The v2 SDK status route answers a finished generation with
+  a 302 to the download URL rather than `{status:"Completed"}`, and the CLI already handles
+  exactly that (`maxRedirects: 0`, 302 → `Completed`). Copy it; do not invent a third shape.
+- **Errors ride on `Failed`.** The plugin status handler populates `errors` for `Failed`;
+  the SDK one does not. Follow the plugin.
+- **Put `[RouteDataGuidValidator]` on the status route as well as download.** The plugin
+  controller does; the SDK controller forgets to on status.
+
+### 4.2 Request: the build zip
+
+The CLI zips the contents of the project's `src/` directory, exactly as the SDK and plugin
+flows zip their build directories, and posts it as the multipart `file` part.
+
+```
+<zip root>/
+  apimatic.json          ← the language request and the artifact request
+  spec/                  ← one or more OpenAPI documents
+  content/               ← portal Markdown (ignored by codegen-v2)
+  static/                ← portal assets   (ignored by codegen-v2)
+```
+
+This lands where codegen-v2 already looks: it extracts to `extract/`, reads specs from
+`extract/spec`, and reads its config file from the extract root — which is where
+`apimatic.json` naturally ends up when `src/` is zipped with its contents at the root.
+
+`apimatic.json`, as far as this endpoint is concerned:
+
+```jsonc
+{
+  "languages": ["typescript", "csharp", "python"],  // >= 1, from the Language enum
+  "portal":  { /* today's portal.json */ },          // presence => docs-as-code entitlement applies
+  "plugin":  { /* today's plugin-config.json */ }    // optional; presence => generate a plugin
+}
+```
+
+`languages` is the whole of the language request. `ValidateApimaticConfig` rejects an
+absent or empty array, and rejects a name outside the enum by naming the valid set.
+
+### 4.3 Status
+
+The token set is **closed**. Emit only what `GenerationStatus` already defines:
+
+```
+Queued  ExecutionStarted  GeneratingArtifacts  Completed  Failed  ValidationError  Unknown
+```
+
+Map every intermediate step — the whole fan-out included — onto `GeneratingArtifacts`.
+The CLI's poller treats any token it does not recognise as healthy and keeps polling to its
+deadline, so **a token outside this set costs the user a 30-minute hang, not an error**.
+
+Budgets ([D34](#d27)): orchestrator 25 minutes, CLI 30 minutes, poll every 5 seconds.
+The gap is deliberate — a run finishing at 29:50 against a 30-minute client budget is
+reported to the user as a platform fault that never happened.
+
+> ⚠️ apimatic-io's HTTP client to codegen-v2 has a **4-minute** timeout, and it re-reads the
+> uploaded zip from disk and re-uploads it rather than streaming through, so a large build
+> directory crosses the wire twice inside those four minutes. The POST must return 202
+> immediately and do no work inline.
+
+### 4.4 Response: the artifact zip
+
+```
+sdk/<language>.zip             ← one per language that generated an SDK
+code-samples/<language>.json   ← one per language that rendered a non-empty catalog
+plugin/plugin.zip              ← RESERVED, not in the first cut
+docs/<language>.json           ← RESERVED, not in the first cut
+```
+
+**A language that produces nothing is omitted entirely rather than written empty.** That is
+what makes a new language stack cost the CLI zero: the CLI renders whatever files it finds,
+so the day C# and Python ship, no CLI release is needed.
+
+`docs/<language>.json` is reserved for generated MDX page content, keyed by page —
+`{"getting-started": "..."}`. The consumer must therefore treat unknown top-level folders
+in the zip as ignorable, and must not fail on them.
+
+### 4.5 The code-sample catalog
+
+One file per language. Language is the artifact boundary — the catalog hangs off the
+per-language blueprint, so there is deliberately no language field inside the file.
+
+```jsonc
+{
+  "paths": {
+    "/payments/{paymentId}": {
+      "POST": {
+        "minimal": "const response = await client.payments.create(...)",
+        "full":    "const response = await client.payments.create(...)"
+      }
+    },
+    "/health": { "GET": { "Example": "await client.ping()" } }
+  },
+  "webhooks": {}
+}
+```
+
+Rules, all of which the consumer depends on:
+
+- **Path is the template verbatim, with its leading slash**, exactly as the document writes
+  it. **Method is uppercase.**
+- **The example id is the OpenAPI `examples:` map key** — an author-written name, so tab
+  captions read `minimal` / `full` rather than `example1`.
+- **`"Example"` is a reserved sentinel**, not a real id. An operation's id set is the union
+  of its members' declared example names; a position the spec left silent carries the name
+  `"Example"`. It is filtered out, and stands in only when the union would otherwise be
+  empty. **The CLI must never render it as a caption.**
+- **Code is raw and unfenced.** The consumer wraps it in whatever it writes into.
+- **Declaration order is authorial intent and is preserved.** Do not sort.
+- **`webhooks` is emitted, empty, from day one.** Webhook operations get no samples
+  ([D24](#wire-format)) — but the key exists so that adding them later is not a breaking
+  change. This is the one-line decision that is very expensive to retrofit: OpenAPI 3.1's
+  `webhooks` map is keyed by *name*, not by path, so a bare path map has nowhere to put a
+  webhook sample without overloading the path key.
+
+### 4.6 Determinism
+
+Three rules the orchestrator must hold, all of which are ways to get burned by
+`Task.WhenAll`:
+
+1. **Return failures, do not throw them.** `Task.WhenAll` surfaces one exception and
+   abandons the other results, so a three-language run would report one failure and
+   silently lose two. Each fan-out activity returns a Result; the orchestrator keys
+   failures by language.
+2. **Order the fan-out, not the results.** `Task.WhenAll` returns results in the order the
+   tasks were handed to it, never completion order. The aggregation activity must be
+   *handed* its input blob names and must never discover them by listing storage.
+3. **All-or-nothing.** If any lane failed, aggregation does not run and the call fails with
+   one error. A half-populated zip would leave the portal advertising an SDK that is not
+   there.
+
+---
+
+## 5. codegen-v2 — what is new
+
+### 5.1 Activity graph
+
+| Activity | State |
+|---|---|
+| `ValidateSpecFile` | exists — writes the parsed SDL every downstream activity reads |
+| `ValidateApimaticConfig` | **new** — `ValidatePluginConfig` is the template; reads `apimatic.json` instead |
+| `GenerateSdk` × N | exists — fan out, one activity per selected language |
+| `GenerateCodeSamples` × N | **new** — same parsed SDL, `RenderCodeSamples()` per language |
+| `AggregateSdkArtifacts` | **new** — assemble the zip of [§4.4](#44-response-the-artifact-zip) |
+| `PostGeneration` | exists — needs a third `GenerationOperation` variant |
+
+`GenerationOperation` is a closed two-member enum today (`Sdk`, `Plugin`); each member owns
+a callback event name, a download link and its tracking events. A third variant must supply
+all three.
+
+### 5.2 Four things with no precedent in the repo
+
+These are the reasons this endpoint is more than a copy of an existing one.
+
+1. **Per-language fan-out.** The plugin orchestrator's `Task.WhenAll` has exactly **two**
+   lanes — V4 skills and V3 skills — and each lane loops languages *inside* one activity.
+   A genuine per-language fan-out is new.
+2. **Result-returning generation activities.** Only the three *validation* activities carry
+   `IsSuccess`/`Errors`. `GenerateSdk` and `GenerateV4Skills` return bare `Unit` and throw.
+   Determinism rule 1 therefore has nothing to copy.
+3. **Retries.** There is **no** Durable retry policy anywhere in the codebase — no
+   `TaskOptions`, no `TaskRetryOptions`, no `RetryPolicy`, and no `retryOptions` in
+   `host.json`. The agreed policy (exponential backoff in powers of 2, else linear 10s;
+   max 4 retries) is a first. **Retries require retry-safe activities**: an activity whose
+   stale state is not cleaned up before the retried attempt starts can produce a run that
+   never finishes.
+4. **Concurrency.** `host.json` pins both `maxConcurrentActivityFunctions` and
+   `maxConcurrentOrchestratorFunctions` to **1**, so a three-language fan-out buys no
+   wall-clock on one host instance — the lanes queue and run one at a time. What it does
+   buy is per-language isolation, per-language errors and one activity per language in the
+   durable history. Whether this orchestrator raises those limits sets the timeout budget,
+   and the budget in [§4.3](#43-status) assumes it does not.
+
+Records only, for everything passed to and from an activity.
+
+### 5.3 Language capability
+
+`CanGenerateSdk` is true for **C#, TypeScript and Python** only. Java, PHP, Ruby and Go
+throw `NoSdkGenerator()` from `CreateBlueprint`; Go cannot even be a plugin language. So a
+`languages` array is validated against `CanGenerateSdk`, not against the seven-member enum.
+
+---
+
+## 6. apimatic-io — what is new
+
+Very little, which is the good news. The fronting layer keeps **no record** of a
+generation: `/api/sdk/v2` and `/api/plugin` pass codegen-v2's own id straight back, wrapped
+with apimatic-io's URLs. No Hangfire, no DB row.
+
+1. A controller — `[WebApiAuthorize]`, `[RoutePrefix("api/sdk-artifacts")]` — validating
+   the multipart `file` part the way both existing controllers do (presence, non-zero
+   length, content-type in `application/zip` / `x-zip-compressed` / `octet-stream`). No
+   `language` or `stability` form field: the zip carries the request.
+2. Three methods on `CodegenV2ApiService`, alongside the seven already there, adding
+   `X-APIMatic-UserId` / `X-APIMatic-TenantId` via `HttpRequestMessageFactory` and
+   forwarding `X-APIMatic-CallbackUrl` when the inbound request carries one.
+3. Download re-wrapped as `FileStreamResult` — a direct stream pass-through, no
+   re-packaging, no size limit. Unchanged from the SDK path.
+
+**Entitlement, PR 2** ([D32](#d32)). Today `/api/sdk/v2` checks *no* entitlement at all —
+only a hard-coded `CodeGeneratorVersion.V4.AvailableLanguages` allowlist — while
+`/api/plugin` gates on `CanGenerateContextPlugin` → `IsCursorIntegrationAllowed`. The new
+route gates on field presence: `plugin` present → the context-plugin check; `portal`
+present → `CanGenerateOnPremPortal`.
+
+> ⚠️ apimatic-io#2216 quotes a message for the latter that does not exist. The real one is
+> *"Docs as code is not allowed on your subscription"*.
+
+Checks run at generate time only, never on status or download — the existing comment in
+`GetContextPluginStatusCommandHandler` states that rule explicitly.
+
+---
+
+## 7. CLI — what is new
+
+### 7.1 Where the code goes
+
+Following the 5-layer stack in `.ai/instructions.md`:
+
+| Concern | Layer | Proposed |
+|---|---|---|
+| Call the endpoint, poll, download | Infrastructure service | `SdkArtifactsService` (`services/sdk-artifacts-service.ts`), axios-auth variant |
+| Parse `code-samples/<lang>.json` | Types (value object) | `CodeSampleCatalog` |
+| The downloaded zip as a thing | Types (value object) | `SdkArtifacts` — `catalogs()`, `sdkZips()`, ignores unknown folders |
+| Inject `x-codeSamples` | Application | pure: `(document, catalogs, languageOrder) -> document` |
+| Detect escaping `$ref`s | Application | pure: `(document, specRoot) -> FileName[]` |
+| Copy + annotate the spec tree, repoint slugs | Infrastructure | `PortalProjectService` |
+| Poll loop | — | **reuse** `pollUntilCompleted`; [D22](#wire-format) makes it a no-change |
+
+The injection being a pure function in `src/application/` matters: it is the piece with the
+most edge cases and the one that most needs tests without a network or a filesystem. The
+`application/` directory is currently empty by design — this is what brings it back.
+
+### 7.2 Merging the catalog into the spec
+
+`PortalProjectService.prepare()` already writes `portal.config.json` with a `specs` map of
+slug → **absolute path**, and each slug is independent. That is the whole seam:
+
+1. Copy `src/spec/` into the temp project ([D13](#wire-format)).
+2. For each spec, walk `paths` and inject `x-codeSamples` from each language's catalog.
+3. Point that slug at the annotated copy.
+4. For a spec with a `$ref` escaping `src/spec/`, **skip steps 1–3 and point the slug at
+   the original file** ([D20](#wire-format)). It then builds exactly as it does today and
+   loses only its samples.
+
+The walk needs no library. `document.paths` is a flat map; the traps are that a path item
+carries non-method keys (`summary`, `description`, `servers`, `parameters`) and that a
+whole path item can itself be a `$ref`, in which case there is no inline operation to
+annotate. Every library that does this walk also *normalizes* the document — upgrades
+3.0 → 3.1, rewrites refs, drops unrecognised keys — which for a docs portal is actively
+harmful: the customer's document is what must render.
+
+Escaping-ref detection is a scan of `$ref` string values: skip `#/...` (internal) and URLs
+(which resolve identically from anywhere), resolve the rest against the file's directory,
+test containment in `src/spec/`.
+
+### 7.3 Rendering the tabs
+
+```jsonc
+"x-codeSamples": [
+  { "lang": "typescript", "label": "TypeScript · minimal", "source": "..." },
+  { "lang": "typescript", "label": "TypeScript · full",    "source": "..." },
+  { "lang": "csharp",     "label": "C# · minimal",         "source": "..." }
+]
+```
+
+- `lang` is the `Language` enum value verbatim. It is simultaneously the catalog filename,
+  the `x-codeSamples` language and the Shiki grammar key — one token, three uses, no
+  mapping table.
+- `label` comes from `LANGUAGE_CHOICES`, suffixed ` · <exampleId>` **only when the
+  operation declares more than one id**. When the id set is just the `"Example"` sentinel,
+  the label is the bare language name.
+- Order: curl, then languages in configured order, examples in catalog order, all tabs of
+  one language adjacent ([D19](#wire-format)).
+
+Nothing in the portal template needs to change. `api-page.tsx` registers curl alone and its
+comment already names `x-codeSamples` as the source of the other tabs, and
+`shiki-bundle.ts` already bundles grammars for **all seven** CLI languages, keyed by the
+same enum values.
+
+### 7.4 Command behaviour
+
+All three of `quickstart`, `portal generate` and `portal serve` generate fresh artifacts on
+every run ([D27](#d27)). A failure fails the command ([D28](#settled-in-the-final-round)) —
+for `portal generate`, nothing is written; for `portal serve`, the dev server never starts.
+
+Generation is **startup-only**, and that is free rather than enforced: the CLI has no file
+watcher of its own, `prepare()` runs exactly once per command, and `vite dev` owns reload.
+`portal serve`'s own help text already tells the user that structural edits need a restart.
+
+---
+
+## 8. Verified facts
+
+Read from source on 2026-09-22. CLI facts are on `feat/code-samples-portal` (= `dev` at
+`073d09a`); codegen-v2 and apimatic-io from their working trees.
+
+### 8.1 CLI
+
+| Fact | Where |
+|---|---|
+| Config is `portal.json` **inside `src/`**; five fields: `title`, `description`, `logo`, `siteUrl`, `aiPageActions` | `src/types/portal-source-context.ts:46-48`, `src/types/portal/portal-config.ts:5-11,29` |
+| `PortalConfig.parse` collects **all** field errors at once, plus unknown-field "did you mean" hints | `portal-config.ts:64-91,106-115`; renames at `:33-38` |
+| `PortalSourceProblem` variants: `missingConfig` (carries a `PortalMigration` hint), `invalidConfig`, `unreadableSpec`, `unsupportedSpec`, `noSpecs`, `missingLogo` | `src/types/portal/portal-source.ts:24-30` |
+| `writeConfiguration` writes `specs[slug] = <absolute posix path>` — each slug independent | `src/infrastructure/portal-project-service.ts:153-193`; map at `:159-162` |
+| `prepare()` runs **once per command**, never per rebuild | `src/actions/portal/generate.ts:76-77`, `src/actions/portal/serve.ts:70-71` |
+| **No file watcher exists anywhere in the CLI** — no chokidar, no `fs.watch`; `vite dev` owns reload | repo-wide grep |
+| Poller: 3s interval, **30-minute** budget; an unrecognised status keeps the run alive until the deadline | `src/infrastructure/generation-status-poller.ts:6,13,68-75` |
+| v2 status already handles completion-by-redirect: `maxRedirects: 0`, 302 → `Completed` | `src/infrastructure/services/sdk-generation-service.ts:225` |
+| Build zip = copy the whole build directory, optionally add `package-settings/`, zip | `src/types/build-context.ts:42-50`, called from `src/actions/sdk/generate.ts:109` |
+| `Language` enum values are `csharp java php python ruby typescript go` | `src/types/sdk/generate.ts:3-11` |
+| `LANGUAGE_CHOICES` is read in exactly one file, as prompt text only | `src/types/sdk/generate.ts:45-53`, used at `src/prompts/sdk/quickstart.ts:12,159-160,163,168` |
+| `shiki-bundle.ts` bundles grammars for **all seven** languages, keyed by the enum values | `portal-template/src/lib/shiki-bundle.ts` |
+| `api-page.tsx` registers curl only; its comment already names `x-codeSamples` | `portal-template/src/components/api-page.tsx:1-11` |
+| A per-language `plugin-config.json` entry requires `codegenVersion` — so `{}` is not valid *today* | `src/types/plugin/plugin-config.ts:48-66` |
+| **`apimatic.json` does not exist anywhere in the repo** | repo-wide grep |
+
+### 8.2 codegen-v2
+
+| Fact | Where |
+|---|---|
+| Routes are `generate`, `generate/{id}/status`, `generate/{id}/download`; `plugin`, `plugin/{id}/status`, `plugin/{id}/download`, `plugin/{id}/build/download` | `Functions/Sdk/*.cs`, `Functions/Plugin/*.cs` |
+| SDK generate returns **200**, plugin generate returns **202** | `Functions/Sdk/GenerateFunction.cs:38`, `Functions/Plugin/GenerateFunction.cs:32` |
+| Plugin fan-out is **two lanes** (V4 skills, V3 skills); each loops languages inside one activity | `Functions/Plugin/GenerateFunction.cs:116-142`, `GenerateV4Skills.cs:79` |
+| `AggregatePlugin` unzips each lane into a subtree, walks the tree, renders manifests, rezips | `Application/Features/AggregatePlugin.cs:77-143` |
+| `GenerationStatus` = `Queued, ExecutionStarted, GeneratingArtifacts, Completed, Failed, ValidationError, Unknown` | `Domain/Models/GenerationStatus.cs:12-24` |
+| `GenerationOperation` has exactly `Sdk` and `Plugin`; each owns a callback event, a download link and tracking events | `Domain/Enums/GenerationOperation.cs:11-78` |
+| Extraction paths: `extract/`, `extract/spec`, config at the extract root | `Domain/Models/GenerateWorkspace.cs:14-17`, `ValidatePluginConfig.cs:88-91` |
+| `host.json` pins both concurrency limits to **1**; no `retryOptions`, no function timeout | `src/CodegenV2.Func/host.json:1-28` |
+| **Zero** Durable retry policy in the repo — no `TaskOptions`/`TaskRetryOptions`/`RetryPolicy` | repo-wide grep |
+| `CanGenerateSdk` true only for C#, TypeScript, Python; Java/PHP/Ruby/Go throw `NoSdkGenerator()`; Go cannot be a plugin language either | `Domain/Enums/SdkLanguage.cs:17-157` |
+| All HTTP triggers are `AuthorizationLevel.Anonymous`; `X-APIMatic-*` headers are attribution, **not** access control, and default to `"undefined"` when absent | `Extensions/ApimaticHeaders.cs:5-21`, `Extensions/HttpExtensions.cs:18-33` |
+| ⚠️ **The code-sample catalog is not merged.** It exists only as `origin/asadali214/code-sample-catalog` | no `CodeSamples.cs` / `RenderCodeSamples` / `SampledPath` in the working tree |
+
+The catalog shape in [§4.5](#45-the-code-sample-catalog) was read from that branch
+(`CodegenV2.Common/Models/CodeSamples.cs`, `docs/plans/code-sample-catalog.md`) in an
+earlier session, and is the one part of this document not re-verifiable from a checked-out
+tree. **Re-check it against the branch before implementing.**
+
+### 8.3 apimatic-io
+
+| Fact | Where |
+|---|---|
+| `CodegenV2ApiService` — static `HttpClient`, **4-minute** timeout, base URL from `ApimaticCodegenV2Api_Url` | `APIMatic.Web/Services/CodegenV2ApiService.cs:22-23`, `Web.config:65` |
+| Build zip is re-read from disk and re-uploaded as fresh multipart — **not** a stream pass-through | `CodegenV2ApiService.cs:36-41` |
+| `X-APIMatic-UserId` / `TenantId` / `User-Agent` on every call; `X-APIMatic-CallbackUrl` on the two POSTs, forwarded from the inbound request | `Services/Common/HttpRequestMessageFactory.cs:23-34`, `CodegenV2ApiService.cs:45-48,104-107` |
+| `X-APIMatic-SubscriptionFeatures` exists but is set **only** by the legacy v1 service | `Application/Common/ApimaticHeaders.cs:15`, `CodegenApiService.cs:87,114,146,288` |
+| No Hangfire, no DB row — codegen-v2's id is passed straight through, wrapped with io's URLs | `Application/CodegenV2Api/GenerateSdk/GenerateSdkCommandHandler.cs:23-48` |
+| v2 SDK status **redirects** to download on completion | `APIControllers/Sdk/GenerateV2SdkApiController.cs:110-116` |
+| Plugin status carries `errors` on `Failed`; SDK status does not | `GetContextPluginStatusCommandHandler.cs:33-35` vs `GetSdkStatusCommandHandler.cs:30-34` |
+| `/api/sdk/v2` performs **no** entitlement check — only a hard-coded v4 language allowlist | `GenerateSdkCommandHandler.cs:20-21`, `Domain/Enums/CodeGeneratorVersion.cs:9-16` |
+| `/api/plugin` gates on `CanGenerateContextPlugin` → `IsCursorIntegrationAllowed`, at generate time only | `GenerateContextPluginCommandHandler.cs:36-39`, `SubscriptionManager.cs:2140-2148` |
+| `CanGenerateOnPremPortal` message is *"Docs as code is not allowed on your subscription"* | `SubscriptionManager.cs:2120-2133` |
+| **Nothing named `sdk-artifacts` exists in the repo** | repo-wide grep |
+
+---
+
+## 9. Risks and open items
+
+| # | Item |
+|---|---|
+| R1 | **The catalog branch is unmerged.** Nothing in codegen-v2's main line emits a catalog, and C#/Python return empty until their stacks are driven off the ASG's resolved examples. The CLI can be built and tested against a fixture; the endpoint cannot be integration-tested until the branch lands. |
+| R2 | **`src/static/` is both an upload and an output.** apimatic-io#2216 wants `sdk.zip` and `plugin.zip` written into the portal's `static/`, and [D31](#settled-in-the-final-round) uploads all of `src/`. A second run therefore uploads the previous run's artifacts back to codegen-v2, and the zip grows every time. Either exclude the generated artifact names from the upload, or write them somewhere outside `src/`. **Decide before the first release, not after a support ticket.** |
+| R3 | **`portal serve` now costs a full orchestration at startup** — serially, given the pinned concurrency, against a 25-minute budget. Accepted under [D27](#d27), but it is the single biggest change to the feel of the command. |
+| R4 | **Retry-safety is a prerequisite, not a follow-up.** Adding retries to activities that do not clean up stale state produces runs that never finish — a worse failure than the transient one being papered over. |
+| R5 | **`apimatic.json` is owned elsewhere.** This document treats it as fixed input; if its shape moves, [§4.2](#42-request-the-build-zip) moves with it. The portal's `PortalConfig.parse` and the signup page's *Download build* must change together, or the first command on a downloaded build hard-stops. |
+| R6 | **`--verbose` does not exist.** [D20](#wire-format) names affected spec files rather than individual `$ref`s because there is no verbose mode to put the detail behind. **TODO:** enumerate the exact refs once a `--verbose` flag exists. |
+| R7 | **This file's name is now wrong.** It describes the `/api/sdk-artifacts` contract, not "portal v2". Rename when convenient. |
+
+---
+
+## 10. Test plan
+
+**CLI, unit.** Injection is a pure function, so most of this needs no filesystem:
+
+- A catalog entry keyed by a path/method the document does not contain → warn, do not fail.
+- The `"Example"` sentinel renders a bare language label; two declared ids render suffixes.
+- Tab order: curl first, languages in configured order, one language's tabs adjacent.
+- A path item that is itself a `$ref` → skipped without throwing.
+- Non-method keys on a path item (`summary`, `parameters`, `servers`) → not treated as
+  operations.
+- Declaration order preserved, not sorted.
+- A language present in `languages` but absent from the zip → its tabs are simply absent.
+- An unknown top-level folder in the artifact zip → ignored, not an error.
+- Escaping-`$ref` detection: internal `#/...` and URL refs do not count; a `../` ref does.
+- A spec with an escaping ref keeps its slug pointed at the **original** file.
+
+**CLI, integration** (nock): 202 → poll → 302 → download; `Failed` with errors; a status
+token outside the closed set (asserts the timeout, documenting the hang); the 30-minute
+budget outliving a 25-minute server.
+
+**codegen-v2:** one lane fails → aggregation does not run and the call fails once, with
+every lane's error keyed by language, not just the first. Aggregation receives its blob
+names rather than listing storage. A retried activity produces the same zip as a
+first-attempt one.
+
+**Manual** (`APIMATIC_BASE_URL` → `api.dev.apimatic.io`): a three-language portal renders
+every example tab on an operation page; a spec with a sibling `$ref` still builds;
+`portal serve` starts after a full generation; Ctrl+C mid-generation leaves nothing behind.
