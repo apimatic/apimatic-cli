@@ -60,7 +60,8 @@ export class PortalServeAction {
       return ActionResult.failed();
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-    this.prompts.pagesCollidingWithSpecs(source.value.collidingSlugs);
+    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
+    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {

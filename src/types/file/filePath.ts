@@ -24,6 +24,14 @@ export class FilePath {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
   }
 
+  /**
+   * How a message names this file to someone standing in `directory`: the path from there,
+   * with forward slashes whatever the platform, so the same file reads the same everywhere.
+   */
+  public relativeTo(directory: DirectoryPath): string {
+    return path.relative(directory.toString(), this.toString()).split(path.sep).join('/');
+  }
+
   public static create(filePath: string): FilePath | undefined {
     if (!filePath) {
       return undefined;

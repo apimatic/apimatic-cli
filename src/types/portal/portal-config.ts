@@ -1,6 +1,7 @@
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../file/urlPath.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
+import { unknownFieldErrors } from './unknown-fields.js';
 
 export interface PortalConfigData {
   title: string;
@@ -28,14 +29,11 @@ const STATIC_PREFIX = 'static/';
 
 const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPageActions']);
 
-// Pre-2.0 names and near misses. A mistyped setting is the one mistake that otherwise
-// produces a portal that builds and is quietly wrong.
-const RENAMED_FIELDS: Record<string, string> = {
-  logoUrl: 'logo',
-  pageTitle: 'title',
-  url: 'siteUrl',
-  site: 'siteUrl'
-};
+// Near misses, each mapped to the setting it means.
+const RENAMED_FIELDS = new Map<string, string>([
+  ['url', 'siteUrl'],
+  ['site', 'siteUrl']
+]);
 
 // Immutable wrapper around the parsed `src/portal.json`. Construct trusted values with
 // `create`; user input goes through `parse`, which names every invalid field.
@@ -72,7 +70,15 @@ export class PortalConfig {
     // Every field is reported at once rather than stopping at the first, so one edit fixes
     // the file. Each validator hands back the typed value it accepted, so the constructor
     // below is fed only what validation proved.
-    const unknownFields = PortalConfig.unknownFieldErrors(data);
+    const unknownFields = unknownFieldErrors(
+      data,
+      KNOWN_FIELDS,
+      (field, intended) =>
+        intended !== undefined
+          ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
+          : `'${field}' is not a portal.json setting.`,
+      RENAMED_FIELDS
+    );
     const fields = Result.combineWithAllErrors([
       PortalConfig.validTitle(data.title),
       PortalConfig.validDescription(data.description),
@@ -101,17 +107,6 @@ export class PortalConfig {
       return err(['portal.json must contain a JSON object.']);
     }
     return ok(data as Record<string, unknown>);
-  }
-
-  private static unknownFieldErrors(data: Record<string, unknown>): string[] {
-    return Object.keys(data)
-      .filter((field) => !KNOWN_FIELDS.has(field))
-      .map((field) => {
-        const intended = RENAMED_FIELDS[field];
-        return intended
-          ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
-          : `'${field}' is not a portal.json setting.`;
-      });
   }
 
   private static validTitle(title: unknown): Result<string, string> {
@@ -167,14 +162,6 @@ export class PortalConfig {
       : ok(parsed);
   }
 
-  /**
-   * Whether a value would survive `parse` as `logo`, so the `portal.json` the migration hint
-   * prints is never one the next command rejects.
-   */
-  public static isValidLogo(value: string): boolean {
-    return value.trim().length > 0 && PortalConfig.isInsideStatic(value);
-  }
-
   public siteTitle(): string {
     return this.title;
   }
@@ -219,7 +206,7 @@ export class PortalConfig {
       ...(this.description !== null ? { description: this.description } : {}),
       ...(this.logo !== null ? { logo: this.logo } : {}),
       ...(this.siteUrl !== null ? { siteUrl: this.siteUrl.toString() } : {}),
-      // Only when it differs from the default, so the migration hint stays minimal.
+      // Only when it differs from the default, so a scaffolded file stays minimal.
       ...(this.aiPageActions ? {} : { aiPageActions: false })
     };
   }

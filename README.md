@@ -27,10 +27,11 @@ Documentation portals are now built on your machine from a `src/` directory, and
 `APIMATIC-BUILD.json` no longer configures them:
 
 - Describe the portal in `src/portal.json` (`title`, `description`, `logo`, `siteUrl`).
-  Running `apimatic portal generate` on a 1.x project prints one to start from.
+  Running `apimatic quickstart` scaffolds one.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
-- Page order comes from the `meta.json` files beside your pages; `toc.yml` is no longer read.
+- Page order comes from a `nav.json` beside your pages, listing them by file name, and a
+  `title` there names the folder it sits in.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
@@ -302,7 +303,7 @@ Generate a static API Documentation Portal.
 
 ```
 USAGE
-  $ apimatic portal generate [-i <value>] [-d <value>] [-f] [--zip] [-k <value>]
+  $ apimatic portal generate [--zip] [-i <value>] [-d <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/portal] path where the portal will be generated.
@@ -349,10 +350,10 @@ DESCRIPTION
   Preview your API Documentation Portal with live reload.
 
   Serves the portal described by 'src/portal.json' from your machine, reloading the browser as you edit the Markdown
-  pages in 'src/content'.
+  pages in 'src/content' or reorder them in a 'nav.json'.
 
-  Adding or removing a page, editing 'meta.json' or 'portal.json', or changing which documents are in 'src/spec', needs
-  the preview restarted.
+  Adding or removing a page, editing 'portal.json', or changing which documents are in 'src/spec', needs the preview
+  restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 

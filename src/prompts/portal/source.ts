@@ -1,9 +1,9 @@
 import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PortalMigration, PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
-import { noteWrapped } from '../prompt.js';
 
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
@@ -13,16 +13,24 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
   switch (problem.kind) {
     case 'missingConfig': {
       log.error(`No ${f.var('portal.json')} found in ${f.path(sourceDirectory)}.`);
-      if (problem.migration === null) {
-        log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
-      } else {
-        reportMigration(problem.migration, sourceDirectory);
-      }
+      log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
       return;
     }
     case 'invalidConfig': {
       log.error(`The ${f.var('portal.json')} in ${f.path(sourceDirectory)} is not valid:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      return;
+    }
+    case 'invalidNavigation': {
+      log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
+      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      return;
+    }
+    case 'unreadableContent': {
+      log.error(
+        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
+          `directory beneath it can be listed.`
+      );
       return;
     }
     case 'unreadableSpec': {
@@ -62,51 +70,26 @@ export function reportShadowedFiles(shadowed: FileName[]): void {
   log.warn(`${names} in ${f.var('static')} replaces the file the portal would have generated.`);
 }
 
-export function reportCollidingPages(slugs: string[]): void {
-  if (slugs.length === 0) {
+export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath): void {
+  if (files.length === 0) {
     return;
   }
-  const addresses = slugs.map((slug) => f.var(`/api/${slug}`)).join(', ');
-  const pages = slugs.length === 1 ? 'A page' : 'Pages';
-  log.warn(
-    `${pages} under ${f.var('content/api')} and a specification share the address ${addresses}; ` +
-      `only one of them is served. Rename or move the page.`
-  );
+  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
+  const verb = files.length === 1 ? 'is' : 'are';
+  // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
+  // beside it, and the two would then need merging rather than renaming.
+  log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
 }
 
-function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryPath): void {
-  const starter = JSON.stringify(migration.suggestedConfig, null, 2);
-  const lines = [
-    `This project still uses ${f.var('APIMATIC-BUILD.json')}, which no longer configures the portal.`,
-    '',
-    `Create ${f.var('portal.json')} next to it with:`,
-    starter
-  ];
-
-  if (migration.unmigratableLogo !== null) {
-    lines.push(
-      '',
-      `The logo at ${f.var(migration.unmigratableLogo)} is not carried over: ${f.var('logo')} addresses ` +
-        `the ${f.var('static')} directory. Move the image under ${f.path(sourceDirectory.join('static'))} ` +
-        `and add it as ${f.var('"logo": "static/<path>"')}.`
-    );
+export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryPath): void {
+  if (files.length === 0) {
+    return;
   }
-
-  if (migration.hadTableOfContents) {
-    lines.push(
-      '',
-      `Navigation is no longer described by ${f.var('toc.yml')}. Pages are ordered by the ` +
-        `${f.var('meta.json')} files in your content directory, and API operations are grouped by their tags.`
-    );
-  }
-
-  if (migration.unsupportedFields.length > 0) {
-    lines.push(
-      '',
-      'These settings have no equivalent yet and are ignored:',
-      ...migration.unsupportedFields.map((field) => `  • ${field}`)
-    );
-  }
-
-  noteWrapped(lines.join('\n'), 'Migrating from APIMATIC-BUILD.json');
+  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
+  const [verb, pronoun] = files.length === 1 ? ['sits', 'it'] : ['sit', 'them'];
+  log.warn(
+    `${names} ${verb} inside a specification's section under ${f.var('content/api')}, which lists only ` +
+      `its own reference pages, so ${pronoun} will not appear in the sidebar. Move ${pronoun} elsewhere ` +
+      `in ${f.var('content')}.`
+  );
 }

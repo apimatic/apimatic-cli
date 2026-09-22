@@ -23,8 +23,10 @@ ships and a breaking change after. That is why the whole key structure lands in
 this release even where a behaviour ships thin (section 11).
 
 In scope: the schema, the CLI-side validation and defaults, the template changes
-that apply each key, the migration hint from the pre-2.0 build file, the
-quickstart scaffold, and a published JSON schema for editors.
+that apply each key, the quickstart scaffold, and a published JSON schema for
+editors. (The migration hint from the pre-2.0 build file was in scope when this
+was written; it was removed on 2026-09-22 and is not to be brought back, see
+section 8.)
 
 Out of scope: a contrast gate on raw token overrides, per-language SDK settings
 beyond the list the navigation plan requires, i18n, the AI section's pages, and
@@ -365,8 +367,13 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   five sections, and `sdks.languages` from the wizard's language step, which the
   portal path dropped in the portal plan and brings back here since the key is
   required. `site.url` stays absent and the closing note names it.
-- **Migration hint.** Extended from three fields to the table below. Fields with
-  no v2 home stay in the unsupported list. Reporting moves from top-level keys
+- **Migration hint.** **Superseded 2026-09-22: the hint was removed from the
+  CLI, and the decision is that no message maps 1.x settings onto 2.0 ones.
+  The table below is kept as a record of the correspondence, not as work to
+  do; the `pageTitle` and `logoUrl` "did you mean" suggestions in
+  `PortalConfig.parse` went with it.** Original text follows. Extended from
+  three fields to the table below. Fields with no v2 home stay in the
+  unsupported list. Reporting moves from top-level keys
   to leaves: today `Object.keys(generatePortal)` minus the migrated set is the
   unsupported list, which would name `portalSettings` as unsupported while
   migrating values inside it. The hint walks `portalSettings.theme` and lists
@@ -409,8 +416,8 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   string.
 - Completion: name and description derived from one spec, `site.name` required
   for two, missing files reported.
-- Migration: each row of the table in section 8, plus a value that does not
-  parse landing in the unsupported list.
+- Migration: dropped with the hint (section 8). Instead, one test that a missing
+  `portal.json` is reported the same way with and without an old build file.
 - Schema conformance: every fixture agrees between `ajv` and the parser.
 - Template units, in `test/portal-template/`: the `root` hook on a synthetic
   tree (five sections to five root folders in array order, empty sections

@@ -2,6 +2,13 @@ import { createGetUrl } from 'fumadocs-core/source';
 
 export const docsRoute = '/';
 
+/**
+ * Where the reference pages of every specification are mounted, one folder per section
+ * beneath it. Shared so the navigation transformer positions the same folder the OpenAPI
+ * sections are written into.
+ */
+export const apiBaseDir = 'api';
+
 const getDocsUrl = createGetUrl(docsRoute);
 
 export function getPageMarkdownUrl(page: { slugs: string[]; locale?: string }) {

@@ -16,31 +16,25 @@ export interface PortalSource {
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
-  /** Spec slugs that a page under `content/api/` also claims, so the two share an address. */
-  collidingSlugs: string[];
+  /**
+   * Pages below `content/api/<slug>/` for a specification `<slug>`. The section's generated
+   * metadata lists only the reference pages, so these never appear in the sidebar.
+   */
+  hiddenPages: FilePath[];
+  /**
+   * A `nav.json` written in a case the build's glob does not match, such as `Nav.json`, and
+   * so read by nothing. Reported rather than left to sit there doing nothing.
+   */
+  ignoredNavigationFiles: FilePath[];
 }
 
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
-  | { kind: 'missingConfig'; migration: PortalMigration | null }
+  | { kind: 'missingConfig' }
   | { kind: 'invalidConfig'; errors: string[] }
+  | { kind: 'invalidNavigation'; errors: string[] }
+  | { kind: 'unreadableContent' }
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
   | { kind: 'noSpecs' }
   | { kind: 'missingLogo'; logoPath: string };
-
-/** What a pre-2.0 `APIMATIC-BUILD.json` can contribute towards a `portal.json`. */
-export interface PortalMigration {
-  suggestedConfig: PortalConfig;
-  unsupportedFields: string[];
-  /**
-   * A `logoUrl` that cannot be carried over as it stands, because `logo` addresses the
-   * `static/` directory. Kept so the user is told what to do with the image instead.
-   */
-  unmigratableLogo: string | null;
-  /**
-   * Whether the pre-2.0 file described its navigation with a table of contents. Reported
-   * separately because that has a 2.0 equivalent: the `meta.json` files beside the pages.
-   */
-  hadTableOfContents: boolean;
-}

@@ -81,17 +81,24 @@ describe('PortalConfig', () => {
       expect(errors).to.deep.equal(["'favicon' is not a portal.json setting."]);
     });
 
-    it('names the setting a pre-2.0 name was renamed to', () => {
-      const errors = parse({ title: 'Calc', logoUrl: 'static/images/logo.png' })._unsafeUnwrapErr();
+    it('names the setting a near miss means', () => {
+      const errors = parse({ title: 'Calc', url: 'https://docs.example.com' })._unsafeUnwrapErr();
 
-      expect(errors).to.deep.equal(["'logoUrl' is not a portal.json setting; did you mean 'logo'?"]);
+      expect(errors).to.deep.equal(["'url' is not a portal.json setting; did you mean 'siteUrl'?"]);
+    });
+
+    // `JSON.parse` will happily hand back a document keyed by a prototype member.
+    it('does not quote a prototype member back as the intended setting', () => {
+      const errors = PortalConfig.parse('{"title":"Calc","toString":"x"}')._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal(["'toString' is not a portal.json setting."]);
     });
 
     it('reports every unknown setting, alongside the invalid ones', () => {
       const errors = parse({ pageTitle: 'Calc', theme: {} })._unsafeUnwrapErr();
 
       expect(errors).to.have.lengthOf(3);
-      expect(errors).to.include("'pageTitle' is not a portal.json setting; did you mean 'title'?");
+      expect(errors).to.include("'pageTitle' is not a portal.json setting.");
       expect(errors).to.include("'theme' is not a portal.json setting.");
       expect(errors).to.include("'title' is required and must be a non-empty string.");
     });

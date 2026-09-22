@@ -52,11 +52,22 @@ const enabled = process.env.APIMATIC_E2E === '1';
   const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
   const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
 
+  /** The prerendered server-function cache entries carrying the sidebar tree. */
+  const treeCacheFiles = () => {
+    const cache = '__tsr/staticServerFnCache';
+    return fs
+      .readdirSync(path.join(output.toString(), cache))
+      .map((name) => `${cache}/${name}`)
+      .filter((relative) => read(relative).includes('"pageTree"'));
+  };
+
   it('writes a home page carrying the content page', () => {
     expect(exists('index.html')).to.be.true;
     expect(read('index.html')).to.contain('Hello from the fixture.');
   });
 
+  // Addresses come from page slugs rather than tree position, so lifting the single
+  // specification's section out of the sidebar must leave every operation where it was.
   it('writes a page per operation in the specification', () => {
     expect(exists('api/apimatic-calculator/simple-calculator/Calculate/index.html')).to.be.true;
   });
@@ -98,12 +109,84 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(offenders).to.deep.equal([]);
   });
 
+  /** Published files naming one of these build-machine directories, in any spelling. */
+  const filesNaming = (...directories: string[]) => {
+    // Three spellings of each: a bundler normalises separators either way, and a Windows
+    // path embedded in a string literal has its backslashes escaped.
+    const secrets = directories.flatMap((absolute) => {
+      const native = absolute.replace(/\//g, '\\');
+      return [native, native.replace(/\\/g, '\\\\'), absolute.replace(/\\/g, '/')];
+    });
+
+    const walk = (directory: string): string[] =>
+      fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const child = path.join(directory, entry.name);
+        return entry.isDirectory() ? walk(child) : [child];
+      });
+
+    return (
+      walk(output.toString())
+        // Images and fonts cannot carry a path the build put there, and reading them as text
+        // only invites a false match.
+        .filter((file) => !/\.(png|jpe?g|gif|svg|ico|woff2?)$/i.test(file))
+        .filter((file) => {
+          const content = fs.readFileSync(file, 'utf8');
+          return secrets.some((secret) => content.includes(secret));
+        })
+        .map((file) => path.relative(output.toString(), file))
+    );
+  };
+
+  // The `.server` split exists so the build machine's filesystem stays out of what is
+  // published: `portal.server.ts` holds the absolute path of every specification, and the
+  // prepared project's own location has no business in the output either.
+  it('publishes neither the specification paths nor the project directory', () => {
+    expect(filesNaming(project.toString(), fixture.join('spec').toString())).to.deep.equal([]);
+  });
+
+  // Skipped: `defineDocs({ dir })` compiles the content directory's absolute path into the
+  // client bundle as its `base`, and `src/lib/source.ts` cannot move behind `.server` because
+  // the browser imports it to lazy load page bodies. A relative directory is no drop-in: the
+  // same literal is substituted into the stylesheet, which resolves it from elsewhere.
+  it.skip('publishes no absolute path from the build machine at all', () => {
+    expect(filesNaming(fixture.join('content').toString())).to.deep.equal([]);
+  });
+
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
-    const cache = '__tsr/staticServerFnCache';
-    const withTree = fs
-      .readdirSync(path.join(output.toString(), cache))
-      .filter((name) => read(cache + '/' + name).includes('"pageTree"'));
-    expect(withTree).to.have.length(1);
+    expect(treeCacheFiles()).to.have.length(1);
+  });
+
+  // The only end-to-end proof that `nav.json` reaches the build: the Vite glob, the macro's
+  // `meta.files` restriction and the transformer over real on-disk storage.
+  it('orders the sidebar by nav.json, with the API reference where the token names it', () => {
+    const tree = read(treeCacheFiles()[0]);
+    const order = ['Welcome', 'API Reference', 'Authentication'].map((name) => tree.indexOf(`"${name}"`));
+
+    expect(
+      order.every((at) => at !== -1),
+      tree.slice(0, 600)
+    ).to.be.true;
+    expect(order).to.deep.equal([...order].sort((left, right) => left - right));
+  });
+
+  // With one specification the section's name only restates the portal title, so the level
+  // is lifted away and the tag folders sit directly under the reference.
+  it('leaves no section level in the sidebar for a single specification', () => {
+    const tree = read(treeCacheFiles()[0]);
+
+    // The tag group, which the specification names; and the section, which is named after
+    // the specification's file and is the level that should be gone.
+    expect(tree).to.contain('"Simple Calculator"');
+    expect(tree).to.not.contain('"Apimatic calculator"');
+  });
+
+  // The fixture's `content/guides/` is named by its `nav.json` rather than by its directory,
+  // which is the only proof the title reaches a real build rather than the in-memory loader.
+  it('names a folder from its nav.json instead of its directory', () => {
+    const tree = read(treeCacheFiles()[0]);
+
+    expect(tree).to.contain('"Developer Guides"');
+    expect(tree).to.not.contain('"Guides"');
   });
 
   it('ships only the syntax grammars a portal can contain', () => {
