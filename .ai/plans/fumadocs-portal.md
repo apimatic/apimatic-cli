@@ -78,12 +78,16 @@ groups sit directly under "API Reference".
 
 Content: `.md` and `.mdx` are both accepted (`.mdx` is executable authoring,
 as in every MDX-based tool; `<include>` targets are confined to `src/content/`).
-The quickstart scaffolds a `content/index.md`, but nothing regenerates one: a
-portal whose content directory has no index page has no `/`. This paragraph
-promised a generated fallback home page and it was never built; the promise is
-dropped rather than restated, since `/` resolving is worth its own decision
-rather than a line in a layout section. Folders without `nav.json` are ordered
-alphabetically by Fumadocs.
+The quickstart scaffolds a `content/index.md`, and a portal whose content
+directory has none still has a `/`: the fallback home page promised here was
+built in #343. `src/routes/$.tsx` answers the empty slug with a generated
+landing page carrying the portal's title and description, and
+`prerender-pages.ts` always seeds `/`, so the static build emits an
+`index.html` either way. What it is not is a composed home page -- a title and
+a description, nothing drawn from the content or the specifications -- and
+making it more than that is worth its own decision rather than a line in a
+layout section. Folders without `nav.json` are ordered alphabetically by
+Fumadocs.
 
 Sidebar order: set by `nav.json` per folder, with the whole API reference
 positioned as one node by the `apimatic:api` token. Unnamed pages keep
