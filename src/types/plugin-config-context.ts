@@ -5,6 +5,7 @@ import { FilePath } from './file/filePath.js';
 import { CodeGenerationVersion, Language } from './sdk/generate.js';
 import {
   DEFAULT_PLUGIN_LICENSE,
+  PLUGIN_ID_PATTERN,
   PluginAuthor,
   PluginConfigData,
   PluginLanguageEntry,
@@ -15,8 +16,7 @@ import { SemVersion } from './publish/version.js';
 import { err, ok, Result } from 'neverthrow';
 import { errorMessage } from '../utils/error-utils.js';
 
-/** Also the rule the metadata prompt validates against, so a plugin ID is legal as a repository name. */
-export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export { PLUGIN_ID_PATTERN };
 
 const MALFORMED_PLUGIN_ID =
   `its 'pluginId' must be lower-case alphanumeric words separated by single dashes, ` + `for example 'acme-payments'`;

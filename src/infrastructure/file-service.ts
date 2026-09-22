@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import fsExtra from 'fs-extra';
 import * as path from 'path';
@@ -255,6 +256,24 @@ export class FileService {
 
   public async writeContents(filePath: FilePath, contents: string) {
     await fsExtra.writeFile(filePath.toString(), contents, 'utf-8');
+  }
+
+  /**
+   * Writes beside the target and renames over it, so a fault mid-write leaves the target as it
+   * was rather than half-written. The temporary file goes on a failure for the same reason: a
+   * write that did not happen must leave nothing behind.
+   */
+  public async replaceContents(filePath: FilePath, contents: string): Promise<void> {
+    const target = filePath.toString();
+    await fsExtra.ensureDir(path.dirname(target));
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    try {
+      await fsExtra.writeFile(temporary, contents, 'utf-8');
+      await fsExtra.rename(temporary, target);
+    } catch (error) {
+      await fsExtra.remove(temporary).catch(() => undefined);
+      throw error;
+    }
   }
 
   public async copy(source: FilePath, destination: FilePath) {

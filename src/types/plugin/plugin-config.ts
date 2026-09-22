@@ -4,6 +4,9 @@ import { CodeGenerationVersion, Language } from '../sdk/generate.js';
 /** Written unprompted: the backend consumes it, and nothing in the CLI asks for it. */
 export const DEFAULT_PLUGIN_LICENSE = 'MIT';
 
+/** Also the rule the metadata prompt validates against, so a plugin ID is legal as a repository name. */
+export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 export interface PluginAuthor {
   name: string;
   email?: string;
