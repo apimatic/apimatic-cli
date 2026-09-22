@@ -144,12 +144,10 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(filesNaming(project.toString(), fixture.join('spec').toString())).to.deep.equal([]);
   });
 
-  // Known gap, found when this assertion was written. `defineDocs({ dir })` compiles the
-  // content directory's absolute path into the client bundle as its `base`, and
-  // `src/lib/source.ts` cannot move behind `.server` because the browser imports it to lazy
-  // load page bodies. Handing the macro a relative directory is not a drop-in either: the
-  // same literal is substituted into the stylesheet, where it resolves against a different
-  // directory. Pending rather than deleted, so the gap is recorded where it would be fixed.
+  // Skipped: `defineDocs({ dir })` compiles the content directory's absolute path into the
+  // client bundle as its `base`, and `src/lib/source.ts` cannot move behind `.server` because
+  // the browser imports it to lazy load page bodies. A relative directory is no drop-in: the
+  // same literal is substituted into the stylesheet, which resolves it from elsewhere.
   it.skip('publishes no absolute path from the build machine at all', () => {
     expect(filesNaming(fixture.join('content').toString())).to.deep.equal([]);
   });
