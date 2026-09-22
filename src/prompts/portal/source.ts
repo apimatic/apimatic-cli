@@ -33,8 +33,8 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
     }
     case 'unreadableContent': {
       log.error(
-        `${f.path(sourceDirectory.join('content'))} could not be read. Check that every directory ` +
-          `beneath it can be listed, and that no link inside it points back into it.`
+        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
+          `directory beneath it can be listed.`
       );
       return;
     }

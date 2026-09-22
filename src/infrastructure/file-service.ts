@@ -5,7 +5,7 @@ import { pipeline } from 'stream';
 import { promisify } from 'util';
 import { FilePath } from '../types/file/filePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
-import { Directory } from '../types/file/directory.js';
+import { Directory, DirectoryItem } from '../types/file/directory.js';
 import { FileName } from '../types/file/fileName.js';
 import { sleep } from './timer-extensions.js';
 
@@ -81,18 +81,32 @@ export class FileService {
     await fsExtra.ensureDir(dir.toString());
   }
 
+  /**
+   * The whole tree beneath `directoryPath`. An entry that cannot be examined -- a link to
+   * nothing, a file only another user may see -- is left out rather than failing the walk,
+   * which is what a glob over the same tree would do with it; a directory that cannot be
+   * listed still throws, because nothing beneath it can be known.
+   */
   public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
     const entries = await fsExtra.readdir(directoryPath.toString());
     const results = await Promise.all(
-      entries.map(async (entry) => {
+      entries.map(async (entry): Promise<DirectoryItem | undefined> => {
         const fullPath = path.join(directoryPath.toString(), entry);
-        const stat = await fsExtra.stat(fullPath);
+        let stat: fsExtra.Stats;
+        try {
+          stat = await fsExtra.stat(fullPath);
+        } catch {
+          return undefined;
+        }
         return stat.isDirectory()
           ? await this.getDirectory(new DirectoryPath(fullPath))
           : { fileName: new FileName(entry) };
       })
     );
-    return new Directory(directoryPath, results);
+    return new Directory(
+      directoryPath,
+      results.filter((item): item is DirectoryItem => item !== undefined)
+    );
   }
 
   /**

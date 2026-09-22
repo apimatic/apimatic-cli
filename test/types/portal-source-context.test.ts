@@ -214,6 +214,27 @@ describe('PortalSourceContext', () => {
       }
     });
 
+    // A glob over the tree would skip such an entry; failing the whole build for one is worse
+    // than describing the pages that are there.
+    it('walks past an entry that cannot be examined, such as a link to nothing', async function () {
+      write('content/index.md', '# Home');
+      write('content/nav.json', JSON.stringify({ pages: ['index'] }));
+      const target = path.join(root, 'content', 'gone');
+      try {
+        fs.symlinkSync(target, path.join(root, 'content', 'dangling.md'), 'file');
+      } catch {
+        // A file link needs a privilege some Windows accounts lack; a junction does not, and
+        // a junction to nothing fails to stat just the same.
+        try {
+          fs.symlinkSync(target, path.join(root, 'content', 'dangling'), 'junction');
+        } catch {
+          this.skip();
+        }
+      }
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
     it('reports content and static as absent when they do not exist', async () => {
       const source = (await resolve())._unsafeUnwrap();
 
