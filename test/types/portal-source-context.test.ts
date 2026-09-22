@@ -25,6 +25,9 @@ describe('PortalSourceContext', () => {
     fs.writeFileSync(target, contents);
   };
 
+  /** A configuration holding the given portal block and nothing else. */
+  const writeConfig = (portal: object) => write('apimatic.json', JSON.stringify({ portal }));
+
   const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
 
   /** The ignored navigation files as the warning names them, relative to the source directory. */
@@ -43,7 +46,7 @@ describe('PortalSourceContext', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  describe('portal.json', () => {
+  describe('apimatic.json', () => {
     it('reports a missing config', async () => {
       write('spec/api.json', OPENAPI);
 
@@ -61,7 +64,7 @@ describe('PortalSourceContext', () => {
 
     it('reads inputs written with a byte-order mark', async () => {
       const mark = '﻿';
-      write('portal.json', mark + JSON.stringify({ title: 'Calc' }));
+      write('apimatic.json', mark + JSON.stringify({ portal: { title: 'Calc' } }));
       write('spec/api.json', mark + OPENAPI);
 
       const source = (await resolve())._unsafeUnwrap();
@@ -71,18 +74,76 @@ describe('PortalSourceContext', () => {
     });
 
     it('passes the field errors through when the config is invalid', async () => {
-      write('portal.json', '{}');
+      writeConfig({});
       write('spec/api.json', OPENAPI);
 
       const problem = (await resolve())._unsafeUnwrapErr();
 
       expect(problem.kind).to.equal('invalidConfig');
     });
+
+    it('reports a missing portal block as the one thing wrong, whatever else the file holds', async () => {
+      write('apimatic.json', JSON.stringify({ plugin: { pluginId: 'acme' }, languages: { csharp: {} } }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal' is required."]
+      });
+    });
+
+    it('reports a file holding no JSON object as invalid, not missing', async () => {
+      write('apimatic.json', '{ not json');
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ['apimatic.json is not valid JSON.']
+      });
+    });
+
+    it('ignores root keys it does not know', async () => {
+      write(
+        'apimatic.json',
+        JSON.stringify({ $schema: 'https://example.com/schema.json', future: true, portal: { title: 'Calc' } })
+      );
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The plugin's blocks are the plugin commands' to judge; a broken one must not fail a build.
+    it('builds past malformed plugin and languages blocks', async () => {
+      write('apimatic.json', JSON.stringify({ portal: { title: 'Calc' }, languages: 'csharp', plugin: 7 }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrap().config.siteTitle()).to.equal('Calc');
+    });
+
+    it('accepts the schema version it reads', async () => {
+      write('apimatic.json', JSON.stringify({ schemaVersion: 1, portal: { title: 'Calc' } }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('refuses another schema version alongside the portal errors, so one edit fixes the file', async () => {
+      write('apimatic.json', JSON.stringify({ schemaVersion: 2, portal: {} }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: [
+          "'schemaVersion' is 2, which this version of the CLI does not read; it reads 1.",
+          "'portal.title' is required and must be a non-empty string."
+        ]
+      });
+    });
   });
 
   describe('logo', () => {
     it('reports a configured logo that is not on disk', async () => {
-      write('portal.json', JSON.stringify({ title: 'Calc', logo: 'static/images/logo.png' }));
+      writeConfig({ title: 'Calc', logo: 'static/images/logo.png' });
       write('spec/api.json', OPENAPI);
 
       const problem = (await resolve())._unsafeUnwrapErr();
@@ -91,7 +152,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('accepts a logo that is', async () => {
-      write('portal.json', JSON.stringify({ title: 'Calc', logo: 'static/images/logo.png' }));
+      writeConfig({ title: 'Calc', logo: 'static/images/logo.png' });
       write('spec/api.json', OPENAPI);
       write('static/images/logo.png', 'x');
 
@@ -99,7 +160,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('says nothing about a logo when none is configured', async () => {
-      write('portal.json', JSON.stringify({ title: 'Calc' }));
+      writeConfig({ title: 'Calc' });
       write('spec/api.json', OPENAPI);
 
       expect((await resolve()).isOk()).to.be.true;
@@ -107,7 +168,7 @@ describe('PortalSourceContext', () => {
   });
 
   describe('spec discovery', () => {
-    beforeEach(() => write('portal.json', JSON.stringify({ title: 'Calc' })));
+    beforeEach(() => writeConfig({ title: 'Calc' }));
 
     it('accepts json, yaml and yml documents, ordered by file name', async () => {
       write('spec/b.json', OPENAPI);
@@ -185,7 +246,7 @@ describe('PortalSourceContext', () => {
 
   describe('optional directories', () => {
     beforeEach(() => {
-      write('portal.json', JSON.stringify({ title: 'Calc' }));
+      writeConfig({ title: 'Calc' });
       write('spec/api.json', OPENAPI);
     });
 
@@ -344,7 +405,7 @@ describe('PortalSourceContext', () => {
 
   describe('nav.json', () => {
     beforeEach(() => {
-      write('portal.json', JSON.stringify({ title: 'Calc' }));
+      writeConfig({ title: 'Calc' });
       write('spec/api.json', OPENAPI);
       write('content/index.md', '# Home');
       write('content/authentication.md', '# Auth');
@@ -635,7 +696,11 @@ describe('PortalSourceContext', () => {
     it('describes the portal from the specification', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
 
-      expect(JSON.parse(read('portal.json'))).to.deep.equal({ title: 'Petstore', description: 'All the pets.' });
+      expect(JSON.parse(read('apimatic.json'))).to.deep.equal({
+        schemaVersion: 1,
+        portal: { title: 'Petstore', description: 'All the pets.' }
+      });
+      expect(read('apimatic.json').endsWith('\n')).to.be.true;
     });
 
     it('orders the sidebar with the welcome page first', async () => {
@@ -661,7 +726,7 @@ describe('PortalSourceContext', () => {
 
       await scaffold(new FilePath(new DirectoryPath(root).join('downloads'), new FileName('broken.json')));
 
-      expect(JSON.parse(read('portal.json'))).to.deep.equal({ title: 'My API' });
+      expect(JSON.parse(read('apimatic.json'))).to.deep.equal({ schemaVersion: 1, portal: { title: 'My API' } });
     });
 
     it('unpacks a split specification into the spec directory', async () => {
@@ -675,7 +740,7 @@ describe('PortalSourceContext', () => {
       expect(fs.existsSync(path.join(source.toString(), 'spec', 'openapi.json'))).to.be.true;
       expect(fs.existsSync(path.join(source.toString(), 'spec', 'paths', 'pets.json'))).to.be.true;
       // The parts of an archive are left to the build to read, so nothing names the portal yet.
-      expect(JSON.parse(read('portal.json'))).to.deep.equal({ title: 'My API' });
+      expect(JSON.parse(read('apimatic.json'))).to.deep.equal({ schemaVersion: 1, portal: { title: 'My API' } });
     });
 
     describe('the welcome page front matter', () => {

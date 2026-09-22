@@ -3,7 +3,8 @@ import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { UrlPath } from '../../../src/types/file/urlPath';
 
 describe('PortalConfig', () => {
-  const parse = (value: unknown) => PortalConfig.parse(JSON.stringify(value));
+  // Through JSON so the block is what a file would hand over: `undefined` fields dropped.
+  const parse = (value: unknown) => PortalConfig.fromBlock(JSON.parse(JSON.stringify(value)));
   const errorsOf = (result: ReturnType<typeof parse>) => result._unsafeUnwrapErr();
 
   describe('title', () => {
@@ -22,7 +23,7 @@ describe('PortalConfig', () => {
 
     it('rejects a missing, empty or blank title', () => {
       for (const title of [undefined, '', '   ', 7]) {
-        expect(errorsOf(parse({ title }))).to.include("'title' is required and must be a non-empty string.");
+        expect(errorsOf(parse({ title }))).to.include("'portal.title' is required and must be a non-empty string.");
       }
     });
   });
@@ -47,7 +48,7 @@ describe('PortalConfig', () => {
 
     it('rejects a value that is not a boolean', () => {
       expect(parse({ title: 'Calc', aiPageActions: 'no' })._unsafeUnwrapErr()).to.deep.equal([
-        "'aiPageActions' must be true or false."
+        "'portal.aiPageActions' must be true or false."
       ]);
     });
 
@@ -78,29 +79,29 @@ describe('PortalConfig', () => {
     it('rejects a setting it does not know', () => {
       const errors = parse({ title: 'Calc', favicon: 'x.ico' })._unsafeUnwrapErr();
 
-      expect(errors).to.deep.equal(["'favicon' is not a portal.json setting."]);
+      expect(errors).to.deep.equal(["'favicon' is not a 'portal' setting."]);
     });
 
     it('names the setting a near miss means', () => {
       const errors = parse({ title: 'Calc', url: 'https://docs.example.com' })._unsafeUnwrapErr();
 
-      expect(errors).to.deep.equal(["'url' is not a portal.json setting; did you mean 'siteUrl'?"]);
+      expect(errors).to.deep.equal(["'url' is not a 'portal' setting; did you mean 'siteUrl'?"]);
     });
 
     // `JSON.parse` will happily hand back a document keyed by a prototype member.
     it('does not quote a prototype member back as the intended setting', () => {
-      const errors = PortalConfig.parse('{"title":"Calc","toString":"x"}')._unsafeUnwrapErr();
+      const errors = PortalConfig.fromBlock(JSON.parse('{"title":"Calc","toString":"x"}'))._unsafeUnwrapErr();
 
-      expect(errors).to.deep.equal(["'toString' is not a portal.json setting."]);
+      expect(errors).to.deep.equal(["'toString' is not a 'portal' setting."]);
     });
 
     it('reports every unknown setting, alongside the invalid ones', () => {
       const errors = parse({ pageTitle: 'Calc', theme: {} })._unsafeUnwrapErr();
 
       expect(errors).to.have.lengthOf(3);
-      expect(errors).to.include("'pageTitle' is not a portal.json setting.");
-      expect(errors).to.include("'theme' is not a portal.json setting.");
-      expect(errors).to.include("'title' is required and must be a non-empty string.");
+      expect(errors).to.include("'pageTitle' is not a 'portal' setting.");
+      expect(errors).to.include("'theme' is not a 'portal' setting.");
+      expect(errors).to.include("'portal.title' is required and must be a non-empty string.");
     });
 
     it('accepts a document using only the settings it knows', () => {
@@ -115,9 +116,18 @@ describe('PortalConfig', () => {
     });
   });
 
-  it('rejects a document that is not a JSON object', () => {
-    expect(PortalConfig.parse('nonsense')._unsafeUnwrapErr()).to.deep.equal(['portal.json is not valid JSON.']);
-    expect(PortalConfig.parse('[]')._unsafeUnwrapErr()).to.deep.equal(['portal.json must contain a JSON object.']);
+  describe('the block itself', () => {
+    it('is required', () => {
+      expect(PortalConfig.fromBlock(undefined)._unsafeUnwrapErr()).to.deep.equal(["'portal' is required."]);
+    });
+
+    it('must be a JSON object, and says so rather than calling a present block missing', () => {
+      for (const block of ['Calc', [], null, 7]) {
+        expect(PortalConfig.fromBlock(block)._unsafeUnwrapErr(), JSON.stringify(block)).to.deep.equal([
+          "'portal' must be a JSON object."
+        ]);
+      }
+    });
   });
 
   describe('logo', () => {

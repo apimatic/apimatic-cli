@@ -22,7 +22,7 @@ export class Directory {
   };
 
   private static readonly fileDescriptions: Record<string, string> = {
-    'portal.json': '# Configures the documentation portal: title, description and logo',
+    'apimatic.json': '# Configures the documentation portal and the context plugin',
     'APIMATIC-BUILD.json': '# Defines all configurations for SDK generation',
     'APIMATIC-META.json': '# Defines customization for SDK generation'
   };
