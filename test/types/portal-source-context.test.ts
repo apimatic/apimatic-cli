@@ -427,36 +427,29 @@ describe('PortalSourceContext', () => {
       expect(errors[0]).to.contain("content/nav.json: 'api' is where the API reference is mounted");
     });
 
-    // The mount point is a child of the root in every portal, so the same mistake gets the
-    // same answer rather than reading as a name that does not exist wherever the user
-    // happens to keep no directory of their own there.
-    it('refuses api at the root with nothing of that name on disk at all', async () => {
+    // The mount point is a child of the content root in every portal, so the entry positions
+    // the reference whether or not the user keeps a directory of their own there.
+    it('accepts api at the root with nothing of that name on disk at all', async () => {
       write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
-
-      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
-
-      expect(errors).to.deep.equal([
-        "content/nav.json: 'api' is where the API reference is mounted, so it is positioned with 'apimatic:api' rather than by name."
-      ]);
-      expect(errors[0]).to.not.contain('is not a page or folder');
-    });
-
-    // A real content/api/ directory is the reference's mount point rather than a folder of
-    // the user's own, so it is positioned by the token like any other portal that has one.
-    it('refuses api at the root when a directory of that name holds the user’s own pages', async () => {
-      write('content/api/overview.md', '# Overview');
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
-
-      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
-
-      expect(errors[0]).to.contain("'api' is where the API reference is mounted");
-    });
-
-    it('accepts the token in its place, with the user’s pages under content/api left alone', async () => {
-      write('content/api/overview.md', '# Overview');
-      write('content/nav.json', JSON.stringify({ pages: ['index', 'apimatic:api'] }));
 
       expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('accepts api at the root when a directory of that name holds the user’s own pages', async () => {
+      write('content/api/overview.md', '# Overview');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // One node, so the two spellings name it twice wherever the directory came from.
+    it('refuses api together with the token, with or without a directory of that name', async () => {
+      write('content/api/overview.md', '# Overview');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'api', 'apimatic:api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("'api' and 'apimatic:api' both position the API reference");
     });
 
     // The specification's folder is one child; a page of the same name beside it is another.
