@@ -5,8 +5,8 @@ import { PluginContents } from '../../types/plugin/plugin-contents.js';
 import { PluginReleaseData } from '../../types/plugin-config-context.js';
 import { format as f } from '../format.js';
 import { noteWrapped } from '../prompt.js';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 
-const PLUGIN_CONFIG_FILE = 'plugin-config.json';
 const NOTE_TITLE = 'Commands to Copy and Run';
 const TAG_PREFIX = 'v';
 
@@ -53,21 +53,21 @@ export class PluginPublishPrompts {
 
   public pluginConfigMissing(directory: DirectoryPath) {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} was not found in ${f.path(directory)}. ` +
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} was not found in ${f.path(directory)}. ` +
       `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' first.`;
     log.error(message);
   }
 
   public pluginConfigUnreadable(reason: string, path: FilePath) {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used: ${reason}. ` +
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be used: ${reason}. ` +
       `Fix or delete it at ${f.path(path)}, then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;
     log.error(message);
   }
 
   public pluginDetailsNotSet() {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} does not name the plugin or its version. ` +
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} does not name the plugin or its version. ` +
       `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' to set them.`;
     log.error(message);
   }

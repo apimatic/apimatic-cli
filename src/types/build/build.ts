@@ -5,7 +5,7 @@ export interface BuildConfigData {
 }
 
 // Immutable wrapper around the parsed APIMATIC-BUILD.json. Since version 2 the portal is
-// configured by `src/portal.json` and built locally, so this file only describes SDK and
+// configured by `src/apimatic.json` and built locally, so this file only describes SDK and
 // plugin generation.
 export class BuildConfig {
   private constructor(private readonly data: BuildConfigData) {}

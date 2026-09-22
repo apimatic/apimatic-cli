@@ -153,7 +153,7 @@ export class PortalQuickstartPrompts {
 
   public nextSteps(): void {
     const message =
-      `Edit ${f.var('src/portal.json')} to change the title, add a description or point at a logo.\n` +
+      `Edit ${f.var('src/apimatic.json')} to change the title, add a description or point at a logo.\n` +
       `Add Markdown pages under ${f.var('src/content')} and more OpenAPI documents under ${f.var('src/spec')}.\n` +
       `Run ${f.cmdAlt('apimatic', 'portal', 'generate')} to produce static files you can host.\n\n` +
       `${f.link(referenceDocumentationUrl)}`;

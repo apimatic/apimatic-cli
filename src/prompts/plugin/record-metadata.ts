@@ -6,8 +6,7 @@ import { PLUGIN_ID_PATTERN, PluginMetadata } from '../../types/plugin/plugin-con
 import { SemVersion } from '../../types/publish/version.js';
 import { format as f } from '../format.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
-
-const PLUGIN_CONFIG_FILE = 'plugin-config.json';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 
 /**
  * Which answer was missing, so a caller that abandons the run can say what it was waiting for
@@ -65,18 +64,20 @@ export class PluginRecordMetadataPrompts {
   }
 
   public accountInfoUnavailable() {
-    log.warn(`Could not read your subscription info, so the author was left out of ${f.var(PLUGIN_CONFIG_FILE)}.`);
+    log.warn(
+      `Could not read your subscription info, so the author was left out of ${f.var(APIMATIC_CONFIG_FILE_NAME)}.`
+    );
   }
 
   public pluginConfigUnreadable() {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} could not be read, so its plugin details were not written. ` +
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be read, so its plugin details were not written. ` +
       `Fix or delete it and try again.`;
     log.error(message);
   }
 
   public pluginConfigNotWritten() {
-    log.error(`${f.var(PLUGIN_CONFIG_FILE)} could not be written, so its plugin details were not saved.`);
+    log.error(`${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written, so its plugin details were not saved.`);
   }
 
   public metadataRecorded(metadata: PluginMetadata) {
@@ -84,7 +85,7 @@ export class PluginRecordMetadataPrompts {
       `Plugin ID: ${f.var(metadata.pluginId)}\n` +
       `Plugin Name: ${f.var(metadata.pluginName)}\n` +
       `Version: ${f.var(metadata.pluginVersion)}\n\n` +
-      `Configuration saved to: ${f.var(PLUGIN_CONFIG_FILE)}`;
+      `Configuration saved to: ${f.var(APIMATIC_CONFIG_FILE_NAME)}`;
     noteWrapped(message, 'Plugin Configuration');
   }
 }

@@ -9,8 +9,7 @@ import { PublishingProfileItem } from '../../../types/publish-api/publishing-pro
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { Language } from '../../../types/sdk/generate.js';
 import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
-
-const PLUGIN_CONFIG_FILE = 'plugin-config.json';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../../types/apimatic-config/document.js';
 
 export class SdkPublishNonInteractivePrompts {
   public directoryCannotBeSame(directory: DirectoryPath) {
@@ -93,7 +92,7 @@ export class SdkPublishNonInteractivePrompts {
   public dryRunPluginConfigNotice() {
     const message =
       `${f.flag('update-plugin-config')} was ignored because ${f.flag('dry-run')} does not publish the SDK. ` +
-      `Re-run without ${f.flag('dry-run')} to record it in ${f.var(PLUGIN_CONFIG_FILE)}.`;
+      `Re-run without ${f.flag('dry-run')} to record it in ${f.var(APIMATIC_CONFIG_FILE_NAME)}.`;
     log.info(message);
   }
 }

@@ -9,7 +9,7 @@ export default class PluginGenerate extends Command {
   static readonly summary = 'Generate a context plugin for your published SDKs.';
 
   static readonly description =
-    'Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory containing a `src` directory with a `plugin-config.json`.';
+    'Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory containing a `src` directory with an `apimatic.json`.';
 
   static readonly cmdTxt = format.cmd('apimatic', 'plugin', 'generate');
 
