@@ -113,7 +113,10 @@ function readOrder(context: NavigationContext, folderPath: string): string[] | u
  * section's place, with those pages staying beside them where the order already put them.
  */
 function applyApiStructure(context: NavigationContext, node: Folder): void {
-  node.name = API_REFERENCE_TITLE;
+  // A user who gives the folder an index page has named it, as any other folder is named.
+  if (node.index === undefined) {
+    node.name = API_REFERENCE_TITLE;
+  }
 
   const sections = node.children.filter((child) => isSpecSection(context, child));
   if (sections.length === 1) {
@@ -209,7 +212,8 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
 /**
  * The child an entry addresses. A page is compared against the virtual path the builder
  * resolves its name to, a folder against its own path, which is why `noRef` has to stay at
- * its default of false.
+ * its default of false. When a page and a folder share the name, the folder wins, as it
+ * does for the same entry in Fumadocs' own metadata.
  */
 function matching(
   context: NavigationContext,
@@ -218,12 +222,12 @@ function matching(
   entry: string
 ): Node | undefined {
   const target = PathUtils.joinPath(folderPath, entry);
+  const folder = find(children, (child) => child.type === 'folder' && child.$ref?.folder === target);
+  if (folder !== undefined) {
+    return folder;
+  }
   const pagePath = context.builder.resolveFlattenPath(target, 'page');
-  return find(
-    children,
-    (child) =>
-      (child.type === 'page' && child.$ref === pagePath) || (child.type === 'folder' && child.$ref?.folder === target)
-  );
+  return find(children, (child) => child.type === 'page' && child.$ref === pagePath);
 }
 
 function afterNamedContent(named: Node[], isInjectedChild: (child: Node) => boolean): number {

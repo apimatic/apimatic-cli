@@ -143,6 +143,19 @@ describe('navigationTransformer', () => {
       ]);
     });
 
+    // Fumadocs resolves a metadata entry to the folder before the page, so the same entry
+    // positions the same node here. The page keeps its default place among the rest.
+    it('positions the folder when a page shares its name', () => {
+      const docs = [
+        ...CONTENT,
+        page('guides.mdx', 'Guides page'),
+        page('guides/intro.mdx', 'Intro'),
+        nav('nav.json', ['guides', 'index', '...'])
+      ];
+
+      expect(treeOf({ docs })).to.deep.equal(['Guides', 'Welcome', 'Authentication', 'Guides page']);
+    });
+
     it('orders a nested directory from its own file', () => {
       const docs = [
         ...CONTENT,
@@ -208,6 +221,15 @@ describe('navigationTransformer', () => {
 
     it('titles the wrapper, which Fumadocs would otherwise render as "Api"', () => {
       expect(treeOf({ docs: CONTENT, openapi: API })).to.contain('API Reference');
+    });
+
+    // The nav.json errors promise that a folder is named after the title of its index page.
+    it('keeps the title of an index page the user gave the api folder', () => {
+      const docs = [...CONTENT, page('api/index.mdx', 'Reference'), nav('nav.json', ['apimatic:api', '...'])];
+      const tree = build({ docs, openapi: API }).pageTree.children;
+
+      expect(names(tree)).to.deep.equal(['Reference', 'Welcome', 'Authentication']);
+      expect(names(childrenOf(tree, 'Reference'))).to.deep.equal(['Pet', 'Store']);
     });
 
     // The section's name only restates the portal's own title when there is one document.
