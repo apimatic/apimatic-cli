@@ -7,9 +7,8 @@ import { FilePath } from './file/filePath.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
-import { PortalMigration, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import { PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
-import { stripByteOrderMark } from '../utils/string-utils.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
@@ -30,12 +29,6 @@ const GENERATED_ROOT_FILES = [
   '404.html',
   '_shell.html'
 ];
-
-// `generatePortal` settings the migration hint accounts for: the first two are carried into
-// the suggested `portal.json`, and the table of contents is passed over without a word, since
-// the sidebar is now ordered from the pages themselves. Everything else in the old build file
-// is reported as unsupported.
-const MIGRATABLE_PORTAL_FIELDS = new Set(['pageTitle', 'logoUrl', 'tableOfContentsPath']);
 
 const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
 
@@ -74,10 +67,6 @@ export class PortalSourceContext {
     return new FilePath(this.sourceDirectory, new FileName('portal.json'));
   }
 
-  private get legacyBuildFile(): FilePath {
-    return new FilePath(this.sourceDirectory, new FileName('APIMATIC-BUILD.json'));
-  }
-
   private get specDirectory(): DirectoryPath {
     return this.sourceDirectory.join('spec');
   }
@@ -93,7 +82,7 @@ export class PortalSourceContext {
   /** Reads and validates the whole source directory, or reports the first problem found. */
   public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
     if (!(await this.fileService.fileExists(this.configFile))) {
-      return err({ kind: 'missingConfig', migration: await this.migration() });
+      return err({ kind: 'missingConfig' });
     }
 
     const config = PortalConfig.parse(await this.fileService.getContents(this.configFile));
@@ -447,53 +436,5 @@ export class PortalSourceContext {
     }
     used.add(slug);
     return slug;
-  }
-
-  /** What a pre-2.0 build file offers towards a `portal.json`, or null when there is none. */
-  private async migration(): Promise<PortalMigration | null> {
-    if (!(await this.fileService.fileExists(this.legacyBuildFile))) {
-      return null;
-    }
-
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(stripByteOrderMark(await this.fileService.getContents(this.legacyBuildFile)));
-    } catch {
-      return null;
-    }
-
-    const portal = data.generatePortal;
-    const versionedPortal = data.generateVersionedPortal;
-    if (typeof portal !== 'object' || portal === null) {
-      return versionedPortal === undefined
-        ? null
-        : {
-            suggestedConfig: PortalConfig.placeholder,
-            unsupportedFields: ['generateVersionedPortal'],
-            unmigratableLogo: null
-          };
-    }
-
-    const portalFields = portal as Record<string, unknown>;
-    // Both fields come from a file the CLI has never validated, so each is held to what
-    // `PortalConfig.parse` accepts before it reaches the trusted factory.
-    const pageTitle = typeof portalFields.pageTitle === 'string' ? portalFields.pageTitle.trim() : '';
-    const title = pageTitle.length > 0 ? pageTitle : PortalConfig.placeholder.siteTitle();
-
-    const logoUrl = typeof portalFields.logoUrl === 'string' ? portalFields.logoUrl : null;
-    const logo = logoUrl !== null && PortalConfig.isValidLogo(logoUrl) ? logoUrl : null;
-
-    const unsupportedFields = Object.keys(portalFields)
-      .filter((field) => !MIGRATABLE_PORTAL_FIELDS.has(field))
-      .sort((a, b) => a.localeCompare(b));
-    if (versionedPortal !== undefined) {
-      unsupportedFields.push('generateVersionedPortal');
-    }
-
-    return {
-      suggestedConfig: PortalConfig.create(title, null, logo),
-      unsupportedFields,
-      unmigratableLogo: logoUrl !== null && logo === null ? logoUrl : null
-    };
   }
 }

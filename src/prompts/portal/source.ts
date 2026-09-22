@@ -1,10 +1,9 @@
 import { log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PortalMigration, PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
-import { noteWrapped } from '../prompt.js';
 
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
@@ -14,11 +13,7 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
   switch (problem.kind) {
     case 'missingConfig': {
       log.error(`No ${f.var('portal.json')} found in ${f.path(sourceDirectory)}.`);
-      if (problem.migration === null) {
-        log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
-      } else {
-        reportMigration(problem.migration, sourceDirectory);
-      }
+      log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
       return;
     }
     case 'invalidConfig': {
@@ -95,33 +90,4 @@ export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryP
       `its own reference pages, so ${pronoun} will not appear in the sidebar. Move ${pronoun} elsewhere ` +
       `in ${f.var('content')}.`
   );
-}
-
-function reportMigration(migration: PortalMigration, sourceDirectory: DirectoryPath): void {
-  const starter = JSON.stringify(migration.suggestedConfig, null, 2);
-  const lines = [
-    `This project still uses ${f.var('APIMATIC-BUILD.json')}, which no longer configures the portal.`,
-    '',
-    `Create ${f.var('portal.json')} next to it with:`,
-    starter
-  ];
-
-  if (migration.unmigratableLogo !== null) {
-    lines.push(
-      '',
-      `The logo at ${f.var(migration.unmigratableLogo)} is not carried over: ${f.var('logo')} addresses ` +
-        `the ${f.var('static')} directory. Move the image under ${f.path(sourceDirectory.join('static'))} ` +
-        `and add it as ${f.var('"logo": "static/<path>"')}.`
-    );
-  }
-
-  if (migration.unsupportedFields.length > 0) {
-    lines.push(
-      '',
-      'These settings have no equivalent yet and are ignored:',
-      ...migration.unsupportedFields.map((field) => `  • ${field}`)
-    );
-  }
-
-  noteWrapped(lines.join('\n'), 'Migrating from APIMATIC-BUILD.json');
 }

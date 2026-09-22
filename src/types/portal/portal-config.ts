@@ -158,14 +158,6 @@ export class PortalConfig {
       : ok(parsed);
   }
 
-  /**
-   * Whether a value would survive `parse` as `logo`, so the `portal.json` the migration hint
-   * prints is never one the next command rejects.
-   */
-  public static isValidLogo(value: string): boolean {
-    return value.trim().length > 0 && PortalConfig.isInsideStatic(value);
-  }
-
   public siteTitle(): string {
     return this.title;
   }
@@ -210,7 +202,7 @@ export class PortalConfig {
       ...(this.description !== null ? { description: this.description } : {}),
       ...(this.logo !== null ? { logo: this.logo } : {}),
       ...(this.siteUrl !== null ? { siteUrl: this.siteUrl.toString() } : {}),
-      // Only when it differs from the default, so the migration hint stays minimal.
+      // Only when it differs from the default, so a scaffolded file stays minimal.
       ...(this.aiPageActions ? {} : { aiPageActions: false })
     };
   }

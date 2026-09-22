@@ -6,8 +6,7 @@ import sinon from 'sinon';
 import { parse as parseYaml } from 'yaml';
 import { FileService } from '../../src/infrastructure/file-service';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
-import { PortalConfig } from '../../src/types/portal/portal-config';
-import { PortalMigration, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
+import { PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
@@ -36,17 +35,6 @@ describe('PortalSourceContext', () => {
   const hidden = (source: PortalSource): string[] =>
     source.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
 
-  /** The migration hint behind a `missingConfig` problem, as its own type. */
-  const migrationOf = (problem: PortalSourceProblem): PortalMigration => {
-    if (problem.kind !== 'missingConfig') {
-      throw new Error(`expected a 'missingConfig' problem, got '${problem.kind}'`);
-    }
-    if (problem.migration === null) {
-      throw new Error('expected a migration hint, got none');
-    }
-    return problem.migration;
-  };
-
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-source-'));
   });
@@ -56,12 +44,19 @@ describe('PortalSourceContext', () => {
   });
 
   describe('portal.json', () => {
-    it('reports a missing config, with no migration when there is no old build file', async () => {
+    it('reports a missing config', async () => {
       write('spec/api.json', OPENAPI);
 
-      const problem = (await resolve())._unsafeUnwrapErr();
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+    });
 
-      expect(problem).to.deep.equal({ kind: 'missingConfig', migration: null });
+    // An APIMATIC-BUILD.json is not read for the portal any more, so its presence changes
+    // nothing about the answer.
+    it('reports a missing config the same way beside an old build file', async () => {
+      write('spec/api.json', OPENAPI);
+      write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
     });
 
     it('reads inputs written with a byte-order mark', async () => {
@@ -603,131 +598,6 @@ describe('PortalSourceContext', () => {
       const source = (await resolve())._unsafeUnwrap();
 
       expect(ignored(source)).to.deep.equal([]);
-    });
-  });
-
-  describe('migration from APIMATIC-BUILD.json', () => {
-    it('suggests a config from the old page title and logo, and names what is unsupported', async () => {
-      write(
-        'APIMATIC-BUILD.json',
-        JSON.stringify({
-          generatePortal: {
-            pageTitle: 'My Portal',
-            logoUrl: 'static/images/logo.png',
-            navTitle: 'Nav',
-            languageConfig: { http: {} }
-          }
-        })
-      );
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(JSON.parse(JSON.stringify(migration.suggestedConfig))).to.deep.equal({
-        title: 'My Portal',
-        logo: 'static/images/logo.png'
-      });
-      expect(migration.unsupportedFields).to.deep.equal(['languageConfig', 'navTitle']);
-    });
-
-    it('falls back to a placeholder title when the old file has none', async () => {
-      write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal: {} }));
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(migration.suggestedConfig.siteTitle()).to.equal('My API');
-    });
-
-    it('reports a versioned portal as unsupported', async () => {
-      write('APIMATIC-BUILD.json', JSON.stringify({ generateVersionedPortal: {} }));
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(migration.unsupportedFields).to.deep.equal(['generateVersionedPortal']);
-    });
-
-    it('offers no migration for a build file that configures no portal', async () => {
-      write('APIMATIC-BUILD.json', JSON.stringify({ generateSdk: {} }));
-
-      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig', migration: null });
-    });
-
-    it('still offers a migration when the build file carries a byte-order mark', async () => {
-      write('APIMATIC-BUILD.json', '﻿' + JSON.stringify({ generatePortal: { pageTitle: 'Acme' } }));
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(migration.suggestedConfig.siteTitle()).to.equal('Acme');
-    });
-
-    it('offers no migration for a build file it cannot parse', async () => {
-      write('APIMATIC-BUILD.json', '{ broken');
-
-      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig', migration: null });
-    });
-
-    // The sidebar is ordered from the pages themselves now, so the old setting is neither
-    // carried over nor called unsupported.
-    it('passes over a table of contents without a word', async () => {
-      write(
-        'APIMATIC-BUILD.json',
-        JSON.stringify({ generatePortal: { pageTitle: 'Acme', tableOfContentsPath: 'content/toc.yml' } })
-      );
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(migration.unsupportedFields).to.not.include('tableOfContentsPath');
-    });
-
-    it('names a logo it cannot carry over instead of listing it as unsupported', async () => {
-      write(
-        'APIMATIC-BUILD.json',
-        JSON.stringify({ generatePortal: { pageTitle: 'Acme', logoUrl: 'images/logo.png' } })
-      );
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(migration.unmigratableLogo).to.equal('images/logo.png');
-      expect(migration.unsupportedFields).to.not.include('logoUrl');
-    });
-
-    it('carries a logo already inside static/ over, with nothing to report', async () => {
-      write(
-        'APIMATIC-BUILD.json',
-        JSON.stringify({ generatePortal: { pageTitle: 'Acme', logoUrl: 'static/images/logo.png' } })
-      );
-
-      const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-
-      expect(migration.unmigratableLogo).to.be.null;
-    });
-
-    describe('every suggestion it can produce is a config the CLI accepts', () => {
-      const oldPortals: Record<string, unknown>[] = [
-        { pageTitle: 'Acme', logoUrl: 'static/images/logo.png' },
-        { pageTitle: 'Acme', logoUrl: 'images/logo.png' },
-        { pageTitle: 'Acme', logoUrl: 'https://cdn.example.com/logo.png' },
-        { pageTitle: 'Acme', logoUrl: 'static/../../secrets.png' },
-        { pageTitle: 'Acme', logoUrl: 'static/' },
-        { pageTitle: 'Acme', logoUrl: '   ' },
-        { pageTitle: 'Acme', logoUrl: 42 },
-        { pageTitle: '' },
-        { pageTitle: '   ' },
-        { pageTitle: 7 },
-        {},
-        { pageTitle: 'Acme', logoUrl: 'images/l.png', portalStyle: 'default', enableApiCopilot: true }
-      ];
-
-      oldPortals.forEach((generatePortal) => {
-        it(`accepts its own suggestion for ${JSON.stringify(generatePortal)}`, async () => {
-          write('APIMATIC-BUILD.json', JSON.stringify({ generatePortal }));
-
-          const migration = migrationOf((await resolve())._unsafeUnwrapErr());
-          // Exactly what the prompt prints for the user to paste.
-          const suggestion = JSON.stringify(migration.suggestedConfig, null, 2);
-
-          expect(PortalConfig.parse(suggestion).isOk(), suggestion).to.be.true;
-        });
-      });
     });
   });
 

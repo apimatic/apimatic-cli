@@ -31,7 +31,7 @@ export interface PortalSource {
 
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
-  | { kind: 'missingConfig'; migration: PortalMigration | null }
+  | { kind: 'missingConfig' }
   | { kind: 'invalidConfig'; errors: string[] }
   | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'unreadableContent' }
@@ -39,14 +39,3 @@ export type PortalSourceProblem =
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
   | { kind: 'noSpecs' }
   | { kind: 'missingLogo'; logoPath: string };
-
-/** What a pre-2.0 `APIMATIC-BUILD.json` can contribute towards a `portal.json`. */
-export interface PortalMigration {
-  suggestedConfig: PortalConfig;
-  unsupportedFields: string[];
-  /**
-   * A `logoUrl` that cannot be carried over as it stands, because `logo` addresses the
-   * `static/` directory. Kept so the user is told what to do with the image instead.
-   */
-  unmigratableLogo: string | null;
-}

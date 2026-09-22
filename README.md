@@ -27,7 +27,7 @@ Documentation portals are now built on your machine from a `src/` directory, and
 `APIMATIC-BUILD.json` no longer configures them:
 
 - Describe the portal in `src/portal.json` (`title`, `description`, `logo`, `siteUrl`).
-  Running `apimatic portal generate` on a 1.x project prints one to start from.
+  Running `apimatic quickstart` scaffolds one.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
