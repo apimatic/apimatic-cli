@@ -205,12 +205,57 @@ describe('PortalNavigation', () => {
   // carries its Fumadocs keys across, and calling those a misspelling of 'pages' would be
   // a dead end.
   it('explains a Fumadocs folder-metadata key rather than calling it a typo', () => {
-    const errors = PortalNavigation.validate('{"title":"Guides","pages":["index"]}', contextFor())._unsafeUnwrapErr();
+    const errors = PortalNavigation.validate('{"icon":"book","pages":["index"]}', contextFor())._unsafeUnwrapErr();
 
     expect(errors).to.have.lengthOf(1);
-    expect(errors[0]).to.contain("'title' is not a nav.json setting");
-    expect(errors[0]).to.contain('named after its directory');
+    expect(errors[0]).to.contain("'icon' is not a nav.json setting");
+    expect(errors[0]).to.contain("the order of pages and a folder's title");
     expect(errors[0]).to.not.contain('did you mean');
+  });
+
+  describe('the folder title', () => {
+    const nested = { label: 'content/guides/nav.json', isContentRoot: false, childNames: ['intro'] };
+
+    it('accepts a name beside the order', () => {
+      expect(PortalNavigation.validate('{"title":"Developer Guides","pages":["intro"]}', contextFor(nested)).isOk()).to
+        .be.true;
+    });
+
+    // Naming a folder is worth a file of its own: the order it would otherwise have to
+    // restate is the order Fumadocs already produces.
+    it('accepts a name with no order at all', () => {
+      expect(PortalNavigation.validate('{"title":"Developer Guides"}', contextFor(nested)).isOk()).to.be.true;
+    });
+
+    for (const [description, title] of [
+      ['a number', '2'],
+      ['an empty string', '""'],
+      ['nothing but whitespace', '"   "']
+    ]) {
+      it(`refuses ${description}`, () => {
+        const errors = PortalNavigation.validate(`{"title":${title}}`, contextFor(nested))._unsafeUnwrapErr();
+
+        expect(errors).to.deep.equal(["content/guides/nav.json: 'title' must be a non-empty string."]);
+      });
+    }
+
+    // The root is no folder in the sidebar, so a name given here would set nothing, which is
+    // the silent wrongness this file exists to refuse.
+    it('refuses a name at the content root, naming where the portal is titled instead', () => {
+      const errors = PortalNavigation.validate('{"title":"My API","pages":["index"]}', contextFor())._unsafeUnwrapErr();
+
+      expect(errors).to.have.lengthOf(1);
+      expect(errors[0]).to.contain('orders the content root, which is not one');
+      expect(errors[0]).to.contain('portal.json');
+    });
+
+    it('suggests it for the names a toc.yml or a meta.json used', () => {
+      for (const field of ['group', 'name', 'label']) {
+        const errors = PortalNavigation.validate(`{"${field}":"Guides"}`, contextFor(nested))._unsafeUnwrapErr();
+
+        expect(errors[0], field).to.contain(`'${field}' is not a nav.json setting; did you mean 'title'?`);
+      }
+    });
   });
 
   // `JSON.parse` will happily hand back a document keyed by a prototype member.

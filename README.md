@@ -30,8 +30,8 @@ Documentation portals are now built on your machine from a `src/` directory, and
   Running `apimatic portal generate` on a 1.x project prints one to start from.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
-- Page order comes from a `nav.json` beside your pages, listing them by file name; `toc.yml` is
-  no longer read.
+- Page order comes from a `nav.json` beside your pages, listing them by file name, and a
+  `title` there names the folder it sits in; `toc.yml` is no longer read.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.

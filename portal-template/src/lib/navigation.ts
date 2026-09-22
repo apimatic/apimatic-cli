@@ -68,19 +68,31 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       // later in the alphabet, and a generated page lands in the middle of the user's pages.
       // Below the root those defaults do not apply, so a folder with no file keeps Fumadocs'
       // order untouched, which is every tag folder of every specification.
-      const order = readOrder(this, folderPath);
+      const settings = readSettings(this, folderPath);
+      const order = settings?.pages;
       if (folderPath === '' || order !== undefined) {
         node.children = reorder(this, node, folderPath, order ?? []);
       }
       if (folderPath === apiBaseDir) {
         applyApiStructure(this, node);
       }
+      // Last, so a name the user wrote outranks both the title Fumadocs takes from an index
+      // page and the default the API wrapper is given just above.
+      if (settings?.title !== undefined) {
+        node.name = settings.title;
+      }
       return node;
     }
   };
 }
 
-function readOrder(context: NavigationContext, folderPath: string): string[] | undefined {
+/** What a directory's `nav.json` says about it. Absent fields leave Fumadocs' own answer. */
+interface NavigationSettings {
+  pages: string[] | undefined;
+  title: string | undefined;
+}
+
+function readSettings(context: NavigationContext, folderPath: string): NavigationSettings | undefined {
   // Resolved through the builder's own index so the extension is never hard-coded.
   const path = context.builder.resolveFlattenPath(PathUtils.joinPath(folderPath, NAVIGATION_FILE_STEM), 'meta');
   const file = context.storage.read(path);
@@ -91,8 +103,14 @@ function readOrder(context: NavigationContext, folderPath: string): string[] | u
     return undefined;
   }
 
-  const pages = (file.data as { pages?: unknown }).pages;
-  return Array.isArray(pages) ? pages.filter((entry): entry is string => typeof entry === 'string') : undefined;
+  const { pages, title } = file.data as { pages?: unknown; title?: unknown };
+  return {
+    pages: Array.isArray(pages) ? pages.filter((entry): entry is string => typeof entry === 'string') : undefined,
+    // A half-typed title reloads to here as an empty string, which would blank the folder in
+    // the sidebar with nothing to click. The CLI refuses one; the preview keeps the default
+    // name until the file is worth reading again.
+    title: typeof title === 'string' && title.trim().length > 0 ? title.trim() : undefined
+  };
 }
 
 /**

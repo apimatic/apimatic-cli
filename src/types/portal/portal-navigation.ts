@@ -28,30 +28,26 @@ export const NAVIGATION_FILE_NAME = 'nav.json';
  */
 export const IGNORED_NAVIGATION_FILE_NAMES = ['nav.yaml', 'nav.yml', 'meta.json', 'meta.yaml', 'meta.yml'];
 
-const KNOWN_FIELDS = new Set(['pages']);
+const KNOWN_FIELDS = new Set(['pages', 'title']);
 
-// Plausible names for the one field there is. A misspelled field would otherwise be stripped
+// Plausible names for each of the two fields. A misspelled field would otherwise be stripped
 // by Fumadocs' own schema and leave the sidebar in its default order with nothing said.
+// `group` and `items` are what `toc.yml` called a section and its contents.
 const RENAMED_FIELDS = new Map<string, string>([
   ['order', 'pages'],
   ['items', 'pages'],
   ['page', 'pages'],
   ['navigation', 'pages'],
-  ['toc', 'pages']
+  ['toc', 'pages'],
+  ['group', 'title'],
+  ['name', 'title'],
+  ['label', 'title']
 ]);
 
 // Fumadocs' own folder-metadata keys. Someone renaming a `meta.json` as the CLI's warning
 // asks them to will carry these across, and "did you mean 'pages'?" would be a poor answer:
 // they are not misspellings, they are a thing `nav.json` deliberately does not do.
-const FUMADOCS_ONLY_FIELDS = new Set([
-  'title',
-  'icon',
-  'description',
-  'defaultOpen',
-  'collapsible',
-  'root',
-  'pagesIndex'
-]);
+const FUMADOCS_ONLY_FIELDS = new Set(['icon', 'description', 'defaultOpen', 'collapsible', 'root', 'pagesIndex']);
 
 // The entry shapes Fumadocs' own `meta.json` accepts and `nav.json` does not: a separator, a
 // link, an exclusion, an extract of another folder's pages, and the reversed rest.
@@ -84,18 +80,21 @@ export class PortalNavigation {
       PortalNavigation.describeUnknownField(field, intended, context)
     );
 
+    const settingErrors = [...unknownFields, ...PortalNavigation.titleErrors(document.value.title, context)];
+
     const pages = document.value.pages;
     if (pages === undefined) {
-      // A file with no `pages` orders nothing, which is odd but not wrong.
-      return unknownFields.length > 0 ? err(unknownFields) : ok(undefined);
+      // A file with no `pages` orders nothing, which is odd but not wrong. It may still name
+      // the folder, which is why the title is checked above rather than alongside the entries.
+      return settingErrors.length > 0 ? err(settingErrors) : ok(undefined);
     }
     if (!Array.isArray(pages) || pages.some((entry) => typeof entry !== 'string')) {
-      return err([...unknownFields, `${context.label}: 'pages' must be an array of strings.`]);
+      return err([...settingErrors, `${context.label}: 'pages' must be an array of strings.`]);
     }
 
     // Every bad entry is reported at once rather than stopping at the first, so one edit
     // fixes the file.
-    const errors = [...unknownFields];
+    const errors = [...settingErrors];
     // Keyed by the node an entry positions rather than its text: at the content root, a
     // folder called `api` is the API reference, so naming it and the token names one node
     // twice, and the template would honour whichever came first without a word.
@@ -231,6 +230,27 @@ export class PortalNavigation {
     return ok(data as Record<string, unknown>);
   }
 
+  /**
+   * A folder is named after its directory, or after the title of its index page; `title`
+   * outranks both. The content root is no folder in the sidebar, so a name given there would
+   * set nothing, and the portal's own name is `portal.json`'s `title`.
+   */
+  private static titleErrors(title: unknown, context: NavigationContext): string[] {
+    if (title === undefined) {
+      return [];
+    }
+    if (context.isContentRoot) {
+      return [
+        `${context.label}: 'title' names a folder, and this file orders the content root, ` +
+          `which is not one. Set the portal's own name with 'title' in portal.json.`
+      ];
+    }
+    if (typeof title !== 'string' || title.trim().length === 0) {
+      return [`${context.label}: 'title' must be a non-empty string.`];
+    }
+    return [];
+  }
+
   private static describeUnknownField(field: string, intended: string | undefined, context: NavigationContext): string {
     if (intended !== undefined) {
       return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting; did you mean '${intended}'?`;
@@ -238,8 +258,7 @@ export class PortalNavigation {
     if (FUMADOCS_ONLY_FIELDS.has(field)) {
       return (
         `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. ` +
-        `${NAVIGATION_FILE_NAME} sets the order of pages and nothing else; a folder is named ` +
-        `after its directory, or after the title of its index page.`
+        `${NAVIGATION_FILE_NAME} sets the order of pages and a folder's title, and nothing else.`
       );
     }
     return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting.`;

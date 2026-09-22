@@ -14,6 +14,13 @@ describe('navigationTransformer', () => {
   const page = (path: string, title: string): File => ({ type: 'page', path, data: { title } });
   const nav = (path: string, pages: string[]): File => ({ type: 'meta', path, data: { pages } });
 
+  /** A `nav.json` that names its folder, with or without an order to go with it. */
+  const titled = (path: string, title: unknown, pages?: string[]): File => ({
+    type: 'meta',
+    path,
+    data: pages === undefined ? { title } : { title, pages }
+  });
+
   /** Top-level names of the tree built from these sources, in order. */
   const treeOf = (sources: { docs?: File[]; openapi?: File[]; generated?: File[] }): string[] =>
     names(build(sources).pageTree.children);
@@ -376,6 +383,63 @@ describe('navigationTransformer', () => {
 
       expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
     });
+  });
+
+  describe('the folder title', () => {
+    it('names a folder that would otherwise be named after its directory', () => {
+      const docs = [...CONTENT, page('guides/intro.mdx', 'Intro'), titled('guides/nav.json', 'Developer Guides')];
+
+      expect(treeOf({ docs, openapi: API })).to.deep.equal([
+        'Welcome',
+        'Authentication',
+        'Developer Guides',
+        'API Reference'
+      ]);
+    });
+
+    // Fumadocs names a folder after its index page, which is the better default and the
+    // reason a folder often needs no title at all. An explicit one still outranks it.
+    it('outranks the title Fumadocs takes from the index page', () => {
+      const docs = [...CONTENT, page('guides/index.mdx', 'Guides'), titled('guides/nav.json', 'Developer Guides')];
+
+      expect(treeOf({ docs })).to.contain('Developer Guides').and.to.not.contain('Guides');
+    });
+
+    // "API Reference" is a default the transformer supplies, not a name the user chose, so
+    // it gives way like any other.
+    it('renames the API reference wrapper', () => {
+      const docs = [...CONTENT, titled('api/nav.json', 'REST API')];
+
+      expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'REST API']);
+    });
+
+    it('orders the folder as well when it names one', () => {
+      const docs = [
+        ...CONTENT,
+        page('guides/intro.mdx', 'Intro'),
+        page('guides/advanced.mdx', 'Advanced'),
+        titled('guides/nav.json', 'Developer Guides', ['intro', 'advanced'])
+      ];
+
+      expect(names(childrenOf(build({ docs }).pageTree.children, 'Developer Guides'))).to.deep.equal([
+        'Intro',
+        'Advanced'
+      ]);
+    });
+
+    // The CLI refuses both, but `portal serve` reloads a half-typed file straight to the
+    // transformer: a folder with no name at all is a sidebar row nobody can read.
+    for (const [description, title] of [
+      ['an empty title', ''],
+      ['a title of nothing but whitespace', '   '],
+      ['a title that is not a string', 2]
+    ] as const) {
+      it(`keeps the default name for ${description}`, () => {
+        const docs = [...CONTENT, page('guides/intro.mdx', 'Intro'), titled('guides/nav.json', title)];
+
+        expect(treeOf({ docs })).to.contain('Guides');
+      });
+    }
   });
 
   /**
