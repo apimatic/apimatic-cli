@@ -36,14 +36,14 @@ const API_REFERENCE_TITLE = 'API Reference';
  * The key the generated pages are passed to `loader()` under, which the storage stamps onto
  * every file of that source.
  */
-const GENERATED_SOURCE = 'generated';
+export const GENERATED_SOURCE = 'generated';
 
 /**
  * The key the reference pages are passed to `loader()` under in `source.server.ts`. It tells
  * a specification's section apart from a folder the user made under `content/api/`, which
  * lands in the same virtual directory.
  */
-const OPENAPI_SOURCE = 'openapi';
+export const OPENAPI_SOURCE = 'openapi';
 
 /**
  * Applies the order in each directory's `nav.json` to the page tree.
@@ -62,11 +62,16 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       // folder whose only page is its index is not empty: the folder itself links to it.
       node.children = node.children.filter((child) => !isEmptyFolder(child));
 
-      // Ordered even with no file of its own: naming nothing still puts the injected pages
-      // and the API reference at their defaults, and Fumadocs' own order would not. It
-      // sorts folders by path, so `api` lands above a user folder called anything later in
-      // the alphabet, and a generated page lands in the middle of the user's pages.
-      node.children = reorder(this, node, folderPath, readOrder(this, folderPath) ?? []);
+      // The root is ordered even with no file of its own: naming nothing still puts the
+      // injected pages and the API reference at their defaults, and Fumadocs' own order would
+      // not. It sorts folders by path, so `api` lands above a user folder called anything
+      // later in the alphabet, and a generated page lands in the middle of the user's pages.
+      // Below the root those defaults do not apply, so a folder with no file keeps Fumadocs'
+      // order untouched, which is every tag folder of every specification.
+      const order = readOrder(this, folderPath);
+      if (folderPath === '' || order !== undefined) {
+        node.children = reorder(this, node, folderPath, order ?? []);
+      }
       if (folderPath === apiBaseDir) {
         applyApiStructure(this, node);
       }
@@ -196,7 +201,9 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
   const at = restIndex ?? afterNamedContent(named, isInjectedChild);
   const ordered = [...named.slice(0, at), ...content, ...named.slice(at)];
 
-  const anchor = anchorIn(ordered);
+  // Before the API reference, but never above the user's own pages: when the file puts the
+  // reference first, the band follows the content instead.
+  const anchor = Math.max(anchorIn(ordered), at + content.length);
   return [...ordered.slice(0, anchor), ...injected, ...ordered.slice(anchor), ...api];
 }
 

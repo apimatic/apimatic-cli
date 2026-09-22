@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { loader } from 'fumadocs-core/source';
 import type { Node } from 'fumadocs-core/page-tree';
-import { navigationTransformer } from '../../portal-template/src/lib/navigation';
+import { GENERATED_SOURCE, navigationTransformer, OPENAPI_SOURCE } from '../../portal-template/src/lib/navigation';
 import { PortalNavigation } from '../../src/types/portal/portal-navigation';
 
 /**
@@ -21,8 +21,8 @@ describe('navigationTransformer', () => {
   const build = (sources: { docs?: File[]; openapi?: File[]; generated?: File[] }) => {
     const input: Record<string, { files: File[]; baseDir?: string }> = {};
     if (sources.docs) input.docs = { files: sources.docs };
-    if (sources.generated) input.generated = { files: sources.generated };
-    if (sources.openapi) input.openapi = { files: sources.openapi, baseDir: 'api' };
+    if (sources.generated) input[GENERATED_SOURCE] = { files: sources.generated };
+    if (sources.openapi) input[OPENAPI_SOURCE] = { files: sources.openapi, baseDir: 'api' };
     // The same page-tree options as `source.server.ts`, so the tree under test is the one built.
     return loader(input, {
       baseUrl: '/',
@@ -335,14 +335,28 @@ describe('navigationTransformer', () => {
       ]);
     });
 
-    it('stay before the API reference even where that is named early', () => {
+    // Before the reference by default, but never above the user's own pages: a generated
+    // page has no business sitting above the home page because the file put the reference
+    // first.
+    it('follow the user’s pages when the file puts the API reference before them', () => {
       const docs = [...CONTENT, nav('nav.json', ['apimatic:api', 'index', 'authentication'])];
 
       expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
-        'SDKs',
         'API Reference',
         'Welcome',
-        'Authentication'
+        'Authentication',
+        'SDKs'
+      ]);
+    });
+
+    it('follow the unnamed pages too when the reference is named before them', () => {
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:api', 'index'])];
+
+      expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
+        'API Reference',
+        'Welcome',
+        'Authentication',
+        'SDKs'
       ]);
     });
 
