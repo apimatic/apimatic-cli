@@ -50,6 +50,15 @@ describe('PortalNavigation', () => {
       expect(errorsFor(['authentication.md'])[0]).to.contain("Did you mean 'authentication'?");
     });
 
+    // The template positions the folder, as Fumadocs does, so the page could never be placed.
+    it('refuses a name that is both a page and a folder in the directory', () => {
+      const errors = errorsFor(['guides'], { childNames: ['index', 'guides', 'guides'] });
+
+      expect(errors).to.deep.equal([
+        "content/nav.json: 'guides' is both a page and a folder in this directory, and the entry positions the folder. Rename the page to position it."
+      ]);
+    });
+
     it('refuses an entry addressing another directory', () => {
       expect(errorsFor(['guides/intro'])[0]).to.contain("'guides/intro' addresses another directory");
     });

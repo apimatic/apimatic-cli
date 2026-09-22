@@ -404,6 +404,26 @@ describe('PortalSourceContext', () => {
       expect((await resolve()).isOk()).to.be.true;
     });
 
+    it('refuses a name shared by a page and a folder, since only the folder could be positioned', async () => {
+      write('content/guides.md', '# Guides');
+      write('content/guides/intro.md', '# Intro');
+      write('content/nav.json', JSON.stringify({ pages: ['guides', 'index'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/nav.json: 'guides' is both a page and a folder");
+    });
+
+    // The specification's folder is one child; a page of the same name beside it is another.
+    it('refuses a specification’s name when a page under content/api carries it too', async () => {
+      write('content/api/api.md', '# Landing');
+      write('content/api/nav.json', JSON.stringify({ pages: ['api'] }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors[0]).to.contain("content/api/nav.json: 'api' is both a page and a folder");
+    });
+
     it('refuses a specification named anywhere but in content/api', async () => {
       write('content/guides/intro.md', '# Intro');
       write('content/guides/nav.json', JSON.stringify({ pages: ['intro', 'api'] }));

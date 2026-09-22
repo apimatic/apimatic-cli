@@ -9,6 +9,7 @@ import { PortalConfig } from './portal/portal-config.js';
 import {
   API_REFERENCE_NAME,
   IGNORED_NAVIGATION_FILE_NAMES,
+  INDEX_NAME,
   NAVIGATION_FILE_NAME,
   PortalNavigation
 } from './portal/portal-navigation.js';
@@ -56,9 +57,6 @@ interface ContentPage {
   file: FilePath;
   segments: string[];
 }
-
-/** The page that stands for its folder rather than sitting among the folder's pages. */
-const INDEX_NAME = 'index';
 
 /** What the walk found in one directory and everything beneath it. */
 interface DirectoryScan {
@@ -235,6 +233,7 @@ export class PortalSourceContext {
       isApiDirectory: boolean
     ): Promise<DirectoryScan> => {
       const childNames: string[] = [];
+      const pageNames = new Set<string>();
       const childErrors: string[] = [];
       let holdsPage = false;
       let navigationFile: FileName | undefined;
@@ -258,7 +257,8 @@ export class PortalSourceContext {
           navigationFile = item.fileName;
           continue;
         }
-        if (IGNORED_NAVIGATION_FILE_NAMES.some((name) => item.fileName.is(name))) {
+        const isCaseVariant = item.fileName.is(NAVIGATION_FILE_NAME) && item.fileName.compare(NAVIGATION_FILE) !== 0;
+        if (isCaseVariant || IGNORED_NAVIGATION_FILE_NAMES.some((name) => item.fileName.is(name))) {
           ignoredFiles.push(new FilePath(directory.directoryPath, item.fileName));
           continue;
         }
@@ -267,15 +267,18 @@ export class PortalSourceContext {
         const pageName = PortalSourceContext.pageName(item.fileName);
         if (pageName !== undefined) {
           childNames.push(pageName);
+          pageNames.add(pageName);
           holdsPage = true;
         }
       }
 
       // The reference pages are mounted in this directory, one folder per specification, and
       // its `nav.json` positions those folders like any other child of its own.
+      // A directory of the same name is that very folder, so it is not listed twice; a page
+      // of the same name is a second child, and listed again so the validator sees the clash.
       if (isApiDirectory) {
         for (const spec of specs) {
-          if (!childNames.includes(spec.slug)) {
+          if (!childNames.includes(spec.slug) || pageNames.has(spec.slug)) {
             childNames.push(spec.slug);
           }
         }

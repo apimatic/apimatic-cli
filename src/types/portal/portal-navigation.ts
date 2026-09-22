@@ -16,16 +16,17 @@ const APIMATIC_PREFIX = 'apimatic:';
 export const API_REFERENCE_NAME = 'api';
 
 /** The page a folder below the content root links to, which is never one of its children. */
-const INDEX_NAME = 'index';
+export const INDEX_NAME = 'index';
 
 export const NAVIGATION_FILE_NAME = 'nav.json';
 /**
  * Files that look like navigation but that the build never reads: Fumadocs' own `meta` file
- * in each format it accepts, which `nav.json` replaced, and `nav` in a format or a case the
- * build's glob does not match. Warned about wherever they are found, compared without
- * regard to case.
+ * in each format it accepts, which `nav.json` replaced, and `nav` in a format the build does
+ * not read. Warned about wherever they are found, compared without regard to case. A
+ * `nav.json` in the wrong case is warned about too, but by name, since the right case is the
+ * file itself.
  */
-export const IGNORED_NAVIGATION_FILE_NAMES = ['nav.json', 'nav.yaml', 'nav.yml', 'meta.json', 'meta.yaml', 'meta.yml'];
+export const IGNORED_NAVIGATION_FILE_NAMES = ['nav.yaml', 'nav.yml', 'meta.json', 'meta.yaml', 'meta.yml'];
 
 const KNOWN_FIELDS = new Set(['pages']);
 
@@ -161,6 +162,16 @@ export class PortalNavigation {
           entry,
           context
         )}`
+      );
+    }
+
+    // A page and a folder of one name are both children, and an entry positions the folder,
+    // as it does in Fumadocs' own metadata. The page could then never be positioned, which
+    // is the quietly wrong sidebar this file exists to refuse.
+    if (context.childNames.filter((name) => name === entry).length > 1) {
+      return err(
+        `${context.label}: '${entry}' is both a page and a folder in this directory, and the entry ` +
+          `positions the folder. Rename the page to position it.`
       );
     }
 
