@@ -43,7 +43,7 @@ export function mapLanguages(languageFlag: number): Language[] {
  * are selectable.
  */
 export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
-  { label: "Typescript", value: Language.TYPESCRIPT },
+  { label: "TypeScript", value: Language.TYPESCRIPT },
   { label: "Ruby", value: Language.RUBY },
   { label: "Python", value: Language.PYTHON },
   { label: "Java", value: Language.JAVA },
