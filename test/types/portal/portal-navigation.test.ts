@@ -92,6 +92,20 @@ describe('PortalNavigation', () => {
       ]);
     });
 
+    // With pages under content/api, the folder is the API reference: naming it and the token
+    // names one node twice, and the template would honour the first without a word.
+    it('refuses api and apimatic:api together at the root, whichever comes first', () => {
+      const withApi = { childNames: ['index', 'api'] };
+
+      expect(validate(['api', 'index'], withApi).isOk()).to.be.true;
+      expect(errorsFor(['api', 'index', 'apimatic:api'], withApi)).to.deep.equal([
+        "content/nav.json: 'api' and 'apimatic:api' both position the API reference; keep one of them."
+      ]);
+      expect(errorsFor(['apimatic:api', 'api'], withApi)).to.deep.equal([
+        "content/nav.json: 'apimatic:api' and 'api' both position the API reference; keep one of them."
+      ]);
+    });
+
     it('names a folder called api below the root as an ordinary child', () => {
       expect(validate(['api'], { isContentRoot: false, childNames: ['api'] }).isOk()).to.be.true;
       expect(errorsFor(['api'], { isContentRoot: false })[0]).to.not.contain('apimatic:api');

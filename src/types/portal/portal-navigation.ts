@@ -95,15 +95,24 @@ export class PortalNavigation {
     // Every bad entry is reported at once rather than stopping at the first, so one edit
     // fixes the file.
     const errors = [...unknownFields];
-    const seen = new Set<string>();
+    // Keyed by the node an entry positions rather than its text: at the content root, a
+    // folder called `api` is the API reference, so naming it and the token names one node
+    // twice, and the template would honour whichever came first without a word.
+    const seen = new Map<string, string>();
 
     for (const raw of pages as string[]) {
       const entry = raw.trim();
-      if (seen.has(entry)) {
-        errors.push(`${context.label}: '${entry}' is listed more than once.`);
+      const node = context.isContentRoot && entry === API_REFERENCE_NAME ? API_REFERENCE_TOKEN : entry;
+      const earlier = seen.get(node);
+      if (earlier !== undefined) {
+        errors.push(
+          earlier === entry
+            ? `${context.label}: '${entry}' is listed more than once.`
+            : `${context.label}: '${earlier}' and '${entry}' both position the API reference; keep one of them.`
+        );
         continue;
       }
-      seen.add(entry);
+      seen.set(node, entry);
 
       const checked = PortalNavigation.checkEntry(entry, context);
       if (checked.isErr()) {
