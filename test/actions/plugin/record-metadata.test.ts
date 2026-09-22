@@ -10,7 +10,7 @@ import { ApiService } from '../../../src/infrastructure/services/api-service.js'
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { PluginConfigData } from '../../../src/types/plugin/plugin-config.js';
+import { PluginIdentityData } from '../../../src/types/plugin/plugin-config.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -33,7 +33,9 @@ describe('PluginRecordMetadataAction', () => {
 
   const execute = () => action.execute(new DirectoryPath(buildDirectory));
 
-  const writtenConfig = (): PluginConfigData => fsExtra.readJsonSync(path.join(buildDirectory, 'plugin-config.json'));
+  const configPath = () => path.join(buildDirectory, 'apimatic.json');
+  /** The plugin block as written: what this action owns in the file. */
+  const writtenPlugin = (): PluginIdentityData => fsExtra.readJsonSync(configPath()).plugin;
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
@@ -58,13 +60,13 @@ describe('PluginRecordMetadataAction', () => {
       .stub(PluginRecordMetadataPrompts.prototype, 'inputPluginMetadata')
       .resolves({ metadata: { ...ANSWERS, ...overrides } });
 
-  it('writes the metadata and a default licence into the config', async () => {
+  it('writes the metadata and a default licence into the plugin block', async () => {
     answers();
 
     const result = await execute();
 
     expect(result.isSuccess()).to.be.true;
-    expect(writtenConfig()).to.include({ ...ANSWERS, license: 'MIT' });
+    expect(writtenPlugin()).to.include({ ...ANSWERS, license: 'MIT' });
   });
 
   it('records the author from the account', async () => {
@@ -72,7 +74,7 @@ describe('PluginRecordMetadataAction', () => {
 
     await execute();
 
-    expect(writtenConfig().author).to.deep.equal({ name: 'Acme', email: 'developers@acme.com' });
+    expect(writtenPlugin().author).to.deep.equal({ name: 'Acme', email: 'developers@acme.com' });
   });
 
   it('offers the hard-coded examples as the prompt defaults', async () => {
@@ -91,7 +93,7 @@ describe('PluginRecordMetadataAction', () => {
     const result = await execute();
 
     expect(result.isCancelled()).to.be.true;
-    expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
+    expect(fsExtra.existsSync(configPath())).to.be.false;
   });
 
   // The caller prints this to say which answer was missing, so it has to survive on the result.
@@ -114,12 +116,12 @@ describe('PluginRecordMetadataAction', () => {
 
     expect(result.isSuccess()).to.be.true;
     expect(accountInfoUnavailable.called).to.be.true;
-    expect(writtenConfig()).to.not.have.property('author');
-    expect(writtenConfig().pluginId).to.equal(ANSWERS.pluginId);
+    expect(writtenPlugin()).to.not.have.property('author');
+    expect(writtenPlugin().pluginId).to.equal(ANSWERS.pluginId);
   });
 
   it('fails rather than overwriting a config it could not read', async () => {
-    await fsExtra.writeFile(path.join(buildDirectory, 'plugin-config.json'), '{ not json');
+    await fsExtra.writeFile(configPath(), '{ not json');
     answers();
     const pluginConfigUnreadable = sinon.stub(PluginRecordMetadataPrompts.prototype, 'pluginConfigUnreadable');
 
@@ -127,6 +129,6 @@ describe('PluginRecordMetadataAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(pluginConfigUnreadable.called).to.be.true;
-    expect(fsExtra.readFileSync(path.join(buildDirectory, 'plugin-config.json'), 'utf-8')).to.equal('{ not json');
+    expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal('{ not json');
   });
 });

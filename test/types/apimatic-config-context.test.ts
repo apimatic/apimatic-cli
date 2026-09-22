@@ -9,14 +9,14 @@ import { FileService } from '../../src/infrastructure/file-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 
 describe('ApimaticConfigContext', () => {
-  const inputDirectory = new DirectoryPath('project');
-  const context = new ApimaticConfigContext(inputDirectory);
+  const sourceDirectory = new DirectoryPath('src');
+  const context = new ApimaticConfigContext(sourceDirectory);
   // Resolved, as DirectoryPath resolves what it is given.
-  const configPath = path.resolve('project', 'apimatic.json');
+  const configPath = path.resolve('src', 'apimatic.json');
 
   const CSHARP_ENTRY = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' }, codegenVersion: 'v3' };
 
-  const withFile = (text: string) => mockFs({ project: { 'apimatic.json': text } });
+  const withFile = (text: string) => mockFs({ src: { 'apimatic.json': text } });
   const withConfig = (config: object) => withFile(JSON.stringify(config, null, 2) + '\n');
   const written = () => fs.readFileSync(configPath, 'utf-8');
   const writtenConfig = () => JSON.parse(written());
@@ -38,23 +38,17 @@ describe('ApimaticConfigContext', () => {
 
   describe('exists', () => {
     it('is false without the file and true with it', async () => {
-      mockFs({ project: {} });
+      mockFs({ src: {} });
       expect(await context.exists()).to.be.false;
 
       withConfig({});
       expect(await context.exists()).to.be.true;
     });
-
-    it('looks at the root of the input directory, not inside src', async () => {
-      mockFs({ project: { src: { 'apimatic.json': '{}' } } });
-
-      expect(await context.exists()).to.be.false;
-    });
   });
 
   describe('read', () => {
     it('is missing when there is no file', async () => {
-      mockFs({ project: {} });
+      mockFs({ src: {} });
 
       expect(await context.read()).to.deep.equal({ state: 'missing' });
     });
@@ -112,7 +106,7 @@ describe('ApimaticConfigContext', () => {
   describe('merge', () => {
     describe('creating the file', () => {
       it('starts from the schema version, two-space indentation and a trailing newline', async () => {
-        mockFs({ project: {} });
+        mockFs({ src: {} });
 
         const result = await context.merge(['languages'], recordCsharp);
 
@@ -144,7 +138,7 @@ describe('ApimaticConfigContext', () => {
       });
 
       it('hands back the document it wrote', async () => {
-        mockFs({ project: {} });
+        mockFs({ src: {} });
 
         const document = (await context.merge(['languages'], recordCsharp))._unsafeUnwrap();
 

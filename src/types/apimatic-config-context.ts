@@ -35,14 +35,14 @@ interface Loaded {
   format: Format;
 }
 
-/** The `apimatic.json` at the root of an input directory, beside `src/`. */
+/** The `apimatic.json` in a project's `src/`, beside `APIMATIC-BUILD.json`. */
 export class ApimaticConfigContext {
   private readonly fileService = new FileService();
 
-  constructor(private readonly inputDirectory: DirectoryPath) {}
+  constructor(private readonly sourceDirectory: DirectoryPath) {}
 
   private get configFile(): FilePath {
-    return new FilePath(this.inputDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
+    return new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME));
   }
 
   public async exists(): Promise<boolean> {

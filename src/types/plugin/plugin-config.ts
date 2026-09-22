@@ -68,7 +68,8 @@ export type PluginLanguageEntry<L extends Language> = PluginConfigForLanguage[L]
 
 export type PluginLanguages = Partial<PluginConfigForLanguage>;
 
-export interface PluginConfigData {
+/** The `plugin` block of `apimatic.json`: the identity `plugin generate` records. */
+export interface PluginIdentityData {
   // Optional on disk: `sdk publish` creates a config carrying languages alone, and
   // `plugin generate` fills the identity in before it ever uploads.
   pluginId?: string;
@@ -79,10 +80,14 @@ export interface PluginConfigData {
   license?: string;
   homepage?: string;
   repository?: string;
-  languages: PluginLanguages;
   // A hand-written config may carry fields this CLI version does not model; the index
   // signature is what lets a read-modify-write round-trip preserve them.
   [key: string]: unknown;
+}
+
+/** The identity with `languages` beside it: the one configuration the plugin commands judge. */
+export interface PluginConfigData extends PluginIdentityData {
+  languages: PluginLanguages;
 }
 
 /** The fields the CLI asks for; everything else is derived, resolved or constant. */
