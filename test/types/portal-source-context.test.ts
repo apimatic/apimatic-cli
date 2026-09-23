@@ -286,6 +286,49 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  // What `portal serve` runs on each save of `apimatic.json`.
+  describe('resolveConfig', () => {
+    const context = () => new PortalSourceContext(new DirectoryPath(root));
+
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
+    it('gives the config resolve gives, from the site the specifications suggested', async () => {
+      writeConfig({ brand: { colors: { preset: 'ocean' } } });
+      const resolved = (await resolve())._unsafeUnwrap();
+
+      const reloaded = (await context().resolveConfig(resolved.suggestedSite))._unsafeUnwrap();
+
+      expect(reloaded.toJSON()).to.deep.equal(resolved.config.toJSON());
+      expect(reloaded.siteTitle()).to.equal(resolved.config.siteTitle());
+    });
+
+    // The specifications are not read again, so with several the name is still required.
+    it('holds the file to the rules resolve holds it to', async () => {
+      writeConfig({});
+
+      const errors = (await context().resolveConfig(null))._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal.site.name' is required when 'spec' holds more than one specification."],
+        missingPortal: false
+      });
+    });
+
+    it('reports a file the block names that is not on disk', async () => {
+      writeConfig({ site: { name: 'Calc' }, brand: { favicon: 'static/favicon.ico' } });
+
+      expect((await context().resolveConfig(null))._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'missingStaticFiles',
+        files: [{ setting: 'portal.brand.favicon', path: 'static/favicon.ico' }]
+      });
+    });
+
+    it('reports a file removed while the preview runs', async () => {
+      expect((await context().resolveConfig(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+    });
+  });
+
   describe('spec discovery', () => {
     beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
 

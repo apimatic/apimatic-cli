@@ -45,6 +45,14 @@ export class ApiConfig {
     return this.showInternal;
   }
 
+  public isEqual(other: ApiConfig): boolean {
+    return (
+      this.groupBy === other.groupBy &&
+      this.showDeprecated === other.showDeprecated &&
+      this.showInternal === other.showInternal
+    );
+  }
+
   public toJSON(): { groupBy: GroupBy; showDeprecated: boolean; showInternal: boolean } {
     return { groupBy: this.groupBy, showDeprecated: this.showDeprecated, showInternal: this.showInternal };
   }

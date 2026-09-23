@@ -98,16 +98,9 @@ export class PortalSourceContext {
     }
     const { specs, suggested } = discovered.value;
 
-    const config = PortalSourceContext.parseConfig(document.value, suggested);
+    const config = await this.configFrom(document.value, suggested);
     if (config.isErr()) {
       return err(config.error);
-    }
-
-    // The block checks the shape of each path, not that the file is there -- and a missing
-    // logo renders as a broken image on every page of a build that otherwise reports success.
-    const missingFiles = await this.missingStaticFiles(config.value);
-    if (missingFiles.length > 0) {
-      return err({ kind: 'missingStaticFiles', files: missingFiles });
     }
 
     const staticDirectory = (await this.fileService.directoryExists(this.staticDirectory))
@@ -139,6 +132,7 @@ export class PortalSourceContext {
 
     return ok({
       config: config.value,
+      suggestedSite: suggested,
       specs,
       contentDirectory,
       staticDirectory,
@@ -149,6 +143,37 @@ export class PortalSourceContext {
           : PortalSourceContext.hiddenPages(PortalSourceContext.contentPages(contentTree), specs),
       ignoredNavigationFiles: navigation.ignoredFiles
     });
+  }
+
+  /**
+   * The config half of `resolve`, for `portal serve` to run on every edit to `apimatic.json`:
+   * the file read again and held to the same rules, so an edit is accepted exactly when a
+   * build would accept it. `suggested` is what `resolve` found in the specifications, which
+   * are not read again; changing them needs a restart anyway.
+   */
+  public async resolveConfig(suggested: SuggestedSite | null): Promise<Result<PortalConfig, PortalSourceProblem>> {
+    const document = await this.readConfigDocument();
+    if (document.isErr()) {
+      return err(document.error);
+    }
+    return this.configFrom(document.value, suggested);
+  }
+
+  private async configFrom(
+    document: ApimaticConfigDocument,
+    suggested: SuggestedSite | null
+  ): Promise<Result<PortalConfig, PortalSourceProblem>> {
+    const config = PortalSourceContext.parseConfig(document, suggested);
+    if (config.isErr()) {
+      return err(config.error);
+    }
+    // The block checks the shape of each path, not that the file is there -- and a missing
+    // logo renders as a broken image on every page of a build that otherwise reports success.
+    const missingFiles = await this.missingStaticFiles(config.value);
+    if (missingFiles.length > 0) {
+      return err({ kind: 'missingStaticFiles', files: missingFiles });
+    }
+    return ok(config.value);
   }
 
   private async readConfigDocument(): Promise<Result<ApimaticConfigDocument, PortalSourceProblem>> {

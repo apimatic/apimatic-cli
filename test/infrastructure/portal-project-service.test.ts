@@ -20,6 +20,7 @@ describe('PortalProjectService', () => {
 
   const sourceFor = (overrides: Partial<PortalSource> = {}): PortalSource => ({
     config: configFor({ site: { name: 'My API' } }),
+    suggestedSite: null,
     specs: [
       {
         slug: 'calculator',
@@ -191,6 +192,61 @@ describe('PortalProjectService', () => {
       const config = readConfig();
       expect(fs.existsSync(config.contentDir)).to.be.true;
       expect(fs.readdirSync(config.contentDir)).to.be.empty;
+    });
+  });
+
+  // What `portal serve` does with an edited block: the dev server reloads whatever changes.
+  describe('applyConfig', () => {
+    const themeFile = () => path.join(project.toString(), 'src/styles/theme.css');
+    const identityFile = () => path.join(project.toString(), 'portal.identity.json');
+
+    it('writes nothing, and says so, when the block makes the same site', async () => {
+      const config = configFor({ site: { name: 'My API' }, brand: { colors: { preset: 'ocean' } } });
+      (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
+      const before = [fs.statSync(themeFile()).mtimeMs, fs.statSync(identityFile()).mtimeMs];
+
+      // Written differently, read the same: the comparison is of what the preview shows.
+      const same = configFor({
+        site: { name: 'My API' },
+        brand: { colors: { preset: 'ocean' } },
+        ai: { pageActions: true }
+      });
+      const applied = await service.applyConfig(project, same);
+
+      expect(applied._unsafeUnwrap()).to.be.false;
+      expect([fs.statSync(themeFile()).mtimeMs, fs.statSync(identityFile()).mtimeMs]).to.deep.equal(before);
+    });
+
+    it('rewrites both files for a brand change, to what a fresh build would write', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      const config = configFor({
+        site: { name: 'My API' },
+        brand: { colors: { primary: '#1d4ed8' }, colorMode: 'dark' }
+      });
+
+      expect((await service.applyConfig(project, config))._unsafeUnwrap()).to.be.true;
+
+      expect(fs.readFileSync(themeFile(), 'utf8')).to.equal(PortalStylesheet.of(config).toString());
+      expect(readIdentity()).to.deep.equal(config.identity());
+    });
+
+    it('leaves the stylesheet alone when only what the browser is told changes', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      const before = fs.statSync(themeFile()).mtimeMs;
+
+      const renamed = configFor({ site: { name: 'Renamed API' } });
+      expect((await service.applyConfig(project, renamed))._unsafeUnwrap()).to.be.true;
+
+      expect(readIdentity().name).to.equal('Renamed API');
+      expect(fs.statSync(themeFile()).mtimeMs).to.equal(before);
+    });
+
+    it('reports a project it cannot write into rather than throwing', async () => {
+      const missing = new DirectoryPath(root).join('nowhere');
+
+      const applied = await service.applyConfig(missing, configFor({ site: { name: 'My API' } }));
+
+      expect(applied.isErr()).to.be.true;
     });
   });
 

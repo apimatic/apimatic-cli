@@ -1,5 +1,6 @@
 import { log } from '@clack/prompts';
 import { once } from 'node:events';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -61,26 +62,57 @@ export class PortalServePrompts {
 
   public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
-    // The content directory is watched, so a page's body and the order in its `nav.json` both
-    // reload. What is fixed is the set of pages and the configuration: the portal's identity
-    // and the list of specifications are substituted into the project when it is prepared.
-    // Validation is fixed too: it runs once, here, and the build drops an entry it cannot
-    // resolve without a word, so a mistake typed during the preview would otherwise pass as
-    // the default order.
+    // The content directory is watched by the dev server, so a page's body and the order in
+    // its `nav.json` both reload, and the CLI watches `apimatic.json` and re-applies it. What
+    // is fixed is the set of pages, the specifications and how their pages are made: the
+    // build set-up reads those once. `nav.json` is validated once, here, and the build drops
+    // an entry it cannot resolve without a word, so a mistake typed during the preview would
+    // otherwise pass as the default order; `apimatic.json` is validated on every save.
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, and to the order and ` +
-          `folder titles in a ${f.var('nav.json')}, appear in the browser automatically. A mistake in a ${f.var(
+        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
+          `folder titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
+            'apimatic.json'
+          )} appear in the browser automatically. A mistake in ${f.var(
+            'apimatic.json'
+          )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a ${f.var(
             'nav.json'
           )} is only reported when the preview starts; until then an entry or a title that the build would ` +
           `refuse is ignored here.`,
         '',
-        `Adding or removing a page, editing ${f.var('apimatic.json')}, or changing which documents`,
+        `Adding or removing a page, changing ${f.var('portal.api')}, or changing which documents`,
         `are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
       'Live preview'
+    );
+  }
+
+  public configApplied() {
+    log.success(`Applied the changes to ${f.var(APIMATIC_CONFIG_FILE_NAME)}.`);
+  }
+
+  /** Explained as `portal generate` would explain it, since the same rules refused it. */
+  public configRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
+    reportSourceProblem(problem, sourceDirectory);
+    log.message('The preview keeps showing what it last accepted until the file is fixed.');
+  }
+
+  /** The prerender list and the reference pages are made once, from the settings at startup. */
+  public restartNeeded() {
+    log.warn(
+      `The ${f.var('portal.api')} settings changed. Restart the preview to regroup or filter the API reference.`
+    );
+  }
+
+  public configNotApplied(reason: string) {
+    log.warn(`The changes to ${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be applied to the preview: ${reason}`);
+  }
+
+  public configNotWatched(reason: string) {
+    log.warn(
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be watched (${reason}), so edits to it need the preview restarted.`
     );
   }
 

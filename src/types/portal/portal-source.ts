@@ -1,6 +1,7 @@
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
+import { SuggestedSite } from './config/site-config.js';
 import { PortalConfig } from './portal-config.js';
 
 /** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
@@ -12,6 +13,12 @@ export interface PortalSpec {
 /** A validated portal source directory, ready to be built. */
 export interface PortalSource {
   config: PortalConfig;
+  /**
+   * What the only specification says about itself, which the config's name and description
+   * default to, or null with several. Kept so `portal serve` can judge an edited config by the
+   * same rules without reading the specifications again.
+   */
+  suggestedSite: SuggestedSite | null;
   specs: PortalSpec[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;

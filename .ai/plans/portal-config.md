@@ -475,7 +475,15 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   because `vite.config.ts` and the prerender list read them once; the prompt
   says so when those keys change. The serve command description and
   `prompts/portal/serve.ts` stop saying every `apimatic.json` edit needs a
-  restart.
+  restart. As built in step 6: `FileWatchService` (`src/infrastructure/`)
+  watches the source directory rather than the file, so an editor's
+  write-and-rename save keeps being seen. It gathers a save's events for 150 ms,
+  never runs two handlers at once, and waits for one in flight on `close()`.
+  `PortalSourceContext.resolveConfig(suggested)` is the split-out half, fed the
+  `suggestedSite` that `PortalSource` now carries from startup.
+  `PortalProjectService.applyConfig` writes each generated file only when its
+  contents change, and its answer is what "a real change" means. The watcher
+  failing to start is reported, and the preview serves regardless.
 - **Quickstart.** `scaffold` writes, through `ApimaticConfigContext.merge`,
   `$schema`, `schemaVersion` and a populated `portal` block: the derived `site`
   fields and every brand, navigation, API and AI default spelled out.
@@ -737,7 +745,11 @@ and the affected tests green, each stopped at for review:
   headless Chrome.
 - The watcher's comparison must be on the resolved config, not the file text:
   the plugin writers re-serialise the whole file, so a text diff would re-apply
-  on every `sdk publish`.
+  on every `sdk publish`. *Done in step 6* by comparing the generated files'
+  contents. Also verified then against a running dev server: rewriting both
+  files changes the name, preset and primary on the next load, with no
+  restart. An already-open tab relies on Vite's own module and CSS updates for
+  the same files, and was not checked separately.
 - Whether the one-entry sidebar on the Home tab grates enough to hide it. Docs
   has `sidebar.enabled`; notebook and glass do not. Deferred.
 

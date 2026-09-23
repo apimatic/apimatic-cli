@@ -9,6 +9,7 @@ import { FilePath } from '../types/file/filePath.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
 import { PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
+import { errorMessage } from '../utils/error-utils.js';
 import { FileService } from './file-service.js';
 
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
@@ -187,19 +188,46 @@ export class PortalProjectService {
   }
 
   /**
+   * Brings a running preview up to date with an edited `portal` block: the dev server picks
+   * the two files up and reloads the browser. Each is written only when its contents change,
+   * so an edit that leaves the site as it was -- a plugin command rewriting its own block --
+   * reloads nothing, and the answer says whether anything was written.
+   */
+  public async applyConfig(projectDirectory: DirectoryPath, config: PortalConfig): Promise<Result<boolean, string>> {
+    try {
+      let written = false;
+      for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
+        const current = (await this.fileService.fileExists(file)) ? await this.fileService.getContents(file) : null;
+        if (current !== contents) {
+          await this.fileService.writeContents(file, contents);
+          written = true;
+        }
+      }
+      return ok(written);
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+
+  private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {
+    for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
+      await this.fileService.writeContents(file, contents);
+    }
+  }
+
+  /**
    * The two files that carry what the `portal` block says about the site's look and identity.
    * The browser imports `portal.identity.json` whole, since a retained JSON module is not
    * tree-shaken per property, which is why it holds nothing that addresses this machine.
    */
-  private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {
-    await this.fileService.writeContents(
-      new FilePath(projectDirectory, new FileName(IDENTITY_FILE_NAME)),
-      JSON.stringify(config.identity(), null, 2)
-    );
-    await this.fileService.writeContents(
-      new FilePath(projectDirectory.join('src').join('styles'), new FileName(STYLESHEET_FILE_NAME)),
-      PortalStylesheet.of(config).toString()
-    );
+  private appearanceFiles(projectDirectory: DirectoryPath, config: PortalConfig): [FilePath, string][] {
+    return [
+      [new FilePath(projectDirectory, new FileName(IDENTITY_FILE_NAME)), JSON.stringify(config.identity(), null, 2)],
+      [
+        new FilePath(projectDirectory.join('src').join('styles'), new FileName(STYLESHEET_FILE_NAME)),
+        PortalStylesheet.of(config).toString()
+      ]
+    ];
   }
 
   private async substitute(file: FilePath, placeholder: string, literal: string): Promise<void> {
