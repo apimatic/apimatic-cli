@@ -68,7 +68,7 @@ called); the backend change itself.
 | Quickstart on an existing file | Does not arise in this PR. Quickstart refuses a non-empty input directory, so it always creates the file. Adopting a directory that already holds an `apimatic.json` is the next PR of the series (section 1). |
 | Backend contract | Changed, not kept. The server reads `plugin` and `languages` from the `apimatic.json` in the uploaded `src/`; it is being changed alongside this PR, which merges only once it does. No `plugin-config.json` is synthesized into the upload and no compatibility is kept (decided 2026-09-22, section 11). |
 | Uploads | `sdk generate` and `plugin generate` zip `src/` wholesale, as today, so both now carry `apimatic.json` with its portal block. The backend change above covers it; nothing is verified against the server beforehand. |
-| Release | The move is breaking, but this commit is an ordinary `feat:`; the `BREAKING CHANGE:` footer rides on the last PR of the series (decided 2026-09-22, section 11). That footer names what users lose: `src/plugin-config.json`, and the 1.x portal — the `APIMATIC-BUILD.json` portal settings and the `portal copilot`, `portal recipe new` and `portal toc new` commands, which #343 removed with an empty commit body. Until that PR lands, `dev` is not merged into `main`: `release.config.cjs` cuts the version from footers, nothing on `dev` carries one, and npm `latest` is 1.5.0, so a merge today would ship the half-moved portal as 1.6.0. PRs into `dev` are squash-merged and commitlint never sees the squash message, so the footer goes in that PR's description too and is checked at merge time. The `1.x` branch in `release.config.cjs` carries 1.x fixes afterwards; it does not exist yet and is created from `v1.5.0` when first needed. |
+| Release | The move is breaking, but this commit is an ordinary `feat:`; the `BREAKING CHANGE:` footer rides on the last PR of the series (decided 2026-09-22, section 11). That footer names what users lose: `src/plugin-config.json`, and the 1.x portal — the `APIMATIC-BUILD.json` portal settings and the `portal copilot`, `portal recipe new` and `portal toc new` commands, which #343 removed with an empty commit body. Until that PR lands, `dev` is not merged into `main`. Since 2026-09-23 `dev` carries a breaking marker of its own (#347, `build!:` for Node 24), so its next release is 2.0.0 regardless; the guard now protects the notes and the half-moved portal, not the version number. PRs into `dev` are squash-merged and commitlint never sees the squash message, so the footer goes in that PR's description too and is checked at merge time. The `1.x` branch in `release.config.cjs` carries 1.x fixes afterwards; it does not exist yet and is created from `v1.5.0` when first needed. |
 
 Rejected:
 
@@ -346,11 +346,14 @@ language and returns success.
   one already published, which the user has to notice themselves. This is the
   breaking change of the move and it ships in a major (section 2), carried by
   the release notes.
-- **`dev` merged into `main` mid-series.** Nothing on `dev` carries a
-  `BREAKING CHANGE:` footer — #343 removed the 1.x portal with an empty commit
-  body — so a merge before the last PR ships the whole line as 1.6.0, with the
-  Fumadocs portal and this move unnamed in the notes. The release row in
-  section 2 is the guard; the PR description repeats it.
+- **`dev` merged into `main` mid-series.** Until 2026-09-23 nothing on `dev`
+  carried a `BREAKING CHANGE:` footer — #343 removed the 1.x portal with an
+  empty commit body — so a merge before the last PR would have shipped the
+  whole line as 1.6.0. #347 (`build!:`, Node 24) now carries one, so the version
+  is 2.0.0 either way; what a mid-series merge would still ship is the
+  half-moved portal, with the Fumadocs portal and this move unnamed in the
+  notes. The release row in section 2 is the guard; the PR description repeats
+  it.
 - **Formatting churn on a shared file.** Preserving indentation and the
   trailing newline is new: today's plugin writer is a bare
   `JSON.stringify(config, null, 2)` with no trailing newline, and the portal
@@ -600,9 +603,12 @@ BREAKING CHANGE: `src/plugin-config.json` is replaced by the `plugin` and
 > and no compatibility is kept; a project with an old `plugin-config.json`
 > records its SDKs and identity again.
 >
-> **Do not merge `dev` into `main` until the series ends.** This commit is an
-> ordinary `feat:`; the `BREAKING CHANGE:` footer rides on the last PR, and
-> nothing on `dev` carries one today, so an early merge ships as 1.6.0.
+> **Do not merge `dev` into `main` until the series ends.** `dev` already
+> carries a breaking marker (#347, Node 24), so its next release is 2.0.0
+> whatever this PR does; the reason to wait is that a half-finished series
+> would ship, with `src/portal.json` gone and `quickstart` not yet adopting an
+> existing `apimatic.json`. This commit is an ordinary `feat:`; the
+> `BREAKING CHANGE:` footer that describes the config move rides on the last PR.
 >
 > First of a series: next, quickstart adopts a directory that already holds an
 > `apimatic.json`; then `portal generate` and `plugin generate` require a
