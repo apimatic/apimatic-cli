@@ -12,7 +12,13 @@ import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
 import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
-import { PortalScaffoldProblem, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import {
+  MissingStaticFile,
+  PortalScaffoldProblem,
+  PortalSource,
+  PortalSourceProblem,
+  PortalSpec
+} from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -211,14 +217,51 @@ export class PortalSourceContext {
     return ok(config.value);
   }
 
-  private async missingStaticFiles(config: PortalConfig): Promise<{ setting: string; path: string }[]> {
-    const missing: { setting: string; path: string }[] = [];
+  private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {
+    const missing: MissingStaticFile[] = [];
     for (const asset of config.staticFiles()) {
-      if (!(await this.fileService.fileExists(this.resolveInSource(asset.sourcePath())))) {
-        missing.push({ setting: asset.settingPath(), path: asset.sourcePath() });
+      const file = asset.resolveIn(this.sourceDirectory);
+      const found = await this.spelledOnDisk(file);
+      if (found === null || found.toString() !== file.toString()) {
+        missing.push({ setting: asset.settingPath(), file, foundAs: found });
       }
     }
     return missing;
+  }
+
+  /**
+   * The file as it is spelt on disk, or null when it is not there in any case. Every name on
+   * the way from `src/` is looked up by code point first, as the hosts portals are published
+   * to look it up, because on Windows and macOS `Logo.PNG` also opens `logo.png`.
+   */
+  private async spelledOnDisk(file: FilePath): Promise<FilePath | null> {
+    const names = file.relativeTo(this.sourceDirectory).split('/');
+    const fileName = names.pop() ?? '';
+    let directory = this.sourceDirectory;
+    for (const name of names) {
+      const subdirectories = await this.fileService.getSubDirectoriesPaths(directory);
+      const match = PortalSourceContext.spelling(
+        name,
+        subdirectories.map((subdirectory) => subdirectory.leafName())
+      );
+      if (match === undefined) {
+        return null;
+      }
+      directory = directory.join(match);
+    }
+    const fileNames = await this.fileService.getFileNames(directory);
+    const match = PortalSourceContext.spelling(
+      fileName,
+      fileNames.map((candidate) => candidate.toString())
+    );
+    return match === undefined ? null : new FilePath(directory, new FileName(match));
+  }
+
+  private static spelling(name: string, candidates: string[]): string | undefined {
+    return (
+      candidates.find((candidate) => candidate === name) ??
+      candidates.find((candidate) => candidate.toLowerCase() === name.toLowerCase())
+    );
   }
 
   /**
@@ -227,17 +270,18 @@ export class PortalSourceContext {
    * the `languages` block, which names the project's SDK languages and which the user adds
    * by hand until the wizard asks for them. Every fault is reported rather than thrown,
    * including the ones the file service raises: the caller is a wizard that has asked its
-   * questions already, and it reports what went wrong instead of crashing.
+   * questions already, and it reports what went wrong instead of crashing. `schemaUrl` is
+   * the address the file names its schema by, which depends on the running CLI's version.
    */
-  public async scaffold(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
+  public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<void, PortalScaffoldProblem>> {
     try {
-      return await this.writeSourceTree(specPath);
+      return await this.writeSourceTree(specPath, schemaUrl);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
   }
 
-  private async writeSourceTree(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
+  private async writeSourceTree(specPath: FilePath, schemaUrl: string): Promise<Result<void, PortalScaffoldProblem>> {
     await new SpecContext(this.specDirectory).install(specPath);
 
     const site = await this.suggestedSite(specPath);
@@ -246,7 +290,7 @@ export class PortalSourceContext {
     // Every default is spelled out, so the block shows what can be set, and the schema lets an
     // editor complete and check the rest.
     const written = await this.configContext.merge(['portal'], (document) =>
-      document.referencingSchema().with('portal', config.toJSON())
+      document.referencingSchema(schemaUrl).with('portal', config.toJSON())
     );
     if (written.isErr()) {
       return err({ kind: written.error === 'unreadable' ? 'configUnreadable' : 'configUnwritable' });
@@ -285,16 +329,6 @@ export class PortalSourceContext {
     }
     const document = await this.readDocument(specPath);
     return document === undefined ? PLACEHOLDER_SITE : document.suggestedSite();
-  }
-
-  /** A `/`-separated path relative to `src/`, as `PortalConfig` reports it, as a file path. */
-  private resolveInSource(relativePath: string): FilePath {
-    const segments = relativePath.split('/');
-    const fileName = new FileName(segments.pop() ?? '');
-    return new FilePath(
-      segments.reduce((directory, segment) => directory.join(segment), this.sourceDirectory),
-      fileName
-    );
   }
 
   /**

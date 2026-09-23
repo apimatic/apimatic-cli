@@ -3,11 +3,12 @@
 Status: in progress, 2026-09-22. Branch `saeedjamshaid/apimatic-config`, cut from `dev`.
 
 **Amended 2026-09-23** by `.ai/plans/portal-config.md`, whose PR changes this
-plan in four places, each noted where it applies: the `portal generate` half of
+plan in five places, each noted where it applies: the `portal generate` half of
 "requires a `languages` entry" lands in that PR (section 1); the portal path
-now reads `languages` findings (section 2); its portal-config bullet is
-superseded (section 10); and the release notes name the new `portal`
-namespaces and the `languages` requirement (section 13).
+now reads `languages` findings, and an unknown `portal` key gets no near-miss
+hint (section 2); its portal-config bullet is superseded (section 10); and the
+release notes name the new `portal` namespaces and the `languages` requirement
+(section 13).
 
 ## 1. Goal and scope
 
@@ -67,7 +68,7 @@ called); the backend change itself.
 | `schemaVersion` | Optional. Accepted when absent or `1`. Any other value is an error naming the CLI version that reads it, so a future format is refused rather than misread. Written by the create path only (writer row). |
 | `$schema` | Accepted and ignored, as the portal-config plan already says. Not written by the scaffold until the schema file exists. *(Amended 2026-09-23: `apimatic.schema.json` exists, and the quickstart scaffold writes `$schema` first in the file; files the plugin and publishing commands create do not carry it.)* |
 | Ownership per block | `portal` is user-authored. In this release the CLI writes it once, from quickstart, and never again; the quickstart PR that adopts an existing directory (section 1) writes it into a file that already exists, which is why the writer below knows no block. `plugin` and `languages` are shared, as `plugin-config.json` was designed to be: the user may edit them and the CLI merges into them after `plugin generate` and `sdk publish`. |
-| Validation per block | `portal` keeps today's strictness: every field validated, unknown fields reported with the near-miss hint. `plugin` and `languages` keep today's leniency: shape checks that protect the merge, unknown fields preserved, and the two `plugin` checks that make the file `unreadable` today — `PLUGIN_ID_PATTERN` on `pluginId`, semver on `pluginVersion` — kept as `plugin` findings (decided 2026-09-22, section 11). The two policies already exist; they now apply to blocks instead of files. |
+| Validation per block | `portal` keeps today's strictness: every field validated, unknown fields reported with the near-miss hint. `plugin` and `languages` keep today's leniency: shape checks that protect the merge, unknown fields preserved, and the two `plugin` checks that make the file `unreadable` today — `PLUGIN_ID_PATTERN` on `pluginId`, semver on `pluginVersion` — kept as `plugin` findings (decided 2026-09-22, section 11). The two policies already exist; they now apply to blocks instead of files. *(Amended 2026-09-23: the near-miss hints are gone. An unknown `portal` key is reported by its dotted path with no hint, as the portal-config plan decides for keys that never shipped.)* |
 | Byte-order mark | Stripped, then parsed. `portal.json` strips one today and `plugin-config.json` refuses one as `unreadable`; with one file the parser has to pick, and stripping is the only choice that cannot break a project that works today. The plugin path's byte-order-mark `reason` is deleted. Windows is where a byte-order mark comes from — Notepad and PowerShell redirection write it — and it is now the portal's file too. Reading past a mark is enough only while the file stays here: `plugin generate` zips `src/` and sends it to a parser that is not this one, so that path takes the mark off the file before the zip (section 6). Only the mark is removed; the rest of the file is written back byte for byte, so a layout the CLI never chose survives a rewrite it never asked for. |
 | Unknown root keys | Ignored, and preserved untouched by the writers — the same leniency `plugin` and `languages` get, for the same reason: a file written by a later CLI that adds a root block must still be readable by this one, which is what `schemaVersion` exists to gate instead. No near-miss hint at the root; a misspelled block is reported only as the required block being absent. |
 | A required block is absent | Reported by the command that needs it, naming the block and nothing else: `'portal' is required`. That is the whole root-level report, so a user who wrote `portla` is told what is missing rather than what is unrecognised. |

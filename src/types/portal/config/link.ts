@@ -1,8 +1,10 @@
 import { err, ok, Result } from 'neverthrow';
-import { UrlPath } from '../../file/urlPath.js';
-import { allOf, isJsonObject, nonEmptyString, Parsed, unknownKeys } from './fields.js';
+import { allOf, isJsonObject, isWebAddress, nonEmptyString, Parsed, unknownKeys } from './fields.js';
 
 const KNOWN = ['label', 'url'];
+
+/** Stands in for the portal's own address, which is not known here; `.invalid` never resolves (RFC 6761). */
+const PORTAL_ORIGIN = 'https://portal.invalid';
 
 /** A labelled link in the portal's chrome: a header link, or the home page's call to action. */
 export class Link {
@@ -47,14 +49,26 @@ export class Link {
   // sits on, and a `mailto:` or `javascript:` address is not somewhere a header link belongs.
   private static validUrl(url: unknown, path: string): Parsed<{ url: string; external: boolean }> {
     const text = typeof url === 'string' ? url.trim() : '';
-    if (text.startsWith('/') && !text.startsWith('//')) {
-      return ok({ url: text, external: false });
+    const page = text.startsWith('/') ? Link.pageOfThePortal(text) : undefined;
+    if (page !== undefined) {
+      return ok({ url: page, external: false });
     }
-    if (UrlPath.create(text) !== undefined) {
+    if (!text.startsWith('/') && isWebAddress(text)) {
       return ok({ url: text, external: true });
     }
     return err([
       `'${path}' must be a page of the portal starting with '/', or an address starting with 'https://' or 'http://'.`
     ]);
+  }
+
+  // Resolved as a browser resolves it, against an origin no link can name: `//host`, `/\host`
+  // and a slash followed by a tab all start with '/' and still lead to another site.
+  private static pageOfThePortal(text: string): string | undefined {
+    try {
+      const resolved = new URL(text, PORTAL_ORIGIN);
+      return resolved.origin === PORTAL_ORIGIN ? `${resolved.pathname}${resolved.search}${resolved.hash}` : undefined;
+    } catch {
+      return undefined;
+    }
   }
 }

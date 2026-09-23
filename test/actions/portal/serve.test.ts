@@ -70,7 +70,9 @@ describe('PortalServeAction', () => {
       );
     authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
     // Never a real watch: most tests serve the shared fixture, which nothing may edit.
-    watch = sinon.stub(FileWatchService.prototype, 'watch').returns(ok({ close: sinon.stub() }));
+    watch = sinon
+      .stub(FileWatchService.prototype, 'watch')
+      .returns(ok({ close: sinon.stub().resolves(), recheck: sinon.stub() }));
   });
 
   afterEach(() => {
@@ -187,19 +189,22 @@ describe('PortalServeAction', () => {
   describe('re-applying apimatic.json', () => {
     let source: DirectoryPath;
     let save: (config: object) => Promise<void>;
-    let watched: Promise<() => Promise<void>>;
+    let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
     let closeWatch: sinon.SinonStub;
+    let recheck: sinon.SinonStub;
     let projectDirectory: DirectoryPath;
 
     const originalConfig = () => JSON.parse(fs.readFileSync(path.join(FIXTURE.toString(), 'apimatic.json'), 'utf8'));
     const readProject = (relative: string) => fs.readFileSync(path.join(projectDirectory.toString(), relative), 'utf8');
+    const writeConfig = (config: object) =>
+      fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
     const whileServing = async (body: () => Promise<void>) => {
       const running = execute(source);
-      const onChange = await watched;
+      const { onChange } = await watched;
       save = async (config: object) => {
-        fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
+        writeConfig(config);
         await onChange();
       };
       try {
@@ -225,23 +230,52 @@ describe('PortalServeAction', () => {
         }
       );
 
-      closeWatch = sinon.stub();
+      closeWatch = sinon.stub().resolves();
+      recheck = sinon.stub();
       watched = new Promise((resolve) => {
-        watch.callsFake((directory: DirectoryPath, fileName: FileName, onChange: () => Promise<void>) => {
-          expect(directory.toString()).to.equal(source.toString());
-          expect(fileName.toString()).to.equal('apimatic.json');
-          resolve(onChange);
-          return ok({ close: closeWatch });
-        });
+        watch.callsFake(
+          (
+            directory: DirectoryPath,
+            fileName: FileName,
+            onChange: () => Promise<void>,
+            onFailed: (reason: string) => void
+          ) => {
+            expect(directory.toString()).to.equal(source.toString());
+            expect(fileName.toString()).to.equal('apimatic.json');
+            resolve({ onChange, onFailed });
+            return ok({ close: closeWatch, recheck });
+          }
+        );
       });
     });
 
-    it('stops watching when the preview stops', async () => {
+    it('stops watching when the preview stops, before saying it stops', async () => {
       await whileServing(async () => {
         expect(closeWatch.called).to.be.false;
       });
 
-      expect(closeWatch.calledOnce).to.be.true;
+      expect(closeWatch.called).to.be.true;
+      expect(closeWatch.calledBefore(prompts.stopping)).to.be.true;
+    });
+
+    // The file is read before the preview starts, which can take a minute.
+    it('reads the file again once it is watched, for a save made while the preview started', async () => {
+      const exited = new Promise<string>(() => undefined);
+      start.callsFake(async () => {
+        const config = originalConfig();
+        config.portal.brand.colors = { preset: 'ocean' };
+        writeConfig(config);
+        return ok({ url: SERVER_URL, exited, stop });
+      });
+
+      await whileServing(async () => {
+        expect(recheck.calledOnce).to.be.true;
+        // What the watch does on a recheck: handle the file as though it had just been saved.
+        await (await watched).onChange();
+
+        expect(readProject('src/styles/theme.css')).to.contain("@import 'fumadocs-ui/css/ocean.css';");
+        expect(prompts.configApplied.calledOnce).to.be.true;
+      });
     });
 
     it('rewrites both of the preview’s files for a brand change, and says so', async () => {
@@ -284,26 +318,39 @@ describe('PortalServeAction', () => {
         await save(config);
 
         const [problem, directory] = prompts.configRejected.firstCall.args;
-        expect(problem).to.deep.equal({
-          kind: 'missingStaticFiles',
-          files: [{ setting: 'portal.brand.favicon', path: 'static/missing.ico' }]
-        });
+        expect(problem.kind).to.equal('missingStaticFiles');
+        const files = problem.kind === 'missingStaticFiles' ? problem.files : [];
+        expect(files.map(({ setting, file, foundAs }) => [setting, file.relativeTo(source), foundAs])).to.deep.equal([
+          ['portal.brand.favicon', 'static/missing.ico', null]
+        ]);
         expect(directory.toString()).to.equal(source.toString());
         expect([readProject('portal.identity.json'), readProject('src/styles/theme.css')]).to.deep.equal(before);
       });
     });
 
-    it('reports an invalid edit, and hears it accepted once it is fixed back', async () => {
+    it('reports an invalid edit, keeps the last good files, and hears it accepted once it is fixed back', async () => {
       await whileServing(async () => {
+        const before = [readProject('portal.identity.json'), readProject('src/styles/theme.css')];
         const broken = originalConfig();
         broken.portal.brand.colorMode = 'sepia';
+        broken.portal.site.name = 'Renamed API';
 
         await save(broken);
         expect(prompts.configRejected.firstCall.args[0].kind).to.equal('invalidConfig');
         expect(prompts.configApplied.called).to.be.false;
+        expect([readProject('portal.identity.json'), readProject('src/styles/theme.css')]).to.deep.equal(before);
 
         await save(originalConfig());
         expect(prompts.configApplied.calledOnce).to.be.true;
+      });
+    });
+
+    it('reports a file removed while the preview runs', async () => {
+      await whileServing(async () => {
+        fs.rmSync(path.join(source.toString(), 'apimatic.json'));
+        await (await watched).onChange();
+
+        expect(prompts.configRejected.firstCall.args[0]).to.deep.equal({ kind: 'missingConfig' });
       });
     });
 
@@ -318,6 +365,79 @@ describe('PortalServeAction', () => {
 
         expect(prompts.restartNeeded.calledOnce).to.be.true;
         expect(JSON.parse(readProject('portal.identity.json')).pageActions).to.be.false;
+      });
+    });
+
+    // Changed back, the preview is what the file says again; changed once more, it is not.
+    it('says nothing when portal.api goes back to what the preview runs with, and says so again after', async () => {
+      await whileServing(async () => {
+        const regrouped = originalConfig();
+        regrouped.portal.api = { groupBy: 'route' };
+
+        await save(regrouped);
+        await save(originalConfig());
+        expect(prompts.restartNeeded.calledOnce).to.be.true;
+
+        await save(regrouped);
+        expect(prompts.restartNeeded.calledTwice).to.be.true;
+      });
+    });
+
+    // Vite reads its public directory once, and one missing at startup is served as none.
+    it('says once that the files of a static directory made while it runs need a restart', async () => {
+      fs.rmSync(path.join(source.toString(), 'static'), { recursive: true });
+      const config = originalConfig();
+      delete config.portal.brand;
+      writeConfig(config);
+
+      await whileServing(async () => {
+        fs.mkdirSync(path.join(source.toString(), 'static'));
+        fs.writeFileSync(path.join(source.toString(), 'static', 'logo.png'), 'x');
+        const branded = { ...config, portal: { ...config.portal, brand: { logo: 'static/logo.png' } } };
+
+        await save(branded);
+        await save({ ...branded, portal: { ...branded.portal, ai: { pageActions: false } } });
+
+        expect(prompts.staticDirectoryNotServed.calledOnce).to.be.true;
+        expect(prompts.staticDirectoryNotServed.firstCall.args[0].toString()).to.equal(source.toString());
+        expect(JSON.parse(readProject('portal.identity.json')).logo).to.deep.equal({
+          light: '/logo.png',
+          dark: '/logo.png'
+        });
+      });
+    });
+
+    it('says nothing of the static directory when it was there at startup', async () => {
+      await whileServing(async () => {
+        // The logo is in the static directory, which the fixture has.
+        const config = originalConfig();
+        config.portal.site.name = 'Renamed API';
+
+        await save(config);
+
+        expect(prompts.staticDirectoryNotServed.called).to.be.false;
+        expect(prompts.configApplied.calledOnce).to.be.true;
+      });
+    });
+
+    it('reports a change it could not write to the preview', async () => {
+      await whileServing(async () => {
+        sinon.stub(PortalProjectService.prototype, 'applyConfig').resolves(err('EACCES: permission denied'));
+        const config = originalConfig();
+        config.portal.site.name = 'Renamed API';
+
+        await save(config);
+
+        expect(prompts.configNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
+        expect(prompts.configApplied.called).to.be.false;
+      });
+    });
+
+    it('tells the user when the file stops being watched', async () => {
+      await whileServing(async () => {
+        (await watched).onFailed('EPERM: operation not permitted');
+
+        expect(prompts.configWatchFailed.calledOnceWith('EPERM: operation not permitted')).to.be.true;
       });
     });
 

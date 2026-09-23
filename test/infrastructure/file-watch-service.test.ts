@@ -1,7 +1,9 @@
+import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import sinon from 'sinon';
 import { FileWatch, FileWatchService, SETTLE_MS } from '../../src/infrastructure/file-watch-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
@@ -30,8 +32,8 @@ describe('FileWatchService', () => {
     await settled();
   };
 
-  const watchFile = (onChange: () => Promise<void>) => {
-    watch = service.watch(new DirectoryPath(root), new FileName('apimatic.json'), onChange)._unsafeUnwrap();
+  const watchFile = (onChange: () => Promise<void>, onFailed: (reason: string) => void = () => undefined) => {
+    watch = service.watch(new DirectoryPath(root), new FileName('apimatic.json'), onChange, onFailed)._unsafeUnwrap();
   };
 
   beforeEach(async () => {
@@ -115,6 +117,78 @@ describe('FileWatchService', () => {
     expect(overlapped).to.be.false;
   });
 
+  // The one handled next reads the file as the last of them left it.
+  it('handles the saves made while one is being handled once, however many there were', async () => {
+    let calls = 0;
+    watchFile(async () => {
+      calls += 1;
+      await pause(SETTLE_MS * 8);
+    });
+
+    fs.writeFileSync(file(), '{"a":1}');
+    await waitFor(() => calls >= 1);
+    for (const contents of ['{"a":2}', '{"a":3}', '{"a":4}']) {
+      fs.writeFileSync(file(), contents);
+      await pause(SETTLE_MS * 2);
+    }
+    await until(() => calls >= 2);
+    await pause(SETTLE_MS * 8);
+
+    expect(calls).to.equal(2);
+  });
+
+  it('keeps reporting after a save whose handling fails', async () => {
+    let calls = 0;
+    watchFile(async () => {
+      calls += 1;
+      throw new Error('the handler broke');
+    });
+
+    fs.writeFileSync(file(), '{"a":1}');
+    await waitFor(() => calls >= 1);
+    fs.writeFileSync(file(), '{"a":2}');
+    await until(() => calls >= 2);
+
+    expect(calls).to.equal(2);
+  });
+
+  it('handles the file on request, as though it had just been saved', async () => {
+    let calls = 0;
+    watchFile(async () => {
+      calls += 1;
+    });
+
+    watch?.recheck();
+    await until(() => calls >= 1);
+
+    expect(calls).to.equal(1);
+  });
+
+  it('says why when the watch fails once running, and reports nothing after', async () => {
+    const watcher = Object.assign(new EventEmitter(), { close: sinon.stub() });
+    const fsWatch = sinon.stub(fs, 'watch').returns(watcher as unknown as fs.FSWatcher);
+    const failures: string[] = [];
+    let calls = 0;
+    try {
+      watchFile(
+        async () => {
+          calls += 1;
+        },
+        (reason) => failures.push(reason)
+      );
+
+      watcher.emit('error', new Error('EPERM: operation not permitted'));
+      watch?.recheck();
+      await settled();
+    } finally {
+      fsWatch.restore();
+    }
+
+    expect(failures).to.deep.equal(['EPERM: operation not permitted']);
+    expect(watcher.close.calledOnce).to.be.true;
+    expect(calls).to.equal(0);
+  });
+
   it('reports nothing once closed, not even a save already settling', async () => {
     let calls = 0;
     watchFile(async () => {
@@ -151,7 +225,8 @@ describe('FileWatchService', () => {
       new FileName('apimatic.json'),
       async () => {
         /* never called */
-      }
+      },
+      () => undefined
     );
 
     expect(result.isErr()).to.be.true;

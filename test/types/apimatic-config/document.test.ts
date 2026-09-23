@@ -4,7 +4,8 @@ import {
   ApimaticConfigDocument,
   ConfigFinding,
   findingClause,
-  findingSentences
+  findingSentences,
+  schemaUrlFor
 } from '../../../src/types/apimatic-config/document';
 
 describe('ApimaticConfigDocument', () => {
@@ -247,8 +248,8 @@ describe('ApimaticConfigDocument', () => {
   });
 
   describe('referencingSchema', () => {
-    it('points at the published schema, first among the keys', () => {
-      const next = ApimaticConfigDocument.empty().referencingSchema().with('portal', {});
+    it('points at the schema it is given, first among the keys', () => {
+      const next = ApimaticConfigDocument.empty().referencingSchema(APIMATIC_SCHEMA_URL).with('portal', {});
 
       expect(next.serialize('  ', true)).to.equal(
         `{\n  "$schema": "${APIMATIC_SCHEMA_URL}",\n  "schemaVersion": 1,\n  "portal": {}\n}\n`
@@ -256,10 +257,30 @@ describe('ApimaticConfigDocument', () => {
     });
 
     it('replaces a reference the file already held, and moves it first', () => {
-      const next = parsedObject({ schemaVersion: 1, $schema: './old.schema.json' }).referencingSchema();
+      const next = parsedObject({ schemaVersion: 1, $schema: './old.schema.json' }).referencingSchema(
+        APIMATIC_SCHEMA_URL
+      );
 
       expect(JSON.parse(next.serialize('  ', false))).to.deep.equal({ $schema: APIMATIC_SCHEMA_URL, schemaVersion: 1 });
       expect(Object.keys(JSON.parse(next.serialize('  ', false)))).to.deep.equal(['$schema', 'schemaVersion']);
+    });
+  });
+
+  // jsDelivr resolves `@2` to the newest stable 2.x and never to a prerelease.
+  describe('schemaUrlFor', () => {
+    it('names the major for a stable release', () => {
+      expect(schemaUrlFor('2.0.0')).to.equal(APIMATIC_SCHEMA_URL);
+      expect(schemaUrlFor('2.4.1')).to.equal(APIMATIC_SCHEMA_URL);
+    });
+
+    it('names the exact version for a prerelease, which no range reaches', () => {
+      expect(schemaUrlFor('2.0.0-beta.3')).to.equal(
+        'https://cdn.jsdelivr.net/npm/@apimatic/cli@2.0.0-beta.3/apimatic.schema.json'
+      );
+    });
+
+    it('names the major when the version cannot be read', () => {
+      expect(schemaUrlFor('unknown')).to.equal(APIMATIC_SCHEMA_URL);
     });
   });
 

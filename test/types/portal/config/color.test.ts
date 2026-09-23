@@ -21,9 +21,28 @@ describe('Color', () => {
         'rgb(10%, 30%, 85%)',
         'hsl(221, 83%, 53%)',
         'hsla(221, 83%, 53%, 0.8)',
-        'hsl(221deg 83% 53% / 0.8)'
+        'hsl(221deg 83% 53% / 0.8)',
+        // The space form may mix numbers and percentages, and take bare numbers for hsl.
+        'rgb(10% 30 85%)',
+        'hsl(221 83 53)',
+        'hsl(0.5turn 50% 50%)'
       ]) {
         color(value);
+      }
+    });
+
+    it('reads a hue in any of the units CSS takes', () => {
+      const luminance = (value: string) => color(value).luminance();
+
+      expect(luminance('hsl(0.5turn 100% 50%)')).to.be.closeTo(luminance('hsl(180, 100%, 50%)'), 1e-9);
+      expect(luminance('hsl(200grad 100% 50%)')).to.be.closeTo(luminance('hsl(180, 100%, 50%)'), 1e-9);
+      expect(luminance(`hsl(${Math.PI}rad 100% 50%)`)).to.be.closeTo(luminance('hsl(180, 100%, 50%)'), 1e-9);
+    });
+
+    // A browser drops each of these as invalid, and every use of the primary with it.
+    it('refuses what CSS refuses in the comma form', () => {
+      for (const value of ['rgb(10%, 30, 85%)', 'rgba(29, 78%, 216, 0.5)', 'hsl(221, 83, 53%)']) {
+        expect(Color.create(value), value).to.be.undefined;
       }
     });
 
@@ -39,6 +58,8 @@ describe('Color', () => {
         'rgb(1 2 3 / 2)',
         'hsl(221, 83, 53)',
         'hsl(221, 101%, 53%)',
+        'hsl(221 101 53)',
+        'hsl(1turns 50% 50%)',
         ''
       ]) {
         expect(Color.create(value), value).to.be.undefined;

@@ -40,13 +40,18 @@ const HOME_URL = docsRoute;
 /**
  * The tabs no folder backs, which the transformer assembles from loose nodes. Their names are
  * fixed, and so are their ids: React keys and the tree context's tab matching both go by id,
- * and the tree is serialised and rebuilt on its way to the browser.
+ * and the tree is serialised and rebuilt on its way to the browser. Fumadocs ids a node by its
+ * path relative to the content directory, which never starts with a slash, so these cannot be
+ * taken by a directory of the same name.
  */
 const SYNTHETIC_TABS = {
-  home: { $id: 'tab:home', name: 'Home' },
-  guides: { $id: 'tab:guides', name: 'Guides' },
-  sdks: { $id: 'tab:sdks', name: 'SDKs' }
+  home: { $id: '/tab/home', name: 'Home' },
+  guides: { $id: '/tab/guides', name: 'Guides' },
+  sdks: { $id: '/tab/sdks', name: 'SDKs' }
 } as const;
+
+/** The node the fallback home page gets when there is no index page; see `groupIntoTabs`. */
+const SYNTHETIC_HOME_ID = '/page/home';
 
 type SyntheticTab = keyof typeof SYNTHETIC_TABS;
 
@@ -197,13 +202,24 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   // node reaches it: it would sit outside every tab and show no tab bar at all. It gets one
   // here -- unless the address is taken deeper down, as by an index page in a `(group)`
   // folder, since the same URL may appear only once in the tree.
-  if (!synthetic.has('home') && !containsUrl(children, HOME_URL)) {
-    gather('home', { type: 'page', $id: 'page:home', name: SYNTHETIC_TABS.home.name, url: HOME_URL });
+  const hasIndexPage = synthetic.has('home');
+  if (!hasIndexPage && !containsUrl(children, HOME_URL)) {
+    gather('home', { type: 'page', $id: SYNTHETIC_HOME_ID, name: SYNTHETIC_TABS.home.name, url: HOME_URL });
   }
 
-  // The home page opens the site, so its tab leads unless the file placed the page itself.
+  // Fumadocs points a tab at the page with the same path inside the tab being left, when
+  // there is one, and finds it through the folders' `$ref`. Between tabs that is the wrong
+  // page -- `/api/overview` from `/tutorials/overview` -- so a tab always opens where its
+  // own list starts. Nothing past this transformer reads a folder's `$ref`.
+  for (const tab of tabs) {
+    delete tab.$ref;
+  }
+
+  // The home page opens the site, so its tab leads unless the file placed the page itself --
+  // which it can only do when there is an index page: without one, an `index` entry names a
+  // folder of that name.
   const home = synthetic.get('home');
-  if (home !== undefined && !namesIndex(context)) {
+  if (home !== undefined && !(hasIndexPage && namesIndex(context))) {
     return [home, ...tabs.filter((tab) => tab !== home)];
   }
   return tabs;

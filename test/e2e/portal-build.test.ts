@@ -309,6 +309,11 @@ const stylesheetOf = (output: DirectoryPath) => {
     // The neutral preset's light primary, which nothing in the fixture overrides.
     expect(stylesheetOf(output)).to.match(/--color-fd-primary:#171717/);
   });
+
+  // The counterpart of the branded portal's forced mode: the same label, present here.
+  it('offers the colour-mode switch when both modes are allowed', () => {
+    expect(read('index.html')).to.contain('aria-label="Toggle Theme"');
+  });
 });
 
 /**
@@ -352,9 +357,33 @@ const stylesheetOf = (output: DirectoryPath) => {
     const selectors = overrides.flatMap((rule) => rule[1].split(',').map((selector) => selector.trim()));
 
     expect(presetDark).to.not.equal(-1);
-    expect(selectors).to.include.members([':root:not(.dark)', '.dark']);
+    expect(selectors).to.include.members([
+      ':root:not(.dark)',
+      ':root:not(.dark) #nd-sidebar',
+      '.dark',
+      '.dark #nd-sidebar'
+    ]);
     expect(overrides.every((rule) => (rule.index ?? -1) > presetDark)).to.be.true;
     expect(css).to.contain('--default-font-family:"Inter"');
+  });
+
+  // Mono is the system's own, so only the body family is fetched.
+  it('loads only the fonts that are not the system’s own', () => {
+    const page = read('index.html');
+
+    expect(page).to.contain('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap');
+    expect(page).to.not.contain('family=Geist');
+  });
+
+  it('shows the logo for each mode, and the favicon with its type', () => {
+    const page = read('index.html');
+
+    expect(page).to.match(/<img src="\/logo-light\.svg"[^>]*class="[^"]*dark:hidden/);
+    expect(page).to.match(/<img src="\/logo-dark\.svg"[^>]*class="[^"]*hidden[^"]*dark:block/);
+    expect(page).to.match(/<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
+    expect(exists('logo-dark.svg')).to.be.true;
+    // Classes only the template uses, so they exist only if Tailwind scanned it.
+    expect(stylesheetOf(output)).to.match(/\.dark\\:block/);
   });
 
   // The DOM itself, after hydration, is checked by hand in a browser; the page as served
@@ -366,12 +395,20 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.not.contain('aria-label="Toggle Theme"');
   });
 
+  // The API tab and the sidebar link to the same operation, so the button is matched by its
+  // label as well as its address.
   it('builds a home page without an index page, with the call to action and a tab of its own', () => {
     const page = read('index.html');
+    const tree = fs
+      .readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))
+      .map((name) => fs.readFileSync(path.join(output.toString(), '__tsr/staticServerFnCache', name), 'utf8'))
+      .find((text) => text.includes('"pageTree"'));
 
-    expect(page).to.contain('Browse the pets');
-    expect(page).to.contain('href="/api/pets/pets/listPets"');
+    expect(page).to.match(/<a [^>]*href="\/api\/pets\/pets\/listPets"[^>]*>Browse the pets<\/a>/);
     expect(page).to.contain('href="https://status.example.com"');
+    expect(tree, 'no page tree').to.not.be.undefined;
+    expect(tree).to.contain('/tab/home');
+    expect(tree).to.contain('/page/home');
   });
 
   it('leaves the deprecated and the internal operations out, pages and sidebar alike', () => {

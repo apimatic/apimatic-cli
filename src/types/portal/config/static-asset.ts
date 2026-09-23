@@ -1,4 +1,7 @@
 import { err, ok } from 'neverthrow';
+import { DirectoryPath } from '../../file/directoryPath.js';
+import { FileName } from '../../file/fileName.js';
+import { FilePath } from '../../file/filePath.js';
 import { Parsed } from './fields.js';
 
 const STATIC_PREFIX = 'static/';
@@ -38,18 +41,26 @@ export class StaticAsset {
     return ok(new StaticAsset(value, normalized, path));
   }
 
-  /** Relative to `src/`, with forward slashes. */
-  public sourcePath(): string {
-    return this.relativePath;
+  /** Where the file sits, given the project's `src/` directory. */
+  public resolveIn(sourceDirectory: DirectoryPath): FilePath {
+    const names = this.relativePath.split('/');
+    const fileName = new FileName(names.pop() ?? '');
+    return new FilePath(
+      names.reduce((directory, name) => directory.join(name), sourceDirectory),
+      fileName
+    );
   }
 
   public settingPath(): string {
     return this.setting;
   }
 
-  /** Where the file is served from: the `static/` prefix is the site root. */
+  /**
+   * Where the file is served from: the `static/` prefix is the site root. Each name is escaped,
+   * since a `#`, `?` or `%` in it would otherwise end or alter the path.
+   */
   public siteUrl(): string {
-    return `/${this.relativePath.slice(STATIC_PREFIX.length)}`;
+    return `/${this.relativePath.slice(STATIC_PREFIX.length).split('/').map(encodeURIComponent).join('/')}`;
   }
 
   /** The image type the extension names, or null when it names none a browser is known to take. */
@@ -71,10 +82,14 @@ export class StaticAsset {
     return relativePath.replaceAll('\\', '/').replace(/^\.\//, '');
   }
 
+  // Every name after `static` must be there: `static//logo.png` finds the file on disk, and is
+  // then served as `//logo.png`, which a browser fetches from a host called `logo.png`.
   private static isInsideStatic(normalized: string): boolean {
-    if (!normalized.startsWith(STATIC_PREFIX) || normalized.length === STATIC_PREFIX.length) {
-      return false;
-    }
-    return !normalized.split('/').includes('..');
+    const [first, ...names] = normalized.split('/');
+    return (
+      `${first}/` === STATIC_PREFIX &&
+      names.length > 0 &&
+      names.every((name) => name.trim().length > 0 && name !== '.' && name !== '..')
+    );
   }
 }

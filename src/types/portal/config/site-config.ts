@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../../file/urlPath.js';
-import { allOf, namespace, nonEmptyString, Parsed, unknownKeys } from './fields.js';
+import { allOf, isWebAddress, namespace, nonEmptyString, Parsed, unknownKeys } from './fields.js';
 
 /** What a specification says about itself, which is what a portal is called until the block says otherwise. */
 export interface SuggestedSite {
@@ -103,7 +103,7 @@ export class SiteConfig {
   }
 
   private static parseOrigin(value: string): UrlPath | null {
-    if (UrlPath.create(value) === undefined) {
+    if (!isWebAddress(value)) {
       return null;
     }
     const parsed = new URL(value);

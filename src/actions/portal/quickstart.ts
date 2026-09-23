@@ -15,6 +15,8 @@ import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { envInfo } from '../../infrastructure/env-info.js';
+import { schemaUrlFor } from '../../types/apimatic-config/document.js';
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -35,7 +37,8 @@ export class PortalQuickstartAction {
 
   public readonly execute = async (): Promise<ActionResult> => {
     // Asked before anything is written: the user's next command is `portal serve`, which
-    // refuses on an older Node, and learning that after the wizard leaves a tree to clean up.
+    // refuses an installation missing the portal build's dependencies, and learning that after
+    // the wizard leaves a tree to clean up.
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
       this.prompts.runtimeUnsupported(runtimeProblem);
@@ -151,7 +154,10 @@ export class PortalQuickstartAction {
       }
 
       const sourceDirectory = inputDirectory.join('src');
-      const scaffolded = await new PortalSourceContext(sourceDirectory).scaffold(specPath);
+      const scaffolded = await new PortalSourceContext(sourceDirectory).scaffold(
+        specPath,
+        schemaUrlFor(envInfo.getCLIVersion())
+      );
       if (scaffolded.isErr()) {
         this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
         return ActionResult.failed();

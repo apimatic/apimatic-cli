@@ -262,6 +262,9 @@ export class PortalNavigation {
     if (root === undefined) {
       return [];
     }
+    if (root === false && !PortalNavigation.mayBeTab(context)) {
+      return [`${context.label}: 'root' is false, which sets nothing here. Remove the setting.`];
+    }
     const setting = `${context.label}: 'root' makes a folder a tab of its own`;
     if (context.isContentRoot) {
       return [
@@ -275,7 +278,7 @@ export class PortalNavigation {
     if (!context.isTopLevel) {
       return [
         `${setting}, and only a folder directly under 'content' can be one. Set it in the ` +
-          `${NAVIGATION_FILE_NAME} of that folder instead, or remove it.`
+          `${NAVIGATION_FILE_NAME} of the top-level folder this one sits in, or remove it.`
       ];
     }
     if (!context.becomesFolder) {
@@ -292,7 +295,11 @@ export class PortalNavigation {
 
   /** Whether the file makes its folder a tab, which is only honoured where `rootErrors` allows it. */
   private static isTab(root: unknown, context: NavigationContext): boolean {
-    return root === true && context.isTopLevel && !context.isApiDirectory && context.becomesFolder;
+    return root === true && PortalNavigation.mayBeTab(context);
+  }
+
+  private static mayBeTab(context: NavigationContext): boolean {
+    return context.isTopLevel && !context.isApiDirectory && context.becomesFolder;
   }
 
   private static describeUnknownField(field: string, context: NavigationContext): string {

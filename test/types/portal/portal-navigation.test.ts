@@ -300,8 +300,24 @@ describe('PortalNavigation', () => {
       const nested = { ...tutorials, label: 'content/tutorials/advanced/nav.json', isTopLevel: false };
 
       expect(rootErrors(true, nested)._unsafeUnwrapErr()).to.deep.equal([
-        "content/tutorials/advanced/nav.json: 'root' makes a folder a tab of its own, and only a folder directly under 'content' can be one. Set it in the nav.json of that folder instead, or remove it."
+        "content/tutorials/advanced/nav.json: 'root' makes a folder a tab of its own, and only a folder directly under 'content' can be one. Set it in the nav.json of the top-level folder this one sits in, or remove it."
       ]);
+    });
+
+    // Every folder is already no tab there, so the advice for `true` would mislead.
+    it('calls false a setting that sets nothing wherever a folder cannot be a tab', () => {
+      const places: Partial<NavigationContext>[] = [
+        {},
+        { ...tutorials, label: 'content/tutorials/advanced/nav.json', isTopLevel: false },
+        { ...tutorials, label: 'content/api/nav.json', isApiDirectory: true },
+        { ...tutorials, becomesFolder: false }
+      ];
+
+      for (const place of places) {
+        expect(rootErrors(false, place)._unsafeUnwrapErr(), place.label).to.deep.equal([
+          `${place.label ?? 'content/nav.json'}: 'root' is false, which sets nothing here. Remove the setting.`
+        ]);
+      }
     });
 
     it('refuses it on the API reference, which is always a tab', () => {

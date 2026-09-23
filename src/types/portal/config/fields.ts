@@ -1,7 +1,17 @@
 import { err, ok, Result } from 'neverthrow';
+import { UrlPath } from '../../file/urlPath.js';
+import { unknownFieldErrors } from '../unknown-fields.js';
 
 /** What every field and namespace parser of the `portal` block answers with. */
 export type Parsed<T> = Result<T, string[]>;
+
+/**
+ * An `http:` or `https:` address written out in full. The URL parser also takes
+ * `https:example.com`, which a browser reads on an https site as a path of that site.
+ */
+export function isWebAddress(text: string): boolean {
+  return /^https?:\/\//i.test(text) && UrlPath.create(text) !== undefined;
+}
 
 export function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -18,14 +28,9 @@ export function namespace(value: unknown, path: string): Parsed<Record<string, u
   return isJsonObject(value) ? ok(value) : err([`'${path}' must be a JSON object.`]);
 }
 
-/**
- * The keys of a namespace that the block does not define. A misspelled key is the one mistake
- * that otherwise produces a portal that builds and is quietly wrong, so each is reported.
- */
+/** The keys of a namespace that the block does not define, each named by its dotted path. */
 export function unknownKeys(data: Record<string, unknown>, known: readonly string[], path: string): string[] {
-  return Object.keys(data)
-    .filter((key) => !known.includes(key))
-    .map((key) => `'${path}.${key}' is not a 'portal' setting.`);
+  return unknownFieldErrors(data, new Set(known), (key) => `'${path}.${key}' is not a 'portal' setting.`);
 }
 
 /**
@@ -59,9 +64,11 @@ export function lightDark<T>(
   if (!isJsonObject(value)) {
     return err([`'${path}' must be a string, or an object with 'light' and 'dark'.`]);
   }
+  const mode = (name: 'light' | 'dark'): Parsed<T> =>
+    value[name] === undefined ? err([`'${path}.${name}' is required.`]) : parse(value[name], `${path}.${name}`);
   return allOf(
     unknownKeys(value, ['light', 'dark'], path),
-    Result.combineWithAllErrors([parse(value.light, `${path}.light`), parse(value.dark, `${path}.dark`)])
+    Result.combineWithAllErrors([mode('light'), mode('dark')])
   ).map(([light, dark]) => ({ light, dark, single: false }));
 }
 

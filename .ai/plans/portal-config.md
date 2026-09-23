@@ -6,7 +6,9 @@ sample repository's change is committed on its own branch there and not yet
 pushed. Replaces the 2026-09-21 draft written against `portal.json`; section 14
 records what changed and why, so the older reasoning is not rediscovered.
 Findings made while implementing are marked *as built* or *verified* in the
-section they concern.
+section they concern. A review of the whole branch the same day found gaps in
+input validation, the API filter, tabs and the serve watcher; each fix is
+marked *as reviewed* where its rule is stated.
 
 Builds on `.ai/plans/fumadocs-portal.md` (PR #343), `.ai/plans/portal-navigation.md`
 (`nav.json`, PR #346) and `.ai/plans/apimatic-config.md` (`apimatic.json`,
@@ -176,21 +178,21 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.site.name` | string | `info.title` of the only spec | Required when `spec/` holds two or more specifications, counted as `PortalSourceContext.specs()` counts them: a JSON file with no OpenAPI or Swagger version key, such as `APIMATIC-META.json`, is not one. Header, page titles, `og:site_name`. |
 | `portal.site.url` | string | none | Origin only, as today's `siteUrl`. Enables canonical links, sitemap, robots, absolute `og:url`. |
 | `portal.site.description` | string | first paragraph of `info.description` of the only spec, whitespace-collapsed, capped at 300 characters on a word boundary | Blank is none. A change from today's `OpenApiDocument.suggestedConfig`, which collapses the whole description: a paragraph ends at a blank line, so wrapped prose without one is still whole. |
-| `portal.brand.logo` | string or `{light, dark}` | none | Paths relative to `src/` inside `static/`; a string sets both. Each file must exist. |
-| `portal.brand.favicon` | string | the light logo | Path inside `static/`; must exist. The link's `type` is set when the extension is known. |
+| `portal.brand.logo` | string or `{light, dark}` | none | Paths relative to `src/` inside `static/`; a string sets both. Each file must exist. *As reviewed:* every name on the path must be there and not `.`, since `static//logo.png` finds the file and is then served as `//logo.png`, another host; each name is escaped in the URL; and the file must exist in the case written, since Windows and macOS find `Logo.PNG` for `logo.png` and the host does not. |
+| `portal.brand.favicon` | string | the light logo | Path inside `static/`; must exist. The link's `type` is set when the extension is known. The logo's path rules apply. |
 | `portal.brand.colors.preset` | enum | `neutral` | `neutral`, `black`, `vitepress`, `dusk`, `catppuccin`, `ocean`, `purple`, `solar`, `emerald`, `ruby`, `aspen`. |
-| `portal.brand.colors.primary` | colour or `{light, dark}` | the preset's | A string sets both modes. Formats per section 2. |
+| `portal.brand.colors.primary` | colour or `{light, dark}` | the preset's | A string sets both modes. Formats per section 2, held to CSS's own rules for each: the comma form takes three numbers or three percentages, never a mix, and the space form also takes bare numbers for `hsl()`, and a hue in `deg`, `grad`, `rad` or `turn` (*as reviewed*). |
 | `portal.brand.fonts.body` | enum | `geist` | `geist`, `inter`, `ibm-plex-sans`, `roboto`, `open-sans`, `source-sans-3`, `manrope`, `dm-sans`, `system`. |
 | `portal.brand.fonts.mono` | enum | `geist-mono` | `geist-mono`, `jetbrains-mono`, `ibm-plex-mono`, `fira-code`, `source-code-pro`, `system`. |
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
 | `portal.navigation.layout` | enum | `notebook-navbar` | `docs`, `notebook`, `notebook-navbar`, `glass`. |
-| `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. |
+| `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. *As reviewed:* a path is resolved as a browser resolves it and refused when that leaves the site (`/\host`, a tab after the slash), and written as resolved; an absolute URL must carry its `//`, since a browser reads `https:example.com` on an https site as a path of that site. |
 | `portal.home.cta` | `{label, url}` | none | Rendered under the title of the home page, including the fallback home. `label` and `url` follow the `links` rules. |
 | `portal.api.groupBy` | enum | `tag` | `tag`, `route`, `none`; Fumadocs' own values. Changes operation URLs: `tag` yields `/api/<spec>/<tag>/<operation>`, `route` `/api/<spec>/<path>/<method>`, `none` `/api/<spec>/<operation>`. |
 | `portal.api.showDeprecated` | boolean | `true` | `true` keeps deprecated operations, struck through in the sidebar as Fumadocs already renders them. |
 | `portal.api.showInternal` | boolean | `false` | Operations carrying `x-internal: true`. |
 | `portal.ai.pageActions` | boolean | `true` | Today's `aiPageActions`, moved. |
-| `portal.advanced.tokens.light`, `.dark` | map | `{}` | Keys are the full custom-property name, as browser dev tools show it: `"--color-fd-accent"`, not `"accent"`. Each must be `--color-fd-` followed by one of the seventeen token names in section 10. Values are non-empty strings without `;`, `{`, `}` or `/*`, and pass through. |
+| `portal.advanced.tokens.light`, `.dark` | map | `{}` | Keys are the full custom-property name, as browser dev tools show it: `"--color-fd-accent"`, not `"accent"`. Each must be `--color-fd-` followed by one of the seventeen token names in section 10. Values are non-empty strings without `;`, `{`, `}` or `/*`, and pass through. *As reviewed:* refusing those was not enough, since an unclosed parenthesis, bracket or quote, or a trailing backslash, also runs past the declaration. A value is now made only of letters, digits, spaces and `# % . , ( ) / * + - _`, with its parentheses balanced and no `/*`, which still writes every CSS colour, `var()`, `calc()` and relative colour syntax. The schema checks the characters; the balance is the CLI's. |
 | `languages` | map | none, required | At least one entry. Keys are `Language` values from `src/types/sdk/generate.ts`: `csharp`, `java`, `php`, `python`, `ruby`, `typescript`, `go`. Each value an object, and its `publishing`, when present, an object too — both shape checks are `ApimaticConfigDocument`'s findings, which the portal now reads (section 8). Nothing inside `publishing` is checked by the portal in this release. |
 
 Every error carries its dotted path from the root, and every error is reported
@@ -235,7 +237,7 @@ content-directory `@source` line prepare already substitutes.
 | `home.cta` | `$.tsx` | An anchor styled with `buttonVariants` from `fumadocs-ui/components/ui/button`, under the title of the index page and of the fallback home alike. |
 | `api.*` | `openapi-section.server.ts` | `groupBy` passes through to `staticSource`; the two `show*` flags filter the bundled document (section 7). |
 | `ai.pageActions` | `$.tsx` | As today. |
-| `advanced.tokens` | `theme.css` | Appended to the same `:root:not(.dark)` / `.dark` blocks after the primary, so a light-only token never reaches dark mode. |
+| `advanced.tokens` | `theme.css` | Appended to the same `:root:not(.dark)` / `.dark` blocks after the primary, so a light-only token never reaches dark mode. *As reviewed:* each block also names `#nd-sidebar`, the id every layout gives the sidebar, because neutral (dark), catppuccin and vitepress set `muted`, `secondary` and `muted-foreground` there, and an id outranks a rule for the mode alone. `dusk` and `vitepress` also set the sidebar's `background-color` directly, which no token reaches. |
 | `languages` | nowhere yet | Validated only. The SDK page reads it when it lands. |
 
 ## 5. Tabs from `nav.json`
@@ -309,7 +311,17 @@ hook), and regroups the children into one `Folder` per tab with `root: true`:
   start — the same rule `reorder` already follows for the `apimatic:` tokens.
 - A synthetic tab's `name` is its fixed label and its `$id` is fixed
   (`tab:home`, `tab:guides`, `tab:sdks`), so React keys and the tree context's
-  root tracking stay stable across renders.
+  root tracking stay stable across renders. *As reviewed:* they are
+  `/tab/home`, `/tab/guides` and `/tab/sdks`, and the fallback home's node
+  `/page/home`. Fumadocs ids a node by its path relative to the content
+  directory, which never starts with a slash, while a directory could be called
+  `tab:guides`.
+- *As reviewed:* the tab folders lose their `$ref`. Fumadocs' `collectTabs`
+  points a tab at the page with the same relative path in the tab being left,
+  found through those references, so from `/tutorials/overview` the API tab
+  linked to `/api/overview`. Nothing past the transformer reads a folder's
+  `$ref`. And Home leads unless the root `nav.json` names `index` *and* there
+  is an index page: without one, the entry names a folder of that name.
 - A tab with no nodes is not created. In this release SDKs is therefore never
   created, and Guides is absent when every top-level node is in a folder tab.
 - The fallback home page gets a tree node. `$.tsx` already renders a landing
@@ -405,7 +417,19 @@ notion of `x-internal`.
    `additionalOperations` are filtered too; `x-internal: true` on a path item
    hides the whole path; a path item that is a `#/…` reference is followed, and
    inlined only when something in it is hidden, since another path may share
-   the component; only a literal `true` hides.
+   the component; only a literal `true` hides. *As reviewed:* a reference is
+   followed to the end of its chain, which is how a split specification reaches
+   a path item once bundled, with the fields beside each `$ref` winning, as
+   Fumadocs reads them; and a tag that only hidden operations carried is dropped
+   from `tags` and `x-tagGroups`, since every page's payload carries the
+   document's tags. Fumadocs 11.4.1 builds pages only for `get`, `put`, `post`,
+   `delete`, `head` and `patch`, so filtering the other methods keeps them out of
+   the payloads rather than off a page. Fumadocs itself gives an operation
+   behind a path-item `$ref` under `paths` no page at all. The filter inlining
+   such an item only when it hides something therefore made whether its visible
+   operations get pages depend on the filter. PR #354 inlines every path item
+   before Fumadocs reads the document, which settles that; it is left to that
+   PR (decided 2026-09-23).
 3. Create a second server with the filtered document as its `input` value,
    which `createOpenAPI` accepts, and call `staticSource` on that one.
 
@@ -414,11 +438,27 @@ is to be removed. When it removes nothing, step 3 is skipped and the first
 server's `staticSource` is used, so the common case costs no second server;
 that is the whole saving.
 
+*Stacked on #354 (2026-09-23):* that PR bundles the specification itself,
+through `bundleSpecification` in `src/lib/openapi-bundle.server.ts`, and hands
+Fumadocs the document through the function form of `input`. `openApiSection`
+therefore filters that document inside the same function, and steps 1 and 3
+collapse into one server that never sees a hidden operation. The filter's
+reference-following now matters for `webhooks` alone: every path item under
+`paths` arrives inlined.
+
 Because the page generator never sees a removed operation, no page, sidebar row
 or emptied tag folder exists for it, and each page's `payload.bundled` is the
 filtered document too. `llms.server.ts`, `sitemap.server.ts`, the search index
 and the prerender list all go through `openApiSection` or the loader, so they
 follow.
+
+*As reviewed:* `groupBy: route` has two Fumadocs defects that the setting makes
+reachable, both handled in `openApiSection` after `staticSource`. The
+operations on `/` form a folder named `''`, the section itself, so two
+`meta.json` land there and whichever wins hides the other's pages; they are
+merged. And a path and a webhook of one name share their page files, so one
+would be dropped without a word; that is refused with a message naming
+`portal.api.groupBy`.
 
 ## 8. CLI changes
 
@@ -487,7 +527,14 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   `suggestedSite` that `PortalSource` now carries from startup.
   `PortalProjectService.applyConfig` writes each generated file only when its
   contents change, and its answer is what "a real change" means. The watcher
-  failing to start is reported, and the preview serves regardless.
+  failing to start is reported, and the preview serves regardless. *As
+  reviewed:* the file is read again once the watch starts, since a save made
+  while the preview started, which can take a minute, reached no watch; saves
+  landing while one is handled are handled once more, not once each; a watch
+  that fails while running says so; and it is closed before the preview says it
+  stops. Vite serves `static/` only if it existed at startup, so a file added
+  to a newly created `src/static` is reported as needing a restart, once, and
+  the restart list in the command description names it.
 - **Quickstart.** `scaffold` writes, through `ApimaticConfigContext.merge`,
   `$schema`, `schemaVersion` and a populated `portal` block: the derived `site`
   fields and every brand, navigation, API and AI default spelled out.
@@ -521,6 +568,11 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   rule is the portal command's, and a file `sdk publish` alone created is
   valid. The `$schema` URL
   is `https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json`.
+  *As reviewed:* jsDelivr resolves a major range to its newest stable release
+  and never to a prerelease, so `@2` leads nowhere until 2.0.0 ships. A
+  prerelease scaffold names its own version instead
+  (`@apimatic/cli@2.0.0-beta.3/…`), which jsDelivr serves exactly
+  (`schemaUrlFor`, decided 2026-09-23). The schema's `$id` stays `@2`.
 - **Prompts.** New source problems: a missing dark logo or favicon named with
   its key; `site.name` required for several specs; the languages errors; the
   serve watcher's re-applied, rejected and restart-needed messages.
@@ -738,7 +790,9 @@ verified to build 22 pages with this branch's CLI.
   `node_modules` under Tailwind 4's Vite plugin. *Verified in step 3.*
 - A token value is written into `theme.css` as it stands, so one holding `;`,
   `{`, `}` or `/*` would reach past its declaration. *Added in step 3:* the
-  parser and the schema refuse those.
+  parser and the schema refuse those. *As reviewed:* not enough; see the
+  token row of section 3. `portal-stylesheet.test.ts` now compiles the
+  generated file through Tailwind for every preset.
 - A bundled document handed back to `createOpenAPI` as a document object
   round-trips: `x-ext` references stay resolvable and the pages match those the
   file-path server produced for an unfiltered spec. *Verified in step 5* by

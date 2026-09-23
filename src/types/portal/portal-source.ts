@@ -42,6 +42,18 @@ export type PortalScaffoldProblem =
   // `reason` is the message of whatever the file service raised, which nothing here can narrow.
   | { kind: 'sourceUnwritable'; reason: string };
 
+/** A file the block names that the build would not find. */
+export interface MissingStaticFile {
+  /** The setting that names it. */
+  setting: string;
+  file: FilePath;
+  /**
+   * The same file in another case, when there is one. Found here because Windows and macOS
+   * ignore case, but a link in it 404s on the hosts portals are published to, which do not.
+   */
+  foundAs: FilePath | null;
+}
+
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
@@ -52,5 +64,4 @@ export type PortalSourceProblem =
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
   | { kind: 'noSpecs' }
-  // Every file the block names that is not on disk, each with the setting that names it.
-  | { kind: 'missingStaticFiles'; files: { setting: string; path: string }[] };
+  | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };

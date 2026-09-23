@@ -1,9 +1,11 @@
 import { expect } from 'chai';
+import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { SuggestedSite } from '../../../src/types/portal/config/site-config';
 
 describe('PortalConfig', () => {
   const suggested: SuggestedSite = { name: 'Spec Title', description: 'What the spec says.' };
+  const source = new DirectoryPath('src');
 
   // Through JSON so the block is what a file would hand over: `undefined` fields dropped.
   const parse = (value: unknown, site: SuggestedSite | null = suggested) =>
@@ -162,6 +164,7 @@ describe('PortalConfig', () => {
         'https://x.test/#top',
         'ftp://x.test',
         'x.test',
+        'https:x.test',
         ''
       ]) {
         expect(errorsOf({ site: { url } }), url).to.have.lengthOf(1);
@@ -191,6 +194,9 @@ describe('PortalConfig', () => {
 
       it('needs both modes once it names either', () => {
         expect(errorsOf({ brand: { logo: { light: 'static/light.svg' } } })).to.deep.equal([
+          "'portal.brand.logo.dark' is required."
+        ]);
+        expect(errorsOf({ brand: { logo: { light: 'static/light.svg', dark: '' } } })).to.deep.equal([
           "'portal.brand.logo.dark' must be a non-empty string."
         ]);
       });
@@ -210,13 +216,30 @@ describe('PortalConfig', () => {
           .logoImages();
 
         expect(logo?.light().siteUrl()).to.equal('/images/logo.png');
-        expect(logo?.light().sourcePath()).to.equal('static/images/logo.png');
+        expect(logo?.light().resolveIn(source).relativeTo(source)).to.equal('static/images/logo.png');
       });
 
-      it('refuses a path outside static/, or one escaping it', () => {
-        for (const logo of ['images/logo.png', 'static/', 'static/../secret.png', '']) {
+      it('refuses a path outside static/, one escaping it, and one that names no file', () => {
+        for (const logo of ['images/logo.png', 'static/', 'static/../secret.png', 'static/images/', '']) {
           expect(errorsOf({ brand: { logo } }), logo).to.have.lengthOf(1);
         }
+      });
+
+      // `static//logo.png` finds the file on disk, and would be served as `//logo.png`: an
+      // address the browser fetches from a host called `logo.png`.
+      it('refuses a path with a name missing, or one standing for the directory it is in', () => {
+        for (const logo of ['static//logo.png', 'static\\\\logo.png', 'static/./logo.png', 'static/ /logo.png']) {
+          expect(errorsOf({ brand: { logo } }), logo).to.have.lengthOf(1);
+        }
+      });
+
+      it('escapes each name in the address it is served at', () => {
+        const logo = config({ brand: { logo: 'static/my logo #1?.png' } })
+          .brandSettings()
+          .logoImages();
+
+        expect(logo?.light().siteUrl()).to.equal('/my%20logo%20%231%3F.png');
+        expect(logo?.light().resolveIn(source).relativeTo(source)).to.equal('static/my logo #1?.png');
       });
     });
 
@@ -244,7 +267,7 @@ describe('PortalConfig', () => {
       const files = (brand: object) =>
         config({ brand })
           .staticFiles()
-          .map((file) => [file.settingPath(), file.sourcePath()]);
+          .map((file) => [file.settingPath(), file.resolveIn(source).relativeTo(source)]);
 
       expect(files({ logo: 'static/logo.svg' })).to.deep.equal([['portal.brand.logo', 'static/logo.svg']]);
       expect(
@@ -340,6 +363,28 @@ describe('PortalConfig', () => {
       }
     });
 
+    // Each starts with '/' or 'https:', and a browser still takes it to another site, or on an
+    // https portal to a path of its own.
+    it('refuses an address a browser reads differently from how it is written', () => {
+      for (const url of [
+        '/\\example.com',
+        '/\t/example.com',
+        '/\n/example.com',
+        'https:example.com',
+        'https:/example.com'
+      ]) {
+        expect(errorsOf({ navigation: { links: [{ label: 'x', url }] } }), JSON.stringify(url)).to.have.lengthOf(1);
+      }
+    });
+
+    it('writes a page of the portal as the browser resolves it', () => {
+      const [link] = config({ navigation: { links: [{ label: 'x', url: '/guides/../start here?tab=1#top' }] } })
+        .navigationSettings()
+        .headerLinks();
+
+      expect(link.href()).to.equal('/start%20here?tab=1#top');
+    });
+
     it('names each broken link by its position', () => {
       expect(
         errorsOf({ navigation: { links: [{ label: 'ok', url: '/' }, 'Status', { label: ' ', url: '/', icon: 'x' }] } })
@@ -433,21 +478,44 @@ describe('PortalConfig', () => {
       expect(errors[2]).to.equal("'portal.advanced.tokens.dark.--color-fd-ring' must be a non-empty string.");
     });
 
-    // The value is written into the generated stylesheet as it stands.
+    // The value is written into the generated stylesheet as it stands. An unclosed parenthesis,
+    // bracket or quote, or a trailing backslash, runs on into the next declaration: the build
+    // then fails naming no setting, or drops both colour-mode blocks.
     it('refuses a value that would reach past its own declaration', () => {
-      const tokens = {
-        '--color-fd-ring': 'red; x: y',
-        '--color-fd-accent': 'red } body {',
-        '--color-fd-card': 'red /*'
-      };
+      const values = [
+        'red; x: y',
+        'red } body {',
+        'red /* note',
+        'rgb(10 20 30',
+        'url(x',
+        'red)',
+        '"red',
+        "'red'",
+        '[a',
+        'red\\',
+        'red !important',
+        'red\nblue'
+      ];
 
-      expect(errorsOf({ advanced: { tokens: { light: tokens } } })).to.deep.equal(
-        Object.keys(tokens).map(
-          (name) =>
-            `'portal.advanced.tokens.light.${name}' must be a single CSS value, without ';', '{', '}' or a comment.`
-        )
-      );
-      expect(parse({ advanced: { tokens: { dark: { '--color-fd-accent': 'rgb(0 0 0 / 50%)' } } } }).isOk()).to.be.true;
+      for (const value of values) {
+        expect(errorsOf({ advanced: { tokens: { light: { '--color-fd-ring': value } } } }), value).to.deep.equal([
+          "'portal.advanced.tokens.light.--color-fd-ring' must be a single CSS value, such as '#1d4ed8' or " +
+            "'oklch(0.6 0.2 260)': letters, digits, spaces and '# % . , ( ) / * + - _', with every parenthesis " +
+            'closed and no comment.'
+        ]);
+      }
+    });
+
+    it('accepts any CSS colour, including functions of other tokens', () => {
+      for (const value of [
+        'rgb(0 0 0 / 50%)',
+        'transparent',
+        'color-mix(in oklab, var(--color-fd-primary) 10%, transparent)',
+        'oklch(from var(--color-fd-primary) calc(l * 0.9) c h)',
+        'light-dark(#fff, #000)'
+      ]) {
+        expect(parse({ advanced: { tokens: { dark: { '--color-fd-accent': value } } } }).isOk(), value).to.be.true;
+      }
     });
   });
 

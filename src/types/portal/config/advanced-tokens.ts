@@ -97,11 +97,28 @@ export class AdvancedTokens {
     });
   }
 
-  // The value is written into the generated stylesheet as it stands, so one that closes the
-  // declaration or the rule, or opens a comment, would restyle or blank everything after it.
+  // The value is written into the generated stylesheet as it stands. Refusing only what ends a
+  // declaration was not enough: an unclosed parenthesis, bracket or quote, or a trailing
+  // backslash, carries the value past its own declaration, and the build either fails naming
+  // no setting or drops both colour-mode blocks. Every CSS colour, `var()`, `calc()` and
+  // relative colour syntax included, is written with these characters alone.
   private static cssValue(value: string, path: string): Parsed<string> {
-    return /[;{}]|\/\*/.test(value)
-      ? err([`'${path}' must be a single CSS value, without ';', '{', '}' or a comment.`])
-      : ok(value);
+    return /^[-A-Za-z0-9#%.,()/*+_ \t]+$/.test(value) && !value.includes('/*') && balanced(value)
+      ? ok(value)
+      : err([
+          `'${path}' must be a single CSS value, such as '#1d4ed8' or 'oklch(0.6 0.2 260)': letters, digits, ` +
+            `spaces and '# % . , ( ) / * + - _', with every parenthesis closed and no comment.`
+        ]);
   }
+}
+
+function balanced(value: string): boolean {
+  let depth = 0;
+  for (const character of value) {
+    depth += character === '(' ? 1 : character === ')' ? -1 : 0;
+    if (depth < 0) {
+      return false;
+    }
+  }
+  return depth === 0;
 }

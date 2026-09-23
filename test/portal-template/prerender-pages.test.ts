@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
+import type { ApiOptions } from '../../portal-template/portal-config';
 import { prerenderPages } from '../../portal-template/prerender-pages';
 
 // The list this builds is the whole of what a static build writes: TanStack's crawler is off,
@@ -15,13 +16,17 @@ describe('prerenderPages', () => {
     fs.writeFileSync(target, body);
   };
 
-  const urlsFor = async (siteUrl: string | null = null) => {
+  const urlsFor = async (
+    siteUrl: string | null = null,
+    specs: Record<string, string> = {},
+    api: Partial<ApiOptions> = {}
+  ) => {
     const pages = await prerenderPages(
       {
-        specs: {},
+        specs,
         contentDir,
         staticDir: null,
-        api: { groupBy: 'tag', showDeprecated: true, showInternal: false }
+        api: { groupBy: 'tag', showDeprecated: true, showInternal: false, ...api }
       },
       siteUrl
     );
@@ -89,6 +94,43 @@ describe('prerenderPages', () => {
     ]) {
       expect(urls, `asked for a Markdown twin of ${generated}`).to.not.include(generated);
     }
+  });
+
+  // Through the options the site is built with: a page listed here and not built is a 404 in
+  // the output, and one built and not listed is never written.
+  it('lists the reference pages portal.api keeps, at the addresses its grouping gives them', async () => {
+    // Beside the pages, which only Markdown files are.
+    const spec = path.join(contentDir, 'pets.json');
+    const ok = { 200: { description: 'ok' } };
+    fs.writeFileSync(
+      spec,
+      JSON.stringify({
+        openapi: '3.1.0',
+        info: { title: 'Pets', version: '1' },
+        paths: {
+          '/pets': {
+            get: { operationId: 'listPets', tags: ['pets'], responses: ok },
+            post: { operationId: 'createPet', tags: ['pets'], deprecated: true, responses: ok },
+            delete: { operationId: 'purgePets', tags: ['pets'], 'x-internal': true, responses: ok }
+          }
+        }
+      })
+    );
+    const reference = async (api: Partial<ApiOptions>) =>
+      (await urlsFor(null, { pets: spec }, api)).filter((url) => url.startsWith('/api/pets/')).sort();
+
+    expect(await reference({})).to.deep.equal([
+      '/api/pets/pets/createPet',
+      '/api/pets/pets/createPet.md',
+      '/api/pets/pets/listPets',
+      '/api/pets/pets/listPets.md'
+    ]);
+    expect(await reference({ groupBy: 'route', showDeprecated: false, showInternal: true })).to.deep.equal([
+      '/api/pets/pets/delete',
+      '/api/pets/pets/delete.md',
+      '/api/pets/pets/get',
+      '/api/pets/pets/get.md'
+    ]);
   });
 
   it('suffixes each page once, however many pages there are', async () => {

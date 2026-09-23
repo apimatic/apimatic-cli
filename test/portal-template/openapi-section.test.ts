@@ -128,6 +128,111 @@ describe('withoutHiddenOperations', () => {
     expect(shared).to.have.property('delete');
   });
 
+  // How a split specification reaches its path items once bundled: a component that is itself a
+  // reference into an embedded file. Fumadocs follows the whole chain for a webhook.
+  it('follows a chain of references to what it hides', () => {
+    const document = documentWith(
+      { '/pets': { get: { operationId: 'list', responses: ok } } },
+      {
+        webhooks: {
+          adopted: { $ref: '#/components/pathItems/Adopted' },
+          born: { $ref: '#/components/pathItems/Born' }
+        },
+        components: { pathItems: { Adopted: { $ref: '#/x-ext/abc1234' }, Born: { $ref: '#/x-ext/def5678' } } },
+        'x-ext': {
+          abc1234: { post: { operationId: 'adopted', 'x-internal': true, responses: ok } },
+          def5678: {
+            post: { operationId: 'born', responses: ok },
+            put: { operationId: 'reborn', deprecated: true, responses: ok }
+          }
+        }
+      }
+    );
+
+    const shown = withoutHiddenOperations(document, hideBoth) as unknown as { webhooks: Record<string, unknown> };
+
+    expect(shown.webhooks).to.deep.equal({ born: { post: { operationId: 'born', responses: ok } } });
+  });
+
+  // Fields beside a reference win over what it points to, so a path shared by two routes can
+  // be marked internal on one of them.
+  it('reads what is written beside a reference as part of the path item', () => {
+    const document = documentWith(
+      {
+        '/pets': { $ref: '#/components/pathItems/Pets' },
+        '/admin/pets': { $ref: '#/components/pathItems/Pets', 'x-internal': true }
+      },
+      {
+        webhooks: { born: { $ref: '#/components/pathItems/Born', 'x-internal': true } },
+        components: {
+          pathItems: {
+            Pets: { get: { operationId: 'list', responses: ok } },
+            Born: { post: { operationId: 'born', responses: ok } }
+          }
+        }
+      }
+    );
+
+    const shown = withoutHiddenOperations(document, hideBoth) as unknown as Record<string, Record<string, unknown>>;
+
+    expect(Object.keys(shown.paths)).to.deep.equal(['/pets']);
+    expect(shown.webhooks).to.deep.equal({});
+  });
+
+  it('leaves a reference it cannot read where it is', () => {
+    const document = documentWith({
+      '/pets': { $ref: '#/components/pathItems/100%' },
+      '/admin': { get: { operationId: 'admin', 'x-internal': true, responses: ok } }
+    });
+
+    expect(pathsOf(withoutHiddenOperations(document, hideBoth))).to.deep.equal({
+      '/pets': { $ref: '#/components/pathItems/100%' }
+    });
+  });
+
+  // Every page's payload carries the document's tags, so a section of internal operations
+  // would still be named and described to the reader.
+  it('drops the tags only hidden operations carried, and the groups left holding none', () => {
+    const document = documentWith(
+      {
+        '/pets': { get: { operationId: 'list', tags: ['pets'], responses: ok } },
+        '/admin': { get: { operationId: 'admin', tags: ['admin', 'audit'], 'x-internal': true, responses: ok } }
+      },
+      {
+        tags: [
+          { name: 'pets' },
+          { name: 'admin', description: 'Internal admin endpoints', parent: 'operations' },
+          { name: 'audit', parent: 'operations' },
+          { name: 'operations', kind: 'nav' },
+          { name: 'unused' }
+        ],
+        'x-tagGroups': [
+          { name: 'Public', tags: ['pets'] },
+          { name: 'Staff', tags: ['admin', 'audit'] }
+        ]
+      }
+    );
+
+    const shown = withoutHiddenOperations(document, hideBoth) as unknown as Record<string, unknown>;
+
+    expect(shown.tags).to.deep.equal([{ name: 'pets' }, { name: 'operations', kind: 'nav' }, { name: 'unused' }]);
+    expect(shown['x-tagGroups']).to.deep.equal([{ name: 'Public', tags: ['pets'] }]);
+  });
+
+  it('keeps a tag a remaining operation still carries, and one a kept tag is grouped under', () => {
+    const document = documentWith(
+      {
+        '/pets': { get: { operationId: 'list', tags: ['pets', 'shared'], responses: ok } },
+        '/admin': { get: { operationId: 'admin', tags: ['shared', 'animals'], 'x-internal': true, responses: ok } }
+      },
+      { tags: [{ name: 'pets', parent: 'animals' }, { name: 'shared' }, { name: 'animals' }] }
+    );
+
+    const shown = withoutHiddenOperations(document, hideBoth) as unknown as Record<string, unknown>;
+
+    expect(shown.tags).to.deep.equal([{ name: 'pets', parent: 'animals' }, { name: 'shared' }, { name: 'animals' }]);
+  });
+
   it('returns the document it was given when nothing is hidden', () => {
     const document = documentWith({
       '/pets': { get: { operationId: 'list', responses: ok } },
@@ -271,5 +376,52 @@ describe('openApiSection', () => {
       'api/pets/pets/post.mdx',
       'api/pets/pets/id/get.mdx'
     ]);
+  });
+
+  /** Rewrites the specification with the given paths and webhooks. */
+  const writeSpecification = (paths: Record<string, unknown>, webhooks: Record<string, unknown> = {}) =>
+    fs.writeFileSync(
+      path.join(directory, 'api.json'),
+      JSON.stringify({ openapi: '3.1.0', info: { title: 'Pets', version: '1' }, paths, webhooks })
+    );
+
+  const metaFiles = async (api: Partial<ApiOptions>) =>
+    (await sectionFor(api)).files
+      .filter((file) => file.type === 'meta')
+      .map((file) => ({ path: file.path.split(path.sep).join('/'), pages: (file.data as { pages: string[] }).pages }));
+
+  // The operations on `/` form a folder named '', the section itself, and Fumadocs writes a
+  // second meta.json there that the section's own one hides.
+  it('lists the operations on the root path in the section, grouped by route', async () => {
+    writeSpecification({
+      '/': { get: { operationId: 'status', responses: ok } },
+      '/pets': { get: { operationId: 'listPets', responses: ok } }
+    });
+
+    const metas = await metaFiles({ groupBy: 'route' });
+
+    expect(metas.filter((meta) => meta.path === 'api/pets/meta.json')).to.deep.equal([
+      { path: 'api/pets/meta.json', pages: ['get', 'pets'] }
+    ]);
+  });
+
+  it('refuses two operations that grouping by route would give one page', async () => {
+    writeSpecification(
+      { '/pets': { post: { operationId: 'createPet', responses: ok } } },
+      { pets: { post: { operationId: 'petCreated', responses: ok } } }
+    );
+
+    let failure: unknown;
+    try {
+      await sectionFor({ groupBy: 'route' });
+    } catch (error) {
+      failure = error;
+    }
+
+    expect((failure as Error | undefined)?.message).to.equal(
+      "[OpenAPI] Two operations of 'pets' would share the page api/pets/pets/post.mdx, so one would be left " +
+        "out. Group the reference by 'tag' or 'none' in portal.api.groupBy."
+    );
+    expect(await pagesOf({ groupBy: 'tag' })).to.have.lengthOf(2);
   });
 });

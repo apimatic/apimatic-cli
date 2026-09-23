@@ -4,6 +4,16 @@ import { PortalConfig } from './portal-config.js';
 /** For whoever opens the build project: where the file came from, and where to change it. */
 const HEADER = "/* Written by the APIMatic CLI from the 'portal' block of src/apimatic.json. Edit that instead. */";
 
+/**
+ * The light rule is scoped with `:not(.dark)`: a bare `:root` has the specificity of the
+ * presets' `.dark` block and comes after it, so a colour meant for light mode would win in dark
+ * mode too. Each rule also names the sidebar, which every layout renders as `#nd-sidebar` and
+ * which some presets give tokens of its own -- neutral's muted and secondary in dark mode,
+ * catppuccin's in both -- with an id that outranks either mode's rule.
+ */
+export const LIGHT_SELECTOR = ':root:not(.dark), :root:not(.dark) #nd-sidebar';
+export const DARK_SELECTOR = '.dark, .dark #nd-sidebar';
+
 type Declarations = ReadonlyMap<string, string>;
 
 /**
@@ -43,18 +53,14 @@ export class PortalStylesheet {
     );
   }
 
-  /**
-   * The light rules are scoped with `:not(.dark)`. A bare `:root` has the specificity of the
-   * presets' `.dark` block and comes after it, so a colour meant for light mode would win in
-   * dark mode too. A mode with nothing to set gets no rule at all.
-   */
+  /** A mode with nothing to set gets no rule at all. */
   public toString(): string {
     return [
       HEADER,
       this.imports.map((specifier) => `@import '${specifier}';`).join('\n'),
       PortalStylesheet.rule('@theme', this.fontFamilies),
-      PortalStylesheet.rule(':root:not(.dark)', this.light),
-      PortalStylesheet.rule('.dark', this.dark)
+      PortalStylesheet.rule(LIGHT_SELECTOR, this.light),
+      PortalStylesheet.rule(DARK_SELECTOR, this.dark)
     ]
       .filter((section) => section !== '')
       .join('\n\n')

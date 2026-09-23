@@ -16,6 +16,11 @@ import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate';
 
+/** As much of a schema object as the walks below read. */
+interface SchemaNode {
+  properties?: Record<string, SchemaNode & { default?: unknown }>;
+}
+
 const repositoryRoot = process.cwd();
 const schema = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'apimatic.schema.json'), 'utf8'));
 const manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
@@ -121,7 +126,16 @@ describe('apimatic.schema.json', () => {
         'a token value that is a CSS function',
         { advanced: { tokens: { light: { '--color-fd-accent': 'color-mix(in oklab, #1d4ed8 10%, transparent)' } } } }
       ],
-      ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }]
+      ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }],
+      ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }],
+      ['a hue written in turns', { brand: { colors: { primary: 'hsl(0.5turn 50% 50%)' } } }],
+      ['a space-syntax hsl primary with bare numbers', { brand: { colors: { primary: 'hsl(221 83 53)' } } }],
+      [
+        'a token value derived from another token',
+        {
+          advanced: { tokens: { dark: { '--color-fd-ring': 'oklch(from var(--color-fd-primary) calc(l * 0.9) c h)' } } }
+        }
+      ]
     ];
 
     const invalid: [string, object][] = [
@@ -141,6 +155,11 @@ describe('apimatic.schema.json', () => {
       ['a logo outside static', { brand: { logo: 'images/logo.png' } }],
       ['the static directory itself', { brand: { logo: 'static/' } }],
       ['a logo escaping static', { brand: { logo: 'static/../secret.png' } }],
+      ['a logo path with a name missing', { brand: { logo: 'static//logo.png' } }],
+      ['a logo path with a name missing between backslashes', { brand: { logo: 'static\\\\logo.png' } }],
+      ['a logo path through the directory it names', { brand: { logo: 'static/./logo.png' } }],
+      ['a logo path to a directory', { brand: { logo: 'static/images/' } }],
+      ['a logo path with a blank name in it', { brand: { logo: 'static/ /logo.png' } }],
       ['an empty logo', { brand: { logo: '' } }],
       ['a logo that is a number', { brand: { logo: 7 } }],
       ['a logo pair missing a mode', { brand: { logo: { light: 'static/a.svg' } } }],
@@ -165,6 +184,16 @@ describe('apimatic.schema.json', () => {
       ['a relative link', { navigation: { links: [{ label: 'x', url: 'docs/x' }] } }],
       ['a javascript link', { navigation: { links: [{ label: 'x', url: 'javascript:alert(1)' }] } }],
       ['a protocol-relative link', { navigation: { links: [{ label: 'x', url: '//example.com' }] } }],
+      [
+        'a link to another host through a backslash',
+        { navigation: { links: [{ label: 'x', url: '/\\example.com' }] } }
+      ],
+      ['a link to another host through a tab', { navigation: { links: [{ label: 'x', url: '/\t/example.com' }] } }],
+      [
+        'a link without the slashes of its scheme',
+        { navigation: { links: [{ label: 'x', url: 'https:example.com' }] } }
+      ],
+      ['an address without the slashes of its scheme', { site: { url: 'https:x.test' } }],
       ['an empty link', { navigation: { links: [{ label: 'x', url: '' }] } }],
       ['a blank link label', { navigation: { links: [{ label: ' ', url: '/' }] } }],
       ['a link with an unknown key', { navigation: { links: [{ label: 'x', url: '/', icon: 'x' }] } }],
@@ -180,6 +209,10 @@ describe('apimatic.schema.json', () => {
       ['a token value closing its rule', { advanced: { tokens: { dark: { '--color-fd-ring': 'red } body {' } } } }],
       ['a token value ending its declaration', { advanced: { tokens: { light: { '--color-fd-ring': 'red; x: y' } } } }],
       ['a token value opening a comment', { advanced: { tokens: { light: { '--color-fd-ring': 'red /* x' } } } }],
+      ['a token value opening a string', { advanced: { tokens: { light: { '--color-fd-ring': '"red' } } } }],
+      ['a token value opening a bracket', { advanced: { tokens: { light: { '--color-fd-ring': '[a' } } } }],
+      ['a token value ending in an escape', { advanced: { tokens: { light: { '--color-fd-ring': 'red\\' } } } }],
+      ['a token value marked important', { advanced: { tokens: { light: { '--color-fd-ring': 'red !important' } } } }],
       ['tokens that are not an object', { advanced: { tokens: [] } }],
       ['an unknown advanced key', { advanced: { css: 'x' } }]
     ];
@@ -199,12 +232,69 @@ describe('apimatic.schema.json', () => {
       });
     }
 
-    // The schema checks a colour's form; its channel ranges are the CLI's to check.
-    it('leaves colour channel ranges to the CLI', () => {
-      const block = { brand: { colors: { primary: 'rgb(256, 0, 0)' } } };
+    // The schema checks a colour's form; what goes inside the parentheses is the CLI's to check.
+    it('leaves colour channels to the CLI', () => {
+      for (const primary of ['rgb(256, 0, 0)', 'rgb(10%, 30, 85%)', 'rgb(none 0 0)']) {
+        const block = { brand: { colors: { primary } } };
+
+        expect(portalAccepts(block), primary).to.be.false;
+        expect(schemaVerdict({ portal: block }).valid, primary).to.be.true;
+      }
+    });
+
+    // A pattern cannot count parentheses.
+    it('leaves unclosed parentheses in a token value to the CLI', () => {
+      const block = { advanced: { tokens: { light: { '--color-fd-ring': 'rgb(10 20 30' } } } };
 
       expect(portalAccepts(block)).to.be.false;
       expect(schemaVerdict({ portal: block }).valid).to.be.true;
+    });
+
+    it('offers the defaults the parser applies', () => {
+      // The scaffolded block spells out every default, and reads back as the portal an empty
+      // block makes.
+      const applied = PortalConfig.scaffolded(suggested).toJSON() as unknown as Record<string, unknown>;
+      const defaults: [string, unknown][] = [];
+      const collect = (node: SchemaNode, path: string[]) => {
+        for (const [key, property] of Object.entries(node.properties ?? {})) {
+          if ('default' in property) {
+            defaults.push([[...path, key].join('.'), property.default]);
+          }
+          collect(property, [...path, key]);
+        }
+      };
+      collect(schema.definitions.portal, []);
+
+      expect(defaults.map(([setting]) => setting)).to.include.members(['brand.colors.preset', 'api.showInternal']);
+      for (const [setting, value] of defaults) {
+        const actual = setting
+          .split('.')
+          .reduce<unknown>((node, key) => (node as Record<string, unknown> | undefined)?.[key], applied);
+        expect(actual, setting).to.deep.equal(value);
+      }
+    });
+
+    // The other way round is covered by the scaffold, which writes every setting that has a
+    // default into a file the schema has to accept.
+    it('names only settings the parser knows', () => {
+      const settings: string[][] = [];
+      const collect = (node: SchemaNode, path: string[]) => {
+        for (const [key, property] of Object.entries(node.properties ?? {})) {
+          settings.push([...path, key]);
+          collect(property, [...path, key]);
+        }
+      };
+      collect(schema.definitions.portal, []);
+
+      expect(settings).to.have.length.greaterThan(20);
+      for (const setting of settings) {
+        const block = setting.reduceRight<unknown>((value, key) => ({ [key]: value }), { probe: true });
+        const errors = PortalConfig.fromBlock(block, suggested).match(
+          () => [],
+          (found) => found
+        );
+        expect(errors, setting.join('.')).to.not.include(`'portal.${setting.join('.')}' is not a 'portal' setting.`);
+      }
     });
 
     // Counting the specifications is the command's to do, so the name is optional here.

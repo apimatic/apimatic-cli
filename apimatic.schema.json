@@ -36,7 +36,7 @@
     "staticPath": {
       "type": "string",
       "description": "A path relative to 'src' inside the 'static' directory, for example 'static/images/logo.png'.",
-      "pattern": "^(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|\\s*$))\\s*(?:\\.[\\\\/])?static[\\\\/].*\\S\\s*$"
+      "pattern": "^\\s*(?:\\.[\\\\/])?static(?:[\\\\/](?!\\.{1,2}(?:[\\\\/]|\\s*$))[^\\\\/]*[^\\\\/\\s][^\\\\/]*)+\\s*$"
     },
     "color": {
       "type": "string",
@@ -54,7 +54,7 @@
         "url": {
           "type": "string",
           "description": "A page of the portal starting with '/', or an address starting with 'https://' or 'http://'.",
-          "pattern": "^\\s*(?:/(?!/).*|[hH][tT][tT][pP][sS]?://[^\\s/?#]+.*)$"
+          "pattern": "^\\s*(?:/(?![\\t\\n\\r]*[/\\\\])[\\s\\S]*|[hH][tT][tT][pP][sS]?://[^\\s/?#]+(?:[/?#][\\s\\S]*)?\\s*)$"
         }
       }
     },
@@ -84,8 +84,8 @@
       },
       "additionalProperties": {
         "type": "string",
-        "description": "A single CSS value, such as a colour, without ';', '{', '}' or a comment.",
-        "pattern": "^(?![\\s\\S]*/\\*)[^;{}]*[^;{}\\s][^;{}]*$"
+        "description": "A single CSS value, such as '#1d4ed8' or 'oklch(0.6 0.2 260)': letters, digits, spaces and # % . , ( ) / * + - _, with every parenthesis closed and no comment.",
+        "pattern": "^\\s*(?!.*/\\*)[-A-Za-z0-9#%.,()/*+_](?:[-A-Za-z0-9#%.,()/*+_ \\t]*[-A-Za-z0-9#%.,()/*+_])?\\s*$"
       }
     },
     "portal": {
@@ -98,7 +98,11 @@
           "additionalProperties": false,
           "properties": {
             "name": {
-              "$ref": "#/definitions/nonBlank",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/nonBlank"
+                }
+              ],
               "description": "The portal's name. Defaults to the title of the only specification; required when 'spec' holds more than one."
             },
             "url": {
@@ -138,7 +142,11 @@
               ]
             },
             "favicon": {
-              "$ref": "#/definitions/staticPath",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/staticPath"
+                }
+              ],
               "description": "Defaults to the light logo."
             },
             "colors": {
@@ -239,7 +247,11 @@
           "additionalProperties": false,
           "properties": {
             "cta": {
-              "$ref": "#/definitions/link",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/link"
+                }
+              ],
               "description": "A button under the home page's title."
             }
           }
@@ -310,7 +322,11 @@
           "type": "string"
         },
         "pluginVersion": {
-          "$ref": "#/definitions/semver",
+          "allOf": [
+            {
+              "$ref": "#/definitions/semver"
+            }
+          ],
           "description": "major.minor.patch, for example '0.1.0'."
         },
         "pluginKey": {

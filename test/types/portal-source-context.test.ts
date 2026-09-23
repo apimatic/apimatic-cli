@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import Ajv from 'ajv';
 import { expect } from 'chai';
+import { Result } from 'neverthrow';
 import sinon from 'sinon';
 import { parse as parseYaml } from 'yaml';
 import { FileService } from '../../src/infrastructure/file-service';
@@ -42,6 +43,20 @@ describe('PortalSourceContext', () => {
   /** The hidden pages as the warning names them, relative to the source directory. */
   const hidden = (source: PortalSource): string[] =>
     source.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
+
+  /** Each file the block names that is not on disk: its setting, its path, and its spelling on disk in another case. */
+  const missingFiles = (result: Result<unknown, PortalSourceProblem>): [string, string, string | null][] => {
+    const problem = result._unsafeUnwrapErr();
+    if (problem.kind !== 'missingStaticFiles') {
+      throw new Error(`expected missing static files, got ${JSON.stringify(problem)}`);
+    }
+    const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
+    return problem.files.map(({ setting, file, foundAs }) => [
+      setting,
+      relative(file),
+      foundAs === null ? null : relative(foundAs)
+    ]);
+  };
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-source-'));
@@ -252,10 +267,7 @@ describe('PortalSourceContext', () => {
     it('reports a configured logo that is not on disk', async () => {
       writeConfig({ brand: { logo: 'static/images/logo.png' } });
 
-      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
-        kind: 'missingStaticFiles',
-        files: [{ setting: 'portal.brand.logo', path: 'static/images/logo.png' }]
-      });
+      expect(missingFiles(await resolve())).to.deep.equal([['portal.brand.logo', 'static/images/logo.png', null]]);
     });
 
     it('reports every missing file at once, each with the setting that names it', async () => {
@@ -264,13 +276,22 @@ describe('PortalSourceContext', () => {
       });
       write('static/light.svg', 'x');
 
-      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
-        kind: 'missingStaticFiles',
-        files: [
-          { setting: 'portal.brand.logo.dark', path: 'static/dark.svg' },
-          { setting: 'portal.brand.favicon', path: 'static/favicon.ico' }
-        ]
-      });
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.brand.logo.dark', 'static/dark.svg', null],
+        ['portal.brand.favicon', 'static/favicon.ico', null]
+      ]);
+    });
+
+    // Windows and macOS open `logo.png` for `Logo.PNG`, and the site then 404s on a host that
+    // does not, so every name on the way is matched exactly.
+    it('reports a file spelt in another case, with its spelling on disk', async () => {
+      writeConfig({ brand: { logo: 'static/Images/Logo.PNG', favicon: 'static/favicon.ico' } });
+      write('static/images/logo.png', 'x');
+      write('static/favicon.ico', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.brand.logo', 'static/Images/Logo.PNG', 'static/images/logo.png']
+      ]);
     });
 
     it('accepts files that are there', async () => {
@@ -320,10 +341,9 @@ describe('PortalSourceContext', () => {
     it('reports a file the block names that is not on disk', async () => {
       writeConfig({ site: { name: 'Calc' }, brand: { favicon: 'static/favicon.ico' } });
 
-      expect((await context().resolveConfig(null))._unsafeUnwrapErr()).to.deep.equal({
-        kind: 'missingStaticFiles',
-        files: [{ setting: 'portal.brand.favicon', path: 'static/favicon.ico' }]
-      });
+      expect(missingFiles(await context().resolveConfig(null))).to.deep.equal([
+        ['portal.brand.favicon', 'static/favicon.ico', null]
+      ]);
     });
 
     it('reports a file removed while the preview runs', async () => {
@@ -856,7 +876,7 @@ describe('PortalSourceContext', () => {
     };
 
     const scaffold = async (specPath: FilePath) =>
-      (await new PortalSourceContext(source).scaffold(specPath))._unsafeUnwrap();
+      (await new PortalSourceContext(source).scaffold(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
     const read = (relative: string) => fs.readFileSync(path.join(source.toString(), relative), 'utf8');
 
     /** What the user adds by hand before the portal builds: nothing in quickstart writes it yet. */
@@ -965,7 +985,10 @@ describe('PortalSourceContext', () => {
     it('reports a configuration it cannot write into rather than throwing', async () => {
       write('project/src/apimatic.json', '{ not json');
 
-      const scaffolded = await new PortalSourceContext(source).scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+      const scaffolded = await new PortalSourceContext(source).scaffold(
+        writeSpec({ title: 'Petstore', version: '1' }),
+        APIMATIC_SCHEMA_URL
+      );
 
       expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({ kind: 'configUnreadable' });
     });
@@ -975,7 +998,8 @@ describe('PortalSourceContext', () => {
 
       try {
         const scaffolded = await new PortalSourceContext(source).scaffold(
-          writeSpec({ title: 'Petstore', version: '1' })
+          writeSpec({ title: 'Petstore', version: '1' }),
+          APIMATIC_SCHEMA_URL
         );
 
         expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({

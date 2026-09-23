@@ -80,8 +80,10 @@ export class PortalServePrompts {
           )} is only reported when the preview starts; until then an entry or a title that the build would ` +
           `refuse is ignored here.`,
         '',
-        `Adding or removing a page, changing ${f.var('portal.api')}, or changing which documents`,
-        `are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        `Adding or removing a page, creating ${f.path(sourceDirectory.join('static'))}, changing ${f.var(
+          'portal.api'
+        )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview ` +
+          `restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
@@ -95,7 +97,7 @@ export class PortalServePrompts {
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
   public configRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory);
+    reportSourceProblem(problem, sourceDirectory, false);
     log.message('The preview keeps showing what it last accepted until the file is fixed.');
   }
 
@@ -110,9 +112,24 @@ export class PortalServePrompts {
     log.warn(`The changes to ${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be applied to the preview: ${reason}`);
   }
 
+  /** Vite reads its public directory once, and a missing one is served as none. */
+  public staticDirectoryNotServed(sourceDirectory: DirectoryPath) {
+    const message =
+      `${f.path(sourceDirectory.join('static'))} did not exist when the preview started, so the files ` +
+      `in it are not served. Restart the preview to show them.`;
+    log.warn(message);
+  }
+
   public configNotWatched(reason: string) {
     log.warn(
       `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be watched (${reason}), so edits to it need the preview restarted.`
+    );
+  }
+
+  public configWatchFailed(reason: string) {
+    log.warn(
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} is no longer watched (${reason}), so further edits to it need the ` +
+        `preview restarted.`
     );
   }
 

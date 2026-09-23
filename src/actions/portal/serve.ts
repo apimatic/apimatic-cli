@@ -112,6 +112,8 @@ export class PortalServeAction {
           return ActionResult.failed();
         }
 
+        // First, so a save still being handled is not reported after the preview says it stops.
+        await configWatch?.close();
         this.prompts.stopping();
         await server.value.stop();
         return ActionResult.stopped();
@@ -136,10 +138,13 @@ export class PortalServeAction {
     sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
     const running = source.config.apiSettings();
+    // The dev server serves `static/` only if it was there at startup, and a block that names
+    // a file in it was refused unless it was.
+    const servesStatic = source.staticDirectory !== null;
     let lastAccepted = source.config;
     let rejected = false;
 
-    const watch = this.fileWatchService.watch(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME), async () => {
+    const reapply = async () => {
       const reloaded = await sourceContext.resolveConfig(source.suggestedSite);
       if (reloaded.isErr()) {
         rejected = true;
@@ -148,10 +153,13 @@ export class PortalServeAction {
       }
       const config = reloaded.value;
 
-      // Said once, on the save that changes them, rather than on every save after it.
+      // Each said once, on the save that brings it about, rather than on every save after it.
       const api = config.apiSettings();
       if (!api.isEqual(lastAccepted.apiSettings()) && !api.isEqual(running)) {
         this.prompts.restartNeeded();
+      }
+      if (!servesStatic && config.staticFiles().length > 0 && lastAccepted.staticFiles().length === 0) {
+        this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
       const applied = await this.projectService.applyConfig(projectDirectory, config);
@@ -166,12 +174,21 @@ export class PortalServeAction {
       }
       rejected = false;
       lastAccepted = config;
-    });
+    };
 
+    const watch = this.fileWatchService.watch(
+      sourceDirectory,
+      new FileName(APIMATIC_CONFIG_FILE_NAME),
+      reapply,
+      (reason) => this.prompts.configWatchFailed(reason)
+    );
     if (watch.isErr()) {
       this.prompts.configNotWatched(watch.error);
       return undefined;
     }
+    // The file was read before the preview started, which can take a minute, and a save made
+    // in the meantime reached no watch.
+    watch.value.recheck();
     return watch.value;
   }
 
