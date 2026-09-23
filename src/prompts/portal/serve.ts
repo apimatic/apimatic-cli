@@ -2,6 +2,7 @@ import { log } from '@clack/prompts';
 import { once } from 'node:events';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
+import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
@@ -10,7 +11,7 @@ import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportCollidingPages, reportShadowedFiles, reportSourceProblem } from './source.js';
+import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
@@ -21,8 +22,12 @@ export class PortalServePrompts {
     reportShadowedFiles(shadowed);
   }
 
-  public pagesCollidingWithSpecs(slugs: string[]) {
-    reportCollidingPages(slugs);
+  public pagesHiddenBySpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
+    reportHiddenPages(files, sourceDirectory);
+  }
+
+  public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
+    reportIgnoredNavigationFiles(files, sourceDirectory);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {
@@ -56,16 +61,22 @@ export class PortalServePrompts {
 
   public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
-    // Only the body of a page the server already knows about reloads: the page tree and the
-    // configuration are read once, when the project is prepared.
+    // The content directory is watched, so a page's body and the order in its `nav.json` both
+    // reload. What is fixed is the set of pages and the configuration: the portal's identity
+    // and the list of specifications are substituted into the project when it is prepared.
+    // Validation is fixed too: it runs once, here, and the build drops an entry it cannot
+    // resolve without a word, so a mistake typed during the preview would otherwise pass as
+    // the default order.
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(
-          sourceDirectory.join('content')
-        )} appear in the browser automatically.`,
+        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, and to the order and ` +
+          `folder titles in a ${f.var('nav.json')}, appear in the browser automatically. A mistake in a ${f.var(
+            'nav.json'
+          )} is only reported when the preview starts; until then an entry or a title that the build would ` +
+          `refuse is ignored here.`,
         '',
-        `Adding or removing a page, editing ${f.var('meta.json')} or ${f.var('portal.json')}, or changing which`,
-        `documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        `Adding or removing a page, editing ${f.var('portal.json')}, or changing which documents`,
+        `are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),

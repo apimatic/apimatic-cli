@@ -5,9 +5,15 @@ import { pipeline } from 'stream';
 import { promisify } from 'util';
 import { FilePath } from '../types/file/filePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
-import { Directory } from '../types/file/directory.js';
+import { Directory, DirectoryItem } from '../types/file/directory.js';
 import { FileName } from '../types/file/fileName.js';
 import { sleep } from './timer-extensions.js';
+
+/** `stat` follows a link, so a link to nothing fails as though the entry were not there. */
+function isDanglingLink(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
+}
 
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
@@ -81,18 +87,35 @@ export class FileService {
     await fsExtra.ensureDir(dir.toString());
   }
 
+  /**
+   * The whole tree beneath `directoryPath`. A link to nothing is left out rather than failing
+   * the walk, which is what a glob over the same tree would do with it. Any other failure
+   * still throws: a file that cannot be examined is a file the caller would otherwise never
+   * hear about, and a missing specification is worse than a failed build.
+   */
   public async getDirectory(directoryPath: DirectoryPath): Promise<Directory> {
     const entries = await fsExtra.readdir(directoryPath.toString());
     const results = await Promise.all(
-      entries.map(async (entry) => {
+      entries.map(async (entry): Promise<DirectoryItem | undefined> => {
         const fullPath = path.join(directoryPath.toString(), entry);
-        const stat = await fsExtra.stat(fullPath);
+        let stat: fsExtra.Stats;
+        try {
+          stat = await fsExtra.stat(fullPath);
+        } catch (error) {
+          if (isDanglingLink(error)) {
+            return undefined;
+          }
+          throw error;
+        }
         return stat.isDirectory()
           ? await this.getDirectory(new DirectoryPath(fullPath))
           : { fileName: new FileName(entry) };
       })
     );
-    return new Directory(directoryPath, results);
+    return new Directory(
+      directoryPath,
+      results.filter((item): item is DirectoryItem => item !== undefined)
+    );
   }
 
   /**

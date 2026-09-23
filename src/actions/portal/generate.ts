@@ -65,7 +65,8 @@ export class GenerateAction {
       return ActionResult.failed();
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-    this.prompts.pagesCollidingWithSpecs(source.value.collidingSlugs);
+    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
+    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
 
     const portalContext = new PortalContext(portalDirectory);
     if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {

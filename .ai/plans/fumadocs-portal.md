@@ -39,7 +39,7 @@ src/
   APIMATIC-BUILD.json   untouched; SDK/plugin commands only
   portal.json           portal-only config
   spec/                 one or more OpenAPI 3.x JSON/YAML files; one sidebar section each
-  content/              .md/.mdx pages with frontmatter; optional meta.json per folder (Fumadocs format)
+  content/              .md/.mdx pages with frontmatter; optional nav.json per folder (page order)
   static/               served verbatim at the site root
 ```
 
@@ -52,7 +52,10 @@ src/
 `title` is required. `logo` is a path relative to `src/` and must point inside
 `static/`; the CLI rewrites it to the site URL (`static/images/logo.png` becomes
 `/images/logo.png`). Validation errors name the field. A `languages` section
-will be added later and checked against the subscription (section 6). Fields
+was to be added later and checked against the subscription (section 6); it
+becomes a *required* property instead, in the change that follows the
+navigation work, so that it lands before the next major rather than as a second
+breaking change (`.ai/plans/portal-navigation.md`, section 4). Fields
 of the old `generatePortal` block that have no v1 equivalent (`navTitle`,
 `logoLink`, `headIncludes`, `themeOverrides`, ...) are listed by the migration
 hint so the loss is visible; they return only when explicitly specified.
@@ -65,19 +68,33 @@ for sectioning and are not copied into the output. Swagger 2.0 and
 non-OpenAPI formats fail validation with a message naming the file. At least
 one OpenAPI document is required. Everything else follows vanilla Fumadocs
 behaviour (decided: minimum rules only): untagged operations land in a group
-named "unknown", the section title is the spec filename, `meta.json` entries
-with no matching page are silently ignored, a `$ref` to a missing file fails
-the build with the bundler's error, and cross-file `$ref`s are bundled by
-Fumadocs.
+named "unknown", the section title is the spec filename, a `$ref` to a missing
+file fails the build with the bundler's error, and cross-file `$ref`s are
+bundled by Fumadocs. Navigation is the one place this no longer holds: a
+`nav.json` entry matching no page fails the build naming the entry, rather than
+being dropped the way Fumadocs drops it (`.ai/plans/portal-navigation.md`).
+With a single specification the section level is also lifted away, so the tag
+groups sit directly under "API Reference".
 
 Content: `.md` and `.mdx` are both accepted (`.mdx` is executable authoring,
 as in every MDX-based tool; `<include>` targets are confined to `src/content/`).
-If `content/index.md` or `index.mdx` is absent, the CLI generates a home page
-from `title` and `description` so `/` always resolves. Folders without
-`meta.json` are ordered alphabetically by Fumadocs.
+The quickstart scaffolds a `content/index.md`, and a portal whose content
+directory has none still has a `/`: the fallback home page promised here was
+built in #343. `src/routes/$.tsx` answers the empty slug with a generated
+landing page carrying the portal's title and description, and
+`prerender-pages.ts` always seeds `/`, so the static build emits an
+`index.html` either way. What it is not is a composed home page -- a title and
+a description, nothing drawn from the content or the specifications -- and
+making it more than that is worth its own decision rather than a line in a
+layout section. Folders without `nav.json` are ordered alphabetically by
+Fumadocs.
 
-Sidebar order: content pages in `meta.json` order first, then one section per
-spec file in filename order, grouped by tag inside each spec.
+Sidebar order: set by `nav.json` per folder, with the whole API reference
+positioned as one node by the `apimatic:api` token. Unnamed pages keep
+Fumadocs' alphabetical order, and with no `nav.json` at all the reference sits
+last. Inside the reference there is one section per spec file in filename
+order, grouped by tag — except for a single specification, whose section level
+is inlined. See `.ai/plans/portal-navigation.md`.
 
 ## 4. Template (`portal-template/`)
 
@@ -235,7 +252,7 @@ Follow the five-layer conventions in `.ai/instructions.md` and the skills in
 - **Infrastructure**: `PortalBuildService` (section 5), `PortalDevServerService` (section 7 serve), `PortalAuthorizationService` (section 6). Remove `generatePortal`, `generateSdl`, `generateTocData` and the portal status polling from `PortalService`.
 - **`portal generate`** (`GenerateAction` rewritten): gate, validate source, confirm overwrite, build with a spinner showing elapsed time, report. Flags: `--input`, `--destination`, `--force`, `--zip`, `--auth-key`. Command class uses `export default class` (convention).
 - **`portal serve`** (rewritten on the Vite dev server, decided): gate once, prepare the same temp project as `generate` (template + linked deps + config pointing at the user's `src/`), start `vite dev` on the chosen port with the same env isolation, open the browser. Content edits are live in under a second and spec edits immediately (both verified against the dev server: content change visible after ~0.8 s, spec summary change visible on the next request); compile errors appear in Vite's browser overlay with file and line. Express, livereload, connect-livereload and chokidar are used only by the current serve action (verified), so they are removed from `package.json`. Ctrl+C returns `ActionResult.stopped()` (exit 130, convention) and quickstart's result check is adjusted. Flags: keep `--input`, `--port`, `--open`, `--auth-key`; drop `--destination` (the dev server has no output folder) and `--no-reload` (reload is always on). Measured dev-server startup: 9 to 18 s with a warm Vite cache, 45 to 60 s on the first run while Vite pre-bundles dependencies; the CLI shows a spinner until the server answers.
-- **Migration hint**: both commands print one when `APIMATIC-BUILD.json` has `generatePortal` or `generateVersionedPortal` and `portal.json` is missing, listing the old fields with no v1 equivalent and a minimal `portal.json` to copy.
+- **Migration hint**: both commands print one when `APIMATIC-BUILD.json` has `generatePortal` or `generateVersionedPortal` and `portal.json` is missing, listing the old fields with no v1 equivalent and a minimal `portal.json` to copy. **Removed 2026-09-22** on `saeedjamshaid/portal-navigation`: the CLI carries no messaging that maps the 1.x setup onto the 2.0 one. A missing `portal.json` points at `quickstart`, whatever sits beside it.
 - **Removals**: `portal toc new`, `portal recipe new`, `portal copilot` commands, actions, prompts, application code (`application/portal/toc`, `application/portal/recipe`), related types and the `ToCCreationFailedEvent`/`RecipeCreationFailedEvent` telemetry events and tests. Hidden stub commands with the same ids remain for one major, print "removed in v2, see <migration notes>" and exit 1 (otherwise users get "not a command", exit 127). Update `test/commands/examples-parse.test.ts`, the `.ai/skills/*.md` files and `.ai/instructions.md` that cite the deleted files as examples, and remove the `portal:toc` topic from `package.json`. Release notes mention `apimatic autocomplete --refresh-cache`.
 - **Quickstart**: the portal step writes `portal.json`, `content/index.md`, `content/meta.json` and calls the new serve; its language-selection, build-file and prune steps are dropped for the portal path until `portal.json` gains `languages`. Its summary and closing "next steps" copy no longer mention themes, recipes or Copilot. The sample repository (`sample-docs-as-code-portal`) has a permanent `v2` branch with the new layout; both quickstarts download their defaults from it.
 - **Telemetry**: `portal generate` and `portal serve` emit no telemetry events today and none are added.

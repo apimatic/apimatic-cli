@@ -14,6 +14,11 @@ export class FileName {
     return this.name.toLowerCase().endsWith(extension.toLowerCase());
   }
 
+  /** Whether the name ends in `extension` exactly, by code point, the way a glob matches it. */
+  public hasExactExtension(extension: string): boolean {
+    return this.name.endsWith(extension);
+  }
+
   /** Whether this is `name`, compared without regard to case. */
   public is(name: string): boolean {
     return this.name.toLowerCase() === name.toLowerCase();
