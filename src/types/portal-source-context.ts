@@ -1,7 +1,8 @@
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
+import { errorMessage } from '../utils/error-utils.js';
 import { ApimaticConfigContext } from './apimatic-config-context.js';
-import { APIMATIC_CONFIG_FILE_NAME, findingSentences } from './apimatic-config/document.js';
+import { findingSentences } from './apimatic-config/document.js';
 import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
@@ -9,7 +10,7 @@ import { FilePath } from './file/filePath.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
-import { PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import { PortalScaffoldProblem, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -170,21 +171,26 @@ export class PortalSourceContext {
 
   /**
    * Writes the smallest source tree `portal generate` and `portal serve` accept, with a
-   * `portal` block described from the specification itself.
+   * `portal` block described from the specification itself. Every fault is reported rather
+   * than thrown, including the ones the file service raises: the caller is a wizard that has
+   * asked its questions already, and it reports what went wrong instead of crashing.
    */
-  public async scaffold(specPath: FilePath): Promise<void> {
+  public async scaffold(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
+    try {
+      return await this.writeSourceTree(specPath);
+    } catch (error) {
+      return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
+    }
+  }
+
+  private async writeSourceTree(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
     await new SpecContext(this.specDirectory).install(specPath);
 
     const config = await this.suggestedConfig(specPath);
     // The directory is empty when quickstart runs this, so the merge always creates the file.
-    // A fault is thrown as the plain write before it was: there is no publish here to protect.
     const written = await this.configContext.merge(['portal'], (document) => document.with('portal', config.toJSON()));
     if (written.isErr()) {
-      throw new Error(
-        written.error === 'unreadable'
-          ? `${APIMATIC_CONFIG_FILE_NAME} is already there and could not be read, so the portal was not written into it.`
-          : `${APIMATIC_CONFIG_FILE_NAME} could not be written.`
-      );
+      return err({ kind: written.error === 'unreadable' ? 'configUnreadable' : 'configUnwritable' });
     }
 
     await this.fileService.createDirectoryIfNotExists(this.contentDirectory);
@@ -210,6 +216,7 @@ export class PortalSourceContext {
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
       JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
     );
+    return ok(undefined);
   }
 
   // A split specification arrives as an archive, whose parts are left to the build to read.

@@ -1,6 +1,7 @@
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { errorMessage } from '../utils/error-utils.js';
+import { stripByteOrderMark } from '../utils/string-utils.js';
 import {
   APIMATIC_CONFIG_FILE_NAME,
   ApimaticConfigDocument,
@@ -93,6 +94,34 @@ export class ApimaticConfigContext {
       return err('unwritable');
     }
     return ok(next);
+  }
+
+  /**
+   * Rewrites the file without its byte-order mark, if it has one. Reading past a mark is enough
+   * while the file stays here, but `plugin generate` zips it and sends it to a parser that is
+   * not this one. Only the mark goes: the rest is written back byte for byte, so a layout this
+   * CLI never chose, and the line endings with it, survive a rewrite nobody asked for.
+   */
+  public async removeByteOrderMark(): Promise<Result<void, ApimaticConfigWriteFailure>> {
+    if (!(await this.fileService.fileExists(this.configFile))) {
+      return ok(undefined);
+    }
+    let text: string;
+    try {
+      text = await this.fileService.getContents(this.configFile);
+    } catch {
+      return err('unreadable');
+    }
+    const stripped = stripByteOrderMark(text);
+    if (stripped === text) {
+      return ok(undefined);
+    }
+    try {
+      await this.fileService.replaceContents(this.configFile, stripped);
+    } catch {
+      return err('unwritable');
+    }
+    return ok(undefined);
   }
 
   private async load(): Promise<Loaded | undefined> {

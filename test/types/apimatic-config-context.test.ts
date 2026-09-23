@@ -15,6 +15,9 @@ describe('ApimaticConfigContext', () => {
 
   const CSHARP_ENTRY = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' }, codegenVersion: 'v3' };
 
+  /** What Notepad and PowerShell redirection leave at the front of a file, spelled out so it shows in a diff. */
+  const BOM = String.fromCodePoint(0xfeff);
+
   const configPath = () => path.join(sourceDirectory.toString(), 'apimatic.json');
   const withFile = (text: string) => fs.writeFileSync(configPath(), text);
   const withConfig = (config: object) => withFile(JSON.stringify(config, null, 2) + '\n');
@@ -90,7 +93,7 @@ describe('ApimaticConfigContext', () => {
     });
 
     it('reads a file that starts with a byte-order mark', async () => {
-      withFile('﻿{ "portal": { "title": "Calc" } }');
+      withFile(BOM + '{ "portal": { "title": "Calc" } }');
 
       expect(parsedState(await context.read()).document.portal()).to.deep.equal({ title: 'Calc' });
     });
@@ -106,6 +109,55 @@ describe('ApimaticConfigContext', () => {
         expect(state.findings[0].problem).to.contain('could not be read');
         expect(state.findings[0].problem).to.contain('EACCES');
       }
+    });
+  });
+
+  // The file travels inside the zip `plugin generate` sends, and the parser at the other end is
+  // not this one, so the mark this context reads past has to come off the file itself.
+  describe('removeByteOrderMark', () => {
+    it('rewrites a file that starts with one, leaving the rest of it byte for byte', async () => {
+      withFile(BOM + '{\r\n\t"portal": {"title": "Calc"}\r\n}\r\n');
+
+      const result = await context.removeByteOrderMark();
+
+      expect(result.isOk()).to.be.true;
+      expect(written()).to.equal('{\r\n\t"portal": {"title": "Calc"}\r\n}\r\n');
+    });
+
+    it('leaves a file without one exactly as it is', async () => {
+      withFile('{ "portal": { "title": "Calc" } }');
+
+      const result = await context.removeByteOrderMark();
+
+      expect(result.isOk()).to.be.true;
+      expect(written()).to.equal('{ "portal": { "title": "Calc" } }');
+    });
+
+    // A file the CLI never had is not its to create, and the callers that follow say so themselves.
+    it('accepts a missing file without writing one', async () => {
+      const result = await context.removeByteOrderMark();
+
+      expect(result.isOk()).to.be.true;
+      expect(fs.existsSync(configPath())).to.be.false;
+    });
+
+    // Malformed JSON is still zipped and sent today; the mark is all this touches.
+    it('strips the mark from a file it could not parse', async () => {
+      withFile(BOM + '{ not json');
+
+      const result = await context.removeByteOrderMark();
+
+      expect(result.isOk()).to.be.true;
+      expect(written()).to.equal('{ not json');
+    });
+
+    it('reports a rewrite it cannot make rather than throwing', async () => {
+      withFile(BOM + '{ "portal": { "title": "Calc" } }');
+      sinon.stub(FileService.prototype, 'replaceContents').rejects(new Error('EACCES: permission denied'));
+
+      const result = await context.removeByteOrderMark();
+
+      expect(result._unsafeUnwrapErr()).to.equal('unwritable');
     });
   });
 

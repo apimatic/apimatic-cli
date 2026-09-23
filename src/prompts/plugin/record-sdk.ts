@@ -43,8 +43,7 @@ export class PluginRecordSdkPrompts {
     const message =
       `${f.var(
         APIMATIC_CONFIG_FILE_NAME
-      )} cannot be used${cause}, so this published SDK's details were not added to it. ` +
-      `Fix or delete it and try again.`;
+      )} cannot be used${cause}, so this published SDK's details were not added to it. ` + `Fix it and try again.`;
     log.warn(message);
   }
 

@@ -119,8 +119,8 @@ const OWNED_BLOCKS: readonly ConfigBlockName[] = ['plugin', 'languages'];
 export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
 
-  constructor(buildDirectory: DirectoryPath) {
-    this.configContext = new ApimaticConfigContext(buildDirectory);
+  constructor(private readonly buildDirectory: DirectoryPath) {
+    this.configContext = new ApimaticConfigContext(this.buildDirectory);
   }
 
   public async getPluginConfigState(): Promise<PluginConfigState> {
@@ -137,6 +137,11 @@ export class PluginConfigContext {
       return { state: 'unreadable', reason: findingClause(findings), path: state.path };
     }
     return PluginConfigPresent.create(PluginConfigContext.configOf(state.document));
+  }
+
+  /** Settles the byte-order mark before `plugin generate` zips `src/` and sends the file on. */
+  public async removeByteOrderMark(): Promise<Result<void, PluginConfigWriteFailure>> {
+    return await this.configContext.removeByteOrderMark();
   }
 
   public async upsertMetadata(

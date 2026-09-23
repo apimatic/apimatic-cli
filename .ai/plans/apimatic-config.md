@@ -58,7 +58,7 @@ called); the backend change itself.
 | `$schema` | Accepted and ignored, as the portal-config plan already says. Not written by the scaffold until the schema file exists. |
 | Ownership per block | `portal` is user-authored. In this release the CLI writes it once, from quickstart, and never again; the quickstart PR that adopts an existing directory (section 1) writes it into a file that already exists, which is why the writer below knows no block. `plugin` and `languages` are shared, as `plugin-config.json` was designed to be: the user may edit them and the CLI merges into them after `plugin generate` and `sdk publish`. |
 | Validation per block | `portal` keeps today's strictness: every field validated, unknown fields reported with the near-miss hint. `plugin` and `languages` keep today's leniency: shape checks that protect the merge, unknown fields preserved, and the two `plugin` checks that make the file `unreadable` today — `PLUGIN_ID_PATTERN` on `pluginId`, semver on `pluginVersion` — kept as `plugin` findings (decided 2026-09-22, section 11). The two policies already exist; they now apply to blocks instead of files. |
-| Byte-order mark | Stripped, then parsed. `portal.json` strips one today and `plugin-config.json` refuses one as `unreadable`; with one file the parser has to pick, and stripping is the only choice that cannot break a project that works today. The plugin path's byte-order-mark `reason` is deleted. Windows is where a byte-order mark comes from — Notepad and PowerShell redirection write it — and it is now the portal's file too. |
+| Byte-order mark | Stripped, then parsed. `portal.json` strips one today and `plugin-config.json` refuses one as `unreadable`; with one file the parser has to pick, and stripping is the only choice that cannot break a project that works today. The plugin path's byte-order-mark `reason` is deleted. Windows is where a byte-order mark comes from — Notepad and PowerShell redirection write it — and it is now the portal's file too. Reading past a mark is enough only while the file stays here: `plugin generate` zips `src/` and sends it to a parser that is not this one, so that path takes the mark off the file before the zip (section 6). Only the mark is removed; the rest of the file is written back byte for byte, so a layout the CLI never chose survives a rewrite it never asked for. |
 | Unknown root keys | Ignored, and preserved untouched by the writers — the same leniency `plugin` and `languages` get, for the same reason: a file written by a later CLI that adds a root block must still be readable by this one, which is what `schemaVersion` exists to gate instead. No near-miss hint at the root; a misspelled block is reported only as the required block being absent. |
 | A required block is absent | Reported by the command that needs it, naming the block and nothing else: `'portal' is required`. That is the whole root-level report, so a user who wrote `portla` is told what is missing rather than what is unrecognised. |
 | Which findings reach which command | Every finding carries the block it came from. `portal generate` and `portal serve` see root-level and `portal` findings; the plugin path sees root-level, `plugin` and `languages`, and never `portal`. A malformed `languages` entry therefore cannot fail a portal build, which is what the ownership split above and the invariants in section 4 both require. When `portal generate` later reads `languages` (the series' last PR, and `x-codeSamples` after it), it opts into those findings deliberately and this row is revisited. |
@@ -239,14 +239,24 @@ its parser in `PluginConfigContext`.
 - No action or command signature changes. Every reader already holds `src/` —
   as `buildDirectory` on the plugin side, `sourceDirectory` on the portal side —
   and the file is there. `PluginGenerateAction` zips `src/` in place as today;
-  `apimatic.json` travels in it and nothing is synthesized (section 2).
+  `apimatic.json` travels in it and nothing is synthesized (section 2). Because
+  it travels, that action asks the context to take a byte-order mark off the
+  file before the zip, and fails with a message naming the file if it cannot:
+  the mark this CLI reads past is one the service's own parser would meet. It
+  runs after the guards, so a run that stops short of the zip — no metadata, no
+  published SDKs — never rewrites anything.
 - `PortalSourceContext.scaffold` writes the config through `ApimaticConfigContext`,
   so the path, the key order and the serializer are owned in one place rather
   than by a second `JSON.stringify` call. The directory is empty when it runs
   (section 4), so this is always a create. It still writes `spec/`,
   `content/index.md` and `content/nav.json`. This moves with the context in
   step 3, not later: once `resolve` demands a `portal` block, a `scaffold` still
-  writing the old shape leaves quickstart serving nothing.
+  writing the old shape leaves quickstart serving nothing. It returns
+  `Result<void, PortalScaffoldProblem>` rather than throwing: the merge reports a
+  write fault as a value, and the file-service faults it always propagated are
+  caught with it, so the wizard reports the failure instead of ending in an oclif
+  stack. The problem is a variant per message, as `PortalSourceProblem` is, so the
+  sentences stay in the prompts with the rest of the portal's wording.
 - Quickstart's tree: unchanged code. `apimatic.json` shows in the `src/` walk
   with its description from `Directory.fileDescriptions`, and the heading
   "`src` directory containing source files created at `<input>`" stays true.

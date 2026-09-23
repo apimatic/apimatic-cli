@@ -72,7 +72,7 @@ export class PluginRecordMetadataPrompts {
   public pluginConfigUnreadable() {
     const message =
       `${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be read, so its plugin details were not written. ` +
-      `Fix or delete it and try again.`;
+      `Fix it and try again.`;
     log.error(message);
   }
 

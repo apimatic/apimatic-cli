@@ -6,6 +6,7 @@ import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 
 // Each link lands on the section that covers loading an unpublished folder, not the page it sits in.
 const CLAUDE_CODE_PLUGINS_URL = 'https://code.claude.com/docs/en/plugins#test-your-plugins-locally';
@@ -51,10 +52,20 @@ export class PluginGeneratePrompts {
     log.error(error);
   }
 
+  public configNotPrepared(failure: PluginConfigWriteFailure, buildDirectory: DirectoryPath) {
+    const message =
+      failure === 'unreadable'
+        ? `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(buildDirectory)} could not be read. ` +
+          `Check that it can be read and try again.`
+        : `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(buildDirectory)} starts with a byte-order mark, ` +
+          `which the plugin cannot be generated from, and it could not be rewritten without one. ` +
+          `Save the file as UTF-8 without a BOM and try again.`;
+    log.error(message);
+  }
+
   public pluginConfigUnreadable(reason: string, path: FilePath) {
     const message =
-      `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be used: ${reason}. ` +
-      `Fix or delete it at ${f.path(path)} and try again.`;
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be used: ${reason}. ` + `Fix it at ${f.path(path)} and try again.`;
     log.error(message);
   }
 

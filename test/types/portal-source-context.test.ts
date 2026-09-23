@@ -701,7 +701,8 @@ describe('PortalSourceContext', () => {
       return new FilePath(new DirectoryPath(root).join('downloads'), new FileName(name));
     };
 
-    const scaffold = (specPath: FilePath) => new PortalSourceContext(source).scaffold(specPath);
+    const scaffold = async (specPath: FilePath) =>
+      (await new PortalSourceContext(source).scaffold(specPath))._unsafeUnwrap();
     const read = (relative: string) => fs.readFileSync(path.join(source.toString(), relative), 'utf8');
 
     const frontMatterOf = (markdown: string): Record<string, unknown> => {
@@ -757,6 +758,33 @@ describe('PortalSourceContext', () => {
       await scaffold(new FilePath(new DirectoryPath(root).join('downloads'), new FileName('broken.json')));
 
       expect(JSON.parse(read('apimatic.json'))).to.deep.equal({ schemaVersion: 1, portal: { title: 'My API' } });
+    });
+
+    // The wizard asks its questions before it writes anything, so a fault here has to come back
+    // as a message it can report -- a throw would leave oclif to print a stack over the wizard.
+    it('reports a configuration it cannot write into rather than throwing', async () => {
+      write('project/src/apimatic.json', '{ not json');
+
+      const scaffolded = await new PortalSourceContext(source).scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({ kind: 'configUnreadable' });
+    });
+
+    it('reports a source directory it cannot write rather than throwing', async () => {
+      const failing = sinon.stub(FileService.prototype, 'writeContents').rejects(new Error('EACCES: denied'));
+
+      try {
+        const scaffolded = await new PortalSourceContext(source).scaffold(
+          writeSpec({ title: 'Petstore', version: '1' })
+        );
+
+        expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'sourceUnwritable',
+          reason: 'EACCES: denied'
+        });
+      } finally {
+        failing.restore();
+      }
     });
 
     it('unpacks a split specification into the spec directory', async () => {

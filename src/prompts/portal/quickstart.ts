@@ -10,6 +10,8 @@ import { Directory } from '../../types/file/directory.js';
 import { createResourceInputFromInput, ResourceInput } from '../../types/file/resource-input.js';
 import { FileDownloadResponse } from '../../infrastructure/services/file-download-service.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { PortalScaffoldProblem } from '../../types/portal/portal-source.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 
@@ -140,6 +142,26 @@ export class PortalQuickstartPrompts {
 
   public noInputDirectoryProvided() {
     log.error('No directory was specified.');
+  }
+
+  public scaffoldFailed(problem: PortalScaffoldProblem, sourceDirectory: DirectoryPath) {
+    switch (problem.kind) {
+      case 'configUnreadable': {
+        const message =
+          `${f.var(APIMATIC_CONFIG_FILE_NAME)} is already in ${f.path(sourceDirectory)} and could not be read, ` +
+          `so the portal was not written into it.`;
+        log.error(message);
+        return;
+      }
+      case 'configUnwritable': {
+        log.error(`${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written to ${f.path(sourceDirectory)}.`);
+        return;
+      }
+      case 'sourceUnwritable': {
+        log.error(`${f.path(sourceDirectory)} could not be written: ${problem.reason}`);
+        return;
+      }
+    }
   }
 
   public downloadSpecFile(fn: Promise<Result<FileDownloadResponse, ServiceError>>) {
