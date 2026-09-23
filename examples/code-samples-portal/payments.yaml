@@ -1,0 +1,324 @@
+openapi: 3.1.0
+info:
+  title: Payments API
+  version: 1.0.0
+  description: >-
+    The annotated copy the CLI would build from, after merging
+    code-samples/<language>.json into the spec (SDK-ARTIFACTS-DESIGN.md §7.2–7.3).
+servers:
+  - url: https://api.example.com/v1
+
+paths:
+  /payments:
+    # Non-method keys on a path item are not operations and get no samples.
+    summary: Payments
+    parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      operationId: createPayment
+      summary: Create a payment
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+            examples:
+              minimal:
+                summary: Amount and currency only
+                value:
+                  amount: 1000
+                  currency: USD
+              full:
+                summary: Every optional field set
+                value:
+                  amount: 1000
+                  currency: USD
+                  description: Order 1042
+                  customerId: cus_123
+                  metadata:
+                    orderId: '1042'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+      # Two declared ids: labels carry the ` · <exampleId>` suffix. Languages follow
+      # configured order, examples follow catalog order, one language's tabs stay adjacent.
+      x-codeSamples:
+        - lang: typescript
+          label: TypeScript · minimal
+          source: |-
+            const response = await client.payments.createPayment({
+              amount: 1000,
+              currency: 'USD',
+            });
+        - lang: typescript
+          label: TypeScript · full
+          source: |-
+            const response = await client.payments.createPayment({
+              amount: 1000,
+              currency: 'USD',
+              description: 'Order 1042',
+              customerId: 'cus_123',
+              metadata: { orderId: '1042' },
+            });
+        - lang: csharp
+          label: C# · minimal
+          source: |-
+            var response = await client.Payments.CreatePaymentAsync(new CreatePaymentRequest
+            {
+                Amount = 1000,
+                Currency = "USD",
+            });
+        - lang: csharp
+          label: C# · full
+          source: |-
+            var response = await client.Payments.CreatePaymentAsync(new CreatePaymentRequest
+            {
+                Amount = 1000,
+                Currency = "USD",
+                Description = "Order 1042",
+                CustomerId = "cus_123",
+                Metadata = new Dictionary<string, string> { ["orderId"] = "1042" },
+            });
+        - lang: python
+          label: Python · minimal
+          source: |-
+            response = client.payments.create_payment(
+                amount=1000,
+                currency="USD",
+            )
+        - lang: python
+          label: Python · full
+          source: |-
+            response = client.payments.create_payment(
+                amount=1000,
+                currency="USD",
+                description="Order 1042",
+                customer_id="cus_123",
+                metadata={"orderId": "1042"},
+            )
+    get:
+      operationId: listPayments
+      summary: List payments
+      tags: [Payments]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+      # No declared examples: the catalog key is the "Example" sentinel, so labels are bare.
+      x-codeSamples:
+        - lang: typescript
+          label: TypeScript
+          source: |-
+            const response = await client.payments.listPayments({ limit: 20 });
+        - lang: csharp
+          label: C#
+          source: |-
+            var response = await client.Payments.ListPaymentsAsync(limit: 20);
+        - lang: python
+          label: Python
+          source: |-
+            response = client.payments.list_payments(limit=20)
+
+  /payments/{paymentId}:
+    parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getPayment
+      summary: Get a payment
+      tags: [Payments]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+      x-codeSamples:
+        - lang: typescript
+          label: TypeScript
+          source: |-
+            const response = await client.payments.getPayment('pay_123');
+        - lang: csharp
+          label: C#
+          source: |-
+            var response = await client.Payments.GetPaymentAsync("pay_123");
+        - lang: python
+          label: Python
+          source: |-
+            response = client.payments.get_payment("pay_123")
+
+  /payments/{paymentId}/refunds:
+    parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: refundPayment
+      summary: Refund a payment
+      tags: [Refunds]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+            examples:
+              full-refund:
+                value: {}
+              partial-refund:
+                value:
+                  amount: 250
+      responses:
+        '201':
+          description: Created
+      # No Python sample for this operation, so it simply has no Python tabs.
+      x-codeSamples:
+        - lang: typescript
+          label: TypeScript · full-refund
+          source: |-
+            const response = await client.refunds.refundPayment('pay_123', {});
+        - lang: typescript
+          label: TypeScript · partial-refund
+          source: |-
+            const response = await client.refunds.refundPayment('pay_123', { amount: 250 });
+        - lang: csharp
+          label: C# · full-refund
+          source: |-
+            var response = await client.Refunds.RefundPaymentAsync("pay_123", new RefundRequest());
+        - lang: csharp
+          label: C# · partial-refund
+          source: |-
+            var response = await client.Refunds.RefundPaymentAsync("pay_123", new RefundRequest
+            {
+                Amount = 250,
+            });
+
+  /health:
+    get:
+      operationId: ping
+      summary: Health check
+      tags: [Health]
+      security: []
+      responses:
+        '204':
+          description: Healthy
+      x-codeSamples:
+        - lang: typescript
+          label: TypeScript
+          source: |-
+            await client.health.ping();
+        - lang: csharp
+          label: C#
+          source: |-
+            await client.Health.PingAsync();
+        - lang: python
+          label: Python
+          source: |-
+            client.health.ping()
+
+  # A path item that is itself a $ref has no inline operation, so the walk leaves it untouched.
+  /customers/{customerId}:
+    $ref: '#/components/pathItems/Customer'
+
+# Webhooks stay curl-only (D24); the catalog's `webhooks` map is empty.
+webhooks:
+  paymentSucceeded:
+    post:
+      summary: Payment succeeded
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Payment'
+      responses:
+        '200':
+          description: Acknowledged
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      schema:
+        type: string
+  pathItems:
+    Customer:
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      get:
+        operationId: getCustomer
+        summary: Get a customer
+        tags: [Customers]
+        responses:
+          '200':
+            description: OK
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          description: Minor units.
+        currency:
+          type: string
+        description:
+          type: string
+        customerId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    RefundRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+          description: Omit to refund in full.
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        amount:
+          type: integer
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [pending, succeeded, failed, refunded]
+
+security:
+  - bearer: []
