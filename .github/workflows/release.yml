@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Keep this at 24 or newer: npm trusted publishing (OIDC) needs npm >= 11.5.1,
-        # and Node 24 is the first release whose bundled npm clears that.
+        # Keep this resolving to 24.5.0 or newer: npm trusted publishing (OIDC) needs
+        # npm >= 11.5.1, and Node 24.5.0 is the first release whose bundled npm clears that.
         node: [ '24' ]
     name: Release with Node version ${{ matrix.node }}
     steps:
@@ -29,15 +29,14 @@ jobs:
           fetch-depth: 0
           path: cli
 
-      - name: setup node
-        uses: actions/setup-node@v4
+      # Corepack is not distributed with Node 25 and newer.
+      - name: setup pnpm
+        uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
         with:
-          node-version: ${{ matrix.node }}
+          version: 11.0.8
+          standalone: true
 
-      - name: enable corepack
-        run: corepack enable
-
-      - name: configure pnpm cache
+      - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
