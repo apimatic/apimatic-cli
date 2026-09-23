@@ -50,8 +50,9 @@ This is Microsoft's documented side-by-side arrangement, and it is temporary. **
 once typescript-eslint supports TypeScript 7** (tracked at
 <https://github.com/typescript-eslint/typescript-eslint/issues/10940>): drop the
 `@typescript/native` alias, point `typescript` back at `^7`, and bump `@typescript-eslint/*`
-to whatever release added support. Nothing else depends on the arrangement — no source file
-imports `typescript`.
+to whatever release added support. The one other dependent is
+`test/e2e/portal-build.test.ts`, which resolves the compiler through
+`@typescript/native/package.json`; point it back at `typescript` in the same change.
 
 Two traps while it is in place:
 
