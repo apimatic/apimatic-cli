@@ -46,62 +46,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Payment'
-      # Two declared ids: labels carry the ` · <exampleId>` suffix. Languages follow
-      # configured order, examples follow catalog order, one language's tabs stay adjacent.
-      x-codeSamples:
+      # One entry per language, its sources keyed by the declared example ids, so the
+      # example selector picks the snippet. Languages follow configured order.
+      x-apimatic-codeSamples:
         - lang: typescript
-          label: TypeScript · minimal
-          source: |-
-            const response = await client.payments.createPayment({
-              amount: 1000,
-              currency: 'USD',
-            });
-        - lang: typescript
-          label: TypeScript · full
-          source: |-
-            const response = await client.payments.createPayment({
-              amount: 1000,
-              currency: 'USD',
-              description: 'Order 1042',
-              customerId: 'cus_123',
-              metadata: { orderId: '1042' },
-            });
+          label: TypeScript
+          sources:
+            minimal: |-
+              const response = await client.payments.createPayment({
+                amount: 1000,
+                currency: 'USD',
+              });
+            full: |-
+              const response = await client.payments.createPayment({
+                amount: 1000,
+                currency: 'USD',
+                description: 'Order 1042',
+                customerId: 'cus_123',
+                metadata: { orderId: '1042' },
+              });
         - lang: csharp
-          label: C# · minimal
-          source: |-
-            var response = await client.Payments.CreatePaymentAsync(new CreatePaymentRequest
-            {
-                Amount = 1000,
-                Currency = "USD",
-            });
-        - lang: csharp
-          label: C# · full
-          source: |-
-            var response = await client.Payments.CreatePaymentAsync(new CreatePaymentRequest
-            {
-                Amount = 1000,
-                Currency = "USD",
-                Description = "Order 1042",
-                CustomerId = "cus_123",
-                Metadata = new Dictionary<string, string> { ["orderId"] = "1042" },
-            });
+          label: C#
+          sources:
+            minimal: |-
+              var response = await client.Payments.CreatePaymentAsync(new CreatePaymentRequest
+              {
+                  Amount = 1000,
+                  Currency = "USD",
+              });
+            full: |-
+              var response = await client.Payments.CreatePaymentAsync(new CreatePaymentRequest
+              {
+                  Amount = 1000,
+                  Currency = "USD",
+                  Description = "Order 1042",
+                  CustomerId = "cus_123",
+                  Metadata = new Dictionary<string, string> { ["orderId"] = "1042" },
+              });
         - lang: python
-          label: Python · minimal
-          source: |-
-            response = client.payments.create_payment(
-                amount=1000,
-                currency="USD",
-            )
-        - lang: python
-          label: Python · full
-          source: |-
-            response = client.payments.create_payment(
-                amount=1000,
-                currency="USD",
-                description="Order 1042",
-                customer_id="cus_123",
-                metadata={"orderId": "1042"},
-            )
+          label: Python
+          sources:
+            minimal: |-
+              response = client.payments.create_payment(
+                  amount=1000,
+                  currency="USD",
+              )
+            full: |-
+              response = client.payments.create_payment(
+                  amount=1000,
+                  currency="USD",
+                  description="Order 1042",
+                  customer_id="cus_123",
+                  metadata={"orderId": "1042"},
+              )
     get:
       operationId: listPayments
       summary: List payments
@@ -121,20 +118,23 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Payment'
-      # No declared examples: the catalog key is the "Example" sentinel, so labels are bare.
-      x-codeSamples:
+      # No declared examples: the only snippet is keyed by the "Example" sentinel.
+      x-apimatic-codeSamples:
         - lang: typescript
           label: TypeScript
-          source: |-
-            const response = await client.payments.listPayments({ limit: 20 });
+          sources:
+            Example: |-
+              const response = await client.payments.listPayments({ limit: 20 });
         - lang: csharp
           label: C#
-          source: |-
-            var response = await client.Payments.ListPaymentsAsync(limit: 20);
+          sources:
+            Example: |-
+              var response = await client.Payments.ListPaymentsAsync(limit: 20);
         - lang: python
           label: Python
-          source: |-
-            response = client.payments.list_payments(limit=20)
+          sources:
+            Example: |-
+              response = client.payments.list_payments(limit=20)
 
   /payments/{paymentId}:
     parameters:
@@ -154,19 +154,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Payment'
-      x-codeSamples:
+      x-apimatic-codeSamples:
         - lang: typescript
           label: TypeScript
-          source: |-
-            const response = await client.payments.getPayment('pay_123');
+          sources:
+            Example: |-
+              const response = await client.payments.getPayment('pay_123');
         - lang: csharp
           label: C#
-          source: |-
-            var response = await client.Payments.GetPaymentAsync("pay_123");
+          sources:
+            Example: |-
+              var response = await client.Payments.GetPaymentAsync("pay_123");
         - lang: python
           label: Python
-          source: |-
-            response = client.payments.get_payment("pay_123")
+          sources:
+            Example: |-
+              response = client.payments.get_payment("pay_123")
 
   /payments/{paymentId}/refunds:
     parameters:
@@ -194,27 +197,25 @@ paths:
       responses:
         '201':
           description: Created
-      # No Python sample for this operation, so it simply has no Python tabs.
-      x-codeSamples:
+      # No Python sample for this operation, so it has no Python tab.
+      x-apimatic-codeSamples:
         - lang: typescript
-          label: TypeScript · full-refund
-          source: |-
-            const response = await client.refunds.refundPayment('pay_123', {});
-        - lang: typescript
-          label: TypeScript · partial-refund
-          source: |-
-            const response = await client.refunds.refundPayment('pay_123', { amount: 250 });
+          label: TypeScript
+          sources:
+            full-refund: |-
+              const response = await client.refunds.refundPayment('pay_123', {});
+            partial-refund: |-
+              const response = await client.refunds.refundPayment('pay_123', { amount: 250 });
         - lang: csharp
-          label: C# · full-refund
-          source: |-
-            var response = await client.Refunds.RefundPaymentAsync("pay_123", new RefundRequest());
-        - lang: csharp
-          label: C# · partial-refund
-          source: |-
-            var response = await client.Refunds.RefundPaymentAsync("pay_123", new RefundRequest
-            {
-                Amount = 250,
-            });
+          label: C#
+          sources:
+            full-refund: |-
+              var response = await client.Refunds.RefundPaymentAsync("pay_123", new RefundRequest());
+            partial-refund: |-
+              var response = await client.Refunds.RefundPaymentAsync("pay_123", new RefundRequest
+              {
+                  Amount = 250,
+              });
 
   /health:
     get:
@@ -225,19 +226,22 @@ paths:
       responses:
         '204':
           description: Healthy
-      x-codeSamples:
+      x-apimatic-codeSamples:
         - lang: typescript
           label: TypeScript
-          source: |-
-            await client.health.ping();
+          sources:
+            Example: |-
+              await client.health.ping();
         - lang: csharp
           label: C#
-          source: |-
-            await client.Health.PingAsync();
+          sources:
+            Example: |-
+              await client.Health.PingAsync();
         - lang: python
           label: Python
-          source: |-
-            client.health.ping()
+          sources:
+            Example: |-
+              client.health.ping()
 
   # A path item that is itself a $ref has no inline operation, so the walk leaves it untouched.
   /customers/{customerId}:

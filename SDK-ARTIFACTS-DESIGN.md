@@ -1,6 +1,6 @@
 # Code samples in the portal — the `/api/portal-artifacts` contract
 
-**Status:** codegen-v2 endpoint implemented except `GenerateCodeSamples`; CLI and apimatic-io not started.
+**Status:** codegen-v2 endpoint implemented except `GenerateCodeSamples`; CLI renders samples from a fixture catalog; apimatic-io not started.
 **Purpose:** the single place the CLI, apimatic-io and codegen-v2 agree on what crosses the
 wire, so the Azure Function can be written from it. Every claim under
 [Verified facts](#8-verified-facts) carries a `file:line` reference and can be re-checked.
@@ -52,7 +52,7 @@ apimatic {quickstart | portal generate | portal serve}
   │  poll ◀────── status ──────────────────────────────────┤
   │  download ◀── portal-artifacts.zip ────────────────────┘
   │
-  ├─ merge code-samples/<lang>.json into a COPY of the spec tree as x-codeSamples
+  ├─ merge code-samples/<lang>.json into a COPY of the spec tree as x-apimatic-codeSamples
   ├─ place sdk/<lang>.zip under the portal output's static assets
   └─ vite build (or vite dev) over the annotated copy ──▶ portal
 ```
@@ -86,8 +86,8 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D13 | **Copy the spec tree into the temp project and annotate the copy.** Relative `$ref`s then keep resolving. See D20 for refs that escape `src/spec/`. |
 | D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. |
 | D17 | The Func wiring is the critical path and is what this document specifies. |
-| D18 | **One `x-codeSamples` array entry per (language × example).** Upstream `fumadocs-openapi` gives each entry its own `lang` and `label`, so every example gets a tab with no fork and no patch. |
-| D19 | **Tab order: curl first, then languages in configured order, examples in catalog order** — and all tabs of one language stay adjacent: `curl, TypeScript · minimal, TypeScript · full, C# · minimal, …`. |
+| D18 | **One `x-apimatic-codeSamples` entry per language, its `sources` keyed by example id**, and the tab follows fumadocs' example selector. `x-codeSamples` is ignored, hand-written or not: each entry is a fixed tab the selector cannot switch, and fumadocs-openapi 11.4.1 renders it empty. |
+| D19 | **Tab order: curl first, then one tab per language in configured order**: `curl, TypeScript, C#, …`. |
 | D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
 | D22 | **Reuse codegen-v2's status vocabulary verbatim**, `SubscriptionError` included. The CLI's poller already handles all of it. |
@@ -251,12 +251,13 @@ Rules, all of which the consumer depends on:
 
 - **Path is the template verbatim, with its leading slash**, exactly as the document writes
   it. **Method is uppercase.**
-- **The example id is the OpenAPI `examples:` map key** — an author-written name, so tab
-  captions read `minimal` / `full` rather than `example1`.
+- **The example id is the OpenAPI `examples:` map key** — the same key fumadocs' example
+  selector switches on, so a snippet lines up with the example it was rendered from.
 - **`"Example"` is a reserved sentinel**, not a real id. An operation's id set is the union
   of its members' declared example names; a position the spec left silent carries the name
   `"Example"`. It is filtered out, and stands in only when the union would otherwise be
-  empty. **The CLI must never render it as a caption.**
+  empty. **It never matches an example**: the portal shows it only as the only snippet of
+  an operation with one example, which fumadocs names `_default`.
 - **Code is raw and unfenced.** The consumer wraps it in whatever it writes into.
 - **Declaration order is authorial intent and is preserved.** Do not sort.
 - **`webhooks` is emitted, empty, from day one.** Webhook operations get no samples
@@ -371,15 +372,15 @@ Following the 5-layer stack in `.ai/instructions.md`:
 | Call the endpoint, poll, download | Infrastructure service | `PortalArtifactsService` (`services/portal-artifacts-service.ts`), axios-auth variant |
 | Parse `code-samples/<lang>.json` | Types (value object) | `CodeSampleCatalog` |
 | The downloaded zip as a thing | Types (value object) | `PortalArtifacts` — `catalogs()`, `sdkZips()`, ignores unknown folders |
-| Inject `x-codeSamples` | Application | pure: `(document, catalogs, languageOrder) -> document` |
-| Detect escaping `$ref`s | Application | pure: `(document, specRoot) -> FileName[]` |
+| Inject `x-apimatic-codeSamples` | Types (value object) | `OpenApiDocument.withCodeSamples(codeSamples) -> OpenApiDocument` |
+| Detect escaping `$ref`s | Types (value object) | `OpenApiDocument.refersOutside(specDirectory) -> boolean` |
 | Copy + annotate the spec tree, repoint slugs | Infrastructure | `PortalProjectService` |
 | Place `sdk/<lang>.zip` in the built site | Infrastructure | `PortalContext` — it already owns the output directory ([D35](#d35)) |
 | Poll loop | — | **reuse** `pollUntilCompleted`; [D22](#wire-format) makes it a no-change |
 
-Injection belongs in `src/application/` as a pure function: it has the most edge cases and
-most needs tests that touch neither network nor filesystem. That directory is currently
-empty — this is what brings it back.
+Injection is a method on the document it rewrites: it has the most edge cases and most
+needs tests that touch neither network nor filesystem, and a value object gives both
+without reviving `src/application/`.
 
 ### 7.2 Merging the catalog into the spec
 
@@ -387,7 +388,8 @@ empty — this is what brings it back.
 slug → **absolute path**, and each slug is independent. That is the whole seam:
 
 1. Copy `src/spec/` into the temp project ([D13](#wire-format)).
-2. For each spec, walk `paths` and inject `x-codeSamples` from each language's catalog.
+2. For each spec, walk `paths` and inject `x-apimatic-codeSamples` from each language's
+   catalog, replacing any the operation already carries.
 3. Point that slug at the annotated copy.
 4. For a spec with a `$ref` escaping `src/spec/`, **skip steps 1–3 and point the slug at
    the original file** ([D20](#wire-format)). It then builds exactly as it does today and
@@ -407,24 +409,23 @@ test containment in `src/spec/`.
 ### 7.3 Rendering the tabs
 
 ```jsonc
-"x-codeSamples": [
-  { "lang": "typescript", "label": "TypeScript · minimal", "source": "..." },
-  { "lang": "typescript", "label": "TypeScript · full",    "source": "..." },
-  { "lang": "csharp",     "label": "C# · minimal",         "source": "..." }
+"x-apimatic-codeSamples": [
+  { "lang": "typescript", "label": "TypeScript", "sources": { "minimal": "...", "full": "..." } },
+  { "lang": "csharp",     "label": "C#",         "sources": { "minimal": "..." } }
 ]
 ```
 
 - `lang` is the `Language` enum value verbatim. It is simultaneously the catalog filename,
-  the `x-codeSamples` language and the Shiki grammar key — one token, three uses, no
-  mapping table.
-- `label` comes from `LANGUAGE_CHOICES`, suffixed ` · <exampleId>` **only when the
-  operation declares more than one id**. When the id set is just the `"Example"` sentinel,
-  the label is the bare language name.
-- Order: curl, then languages in configured order, examples in catalog order, all tabs of
-  one language adjacent ([D19](#wire-format)).
+  the tab id and the Shiki grammar key — one token, three uses, no mapping table.
+- `label` is the bare language name from `LANGUAGE_CHOICES`; the example is chosen by
+  fumadocs' example selector, never by the label.
+- Order: curl, then languages in configured order ([D19](#wire-format)).
 
-Nothing in the portal template needs to change. `api-page.tsx` registers curl alone and its
-comment already names `x-codeSamples` as the source of the other tabs, and
+`api-page.tsx` registers curl alone and replaces fumadocs' usage tabs with
+`usage-tabs.tsx`, which reads the selected example id from the operation context. A
+language without a snippet for that example shows a note, never another example's code;
+an empty snippet is still a snippet. With one example, the language's only snippet shows
+whatever its key. A malformed entry is skipped rather than failing the page.
 `shiki-bundle.ts` already bundles grammars for **all seven** CLI languages, keyed by the
 same enum values.
 
@@ -462,7 +463,7 @@ Read from source on 2026-09-22. CLI facts are on `feat/code-samples-portal` (= `
 | `Language` enum values are `csharp java php python ruby typescript go` | `src/types/sdk/generate.ts:3-11` |
 | `LANGUAGE_CHOICES` is read in exactly one file, as prompt text only | `src/types/sdk/generate.ts:45-53`, used at `src/prompts/sdk/quickstart.ts:12,159-160,163,168` |
 | `shiki-bundle.ts` bundles grammars for **all seven** languages, keyed by the enum values | `portal-template/src/lib/shiki-bundle.ts` |
-| `api-page.tsx` registers curl only; its comment already names `x-codeSamples` | `portal-template/src/components/api-page.tsx:1-11` |
+| fumadocs-openapi 11.4.1 renders an `x-codeSamples` entry as an empty tab: it registers the entry per operation, but the tab body reads only the page registry | `fumadocs-openapi/dist/ui/operation/usage-tabs.js:51,108` |
 | A per-language `plugin-config.json` entry requires `codegenVersion` — so `{}` is not valid *today* | `src/types/plugin/plugin-config.ts:48-66` |
 | **`apimatic.json` does not exist anywhere in the repo** | repo-wide grep |
 
@@ -524,8 +525,9 @@ before implementing** — it may have moved under review.
 **CLI, unit.** Injection is a pure function, so most of this needs no filesystem:
 
 - A catalog entry keyed by a path/method the document does not contain → warn, do not fail.
-- The `"Example"` sentinel renders a bare language label; two declared ids render suffixes.
-- Tab order: curl first, languages in configured order, one language's tabs adjacent.
+- The `"Example"` sentinel shows only for an operation with one example; a language
+  without a snippet for the selected example shows a note.
+- Tab order: curl first, then languages in configured order.
 - A path item that is itself a `$ref` → skipped without throwing.
 - Non-method keys on a path item (`summary`, `parameters`, `servers`) → not treated as
   operations.
@@ -544,6 +546,6 @@ every lane's error keyed by language, not just the first. Aggregation receives i
 names rather than listing storage. A retried activity produces the same zip as a
 first-attempt one.
 
-**Manual** (`APIMATIC_BASE_URL` → `api.dev.apimatic.io`): a three-language portal renders
-every example tab on an operation page; a spec with a sibling `$ref` still builds;
+**Manual** (`APIMATIC_BASE_URL` → `api.dev.apimatic.io`): a three-language portal switches
+every language's snippet with the example selector; a spec with a sibling `$ref` still builds;
 `portal serve` starts after a full generation; Ctrl+C mid-generation leaves nothing behind.
