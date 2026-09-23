@@ -45,7 +45,8 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    let configState = await new PluginConfigContext(buildDirectory).getPluginConfigState();
+    const configContext = new PluginConfigContext(buildDirectory);
+    let configState = await configContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
@@ -71,6 +72,15 @@ export class PluginGenerateAction {
       this.prompts.noPublishedSdks();
       this.prompts.nextStepsPublishSdks();
       return ActionResult.success();
+    }
+
+    // `src/` is zipped as it sits on disk, so a byte-order mark the reader above looked past
+    // would travel to a service that reads the file with its own parser. Done here rather than
+    // on the read: a run that stops short of the zip has no reason to rewrite the file.
+    const prepared = await configContext.removeByteOrderMark();
+    if (prepared.isErr()) {
+      this.prompts.configNotPrepared(prepared.error, buildDirectory);
+      return ActionResult.failed();
     }
 
     return await withDirPath(async (tempDirectory) => {

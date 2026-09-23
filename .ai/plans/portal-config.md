@@ -5,6 +5,27 @@ Status: decided 2026-09-21 with no open questions, not started. Builds on `.ai/p
 page; not yet implemented, assumed to ship in the same 2.0 release). Section 13
 lists what those two plans need amended.
 
+Amended 2026-09-22 by `.ai/plans/apimatic-config.md`, which moved the file:
+
+- `portal.json` is now the `portal` block of `src/apimatic.json`, shared with the
+  plugin commands' `plugin` and `languages` blocks. Every key structure below
+  lands inside that block; the file's root is lenient and owned by that plan.
+- `sdks.languages` is dropped. The portal reads the shared top-level `languages`
+  block that `sdk publish` writes — a map keyed by language, carrying `source`,
+  `package` and `codegenVersion` — so the SDK page gets its package and repository
+  fields from the same place the plugin does. The rejected "top-level
+  `languages`" entry is reversed. The required-key set loses its only required
+  path until the last PR of that series requires a `languages` entry for
+  `portal generate`.
+- The schema file becomes `apimatic.schema.json` with the `portal` block as one
+  definition; the `$schema` URL follows.
+- The scaffold writes the `portal` block of `src/apimatic.json`; the wizard's
+  language step writes top-level `languages` entries, settled when that series'
+  quickstart PR lands.
+- Section 11's claim that PR #343 carries the `BREAKING CHANGE:` footer is wrong:
+  its commit body is empty. The footer rides on the last PR of the
+  apimatic-config series, and `dev` is not merged into `main` before then.
+
 Reference: the PM's proposal "Portal Configuration: MVP Structure" (Abdul Hannan,
 2026-09-18). It was used for *capabilities*; key names were chosen here against
 Fumadocs' own prop names, Mintlify's `docs.json`, Starlight and Docusaurus.
@@ -40,13 +61,13 @@ a hidden sidebar on the Home tab (section 12).
 | Home | `content/index.md` rendered in the docs layout, with an optional CTA button under the title. No landing layout. The Home tab's sidebar holds only the home page; hiding it is deferred. |
 | Sections without pages | `sdks` and `ai` are accepted now and resolve to nothing until their pages exist. A section with no pages emits no tab. |
 | Sections left out of the array | Appended after the listed ones, in default order, with their default label. Listing a section sets its label and position; nothing hides it. Hiding, if ever needed, arrives as an explicit `hidden: true` on the entry, which is additive, so this default never has to change. Same rule the navigation plan applies to unnamed pages. |
-| `languages` | Lives at `sdks.languages`, not top level. Required, with at least one entry, as the navigation plan already says; the only required path in the file. |
+| `languages` | **Superseded 2026-09-22.** The shared top-level `languages` block of `apimatic.json`, written by `sdk publish`, is what the portal reads; there is no `sdks.languages`. Required for `portal generate` only from the last PR of the apimatic-config series. |
 | Layouts | `docs`, `notebook`, `notebook-navbar`, `glass`. Default `notebook-navbar`. `flux` is not exposed. |
 | Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. The preset supplies every other token. |
 | Fonts | A validated shortlist plus `system`. No free text. Loaded from Google Fonts at runtime, as Geist is today; `system` makes no network request. |
 | Favicon default | The light logo, as today; none when there is no logo. The APIMatic mark is never shipped onto a customer's domain. |
 | Site name default | Derived from `info.title` when the project has exactly one spec. With two or more specs `site.name` is required. |
-| JSON schema | `portal.schema.json` ships in the npm package and is referenced from a CDN URL; the scaffold writes the `$schema` line; a test keeps schema and parser in step. |
+| JSON schema | `apimatic.schema.json` ships in the npm package and is referenced from a CDN URL; the scaffold writes the `$schema` line; a test keeps schema and parser in step. |
 | Key names | The five deviations from the PM draft stand: `brand.colors.preset`, `brand.colorMode`, `brand.fonts`, `navigation.links`, `showInternal`. |
 | Raw tokens | `advanced.tokens.{light,dark}` are validated by name and passed through in this release, because the same generated stylesheet carries them for free. The contrast gate is post-MVP. |
 | Colour formats | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `hsl()` for `brand.colors.primary`, because the foreground derivation has to parse it. Raw tokens accept any CSS colour string. |
@@ -65,9 +86,10 @@ Rejected, with reasons:
   root.
 - **A landing page on Fumadocs' HomeLayout.** A second layout with its own
   navbar rules and a fourth page type in the routes, for a CTA a button covers.
-- **Top-level `languages`.** Every other key lives under a concept; the bare
-  word means locales in Fumadocs' and Mintlify's own configs; and the SDK page
-  will want package and repository fields next to the list.
+- ~~**Top-level `languages`.**~~ **Reversed 2026-09-22.** The block is shared
+  with `sdk publish`, so it lives at the top level of `apimatic.json`, and the
+  package and repository fields the SDK page wants are exactly what `sdk publish`
+  writes there. The locale reading of the bare word is accepted as the cost.
 - **Tinting accent, secondary and muted from the primary.** Hue and chroma math
   per preset, and it fights presets like `vitepress` and `ocean` that restyle
   surfaces themselves. `advanced.tokens` is the escape hatch.
@@ -95,7 +117,7 @@ Rejected, with reasons:
 
 ```json
 {
-  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/portal.schema.json",
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
   "site": {
     "name": "Calculator API",
     "url": "https://docs.example.com",
@@ -394,10 +416,10 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 | `tableOfContentsPath` | still the `nav.json` note |
 | `navTitle`, `logoLink`, `logoAltText`, `headIncludes`, `tailIncludes`, `whiteLabel`, `theme.fontSource`, `theme.layout.*`, everything else | unsupported |
 
-- **JSON schema.** `portal.schema.json` at the repository root, listed in
+- **JSON schema.** `apimatic.schema.json` at the repository root, listed in
   `files`. Hand-written; a test runs every fixture through both `ajv` (dev
   dependency) and `PortalConfig.parse` and asserts they agree on validity. The
-  `$schema` URL is `https://cdn.jsdelivr.net/npm/@apimatic/cli@2/portal.schema.json`.
+  `$schema` URL is `https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json`.
 - **Prompts.** New source problems: a missing dark logo or favicon named with its
   key; `site.name` required for several specs; the serve watcher's re-applied,
   rejected and restart-needed messages.
@@ -515,9 +537,11 @@ Two PRs against `dev`, both before the 2.0 stable cut, after PR #343 merges.
    source module, after the `nav.json` PR has landed, since the `root` hook
    extends its transformer.
 
-Both are ordinary `feat(portal)` commits. The `BREAKING CHANGE:` footer is
-PR #343's, and it already names the new `portal.json` layout; these PRs change
-a schema no release has shipped.
+Both are ordinary `feat(portal)` commits. **Corrected 2026-09-22**: PR #343
+carries no `BREAKING CHANGE:` footer — its commit body is empty — so the footer
+rides on the last PR of the apimatic-config series, and `dev` is not merged into
+`main` before that PR lands (`.ai/plans/apimatic-config.md`, section 2). These
+PRs still change a schema no release has shipped.
 
 ## 12. To verify during implementation
 
@@ -557,8 +581,9 @@ amend, not the navigation plan.
 - Section 2 and 3: drop the `apimatic:api` and `apimatic:pages` tokens. The
   content root's `nav.json` orders the Guides section; both tokens become
   errors naming this plan.
-- Section 4: `languages` moves to `sdks.languages`. It stays required with at
-  least one entry (confirmed 2026-09-21).
+- Section 4: ~~`languages` moves to `sdks.languages`~~. **Superseded
+  2026-09-22**: `languages` is the shared top-level block of `apimatic.json`
+  (amendment at the top of this plan).
 - Section 6: the defaults paragraph describes tabs, not one flat list. The
   "nothing can disappear" rule now also covers sections: one left out of the
   array is appended, not hidden. Its claim that the fallback home page was
@@ -570,11 +595,12 @@ amend, not the navigation plan.
   hook in this plan's section 5 recognises injected pages by it.
 - Section 7: the API structure is applied inside the `api` root folder; the
   wrapper's label comes from `sections[api].label`.
-- Section 13: `scaffold` writes the `portal.json` from this plan's section 8.
+- Section 13: `scaffold` writes the `portal` block of `src/apimatic.json` from
+  this plan's section 8.
 
 `.ai/plans/fumadocs-portal.md`:
 
-- Section 3: replace the v1 `portal.json` schema with a pointer to this plan.
+- Section 3: replace the v1 `portal` block shape with a pointer to this plan.
 - Section 9: the Google Fonts risk now covers a shortlist and has a `system`
   opt-out.
 - Section 4: the template's fixed `neutral.css` import and Geist lines move

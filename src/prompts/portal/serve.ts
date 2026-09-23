@@ -75,7 +75,7 @@ export class PortalServePrompts {
           )} is only reported when the preview starts; until then an entry or a title that the build would ` +
           `refuse is ignored here.`,
         '',
-        `Adding or removing a page, editing ${f.var('portal.json')}, or changing which documents`,
+        `Adding or removing a page, editing ${f.var('apimatic.json')}, or changing which documents`,
         `are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'

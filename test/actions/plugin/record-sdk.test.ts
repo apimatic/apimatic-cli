@@ -8,7 +8,7 @@ import { PluginRecordSdkAction } from '../../../src/actions/plugin/record-sdk.js
 import { PluginRecordSdkPrompts } from '../../../src/prompts/plugin/record-sdk.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PluginConfigContext } from '../../../src/types/plugin-config-context.js';
-import { PluginConfigData } from '../../../src/types/plugin/plugin-config.js';
+import { PluginIdentityData, PluginLanguages } from '../../../src/types/plugin/plugin-config.js';
 import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
@@ -35,6 +35,13 @@ const GIT_CONFIG = {
   branch: 'main'
 };
 
+/** The file as written back, read whole. */
+interface WrittenDocument {
+  schemaVersion?: number;
+  plugin?: PluginIdentityData;
+  languages: PluginLanguages;
+}
+
 describe('PluginRecordSdkAction', () => {
   let tmpDirResult: DirectoryResult;
   let buildDirectory: string;
@@ -42,8 +49,8 @@ describe('PluginRecordSdkAction', () => {
   let noSourceRepository: sinon.SinonStub;
   let codegenVersionMismatch: sinon.SinonStub;
 
-  const configPath = () => path.join(buildDirectory, 'plugin-config.json');
-  const writtenConfig = (): PluginConfigData => fsExtra.readJsonSync(configPath());
+  const configPath = () => path.join(buildDirectory, 'apimatic.json');
+  const writtenConfig = (): WrittenDocument => fsExtra.readJsonSync(configPath());
 
   const execute = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
     action.execute(
@@ -83,16 +90,15 @@ describe('PluginRecordSdkAction', () => {
     await tmpDirResult.cleanup();
   });
 
-  const accepts = () =>
-    sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite').resolves(true);
-  const declines = () =>
-    sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite').resolves(false);
+  const accepts = () => sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite').resolves(true);
+  const declines = () => sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite').resolves(false);
 
-  it('creates a config carrying the language and no metadata at all', async () => {
+  it('creates a config carrying the language and no plugin block at all', async () => {
     const result = await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
 
     expect(result.isSuccess()).to.be.true;
     expect(writtenConfig()).to.deep.equal({
+      schemaVersion: 1,
       languages: {
         csharp: {
           source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
@@ -103,18 +109,16 @@ describe('PluginRecordSdkAction', () => {
     });
   });
 
-  it('adds the language to a config that already has metadata, leaving it alone', async () => {
+  it('adds the language to a config that already has a plugin block, leaving it alone', async () => {
     await fsExtra.writeJson(configPath(), {
-      pluginId: 'acme-payments',
-      pluginName: 'Acme Payments',
-      license: 'MIT',
+      plugin: { pluginId: 'acme-payments', pluginName: 'Acme Payments', license: 'MIT' },
       languages: {}
     });
 
     await execute(profileWith(GIT_CONFIG));
 
     const config = writtenConfig();
-    expect(config).to.include({ pluginId: 'acme-payments', pluginName: 'Acme Payments', license: 'MIT' });
+    expect(config.plugin).to.deep.equal({ pluginId: 'acme-payments', pluginName: 'Acme Payments', license: 'MIT' });
     expect(Object.keys(config.languages)).to.deep.equal(['csharp']);
   });
 
@@ -303,7 +307,20 @@ describe('PluginRecordSdkAction', () => {
 
     await execute(profileWith(GIT_CONFIG));
 
-    expect(pluginConfigUnreadable.firstCall.args[0]).to.equal(`its 'languages' field is not a JSON object`);
+    expect(pluginConfigUnreadable.firstCall.args[0]).to.equal(`its 'languages' is not a JSON object`);
     expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(contents);
+  });
+
+  // The portal block is the portal's to judge. A publish that succeeded is recorded whatever
+  // state that block is in, which is the invariant the block partition exists for.
+  it('records the language past a portal block the portal would refuse, leaving it as written', async () => {
+    const portal = { title: '', favicon: 'x.ico' };
+    await fsExtra.writeJson(configPath(), { portal, languages: {} });
+
+    const result = await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
+
+    expect(result.isSuccess()).to.be.true;
+    expect(Object.keys(writtenConfig().languages)).to.deep.equal(['csharp']);
+    expect(fsExtra.readJsonSync(configPath()).portal).to.deep.equal(portal);
   });
 });

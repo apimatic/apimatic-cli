@@ -1,4 +1,5 @@
 import { log } from '@clack/prompts';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -12,13 +13,17 @@ import { format as f } from '../format.js';
 export function reportSourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath): void {
   switch (problem.kind) {
     case 'missingConfig': {
-      log.error(`No ${f.var('portal.json')} found in ${f.path(sourceDirectory)}.`);
+      log.error(`No ${f.var(APIMATIC_CONFIG_FILE_NAME)} found in ${f.path(sourceDirectory)}.`);
       log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
       return;
     }
     case 'invalidConfig': {
-      log.error(`The ${f.var('portal.json')} in ${f.path(sourceDirectory)} is not valid:`);
+      log.error(`The ${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} is not valid:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      // A file without the block is no worse off than no file: the same command sets it up.
+      if (problem.missingPortal) {
+        log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
+      }
       return;
     }
     case 'invalidNavigation': {
@@ -47,8 +52,8 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
     }
     case 'missingLogo': {
       const message =
-        `The logo ${f.var(problem.logoPath)} named in ${f.var('portal.json')} is not in ` +
-        `${f.path(sourceDirectory)}. Add the image there, or remove ${f.var('logo')}.`;
+        `The logo ${f.var(problem.logoPath)} named in ${f.var(APIMATIC_CONFIG_FILE_NAME)} is not in ` +
+        `${f.path(sourceDirectory)}. Add the image there, or remove ${f.var('portal.logo')}.`;
       log.error(message);
       return;
     }

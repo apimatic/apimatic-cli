@@ -5,8 +5,8 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
-
-const PLUGIN_CONFIG_FILE = 'plugin-config.json';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 
 // Each link lands on the section that covers loading an unpublished folder, not the page it sits in.
 const CLAUDE_CODE_PLUGINS_URL = 'https://code.claude.com/docs/en/plugins#test-your-plugins-locally';
@@ -52,9 +52,20 @@ export class PluginGeneratePrompts {
     log.error(error);
   }
 
+  public configNotPrepared(failure: PluginConfigWriteFailure, buildDirectory: DirectoryPath) {
+    const message =
+      failure === 'unreadable'
+        ? `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(buildDirectory)} could not be read. ` +
+          `Check that it can be read and try again.`
+        : `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(buildDirectory)} starts with a byte-order mark, ` +
+          `which the plugin cannot be generated from, and it could not be rewritten without one. ` +
+          `Save the file as UTF-8 without a BOM and try again.`;
+    log.error(message);
+  }
+
   public pluginConfigUnreadable(reason: string, path: FilePath) {
     const message =
-      `${f.var(PLUGIN_CONFIG_FILE)} cannot be used: ${reason}. ` + `Fix or delete it at ${f.path(path)} and try again.`;
+      `${f.var(APIMATIC_CONFIG_FILE_NAME)} cannot be used: ${reason}. ` + `Fix it at ${f.path(path)} and try again.`;
     log.error(message);
   }
 
@@ -63,12 +74,12 @@ export class PluginGeneratePrompts {
   }
 
   public noPublishedSdks() {
-    log.info(`${f.var(PLUGIN_CONFIG_FILE)} has no published SDKs config yet.`);
+    log.info(`${f.var(APIMATIC_CONFIG_FILE_NAME)} has no published SDKs config yet.`);
   }
 
   public nextStepsPublishSdks() {
     const message =
-      `Publish SDK for the language(s) to add it to plugin-config.json. ` +
+      `Publish SDK for the language(s) to add it to ${f.var(APIMATIC_CONFIG_FILE_NAME)}. ` +
       `${f.var('Source Code')} details are required.\n\n` +
       `Run '${f.cmdAlt('apimatic', 'sdk', 'publish')}'\n\n` +
       `Then run '${f.cmdAlt('apimatic', 'plugin', 'generate')}'.`;

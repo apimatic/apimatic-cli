@@ -184,7 +184,7 @@ export class PortalNavigation {
   }
 
   private static parseObject(json: string, context: NavigationContext): Result<Record<string, unknown>, string[]> {
-    // Unlike `portal.json`, this file is not read by the CLI alone: the build reads it again
+    // Unlike `apimatic.json`, this file is not read by the CLI alone: the build reads it again
     // from the content directory with a bare `JSON.parse`, which a byte-order mark breaks.
     // Accepting the mark here would pass a file the build then refuses with an opaque error.
     if (json.codePointAt(0) === BYTE_ORDER_MARK) {
@@ -214,7 +214,7 @@ export class PortalNavigation {
   /**
    * A folder is named after its directory, or after the title of its index page; `title`
    * outranks both. The content root is no folder in the sidebar, so a name given there would
-   * set nothing, and the portal's own name is `portal.json`'s `title`.
+   * set nothing, and the portal's own name is `apimatic.json`'s `portal.title`.
    */
   private static titleErrors(title: unknown, context: NavigationContext): string[] {
     if (title === undefined) {
@@ -223,7 +223,7 @@ export class PortalNavigation {
     if (context.isContentRoot) {
       return [
         `${context.label}: 'title' names a folder, and this file orders the content root, ` +
-          `which is not one. Set the portal's own name with 'title' in portal.json.`
+          `which is not one. Set the portal's own name with 'portal.title' in apimatic.json.`
       ];
     }
     // A directory with no page beneath it becomes no folder, so the name would reach nothing
