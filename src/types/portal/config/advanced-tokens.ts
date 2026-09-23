@@ -29,7 +29,7 @@ type Tokens = ReadonlyMap<string, string>;
 
 /**
  * `portal.advanced.tokens`: raw overrides of the preset's tokens, one set per mode. Values
- * are passed through as written; only the names are checked.
+ * are passed through as written: only the names are checked, and that each value is one value.
  */
 export class AdvancedTokens {
   private constructor(private readonly light: Tokens, private readonly dark: Tokens) {}
@@ -84,7 +84,9 @@ export class AdvancedTokens {
           );
           continue;
         }
-        const parsed = nonEmptyString(token, `${path}.${name}`);
+        const parsed = nonEmptyString(token, `${path}.${name}`).andThen((value) =>
+          AdvancedTokens.cssValue(value, `${path}.${name}`)
+        );
         if (parsed.isErr()) {
           errors.push(...parsed.error);
         } else {
@@ -93,5 +95,13 @@ export class AdvancedTokens {
       }
       return errors.length > 0 ? err(errors) : ok(tokens);
     });
+  }
+
+  // The value is written into the generated stylesheet as it stands, so one that closes the
+  // declaration or the rule, or opens a comment, would restyle or blank everything after it.
+  private static cssValue(value: string, path: string): Parsed<string> {
+    return /[;{}]|\/\*/.test(value)
+      ? err([`'${path}' must be a single CSS value, without ';', '{', '}' or a comment.`])
+      : ok(value);
   }
 }

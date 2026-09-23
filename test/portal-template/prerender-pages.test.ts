@@ -16,16 +16,15 @@ describe('prerenderPages', () => {
   };
 
   const urlsFor = async (siteUrl: string | null = null) => {
-    const pages = await prerenderPages({
-      title: 'Calc',
-      description: null,
-      logoUrl: null,
-      siteUrl,
-      aiPageActions: true,
-      specs: {},
-      contentDir,
-      staticDir: null
-    });
+    const pages = await prerenderPages(
+      {
+        specs: {},
+        contentDir,
+        staticDir: null,
+        api: { groupBy: 'tag', showDeprecated: true, showInternal: false }
+      },
+      siteUrl
+    );
     return pages.map((page) => page.path);
   };
 
@@ -81,7 +80,13 @@ describe('prerenderPages', () => {
 
     const urls = await urlsFor('https://docs.test');
 
-    for (const generated of ['/llms.txt.md', '/llms-full.txt.md', '/sitemap.xml.md', '/robots.txt.md', '/api/search.json.md']) {
+    for (const generated of [
+      '/llms.txt.md',
+      '/llms-full.txt.md',
+      '/sitemap.xml.md',
+      '/robots.txt.md',
+      '/api/search.json.md'
+    ]) {
       expect(urls, `asked for a Markdown twin of ${generated}`).to.not.include(generated);
     }
   });

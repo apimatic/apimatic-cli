@@ -186,7 +186,7 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.api.showDeprecated` | boolean | `true` | `true` keeps deprecated operations, struck through in the sidebar as Fumadocs already renders them. |
 | `portal.api.showInternal` | boolean | `false` | Operations carrying `x-internal: true`. |
 | `portal.ai.pageActions` | boolean | `true` | Today's `aiPageActions`, moved. |
-| `portal.advanced.tokens.light`, `.dark` | map | `{}` | Keys are the full custom-property name, as browser dev tools show it: `"--color-fd-accent"`, not `"accent"`. Each must be `--color-fd-` followed by one of the seventeen token names in section 10. Values are non-empty strings and pass through. |
+| `portal.advanced.tokens.light`, `.dark` | map | `{}` | Keys are the full custom-property name, as browser dev tools show it: `"--color-fd-accent"`, not `"accent"`. Each must be `--color-fd-` followed by one of the seventeen token names in section 10. Values are non-empty strings without `;`, `{`, `}` or `/*`, and pass through. |
 | `languages` | map | none, required | At least one entry. Keys are `Language` values from `src/types/sdk/generate.ts`: `csharp`, `java`, `php`, `python`, `ruby`, `typescript`, `go`. Each value an object, and its `publishing`, when present, an object too — both shape checks are `ApimaticConfigDocument`'s findings, which the portal now reads (section 8). Nothing inside `publishing` is checked by the portal in this release. |
 
 Every error carries its dotted path from the root, and every error is reported
@@ -203,12 +203,15 @@ that addresses the build machine stays in `portal.config.json` behind
 `portal serve` is a file write Vite hot-reloads.
 
 Browser identity: `name`, `description`, `siteUrl`, `logo` (`{light, dark}` or
-null), `faviconUrl`, `fonts` (the Google Fonts URL or null), `layout`,
-`colorMode`, `links`, `homeCta`, `pageActions`. Tabs are not in it: they come
-from the page tree, which already carries `nav.json`.
+null, the same URL twice for one image), `favicon` (`{url, type}` or null, the
+type from the extension), `fontsUrl` (the Google Fonts URL or null), `layout`,
+`colorMode`, `links` and `homeCta` (each `{label, url, external}`),
+`pageActions`. Tabs are not in it: they come from the page tree, which already
+carries `nav.json`.
 
 Server-only (`portal.config.json`): `specs`, `contentDir`, `staticDir`, and
-`api` (`groupBy`, `showDeprecated`, `showInternal`).
+`api` (`groupBy`, `showDeprecated`, `showInternal`). The prerender list also
+needs `siteUrl`, which `vite.config.ts` reads from `portal.identity.json`.
 
 Generated stylesheet: the CLI writes `src/styles/theme.css` into the build
 project; `app.css` imports it last and is otherwise fixed apart from the
@@ -685,9 +688,15 @@ and the affected tests green, each stopped at for review:
 - An unlayered `:root:not(.dark) { --color-fd-primary }` after the preset
   import beats the preset's `@theme` declaration under Tailwind 4's layering,
   and stays out of dark mode. Confirm in the built CSS in both modes.
+  *Verified in step 3:* the preset's light tokens land in `@layer theme`, the
+  override is unlayered, and the generated `.dark` rule follows the preset's.
+  Headless Chrome shows each mode's primary with its own foreground.
 - A bare-specifier `@import 'fumadocs-ui/css/<preset>.css'` at the top of
   `theme.css`, itself imported from `app.css`, resolves through the linked
-  `node_modules` under Tailwind 4's Vite plugin.
+  `node_modules` under Tailwind 4's Vite plugin. *Verified in step 3.*
+- A token value is written into `theme.css` as it stands, so one holding `;`,
+  `{`, `}` or `/*` would reach past its declaration. *Added in step 3:* the
+  parser and the schema refuse those.
 - A bundled document handed back to `createOpenAPI` as a document object
   round-trips: `x-ext` references stay resolvable and the pages match those the
   file-path server produced for an unfiltered spec.
@@ -698,10 +707,12 @@ and the affected tests green, each stopped at for review:
   and `$id`-based tab matching on the client.
 - The client bundle carries `portal.identity.json` whole and nothing else from
   the CLI-written files.
-- Bundle delta from importing all four layouts statically.
+- Bundle delta from importing all four layouts statically. *Measured in step
+  3:* about 38 KB of script, 8 KB gzipped, over notebook alone.
 - The Google Fonts weight axis for each shortlisted family; the CSS2 URL
   differs between variable fonts (`wght@100..900`) and static ones.
-- A `full` OpenAPI page under the glass layout.
+- A `full` OpenAPI page under the glass layout. *Verified in step 3* in
+  headless Chrome.
 - The watcher's comparison must be on the resolved config, not the file text:
   the plugin writers re-serialise the whole file, so a text diff would re-apply
   on every `sdk publish`.

@@ -3,6 +3,18 @@ import { Parsed } from './fields.js';
 
 const STATIC_PREFIX = 'static/';
 
+/** The image types a browser takes for an icon, by extension, for the `type` its link carries. */
+const IMAGE_TYPES: Record<string, string> = {
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif'
+};
+
 /** A file the block names inside `src/static/`, which the build copies to the root of the site. */
 export class StaticAsset {
   private constructor(
@@ -38,6 +50,13 @@ export class StaticAsset {
   /** Where the file is served from: the `static/` prefix is the site root. */
   public siteUrl(): string {
     return `/${this.relativePath.slice(STATIC_PREFIX.length)}`;
+  }
+
+  /** The image type the extension names, or null when it names none a browser is known to take. */
+  public imageType(): string | null {
+    const name = this.relativePath.slice(this.relativePath.lastIndexOf('/') + 1);
+    const dot = name.lastIndexOf('.');
+    return dot <= 0 ? null : IMAGE_TYPES[name.slice(dot).toLowerCase()] ?? null;
   }
 
   public isEqual(other: StaticAsset): boolean {

@@ -1,26 +1,21 @@
 import { createFileRoute, getRouteApi, isNotFound, isRedirect, notFound } from '@tanstack/react-router';
-import { DocsLayout } from 'fumadocs-ui/layouts/notebook';
 import { createServerFn } from '@tanstack/react-start';
 import { docs } from '@/lib/source';
 import { source } from '@/lib/source.server';
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-  MarkdownCopyButton,
-  ViewOptionsPopover
-} from 'fumadocs-ui/layouts/notebook/page';
-import { baseOptions } from '@/lib/layout.shared';
+import { pageComponents, PortalLayout } from '@/lib/layout';
 import { getPageMarkdownUrl } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
+import Link from 'fumadocs-core/link';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
+import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { Suspense, use, type ReactNode } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
 import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
+
+const { DocsBody, DocsDescription, DocsPage, DocsTitle, MarkdownCopyButton, ViewOptionsPopover } = pageComponents;
 
 const rootRoute = getRouteApi('__root__');
 
@@ -36,7 +31,7 @@ export const Route = createFileRoute('/$')({
     return data;
   },
   head: ({ loaderData, params }) => {
-    const title = loaderData && loaderData.type !== 'home' ? `${loaderData.title} | ${portal.title}` : portal.title;
+    const title = loaderData && loaderData.type !== 'home' ? `${loaderData.title} | ${portal.name}` : portal.name;
     const description = loaderData?.description ?? portal.description;
     const splat = params._splat?.replace(/\/$/, '') ?? '';
     const pageUrl = splat.length > 0 ? `/${splat}` : '/';
@@ -50,7 +45,7 @@ export const Route = createFileRoute('/$')({
         { property: 'og:title', content: title },
         ...(description ? [{ property: 'og:description', content: description }] : []),
         { property: 'og:type', content: 'website' },
-        { property: 'og:site_name', content: portal.title },
+        { property: 'og:site_name', content: portal.name },
         ...(absolute ? [{ property: 'og:url', content: absolute }] : []),
         { name: 'twitter:card', content: 'summary' }
       ],
@@ -70,7 +65,7 @@ const serverLoader = createServerFn({
     if (!page) {
       // A project without content/index.md(x) still gets a landing page.
       if (slugs.length === 0) {
-        return { type: 'home' as const, title: portal.title, description: portal.description };
+        return { type: 'home' as const, title: portal.name, description: portal.description };
       }
       throw notFound();
     }
@@ -89,7 +84,8 @@ const serverLoader = createServerFn({
       title: page.data.title,
       description: page.data.description ?? null,
       path: page.path,
-      markdownUrl: getPageMarkdownUrl(page).url
+      markdownUrl: getPageMarkdownUrl(page).url,
+      isHome: slugs.length === 0
     };
   });
 
@@ -117,7 +113,7 @@ async function loadPage(slugs: string[]) {
   }
 }
 
-function Content({ path, markdownUrl }: Readonly<{ path: string; markdownUrl: string }>) {
+function Content({ path, markdownUrl, isHome }: Readonly<{ path: string; markdownUrl: string; isHome: boolean }>) {
   const page = docs.getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
 
@@ -128,11 +124,12 @@ function Content({ path, markdownUrl }: Readonly<{ path: string; markdownUrl: st
     <DocsPage toc={toc}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
+      {isHome ? <HomeCallToAction /> : null}
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
-        {portal.aiPageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
+        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
       </div>
       <DocsBody>
         <PageBody components={useMDXComponents()} />
@@ -146,10 +143,25 @@ function Home({ title, description }: Readonly<{ title: string; description: str
     <DocsPage>
       <DocsTitle>{title}</DocsTitle>
       {description ? <DocsDescription>{description}</DocsDescription> : null}
+      <HomeCallToAction />
       <DocsBody>
         <p>Use the navigation to browse the API reference and guides.</p>
       </DocsBody>
     </DocsPage>
+  );
+}
+
+/** The button `portal.home.cta` puts under the home page's title, on either kind of home page. */
+function HomeCallToAction() {
+  const cta = portal.homeCta;
+  if (!cta) return null;
+  return (
+    // Tucked under the description as the page actions are, so the title block reads as one.
+    <div className="-mt-4 mb-8">
+      <Link href={cta.url} external={cta.external} className={buttonVariants({ variant: 'primary' })}>
+        {cta.label}
+      </Link>
+    </div>
   );
 }
 
@@ -173,15 +185,10 @@ function Page() {
   } else {
     content = (
       <Suspense>
-        <Content path={page.path} markdownUrl={page.markdownUrl} />
+        <Content path={page.path} markdownUrl={page.markdownUrl} isHome={page.isHome} />
       </Suspense>
     );
   }
 
-  const base = baseOptions();
-  return (
-    <DocsLayout {...base} nav={{ ...base.nav, mode: 'top' }} tree={pageTree}>
-      {content}
-    </DocsLayout>
-  );
+  return <PortalLayout tree={pageTree}>{content}</PortalLayout>;
 }

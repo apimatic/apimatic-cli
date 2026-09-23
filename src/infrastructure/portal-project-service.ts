@@ -6,7 +6,9 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { PortalConfig } from '../types/portal/portal-config.js';
 import { PortalSource } from '../types/portal/portal-source.js';
+import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
 import { FileService } from './file-service.js';
 
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
@@ -33,7 +35,12 @@ export const TEMPLATE_DEPENDENCIES = [
 ];
 
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
-const PORTAL_IDENTITY_PLACEHOLDER = "'__APIMATIC_PORTAL_IDENTITY__'";
+
+/** Beside `portal.config.json`; `src/lib/portal.ts` imports it. */
+const IDENTITY_FILE_NAME = 'portal.identity.json';
+
+/** In `src/styles/`, beside `app.css`, which imports it. */
+const STYLESHEET_FILE_NAME = 'theme.css';
 
 export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
@@ -151,16 +158,14 @@ export class PortalProjectService {
       specs[spec.slug] = this.toPosix(spec.file.toString());
     }
 
-    // Only the portal's identity reaches the browser; everything else in the configuration
-    // addresses this machine and stays behind `portal.server.ts`. A JSON module is retained
-    // whole once client code imports it, so this is substituted into `portal.ts` as a literal.
-    const identity = source.config.identity();
-
+    // Everything here addresses this machine, or is read only while the build is set up, so
+    // it stays behind `portal.server.ts` and the build's own config files. What the browser
+    // is told goes into a file of its own, below.
     const configuration = {
-      ...identity,
       specs,
       contentDir: this.toPosix(contentDirectory.toString()),
-      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
+      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString()),
+      api: source.config.apiSettings().toJSON()
     };
 
     await this.fileService.writeContents(
@@ -168,8 +173,7 @@ export class PortalProjectService {
       JSON.stringify(configuration, null, 2)
     );
 
-    const portalModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('portal.ts'));
-    await this.substitute(portalModule, PORTAL_IDENTITY_PLACEHOLDER, JSON.stringify(identity));
+    await this.writeAppearance(projectDirectory, source.config);
 
     // A literal because Fumadocs' `defineDocs` macro rejects anything it cannot read at
     // compile time. Tailwind needs the same path to scan the user's pages: its automatic
@@ -180,6 +184,22 @@ export class PortalProjectService {
 
     const stylesheet = new FilePath(projectDirectory.join('src').join('styles'), new FileName('app.css'));
     await this.substitute(stylesheet, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);
+  }
+
+  /**
+   * The two files that carry what the `portal` block says about the site's look and identity.
+   * The browser imports `portal.identity.json` whole, since a retained JSON module is not
+   * tree-shaken per property, which is why it holds nothing that addresses this machine.
+   */
+  private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {
+    await this.fileService.writeContents(
+      new FilePath(projectDirectory, new FileName(IDENTITY_FILE_NAME)),
+      JSON.stringify(config.identity(), null, 2)
+    );
+    await this.fileService.writeContents(
+      new FilePath(projectDirectory.join('src').join('styles'), new FileName(STYLESHEET_FILE_NAME)),
+      PortalStylesheet.of(config).toString()
+    );
   }
 
   private async substitute(file: FilePath, placeholder: string, literal: string): Promise<void> {

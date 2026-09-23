@@ -83,7 +83,9 @@
         ]
       },
       "additionalProperties": {
-        "$ref": "#/definitions/nonBlank"
+        "type": "string",
+        "description": "A single CSS value, such as a colour, without ';', '{', '}' or a comment.",
+        "pattern": "^(?![\\s\\S]*/\\*)[^;{}]*[^;{}\\s][^;{}]*$"
       }
     },
     "portal": {

@@ -117,6 +117,10 @@ describe('apimatic.schema.json', () => {
       ['a logo path with its dots inside a name', { brand: { logo: 'static/..hidden/logo.png' } }],
       ['an eight-digit hex primary', { brand: { colors: { primary: '#1D4ED8cc' } } }],
       ['a space-syntax rgb primary', { brand: { colors: { primary: 'rgb(29 78 216 / 50%)' } } }],
+      [
+        'a token value that is a CSS function',
+        { advanced: { tokens: { light: { '--color-fd-accent': 'color-mix(in oklab, #1d4ed8 10%, transparent)' } } } }
+      ],
       ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }]
     ];
 
@@ -173,6 +177,9 @@ describe('apimatic.schema.json', () => {
       ['a short token name', { advanced: { tokens: { light: { accent: '#eee' } } } }],
       ['a token set once for both modes', { advanced: { tokens: { light: { '--color-fd-info': 'blue' } } } }],
       ['an empty token value', { advanced: { tokens: { dark: { '--color-fd-ring': '' } } } }],
+      ['a token value closing its rule', { advanced: { tokens: { dark: { '--color-fd-ring': 'red } body {' } } } }],
+      ['a token value ending its declaration', { advanced: { tokens: { light: { '--color-fd-ring': 'red; x: y' } } } }],
+      ['a token value opening a comment', { advanced: { tokens: { light: { '--color-fd-ring': 'red /* x' } } } }],
       ['tokens that are not an object', { advanced: { tokens: [] } }],
       ['an unknown advanced key', { advanced: { css: 'x' } }]
     ];

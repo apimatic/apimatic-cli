@@ -11,10 +11,10 @@ const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
  * collapsed sidebar folders and never sees the `.md` URLs the page actions fetch, so
  * the list is computed here from the same sources the site is built from.
  */
-export async function prerenderPages(config: PortalConfig): Promise<{ path: string }[]> {
+export async function prerenderPages(config: PortalConfig, siteUrl: string | null): Promise<{ path: string }[]> {
   const urls = new Set<string>(['/', '/api/search.json', '/llms.txt', '/llms-full.txt']);
   // Both need absolute URLs, so they are only emitted for a portal that declares its address.
-  if (config.siteUrl) {
+  if (siteUrl) {
     urls.add('/sitemap.xml');
     urls.add('/robots.txt');
   }

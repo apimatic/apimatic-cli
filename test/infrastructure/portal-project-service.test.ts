@@ -7,8 +7,9 @@ import { PortalProjectService, TEMPLATE_DEPENDENCIES } from '../../src/infrastru
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
-import { PortalConfig } from '../../src/types/portal/portal-config';
+import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
 import { PortalSource } from '../../src/types/portal/portal-source';
+import { PortalStylesheet } from '../../src/types/portal/portal-stylesheet';
 
 describe('PortalProjectService', () => {
   const service = new PortalProjectService();
@@ -34,6 +35,8 @@ describe('PortalProjectService', () => {
   });
 
   const readConfig = () => JSON.parse(fs.readFileSync(path.join(project.toString(), 'portal.config.json'), 'utf8'));
+  const readIdentity = () =>
+    JSON.parse(fs.readFileSync(path.join(project.toString(), 'portal.identity.json'), 'utf8')) as PortalIdentity;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-project-'));
@@ -94,28 +97,64 @@ describe('PortalProjectService', () => {
       expect(fs.existsSync(path.join(project.toString(), 'vite.config.ts'))).to.be.true;
     });
 
-    it('writes the spec, title and description into the generated config', async () => {
-      const source = sourceFor({ config: configFor({ site: { name: 'My API', description: 'Docs for it' } }) });
+    it('writes the specs and the API options into the build-only config', async () => {
+      const source = sourceFor({ config: configFor({ site: { name: 'My API' }, api: { groupBy: 'route' } }) });
 
       (await service.prepare(project, source))._unsafeUnwrap();
 
       const config = readConfig();
-      expect(config.title).to.equal('My API');
-      expect(config.description).to.equal('Docs for it');
+      expect(Object.keys(config).sort()).to.deep.equal(['api', 'contentDir', 'specs', 'staticDir']);
       expect(Object.keys(config.specs)).to.deep.equal(['calculator']);
       expect(config.specs.calculator).to.contain('api.json');
+      expect(config.api).to.deep.equal({ groupBy: 'route', showDeprecated: true, showInternal: false });
     });
 
-    it('resolves the logo to a site URL and the site address to an origin', async () => {
+    it('writes what the browser is told into a file of its own', async () => {
       const config = configFor({
-        site: { name: 'My API', url: 'https://docs.example.com' },
+        site: { name: 'My API', url: 'https://docs.example.com', description: 'Docs for it' },
         brand: { logo: 'static/images/logo.png' }
       });
 
       (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
 
-      expect(readConfig().logoUrl).to.equal('/images/logo.png');
-      expect(readConfig().siteUrl).to.equal('https://docs.example.com');
+      expect(readIdentity()).to.deep.equal(config.identity());
+      expect(readIdentity().logo).to.deep.equal({ light: '/images/logo.png', dark: '/images/logo.png' });
+      expect(readIdentity().siteUrl).to.equal('https://docs.example.com');
+    });
+
+    // The browser bundle imports the file whole, so a path from this machine in it would be
+    // published to every visitor.
+    it('keeps every path from this machine out of what the browser is told', async () => {
+      const contentDirectory = new DirectoryPath(root).join('content');
+      fs.mkdirSync(contentDirectory.toString(), { recursive: true });
+
+      (await service.prepare(project, sourceFor({ contentDirectory })))._unsafeUnwrap();
+
+      const identity = fs.readFileSync(path.join(project.toString(), 'portal.identity.json'), 'utf8');
+      expect(identity).to.not.contain(root.split(path.sep).join('/'));
+      expect(identity).to.not.contain(JSON.stringify(root).slice(1, -1));
+      expect(identity).to.not.contain('specs');
+    });
+
+    it('writes the stylesheet the block describes beside the one that imports it', async () => {
+      const config = configFor({
+        site: { name: 'My API' },
+        brand: { colors: { preset: 'ocean', primary: '#1d4ed8' } }
+      });
+
+      (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
+
+      const styles = path.join(project.toString(), 'src/styles');
+      expect(fs.readFileSync(path.join(styles, 'theme.css'), 'utf8')).to.equal(PortalStylesheet.of(config).toString());
+      expect(fs.readFileSync(path.join(styles, 'app.css'), 'utf8')).to.contain("@import './theme.css';");
+    });
+
+    it('leaves no identity placeholder in the module the browser receives', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+
+      const module = fs.readFileSync(path.join(project.toString(), 'src/lib/portal.ts'), 'utf8');
+      expect(module).to.not.contain('__APIMATIC_');
+      expect(module).to.contain("from '../../portal.identity.json'");
     });
 
     it('reports no static directory when the project has none', async () => {
@@ -144,16 +183,6 @@ describe('PortalProjectService', () => {
       const stylesheet = fs.readFileSync(path.join(project.toString(), 'src/styles/app.css'), 'utf8');
       expect(stylesheet).to.not.contain('__APIMATIC_CONTENT_DIR__');
       expect(stylesheet).to.contain(contentDirectory.toString().split(path.sep).join('/'));
-    });
-
-    it('substitutes the portal identity into the module the browser receives', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
-
-      const module = fs.readFileSync(path.join(project.toString(), 'src/lib/portal.ts'), 'utf8');
-      expect(module).to.not.contain('__APIMATIC_PORTAL_IDENTITY__');
-      expect(module).to.contain('"title":"My API"');
-      expect(module).to.not.contain(root.split(path.sep).join('/'));
-      expect(module).to.not.contain('specs');
     });
 
     it('creates an empty content directory when the project has none, so the build has one to read', async () => {

@@ -13,18 +13,38 @@ const loadPageTree = createServerFn({ method: 'GET' })
   .middleware([staticFunctionMiddleware])
   .handler(async () => ({ pageTree: await source.serializePageTree(source.getPageTree()) }));
 
+// A link rather than an `@import` in the stylesheet: a remote import nested in an imported
+// stylesheet lands mid-file once bundled, where browsers ignore it.
+const fontLinks = portal.fontsUrl
+  ? [
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' as const },
+      { rel: 'stylesheet', href: portal.fontsUrl }
+    ]
+  : [];
+
+// Without one the browser tab shows the blank-document icon on every page.
+const iconLinks = portal.favicon
+  ? [{ rel: 'icon', href: portal.favicon.url, ...(portal.favicon.type ? { type: portal.favicon.type } : {}) }]
+  : [];
+
+// A portal fixed to one mode keeps to it whatever the visitor's system prefers, and offers no
+// way out: the layouts hide the switch, and the `D` hotkey is turned off here.
+const theme =
+  portal.colorMode === 'both'
+    ? undefined
+    : { forcedTheme: portal.colorMode, defaultTheme: portal.colorMode, enableSystem: false, hotKey: false as const };
+
 export const Route = createRootRoute({
   loader: () => loadPageTree(),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: portal.title },
+      { title: portal.name },
       ...(portal.description ? [{ name: 'description', content: portal.description }] : [])
     ],
-    // The portal already supplies a logo for the navigation bar; without this the browser
-    // tab showed the blank-document icon on every page.
-    links: [{ rel: 'stylesheet', href: appCss }, ...(portal.logoUrl ? [{ rel: 'icon', href: portal.logoUrl }] : [])]
+    links: [...fontLinks, { rel: 'stylesheet', href: appCss }, ...iconLinks]
   }),
   component: RootComponent
 });
@@ -36,7 +56,7 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body className="flex flex-col min-h-screen">
-        <RootProvider search={{ SearchDialog }}>
+        <RootProvider search={{ SearchDialog }} theme={theme}>
           <Outlet />
         </RootProvider>
         <Scripts />

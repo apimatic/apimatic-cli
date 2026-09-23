@@ -1,8 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap');
 @import 'tailwindcss';
-@import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
+/* Written by the CLI from the 'portal' block of apimatic.json: the colour preset, the fonts and
+   the colour overrides. Imported last, so what it sets outranks the presets above. */
+@import './theme.css';
 
 @source not '../../dist';
 
@@ -10,11 +11,6 @@
    outside it, so a utility class written in a page produced no CSS at all. The CLI
    substitutes the placeholder with the content directory before the build. */
 @source '__APIMATIC_CONTENT_DIR__';
-
-@theme {
-  --default-font-family: 'Geist';
-  --default-mono-font-family: 'Geist Mono';
-}
 
 html {
   scrollbar-gutter: stable;

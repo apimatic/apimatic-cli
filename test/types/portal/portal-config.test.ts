@@ -432,33 +432,110 @@ describe('PortalConfig', () => {
       );
       expect(errors[2]).to.equal("'portal.advanced.tokens.dark.--color-fd-ring' must be a non-empty string.");
     });
+
+    // The value is written into the generated stylesheet as it stands.
+    it('refuses a value that would reach past its own declaration', () => {
+      const tokens = {
+        '--color-fd-ring': 'red; x: y',
+        '--color-fd-accent': 'red } body {',
+        '--color-fd-card': 'red /*'
+      };
+
+      expect(errorsOf({ advanced: { tokens: { light: tokens } } })).to.deep.equal(
+        Object.keys(tokens).map(
+          (name) =>
+            `'portal.advanced.tokens.light.${name}' must be a single CSS value, without ';', '{', '}' or a comment.`
+        )
+      );
+      expect(parse({ advanced: { tokens: { dark: { '--color-fd-accent': 'rgb(0 0 0 / 50%)' } } } }).isOk()).to.be.true;
+    });
   });
 
   describe('identity', () => {
-    it('resolves the logo to its site URL and the address to its origin', () => {
+    it('resolves every file to its site URL and the address to its origin', () => {
       const portal = config({
         site: { name: 'My API', url: 'https://docs.example.com/', description: 'Docs' },
-        brand: { logo: { light: 'static/images/logo.png', dark: 'static/images/logo-dark.png' } },
+        brand: {
+          logo: { light: 'static/images/logo.png', dark: 'static/images/logo-dark.png' },
+          favicon: 'static/favicon.svg',
+          fonts: { body: 'inter', mono: 'system' },
+          colorMode: 'dark'
+        },
+        navigation: {
+          layout: 'glass',
+          links: [
+            { label: 'Status', url: 'https://status.example.com' },
+            { label: 'Changelog', url: '/changelog' }
+          ]
+        },
+        home: { cta: { label: 'Get a key', url: '/authentication' } },
         ai: { pageActions: false }
       });
 
       expect(portal.identity()).to.deep.equal({
-        title: 'My API',
+        name: 'My API',
         description: 'Docs',
-        logoUrl: '/images/logo.png',
         siteUrl: 'https://docs.example.com',
-        aiPageActions: false
+        logo: { light: '/images/logo.png', dark: '/images/logo-dark.png' },
+        favicon: { url: '/favicon.svg', type: 'image/svg+xml' },
+        fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap',
+        layout: 'glass',
+        colorMode: 'dark',
+        links: [
+          { label: 'Status', url: 'https://status.example.com', external: true },
+          { label: 'Changelog', url: '/changelog', external: false }
+        ],
+        homeCta: { label: 'Get a key', url: '/authentication', external: false },
+        pageActions: false
       });
     });
 
     it('reports absent settings as null rather than leaving them out', () => {
       expect(PortalConfig.scaffolded({ name: 'My API', description: null }).identity()).to.deep.equal({
-        title: 'My API',
+        name: 'My API',
         description: null,
-        logoUrl: null,
         siteUrl: null,
-        aiPageActions: true
+        logo: null,
+        favicon: null,
+        fontsUrl:
+          'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap',
+        layout: 'notebook-navbar',
+        colorMode: 'both',
+        links: [],
+        homeCta: null,
+        pageActions: true
       });
+    });
+
+    // One image serves both modes, so the browser is told the same address twice rather than
+    // having to know that a missing dark variant means the light one.
+    it('names one logo for both modes when the block names one', () => {
+      expect(config({ brand: { logo: 'static/logo.svg' } }).identity().logo).to.deep.equal({
+        light: '/logo.svg',
+        dark: '/logo.svg'
+      });
+    });
+
+    it('takes the favicon from the light logo when the block names none', () => {
+      const favicon = config({ brand: { logo: { light: 'static/light.png', dark: 'static/dark.png' } } }).identity()
+        .favicon;
+
+      expect(favicon).to.deep.equal({ url: '/light.png', type: 'image/png' });
+    });
+
+    it('types the favicon by its extension, whatever its case, and leaves an unknown one untyped', () => {
+      const typeOf = (favicon: string) => config({ brand: { favicon } }).identity().favicon?.type;
+
+      expect(typeOf('static/favicon.ICO')).to.equal('image/x-icon');
+      expect(typeOf('static/icons/app.jpeg')).to.equal('image/jpeg');
+      expect(typeOf('static/favicon.bmp')).to.be.null;
+      expect(typeOf('static/favicon')).to.be.null;
+      // A leading dot names a hidden file, not an extension.
+      expect(typeOf('static/.png')).to.be.null;
+    });
+
+    it('leaves the fonts stylesheet out when both families are the system ones', () => {
+      expect(config({ brand: { fonts: { body: 'system', mono: 'system' } } }).identity().fontsUrl).to.be.null;
     });
   });
 

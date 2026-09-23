@@ -3,25 +3,44 @@ import { UrlPath } from '../file/urlPath.js';
 import { AdvancedTokens } from './config/advanced-tokens.js';
 import { AiConfig } from './config/ai-config.js';
 import { ApiConfig } from './config/api-config.js';
-import { BrandConfig } from './config/brand-config.js';
+import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, isJsonObject, unknownKeys } from './config/fields.js';
 import { HomeConfig } from './config/home-config.js';
-import { NavigationConfig } from './config/navigation-config.js';
+import { Link } from './config/link.js';
+import { Layout, NavigationConfig } from './config/navigation-config.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
 
+/** A link in the portal's chrome, as the browser renders it. */
+export interface PortalLink {
+  label: string;
+  url: string;
+  /** Whether it leaves the portal, which opens it in a new tab. */
+  external: boolean;
+}
+
 /**
- * What the browser bundle is told about the portal. Nothing here may address the machine the
- * portal was built on; `portal-template/src/lib/portal.ts` declares the same fields.
+ * What the browser bundle is told about the portal, written to `portal.identity.json`. Nothing
+ * here may address the machine the portal was built on; `portal-template/src/lib/portal.ts`
+ * declares the same fields.
  */
 export interface PortalIdentity {
-  title: string;
+  name: string;
   description: string | null;
-  /** Site-relative, and inside the static directory. */
-  logoUrl: string | null;
   /** Origin only, with no trailing slash. */
   siteUrl: string | null;
-  aiPageActions: boolean;
+  /** Site-relative, one per colour mode; the same URL twice when one image serves both. */
+  logo: { light: string; dark: string } | null;
+  /** Site-relative, with the image type its extension names, when it names one. */
+  favicon: { url: string; type: string | null } | null;
+  /** The Google Fonts stylesheet, or null when both families are the system's own. */
+  fontsUrl: string | null;
+  layout: Layout;
+  colorMode: ColorMode;
+  links: PortalLink[];
+  homeCta: PortalLink | null;
+  /** Whether each page offers to open itself in an external AI assistant. */
+  pageActions: boolean;
 }
 
 /** The block as a message names it: every setting's path starts with it. */
@@ -128,12 +147,21 @@ export class PortalConfig {
 
   public identity(): PortalIdentity {
     const origin = this.site.origin();
+    const logo = this.brand.logoImages();
+    const favicon = this.brand.faviconImage();
+    const cta = this.home.callToAction();
     return {
-      title: this.site.siteName(),
+      name: this.site.siteName(),
       description: this.site.siteDescription(),
-      logoUrl: this.brand.logoImages()?.light().siteUrl() ?? null,
       siteUrl: origin === null ? null : origin.toString(),
-      aiPageActions: this.ai.offersPageActions()
+      logo: logo === null ? null : { light: logo.light().siteUrl(), dark: logo.dark().siteUrl() },
+      favicon: favicon === null ? null : { url: favicon.siteUrl(), type: favicon.imageType() },
+      fontsUrl: this.brand.brandFonts().googleFontsUrl(),
+      layout: this.navigation.layoutName(),
+      colorMode: this.brand.mode(),
+      links: this.navigation.headerLinks().map(portalLink),
+      homeCta: cta === null ? null : portalLink(cta),
+      pageActions: this.ai.offersPageActions()
     };
   }
 
@@ -149,6 +177,10 @@ export class PortalConfig {
       advanced: this.advanced.toJSON()
     };
   }
+}
+
+function portalLink(link: Link): PortalLink {
+  return { label: link.text(), url: link.href(), external: link.isExternal() };
 }
 
 export interface PortalBlock {
