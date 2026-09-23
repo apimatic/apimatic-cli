@@ -98,7 +98,9 @@ describe('GenerateAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.runtimeUnsupported.calledOnceWith("The portal build dependency 'vite' is missing from this installation.")).to.be.true;
+    expect(
+      prompts.runtimeUnsupported.calledOnceWith("The portal build dependency 'vite' is missing from this installation.")
+    ).to.be.true;
     expect(authorize.called).to.be.false;
   });
 

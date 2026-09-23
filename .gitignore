@@ -177,6 +177,7 @@ $RECYCLE.BIN/
 # directories such as portal-template/src/lib.
 /lib/
 tmp/
+.vscode/launch.json
 test-source/
 test-destination/
 test-portal/
