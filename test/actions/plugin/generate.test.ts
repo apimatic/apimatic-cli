@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { Buffer } from 'node:buffer';
 import { Readable } from 'node:stream';
+import AdmZip from 'adm-zip';
 import fsExtra from 'fs-extra';
 import sinon from 'sinon';
 import { expect } from 'chai';
@@ -17,6 +18,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
+import { FileService } from '../../../src/infrastructure/file-service.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -28,19 +30,42 @@ describe('PluginGenerateAction', () => {
   let action: PluginGenerateAction;
 
   let pluginArchive: Buffer;
+  /** Every file in the last zip handed to the service, by entry name. */
+  let uploaded: Record<string, string>;
+
+  /** What Notepad and PowerShell redirection leave at the front of a file, spelled out so it shows in a diff. */
+  const BOM = String.fromCodePoint(0xfeff);
+
+  const PLUGIN = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
+  const LANGUAGES = { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } } };
+
+  const configPath = () => path.join(buildDirectory, 'apimatic.json');
+  const writeConfig = (config: object) => fsExtra.writeJson(configPath(), config);
+  const writtenConfig = () => fsExtra.readJsonSync(configPath());
 
   const execute = (force = false) =>
     action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(pluginDirectory), force);
 
   // The action expands what the service returns, so the stubbed payload has to be a genuine zip.
+  // The upload is read while the stub runs: the temporary directory it sits in is gone once the
+  // action returns.
   const generated = () =>
-    sinon.stub(PluginService.prototype, 'generatePlugin').resolves(ok(Readable.from([pluginArchive])));
+    sinon.stub(PluginService.prototype, 'generatePlugin').callsFake(async (buildZipPath: FilePath) => {
+      uploaded = Object.fromEntries(
+        new AdmZip(buildZipPath.toString())
+          .getEntries()
+          .filter((entry) => !entry.isDirectory)
+          .map((entry) => [entry.entryName, entry.getData().toString('utf-8')])
+      );
+      return ok(Readable.from([pluginArchive]));
+    });
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     const workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
     buildDirectory = path.join(workingDirectory, 'src');
     pluginDirectory = path.join(workingDirectory, 'plugin');
+    uploaded = {};
     const archiveSource = path.join(tmpDirResult.path, 'archive-source');
     await fsExtra.outputFile(path.join(archiveSource, 'README.md'), '# plugin');
     await fsExtra.outputFile(path.join(archiveSource, 'skills', 'SKILL.md'), '# skill');
@@ -50,11 +75,7 @@ describe('PluginGenerateAction', () => {
 
     await fsExtra.ensureDir(buildDirectory);
     await fsExtra.writeJson(path.join(buildDirectory, 'APIMATIC-BUILD.json'), {});
-    await fsExtra.writeJson(path.join(buildDirectory, 'plugin-config.json'), {
-      pluginId: 'acme-payments',
-      pluginName: 'Acme Payments',
-      languages: { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } }
-    });
+    await writeConfig({ plugin: PLUGIN, languages: LANGUAGES });
 
     // The spinner would render to stdout; pass the underlying promise straight through.
     sinon.stub(PluginGeneratePrompts.prototype, 'generatePlugin').callsFake((fn) => fn);
@@ -71,11 +92,7 @@ describe('PluginGenerateAction', () => {
     it('fails when the build and plugin directories are the same', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
-      const result = await action.execute(
-        new DirectoryPath(buildDirectory),
-        new DirectoryPath(buildDirectory),
-        false
-      );
+      const result = await action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(buildDirectory), false);
 
       expect(result.isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
@@ -138,14 +155,57 @@ describe('PluginGenerateAction', () => {
     });
   });
 
+  // The server reads the plugin's identity and languages from the `apimatic.json` in the upload.
+  describe('the upload', () => {
+    it('is src as it stands, apimatic.json beside the build file', async () => {
+      generated();
+
+      await execute();
+
+      expect(JSON.parse(uploaded['apimatic.json'])).to.deep.equal({ plugin: PLUGIN, languages: LANGUAGES });
+      expect(uploaded).to.have.property('APIMATIC-BUILD.json');
+    });
+
+    it('synthesizes nothing: no plugin-config.json is written for the server', async () => {
+      generated();
+
+      await execute();
+
+      expect(uploaded).to.not.have.property('plugin-config.json');
+      expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
+    });
+
+    // The CLI reads past a mark an editor left at the front of the file, but the server parses
+    // the file itself, so it must not travel with one. Nothing else about the file changes.
+    it('carries no byte-order mark, and the rest of the file as written', async () => {
+      generated();
+      const body =
+        '{\r\n' +
+        '\t"plugin": {"pluginId": "acme-payments", "pluginName": "Acme Payments"},\r\n' +
+        '\t"languages": {"csharp": {"publishing": {"source": {"repositoryUrl": "https://github.com/acme/acme-csharp"}}}}\r\n' +
+        '}\r\n';
+      await fsExtra.writeFile(configPath(), BOM + body);
+
+      expect((await execute()).isSuccess()).to.be.true;
+
+      expect(uploaded['apimatic.json']).to.equal(body);
+      expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(body);
+    });
+
+    it('fails rather than uploading a marked file it could not rewrite', async () => {
+      const generatePlugin = generated();
+      await fsExtra.writeFile(configPath(), BOM + JSON.stringify({ plugin: PLUGIN, languages: LANGUAGES }));
+      sinon.stub(FileService.prototype, 'replaceContents').rejects(new Error('EACCES: permission denied'));
+
+      expect((await execute()).isFailed()).to.be.true;
+      expect(generatePlugin.called).to.be.false;
+    });
+  });
+
   describe('plugin config', () => {
     const ACCOUNT = { FullName: 'Acme', Email: 'developers@acme.com' } as unknown as SubscriptionInfo;
     const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
-    const CSHARP = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } };
-
-    const configPath = () => path.join(buildDirectory, 'plugin-config.json');
-    const writeConfig = (config: object) => fsExtra.writeJson(configPath(), config);
-    const writtenConfig = () => fsExtra.readJsonSync(configPath());
+    const CSHARP = { publishing: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } };
 
     // The real PluginRecordMetadataAction runs; only its prompts and the account call are stubbed,
     // so these assert what actually lands on disk.
@@ -181,12 +241,12 @@ describe('PluginGenerateAction', () => {
       const result = await execute();
 
       expect(result.isSuccess()).to.be.true;
-      expect(writtenConfig()).to.include(METADATA);
+      expect(writtenConfig().plugin).to.include(METADATA);
       expect(nextSteps.called).to.be.true;
       expect(generatePlugin.called).to.be.false;
     });
 
-    it('fills in metadata and generates when sdk publish already recorded a language', async () => {
+    it('fills in the plugin block and generates when sdk publish already recorded a language', async () => {
       await writeConfig({ languages: { csharp: CSHARP } });
       answersMetadata();
       const generatePlugin = generated();
@@ -196,14 +256,14 @@ describe('PluginGenerateAction', () => {
 
       expect(result.isSuccess()).to.be.true;
       const config = writtenConfig();
-      expect(config).to.include(METADATA);
+      expect(config.plugin).to.include(METADATA);
       expect(config.languages).to.deep.equal({ csharp: CSHARP });
       expect(generatePlugin.called).to.be.true;
       expect(nextSteps.called).to.be.false;
     });
 
     it('stops with next steps when the config has metadata but no languages', async () => {
-      await writeConfig({ ...METADATA, languages: {} });
+      await writeConfig({ plugin: METADATA, languages: {} });
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
       const inputPluginMetadata = answersMetadata();
 
@@ -215,7 +275,7 @@ describe('PluginGenerateAction', () => {
     });
 
     it('stops with next steps when the only recorded language has neither a source nor a package', async () => {
-      await writeConfig({ ...METADATA, languages: { csharp: { codegenVersion: 'v3' } } });
+      await writeConfig({ plugin: METADATA, languages: { csharp: { publishing: { codegenVersion: 'v3' } } } });
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
       const result = await execute();

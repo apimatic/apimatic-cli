@@ -1,6 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../file/urlPath.js';
-import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { unknownFieldErrors } from './unknown-fields.js';
 
 export interface PortalConfigData {
@@ -35,8 +34,11 @@ const RENAMED_FIELDS = new Map<string, string>([
   ['site', 'siteUrl']
 ]);
 
-// Immutable wrapper around the parsed `src/portal.json`. Construct trusted values with
-// `create`; user input goes through `parse`, which names every invalid field.
+/** The block as a message names it: every field error is prefixed with it. */
+const BLOCK = 'portal';
+
+// Immutable wrapper around the `portal` block of `src/apimatic.json`. Construct trusted values
+// with `create`; user input goes through `fromBlock`, which names every invalid field.
 export class PortalConfig {
   private constructor(
     private readonly title: string,
@@ -59,13 +61,20 @@ export class PortalConfig {
   /** What a portal is called until something names it: a specification, or the user. */
   public static readonly placeholder = new PortalConfig('My API', null, null, null, true);
 
-  public static parse(json: string): Result<PortalConfig, string[]> {
-    const document = PortalConfig.parseObject(json);
-    if (document.isErr()) {
-      return err(document.error);
+  /**
+   * The `portal` block as the document parser hands it over, which is whatever the file holds
+   * under that key. The file-level checks are the document's; this one says what is wrong
+   * inside the block, or that there is no block to read.
+   */
+  public static fromBlock(block: unknown): Result<PortalConfig, string[]> {
+    if (block === undefined) {
+      return err([`'${BLOCK}' is required.`]);
+    }
+    if (typeof block !== 'object' || block === null || Array.isArray(block)) {
+      return err([`'${BLOCK}' must be a JSON object.`]);
     }
 
-    const data = document.value;
+    const data = block as Record<string, unknown>;
 
     // Every field is reported at once rather than stopping at the first, so one edit fixes
     // the file. Each validator hands back the typed value it accepted, so the constructor
@@ -75,8 +84,8 @@ export class PortalConfig {
       KNOWN_FIELDS,
       (field, intended) =>
         intended !== undefined
-          ? `'${field}' is not a portal.json setting; did you mean '${intended}'?`
-          : `'${field}' is not a portal.json setting.`,
+          ? `'${field}' is not a '${BLOCK}' setting; did you mean '${intended}'?`
+          : `'${field}' is not a '${BLOCK}' setting.`,
       RENAMED_FIELDS
     );
     const fields = Result.combineWithAllErrors([
@@ -96,23 +105,10 @@ export class PortalConfig {
     return ok(new PortalConfig(...fields.value));
   }
 
-  private static parseObject(json: string): Result<Record<string, unknown>, string[]> {
-    let data: unknown;
-    try {
-      data = JSON.parse(stripByteOrderMark(json));
-    } catch {
-      return err(['portal.json is not valid JSON.']);
-    }
-    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-      return err(['portal.json must contain a JSON object.']);
-    }
-    return ok(data as Record<string, unknown>);
-  }
-
   private static validTitle(title: unknown): Result<string, string> {
     return typeof title === 'string' && title.trim().length > 0
       ? ok(title.trim())
-      : err("'title' is required and must be a non-empty string.");
+      : err(`'${BLOCK}.title' is required and must be a non-empty string.`);
   }
 
   // A blank description is the same as none; without this it shipped as the site
@@ -122,7 +118,7 @@ export class PortalConfig {
       return ok(null);
     }
     if (typeof description !== 'string') {
-      return err("'description' must be a string.");
+      return err(`'${BLOCK}.description' must be a string.`);
     }
     const trimmed = description.trim();
     return ok(trimmed.length > 0 ? trimmed : null);
@@ -133,11 +129,11 @@ export class PortalConfig {
       return ok(null);
     }
     if (typeof logo !== 'string' || logo.trim().length === 0) {
-      return err("'logo' must be a non-empty string.");
+      return err(`'${BLOCK}.logo' must be a non-empty string.`);
     }
     if (!PortalConfig.isInsideStatic(logo)) {
       return err(
-        `'logo' must be a path relative to 'src' inside the 'static' directory, for example '${STATIC_PREFIX}images/logo.png'.`
+        `'${BLOCK}.logo' must be a path relative to 'src' inside the 'static' directory, for example '${STATIC_PREFIX}images/logo.png'.`
       );
     }
     return ok(logo);
@@ -147,7 +143,9 @@ export class PortalConfig {
     if (aiPageActions === undefined) {
       return ok(true);
     }
-    return typeof aiPageActions === 'boolean' ? ok(aiPageActions) : err("'aiPageActions' must be true or false.");
+    return typeof aiPageActions === 'boolean'
+      ? ok(aiPageActions)
+      : err(`'${BLOCK}.aiPageActions' must be true or false.`);
   }
 
   private static validSiteUrl(siteUrl: unknown): Result<UrlPath | null, string> {
@@ -157,7 +155,7 @@ export class PortalConfig {
     const parsed = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
     return parsed === null
       ? err(
-          "'siteUrl' must be the address the portal is hosted at, without a path, for example 'https://docs.example.com'."
+          `'${BLOCK}.siteUrl' must be the address the portal is hosted at, without a path, for example 'https://docs.example.com'.`
         )
       : ok(parsed);
   }

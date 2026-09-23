@@ -1,5 +1,8 @@
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
+import { errorMessage } from '../utils/error-utils.js';
+import { ApimaticConfigContext } from './apimatic-config-context.js';
+import { findingSentences } from './apimatic-config/document.js';
 import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
@@ -7,7 +10,7 @@ import { FilePath } from './file/filePath.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
-import { PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import { PortalScaffoldProblem, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -55,16 +58,15 @@ interface DirectoryScan {
 }
 
 /**
- * The `src/` directory of a portal project: `portal.json`, the OpenAPI documents in
- * `spec/`, and the optional `content/` and `static/` directories.
+ * The `src/` directory of a portal project: the `portal` block of `apimatic.json`, the OpenAPI
+ * documents in `spec/`, and the optional `content/` and `static/` directories.
  */
 export class PortalSourceContext {
   private readonly fileService = new FileService();
+  private readonly configContext: ApimaticConfigContext;
 
-  constructor(private readonly sourceDirectory: DirectoryPath) {}
-
-  private get configFile(): FilePath {
-    return new FilePath(this.sourceDirectory, new FileName('portal.json'));
+  constructor(private readonly sourceDirectory: DirectoryPath) {
+    this.configContext = new ApimaticConfigContext(sourceDirectory);
   }
 
   private get specDirectory(): DirectoryPath {
@@ -81,13 +83,9 @@ export class PortalSourceContext {
 
   /** Reads and validates the whole source directory, or reports the first problem found. */
   public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
-    if (!(await this.fileService.fileExists(this.configFile))) {
-      return err({ kind: 'missingConfig' });
-    }
-
-    const config = PortalConfig.parse(await this.fileService.getContents(this.configFile));
+    const config = await this.readConfig();
     if (config.isErr()) {
-      return err({ kind: 'invalidConfig', errors: config.error });
+      return err(config.error);
     }
 
     // `parse` checks the shape of `logo`, not that the file is there -- and a missing logo
@@ -145,14 +143,56 @@ export class PortalSourceContext {
   }
 
   /**
-   * Writes the smallest source tree `portal generate` and `portal serve` accept, with a
-   * `portal.json` described from the specification itself.
+   * The `portal` block, or why it cannot be read. Only the root and the portal block are this
+   * command's to judge: a malformed plugin or languages block belongs to the commands that write
+   * them, and must not fail a build. Everything found is reported together, so one edit fixes
+   * the file.
    */
-  public async scaffold(specPath: FilePath): Promise<void> {
+  private async readConfig(): Promise<Result<PortalConfig, PortalSourceProblem>> {
+    const state = await this.configContext.read();
+    if (state.state === 'missing') {
+      return err({ kind: 'missingConfig' });
+    }
+    if (state.state === 'unparseable') {
+      return err({ kind: 'invalidConfig', errors: findingSentences(state.findings), missingPortal: false });
+    }
+
+    const block = state.document.portal();
+    const rootErrors = findingSentences(state.document.findingsFor('root'));
+    const config = PortalConfig.fromBlock(block);
+    if (config.isErr() || rootErrors.length > 0) {
+      return err({
+        kind: 'invalidConfig',
+        errors: [...rootErrors, ...(config.isErr() ? config.error : [])],
+        missingPortal: block === undefined
+      });
+    }
+    return ok(config.value);
+  }
+
+  /**
+   * Writes the smallest source tree `portal generate` and `portal serve` accept, with a
+   * `portal` block described from the specification itself. Every fault is reported rather
+   * than thrown, including the ones the file service raises: the caller is a wizard that has
+   * asked its questions already, and it reports what went wrong instead of crashing.
+   */
+  public async scaffold(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
+    try {
+      return await this.writeSourceTree(specPath);
+    } catch (error) {
+      return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
+    }
+  }
+
+  private async writeSourceTree(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
     await new SpecContext(this.specDirectory).install(specPath);
 
     const config = await this.suggestedConfig(specPath);
-    await this.fileService.writeContents(this.configFile, JSON.stringify(config, null, 2) + '\n');
+    // The directory is empty when quickstart runs this, so the merge always creates the file.
+    const written = await this.configContext.merge(['portal'], (document) => document.with('portal', config.toJSON()));
+    if (written.isErr()) {
+      return err({ kind: written.error === 'unreadable' ? 'configUnreadable' : 'configUnwritable' });
+    }
 
     await this.fileService.createDirectoryIfNotExists(this.contentDirectory);
     const summary = `Getting started with ${config.siteTitle()}`;
@@ -177,6 +217,7 @@ export class PortalSourceContext {
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
       JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
     );
+    return ok(undefined);
   }
 
   // A split specification arrives as an archive, whose parts are left to the build to read.

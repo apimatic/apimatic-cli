@@ -95,7 +95,7 @@ export class OpenApiDocument {
   }
 
   /**
-   * A `portal.json` to start from, so the wizard has one question fewer to ask. Both fields
+   * A `portal` block to start from, so the wizard has one question fewer to ask. Both fields
    * are written into generated files, so each is collapsed to one line first -- taking only
    * the first line left the description cap unreachable for wrapped prose.
    */

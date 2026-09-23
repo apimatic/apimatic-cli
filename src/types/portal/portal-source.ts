@@ -31,10 +31,18 @@ export interface PortalSource {
   ignoredNavigationFiles: FilePath[];
 }
 
+/** Why a source directory could not be written; each variant maps to its own message. */
+export type PortalScaffoldProblem =
+  | { kind: 'configUnreadable' }
+  | { kind: 'configUnwritable' }
+  // `reason` is the message of whatever the file service raised, which nothing here can narrow.
+  | { kind: 'sourceUnwritable'; reason: string };
+
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
-  | { kind: 'invalidConfig'; errors: string[] }
+  // `missingPortal`: the block itself is absent, which is what quickstart sets up.
+  | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'unreadableContent' }
   | { kind: 'unreadableSpec'; fileName: FileName }

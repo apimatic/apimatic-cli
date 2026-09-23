@@ -10,8 +10,8 @@ The official CLI for APIMatic.
 
 # Requirements
 
-Node.js 22.12 or newer, for every command. npm only warns when your Node is older, so the
-install succeeds and the CLI then refuses to build a portal.
+Node.js 24 or newer, for every command. npm only warns when your Node is older, so the
+install succeeds and the CLI then refuses to run, naming the version it found.
 
 # Getting Started
 
@@ -26,8 +26,11 @@ $ apimatic quickstart
 Documentation portals are now built on your machine from a `src/` directory, and
 `APIMATIC-BUILD.json` no longer configures them:
 
-- Describe the portal in `src/portal.json` (`title`, `description`, `logo`, `siteUrl`).
-  Running `apimatic quickstart` scaffolds one.
+- Describe the portal in the `portal` block of `src/apimatic.json` (`title`, `description`,
+  `logo`, `siteUrl`). Running `apimatic quickstart` scaffolds one. The same file carries the
+  context plugin's identity in `plugin` and the SDKs you publish in `languages`, which
+  `plugin generate` and `sdk publish` write; `src/plugin-config.json` is no longer read, so run
+  those two commands again after upgrading and delete the old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
@@ -260,7 +263,7 @@ DESCRIPTION
   Generate a context plugin for your published SDKs.
 
   Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
-  containing a `src` directory with a `plugin-config.json`.
+  containing a `src` directory with an `apimatic.json`.
 
 EXAMPLES
   apimatic plugin generate
@@ -319,7 +322,7 @@ DESCRIPTION
   Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
 
   The portal is built on your machine and written as static files you can host anywhere. Configure it with
-  'src/portal.json'.
+  'src/apimatic.json'.
 
 EXAMPLES
   apimatic portal generate
@@ -349,10 +352,10 @@ FLAGS
 DESCRIPTION
   Preview your API Documentation Portal with live reload.
 
-  Serves the portal described by 'src/portal.json' from your machine, reloading the browser as you edit the Markdown
+  Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown
   pages in 'src/content' or reorder them in a 'nav.json'.
 
-  Adding or removing a page, editing 'portal.json', or changing which documents are in 'src/spec', needs the preview
+  Adding or removing a page, editing 'apimatic.json', or changing which documents are in 'src/spec', needs the preview
   restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
@@ -474,7 +477,7 @@ FLAGS
                                   <options: package|sourcecode>
       --stability=<option>        [default: stable] Stability level of the generated SDK
                                   <options: stable|beta>
-      --update-plugin-config      Record the published SDK in 'plugin-config.json', creating the file if it does not
+      --update-plugin-config      Record the published SDK in 'src/apimatic.json', creating the file if it does not
                                   exist. Interactive runs are asked instead.
 
 DESCRIPTION

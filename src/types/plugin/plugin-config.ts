@@ -4,6 +4,9 @@ import { CodeGenerationVersion, Language } from '../sdk/generate.js';
 /** Written unprompted: the backend consumes it, and nothing in the CLI asks for it. */
 export const DEFAULT_PLUGIN_LICENSE = 'MIT';
 
+/** Also the rule the metadata prompt validates against, so a plugin ID is legal as a repository name. */
+export const PLUGIN_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 export interface PluginAuthor {
   name: string;
   email?: string;
@@ -45,27 +48,40 @@ interface GoPackageConfig {
   version: SemVersionString;
 }
 
-interface PluginConfig<TPackage> {
+/** Where one language's SDK is published, and which generator produced what was published. */
+interface LanguagePublishing<TPackage> {
   source?: LanguageSource;
   package?: TPackage;
   codegenVersion: CodeGenerationVersion;
 }
 
-interface PluginConfigForLanguage {
-  [Language.CSHARP]: PluginConfig<CSharpPackageConfig>;
-  [Language.JAVA]: PluginConfig<JavaPackageConfig>;
-  [Language.PHP]: PluginConfig<PhpPackageConfig>;
-  [Language.PYTHON]: PluginConfig<PythonPackageConfig>;
-  [Language.RUBY]: PluginConfig<RubyPackageConfig>;
-  [Language.TYPESCRIPT]: PluginConfig<TypeScriptPackageConfig>;
-  [Language.GO]: PluginConfig<GoPackageConfig>;
+interface PublishingForLanguage {
+  [Language.CSHARP]: LanguagePublishing<CSharpPackageConfig>;
+  [Language.JAVA]: LanguagePublishing<JavaPackageConfig>;
+  [Language.PHP]: LanguagePublishing<PhpPackageConfig>;
+  [Language.PYTHON]: LanguagePublishing<PythonPackageConfig>;
+  [Language.RUBY]: LanguagePublishing<RubyPackageConfig>;
+  [Language.TYPESCRIPT]: LanguagePublishing<TypeScriptPackageConfig>;
+  [Language.GO]: LanguagePublishing<GoPackageConfig>;
 }
 
-export type PluginLanguageEntry<L extends Language> = PluginConfigForLanguage[L];
+export type LanguagePublishingEntry<L extends Language> = PublishingForLanguage[L];
 
-export type PluginLanguages = Partial<PluginConfigForLanguage>;
+/**
+ * One language's entry. The publishing record nests under `publishing` because the entry is
+ * shared state — the plugin's skills, the portal's SDK page and publishing all read it — so the
+ * rest of the entry has to stay free for settings that are not about publishing. The backend
+ * binds this level, and an entry with no `publishing` block is how "this language was asked for,
+ * nothing has been published yet" is expressed.
+ */
+export interface PluginLanguageEntry<L extends Language> {
+  publishing?: PublishingForLanguage[L];
+}
 
-export interface PluginConfigData {
+export type PluginLanguages = Partial<{ [L in Language]: PluginLanguageEntry<L> }>;
+
+/** The `plugin` block of `apimatic.json`: the identity `plugin generate` records. */
+export interface PluginIdentityData {
   // Optional on disk: `sdk publish` creates a config carrying languages alone, and
   // `plugin generate` fills the identity in before it ever uploads.
   pluginId?: string;
@@ -76,10 +92,14 @@ export interface PluginConfigData {
   license?: string;
   homepage?: string;
   repository?: string;
-  languages: PluginLanguages;
   // A hand-written config may carry fields this CLI version does not model; the index
   // signature is what lets a read-modify-write round-trip preserve them.
   [key: string]: unknown;
+}
+
+/** The identity with `languages` beside it: the one configuration the plugin commands judge. */
+export interface PluginConfigData extends PluginIdentityData {
+  languages: PluginLanguages;
 }
 
 /** The fields the CLI asks for; everything else is derived, resolved or constant. */

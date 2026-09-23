@@ -25,28 +25,32 @@ rejected with a clear error (see section 3).
 |---|---|
 | Framework | TanStack Start, SPA + prerender mode, no Nitro. Exact versions pinned in the CLI lockfile. |
 | Output | Static files only (`dist/client` of the template build). Root hosting only (no `basePath`). |
-| Input layout | Additive. `src/APIMATIC-BUILD.json` stays for SDK/plugin commands only and is removed later once SDK generation works without it. Portal reads `src/portal.json`, `src/spec/` (shared with SDK generation), `src/content/`, `src/static/`. |
+| Input layout | Additive. `src/APIMATIC-BUILD.json` stays for SDK/plugin commands only and is removed later once SDK generation works without it. Portal reads the `portal` block of `src/apimatic.json` (which replaced `src/portal.json` on 2026-09-22, see `.ai/plans/apimatic-config.md`), `src/spec/` (shared with SDK generation), `src/content/`, `src/static/`. |
 | Commands | `portal generate` replaced in place (keeps `--zip` and `--auth-key`). `portal serve` kept, rebuilt on the Vite dev server. `portal toc new`, `portal recipe new`, `portal copilot` removed, hidden stubs kept for one major. `quickstart` portal step scaffolds the new layout. |
 | Node | Engine `>=22.12.0` (TanStack Start requirement; Node 20 is EOL). Explicit runtime check before building. |
 | Authorization | Gate on `portal generate` and `portal serve` only (section 6). Entitlement is the boolean `isOnPremGenerationAllowed`; no spec pruning or endpoint limits for portals. |
 | Delivery | One PR against `dev` containing everything (section 10). Carries the `BREAKING CHANGE` footer. |
 | `$ref` handling | Deferred: Fumadocs' built-in bundling is used as-is in v1 (known risk, section 9). |
 
-## 3. Input layout and `portal.json`
+## 3. Input layout and `apimatic.json`
+
+Amended 2026-09-22: `portal.json` became the `portal` block of `src/apimatic.json`, one
+file shared with the plugin commands (`.ai/plans/apimatic-config.md`). Mentions of
+`portal.json` further down this plan are historical and read as that block.
 
 ```
 src/
   APIMATIC-BUILD.json   untouched; SDK/plugin commands only
-  portal.json           portal-only config
+  apimatic.json         portal, plugin and languages blocks (was portal.json)
   spec/                 one or more OpenAPI 3.x JSON/YAML files; one sidebar section each
   content/              .md/.mdx pages with frontmatter; optional nav.json per folder (page order)
   static/               served verbatim at the site root
 ```
 
-`portal.json` v1 schema:
+The `portal` block, v1 shape:
 
 ```json
-{ "title": "My API", "description": "optional", "logo": "static/logo.png" }
+{ "portal": { "title": "My API", "description": "optional", "logo": "static/logo.png" } }
 ```
 
 `title` is required. `logo` is a path relative to `src/` and must point inside

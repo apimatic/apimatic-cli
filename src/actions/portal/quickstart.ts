@@ -151,7 +151,11 @@ export class PortalQuickstartAction {
       }
 
       const sourceDirectory = inputDirectory.join('src');
-      await new PortalSourceContext(sourceDirectory).scaffold(specPath);
+      const scaffolded = await new PortalSourceContext(sourceDirectory).scaffold(specPath);
+      if (scaffolded.isErr()) {
+        this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
+        return ActionResult.failed();
+      }
 
       const structure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, structure);

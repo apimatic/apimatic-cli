@@ -7,16 +7,13 @@
     "outDir": "lib",
     "rootDir": "src",
     "strict": true,
-    "target": "es2017",
-    "lib": ["es2018", "dom"],
+    "target": "es2024",
+    "lib": ["es2024", "dom"],
     "sourceMap": true,
     "moduleResolution": "nodenext",
     "allowSyntheticDefaultImports": true,
   },
   "include": [
     "src/**/*"
-  ], 
-  "ts-node": {
-    "esm": true
-  }
+  ]
 }

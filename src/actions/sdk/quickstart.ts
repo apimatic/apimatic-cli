@@ -26,7 +26,7 @@ export class SdkQuickstartAction {
   private readonly launcherService = new LauncherService();
   private readonly zipService = new ZipService();
   private readonly apiService = new ApiService();
-  private readonly validationService = new ValidationService(this.configDir);
+  private readonly validationService: ValidationService;
   private readonly metadataFileUrl = new UrlPath(
     `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/v2/src/spec/APIMATIC-META.json`
   );
@@ -34,7 +34,9 @@ export class SdkQuickstartAction {
     `https://raw.githubusercontent.com/apimatic/sample-docs-as-code-portal/refs/heads/v2/src/spec/petstore.json`
   );
 
-  constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
+  constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {
+    this.validationService = new ValidationService(configDir);
+  }
 
   public readonly execute = async (): Promise<ActionResult> => {
     const storedAuth = await getAuthInfo(this.configDir.toString());

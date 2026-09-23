@@ -52,7 +52,7 @@ export default class SdkPublish extends Command {
       options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
       default: CodeGenerationVersion.V3
     }),
-    'stability': Flags.string({
+    stability: Flags.string({
       description: 'Stability level of the generated SDK',
       options: Object.values(Stability).map((s) => s.valueOf()),
       default: Stability.STABLE
@@ -60,7 +60,7 @@ export default class SdkPublish extends Command {
     'update-plugin-config': Flags.boolean({
       default: false,
       description:
-        "Record the published SDK in 'plugin-config.json', creating the file if it does not exist. Interactive runs are asked instead."
+        "Record the published SDK in 'src/apimatic.json', creating the file if it does not exist. Interactive runs are asked instead."
     })
   };
 
@@ -73,21 +73,23 @@ export default class SdkPublish extends Command {
       'publish-type',
       PublishType.SourceCodePublishing
     )}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'b2c3d4e5f6a1b2c3d4e5f6a1')} ${format.flag('language', 'java')} ${format.flag(
-      'version',
-      '2.0.0'
-    )} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'c3d4e5f6a1b2c3d4e5f6a1b2')} ${format.flag('language', 'python')} ${format.flag(
-      'version',
-      '1.0.0'
-    )} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag('dry-run')}`,
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'b2c3d4e5f6a1b2c3d4e5f6a1')} ${format.flag(
+      'language',
+      'java'
+    )} ${format.flag('version', '2.0.0')} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
+    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'c3d4e5f6a1b2c3d4e5f6a1b2')} ${format.flag(
+      'language',
+      'python'
+    )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
+      'dry-run'
+    )}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'd4e5f6a1b2c3d4e5f6a1b2c3')} ${format.flag(
       'language',
       'csharp'
-    )} ${format.flag('version', '1.0.0')} ${format.flag(
-      'publish-type',
-      PublishType.PackagePublishing
-    )} ${format.flag('codegen-version', 'v4')} ${format.flag('stability', 'beta')}`
+    )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
+      'codegen-version',
+      'v4'
+    )} ${format.flag('stability', 'beta')}`
   ];
 
   async run() {
@@ -143,10 +145,7 @@ export default class SdkPublish extends Command {
 
     intro('Publish SDK');
     const result = interactive
-      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
-          workingDirectory,
-          onPublishSdkError
-        )
+      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(workingDirectory, onPublishSdkError)
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
           buildDirectory,
           sdkDirectory,

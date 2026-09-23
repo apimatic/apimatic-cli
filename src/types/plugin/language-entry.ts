@@ -1,23 +1,23 @@
 import { GitConfiguration, PackageConfigurationForLanguage } from '../publish/package-settings-configuration.js';
 import { SemVersion, SemVersionString } from '../publish/version.js';
 import { CodeGenerationVersion, Language } from '../sdk/generate.js';
-import { LanguageSource, PluginLanguageEntry } from './plugin-config.js';
+import { LanguagePublishingEntry, LanguageSource, PluginLanguageEntry } from './plugin-config.js';
 
 const GITHUB_BASE_URL = 'https://github.com';
 
-type LanguageEntryBuilder<L extends Language> = (
+type LanguagePublishingBuilder<L extends Language> = (
   source: LanguageSource | undefined,
   packageConfiguration: PackageConfigurationForLanguage[L] | undefined,
   version: SemVersionString,
   codegenVersion: CodeGenerationVersion
-) => PluginLanguageEntry<L>;
+) => LanguagePublishingEntry<L>;
 
 /**
  * One builder per language, each checked against that language's own profile fields and its own
- * entry shape. A single builder taking every language's configuration at once can only reach those
- * fields through a cast, which is what let a mismatched pair compile.
+ * publishing shape. A single builder taking every language's configuration at once can only reach
+ * those fields through a cast, which is what let a mismatched pair compile.
  */
-const languageEntryBuilders: { [L in Language]: LanguageEntryBuilder<L> } = {
+const publishingBuilders: { [L in Language]: LanguagePublishingBuilder<L> } = {
   [Language.CSHARP]: (source, configuration, version, codegenVersion) => ({
     source,
     package: configuration?.packageId ? { packageId: configuration.packageId, version } : undefined,
@@ -80,5 +80,7 @@ export function buildLanguageEntry<L extends Language>(
       }
     : undefined;
 
-  return languageEntryBuilders[language](source, packageConfiguration, packageVersion.toString(), codegenVersion);
+  return {
+    publishing: publishingBuilders[language](source, packageConfiguration, packageVersion.toString(), codegenVersion)
+  };
 }
