@@ -45,4 +45,5 @@ export type PortalSourceProblem =
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
   | { kind: 'noSpecs' }
-  | { kind: 'missingLogo'; logoPath: string };
+  // Every file the block names that is not on disk, each with the setting that names it.
+  | { kind: 'missingStaticFiles'; files: { setting: string; path: string }[] };

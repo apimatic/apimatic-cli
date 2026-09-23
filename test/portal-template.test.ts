@@ -99,7 +99,9 @@ describe('portal template packaging', () => {
     const declared = [...(block?.[1] ?? '').matchAll(/^\s*(\w+):/gm)].map((match) => match[1]).sort();
 
     expect(declared).to.not.be.empty;
-    expect(declared).to.deep.equal(Object.keys(PortalConfig.create('Acme').identity()).sort());
+    expect(declared).to.deep.equal(
+      Object.keys(PortalConfig.scaffolded({ name: 'Acme', description: null }).identity()).sort()
+    );
   });
 
   it('carries no nested .gitignore, which would drop files from the package', () => {

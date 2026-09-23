@@ -214,7 +214,7 @@ export class PortalNavigation {
   /**
    * A folder is named after its directory, or after the title of its index page; `title`
    * outranks both. The content root is no folder in the sidebar, so a name given there would
-   * set nothing, and the portal's own name is `apimatic.json`'s `portal.title`.
+   * set nothing, and the portal's own name is `apimatic.json`'s `portal.site.name`.
    */
   private static titleErrors(title: unknown, context: NavigationContext): string[] {
     if (title === undefined) {
@@ -223,7 +223,7 @@ export class PortalNavigation {
     if (context.isContentRoot) {
       return [
         `${context.label}: 'title' names a folder, and this file orders the content root, ` +
-          `which is not one. Set the portal's own name with 'portal.title' in apimatic.json.`
+          `which is not one. Set the portal's own name with 'portal.site.name' in apimatic.json.`
       ];
     }
     // A directory with no page beneath it becomes no folder, so the name would reach nothing

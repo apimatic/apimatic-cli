@@ -224,7 +224,7 @@ describe('PortalNavigation', () => {
 
       expect(errors).to.have.lengthOf(1);
       expect(errors[0]).to.contain('orders the content root, which is not one');
-      expect(errors[0]).to.contain("'portal.title' in apimatic.json");
+      expect(errors[0]).to.contain("'portal.site.name' in apimatic.json");
     });
 
     // The template drops a folder with no page beneath it, so the name would reach nothing --

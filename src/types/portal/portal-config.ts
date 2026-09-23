@@ -1,14 +1,14 @@
-import { err, ok, Result } from 'neverthrow';
+import { err, Result } from 'neverthrow';
 import { UrlPath } from '../file/urlPath.js';
-import { unknownFieldErrors } from './unknown-fields.js';
-
-export interface PortalConfigData {
-  title: string;
-  description?: string;
-  logo?: string;
-  siteUrl?: string;
-  aiPageActions?: boolean;
-}
+import { AdvancedTokens } from './config/advanced-tokens.js';
+import { AiConfig } from './config/ai-config.js';
+import { ApiConfig } from './config/api-config.js';
+import { BrandConfig } from './config/brand-config.js';
+import { allOf, isJsonObject, unknownKeys } from './config/fields.js';
+import { HomeConfig } from './config/home-config.js';
+import { NavigationConfig } from './config/navigation-config.js';
+import { SiteConfig, SuggestedSite } from './config/site-config.js';
+import { StaticAsset } from './config/static-asset.js';
 
 /**
  * What the browser bundle is told about the portal. Nothing here may address the machine the
@@ -24,216 +24,139 @@ export interface PortalIdentity {
   aiPageActions: boolean;
 }
 
-const STATIC_PREFIX = 'static/';
-
-const KNOWN_FIELDS = new Set(['title', 'description', 'logo', 'siteUrl', 'aiPageActions']);
-
-// Near misses, each mapped to the setting it means.
-const RENAMED_FIELDS = new Map<string, string>([
-  ['url', 'siteUrl'],
-  ['site', 'siteUrl']
-]);
-
-/** The block as a message names it: every field error is prefixed with it. */
+/** The block as a message names it: every setting's path starts with it. */
 const BLOCK = 'portal';
 
-// Immutable wrapper around the `portal` block of `src/apimatic.json`. Construct trusted values
-// with `create`; user input goes through `fromBlock`, which names every invalid field.
+const NAMESPACES = ['site', 'brand', 'navigation', 'home', 'api', 'ai', 'advanced'];
+
+// Immutable wrapper around the `portal` block of `src/apimatic.json`. User input goes through
+// `fromBlock`, which names every invalid setting; a new project's block comes from `scaffolded`.
 export class PortalConfig {
   private constructor(
-    private readonly title: string,
-    private readonly description: string | null,
-    private readonly logo: string | null,
-    private readonly siteUrl: UrlPath | null,
-    private readonly aiPageActions: boolean
+    private readonly site: SiteConfig,
+    private readonly brand: BrandConfig,
+    private readonly navigation: NavigationConfig,
+    private readonly home: HomeConfig,
+    private readonly api: ApiConfig,
+    private readonly ai: AiConfig,
+    private readonly advanced: AdvancedTokens
   ) {}
 
-  public static create(
-    title: string,
-    description: string | null = null,
-    logo: string | null = null,
-    siteUrl: UrlPath | null = null,
-    aiPageActions = true
-  ): PortalConfig {
-    return new PortalConfig(title, description, logo, siteUrl, aiPageActions);
+  /** The block quickstart writes: the specification's own name and description, and every default spelled out. */
+  public static scaffolded(site: SuggestedSite): PortalConfig {
+    return new PortalConfig(
+      SiteConfig.suggested(site),
+      BrandConfig.defaults,
+      NavigationConfig.defaults,
+      HomeConfig.defaults,
+      ApiConfig.defaults,
+      AiConfig.defaults,
+      AdvancedTokens.defaults
+    );
   }
-
-  /** What a portal is called until something names it: a specification, or the user. */
-  public static readonly placeholder = new PortalConfig('My API', null, null, null, true);
 
   /**
    * The `portal` block as the document parser hands it over, which is whatever the file holds
-   * under that key. The file-level checks are the document's; this one says what is wrong
-   * inside the block, or that there is no block to read.
+   * under that key. `suggested` is what the only specification says about itself, or null when
+   * there are several; it fills the site's name and description when the block leaves them out.
    */
-  public static fromBlock(block: unknown): Result<PortalConfig, string[]> {
+  public static fromBlock(block: unknown, suggested: SuggestedSite | null): Result<PortalConfig, string[]> {
     if (block === undefined) {
       return err([`'${BLOCK}' is required.`]);
     }
-    if (typeof block !== 'object' || block === null || Array.isArray(block)) {
+    if (!isJsonObject(block)) {
       return err([`'${BLOCK}' must be a JSON object.`]);
     }
 
-    const data = block as Record<string, unknown>;
-
-    // Every field is reported at once rather than stopping at the first, so one edit fixes
-    // the file. Each validator hands back the typed value it accepted, so the constructor
-    // below is fed only what validation proved.
-    const unknownFields = unknownFieldErrors(
-      data,
-      KNOWN_FIELDS,
-      (field, intended) =>
-        intended !== undefined
-          ? `'${field}' is not a '${BLOCK}' setting; did you mean '${intended}'?`
-          : `'${field}' is not a '${BLOCK}' setting.`,
-      RENAMED_FIELDS
-    );
-    const fields = Result.combineWithAllErrors([
-      PortalConfig.validTitle(data.title),
-      PortalConfig.validDescription(data.description),
-      PortalConfig.validLogo(data.logo),
-      PortalConfig.validSiteUrl(data.siteUrl),
-      PortalConfig.validAiPageActions(data.aiPageActions)
-    ]);
-    if (fields.isErr()) {
-      return err([...unknownFields, ...fields.error]);
-    }
-    if (unknownFields.length > 0) {
-      return err(unknownFields);
-    }
-
-    return ok(new PortalConfig(...fields.value));
-  }
-
-  private static validTitle(title: unknown): Result<string, string> {
-    return typeof title === 'string' && title.trim().length > 0
-      ? ok(title.trim())
-      : err(`'${BLOCK}.title' is required and must be a non-empty string.`);
-  }
-
-  // A blank description is the same as none; without this it shipped as the site
-  // description and as the og:description of every page.
-  private static validDescription(description: unknown): Result<string | null, string> {
-    if (description === undefined) {
-      return ok(null);
-    }
-    if (typeof description !== 'string') {
-      return err(`'${BLOCK}.description' must be a string.`);
-    }
-    const trimmed = description.trim();
-    return ok(trimmed.length > 0 ? trimmed : null);
-  }
-
-  private static validLogo(logo: unknown): Result<string | null, string> {
-    if (logo === undefined) {
-      return ok(null);
-    }
-    if (typeof logo !== 'string' || logo.trim().length === 0) {
-      return err(`'${BLOCK}.logo' must be a non-empty string.`);
-    }
-    if (!PortalConfig.isInsideStatic(logo)) {
-      return err(
-        `'${BLOCK}.logo' must be a path relative to 'src' inside the 'static' directory, for example '${STATIC_PREFIX}images/logo.png'.`
-      );
-    }
-    return ok(logo);
-  }
-
-  private static validAiPageActions(aiPageActions: unknown): Result<boolean, string> {
-    if (aiPageActions === undefined) {
-      return ok(true);
-    }
-    return typeof aiPageActions === 'boolean'
-      ? ok(aiPageActions)
-      : err(`'${BLOCK}.aiPageActions' must be true or false.`);
-  }
-
-  private static validSiteUrl(siteUrl: unknown): Result<UrlPath | null, string> {
-    if (siteUrl === undefined) {
-      return ok(null);
-    }
-    const parsed = typeof siteUrl === 'string' ? PortalConfig.parseOrigin(siteUrl) : null;
-    return parsed === null
-      ? err(
-          `'${BLOCK}.siteUrl' must be the address the portal is hosted at, without a path, for example 'https://docs.example.com'.`
-        )
-      : ok(parsed);
+    // Every setting is reported at once rather than stopping at the first, so one edit fixes
+    // the file. Each parser hands back the value it accepted, so the constructor below is fed
+    // only what validation proved.
+    return allOf(
+      unknownKeys(block, NAMESPACES, BLOCK),
+      Result.combineWithAllErrors([
+        SiteConfig.parse(block.site, `${BLOCK}.site`, suggested),
+        BrandConfig.parse(block.brand, `${BLOCK}.brand`),
+        NavigationConfig.parse(block.navigation, `${BLOCK}.navigation`),
+        HomeConfig.parse(block.home, `${BLOCK}.home`),
+        ApiConfig.parse(block.api, `${BLOCK}.api`),
+        AiConfig.parse(block.ai, `${BLOCK}.ai`),
+        AdvancedTokens.parse(block.advanced, `${BLOCK}.advanced`)
+      ])
+    ).map((namespaces) => new PortalConfig(...namespaces));
   }
 
   public siteTitle(): string {
-    return this.title;
+    return this.site.siteName();
   }
 
   public siteDescription(): string | null {
-    return this.description;
-  }
-
-  /** Whether each page offers to open itself in an external AI assistant. */
-  public offersAiPageActions(): boolean {
-    return this.aiPageActions;
-  }
-
-  /** Path of the logo relative to `src/` with forward slashes, or null when none is configured. */
-  public logoPath(): string | null {
-    return this.logo === null ? null : PortalConfig.normalize(this.logo);
-  }
-
-  /** URL of the logo on the generated site (the `static/` prefix is the site root). */
-  public logoSiteUrl(): string | null {
-    const logoPath = this.logoPath();
-    return logoPath === null ? null : `/${logoPath.slice(STATIC_PREFIX.length)}`;
+    return this.site.siteDescription();
   }
 
   public siteOrigin(): UrlPath | null {
-    return this.siteUrl;
+    return this.site.origin();
+  }
+
+  public brandSettings(): BrandConfig {
+    return this.brand;
+  }
+
+  public navigationSettings(): NavigationConfig {
+    return this.navigation;
+  }
+
+  public homeSettings(): HomeConfig {
+    return this.home;
+  }
+
+  public apiSettings(): ApiConfig {
+    return this.api;
+  }
+
+  public aiSettings(): AiConfig {
+    return this.ai;
+  }
+
+  public tokenOverrides(): AdvancedTokens {
+    return this.advanced;
+  }
+
+  /** Every file the block names under `static/`, each once; each knows the setting that names it. */
+  public staticFiles(): StaticAsset[] {
+    return this.brand.files();
   }
 
   public identity(): PortalIdentity {
+    const origin = this.site.origin();
     return {
-      title: this.title,
-      description: this.description,
-      logoUrl: this.logoSiteUrl(),
-      siteUrl: this.siteUrl === null ? null : this.siteUrl.toString(),
-      aiPageActions: this.aiPageActions
+      title: this.site.siteName(),
+      description: this.site.siteDescription(),
+      logoUrl: this.brand.logoImages()?.light().siteUrl() ?? null,
+      siteUrl: origin === null ? null : origin.toString(),
+      aiPageActions: this.ai.offersPageActions()
     };
   }
 
-  public toJSON(): PortalConfigData {
+  /** The block as plain data, every namespace included, which is what quickstart writes. */
+  public toJSON(): PortalBlock {
     return {
-      title: this.title,
-      ...(this.description !== null ? { description: this.description } : {}),
-      ...(this.logo !== null ? { logo: this.logo } : {}),
-      ...(this.siteUrl !== null ? { siteUrl: this.siteUrl.toString() } : {}),
-      // Only when it differs from the default, so a scaffolded file stays minimal.
-      ...(this.aiPageActions ? {} : { aiPageActions: false })
+      site: this.site.toJSON(),
+      brand: this.brand.toJSON(),
+      navigation: this.navigation.toJSON(),
+      home: this.home.toJSON(),
+      api: this.api.toJSON(),
+      ai: this.ai.toJSON(),
+      advanced: this.advanced.toJSON()
     };
   }
+}
 
-  // Not `replaceAll`, which Sonar asks for: the root tsconfig compiles `src` against
-  // `lib: es2018`, where the method does not exist.
-  private static normalize(relativePath: string): string {
-    return relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
-  }
-
-  private static isInsideStatic(relativePath: string): boolean {
-    const normalized = PortalConfig.normalize(relativePath);
-    if (!normalized.startsWith(STATIC_PREFIX) || normalized.length === STATIC_PREFIX.length) {
-      return false;
-    }
-    return !normalized.split('/').includes('..');
-  }
-
-  // Only the origin is accepted: the portal is hosted at the root of its host, so a path,
-  // query or fragment would produce canonical links that do not resolve.
-  private static parseOrigin(value: string): UrlPath | null {
-    const url = UrlPath.create(value.trim());
-    if (url === undefined) {
-      return null;
-    }
-    const parsed = new URL(value.trim());
-    if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '') {
-      return null;
-    }
-    return new UrlPath(parsed.origin);
-  }
+export interface PortalBlock {
+  site: ReturnType<SiteConfig['toJSON']>;
+  brand: ReturnType<BrandConfig['toJSON']>;
+  navigation: ReturnType<NavigationConfig['toJSON']>;
+  home: ReturnType<HomeConfig['toJSON']>;
+  api: ReturnType<ApiConfig['toJSON']>;
+  ai: ReturnType<AiConfig['toJSON']>;
+  advanced: ReturnType<AdvancedTokens['toJSON']>;
 }

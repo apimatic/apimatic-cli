@@ -50,11 +50,18 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       log.error(message);
       return;
     }
-    case 'missingLogo': {
-      const message =
-        `The logo ${f.var(problem.logoPath)} named in ${f.var(APIMATIC_CONFIG_FILE_NAME)} is not in ` +
-        `${f.path(sourceDirectory)}. Add the image there, or remove ${f.var('portal.logo')}.`;
-      log.error(message);
+    case 'missingStaticFiles': {
+      const one = problem.files.length === 1;
+      const [subject, verb] = one ? ['A file', 'is'] : ['Files', 'are'];
+      log.error(`${subject} named in ${f.var(APIMATIC_CONFIG_FILE_NAME)} ${verb} not in ${f.path(sourceDirectory)}:`);
+      log.message(
+        problem.files.map(({ setting, path }) => `  • ${f.var(path)}, named by ${f.var(setting)}`).join('\n')
+      );
+      log.message(
+        one
+          ? 'Add the file there, or remove the setting that names it.'
+          : 'Add each file there, or remove the setting that names it.'
+      );
       return;
     }
     case 'noSpecs': {

@@ -1,7 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import { FileName } from '../file/fileName.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
-import { PortalConfig } from './portal-config.js';
+import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
 
 /**
  * Whether a parsed document is one a portal can be built from. `format` names what it is
@@ -51,17 +51,23 @@ export class OpenApiDocument {
   }
 
   /**
-   * A `portal` block to start from, so the wizard has one question fewer to ask. Both fields
-   * are written into generated files, so each is collapsed to one line first -- taking only
-   * the first line left the description cap unreachable for wrapped prose.
+   * What the portal is called and how it describes itself, until the `portal` block says
+   * otherwise. Both are written into generated files, so each is collapsed to one line first
+   * -- taking only the first line left the description cap unreachable for wrapped prose. The
+   * description stops at its first blank line: past it a specification's description is
+   * usually a guide to the API, not a summary of it.
    */
-  public suggestedConfig(): PortalConfig {
+  public suggestedSite(): SuggestedSite {
     const info = this.document.info;
     const fields = typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {};
-    const title = oneLine(fields.title) ?? PortalConfig.placeholder.siteTitle();
-    const description = oneLine(fields.description);
-    return PortalConfig.create(title, description === null ? null : cap(description, DESCRIPTION_LIMIT));
+    const name = oneLine(fields.title) ?? PLACEHOLDER_SITE.name;
+    const description = oneLine(firstParagraph(fields.description));
+    return { name, description: description === null ? null : cap(description, DESCRIPTION_LIMIT) };
   }
+}
+
+function firstParagraph(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim().split(/\n\s*\n/)[0] : value;
 }
 
 // Version keys are strings in well-formed documents; anything else is named rather than

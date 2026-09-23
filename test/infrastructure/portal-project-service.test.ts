@@ -9,15 +9,16 @@ import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 import { PortalConfig } from '../../src/types/portal/portal-config';
 import { PortalSource } from '../../src/types/portal/portal-source';
-import { UrlPath } from '../../src/types/file/urlPath';
 
 describe('PortalProjectService', () => {
   const service = new PortalProjectService();
   let root: string;
   let project: DirectoryPath;
 
+  const configFor = (block: object) => PortalConfig.fromBlock(block, null)._unsafeUnwrap();
+
   const sourceFor = (overrides: Partial<PortalSource> = {}): PortalSource => ({
-    config: PortalConfig.create('My API'),
+    config: configFor({ site: { name: 'My API' } }),
     specs: [
       {
         slug: 'calculator',
@@ -94,7 +95,7 @@ describe('PortalProjectService', () => {
     });
 
     it('writes the spec, title and description into the generated config', async () => {
-      const source = sourceFor({ config: PortalConfig.create('My API', 'Docs for it') });
+      const source = sourceFor({ config: configFor({ site: { name: 'My API', description: 'Docs for it' } }) });
 
       (await service.prepare(project, source))._unsafeUnwrap();
 
@@ -106,12 +107,10 @@ describe('PortalProjectService', () => {
     });
 
     it('resolves the logo to a site URL and the site address to an origin', async () => {
-      const config = PortalConfig.create(
-        'My API',
-        null,
-        'static/images/logo.png',
-        new UrlPath('https://docs.example.com')
-      );
+      const config = configFor({
+        site: { name: 'My API', url: 'https://docs.example.com' },
+        brand: { logo: 'static/images/logo.png' }
+      });
 
       (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
 
