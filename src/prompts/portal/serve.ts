@@ -8,10 +8,13 @@ import { PortalAuthorizationFailure } from '../../infrastructure/services/portal
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
+import { CodeSamples } from '../../types/portal/code-samples.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
+import { generateCodeSamples, reportUnplacedSamples, reportUnsampledSpecs } from './code-samples.js';
 
 export class PortalServePrompts {
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
@@ -28,6 +31,18 @@ export class PortalServePrompts {
 
   public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
     reportIgnoredNavigationFiles(files, sourceDirectory);
+  }
+
+  public generateCodeSamples(fn: Promise<Result<CodeSamples, ServiceError>>) {
+    return generateCodeSamples(fn);
+  }
+
+  public unplacedSamples(endpoints: string[]) {
+    reportUnplacedSamples(endpoints);
+  }
+
+  public unsampledSpecs(fileNames: FileName[]) {
+    reportUnsampledSpecs(fileNames);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

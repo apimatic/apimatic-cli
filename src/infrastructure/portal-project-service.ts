@@ -6,7 +6,8 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
-import { PortalSource } from '../types/portal/portal-source.js';
+import { CodeSamples } from '../types/portal/code-samples.js';
+import { PortalSource, PortalSpec } from '../types/portal/portal-source.js';
 import { FileService } from './file-service.js';
 
 /** Minimum Node version TanStack Start's build supports. */
@@ -41,6 +42,11 @@ export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
   /** Vite's CLI entry point, resolved from the CLI's own dependencies. */
   viteBinary: FilePath;
+}
+
+export interface SampledSource {
+  source: PortalSource;
+  unsampledSpecs: FileName[];
 }
 
 /**
@@ -95,6 +101,24 @@ export class PortalProjectService {
     });
   }
 
+  // A spec whose `$ref`s leave `spec/` keeps its original file: they would not resolve from the copy.
+  public async addCodeSamples(
+    projectDirectory: DirectoryPath,
+    source: PortalSource,
+    codeSamples: CodeSamples
+  ): Promise<SampledSource> {
+    const specDirectory = projectDirectory.join('spec');
+    await this.fileService.copyDirectoryContents(source.specDirectory, specDirectory);
+
+    const unsampled = source.specs.filter((spec) => spec.document.refersOutside(source.specDirectory));
+    const specs = await Promise.all(
+      source.specs.map((spec) =>
+        unsampled.includes(spec) ? spec : this.writeWithCodeSamples(spec, specDirectory, codeSamples)
+      )
+    );
+    return { source: { ...source, specs }, unsampledSpecs: unsampled.map((spec) => spec.file.name()) };
+  }
+
   /**
    * Environment for the child process. Deliberately an allow-list: the auth key must not
    * reach the build, and any stray `VITE_*` variable would be inlined into the output.
@@ -130,6 +154,17 @@ export class PortalProjectService {
       ? nodeOptions
       : `${nodeOptions} --max-old-space-size=4096`.trim();
     return environment;
+  }
+
+  private async writeWithCodeSamples(
+    spec: PortalSpec,
+    directory: DirectoryPath,
+    codeSamples: CodeSamples
+  ): Promise<PortalSpec> {
+    const file = spec.file.replaceDirectory(directory);
+    const document = spec.document.withCodeSamples(codeSamples);
+    await this.fileService.writeContents(file, document.serialize(file.name()));
+    return { ...spec, file, document };
   }
 
   private async linkDependencies(projectDirectory: DirectoryPath): Promise<void> {

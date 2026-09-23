@@ -8,11 +8,13 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
+  private readonly artifactsService = new PortalArtifactsService();
   private readonly buildService = new PortalBuildService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -74,8 +76,17 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
 
+    const codeSamples = await this.prompts.generateCodeSamples(this.artifactsService.generate());
+    if (codeSamples.isErr()) {
+      return ActionResult.failed();
+    }
+    this.prompts.unplacedSamples(codeSamples.value.unplacedIn(source.value.specs.map((spec) => spec.document)));
+
     return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const project = await this.projectService.prepare(tempDirectory, source.value);
+      const sampled = await this.projectService.addCodeSamples(tempDirectory, source.value, codeSamples.value);
+      this.prompts.unsampledSpecs(sampled.unsampledSpecs);
+
+      const project = await this.projectService.prepare(tempDirectory, sampled.source);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);
         return ActionResult.failed();

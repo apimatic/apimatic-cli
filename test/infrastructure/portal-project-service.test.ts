@@ -6,9 +6,12 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
+import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
+import { OpenApiDocument } from '../../src/types/portal/openapi-document';
 import { PortalConfig } from '../../src/types/portal/portal-config';
 import { PortalSource } from '../../src/types/portal/portal-source';
 import { UrlPath } from '../../src/types/file/urlPath';
+import { Language } from '../../src/types/sdk/generate';
 
 describe('PortalProjectService', () => {
   const service = new PortalProjectService();
@@ -20,9 +23,11 @@ describe('PortalProjectService', () => {
     specs: [
       {
         slug: 'calculator',
-        file: new FilePath(new DirectoryPath(root).join('spec'), new FileName('api.json'))
+        file: new FilePath(new DirectoryPath(root).join('spec'), new FileName('api.json')),
+        document: OpenApiDocument.parse(new FileName('api.json'), '{}') as OpenApiDocument
       }
     ],
+    specDirectory: new DirectoryPath(root).join('spec'),
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],
@@ -147,6 +152,65 @@ describe('PortalProjectService', () => {
       const config = readConfig();
       expect(fs.existsSync(config.contentDir)).to.be.true;
       expect(fs.readdirSync(config.contentDir)).to.be.empty;
+    });
+  });
+
+  describe('addCodeSamples', () => {
+    const codeSamples = new CodeSamples([
+      CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+        paths: { '/pets': { GET: { Example: 'await client.pets.list();' } } },
+        webhooks: {}
+      }) as CodeSampleCatalog
+    ]);
+
+    const writeSpec = (fileName: string, document: unknown) => {
+      const specDirectory = path.join(root, 'spec');
+      fs.mkdirSync(specDirectory, { recursive: true });
+      fs.writeFileSync(path.join(specDirectory, fileName), JSON.stringify(document));
+      const name = new FileName(fileName);
+      return {
+        slug: name.withoutExtension().toString(),
+        file: new FilePath(new DirectoryPath(specDirectory), name),
+        document: OpenApiDocument.parse(name, JSON.stringify(document)) as OpenApiDocument
+      };
+    };
+
+    const petsSpec = (extra: Record<string, unknown> = {}) => ({
+      openapi: '3.0.0',
+      paths: { '/pets': { get: { responses: {}, ...extra } } }
+    });
+
+    it('points the spec at a copy in the project carrying its samples, leaving the original alone', async () => {
+      const spec = writeSpec('pets.json', petsSpec());
+
+      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+
+      const [copy] = sampled.source.specs;
+      expect(copy.file.toString()).to.equal(path.join(project.toString(), 'spec', 'pets.json'));
+      const written = JSON.parse(fs.readFileSync(copy.file.toString(), 'utf8'));
+      expect(written.paths['/pets'].get['x-apimatic-codeSamples']).to.deep.equal([
+        { lang: 'typescript', label: 'TypeScript', sourceByExample: { Example: 'await client.pets.list();' } }
+      ]);
+      expect(JSON.parse(fs.readFileSync(spec.file.toString(), 'utf8'))).to.deep.equal(petsSpec());
+      expect(sampled.unsampledSpecs).to.be.empty;
+    });
+
+    it('copies the files a spec refers to, so its relative references still resolve', async () => {
+      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: './responses.json' } }));
+      fs.writeFileSync(path.join(root, 'spec', 'responses.json'), '{}');
+
+      await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+
+      expect(fs.existsSync(path.join(project.toString(), 'spec', 'responses.json'))).to.be.true;
+    });
+
+    it('keeps a spec whose references leave spec/ on its original file, and names it', async () => {
+      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: '../shared/responses.json' } }));
+
+      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+
+      expect(sampled.source.specs[0].file).to.equal(spec.file);
+      expect(sampled.unsampledSpecs.map(String)).to.deep.equal(['pets.json']);
     });
   });
 

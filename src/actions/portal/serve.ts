@@ -9,6 +9,7 @@ import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 
 export const DEFAULT_PORTAL_PORT = 23513;
 
@@ -18,6 +19,7 @@ export class PortalServeAction {
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
+  private readonly artifactsService = new PortalArtifactsService();
   private readonly devServerService = new PortalDevServerService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -63,13 +65,22 @@ export class PortalServeAction {
     this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
     this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
 
+    const codeSamples = await this.prompts.generateCodeSamples(this.artifactsService.generate());
+    if (codeSamples.isErr()) {
+      return ActionResult.failed();
+    }
+    this.prompts.unplacedSamples(codeSamples.value.unplacedIn(source.value.specs.map((spec) => spec.document)));
+
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
     return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const project = await this.projectService.prepare(tempDirectory, source.value);
+      const sampled = await this.projectService.addCodeSamples(tempDirectory, source.value, codeSamples.value);
+      this.prompts.unsampledSpecs(sampled.unsampledSpecs);
+
+      const project = await this.projectService.prepare(tempDirectory, sampled.source);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);
         return ActionResult.failed();

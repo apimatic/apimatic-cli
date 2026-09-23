@@ -132,6 +132,7 @@ export class PortalSourceContext {
     return ok({
       config: config.value,
       specs: specs.value,
+      specDirectory: this.specDirectory,
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
@@ -396,7 +397,7 @@ export class PortalSourceContext {
         return err({ kind: 'unsupportedSpec', fileName, format: format.format });
       }
 
-      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file });
+      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file, document });
     }
 
     if (specs.length === 0) {
