@@ -8,7 +8,7 @@ export default [
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: tsparser,
-      ecmaVersion: 2021,
+      ecmaVersion: 2024,
       sourceType: 'module',
       globals: {
         process: 'readonly',
@@ -52,6 +52,8 @@ export default [
     ignores: [
       'lib',
       'node_modules',
+      // Claude Code worktrees, each a full checkout of the repo.
+      '.claude',
       // Built by Vite inside a temp project, not by this package's toolchain.
       'portal-template',
       // Scratch input and output directories .gitignore already sets aside for local runs.

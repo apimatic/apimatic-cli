@@ -1,7 +1,6 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import mockFs from 'mock-fs';
 import { expect } from 'chai';
 import { ZipService } from '../../src/infrastructure/zip-service';
 import { PluginContext } from '../../src/types/plugin-context';
@@ -10,26 +9,39 @@ import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 
 describe('PluginContext', () => {
-  const pluginDirectory = new DirectoryPath('plugin');
-  const context = new PluginContext(pluginDirectory);
+  let root: string;
+  let pluginDirectory: DirectoryPath;
+  let context: PluginContext;
 
-  afterEach(() => mockFs.restore());
+  const write = (relative: string, contents: string) => {
+    const target = path.join(pluginDirectory.toString(), relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, contents);
+  };
+
+  const mkdir = (relative = '.') => fs.mkdirSync(path.join(pluginDirectory.toString(), relative), { recursive: true });
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-context-'));
+    pluginDirectory = new DirectoryPath(path.join(root, 'plugin'));
+    context = new PluginContext(pluginDirectory);
+  });
+
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
   describe('exists', () => {
     it('is false when the directory is absent', async () => {
-      mockFs({});
-
       expect(await context.exists()).to.be.false;
     });
 
     it('is false when the directory holds nothing but dotfiles', async () => {
-      mockFs({ plugin: { '.gitkeep': '' } });
+      write('.gitkeep', '');
 
       expect(await context.exists()).to.be.false;
     });
 
     it('is true when the directory holds artifacts', async () => {
-      mockFs({ plugin: { 'README.md': '# plugin' } });
+      write('README.md', '# plugin');
 
       expect(await context.exists()).to.be.true;
     });
@@ -37,13 +49,14 @@ describe('PluginContext', () => {
 
   describe('isGitInitialized', () => {
     it('is false when the directory is not a repository', async () => {
-      mockFs({ plugin: { 'README.md': '# plugin' } });
+      write('README.md', '# plugin');
 
       expect(await context.isGitInitialized()).to.be.false;
     });
 
     it('is true when the directory holds a repository', async () => {
-      mockFs({ plugin: { 'README.md': '# plugin', '.git': { HEAD: 'ref: refs/heads/main' } } });
+      write('README.md', '# plugin');
+      write('.git/HEAD', 'ref: refs/heads/main');
 
       expect(await context.isGitInitialized()).to.be.true;
     });
@@ -51,62 +64,50 @@ describe('PluginContext', () => {
 
   describe('describeContents', () => {
     it('counts files and directories recursively', async () => {
-      mockFs({
-        plugin: {
-          'README.md': '# plugin',
-          skills: { auth: { 'SKILL.md': '# skill' }, 'index.md': '# skills' },
-          commands: { 'setup.md': '# setup' }
-        }
-      });
+      write('README.md', '# plugin');
+      write('skills/auth/SKILL.md', '# skill');
+      write('skills/index.md', '# skills');
+      write('commands/setup.md', '# setup');
 
       expect(await context.describeContents()).to.deep.equal({ fileCount: 4, directoryCount: 3 });
     });
 
     it('counts dot-directories, which a publish exposes like any other', async () => {
-      mockFs({ plugin: { '.claude-plugin': { 'plugin.json': '{}' } } });
+      write('.claude-plugin/plugin.json', '{}');
 
       expect(await context.describeContents()).to.deep.equal({ fileCount: 1, directoryCount: 1 });
     });
 
     it('leaves the repository out of the counts', async () => {
-      mockFs({
-        plugin: {
-          'README.md': '# plugin',
-          '.git': { HEAD: 'ref: refs/heads/main', refs: { tags: { 'v0.1.66': 'abc123' } } }
-        }
-      });
+      write('README.md', '# plugin');
+      write('.git/HEAD', 'ref: refs/heads/main');
+      write('.git/refs/tags/v0.1.66', 'abc123');
 
       expect(await context.describeContents()).to.deep.equal({ fileCount: 1, directoryCount: 0 });
     });
 
     it('reports nothing for an empty directory', async () => {
-      mockFs({ plugin: {} });
+      mkdir();
 
       expect(await context.describeContents()).to.deep.equal({ fileCount: 0, directoryCount: 0 });
     });
   });
 
-  // Real files rather than mock-fs: adm-zip reads the archive itself, so the bytes have to be
-  // a genuine zip.
   describe('save', () => {
-    let workDir: string;
     let archive: FilePath;
     let destination: DirectoryPath;
 
     beforeEach(async () => {
-      workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-context-'));
-      const source = new DirectoryPath(path.join(workDir, 'source'));
+      const source = new DirectoryPath(path.join(root, 'source'));
       fs.mkdirSync(path.join(source.toString(), 'skills'), { recursive: true });
       fs.writeFileSync(path.join(source.toString(), 'README.md'), '# plugin');
       fs.writeFileSync(path.join(source.toString(), 'skills', 'SKILL.md'), '# skill');
 
-      archive = new FilePath(new DirectoryPath(workDir), new FileName('plugin.zip'));
+      archive = new FilePath(new DirectoryPath(root), new FileName('plugin.zip'));
       await new ZipService().archive(source, archive);
 
-      destination = new DirectoryPath(path.join(workDir, 'destination'));
+      destination = new DirectoryPath(path.join(root, 'destination'));
     });
-
-    afterEach(() => fs.rmSync(workDir, { recursive: true, force: true }));
 
     it('expands the archive into the destination', async () => {
       await new PluginContext(destination).save(archive);

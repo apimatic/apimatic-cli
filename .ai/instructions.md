@@ -10,7 +10,7 @@ APIMatic CLI (`@apimatic/cli`) — the official CLI for APIMatic, built on oclif
 
 ```bash
 # Build
-pnpm build             # tsc -b → outputs to lib/
+pnpm build             # tsc (TypeScript 7) → outputs to lib/
 
 # Lint
 pnpm lint              # ESLint on src/**/*.{js,ts}
@@ -26,7 +26,7 @@ pnpm test              # tsx + mocha, runs test/**/*.test.ts
 pnpm exec tsx node_modules/mocha/bin/_mocha "test/actions/portal/serve.test.ts" --timeout 99999
 
 # Run CLI locally
-pnpm build:watch       # tsc -b --watch: recompiles src/ → lib/ on change; keep running in a separate terminal
+pnpm build:watch       # tsc --watch: recompiles src/ → lib/ on change; keep running in a separate terminal
 pnpm apimatic <command>
 pnpm apimatic <command> -i <abs-path-to-dir-containing-src>   # -i: for commands operating on a project directory containing src/
 ```
@@ -36,6 +36,34 @@ pnpm apimatic <command> -i <abs-path-to-dir-containing-src>   # -i: for commands
 `pnpm-workspace.yaml` sets `minimumReleaseAge: 10080` (7 days) as a supply-chain defense. Brand-new package versions are blocked from install until they've been on the registry for at least a week. `@apimatic/*` is exempt via `minimumReleaseAgeExclude`.
 
 If you hit `ERR_PNPM_PACKAGE_RECENTLY_PUBLISHED` adding a fresh release, either wait it out or run a one-off install with `pnpm install --ignore-minimum-release-age` (CI uses `--frozen-lockfile`, which bypasses the check entirely, so this only blocks manual `pnpm add` / `pnpm update`).
+
+## TypeScript toolchain — two compilers, on purpose
+
+`tsc` is **TypeScript 7** (the native compiler) and is what `build`, `build:watch` and
+`pretest` run. The bare `typescript` dependency is **TypeScript 6**, aliased to
+`@typescript/typescript6`, and exists only so `@typescript-eslint` can load: every published
+version of it declares `typescript >=4.8.4 <6.1.0` and throws at module init on TypeScript 7,
+which would take out `lint`, `posttest` and the pre-commit hook. TypeScript 6 is also
+available directly as `tsc6` if you need to compare the two.
+
+This is Microsoft's documented side-by-side arrangement, and it is temporary. **Delete it
+once typescript-eslint supports TypeScript 7** (tracked at
+<https://github.com/typescript-eslint/typescript-eslint/issues/10940>): drop the
+`@typescript/native` alias, point `typescript` back at `^7`, and bump `@typescript-eslint/*`
+to whatever release added support. The one other dependent is
+`test/e2e/portal-build.test.ts`, which resolves the compiler through
+`@typescript/native/package.json`; point it back at `typescript` in the same change.
+
+Two traps while it is in place:
+
+- `pnpm outdated` lists both entries under the real name `typescript` and recommends bumping
+  the linter's copy to 7.x. Don't: `posttest` will fail with a module-init throw that reads
+  like a broken install. `pnpm update --latest` is safe, because `@typescript/typescript6`
+  has never published above 6.x.
+- TypeScript 6 dropped the automatic sweep of `node_modules/@types`, so any type-only global
+  a project relies on must be named in that project's `types` array. `test/tsconfig.json`
+  does this; the source project needs no list because it reaches its types through `node:`
+  imports.
 
 ## Architecture — 5-Layer Stack
 
@@ -49,7 +77,7 @@ Command → Action → Application → Prompts / Infrastructure → Types
 4. **Prompts** (`src/prompts/`) — All terminal UI via `@clack/prompts`. One class per command mirroring `actions/`. Uses `withSpinner` for async operations. No business logic.
 5. **Infrastructure** (`src/infrastructure/`) — I/O adapters: `FileService`, `ZipService`, `NetworkService`, API services in `services/`. All return `Result<T, ServiceError>` (neverthrow).
 
-Supporting: **Types** (`src/types/`) for value objects, context objects, and domain events, **client-utils** for auth credential management, **utils** for pure string helpers, **config** for shared Axios instance, **hooks** (`src/hooks/`) for oclif lifecycle hooks (e.g., command-not-found suggestions), **env-info** (`src/infrastructure/env-info.ts`) singleton for CLI version, user-agent string, and base URL resolution.
+Supporting: **Types** (`src/types/`) for value objects, context objects, and domain events, **client-utils** for auth credential management, **utils** for pure string helpers, **config** for shared Axios instance, **hooks** (`src/hooks/`) for oclif lifecycle hooks (the engine-floor check on `init`, and command-not-found suggestions), **env-info** (`src/infrastructure/env-info.ts`) singleton for CLI version, user-agent string, and base URL resolution.
 
 ## Critical Code Conventions
 
@@ -88,10 +116,15 @@ Uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by co
 
 ## Testing
 
-- **Framework**: mocha + chai (expect style) + sinon + nock + mock-fs
+- **Framework**: mocha + chai (expect style) + sinon + nock
 - **Test location**: mirrors source — `test/commands/`, `test/actions/`, `test/types/`, `test/infrastructure/`
 - **HTTP mocking**: nock for API calls
 - **Run via tsx** (not ts-node) for ESM compatibility
+- **Filesystem**: real directories under `os.tmpdir()`, made with `fs.mkdtempSync` and removed in
+  `afterEach`. Do not reach for `mock-fs`: Node 26.8 rewrote `fs.readFile` to open, read and close
+  in one thread-pool job, so the binding interception mock-fs relies on never fires. It throws at
+  import, and patching past that only makes reads fall through to the real disk unnoticed
+  (<https://github.com/tschaub/mock-fs/issues/447>).
 
 ## Skills
 

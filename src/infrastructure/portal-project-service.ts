@@ -9,9 +9,6 @@ import { FilePath } from '../types/file/filePath.js';
 import { PortalSource } from '../types/portal/portal-source.js';
 import { FileService } from './file-service.js';
 
-/** Minimum Node version TanStack Start's build supports. */
-const MINIMUM_NODE_VERSION = [22, 12, 0] as const;
-
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
@@ -51,16 +48,8 @@ export class PortalProjectService {
   private readonly fileService = new FileService();
   private readonly require = createRequire(import.meta.url);
 
-  /** Checks this Node build can run the portal build at all, before any work is done. */
+  /** Checks this installation can run the portal build at all, before any work is done. */
   public runtimeProblem(): string | null {
-    const [major, minor] = process.versions.node.split('.').map(Number);
-    const [requiredMajor, requiredMinor] = MINIMUM_NODE_VERSION;
-    if (major < requiredMajor || (major === requiredMajor && minor < requiredMinor)) {
-      return `Building a portal needs Node ${MINIMUM_NODE_VERSION.join('.')} or newer; this is Node ${
-        process.versions.node
-      }.`;
-    }
-
     for (const dependency of TEMPLATE_DEPENDENCIES) {
       if (this.packageDirectory(dependency) === undefined) {
         return `The portal build dependency '${dependency}' is missing from this installation. Reinstall the CLI and try again.`;
