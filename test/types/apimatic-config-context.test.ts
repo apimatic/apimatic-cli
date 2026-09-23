@@ -1,6 +1,6 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
-import mockFs from 'mock-fs';
 import sinon from 'sinon';
 import { expect } from 'chai';
 import { ApimaticConfigContext, ApimaticConfigState } from '../../src/types/apimatic-config-context';
@@ -9,16 +9,16 @@ import { FileService } from '../../src/infrastructure/file-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 
 describe('ApimaticConfigContext', () => {
-  const sourceDirectory = new DirectoryPath('src');
-  const context = new ApimaticConfigContext(sourceDirectory);
-  // Resolved, as DirectoryPath resolves what it is given.
-  const configPath = path.resolve('src', 'apimatic.json');
+  let root: string;
+  let sourceDirectory: DirectoryPath;
+  let context: ApimaticConfigContext;
 
   const CSHARP_ENTRY = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' }, codegenVersion: 'v3' };
 
-  const withFile = (text: string) => mockFs({ src: { 'apimatic.json': text } });
+  const configPath = () => path.join(sourceDirectory.toString(), 'apimatic.json');
+  const withFile = (text: string) => fs.writeFileSync(configPath(), text);
   const withConfig = (config: object) => withFile(JSON.stringify(config, null, 2) + '\n');
-  const written = () => fs.readFileSync(configPath, 'utf-8');
+  const written = () => fs.readFileSync(configPath(), 'utf-8');
   const writtenConfig = () => JSON.parse(written());
 
   const recordCsharp = (document: ApimaticConfigDocument) =>
@@ -31,14 +31,22 @@ describe('ApimaticConfigContext', () => {
     return state;
   };
 
+  // `src/` is there before each test, as it is in any project; the one test about a missing
+  // directory removes it first.
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'apimatic-config-context-'));
+    sourceDirectory = new DirectoryPath(path.join(root, 'src'));
+    fs.mkdirSync(sourceDirectory.toString(), { recursive: true });
+    context = new ApimaticConfigContext(sourceDirectory);
+  });
+
   afterEach(() => {
     sinon.restore();
-    mockFs.restore();
+    fs.rmSync(root, { recursive: true, force: true });
   });
 
   describe('exists', () => {
     it('is false without the file and true with it', async () => {
-      mockFs({ src: {} });
       expect(await context.exists()).to.be.false;
 
       withConfig({});
@@ -48,8 +56,6 @@ describe('ApimaticConfigContext', () => {
 
   describe('read', () => {
     it('is missing when there is no file', async () => {
-      mockFs({ src: {} });
-
       expect(await context.read()).to.deep.equal({ state: 'missing' });
     });
 
@@ -61,7 +67,7 @@ describe('ApimaticConfigContext', () => {
       expect(state.state).to.equal('unparseable');
       if (state.state === 'unparseable') {
         expect(state.findings).to.deep.equal([{ block: 'root', field: null, problem: 'is not valid JSON' }]);
-        expect(state.path.toString()).to.equal(configPath);
+        expect(state.path.toString()).to.equal(configPath());
       }
     });
 
@@ -71,7 +77,7 @@ describe('ApimaticConfigContext', () => {
       const state = parsedState(await context.read());
 
       expect(state.document.portal()).to.deep.equal({ title: 'Calc' });
-      expect(state.path.toString()).to.equal(configPath);
+      expect(state.path.toString()).to.equal(configPath());
     });
 
     it('is parsed even when a block is malformed; the findings say which', async () => {
@@ -106,8 +112,6 @@ describe('ApimaticConfigContext', () => {
   describe('merge', () => {
     describe('creating the file', () => {
       it('starts from the schema version, two-space indentation and a trailing newline', async () => {
-        mockFs({ src: {} });
-
         const result = await context.merge(['languages'], recordCsharp);
 
         expect(result.isOk()).to.be.true;
@@ -130,7 +134,7 @@ describe('ApimaticConfigContext', () => {
       });
 
       it('creates the input directory when it is not there yet', async () => {
-        mockFs({});
+        fs.rmSync(sourceDirectory.toString(), { recursive: true });
 
         expect((await context.merge(['portal'], (document) => document.with('portal', { title: 'Calc' }))).isOk()).to.be
           .true;
@@ -138,8 +142,6 @@ describe('ApimaticConfigContext', () => {
       });
 
       it('hands back the document it wrote', async () => {
-        mockFs({ src: {} });
-
         const document = (await context.merge(['languages'], recordCsharp))._unsafeUnwrap();
 
         expect(document.languages()).to.deep.equal({ csharp: CSHARP_ENTRY });

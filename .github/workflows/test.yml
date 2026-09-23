@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: ['22.12', '24']
+        node: ['24', '26']
 
     steps:
       - name: checkout cli
@@ -22,8 +22,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # Installed as a standalone executable: pnpm 11 itself needs Node 22.13, and corepack
-      # would run it on the matrix Node, which fails on the 22.12 floor the CLI supports.
+      # Installed as a standalone executable: a pinned pnpm that needs no Node of its own,
+      # so the matrix Node only ever runs the CLI's build and tests.
       - name: setup pnpm
         uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
         with:

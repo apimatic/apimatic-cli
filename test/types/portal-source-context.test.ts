@@ -17,8 +17,6 @@ const OPENAPI = JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', versio
 describe('PortalSourceContext', () => {
   let root: string;
 
-  // A real directory rather than mock-fs: the context reads through FileService, and the
-  // YAML parser used for .yaml specs is loaded lazily, which mock-fs breaks.
   const write = (relative: string, contents: string) => {
     const target = path.join(root, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });

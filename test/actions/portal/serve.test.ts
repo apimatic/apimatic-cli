@@ -78,13 +78,15 @@ describe('PortalServeAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('stops before anything else on a Node this build does not support', async () => {
-    runtimeProblem.returns('Building a portal needs Node 22.12.0 or newer.');
+  it('stops before anything else when the installation cannot build a portal', async () => {
+    runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
 
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.runtimeUnsupported.calledOnceWith('Building a portal needs Node 22.12.0 or newer.')).to.be.true;
+    expect(
+      prompts.runtimeUnsupported.calledOnceWith("The portal build dependency 'vite' is missing from this installation.")
+    ).to.be.true;
     expect(authorize.called).to.be.false;
   });
 

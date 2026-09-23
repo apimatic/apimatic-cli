@@ -38,6 +38,10 @@ export default defineConfig(async () => {
       }),
       react()
     ],
+    // The prerender pass fetches every page from a preview server on `localhost`. Where that
+    // listens on `::1` alone, a connect that stalls under load falls back to 127.0.0.1 and is
+    // refused, failing the build; binding IPv4 leaves the fetch a single address to reach.
+    preview: { host: '127.0.0.1' },
     resolve: {
       tsconfigPaths: true,
       alias: [

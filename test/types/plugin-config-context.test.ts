@@ -1,6 +1,6 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
-import mockFs from 'mock-fs';
 import { expect } from 'chai';
 import { PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
@@ -17,8 +17,9 @@ interface WrittenDocument {
 }
 
 describe('PluginConfigContext', () => {
-  const buildDirectory = new DirectoryPath('src');
-  const context = new PluginConfigContext(buildDirectory);
+  let root: string;
+  let buildDirectory: DirectoryPath;
+  let context: PluginConfigContext;
 
   const CSHARP_ENTRY = {
     source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
@@ -42,14 +43,21 @@ describe('PluginConfigContext', () => {
 
   const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
 
-  const configPath = path.join(buildDirectory.toString(), 'apimatic.json');
-  const written = () => fs.readFileSync(configPath, 'utf-8');
+  const configPath = () => path.join(buildDirectory.toString(), 'apimatic.json');
+  const written = () => fs.readFileSync(configPath(), 'utf-8');
   const writtenDocument = (): WrittenDocument => JSON.parse(written());
 
-  const withFile = (text: string) => mockFs({ src: { 'apimatic.json': text } });
+  const withFile = (text: string) => fs.writeFileSync(configPath(), text);
   const withConfig = (document: object) => withFile(JSON.stringify(document));
 
-  afterEach(() => mockFs.restore());
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-config-context-'));
+    buildDirectory = new DirectoryPath(path.join(root, 'src'));
+    fs.mkdirSync(buildDirectory.toString(), { recursive: true });
+    context = new PluginConfigContext(buildDirectory);
+  });
+
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
   describe('getPluginConfigState', () => {
     const presentState = (state: PluginConfigState) => {
@@ -60,8 +68,6 @@ describe('PluginConfigContext', () => {
     };
 
     it('is missing when there is no file', async () => {
-      mockFs({ src: {} });
-
       expect(await context.getPluginConfigState()).to.deep.equal({ state: 'missing' });
     });
 
@@ -386,8 +392,6 @@ describe('PluginConfigContext', () => {
 
   describe('upsertMetadata', () => {
     it('creates the file with the plugin block, the metadata and a default licence', async () => {
-      mockFs({ src: {} });
-
       expect((await context.upsertMetadata(METADATA)).isOk()).to.be.true;
       expect(writtenDocument()).to.deep.equal({
         schemaVersion: 1,
@@ -396,8 +400,6 @@ describe('PluginConfigContext', () => {
     });
 
     it('records the author when one is supplied', async () => {
-      mockFs({ src: {} });
-
       await context.upsertMetadata(METADATA, { name: 'Acme', email: 'developers@acme.com' });
 
       expect(writtenDocument().plugin?.author).to.deep.equal({ name: 'Acme', email: 'developers@acme.com' });
@@ -412,8 +414,6 @@ describe('PluginConfigContext', () => {
     });
 
     it('never writes a plugin key', async () => {
-      mockFs({ src: {} });
-
       await context.upsertMetadata(METADATA);
 
       expect(writtenDocument().plugin).to.not.have.property('pluginKey');
@@ -493,8 +493,6 @@ describe('PluginConfigContext', () => {
 
   describe('the state a write hands back', () => {
     it('reports the metadata it just wrote', async () => {
-      mockFs({ src: {} });
-
       const state = (await context.upsertMetadata(METADATA))._unsafeUnwrap();
 
       expect(state.hasMetadata()).to.be.true;
@@ -514,8 +512,6 @@ describe('PluginConfigContext', () => {
 
   describe('upsertLanguage', () => {
     it('creates the file with the languages block and no plugin block at all', async () => {
-      mockFs({ src: {} });
-
       expect((await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY)).isOk()).to.be.true;
       expect(writtenDocument()).to.deep.equal({
         schemaVersion: 1,
