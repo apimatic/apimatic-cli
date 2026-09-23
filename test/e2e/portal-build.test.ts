@@ -199,6 +199,13 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(assets.length, 'asset count').to.be.below(150);
   });
 
+  it('keeps the code samples in the operation page data', () => {
+    const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
+
+    expect(page).to.contain('x-apimatic-codeSamples');
+    expect(page).to.contain('calculator.calculate(OperationType.Sum, 4, 5)');
+  });
+
   it('keeps an operation page small', () => {
     const page = 'api/apimatic-calculator/simple-calculator/Calculate/index.html';
     expect(fs.statSync(path.join(output.toString(), page)).size).to.be.below(100 * 1024);
