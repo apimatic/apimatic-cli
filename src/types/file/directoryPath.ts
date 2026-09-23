@@ -24,6 +24,10 @@ export class DirectoryPath {
     return new DirectoryPath(path.join(this.directoryPath, ...subPath));
   }
 
+  public resolve(relativePath: string) {
+    return new DirectoryPath(this.directoryPath, relativePath);
+  }
+
   public isEqual(other: DirectoryPath) {
     return this.directoryPath === other.directoryPath;
   }

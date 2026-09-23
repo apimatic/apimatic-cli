@@ -1,6 +1,10 @@
-import { parse as parseYaml } from 'yaml';
+import { dirname } from 'node:path';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
+import { CodeSample, CodeSamples } from './code-samples.js';
+import { Endpoint } from './endpoint.js';
 import { PortalConfig } from './portal-config.js';
 
 /**
@@ -12,9 +16,18 @@ export type SpecFormat = { supported: true } | { supported: false; format: strin
 
 const DESCRIPTION_LIMIT = 300;
 
+const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
+
+const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
+
+// Not `x-codeSamples`: fumadocs makes each of those a fixed tab that the example selector cannot switch.
+const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
+
+type JsonObject = Record<string, unknown>;
+
 /** A specification as written to disk, read the one way the wizard and the build agree on. */
 export class OpenApiDocument {
-  private constructor(private readonly document: Record<string, unknown>) {}
+  private constructor(private readonly document: JsonObject) {}
 
   /**
    * Undefined when neither parser accepts the text. A document that parses to something other
@@ -27,13 +40,44 @@ export class OpenApiDocument {
       const text = stripByteOrderMark(contents);
       const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text);
       return new OpenApiDocument(
-        typeof document === 'object' && document !== null && !Array.isArray(document)
-          ? (document as Record<string, unknown>)
-          : {}
+        typeof document === 'object' && document !== null && !Array.isArray(document) ? (document as JsonObject) : {}
       );
     } catch {
       return undefined;
     }
+  }
+
+  public serialize(fileName: FileName): string {
+    return fileName.hasExtension('.json') ? JSON.stringify(this.document, null, 2) : stringifyYaml(this.document);
+  }
+
+  public endpoints(): Endpoint[] {
+    return Object.entries(this.paths()).flatMap(([path, pathItem]) =>
+      isInlinePathItem(pathItem)
+        ? Object.entries(pathItem)
+            .filter(([key, value]) => isOperation(key, value))
+            .map(([method]) => new Endpoint(method, path))
+        : []
+    );
+  }
+
+  public withCodeSamples(codeSamples: CodeSamples): OpenApiDocument {
+    if (!isObject(this.document.paths)) {
+      return this;
+    }
+    const paths = Object.fromEntries(
+      Object.entries(this.paths()).map(([path, pathItem]) => [
+        path,
+        isInlinePathItem(pathItem) ? pathItemWithSamples(path, pathItem, codeSamples) : pathItem
+      ])
+    );
+    return new OpenApiDocument({ ...this.document, paths });
+  }
+
+  public refersOutside(directory: DirectoryPath): boolean {
+    return [...references(this.document)]
+      .map(referencedFile)
+      .some((file) => file !== undefined && !directory.contains(directory.resolve(dirname(file))));
   }
 
   public format(): SpecFormat {
@@ -62,6 +106,56 @@ export class OpenApiDocument {
     const description = oneLine(fields.description);
     return PortalConfig.create(title, description === null ? null : cap(description, DESCRIPTION_LIMIT));
   }
+
+  private paths(): JsonObject {
+    return isObject(this.document.paths) ? this.document.paths : {};
+  }
+}
+
+function isInlinePathItem(value: unknown): value is JsonObject {
+  return isObject(value) && !('$ref' in value);
+}
+
+function isOperation(key: string, value: unknown): value is JsonObject {
+  return HTTP_METHODS.has(key.toLowerCase()) && isObject(value);
+}
+
+function pathItemWithSamples(path: string, pathItem: JsonObject, codeSamples: CodeSamples): JsonObject {
+  return Object.fromEntries(
+    Object.entries(pathItem).map(([key, value]) => [
+      key,
+      isOperation(key, value) ? withSamples(value, codeSamples.samplesFor(new Endpoint(key, path))) : value
+    ])
+  );
+}
+
+function withSamples(operation: JsonObject, samples: CodeSample[]): JsonObject {
+  return samples.length === 0 ? operation : { ...operation, [CODE_SAMPLES_EXTENSION]: samples };
+}
+
+function* references(node: unknown): Generator<string> {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      yield* references(item);
+    }
+  } else if (isObject(node)) {
+    for (const [key, value] of Object.entries(node)) {
+      if (key === '$ref' && typeof value === 'string') {
+        yield value;
+      } else {
+        yield* references(value);
+      }
+    }
+  }
+}
+
+function referencedFile(reference: string): string | undefined {
+  const [file] = reference.split('#');
+  return file === '' || URL_SCHEME.test(file) ? undefined : file;
+}
+
+function isObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // Version keys are strings in well-formed documents; anything else is named rather than

@@ -1,6 +1,9 @@
 import { expect } from 'chai';
 import { OpenApiDocument, SpecFormat } from '../../../src/types/portal/openapi-document';
 import { FileName } from '../../../src/types/file/fileName';
+import { DirectoryPath } from '../../../src/types/file/directoryPath';
+import { CodeSampleCatalog, CodeSamples } from '../../../src/types/portal/code-samples';
+import { Language } from '../../../src/types/sdk/generate';
 
 const JSON_FILE = new FileName('spec.json');
 const YAML_FILE = new FileName('spec.yaml');
@@ -116,6 +119,107 @@ describe('OpenApiDocument', () => {
 
     it('copes with a document that has no info block at all', () => {
       expect(readJson({ openapi: '3.0.0' }).suggestedConfig().siteTitle()).to.equal('My API');
+    });
+  });
+
+  describe('withCodeSamples', () => {
+    const EXTENSION = 'x-apimatic-codeSamples';
+    const codeSamples = new CodeSamples([
+      CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+        paths: {
+          '/pets': { GET: { Example: 'list()' }, POST: { Example: 'create()' } },
+          '/health': { GET: { Example: 'ping()' } }
+        },
+        webhooks: {}
+      }) as CodeSampleCatalog
+    ]);
+
+    const sampled = (document: unknown) =>
+      JSON.parse(readJson(document).withCodeSamples(codeSamples).serialize(JSON_FILE));
+
+    it('adds the samples to each operation that has them', () => {
+      const document = sampled({ openapi: '3.0.0', paths: { '/pets': { get: {}, post: {} } } });
+
+      expect(document.paths['/pets'].get[EXTENSION][0].sourceByExample).to.deep.equal({ Example: 'list()' });
+      expect(document.paths['/pets'].post[EXTENSION][0].sourceByExample).to.deep.equal({ Example: 'create()' });
+    });
+
+    it('leaves the keys of a path item that are not operations alone', () => {
+      const pathItem = { summary: 'Pets', parameters: [{ name: 'id', in: 'query' }], servers: [], get: {} };
+
+      const document = sampled({ openapi: '3.0.0', paths: { '/pets': pathItem } });
+
+      expect(document.paths['/pets'].summary).to.equal('Pets');
+      expect(document.paths['/pets'].parameters).to.deep.equal(pathItem.parameters);
+      expect(document.paths['/pets'].servers).to.deep.equal([]);
+      expect(document.paths['/pets'].parameters[0]).to.not.have.property(EXTENSION);
+    });
+
+    it('skips a path item that is itself a reference', () => {
+      const document = sampled({ openapi: '3.0.0', paths: { '/health': { $ref: './health.yaml' } } });
+
+      expect(document.paths['/health']).to.deep.equal({ $ref: './health.yaml' });
+    });
+
+    it('leaves the samples the author wrote alone', () => {
+      const authored = [{ lang: 'go', label: 'Go', source: 'List()' }];
+
+      const document = sampled({ openapi: '3.0.0', paths: { '/pets': { get: { 'x-codeSamples': authored } } } });
+
+      expect(document.paths['/pets'].get['x-codeSamples']).to.deep.equal(authored);
+      expect(document.paths['/pets'].get[EXTENSION]).to.have.length(1);
+    });
+
+    it('keeps the declaration order of paths and methods', () => {
+      const document = sampled({ openapi: '3.0.0', paths: { '/pets': { post: {}, get: {} }, '/health': { get: {} } } });
+
+      expect(Object.keys(document.paths)).to.deep.equal(['/pets', '/health']);
+      expect(Object.keys(document.paths['/pets'])).to.deep.equal(['post', 'get']);
+    });
+
+    it('leaves a document without paths as it was', () => {
+      expect(sampled({ openapi: '3.1.0', webhooks: {} })).to.deep.equal({ openapi: '3.1.0', webhooks: {} });
+    });
+  });
+
+  describe('endpoints', () => {
+    it('lists the inline operations of every path', () => {
+      const document = readJson({
+        openapi: '3.0.0',
+        paths: { '/pets': { summary: 'Pets', get: {}, post: {} }, '/health': { $ref: './health.yaml' } }
+      });
+
+      expect(document.endpoints().map(String)).to.deep.equal(['GET /pets', 'POST /pets']);
+    });
+  });
+
+  describe('refersOutside', () => {
+    const specDirectory = new DirectoryPath('/project/src/spec');
+    const referring = (ref: string) =>
+      readJson({ openapi: '3.0.0', paths: { '/pets': { get: { responses: { 200: { $ref: ref } } } } } });
+
+    it('ignores internal references and URLs, which resolve the same from anywhere', () => {
+      expect(referring('#/components/responses/Ok').refersOutside(specDirectory)).to.be.false;
+      expect(referring('https://example.com/common.yaml#/Ok').refersOutside(specDirectory)).to.be.false;
+    });
+
+    it('accepts a file beside or below the spec', () => {
+      expect(referring('./common.yaml#/Ok').refersOutside(specDirectory)).to.be.false;
+      expect(referring('shared/common.yaml').refersOutside(specDirectory)).to.be.false;
+    });
+
+    it('catches a file above the spec directory', () => {
+      expect(referring('../common.yaml#/Ok').refersOutside(specDirectory)).to.be.true;
+      expect(referring('shared/../../common.yaml').refersOutside(specDirectory)).to.be.true;
+    });
+  });
+
+  describe('serialize', () => {
+    it('writes YAML back as YAML and JSON as JSON', () => {
+      const yaml = read('openapi: 3.0.0\npaths: {}\n', YAML_FILE);
+
+      expect(yaml.serialize(YAML_FILE)).to.equal('openapi: 3.0.0\npaths: {}\n');
+      expect(JSON.parse(yaml.serialize(JSON_FILE))).to.deep.equal({ openapi: '3.0.0', paths: {} });
     });
   });
 });
