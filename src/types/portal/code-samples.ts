@@ -4,12 +4,12 @@ import type { OpenApiDocument } from './openapi-document.js';
 
 const UNNAMED_EXAMPLE_ID = 'Example';
 
-type SourceByExample = Record<string, string>;
+type Sources = Record<string, string>;
 
 export interface CodeSample {
   lang: Language;
   label: string;
-  sourceByExample: SourceByExample;
+  sources: Sources;
 }
 
 export class CodeSampleCatalog {
@@ -26,7 +26,7 @@ export class CodeSampleCatalog {
         return undefined;
       }
       for (const [method, sources] of Object.entries(methods)) {
-        if (!isSourceByExample(sources)) {
+        if (!isSources(sources)) {
           return undefined;
         }
         samplesByEndpoint.set(`${new Endpoint(method, path)}`, toCodeSample(language, sources));
@@ -60,12 +60,12 @@ export class CodeSamples {
   }
 }
 
-function toCodeSample(language: Language, sources: SourceByExample): CodeSample {
+function toCodeSample(language: Language, sources: Sources): CodeSample {
   const named = Object.entries(sources).filter(([exampleId]) => exampleId !== UNNAMED_EXAMPLE_ID);
   return {
     lang: language,
     label: languageLabel(language),
-    sourceByExample: named.length > 0 ? Object.fromEntries(named) : sources
+    sources: named.length > 0 ? Object.fromEntries(named) : sources
   };
 }
 
@@ -77,6 +77,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isSourceByExample(value: unknown): value is SourceByExample {
+function isSources(value: unknown): value is Sources {
   return isRecord(value) && Object.values(value).every((source) => typeof source === 'string');
 }

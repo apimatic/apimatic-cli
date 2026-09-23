@@ -205,7 +205,7 @@ describe('PortalProjectService', () => {
       expect(copy.file.toString()).to.equal(path.join(project.toString(), 'spec', 'pets.json'));
       const written = JSON.parse(fs.readFileSync(copy.file.toString(), 'utf8'));
       expect(written.paths['/pets'].get['x-apimatic-codeSamples']).to.deep.equal([
-        { lang: 'typescript', label: 'TypeScript', sourceByExample: { Example: 'await client.pets.list();' } }
+        { lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }
       ]);
       expect(JSON.parse(fs.readFileSync(spec.file.toString(), 'utf8'))).to.deep.equal(petsSpec());
       expect(sampled.unsampledSpecs).to.be.empty;

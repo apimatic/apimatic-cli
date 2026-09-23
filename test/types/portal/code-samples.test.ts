@@ -12,7 +12,7 @@ const catalog = (language: Language, paths: unknown): CodeSampleCatalog => {
 };
 
 const samples = (codeSamples: CodeSamples, endpoint: Endpoint) =>
-  codeSamples.samplesFor(endpoint).map(({ label, sourceByExample }) => ({ label, sourceByExample }));
+  codeSamples.samplesFor(endpoint).map(({ label, sources }) => ({ label, sources }));
 
 describe('CodeSampleCatalog', () => {
   it('rejects a catalog that is not the wire shape', () => {
@@ -31,7 +31,7 @@ describe('CodeSampleCatalog', () => {
     const codeSamples = new CodeSamples([catalog(Language.CSHARP, { '/pets': { GET: { Example: 'List()' } } })]);
 
     expect(samples(codeSamples, new Endpoint('GET', '/pets'))).to.deep.equal([
-      { label: 'C#', sourceByExample: { Example: 'List()' } }
+      { label: 'C#', sources: { Example: 'List()' } }
     ]);
   });
 
@@ -41,7 +41,7 @@ describe('CodeSampleCatalog', () => {
     ]);
 
     const [sample] = codeSamples.samplesFor(new Endpoint('POST', '/pets'));
-    expect(Object.keys(sample.sourceByExample)).to.deep.equal(['minimal', 'full', 'basic']);
+    expect(Object.keys(sample.sources)).to.deep.equal(['minimal', 'full', 'basic']);
   });
 
   it('drops the unnamed example beside named ones', () => {
@@ -50,7 +50,7 @@ describe('CodeSampleCatalog', () => {
     ]);
 
     expect(samples(codeSamples, new Endpoint('POST', '/pets'))).to.deep.equal([
-      { label: 'Python', sourceByExample: { minimal: 'a', full: 'b' } }
+      { label: 'Python', sources: { minimal: 'a', full: 'b' } }
     ]);
   });
 });

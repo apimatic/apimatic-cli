@@ -140,8 +140,8 @@ describe('OpenApiDocument', () => {
     it('adds the samples to each operation that has them', () => {
       const document = sampled({ openapi: '3.0.0', paths: { '/pets': { get: {}, post: {} } } });
 
-      expect(document.paths['/pets'].get[EXTENSION][0].sourceByExample).to.deep.equal({ Example: 'list()' });
-      expect(document.paths['/pets'].post[EXTENSION][0].sourceByExample).to.deep.equal({ Example: 'create()' });
+      expect(document.paths['/pets'].get[EXTENSION][0].sources).to.deep.equal({ Example: 'list()' });
+      expect(document.paths['/pets'].post[EXTENSION][0].sources).to.deep.equal({ Example: 'create()' });
     });
 
     it('leaves the keys of a path item that are not operations alone', () => {

@@ -15,7 +15,7 @@ type Example = [id: string, value: unknown];
 interface CodeSample {
   lang: string;
   label: string;
-  sourceByExample: Record<string, string>;
+  sources: Record<string, string>;
 }
 
 // fumadocs-openapi 11 reads a tab's code from the page's registry, never the operation's.
@@ -42,7 +42,7 @@ function codeUsagesOf(document: Document): CodeUsageGeneratorRegistry {
 }
 
 function sourceFor(sample: CodeSample, exampleId: string | undefined): string {
-  const sources = sample.sourceByExample;
+  const sources = sample.sources;
   return (exampleId !== undefined && sources[exampleId]) || Object.values(sources)[0];
 }
 
