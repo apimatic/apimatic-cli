@@ -91,7 +91,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
 | D22 | **Reuse codegen-v2's status vocabulary verbatim**, `SubscriptionError` included. The CLI's poller already handles all of it; the `SubscriptionError` callback status is new, so apimatic-io's callback handler must accept it. |
-| D24 | **Webhooks stay curl-only.** The wire format reserves the space now — see D33. |
+| D24 | **Webhooks stay curl-only.** The catalog carries `paths` only. |
 | D26 | **The endpoint is `/api/portal-artifacts`**, existing only to produce what portal generation needs — an all-or-nothing async orchestrator in codegen-v2 that takes a build directory and returns one zip of artifacts. The thing that crosses the wire is a **code-sample catalog**. |
 
 ### Build input, artifacts and budgets
@@ -177,8 +177,9 @@ the first.
 ```jsonc
 {
   "languages": {                                     // >= 1 key, each from the Language enum
-    "typescript": { "publishing": { "source": { "…": "…" } } },   // `publishing.source` required
-    "csharp":     { "publishing": { "source": { "…": "…" } } }
+    "typescript": { "packageConfiguration": { "…": "…" } },       // only `packageConfiguration` required
+    "csharp":     { "packageConfiguration": { "…": "…" },
+                    "publishing": { "source": { "…": "…" }, "package": { "…": "…" } } }   // optional
   },
   "portal":  { /* today's portal.json */ },          // unread here
   "plugin":  { /* today's plugin-config.json */ }    // optional; presence => context-plugin entitlement
@@ -245,8 +246,7 @@ per-language blueprint, so there is deliberately no language field inside the fi
       }
     },
     "/health": { "GET": { "Example": "await client.ping()" } }
-  },
-  "webhooks": {}
+  }
 }
 ```
 
@@ -263,12 +263,6 @@ Rules, all of which the consumer depends on:
   an operation with one example, which fumadocs names `_default`.
 - **Code is raw and unfenced.** The consumer wraps it in whatever it writes into.
 - **Declaration order is authorial intent and is preserved.** Do not sort.
-- **`webhooks` is emitted, empty, from day one.** ⚠️ The TypeScript renderer does not emit
-  it yet ([R1](#9-risks-and-open-items)). Webhook operations get no samples
-  ([D24](#wire-format)) — but the key exists so that adding them later is not a breaking
-  change. This is the one-line decision that is very expensive to retrofit: OpenAPI 3.1's
-  `webhooks` map is keyed by *name*, not by path, so a bare path map has nowhere to put a
-  webhook sample without overloading the path key.
 
 ### 4.6 Determinism
 
@@ -487,10 +481,9 @@ Read from source on 2026-09-22, codegen-v2 re-read on 2026-09-23. CLI facts are 
 | The only Durable retry policy is `PortalArtifactsRun.Retries`, and it retries `RequestFailedException` only | `Domain/Models/PortalArtifacts/PortalArtifactsRun.cs:13-24` |
 | `CanGenerateSdk` true only for C#, TypeScript, Python; Java/PHP/Ruby/Go throw `NoSdkGenerator()`; Go cannot be a plugin language either | `Domain/Enums/SdkLanguage.cs:17-157` |
 | All HTTP triggers are `AuthorizationLevel.Anonymous`; `X-APIMatic-*` headers are attribution, **not** access control, and default to `"undefined"` when absent | `Extensions/ApimaticHeaders.cs:5-21`, `Extensions/HttpExtensions.cs:18-33` |
-| The code-sample catalog is merged ([codegen-v2#406](https://github.com/apimatic/codegen-v2/pull/406)); `ISdkBlueprint.RenderGuides()` yields it as `code-samples.json`, with a `paths` key and no `webhooks` key | `CodegenV2.Common/Blueprint/ISdkBlueprint.cs:22-24`, `CodegenV2.TypeScript/DocsRendering/CodeSamplesRenderer.cs:53` |
+| The code-sample catalog is merged ([codegen-v2#406](https://github.com/apimatic/codegen-v2/pull/406)); `ISdkBlueprint.RenderGuides()` yields it as `code-samples.json`, with a single `paths` key | `CodegenV2.Common/Blueprint/ISdkBlueprint.cs:22-24`, `CodegenV2.TypeScript/DocsRendering/CodeSamplesRenderer.cs:53` |
 
-The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged renderer
-except for the `webhooks` key.
+The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged renderer.
 
 ### 8.3 apimatic-io
 
@@ -514,10 +507,10 @@ except for the `webhooks` key.
 
 | # | Item |
 |---|---|
-| R1 | **Only TypeScript emits a catalog, and without `webhooks`.** C#/Python return empty until their stacks are driven off the ASG's resolved examples. The TypeScript catalog lacks the `webhooks` key of [§4.5](#45-the-code-sample-catalog): either the renderer adds it or this document drops it. |
+| R1 | **Only TypeScript emits a catalog.** C#/Python return empty until their stacks are driven off the ASG's resolved examples. |
 | R2 | **`portal serve` now costs a full orchestration at startup** — serially, given the pinned concurrency, against a 25-minute budget. Accepted under [D27](#d27), but it is the single biggest change to the feel of the command. |
 | R3 | **Retry-safety is a prerequisite, not a follow-up.** Retries are limited to transient storage failures, but a retried activity that does not clean up stale state still produces a run that never finishes — a worse failure than the transient one being papered over. |
-| R4 | **`apimatic.json` is owned elsewhere.** This document treats it as fixed input; if its shape moves, [§4.2](#42-request-the-build-zip) moves with it. Its `publishing` shape (`source` + `package.packageId`) conflicts with package settings' `{ packageConfiguration: … }`; one must be picked with its owner. The portal's `PortalConfig.parse` and the signup page's *Download build* must change together, or the first command on a downloaded build hard-stops. |
+| R4 | **`apimatic.json` is owned elsewhere.** This document treats it as fixed input; if its shape moves, [§4.2](#42-request-the-build-zip) moves with it. The portal's `PortalConfig.parse` and the signup page's *Download build* must change together, or the first command on a downloaded build hard-stops. |
 | R5 | **`--verbose` does not exist.** [D20](#wire-format) names affected spec files rather than individual `$ref`s because there is no verbose mode to put the detail behind. **TODO:** enumerate the exact refs once a `--verbose` flag exists. |
 
 ---
