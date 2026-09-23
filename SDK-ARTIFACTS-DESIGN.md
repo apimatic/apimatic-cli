@@ -1,6 +1,6 @@
 # Code samples in the portal — the `/api/portal-artifacts` contract
 
-**Status:** codegen-v2 endpoint implemented except `GenerateCodeSamples`; CLI renders samples from a fixture catalog; apimatic-io not started.
+**Status:** codegen-v2 endpoint implemented, catalog merged ([#406](https://github.com/apimatic/codegen-v2/pull/406)); CLI renders samples from a fixture catalog; apimatic-io not started.
 **Purpose:** the single place the CLI, apimatic-io and codegen-v2 agree on what crosses the
 wire, so the Azure Function can be written from it. Every claim under
 [Verified facts](#8-verified-facts) carries a `file:line` reference and can be re-checked.
@@ -90,7 +90,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D19 | **Tab order: curl first, then one tab per language in configured order**: `curl, TypeScript, C#, …`. |
 | D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
-| D22 | **Reuse codegen-v2's status vocabulary verbatim**, `SubscriptionError` included. The CLI's poller already handles all of it. |
+| D22 | **Reuse codegen-v2's status vocabulary verbatim**, `SubscriptionError` included. The CLI's poller already handles all of it; the `SubscriptionError` callback status is new, so apimatic-io's callback handler must accept it. |
 | D24 | **Webhooks stay curl-only.** The wire format reserves the space now — see D33. |
 | D26 | **The endpoint is `/api/portal-artifacts`**, existing only to produce what portal generation needs — an all-or-nothing async orchestrator in codegen-v2 that takes a build directory and returns one zip of artifacts. The thing that crosses the wire is a **code-sample catalog**. |
 
@@ -119,13 +119,14 @@ the wire, not about implementation.
 
 ### 4.1 Routes
 
-**codegen-v2** — three functions, mirroring the two trios that exist today. Routes carry no
+**codegen-v2** — four routes, mirroring the plugin's four. Routes carry no
 `api/` prefix in the attribute; the Functions host adds it.
 
 ```
 POST api/portal-artifacts                 -> 202 { id }  |  403  |  400 bad subscription header
 GET  api/portal-artifacts/{id}/status     -> 200 { status, errors? }
 GET  api/portal-artifacts/{id}/download   -> 200 application/zip
+GET  api/portal-artifacts/{id}/build/download -> 200 application/zip   (the uploaded build, for debugging)
 ```
 
 The POST is multipart/form-data with file part `file`. No query parameters. The language request travels inside the zip ([§4.2](#42-request-the-build-zip)).
@@ -154,7 +155,8 @@ Three details are load-bearing and all three already exist:
 ### 4.2 Request: the build zip
 
 The CLI zips the contents of the project's `src/` directory, exactly as the SDK and plugin
-flows zip their build directories, and posts it as the multipart `file` part.
+flows zip their build directories, and posts it as the multipart `file` part. A file that is
+not a zip ends the run with `ValidationError`.
 
 ```
 <zip root>/
@@ -183,7 +185,8 @@ the first.
 }
 ```
 
-`languages` **keys** are the whole of the language request. `ReadPortalArtifactsRequest`
+`languages` **keys** are the whole of the language request; SDK stability is fixed at `Beta`
+until `apimatic.json` carries it. `ReadPortalArtifactsRequest`
 validates the file with the same `ApimaticConfigValidator` the plugin flow uses: only
 `csharp`, `typescript` and `python` are recognised, other keys are ignored, and a file with
 none of the three is rejected. Generation order is fixed; tab order comes from the CLI's own
@@ -260,7 +263,8 @@ Rules, all of which the consumer depends on:
   an operation with one example, which fumadocs names `_default`.
 - **Code is raw and unfenced.** The consumer wraps it in whatever it writes into.
 - **Declaration order is authorial intent and is preserved.** Do not sort.
-- **`webhooks` is emitted, empty, from day one.** Webhook operations get no samples
+- **`webhooks` is emitted, empty, from day one.** ⚠️ The TypeScript renderer does not emit
+  it yet ([R1](#9-risks-and-open-items)). Webhook operations get no samples
   ([D24](#wire-format)) — but the key exists so that adding them later is not a breaking
   change. This is the one-line decision that is very expensive to retrofit: OpenAPI 3.1's
   `webhooks` map is keyed by *name*, not by path, so a bare path map has nowhere to put a
@@ -274,7 +278,8 @@ Three rules the orchestrator must hold, all of which are ways to get burned by
 1. **Return failures, do not throw them.** `Task.WhenAll` surfaces one exception and
    abandons the other results, so a three-language run would report one failure and
    silently lose two. Each fan-out activity returns a Result; the orchestrator keys
-   failures by language.
+   failures by language, with a generic `<step> failed` reason — the failure's own message
+   can carry internals, so it goes to the log only.
 2. **Order the fan-out, not the results.** `Task.WhenAll` returns results in the order the
    tasks were handed to it, never completion order. The aggregation activity must be
    *handed* its input blob names and must never discover them by listing storage.
@@ -293,7 +298,7 @@ Three rules the orchestrator must hold, all of which are ways to get burned by
 | `ReadPortalArtifactsRequest` | **new** — validates `apimatic.json` and returns its languages and whether `plugin` is present, which the orchestrator checks against the subscription |
 | `ValidateSpecFile` | exists — writes the parsed SDL every downstream activity reads |
 | `GenerateSdk` × N | exists — fan out, one activity per selected language |
-| `GenerateCodeSamples` × N | **new** — same parsed SDL, `RenderCodeSamples()` per language |
+| `GenerateCodeSamples` × N | **new** — same parsed SDL, `RenderGuides()` per language, which yields `code-samples.json` |
 | `AggregatePortalArtifacts` | **new** — assemble the zip of [§4.4](#44-response-the-artifact-zip) |
 | `PostGeneration` | exists — needs a third `GenerationOperation` variant |
 
@@ -314,10 +319,10 @@ endpoint is more than a copy of one.
 2. **Result-returning generation activities.** Only the three *validation* activities carry
    `IsSuccess`/`Errors`. `GenerateSdk` and `GenerateV4Skills` return bare `Unit` and throw.
    Determinism rule 1 therefore has nothing to copy.
-3. **Retries.** There is **no** Durable retry policy anywhere in the codebase — no
-   `TaskOptions`, no `TaskRetryOptions`, no `RetryPolicy`, and no `retryOptions` in
-   `host.json`. The agreed policy (exponential backoff in powers of 2, else linear 10s;
-   max 4 retries) is a first. **Retries require retry-safe activities**: an activity whose
+3. **Retries.** `PortalArtifactsRun.Retries` is the codebase's first Durable retry policy:
+   5 attempts, 10s first interval, backoff ×2. It retries **transient storage failures
+   only** (`RequestFailedException`, however deeply wrapped); a network or generator fault
+   fails the lane on the first attempt. **Retries require retry-safe activities**: an activity whose
    stale state is not cleaned up before the retried attempt starts can produce a run that
    never finishes.
 4. **Concurrency.** `host.json` pins both `maxConcurrentActivityFunctions` and
@@ -443,8 +448,8 @@ watcher of its own, `prepare()` runs exactly once per command, and `vite dev` ow
 
 ## 8. Verified facts
 
-Read from source on 2026-09-22. CLI facts are on `feat/code-samples-portal` (= `dev` at
-`073d09a`); codegen-v2 and apimatic-io from their working trees.
+Read from source on 2026-09-22, codegen-v2 re-read on 2026-09-23. CLI facts are on
+`feat/code-samples-portal` (= `dev` at `073d09a`); codegen-v2 and apimatic-io from their working trees.
 
 ### 8.1 CLI
 
@@ -471,24 +476,21 @@ Read from source on 2026-09-22. CLI facts are on `feat/code-samples-portal` (= `
 
 | Fact | Where |
 |---|---|
-| Routes are `generate`, `generate/{id}/status`, `generate/{id}/download`; `plugin`, `plugin/{id}/status`, `plugin/{id}/download`, `plugin/{id}/build/download` | `Functions/Sdk/*.cs`, `Functions/Plugin/*.cs` |
+| Routes are `generate`, `generate/{id}/status`, `generate/{id}/download`; `plugin`, `plugin/{id}/status`, `plugin/{id}/download`, `plugin/{id}/build/download`; `portal-artifacts` with the same four | `Functions/Sdk/*.cs`, `Functions/Plugin/*.cs`, `Functions/PortalArtifacts/*.cs` |
 | SDK generate returns **200**, plugin generate returns **202** | `Functions/Sdk/GenerateFunction.cs:38`, `Functions/Plugin/GenerateFunction.cs:32` |
 | Plugin fan-out is **two lanes** (V4 skills, V3 skills); each loops languages inside one activity | `Functions/Plugin/GenerateFunction.cs:116-142`, `GenerateV4Skills.cs:79` |
 | `AggregatePlugin` unzips each lane into a subtree, walks the tree, renders manifests, rezips | `Application/Features/AggregatePlugin.cs:77-143` |
-| `GenerationStatus` = `Queued, ExecutionStarted, GeneratingArtifacts, Completed, Failed, ValidationError, Unknown` | `Domain/Models/GenerationStatus.cs:12-24` |
-| `GenerationOperation` has exactly `Sdk` and `Plugin`; each owns a callback event, a download link and tracking events | `Domain/Enums/GenerationOperation.cs:11-78` |
+| `GenerationStatus` = `Queued, ExecutionStarted, GeneratingArtifacts, Completed, Failed, ValidationError, SubscriptionError, Unknown` | `Domain/Models/GenerationStatus.cs:12-24` |
+| `GenerationOperation` has `Sdk`, `Plugin` and `PortalArtifacts`; each owns a callback event, a download link and tracking events | `Domain/Enums/GenerationOperation.cs` |
 | Extraction paths: `extract/`, `extract/spec`, config at the extract root | `Domain/Models/GenerateWorkspace.cs:14-17`, `ValidatePluginConfig.cs:88-91` |
 | `host.json` pins both concurrency limits to **1**; no `retryOptions`, no function timeout | `src/CodegenV2.Func/host.json:1-28` |
-| **Zero** Durable retry policy in the repo — no `TaskOptions`/`TaskRetryOptions`/`RetryPolicy` | repo-wide grep |
+| The only Durable retry policy is `PortalArtifactsRun.Retries`, and it retries `RequestFailedException` only | `Domain/Models/PortalArtifacts/PortalArtifactsRun.cs:13-24` |
 | `CanGenerateSdk` true only for C#, TypeScript, Python; Java/PHP/Ruby/Go throw `NoSdkGenerator()`; Go cannot be a plugin language either | `Domain/Enums/SdkLanguage.cs:17-157` |
 | All HTTP triggers are `AuthorizationLevel.Anonymous`; `X-APIMatic-*` headers are attribution, **not** access control, and default to `"undefined"` when absent | `Extensions/ApimaticHeaders.cs:5-21`, `Extensions/HttpExtensions.cs:18-33` |
-| ⚠️ **The code-sample catalog is not merged.** It exists only as `origin/asadali214/code-sample-catalog`, open as [codegen-v2#406](https://github.com/apimatic/codegen-v2/pull/406) | no `CodeSamples.cs` / `RenderCodeSamples` / `SampledPath` in the working tree |
+| The code-sample catalog is merged ([codegen-v2#406](https://github.com/apimatic/codegen-v2/pull/406)); `ISdkBlueprint.RenderGuides()` yields it as `code-samples.json`, with a `paths` key and no `webhooks` key | `CodegenV2.Common/Blueprint/ISdkBlueprint.cs:22-24`, `CodegenV2.TypeScript/DocsRendering/CodeSamplesRenderer.cs:53` |
 
-The catalog shape in [§4.5](#45-the-code-sample-catalog) was read from that branch
-(`CodegenV2.Common/Models/CodeSamples.cs`, `docs/plans/code-sample-catalog.md`) in an
-earlier session, and is the one part of this document not re-verifiable from a checked-out
-tree. **Re-check it against [PR #406](https://github.com/apimatic/codegen-v2/pull/406)
-before implementing** — it may have moved under review.
+The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged renderer
+except for the `webhooks` key.
 
 ### 8.3 apimatic-io
 
@@ -512,10 +514,10 @@ before implementing** — it may have moved under review.
 
 | # | Item |
 |---|---|
-| R1 | **The catalog branch is unmerged** — [codegen-v2#406](https://github.com/apimatic/codegen-v2/pull/406). Nothing in codegen-v2's main line emits a catalog, and C#/Python return empty until their stacks are driven off the ASG's resolved examples. The CLI can be built and tested against a fixture; the endpoint cannot be integration-tested until the PR lands. |
+| R1 | **Only TypeScript emits a catalog, and without `webhooks`.** C#/Python return empty until their stacks are driven off the ASG's resolved examples. The TypeScript catalog lacks the `webhooks` key of [§4.5](#45-the-code-sample-catalog): either the renderer adds it or this document drops it. |
 | R2 | **`portal serve` now costs a full orchestration at startup** — serially, given the pinned concurrency, against a 25-minute budget. Accepted under [D27](#d27), but it is the single biggest change to the feel of the command. |
-| R3 | **Retry-safety is a prerequisite, not a follow-up.** Adding retries to activities that do not clean up stale state produces runs that never finish — a worse failure than the transient one being papered over. |
-| R4 | **`apimatic.json` is owned elsewhere.** This document treats it as fixed input; if its shape moves, [§4.2](#42-request-the-build-zip) moves with it. The portal's `PortalConfig.parse` and the signup page's *Download build* must change together, or the first command on a downloaded build hard-stops. |
+| R3 | **Retry-safety is a prerequisite, not a follow-up.** Retries are limited to transient storage failures, but a retried activity that does not clean up stale state still produces a run that never finishes — a worse failure than the transient one being papered over. |
+| R4 | **`apimatic.json` is owned elsewhere.** This document treats it as fixed input; if its shape moves, [§4.2](#42-request-the-build-zip) moves with it. Its `publishing` shape (`source` + `package.packageId`) conflicts with package settings' `{ packageConfiguration: … }`; one must be picked with its owner. The portal's `PortalConfig.parse` and the signup page's *Download build* must change together, or the first command on a downloaded build hard-stops. |
 | R5 | **`--verbose` does not exist.** [D20](#wire-format) names affected spec files rather than individual `$ref`s because there is no verbose mode to put the detail behind. **TODO:** enumerate the exact refs once a `--verbose` flag exists. |
 
 ---
