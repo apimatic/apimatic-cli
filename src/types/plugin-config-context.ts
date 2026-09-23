@@ -13,7 +13,7 @@ import {
   PluginMetadata
 } from './plugin/plugin-config.js';
 import { SemVersion } from './publish/version.js';
-import { CodeGenerationVersion, Language } from './sdk/generate.js';
+import { CodeGenerationVersion, isPluginLanguage, Language } from './sdk/generate.js';
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
@@ -37,12 +37,49 @@ export class PluginConfigPresent {
   }
 
   public hasPublishedSdks(): boolean {
+    return this.publishedLanguages().length > 0;
+  }
+
+  /**
+   * The languages whose SDK is published somewhere a reader can reach — a repository, a registry,
+   * or both. These are the ones a plugin describes rather than carries, and the ones a language
+   * selection may not drop: the entry records where the SDK actually went.
+   */
+  public publishedLanguages(): readonly Language[] {
+    return this.languageEntries()
+      .filter(([, entry]) => entry?.publishing?.source || entry?.publishing?.package)
+      .map(([language]) => language);
+  }
+
+  /** Every language the config names, published or not. */
+  public requestedLanguages(): readonly Language[] {
+    return this.languageEntries().map(([language]) => language);
+  }
+
+  /**
+   * Language keys a plugin cannot carry — java, php, ruby and go, which have no v4 renderer. They
+   * are left in the file untouched; naming them is the only way a reader learns the plugin will
+   * not include them.
+   */
+  public unsupportedLanguages(): readonly string[] {
     const languages = this.config.languages;
     if (typeof languages !== 'object' || languages === null) {
-      return false;
+      return [];
     }
 
-    return Object.values(languages).some((entry) => entry?.publishing?.source || entry?.publishing?.package);
+    return Object.keys(languages).filter((language) => !isPluginLanguage(language));
+  }
+
+  private languageEntries(): [Language, PluginLanguages[Language]][] {
+    const languages = this.config.languages;
+    if (typeof languages !== 'object' || languages === null) {
+      return [];
+    }
+
+    return Object.entries(languages).filter(([language]) => isPluginLanguage(language)) as [
+      Language,
+      PluginLanguages[Language]
+    ][];
   }
 
   public hasMetadata(): boolean {
@@ -159,6 +196,32 @@ export class PluginConfigContext {
         ...(!plugin.author && author && { author }),
         license: plugin.license ?? DEFAULT_PLUGIN_LICENSE
       });
+    });
+  }
+
+  /**
+   * Records the languages the plugin should include. A language the config does not carry is added
+   * as an empty entry — no `publishing` block at all, which is how "asked for, nothing published
+   * yet" is written and what the service turns into an SDK bundled inside the plugin.
+   *
+   * An entry that is already there is left **byte-identical**, published or not: this writes what
+   * is missing and never edits what is recorded, so a selection can neither blank a repository URL
+   * nor restate one. A run that adds nothing does not rewrite the file.
+   */
+  public async requestLanguages(
+    languages: readonly Language[]
+  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
+    const state = await this.getPluginConfigState();
+    if (state.state === 'present' && languages.every((language) => state.requestedLanguages().includes(language))) {
+      return ok(state);
+    }
+
+    return await this.merge((document) => {
+      const recorded: PluginLanguages = { ...(document.languages() as PluginLanguages | undefined) };
+      for (const language of languages) {
+        recorded[language] ??= {};
+      }
+      return document.with('languages', recorded);
     });
   }
 

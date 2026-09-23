@@ -1,11 +1,13 @@
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
+import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PluginConfigContext, PluginConfigPresent } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
+import { Language, PLUGIN_LANGUAGES } from '../../types/sdk/generate.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { PluginRecordMetadataAction } from './record-metadata.js';
@@ -13,6 +15,7 @@ import { PluginRecordMetadataAction } from './record-metadata.js';
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
   private readonly pluginService: PluginService = new PluginService();
+  private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -45,6 +48,7 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
+    let preview = false;
     const configContext = new PluginConfigContext(buildDirectory);
     let configState = await configContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
@@ -68,10 +72,35 @@ export class PluginGenerateAction {
       configState = metadataResult.getValue();
     }
 
-    if (!configState.hasPublishedSdks()) {
-      this.prompts.noPublishedSdks();
-      this.prompts.nextStepsPublishSdks();
-      return ActionResult.success();
+    const published = configState.publishedLanguages();
+    const selection = await this.selectLanguages(configState);
+    if (selection === undefined) {
+      this.prompts.noLanguagesSelected();
+      return ActionResult.cancelled();
+    }
+
+    const recorded = await configContext.requestLanguages(selection);
+    if (recorded.isErr()) {
+      this.prompts.configNotPrepared(recorded.error, buildDirectory);
+      return ActionResult.failed();
+    }
+    configState = recorded.value;
+
+    const unsupported = configState.unsupportedLanguages();
+    if (unsupported.length > 0) {
+      this.prompts.languagesNotIncluded(unsupported);
+    }
+
+    // Only a language the plugin has to carry itself is worth a word about publishing; a run that
+    // adds nothing local is describing packages that already exist.
+    const bundled = selection.filter((language) => !published.includes(language));
+    if (bundled.length > 0 && (await this.hasPublishingProfile())) {
+      this.prompts.recommendPublishingFirst();
+      if (!(await this.prompts.confirmLocalPlugin())) {
+        this.prompts.localPluginCancelled();
+        return ActionResult.cancelled();
+      }
+      preview = true;
     }
 
     // `src/` is zipped as it sits on disk, so a byte-order mark the reader above looked past
@@ -102,8 +131,48 @@ export class PluginGenerateAction {
       this.prompts.pluginGenerated(pluginDirectory);
       this.prompts.tryPluginLocally(pluginDirectory);
       this.prompts.nextStepsPublishPlugin();
+      if (preview) {
+        this.prompts.previewOnly();
+      }
 
       return ActionResult.success();
     });
+  };
+
+  /**
+   * The languages the plugin should include. Published ones are offered checked and are put back
+   * if they are cleared, because their entry records where the SDK actually went — see
+   * `selectLanguages` in the prompts. `undefined` means the user chose nothing at all, which is
+   * the one way this command ends with no plugin.
+   */
+  private readonly selectLanguages = async (config: PluginConfigPresent): Promise<Language[] | undefined> => {
+    const published = config.publishedLanguages();
+    const requested = config.requestedLanguages();
+
+    const chosen = await this.prompts.selectLanguages(PLUGIN_LANGUAGES, published, requested);
+    if (chosen === undefined) {
+      return undefined;
+    }
+
+    const cleared = published.filter((language) => !chosen.includes(language));
+    if (cleared.length > 0) {
+      this.prompts.publishedLanguagesKept(cleared);
+    }
+
+    const selection = [...new Set([...chosen, ...published])];
+    return selection.length > 0 ? selection : undefined;
+  };
+
+  /**
+   * Advisory only, so a lookup that cannot answer is read as "no profile": a recommendation is not
+   * worth failing a generation the user asked for, and `--auth-key` does not reach this call.
+   */
+  private readonly hasPublishingProfile = async (): Promise<boolean> => {
+    const profiles = await this.publishingApiService.getPublishingProfiles(
+      this.configDir,
+      this.commandMetadata.shell
+    );
+
+    return profiles.isOk() && profiles.value.length > 0;
   };
 }

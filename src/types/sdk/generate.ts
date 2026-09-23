@@ -52,6 +52,17 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
   { label: "Go", value: Language.GO }
 ];
 
+/**
+ * The languages a context plugin can carry, in the order they are offered. These are the three
+ * `apimatic.json` can express and the three the service renders v4 skills for; java, php, ruby and
+ * go have no v4 renderer, so a plugin cannot include them whatever the config says.
+ */
+export const PLUGIN_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
+
+export function isPluginLanguage(language: string): language is Language {
+  return PLUGIN_LANGUAGES.includes(language as Language);
+}
+
 export class CodegenOption {
   public static readonly v3 = new CodegenOption(CodeGenerationVersion.V3, Stability.STABLE);
 
