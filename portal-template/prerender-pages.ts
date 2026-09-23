@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
-import type { PortalConfig } from './portal-config.ts';
+import type { ApiOptions, PortalConfig } from './portal-config.ts';
 import { openApiSection } from './src/lib/openapi-section.server';
 
 const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
@@ -20,7 +20,7 @@ export async function prerenderPages(config: PortalConfig, siteUrl: string | nul
   }
 
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
-  for (const url of await openApiUrls(config.specs)) urls.add(url);
+  for (const url of await openApiUrls(config.specs, config.api)) urls.add(url);
 
   // The copy is load-bearing, not redundant: this loop adds to `urls`, and a `Set` visits
   // entries added during iteration, so iterating `urls` itself would suffix the `.md` URLs it
@@ -63,9 +63,11 @@ async function contentUrls(contentDir: string): Promise<string[]> {
   return urls;
 }
 
-async function openApiUrls(specs: Record<string, string>): Promise<string[]> {
+// Through the same options as the site, so a hidden operation gets no page here either and a
+// grouping that moves the pages moves the list with them.
+async function openApiUrls(specs: Record<string, string>, api: ApiOptions): Promise<string[]> {
   const sources = Object.fromEntries(
-    await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file)]))
+    await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file, api)]))
   );
   if (Object.keys(sources).length === 0) return [];
   return loader(sources, { baseUrl: '/' })

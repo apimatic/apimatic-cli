@@ -396,7 +396,12 @@ notion of `x-internal`.
    `#/components` or `x-ext`.
 2. Walk `paths` and `webhooks`. Remove an operation when it is `deprecated` and
    `showDeprecated` is false, or carries `x-internal: true` and `showInternal`
-   is false. Remove a path item left with no operations.
+   is false. Remove a path item left with no operations. As built in step 5
+   (`src/lib/openapi-filter.ts`): OpenAPI 3.2's `query` and
+   `additionalOperations` are filtered too; `x-internal: true` on a path item
+   hides the whole path; a path item that is a `#/…` reference is followed, and
+   inlined only when something in it is hidden, since another path may share
+   the component; only a literal `true` hides.
 3. Create a second server with the filtered document as its `input` value,
    which `createOpenAPI` accepts, and call `staticSource` on that one.
 
@@ -710,7 +715,12 @@ and the affected tests green, each stopped at for review:
   parser and the schema refuse those.
 - A bundled document handed back to `createOpenAPI` as a document object
   round-trips: `x-ext` references stay resolvable and the pages match those the
-  file-path server produced for an unfiltered spec.
+  file-path server produced for an unfiltered spec. *Verified in step 5* by
+  `test/portal-template/openapi-section.test.ts` on a specification with a
+  relative `$ref`. That test runs under mocha; a plain `tsx` script importing
+  `fumadocs-openapi/server` fails to link a vendored module under its
+  `dist/node_modules` (`does not provide an export named 'upgrade'`). The build
+  is unaffected.
 - The `root` hook runs after the `folder` hook for `''`, so it receives the
   root already ordered by `nav.json`. Confirm on the pinned version; if not,
   the hook calls `reorder` itself. *Confirmed in step 4.*
