@@ -58,7 +58,7 @@ export class PluginRecordSdkAction {
       }
     }
 
-    if (!entry.source && (!configExisted || configState.hasNoSourceRepository(language))) {
+    if (!entry.publishing?.source && (!configExisted || configState.hasNoSourceRepository(language))) {
       this.prompts.noSourceRepository(language);
     }
 

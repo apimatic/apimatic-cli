@@ -111,6 +111,20 @@ describe('ApimaticConfigDocument', () => {
       ]);
     });
 
+    it('names the language whose publishing record is not an object', () => {
+      const document = parsedObject({ languages: { csharp: { publishing: 'v3' }, java: { publishing: {} } } });
+
+      expect(document.findingsFor('languages')).to.deep.equal([
+        { block: 'languages', field: 'languages.csharp.publishing', problem: 'is not a JSON object' }
+      ]);
+    });
+
+    it('accepts an entry that carries no publishing record at all', () => {
+      const document = parsedObject({ languages: { csharp: {} } });
+
+      expect(document.findingsFor('languages')).to.deep.equal([]);
+    });
+
     it('treats a null block like any other non-object', () => {
       expect(parsedObject({ plugin: null }).findingsFor('plugin')).to.have.length(1);
       expect(parsedObject({ languages: null }).findingsFor('languages')).to.have.length(1);

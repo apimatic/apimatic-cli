@@ -127,15 +127,18 @@ export class ApimaticConfigDocument {
     if (!isJsonObject(languages)) {
       return [{ block: 'languages', field: 'languages', problem: NOT_A_JSON_OBJECT }];
     }
-    return Object.entries(languages)
-      .filter(([, entry]) => !isJsonObject(entry))
-      .map(
-        ([language]): ConfigFinding => ({
-          block: 'languages',
-          field: `languages.${language}`,
-          problem: NOT_A_JSON_OBJECT
-        })
-      );
+    // Both levels are spread by `upsertLanguage`, so both are refused when they are not objects.
+    return Object.entries(languages).flatMap(([language, entry]): ConfigFinding[] => {
+      if (!isJsonObject(entry)) {
+        return [{ block: 'languages', field: `languages.${language}`, problem: NOT_A_JSON_OBJECT }];
+      }
+      if (entry.publishing !== undefined && !isJsonObject(entry.publishing)) {
+        return [
+          { block: 'languages', field: `languages.${language}.publishing`, problem: NOT_A_JSON_OBJECT }
+        ];
+      }
+      return [];
+    });
   }
 
   /** As written, whatever that is: the portal's own parser says what is wrong with it. */
