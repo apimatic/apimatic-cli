@@ -42,7 +42,7 @@ export class PluginConfigPresent {
       return false;
     }
 
-    return Object.values(languages).some((entry) => entry?.source || entry?.package);
+    return Object.values(languages).some((entry) => entry?.publishing?.source || entry?.publishing?.package);
   }
 
   public hasMetadata(): boolean {
@@ -69,7 +69,7 @@ export class PluginConfigPresent {
   }
 
   public hasNoSourceRepository(language: Language): boolean {
-    return !this.config.languages?.[language]?.source;
+    return !this.config.languages?.[language]?.publishing?.source;
   }
 
   public assertNoCodegenVersionMismatch(
@@ -77,20 +77,21 @@ export class PluginConfigPresent {
     language: Language,
     entry: PluginLanguageEntry<Language>
   ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
-    if (entry.package && entry.source) {
+    const publishing = entry.publishing;
+    if (publishing?.package && publishing.source) {
       return ok(); // if both package and source are given, there is no possible mismatch
     }
 
-    const existingEntry = this.config.languages?.[language];
-    if (!existingEntry) {
+    const existingPublishing = this.config.languages?.[language]?.publishing;
+    if (!existingPublishing) {
       return ok();
     }
 
-    if (!existingEntry.package && !existingEntry.source) {
+    if (!existingPublishing.package && !existingPublishing.source) {
       return ok();
     }
 
-    const extractedVersion = this.config.languages?.[language]?.codegenVersion;
+    const extractedVersion = existingPublishing.codegenVersion;
     if (!extractedVersion) {
       return ok();
     }
@@ -168,12 +169,19 @@ export class PluginConfigContext {
     return await this.merge((document) => {
       const languages: PluginLanguages = { ...(document.languages() as PluginLanguages | undefined) };
       const existingEntry = languages[language];
-      languages[language] = {
-        ...existingEntry,
-        ...entry,
-        source: entry.source ?? existingEntry?.source,
-        package: entry.package ?? existingEntry?.package
-      };
+      // Preservation is one level down: a run that publishes only source must not drop the
+      // package block a previous run recorded, and neither may blank a key this CLI version
+      // does not model. A run carrying no publishing record at all leaves the existing one be.
+      const existingPublishing = existingEntry?.publishing;
+      const publishing = entry.publishing
+        ? {
+            ...existingPublishing,
+            ...entry.publishing,
+            source: entry.publishing.source ?? existingPublishing?.source,
+            package: entry.publishing.package ?? existingPublishing?.package
+          }
+        : existingPublishing;
+      languages[language] = { ...existingEntry, ...entry, ...(publishing ? { publishing } : {}) };
       return document.with('languages', languages);
     });
   }

@@ -110,9 +110,11 @@ Rejected:
   },
   "languages": {
     "typescript": {
-      "source": { "repositoryUrl": "https://github.com/acme/payments-typescript", "branch": "main" },
-      "package": { "name": "@acme/payments", "version": "1.2.0" },
-      "codegenVersion": "v2"
+      "publishing": {
+        "source": { "repositoryUrl": "https://github.com/acme/payments-typescript", "branch": "main" },
+        "package": { "name": "@acme/payments", "version": "1.2.0" },
+        "codegenVersion": "v4"
+      }
     }
   }
 }
@@ -124,8 +126,19 @@ Rejected:
 - `plugin` is today's identity: `pluginId`, `pluginName`, `pluginVersion`,
   `pluginKey`, `author`, `license`, `homepage`, `repository`. Same validation
   (`PLUGIN_ID_PATTERN`, semver), same defaults (`license` written as `MIT`).
-- `languages` is today's `PluginLanguages` verbatim: per language `source`,
-  `package`, `codegenVersion`. `codegenVersion` stays because the mismatch check
+- `languages` is today's `PluginLanguages` with its per-language record moved one
+  level down, under `publishing`: `source`, `package`, `codegenVersion`.
+  **Amended 2026-09-23.** This PR first shipped the record flat at the entry
+  level, which is not the shape the backend binds — codegen-v2 reads
+  `languages.<lang>.publishing`, so a flat entry arrived with every field skipped
+  as an unknown key and the language read as carrying nothing. Restored here,
+  because it is also load-bearing beyond the wire: the entry is shared state that
+  the plugin's skills, the portal's SDK page and publishing all read, so the rest
+  of it has to stay free for settings that are not about publishing, and an entry
+  with **no** `publishing` block is how "this language was asked for, nothing is
+  published yet" is expressed — the state local plugin generation turns into a
+  bundled SDK.
+  `codegenVersion` stays, inside `publishing`, because the mismatch check
   in `PluginConfigPresent.assertNoCodegenVersionMismatch` depends on it.
   `packageConfiguration` and `source.repositoryType` from the design sketch are
   not modelled in this release. A hand-written file carrying `packageConfiguration`
@@ -133,10 +146,10 @@ Rejected:
   `source.repositoryType` does **not** survive a source-code publish: today's
   `upsertLanguage` sets `source: entry.source ?? existingEntry?.source`, which
   replaces the whole `source` object rather than merging into it, so keys inside
-  it are lost the moment a run supplies its own. Preservation is per entry, not
-  per leaf. This is today's behaviour and the move does not change it; it is
-  stated because the shape above invites the opposite reading, and because the
-  later `packageConfiguration` plan has to decide whether to fix it.
+  it are lost the moment a run supplies its own. Preservation is per publishing
+  record, not per leaf. This is today's behaviour and the move does not change
+  it; it is stated because the shape above invites the opposite reading, and
+  because the later `packageConfiguration` plan has to decide whether to fix it.
 
 The upload carries this file as it is. There is no synthesized
 `plugin-config.json`; the server reads `plugin` and `languages` from here.

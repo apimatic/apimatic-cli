@@ -51,6 +51,7 @@ describe('PluginRecordSdkAction', () => {
 
   const configPath = () => path.join(buildDirectory, 'apimatic.json');
   const writtenConfig = (): WrittenDocument => fsExtra.readJsonSync(configPath());
+  const writtenPublishing = () => writtenConfig().languages.csharp?.publishing;
 
   const execute = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
     action.execute(
@@ -101,9 +102,11 @@ describe('PluginRecordSdkAction', () => {
       schemaVersion: 1,
       languages: {
         csharp: {
-          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
-          package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
-          codegenVersion: 'v3'
+          publishing: {
+            source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+            package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
+            codegenVersion: 'v3'
+          }
         }
       }
     });
@@ -124,7 +127,7 @@ describe('PluginRecordSdkAction', () => {
 
   it('records without asking, because the caller already asked', async () => {
     await fsExtra.writeJson(configPath(), {
-      languages: { csharp: { ...RECORDED_SOURCE_ENTRY, codegenVersion: 'v3' } }
+      languages: { csharp: { publishing: { ...RECORDED_SOURCE_ENTRY, codegenVersion: 'v3' } } }
     });
     const confirmOverwrite = sinon.stub(PluginRecordSdkPrompts.prototype, 'confirmCodegenVersionOverwrite');
 
@@ -140,14 +143,14 @@ describe('PluginRecordSdkAction', () => {
     await execute(profileWith(undefined, { packageId: 'Acme.Payments.Sdk' }));
 
     expect(noSourceRepository.calledOnceWith(Language.CSHARP)).to.be.true;
-    expect(writtenConfig().languages.csharp).to.not.have.property('source');
+    expect(writtenPublishing()).to.not.have.property('source');
   });
 
   describe('records only what the run published', () => {
     it('leaves out the source when only the package was published', async () => {
       await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
 
-      expect(writtenConfig().languages.csharp).to.deep.equal({
+      expect(writtenPublishing()).to.deep.equal({
         package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
         codegenVersion: 'v3'
       });
@@ -156,7 +159,7 @@ describe('PluginRecordSdkAction', () => {
     it('leaves out the package when only the source was published', async () => {
       await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.SourceCodePublishing]);
 
-      expect(writtenConfig().languages.csharp).to.not.have.property('package');
+      expect(writtenPublishing()).to.not.have.property('package');
     });
   });
 
@@ -164,15 +167,17 @@ describe('PluginRecordSdkAction', () => {
     await fsExtra.writeJson(configPath(), {
       languages: {
         csharp: {
-          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
-          codegenVersion: 'v3'
+          publishing: {
+            source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+            codegenVersion: 'v3'
+          }
         }
       }
     });
 
     await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }), [PublishType.PackagePublishing]);
 
-    expect(writtenConfig().languages.csharp).to.deep.equal({
+    expect(writtenPublishing()).to.deep.equal({
       source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
       package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
       codegenVersion: 'v3'
@@ -183,7 +188,7 @@ describe('PluginRecordSdkAction', () => {
   it('says so when neither the run nor the config has a source repository', async () => {
     await fsExtra.writeJson(configPath(), {
       languages: {
-        csharp: { package: { packageId: 'Acme.Payments.Sdk', version: '1.0.0' }, codegenVersion: 'v3' }
+        csharp: { publishing: { package: { packageId: 'Acme.Payments.Sdk', version: '1.0.0' }, codegenVersion: 'v3' } }
       }
     });
 
@@ -216,7 +221,8 @@ describe('PluginRecordSdkAction', () => {
     const RECORDED_SOURCE = { source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp' } };
     const RECORDED_PACKAGE = { package: { packageId: 'Acme.Payments.Sdk', version: '1.0.0' } };
 
-    const recordedAs = (entry: object) => fsExtra.writeJson(configPath(), { languages: { csharp: entry } });
+    const recordedAs = (publishing: object) =>
+      fsExtra.writeJson(configPath(), { languages: { csharp: { publishing } } });
 
     const publishPackageOnly = () => execute(profileWith(GIT_CONFIG, PACKAGE_CONFIG), [PublishType.PackagePublishing]);
 
@@ -258,7 +264,7 @@ describe('PluginRecordSdkAction', () => {
 
       await publishPackageOnly();
 
-      expect(writtenConfig().languages.csharp).to.include({ codegenVersion: 'v3' });
+      expect(writtenPublishing()).to.include({ codegenVersion: 'v3' });
     });
 
     it('leaves the recorded version alone when the user declines', async () => {
@@ -268,7 +274,7 @@ describe('PluginRecordSdkAction', () => {
       const result = await publishPackageOnly();
 
       expect(result.isCancelled()).to.be.true;
-      expect(writtenConfig().languages.csharp).to.deep.equal({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
+      expect(writtenPublishing()).to.deep.equal({ ...RECORDED_SOURCE, codegenVersion: 'v4' });
     });
 
     it('warns but does not ask on the --update-plugin-config path', async () => {
@@ -279,7 +285,7 @@ describe('PluginRecordSdkAction', () => {
 
       expect(codegenVersionMismatch.calledOnce).to.be.true;
       expect(confirmOverwrite.called).to.be.false;
-      expect(writtenConfig().languages.csharp).to.include({ codegenVersion: 'v3' });
+      expect(writtenPublishing()).to.include({ codegenVersion: 'v3' });
     });
   });
 

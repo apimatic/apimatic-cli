@@ -37,7 +37,7 @@ describe('PluginGenerateAction', () => {
   const BOM = String.fromCodePoint(0xfeff);
 
   const PLUGIN = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
-  const LANGUAGES = { csharp: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } };
+  const LANGUAGES = { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } } };
 
   const configPath = () => path.join(buildDirectory, 'apimatic.json');
   const writeConfig = (config: object) => fsExtra.writeJson(configPath(), config);
@@ -182,7 +182,7 @@ describe('PluginGenerateAction', () => {
       const body =
         '{\r\n' +
         '\t"plugin": {"pluginId": "acme-payments", "pluginName": "Acme Payments"},\r\n' +
-        '\t"languages": {"csharp": {"source": {"repositoryUrl": "https://github.com/acme/acme-csharp"}}}\r\n' +
+        '\t"languages": {"csharp": {"publishing": {"source": {"repositoryUrl": "https://github.com/acme/acme-csharp"}}}}\r\n' +
         '}\r\n';
       await fsExtra.writeFile(configPath(), BOM + body);
 
@@ -205,7 +205,7 @@ describe('PluginGenerateAction', () => {
   describe('plugin config', () => {
     const ACCOUNT = { FullName: 'Acme', Email: 'developers@acme.com' } as unknown as SubscriptionInfo;
     const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
-    const CSHARP = { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } };
+    const CSHARP = { publishing: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } };
 
     // The real PluginRecordMetadataAction runs; only its prompts and the account call are stubbed,
     // so these assert what actually lands on disk.
@@ -275,7 +275,7 @@ describe('PluginGenerateAction', () => {
     });
 
     it('stops with next steps when the only recorded language has neither a source nor a package', async () => {
-      await writeConfig({ plugin: METADATA, languages: { csharp: { codegenVersion: 'v3' } } });
+      await writeConfig({ plugin: METADATA, languages: { csharp: { publishing: { codegenVersion: 'v3' } } } });
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
       const result = await execute();

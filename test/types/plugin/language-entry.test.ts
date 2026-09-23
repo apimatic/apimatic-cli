@@ -28,9 +28,11 @@ describe('buildLanguageEntry', () => {
       );
 
       expect(result).to.deep.equal({
-        source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
-        package: undefined,
-        codegenVersion: 'v4'
+        publishing: {
+          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
+          package: undefined,
+          codegenVersion: 'v4'
+        }
       });
     });
 
@@ -43,19 +45,19 @@ describe('buildLanguageEntry', () => {
         CodeGenerationVersion.V3
       );
 
-      expect(result.source?.branch).to.be.undefined;
+      expect(result.publishing?.source?.branch).to.be.undefined;
     });
 
     it('omits the source when the profile has no git configuration', () => {
       const result = buildLanguageEntry(Language.CSHARP, undefined, undefined, VERSION, CodeGenerationVersion.V3);
 
-      expect(result.source).to.be.undefined;
+      expect(result.publishing?.source).to.be.undefined;
     });
 
     it('omits the source when the repository name is blank', () => {
       const result = buildLanguageEntry(Language.CSHARP, gitConfig('   '), undefined, VERSION, CodeGenerationVersion.V3);
 
-      expect(result.source).to.be.undefined;
+      expect(result.publishing?.source).to.be.undefined;
     });
   });
 
@@ -68,7 +70,7 @@ describe('buildLanguageEntry', () => {
         configuration as PackageConfigurationForLanguage[L],
         VERSION,
         CodeGenerationVersion.V3
-      ).package;
+      ).publishing?.package;
 
     it('names a C# package by its package id', () => {
       expect(packageFor(Language.CSHARP, { packageId: 'Acme.Payments.Sdk' })).to.deep.equal({
@@ -109,7 +111,7 @@ describe('buildLanguageEntry', () => {
     it('omits the package when the profile configures none', () => {
       const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), undefined, VERSION, CodeGenerationVersion.V3);
 
-      expect(result.package).to.be.undefined;
+      expect(result.publishing?.package).to.be.undefined;
     });
 
     it('omits the package when the configuration is missing half its identity', () => {
