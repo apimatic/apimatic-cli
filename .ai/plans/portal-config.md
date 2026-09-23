@@ -279,22 +279,30 @@ keeps the API last; an unnamed `apimatic:sdks` keeps the SDKs before the API.
 
 ### Mechanism
 
-The transformer gains a `root` hook. It receives the assembled root, which the
-`folder` hook at `''` has already ordered, and regroups the children into one
-`Folder` per tab with `root: true`:
+A second transformer, `tabsTransformer`, registered after `navigationTransformer`,
+has only a `root` hook. It receives the assembled root, which the `folder` hook
+at `''` has already ordered (confirmed on the pinned version: `root()` builds
+the content root's folder, running every `folder` hook, before any `root`
+hook), and regroups the children into one `Folder` per tab with `root: true`:
 
 - A tab is told apart by what `dev` already uses: `index` by URL `/`, the API by
   `$ref.folder === apiBaseDir`, injected pages by the loader source key
   (`isFromSource(…, GENERATED_SOURCE)`), and folder tabs by the `root` setting
   read through `readSettings`. No slug is reserved for this.
 - A folder tab keeps its own node, flagged `root: true`, rather than being
-  wrapped, so its `$ref` and index stay as they are.
-- `root` is honoured only where the CLI accepts it: on a folder directly under
-  the content root, other than `api`. Anywhere else the transformer ignores
-  it. Under `portal serve` an edited `nav.json` reaches the transformer without
-  passing the CLI again, and a nested `"root": true` typed mid-edit must not
-  produce nested tab groups the CLI would refuse at the next start — the same
-  rule `reorder` already follows for the `apimatic:` tokens.
+  wrapped, so its `$ref` stays as it is. Its index page, if any, moves from
+  `index` to the front of its children: a root folder's own link is not listed
+  in its sidebar, and `isLayoutTabActive` searches only a tab's children. So
+  the CLI refuses an `index` entry in a tab's `nav.json` with its own sentence,
+  as it does in any folder below the root. The same applies to the API tab.
+- Fumadocs never reads `root` from `nav.json`: its builder takes a folder's
+  metadata from `meta.json` only, which the content collection does not load.
+  A folder is therefore built, and named, as any other, and `root` takes effect
+  only where this hook honours it: on a folder directly under the content root,
+  other than `api`. Under `portal serve` an edited `nav.json` reaches the
+  transformer without passing the CLI again, and a nested `"root": true` typed
+  mid-edit produces no nested tab groups the CLI would refuse at the next
+  start — the same rule `reorder` already follows for the `apimatic:` tokens.
 - A synthetic tab's `name` is its fixed label and its `$id` is fixed
   (`tab:home`, `tab:guides`, `tab:sdks`), so React keys and the tree context's
   root tracking stay stable across renders.
@@ -307,9 +315,9 @@ The transformer gains a `root` hook. It receives the assembled root, which the
 - Tab URLs are computed in the template, not by Fumadocs. `getLayoutTabs` links
   a root folder to its `index` or its first *direct* page child; the API tab
   has only folders under it, as does a Guides tab whose pages sit in folders.
-  `layout.tsx` passes an explicit `tabs` list: one per root folder, `$folder`
-  bound so active-state detection keeps working, `url` the first page found
-  depth-first.
+  `layout.tsx` passes an explicit `tabs` list, computed in `src/lib/tabs.ts`:
+  one per root folder, `$folder` bound so active-state detection keeps
+  working, `url` the first page found depth-first.
 - Tabs do not change URLs. Fumadocs derives them from slugs, not tree position,
   so a root-level guide stays at `/authentication`. A folder tab's pages were
   already at `/tutorials/...`.
@@ -339,8 +347,11 @@ under `portal serve` as they do today, tabs included, with no config watcher.
 
 ## 6. Template changes
 
-- **`src/lib/navigation.ts`**: the `root` hook from section 5;
-  `INJECTED_PAGES_TOKEN` becomes `apimatic:sdks`; `readSettings` returns `root`.
+- **`src/lib/navigation.ts`**: `tabsTransformer` from section 5, registered
+  in `source.server.ts` after `navigationTransformer`; `INJECTED_PAGES_TOKEN`
+  becomes `apimatic:sdks`; `readSettings` returns `root`.
+- **`src/lib/tabs.ts`** (new): the explicit tab list, kept apart from
+  `layout.tsx` so it is unit-testable without the generated identity file.
 - **`src/lib/layout.tsx`** (new): maps `portal.layout` to the layout component
   and its page module, and returns the layout props each needs. Notebook takes
   `nav.mode: 'top'` and `tabMode: 'sidebar' | 'navbar'`; docs has no `nav.mode`
@@ -702,9 +713,10 @@ and the affected tests green, each stopped at for review:
   file-path server produced for an unfiltered spec.
 - The `root` hook runs after the `folder` hook for `''`, so it receives the
   root already ordered by `nav.json`. Confirm on the pinned version; if not,
-  the hook calls `reorder` itself.
+  the hook calls `reorder` itself. *Confirmed in step 4.*
 - Synthetic root folders survive `serializePageTree` / `deserializePageTree`
-  and `$id`-based tab matching on the client.
+  and `$id`-based tab matching on the client. *Verified in step 4* in headless
+  Chrome under all four layouts: the active tab follows the page.
 - The client bundle carries `portal.identity.json` whole and nothing else from
   the CLI-written files.
 - Bundle delta from importing all four layouts statically. *Measured in step

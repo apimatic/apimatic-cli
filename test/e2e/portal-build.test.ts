@@ -182,11 +182,12 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
   // The fixture's `content/guides/` is named by its `nav.json` rather than by its directory,
   // which is the only proof the title reaches a real build rather than the in-memory loader.
+  // The Guides tab holding it is called "Guides" too, so that name is counted, not looked for.
   it('names a folder from its nav.json instead of its directory', () => {
     const tree = read(treeCacheFiles()[0]);
 
     expect(tree).to.contain('"Developer Guides"');
-    expect(tree).to.not.contain('"Guides"');
+    expect(tree.split('"Guides"').length - 1, 'nodes named "Guides"').to.equal(1);
   });
 
   it('ships only the syntax grammars a portal can contain', () => {

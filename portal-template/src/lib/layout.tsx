@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type * as PageTree from 'fumadocs-core/page-tree';
 import type { TOCItemType } from 'fumadocs-core/toc';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
@@ -9,6 +9,7 @@ import { DocsLayout as NotebookLayout } from 'fumadocs-ui/layouts/notebook';
 import * as notebookPage from 'fumadocs-ui/layouts/notebook/page';
 import { baseOptions } from './layout.shared';
 import { portal, type PortalLayout } from './portal';
+import { portalTabs } from './tabs';
 
 /**
  * What the routes build a page from. Each layout ships its own set, and they differ in the
@@ -39,16 +40,17 @@ export const pageComponents: PageComponents = PAGE_COMPONENTS[portal.layout];
 /** The configured layout around a page, with the site's shared header options. */
 export function PortalLayout({ tree, children }: Readonly<{ tree: PageTree.Root; children: ReactNode }>) {
   const base = baseOptions();
+  const tabs = useMemo(() => portalTabs(tree), [tree]);
   switch (portal.layout) {
     case 'docs':
       return (
-        <DocsLayout {...base} tree={tree}>
+        <DocsLayout {...base} tree={tree} tabs={tabs}>
           {children}
         </DocsLayout>
       );
     case 'glass':
       return (
-        <GlassLayout {...base} tree={tree}>
+        <GlassLayout {...base} tree={tree} tabs={tabs}>
           {children}
         </GlassLayout>
       );
@@ -61,6 +63,7 @@ export function PortalLayout({ tree, children }: Readonly<{ tree: PageTree.Root;
           nav={{ ...base.nav, mode: 'top' }}
           tabMode={portal.layout === 'notebook-navbar' ? 'navbar' : 'sidebar'}
           tree={tree}
+          tabs={tabs}
         >
           {children}
         </NotebookLayout>

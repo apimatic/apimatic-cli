@@ -541,7 +541,7 @@ describe('PortalSourceContext', () => {
     it('accepts a file naming the pages beside it, and both tokens at the root', async () => {
       write(
         'content/nav.json',
-        JSON.stringify({ pages: ['index', 'apimatic:pages', 'authentication', 'apimatic:api'] })
+        JSON.stringify({ pages: ['index', 'apimatic:sdks', 'authentication', 'apimatic:api'] })
       );
 
       expect((await resolve()).isOk()).to.be.true;
@@ -577,6 +577,26 @@ describe('PortalSourceContext', () => {
       write('content/api/nav.json', JSON.stringify({ pages: ['overview', 'api', 'billing'] }));
 
       expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The walk is what tells a top-level folder from a nested one, which only it can know.
+    it('makes a tab of a folder directly under content, and of no folder deeper down', async () => {
+      write('content/tutorials/first-call.md', '# First call');
+      write('content/tutorials/nav.json', JSON.stringify({ root: true }));
+      write('content/tutorials/advanced/retries.md', '# Retries');
+      write('content/tutorials/advanced/nav.json', JSON.stringify({ root: true }));
+      write('content/api/overview.md', '# Overview');
+      write('content/api/nav.json', JSON.stringify({ root: true }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(2);
+      expect(errors.find((error) => error.startsWith('content/api/nav.json: '))).to.contain(
+        'and the API reference is always one'
+      );
+      expect(errors.find((error) => error.startsWith('content/tutorials/advanced/nav.json: '))).to.contain(
+        "only a folder directly under 'content' can be one"
+      );
     });
 
     it('refuses a name shared by a page and a folder, since only the folder could be positioned', async () => {

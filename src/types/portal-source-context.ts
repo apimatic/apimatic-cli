@@ -284,7 +284,8 @@ export class PortalSourceContext {
     const visit = async (
       directory: Directory,
       isContentRoot: boolean,
-      isApiDirectory: boolean
+      isApiDirectory: boolean,
+      isTopLevel: boolean
     ): Promise<DirectoryScan> => {
       const childNames: string[] = [];
       const pageNames = new Set<string>();
@@ -298,7 +299,7 @@ export class PortalSourceContext {
         // holds only a `nav.json`, but the template drops it again to keep to this rule.
         if (item instanceof Directory) {
           const isApiChild = isContentRoot && item.directoryPath.leafName() === API_REFERENCE_NAME;
-          const child = await visit(item, false, isApiChild);
+          const child = await visit(item, false, isApiChild, isContentRoot);
           childErrors.push(...child.errors);
           if (child.holdsPage) {
             holdsPage = true;
@@ -373,6 +374,8 @@ export class PortalSourceContext {
           const checked = PortalNavigation.validate(contents, {
             label,
             isContentRoot,
+            isTopLevel,
+            isApiDirectory,
             becomesFolder,
             childNames
           });
@@ -385,7 +388,7 @@ export class PortalSourceContext {
       return { holdsPage, errors: [...errors, ...childErrors] };
     };
 
-    const root = await visit(contentTree, true, false);
+    const root = await visit(contentTree, true, false, false);
     return { errors: root.errors, ignoredFiles };
   }
 
