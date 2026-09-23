@@ -14,39 +14,102 @@ import { ensureBuildDirectoryBase, removeBuildDirectoryBase } from '../../src/in
 // so it stays out of the default run. CI switches it on for the platform matrix.
 const enabled = process.env.APIMATIC_E2E === '1';
 
+interface BuiltPortal {
+  base: string;
+  root: string;
+  project: DirectoryPath;
+  output: DirectoryPath;
+}
+
+/** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
+async function buildFixture(name: string): Promise<BuiltPortal> {
+  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name);
+  const base = await ensureBuildDirectoryBase(fixture);
+  const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
+
+  const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
+
+  const project = new DirectoryPath(root).join('build');
+  fs.mkdirSync(project.toString(), { recursive: true });
+  const prepared = (await new PortalProjectService().prepare(project, source))._unsafeUnwrap();
+
+  const build = await new PortalBuildService().build(prepared);
+  if (build.isErr()) {
+    throw new Error(`${build.error.message}\n${build.error.log.split('\n').slice(-20).join('\n')}`);
+  }
+  expect(build.value.pageCount).to.be.greaterThan(1);
+
+  const output = new DirectoryPath(root).join('portal');
+  (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
+  return { base, root, project, output };
+}
+
+async function removeBuilt(built: BuiltPortal | undefined): Promise<void> {
+  if (built === undefined) return;
+  fs.rmSync(built.root, { recursive: true, force: true });
+  await removeBuildDirectoryBase(built.base);
+}
+
+/**
+ * Vite strips types without checking them, and nothing else in the repository imports the
+ * routes and components, so this is the one place the template is held to its types. It runs
+ * after a build because the build generates the route tree the router imports.
+ */
+async function typeCheck(project: DirectoryPath) {
+  const require = createRequire(import.meta.url);
+  const typesDirectory = path.join(project.toString(), 'node_modules', '@types');
+  fs.mkdirSync(typesDirectory, { recursive: true });
+  // React's types are development dependencies of the CLI, so the prepared project does not
+  // link them the way it links the packages the build runs with.
+  for (const name of ['react', 'react-dom']) {
+    const target = path.dirname(require.resolve(`@types/${name}/package.json`));
+    fs.symlinkSync(target, path.join(typesDirectory, name), process.platform === 'win32' ? 'junction' : 'dir');
+  }
+
+  // The bare `typescript` dependency is the linter's TypeScript 6 copy (see "TypeScript
+  // toolchain" in .ai/instructions.md) and TypeScript 7 does not export its `bin` directory,
+  // so reach the compiler `build` runs through its manifest.
+  const manifest = require.resolve('@typescript/native/package.json');
+  const tsc = path.join(path.dirname(manifest), require(manifest).bin.tsc);
+  return execa(
+    process.execPath,
+    [tsc, '-p', path.join(project.toString(), 'tsconfig.json'), '--noEmit', '--pretty', 'false'],
+    { cwd: project.toString(), reject: false, all: true }
+  );
+}
+
+/** The browser's scripts, by name. */
+const scriptsOf = (output: DirectoryPath) =>
+  fs
+    .readdirSync(path.join(output.toString(), 'assets'))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => ({ name, text: fs.readFileSync(path.join(output.toString(), 'assets', name), 'utf8') }));
+
+const stylesheetOf = (output: DirectoryPath) => {
+  const assets = path.join(output.toString(), 'assets');
+  return fs
+    .readdirSync(assets)
+    .filter((name) => name.endsWith('.css'))
+    .map((name) => fs.readFileSync(path.join(assets, name), 'utf8'))
+    .join('\n');
+};
+
 (enabled ? describe : describe.skip)('portal build (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 
-  let base: string;
-  let root: string;
+  let built: BuiltPortal | undefined;
   let project: DirectoryPath;
   let output: DirectoryPath;
 
   before(async () => {
-    base = await ensureBuildDirectoryBase(fixture);
-    root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
-
-    const source = (await new PortalSourceContext(fixture).resolve())._unsafeUnwrap();
-
-    project = new DirectoryPath(root).join('build');
-    fs.mkdirSync(project.toString(), { recursive: true });
-    const prepared = (await new PortalProjectService().prepare(project, source))._unsafeUnwrap();
-
-    const build = await new PortalBuildService().build(prepared);
-    if (build.isErr()) {
-      throw new Error(`${build.error.message}\n${build.error.log.split('\n').slice(-20).join('\n')}`);
-    }
-    expect(build.value.pageCount).to.be.greaterThan(1);
-
-    output = new DirectoryPath(root).join('portal');
-    (await new PortalContext(output).save(build.value.output, false))._unsafeUnwrap();
+    built = await buildFixture('default');
+    ({ project, output } = built);
   });
 
   after(async () => {
-    fs.rmSync(root, { recursive: true, force: true });
-    await removeBuildDirectoryBase(base);
+    await removeBuilt(built);
   });
 
   const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
@@ -205,31 +268,123 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(fs.statSync(path.join(output.toString(), page)).size).to.be.below(100 * 1024);
   });
 
-  // Vite strips types without checking them, and nothing else in the repository imports the
-  // routes and components, so this is the one place the template is held to its types. It
-  // runs here because the build has just generated the route tree the router imports.
   it('type-checks against the packages it is built with', async () => {
-    const require = createRequire(import.meta.url);
-    const typesDirectory = path.join(project.toString(), 'node_modules', '@types');
-    fs.mkdirSync(typesDirectory, { recursive: true });
-    // React's types are development dependencies of the CLI, so the prepared project does not
-    // link them the way it links the packages the build runs with.
-    for (const name of ['react', 'react-dom']) {
-      const target = path.dirname(require.resolve(`@types/${name}/package.json`));
-      fs.symlinkSync(target, path.join(typesDirectory, name), process.platform === 'win32' ? 'junction' : 'dir');
-    }
-
-    // The bare `typescript` dependency is the linter's TypeScript 6 copy (see "TypeScript
-    // toolchain" in .ai/instructions.md) and TypeScript 7 does not export its `bin` directory,
-    // so reach the compiler `build` runs through its manifest.
-    const manifest = require.resolve('@typescript/native/package.json');
-    const tsc = path.join(path.dirname(manifest), require(manifest).bin.tsc);
-    const result = await execa(
-      process.execPath,
-      [tsc, '-p', path.join(project.toString(), 'tsconfig.json'), '--noEmit', '--pretty', 'false'],
-      { cwd: project.toString(), reject: false, all: true }
-    );
+    const result = await typeCheck(project);
 
     expect(result.exitCode, result.all).to.equal(0);
+  });
+
+  // The default layout puts the tab bar in the header, and the prerendered page carries it,
+  // so the tabs are there before any script runs.
+  it('renders the top level as tabs in the header, in the order nav.json gives', () => {
+    const page = read('index.html');
+    const tab = (href: string, name: string) =>
+      page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
+    const positions = [
+      tab('/', 'Home'),
+      tab('/api/apimatic-calculator/simple-calculator/Calculate', 'API Reference'),
+      tab('/authentication', 'Guides')
+    ];
+
+    expect(
+      positions.every((at) => at !== -1),
+      'a tab is missing'
+    ).to.be.true;
+    expect(positions).to.deep.equal([...positions].sort((left, right) => left - right));
+  });
+
+  // The browser imports `portal.identity.json` whole, which is safe only because nothing in
+  // it, and nothing else the CLI writes, addresses the build machine.
+  it('ships what the browser is told, and nothing from the build-only config', () => {
+    const scripts = scriptsOf(output);
+
+    expect(scripts.some((script) => script.text.includes('fontsUrl'))).to.be.true;
+    expect(
+      scripts.filter((script) => /contentDir|staticDir/.test(script.text)).map((script) => script.name)
+    ).to.deep.equal([]);
+  });
+
+  it('loads the default fonts and imports the default preset', () => {
+    expect(read('index.html')).to.contain('https://fonts.googleapis.com/css2?family=Geist:wght@100..900');
+    // The neutral preset's light primary, which nothing in the fixture overrides.
+    expect(stylesheetOf(output)).to.match(/--color-fd-primary:#171717/);
+  });
+});
+
+/**
+ * A second portal, branded in every way the block allows at once, so one more build covers
+ * the settings the default fixture leaves at their defaults: a preset and a primary, a forced
+ * colour mode, the glass layout, header links, a call to action on the fallback home page, and
+ * a reference that leaves its deprecated and internal operations out.
+ */
+(enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
+  this.timeout(10 * 60 * 1000);
+
+  let built: BuiltPortal | undefined;
+  let project: DirectoryPath;
+  let output: DirectoryPath;
+
+  before(async () => {
+    built = await buildFixture('branded');
+    ({ project, output } = built);
+  });
+
+  after(async () => {
+    await removeBuilt(built);
+  });
+
+  const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
+  const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
+
+  it('type-checks with the glass layout', async () => {
+    const result = await typeCheck(project);
+
+    expect(result.exitCode, result.all).to.equal(0);
+  });
+
+  // The minifier may merge the two modes' rules when they match, as they do for a primary
+  // written once, so the selectors and their place are checked rather than one spelling.
+  it('imports the preset and lays the primary over it in both modes, after the preset', () => {
+    const css = stylesheetOf(output);
+    // Ocean's own dark background, which only its file sets.
+    const presetDark = css.indexOf('.dark{--color-fd-background:#081021');
+    const overrides = [...css.matchAll(/([^{}]+)\{--color-fd-primary:#1d4ed8;--color-fd-primary-foreground:#fafafa/g)];
+    const selectors = overrides.flatMap((rule) => rule[1].split(',').map((selector) => selector.trim()));
+
+    expect(presetDark).to.not.equal(-1);
+    expect(selectors).to.include.members([':root:not(.dark)', '.dark']);
+    expect(overrides.every((rule) => (rule.index ?? -1) > presetDark)).to.be.true;
+    expect(css).to.contain('--default-font-family:"Inter"');
+  });
+
+  // The DOM itself, after hydration, is checked by hand in a browser; the page as served
+  // carries the forced mode for next-themes' inline script and no switch to leave it.
+  it('fixes the colour mode to dark and offers no way out of it', () => {
+    const page = read('index.html');
+
+    expect(page).to.contain('"class","theme","dark","dark"');
+    expect(page).to.not.contain('aria-label="Toggle Theme"');
+  });
+
+  it('builds a home page without an index page, with the call to action and a tab of its own', () => {
+    const page = read('index.html');
+
+    expect(page).to.contain('Browse the pets');
+    expect(page).to.contain('href="/api/pets/pets/listPets"');
+    expect(page).to.contain('href="https://status.example.com"');
+  });
+
+  it('leaves the deprecated and the internal operations out, pages and sidebar alike', () => {
+    expect(exists('api/pets/pets/listPets/index.html')).to.be.true;
+    expect(exists('api/pets/pets/createPet/index.html')).to.be.false;
+    expect(exists('api/pets/pets/auditPets/index.html')).to.be.false;
+
+    const everything = fs
+      .readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))
+      .map((name) => fs.readFileSync(path.join(output.toString(), '__tsr/staticServerFnCache', name), 'utf8'))
+      .join('\n');
+    expect(everything).to.contain('List pets');
+    expect(everything).to.not.contain('Create a pet');
+    expect(everything).to.not.contain('Audit the pets');
   });
 });

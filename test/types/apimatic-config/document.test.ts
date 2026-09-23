@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import {
+  APIMATIC_SCHEMA_URL,
   ApimaticConfigDocument,
   ConfigFinding,
   findingClause,
@@ -242,6 +243,23 @@ describe('ApimaticConfigDocument', () => {
       const document = parsedObject({ languages: 'csharp' });
 
       expect(document.with('languages', {}).findingsFor('languages')).to.deep.equal([]);
+    });
+  });
+
+  describe('referencingSchema', () => {
+    it('points at the published schema, first among the keys', () => {
+      const next = ApimaticConfigDocument.empty().referencingSchema().with('portal', {});
+
+      expect(next.serialize('  ', true)).to.equal(
+        `{\n  "$schema": "${APIMATIC_SCHEMA_URL}",\n  "schemaVersion": 1,\n  "portal": {}\n}\n`
+      );
+    });
+
+    it('replaces a reference the file already held, and moves it first', () => {
+      const next = parsedObject({ schemaVersion: 1, $schema: './old.schema.json' }).referencingSchema();
+
+      expect(JSON.parse(next.serialize('  ', false))).to.deep.equal({ $schema: APIMATIC_SCHEMA_URL, schemaVersion: 1 });
+      expect(Object.keys(JSON.parse(next.serialize('  ', false)))).to.deep.equal(['$schema', 'schemaVersion']);
     });
   });
 

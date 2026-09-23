@@ -1,0 +1,19 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": { "name": "Branded Pets" },
+    "brand": {
+      "colors": { "preset": "ocean", "primary": "#1d4ed8" },
+      "fonts": { "body": "inter", "mono": "system" },
+      "colorMode": "dark"
+    },
+    "navigation": {
+      "layout": "glass",
+      "links": [{ "label": "Status", "url": "https://status.example.com" }]
+    },
+    "home": { "cta": { "label": "Browse the pets", "url": "/api/pets/pets/listPets" } },
+    "api": { "showDeprecated": false }
+  },
+  "languages": { "typescript": {} }
+}

@@ -47,6 +47,11 @@ src/
   static/               served verbatim at the site root
 ```
 
+*Amended 2026-09-23:* the v1 shape below is superseded by the nested block of
+`.ai/plans/portal-config.md` (`site`, `brand`, `navigation`, `home`, `api`, `ai`,
+`advanced`), which also requires a top-level `languages` entry. The text below
+is kept as it was.
+
 The `portal` block, v1 shape:
 
 ```json
@@ -106,6 +111,14 @@ Shipped inside the npm package (add to `files`). Derived from the spike, which
 was itself based on the official `tanstack-start-openapi` and
 `tanstack-start-spa` Fumadocs examples. Kept as the spike has it (Geist fonts
 from Google Fonts at runtime, Fumadocs page actions) except where noted.
+
+*Amended 2026-09-23* (`.ai/plans/portal-config.md`, sections 4 and 6): the
+fixed `neutral.css` import and the Geist lines have left `app.css`. The preset,
+the fonts and the colour overrides are in a `src/styles/theme.css` the CLI
+generates, which `app.css` imports last, and the fonts load through a head
+link. The identity literal substituted into `portal.ts` is gone: `portal.ts`
+imports a CLI-written `portal.identity.json`, and `portal.config.json` holds
+only what the build set-up reads. The layout is chosen in `src/lib/layout.tsx`.
 
 - `vite.config.ts`: `fumadocsMdx()`, `tailwindcss()`, `react()`, and
   `tanstackStart({ spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true } }, pages: [...], prerender: { crawlLinks: false }, importProtection: { behavior: 'error' } })`.
@@ -276,7 +289,7 @@ Follow the five-layer conventions in `.ai/instructions.md` and the skills in
 - Large, densely connected APIs still yield large output folders (section 5:
   a Stripe-shaped spec approaches 1 GB at full size). The remaining lever is the
   second copy of each page's payload; see section 12.
-- Generated site is not self-contained: Geist fonts load from Google Fonts at runtime and Fumadocs' page actions link to ChatGPT/Claude/Cursor (decided to keep as-is for v1).
+- Generated site is not self-contained: Geist fonts load from Google Fonts at runtime and Fumadocs' page actions link to ChatGPT/Claude/Cursor (decided to keep as-is for v1). *Amended 2026-09-23:* the fonts are now a shortlist in `portal.brand.fonts`, each still from Google Fonts, and `system` for both makes no font request at all; `portal.ai.pageActions: false` removes the external links.
 - Verified on Windows only; macOS/Linux via the new CI matrix.
 - Try-it playground requires CORS on the customer's API (Fumadocs' proxy needs a server). Out of scope.
 - Fumadocs UI is mid-transition to `@fumadocs/base-ui`; fumadocs-openapi has had three majors in about a year; several single-maintainer and 0.x packages in the tree (`lucide-react`, `yuku-analyzer` with native binaries, `zbsearch`, `h3` RC). Mitigated by pinning and the e2e test.

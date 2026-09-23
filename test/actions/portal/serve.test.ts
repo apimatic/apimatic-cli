@@ -39,13 +39,8 @@ describe('PortalServeAction', () => {
   /** Stands in for the preview process dying, with what it printed on the way out. */
   let exit: (output: string) => void;
 
-  const execute = (source = FIXTURE, openInBrowser = false, onAfterServe?: () => void) =>
-    new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
-      source,
-      PORT,
-      openInBrowser,
-      onAfterServe
-    );
+  const execute = (source = FIXTURE, openInBrowser = false) =>
+    new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(source, PORT, openInBrowser);
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
@@ -161,16 +156,6 @@ describe('PortalServeAction', () => {
 
     await execute(FIXTURE, true);
     expect(openUrlInBrowser.calledOnceWith(SERVER_URL)).to.be.true;
-  });
-
-  it("runs the caller's hook once the preview is up", async () => {
-    interrupt();
-    const hook = sinon.spy();
-
-    await execute(FIXTURE, false, hook);
-
-    expect(hook.calledOnce).to.be.true;
-    expect(hook.calledAfter(prompts.portalServed)).to.be.true;
   });
 
   it('stops the preview when the user interrupts', async () => {

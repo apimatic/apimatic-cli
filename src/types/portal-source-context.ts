@@ -222,10 +222,12 @@ export class PortalSourceContext {
   }
 
   /**
-   * Writes the smallest source tree `portal generate` and `portal serve` accept, with a
-   * `portal` block described from the specification itself. Every fault is reported rather
-   * than thrown, including the ones the file service raises: the caller is a wizard that has
-   * asked its questions already, and it reports what went wrong instead of crashing.
+   * Writes the source tree of a new portal, with a `portal` block described from the
+   * specification itself. It holds everything `portal generate` and `portal serve` need but
+   * the `languages` block, which names the project's SDK languages and which the user adds
+   * by hand until the wizard asks for them. Every fault is reported rather than thrown,
+   * including the ones the file service raises: the caller is a wizard that has asked its
+   * questions already, and it reports what went wrong instead of crashing.
    */
   public async scaffold(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
     try {
@@ -241,7 +243,11 @@ export class PortalSourceContext {
     const site = await this.suggestedSite(specPath);
     const config = PortalConfig.scaffolded(site);
     // The directory is empty when quickstart runs this, so the merge always creates the file.
-    const written = await this.configContext.merge(['portal'], (document) => document.with('portal', config.toJSON()));
+    // Every default is spelled out, so the block shows what can be set, and the schema lets an
+    // editor complete and check the rest.
+    const written = await this.configContext.merge(['portal'], (document) =>
+      document.referencingSchema().with('portal', config.toJSON())
+    );
     if (written.isErr()) {
       return err({ kind: written.error === 'unreadable' ? 'configUnreadable' : 'configUnwritable' });
     }

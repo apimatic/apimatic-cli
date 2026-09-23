@@ -1,8 +1,12 @@
 # Plan: the `portal` block v2 — site, brand, tabs and API options
 
-Status: rewritten 2026-09-23 for `src/apimatic.json`, not started. Replaces the
-2026-09-21 draft written against `portal.json`; section 14 records what changed
-and why, so the older reasoning is not rediscovered.
+Status: rewritten 2026-09-23 for `src/apimatic.json`, and implemented the same
+day on `saeedjamshaid/portal-config`, one commit per step of section 11. The
+sample repository's change is committed on its own branch there and not yet
+pushed. Replaces the 2026-09-21 draft written against `portal.json`; section 14
+records what changed and why, so the older reasoning is not rediscovered.
+Findings made while implementing are marked *as built* or *verified* in the
+section they concern.
 
 Builds on `.ai/plans/fumadocs-portal.md` (PR #343), `.ai/plans/portal-navigation.md`
 (`nav.json`, PR #346) and `.ai/plans/apimatic-config.md` (`apimatic.json`,
@@ -673,6 +677,20 @@ and the affected tests green, each stopped at for review:
 7. **Scaffold, docs, e2e.** Populated scaffold with `$schema`, README, the e2e
    cases, the plan amendments in section 13, and the sample repository's v2
    branch as a separate PR in its own repo.
+
+*As built.* Only the scaffold writes `$schema`, through
+`ApimaticConfigDocument.referencingSchema()`. `empty()` is unchanged, so the
+files the plugin and publishing commands create do not carry it, which keeps
+this PR to the portal. `PortalServeAction.execute` loses its `onAfterServe`
+hook, which only quickstart used; the language-step PR brings it back with the
+serve call. The e2e cases share one extra build: a `branded` fixture that sets
+glass, forced dark, ocean with a primary, fonts, a header link and a CTA, and
+hides a deprecated and an internal operation. It has no content directory, so it
+also covers the fallback home page and its Home tab. The sample repository's
+`v2` change is branch `saeedjamshaid/portal-config` in
+`sample-docs-as-code-portal`: `portal.json` → `apimatic.json`, `meta.json` →
+`nav.json`, a Java `languages` entry, and Node 24 in its workflow. It is
+verified to build 22 pages with this branch's CLI.
 
 ## 12. Risks and things to verify during implementation
 

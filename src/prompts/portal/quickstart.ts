@@ -173,12 +173,35 @@ export class PortalQuickstartPrompts {
     );
   }
 
-  public nextSteps(): void {
-    const message =
-      `Edit ${f.var('src/apimatic.json')} to change the title, add a description or point at a logo.\n` +
-      `Add Markdown pages under ${f.var('src/content')} and more OpenAPI documents under ${f.var('src/spec')}.\n` +
-      `Run ${f.cmdAlt('apimatic', 'portal', 'generate')} to produce static files you can host.\n\n` +
-      `${f.link(referenceDocumentationUrl)}`;
+  /**
+   * The wizard writes no `languages` block yet, and a portal is not built without one, so the
+   * first step is the entry to add. It is the project's one list of SDK languages, which the
+   * plugin commands read too, hence the line on naming only what is shipped.
+   */
+  public nextSteps(projectDirectory: DirectoryPath): void {
+    const message = [
+      `1. Name the SDK languages your API ships in ${f.var('src/apimatic.json')}, beside the ${f.var(
+        'portal'
+      )} block, for example:`,
+      '',
+      `     "languages": { "typescript": {} }`,
+      '',
+      `   This is the project's one list of SDK languages: the plugin commands read it too, and ` +
+        `${f.cmdAlt('apimatic', 'sdk', 'publish')} adds to it, so name only the languages you ship.`,
+      '',
+      `2. Preview the portal with ${f.cmdAlt('apimatic', 'portal', 'serve')} ${f.flag(
+        'input',
+        projectDirectory.toString()
+      )}. It reloads as you edit.`,
+      '',
+      `Change the name, colours, fonts and layout in the ${f.var('portal')} block; your editor completes ` +
+        `and checks it. Set ${f.var('portal.site.url')} to the address you will host the portal at, for ` +
+        `canonical links and a sitemap. Add Markdown pages under ${f.var('src/content')} and more OpenAPI ` +
+        `documents under ${f.var('src/spec')}, and run ${f.cmdAlt('apimatic', 'portal', 'generate')} to ` +
+        `produce static files you can host.`,
+      '',
+      f.link(referenceDocumentationUrl)
+    ].join('\n');
     noteWrapped(message, 'Next Steps');
   }
 

@@ -162,6 +162,16 @@ export class ApimaticConfigDocument {
   }
 
   /**
+   * The document pointing editors at the schema of the file, which gives them completions and
+   * checks as the user types. First among the keys, where a reader looks for it.
+   */
+  public referencingSchema(): ApimaticConfigDocument {
+    const rest = { ...this.root };
+    delete rest.$schema;
+    return ApimaticConfigDocument.of({ $schema: APIMATIC_SCHEMA_URL, ...rest });
+  }
+
+  /**
    * The document with one block replaced. A block the file already holds keeps its place among
    * the other keys; a new one goes after the last.
    */

@@ -26,15 +26,22 @@ $ apimatic quickstart
 Documentation portals are now built on your machine from a `src/` directory, and
 `APIMATIC-BUILD.json` no longer configures them:
 
-- Describe the portal in the `portal` block of `src/apimatic.json` (`title`, `description`,
-  `logo`, `siteUrl`). Running `apimatic quickstart` scaffolds one. The same file carries the
-  context plugin's identity in `plugin` and the SDKs you publish in `languages`, which
-  `plugin generate` and `sdk publish` write; `src/plugin-config.json` is no longer read, so run
-  those two commands again after upgrading and delete the old file.
+- Describe the portal in the `portal` block of `src/apimatic.json`: `site` (its name, address
+  and description), `brand` (logo, favicon, colours, fonts and colour mode), `navigation`
+  (layout and header links), `home`, `api`, `ai` and `advanced`. Running `apimatic quickstart`
+  scaffolds the block with every default spelled out, and the file's `$schema` lets your editor
+  complete and check it.
+- A portal also needs the project's SDK languages, at least one, in the same file's
+  `languages` block, for example `"languages": { "typescript": {} }`. `sdk publish` adds to it,
+  and the context plugin reads it too, so name only the languages you ship. The same file
+  carries the plugin's identity in `plugin`; `src/plugin-config.json` is no longer read, so run
+  `plugin generate` and `sdk publish` again after upgrading and delete the old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
-  `title` there names the folder it sits in.
+  `title` there names the folder it sits in. The top level of the portal is shown as tabs:
+  Home, Guides, the API reference, and any folder directly under `src/content/` whose own
+  `nav.json` sets `"root": true`.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
@@ -353,9 +360,9 @@ DESCRIPTION
   Preview your API Documentation Portal with live reload.
 
   Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown
-  pages in 'src/content' or reorder them in a 'nav.json'.
+  pages in 'src/content', reorder them in a 'nav.json', or change the 'portal' block of 'apimatic.json'.
 
-  Adding or removing a page, editing 'apimatic.json', or changing which documents are in 'src/spec', needs the preview
+  Adding or removing a page, changing 'portal.api', or changing which documents are in 'src/spec', needs the preview
   restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.

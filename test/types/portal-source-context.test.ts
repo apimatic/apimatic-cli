@@ -1,10 +1,12 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import Ajv from 'ajv';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { parse as parseYaml } from 'yaml';
 import { FileService } from '../../src/infrastructure/file-service';
+import { APIMATIC_SCHEMA_URL } from '../../src/types/apimatic-config/document';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
@@ -890,7 +892,10 @@ describe('PortalSourceContext', () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
 
       const written = JSON.parse(read('apimatic.json'));
-      expect(Object.keys(written)).to.deep.equal(['schemaVersion', 'portal']);
+      // The schema first, where an editor looks for it, and no `languages` block: nothing in
+      // the wizard asks for the project's languages yet.
+      expect(Object.keys(written)).to.deep.equal(['$schema', 'schemaVersion', 'portal']);
+      expect(written.$schema).to.equal(APIMATIC_SCHEMA_URL);
       expect(written.schemaVersion).to.equal(1);
       expect(written.portal.site).to.deep.equal({ name: 'Petstore', description: 'All the pets.' });
       expect(Object.keys(written.portal)).to.deep.equal([
@@ -903,6 +908,29 @@ describe('PortalSourceContext', () => {
         'advanced'
       ]);
       expect(read('apimatic.json').endsWith('\n')).to.be.true;
+    });
+
+    // Defaults are applied twice, on purpose: written into a new block, and filled in for a
+    // block written by hand. The two have to make the same portal.
+    it('writes a block that resolves to the portal an empty block makes', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+      addLanguages();
+      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+
+      write('project/src/apimatic.json', JSON.stringify({ portal: {}, languages: LANGUAGES }));
+      const empty = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+
+      expect(scaffolded.toJSON()).to.deep.equal(empty.toJSON());
+      expect(scaffolded.identity()).to.deep.equal(empty.identity());
+    });
+
+    // Every block the wizard writes has to pass the schema it points editors at.
+    it('writes a file the schema it names accepts', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+      const schema = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'apimatic.schema.json'), 'utf8'));
+      const validate = new Ajv({ strict: true, allErrors: true }).compile(schema);
+
+      expect(validate(JSON.parse(read('apimatic.json'))), JSON.stringify(validate.errors)).to.be.true;
     });
 
     it('orders the sidebar with the welcome page first', async () => {
