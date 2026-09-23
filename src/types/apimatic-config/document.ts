@@ -5,6 +5,9 @@ import { SemVersion } from '../publish/version.js';
 
 export const APIMATIC_CONFIG_FILE_NAME = 'apimatic.json';
 
+/** Where editors find the file's schema: the copy the published package carries, for this major. */
+export const APIMATIC_SCHEMA_URL = 'https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json';
+
 /** The one format this CLI reads. A file naming another is refused rather than misread. */
 export const SCHEMA_VERSION = 1;
 
@@ -133,9 +136,7 @@ export class ApimaticConfigDocument {
         return [{ block: 'languages', field: `languages.${language}`, problem: NOT_A_JSON_OBJECT }];
       }
       if (entry.publishing !== undefined && !isJsonObject(entry.publishing)) {
-        return [
-          { block: 'languages', field: `languages.${language}.publishing`, problem: NOT_A_JSON_OBJECT }
-        ];
+        return [{ block: 'languages', field: `languages.${language}.publishing`, problem: NOT_A_JSON_OBJECT }];
       }
       return [];
     });

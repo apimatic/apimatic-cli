@@ -1,0 +1,553 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "title": "apimatic.json",
+  "description": "The APIMatic CLI's project file, src/apimatic.json: the documentation portal, the context plugin's identity, and the project's SDK languages.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Where editors find this schema. Ignored by the CLI."
+    },
+    "schemaVersion": {
+      "const": 1,
+      "description": "The format of this file. The CLI refuses a version it does not read."
+    },
+    "portal": {
+      "$ref": "#/definitions/portal"
+    },
+    "plugin": {
+      "$ref": "#/definitions/plugin"
+    },
+    "languages": {
+      "$ref": "#/definitions/languages"
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "nonBlank": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "staticPath": {
+      "type": "string",
+      "description": "A path relative to 'src' inside the 'static' directory, for example 'static/images/logo.png'.",
+      "pattern": "^(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|\\s*$))\\s*(?:\\.[\\\\/])?static[\\\\/].*\\S\\s*$"
+    },
+    "color": {
+      "type": "string",
+      "description": "#rgb, #rrggbb, #rrggbbaa, rgb() or hsl(), for example '#1d4ed8'.",
+      "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([^()]*\\))\\s*$"
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "url"],
+      "properties": {
+        "label": {
+          "$ref": "#/definitions/nonBlank"
+        },
+        "url": {
+          "type": "string",
+          "description": "A page of the portal starting with '/', or an address starting with 'https://' or 'http://'.",
+          "pattern": "^\\s*(?:/(?!/).*|[hH][tT][tT][pP][sS]?://[^\\s/?#]+.*)$"
+        }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "description": "Overrides of the preset's colour tokens, by their full custom-property name. Values pass through as written.",
+      "propertyNames": {
+        "enum": [
+          "--color-fd-background",
+          "--color-fd-foreground",
+          "--color-fd-muted",
+          "--color-fd-muted-foreground",
+          "--color-fd-popover",
+          "--color-fd-popover-foreground",
+          "--color-fd-card",
+          "--color-fd-card-foreground",
+          "--color-fd-border",
+          "--color-fd-primary",
+          "--color-fd-primary-foreground",
+          "--color-fd-secondary",
+          "--color-fd-secondary-foreground",
+          "--color-fd-accent",
+          "--color-fd-accent-foreground",
+          "--color-fd-ring",
+          "--color-fd-overlay"
+        ]
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/nonBlank"
+      }
+    },
+    "portal": {
+      "type": "object",
+      "description": "The documentation portal that 'apimatic portal generate' and 'apimatic portal serve' build.",
+      "additionalProperties": false,
+      "properties": {
+        "site": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/nonBlank",
+              "description": "The portal's name. Defaults to the title of the only specification; required when 'spec' holds more than one."
+            },
+            "url": {
+              "type": "string",
+              "description": "The address the portal is hosted at, without a path, for example 'https://docs.example.com'.",
+              "pattern": "^\\s*[hH][tT][tT][pP][sS]?://[^\\s/?#]+/?\\s*$"
+            },
+            "description": {
+              "type": "string",
+              "description": "Defaults to the first paragraph of the only specification's description. Blank is none."
+            }
+          }
+        },
+        "brand": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "logo": {
+              "description": "One image for both colour modes, or one per mode.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/staticPath"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["light", "dark"],
+                  "properties": {
+                    "light": {
+                      "$ref": "#/definitions/staticPath"
+                    },
+                    "dark": {
+                      "$ref": "#/definitions/staticPath"
+                    }
+                  }
+                }
+              ]
+            },
+            "favicon": {
+              "$ref": "#/definitions/staticPath",
+              "description": "Defaults to the light logo."
+            },
+            "colors": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "preset": {
+                  "enum": [
+                    "neutral",
+                    "black",
+                    "vitepress",
+                    "dusk",
+                    "catppuccin",
+                    "ocean",
+                    "purple",
+                    "solar",
+                    "emerald",
+                    "ruby",
+                    "aspen"
+                  ],
+                  "default": "neutral"
+                },
+                "primary": {
+                  "description": "Laid over the preset. One colour for both modes, or one per mode.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/color"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["light", "dark"],
+                      "properties": {
+                        "light": {
+                          "$ref": "#/definitions/color"
+                        },
+                        "dark": {
+                          "$ref": "#/definitions/color"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "fonts": {
+              "type": "object",
+              "description": "Families from a fixed shortlist, loaded from Google Fonts; 'system' loads nothing and uses the reader's own.",
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "enum": [
+                    "geist",
+                    "inter",
+                    "ibm-plex-sans",
+                    "roboto",
+                    "open-sans",
+                    "source-sans-3",
+                    "manrope",
+                    "dm-sans",
+                    "system"
+                  ],
+                  "default": "geist"
+                },
+                "mono": {
+                  "enum": ["geist-mono", "jetbrains-mono", "ibm-plex-mono", "fira-code", "source-code-pro", "system"],
+                  "default": "geist-mono"
+                }
+              }
+            },
+            "colorMode": {
+              "enum": ["light", "dark", "both"],
+              "default": "both",
+              "description": "A forced mode hides the switch."
+            }
+          }
+        },
+        "navigation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "enum": ["docs", "notebook", "notebook-navbar", "glass"],
+              "default": "notebook-navbar",
+              "description": "The page layout. 'notebook-navbar' puts the tabs in the header; the others show them at the top of the sidebar."
+            },
+            "links": {
+              "type": "array",
+              "description": "Links in the header and the mobile menu.",
+              "items": {
+                "$ref": "#/definitions/link"
+              }
+            }
+          }
+        },
+        "home": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cta": {
+              "$ref": "#/definitions/link",
+              "description": "A button under the home page's title."
+            }
+          }
+        },
+        "api": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groupBy": {
+              "enum": ["tag", "route", "none"],
+              "default": "tag",
+              "description": "How operations are grouped in the sidebar, which also decides their URLs."
+            },
+            "showDeprecated": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether deprecated operations are documented, struck through in the sidebar."
+            },
+            "showInternal": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether operations marked 'x-internal: true' are documented."
+            }
+          }
+        },
+        "ai": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pageActions": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether each page offers to open itself in an external AI assistant."
+            }
+          }
+        },
+        "advanced": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokens": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "light": {
+                  "$ref": "#/definitions/tokens"
+                },
+                "dark": {
+                  "$ref": "#/definitions/tokens"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "description": "The context plugin's identity, which 'apimatic plugin generate' records.",
+      "additionalProperties": true,
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Lower-case alphanumeric words separated by single dashes, for example 'acme-payments'.",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "pluginName": {
+          "type": "string"
+        },
+        "pluginVersion": {
+          "$ref": "#/definitions/semver",
+          "description": "major.minor.patch, for example '0.1.0'."
+        },
+        "pluginKey": {
+          "type": "string"
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
+          }
+        },
+        "license": {
+          "type": "string"
+        },
+        "homepage": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        }
+      }
+    },
+    "languages": {
+      "type": "object",
+      "description": "The project's SDK languages, which 'apimatic sdk publish' adds to. An entry without 'publishing' is a language that is wanted but not yet published.",
+      "propertyNames": {
+        "enum": ["csharp", "java", "php", "python", "ruby", "typescript", "go"]
+      },
+      "properties": {
+        "csharp": {
+          "$ref": "#/definitions/csharpEntry"
+        },
+        "java": {
+          "$ref": "#/definitions/javaEntry"
+        },
+        "php": {
+          "$ref": "#/definitions/phpEntry"
+        },
+        "python": {
+          "$ref": "#/definitions/namedEntry"
+        },
+        "ruby": {
+          "$ref": "#/definitions/namedEntry"
+        },
+        "typescript": {
+          "$ref": "#/definitions/namedEntry"
+        },
+        "go": {
+          "$ref": "#/definitions/goEntry"
+        }
+      }
+    },
+    "languageEntry": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "publishing": {
+          "type": "object",
+          "description": "Where the SDK is published, and which generator produced it.",
+          "additionalProperties": true,
+          "properties": {
+            "source": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "repositoryUrl": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": "string"
+                }
+              }
+            },
+            "package": {
+              "type": "object"
+            },
+            "codegenVersion": {
+              "enum": ["v3", "v4"]
+            }
+          }
+        }
+      }
+    },
+    "csharpEntry": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/languageEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "publishing": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "packageId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "$ref": "#/definitions/semver"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "javaEntry": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/languageEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "publishing": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "groupId": {
+                      "type": "string"
+                    },
+                    "artifactId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "$ref": "#/definitions/semver"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "phpEntry": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/languageEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "publishing": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "vendorName": {
+                      "type": "string"
+                    },
+                    "projectName": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "$ref": "#/definitions/semver"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "namedEntry": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/languageEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "publishing": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "$ref": "#/definitions/semver"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "goEntry": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/languageEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "publishing": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "packageName": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "$ref": "#/definitions/semver"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
