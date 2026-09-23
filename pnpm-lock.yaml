@@ -120,6 +120,9 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
+      semver:
+        specifier: ^7.7.0
+        version: 7.8.0
       shiki:
         specifier: 4.4.3
         version: 4.4.3
@@ -196,6 +199,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       '@types/sinon':
         specifier: ^17.0.4
         version: 17.0.4
@@ -2553,6 +2559,9 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
+
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
   '@types/sinon@17.0.4':
     resolution: {integrity: sha512-RHnIrhfPO3+tJT0s7cFaXGZvsL4bbR3/k7z3P312qMS4JaS2Tk+KiwiLx1S0rQ56ERj00u1/BtdyVd0FY+Pdew==}
@@ -5967,11 +5976,6 @@ packages:
     resolution: {integrity: sha512-hunMQrEy1T6Jr2uEVjrAIqjwWcQTgOAcIM52C8MY1EZSD3DDNft04XzvYKPqjED65bNVVko0YI38nYeEHCX3yw==}
     engines: {node: '>=12'}
 
-  semver@7.7.4:
-    resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.0:
     resolution: {integrity: sha512-AcM7dV/5ul4EekoQ29Agm5vri8JNqRyj39o0qpX6vDF2GZrtutZl5RwgD1XnZjiTAfncsJhMI48QQH3sN87YNA==}
     engines: {node: '>=10'}
@@ -7461,7 +7465,7 @@ snapshots:
       debug: 4.4.3(supports-color@8.1.1)
       gensync: 1.0.0-beta.2
       json5: 2.2.3
-      semver: 7.7.4
+      semver: 7.8.0
     transitivePeerDependencies:
       - supports-color
 
@@ -7479,7 +7483,7 @@ snapshots:
       '@babel/helper-validator-option': 7.27.1
       browserslist: 4.24.4
       lru-cache: 5.1.1
-      semver: 7.7.4
+      semver: 7.8.0
 
   '@babel/helper-globals@7.28.0': {}
 
@@ -7616,7 +7620,7 @@ snapshots:
   '@commitlint/is-ignored@20.5.0':
     dependencies:
       '@commitlint/types': 20.5.0
-      semver: 7.7.4
+      semver: 7.8.0
 
   '@commitlint/lint@20.5.3':
     dependencies:
@@ -7690,7 +7694,7 @@ snapshots:
     dependencies:
       '@simple-libs/child-process-utils': 1.0.2
       '@simple-libs/stream-utils': 1.2.0
-      semver: 7.7.4
+      semver: 7.8.0
     optionalDependencies:
       conventional-commits-filter: 5.0.0
       conventional-commits-parser: 6.4.0
@@ -8229,7 +8233,7 @@ snapshots:
       is-wsl: 2.2.0
       lilconfig: 3.1.3
       minimatch: 10.2.5
-      semver: 7.7.4
+      semver: 7.8.0
       string-width: 4.2.3
       supports-color: 8.1.1
       tinyglobby: 0.2.16
@@ -9643,6 +9647,8 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  '@types/semver@7.8.0': {}
+
   '@types/sinon@17.0.4':
     dependencies:
       '@types/sinonjs__fake-timers': 15.0.1
@@ -10772,7 +10778,7 @@ snapshots:
       object.fromentries: 2.0.8
       object.groupby: 1.0.3
       object.values: 1.2.1
-      semver: 7.7.4
+      semver: 7.8.0
       string.prototype.trimend: 1.0.9
       tsconfig-paths: 3.15.0
     optionalDependencies:
@@ -11821,7 +11827,7 @@ snapshots:
       '@babel/parser': 7.29.3
       '@istanbuljs/schema': 0.1.6
       istanbul-lib-coverage: 3.2.2
-      semver: 7.7.4
+      semver: 7.8.0
     transitivePeerDependencies:
       - supports-color
 
@@ -12145,11 +12151,11 @@ snapshots:
 
   make-dir@3.1.0:
     dependencies:
-      semver: 7.7.4
+      semver: 7.8.0
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.7.4
+      semver: 7.8.0
 
   markdown-extensions@2.0.0: {}
 
@@ -12736,7 +12742,7 @@ snapshots:
       array.prototype.flatmap: 1.3.3
       es-errors: 1.3.0
       object.entries: 1.1.9
-      semver: 7.7.4
+      semver: 7.8.0
 
   node-preload@0.2.1:
     dependencies:
@@ -12747,7 +12753,7 @@ snapshots:
   normalize-package-data@6.0.2:
     dependencies:
       hosted-git-info: 7.0.2
-      semver: 7.7.4
+      semver: 7.8.0
       validate-npm-package-license: 3.0.4
 
   normalize-package-data@8.0.0:
@@ -12875,7 +12881,7 @@ snapshots:
       got: 13.0.0
       lodash: 4.18.1
       normalize-package-data: 6.0.2
-      semver: 7.7.4
+      semver: 7.8.0
       sort-package-json: 2.15.1
       tiny-jsonc: 1.0.2
       validate-npm-package-name: 5.0.1
@@ -13506,8 +13512,6 @@ snapshots:
 
   semver-regex@4.0.5: {}
 
-  semver@7.7.4: {}
-
   semver@7.8.0: {}
 
   sentence-case@3.0.4:
@@ -13668,7 +13672,7 @@ snapshots:
       get-stdin: 9.0.0
       git-hooks-list: 3.2.0
       is-plain-obj: 4.1.0
-      semver: 7.7.4
+      semver: 7.8.0
       sort-object-keys: 1.1.3
       tinyglobby: 0.2.16
 

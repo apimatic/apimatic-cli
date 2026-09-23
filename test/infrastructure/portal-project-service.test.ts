@@ -2,7 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
+import semver from 'semver';
+import { PortalProjectService, TEMPLATE_DEPENDENCIES } from '../../src/infrastructure/portal-project-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
@@ -46,6 +47,21 @@ describe('PortalProjectService', () => {
 
   it('reports no runtime problem with the dependencies installed', () => {
     expect(service.runtimeProblem()).to.be.null;
+  });
+
+  // The init hook is the only Node version gate, so a template dependency that raises its own
+  // floor above the CLI's must raise `engines.node` with it rather than crash inside Vite.
+  it('supports only Node versions every template dependency supports', () => {
+    const readManifest = (directory: string) =>
+      JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8'));
+    const supported = readManifest('.').engines.node;
+
+    for (const dependency of TEMPLATE_DEPENDENCIES) {
+      const required = readManifest(path.join('node_modules', dependency)).engines?.node;
+      if (required !== undefined) {
+        expect(semver.subset(supported, required), `${dependency} needs Node ${required}`).to.be.true;
+      }
+    }
   });
 
   describe('prepare', () => {
