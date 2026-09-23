@@ -1,6 +1,6 @@
-# Code samples in the portal — the `/api/sdk-artifacts` contract
+# Code samples in the portal — the `/api/portal-artifacts` contract
 
-**Status:** design settled, nothing implemented.
+**Status:** codegen-v2 endpoint implemented except `GenerateCodeSamples`; CLI and apimatic-io not started.
 **Purpose:** the single place the CLI, apimatic-io and codegen-v2 agree on what crosses the
 wire, so the Azure Function can be written from it. Every claim under
 [Verified facts](#8-verified-facts) carries a `file:line` reference and can be re-checked.
@@ -12,18 +12,17 @@ wire, so the Azure Function can be written from it. Every claim under
 **In scope.**
 
 - The code-sample catalog: what codegen-v2 renders, how it is keyed, how it is packaged.
-- `/api/sdk-artifacts`: the async endpoint that produces it, and the apimatic-io route
-  that fronts it.
+- `/api/portal-artifacts`: the async endpoint that produces the artifacts portal generation
+  needs, and the apimatic-io route that fronts it.
 - The portal: how the CLI merges the catalog into the spec and how fumadocs renders it.
 
 **Out of scope — named so nobody reads silence as omission.**
 
 | Concern | Owner / when |
 |---|---|
-| `apimatic.json` itself — the file, its parser, the migration from `src/portal.json` | Another developer, later. This doc treats it as a fixed input. |
+| `apimatic.json` itself — the file, its parser, the migration from `src/portal.json` | Another developer. codegen-v2 reads it through the shared `ApimaticConfig` model and validator from `GA-dev-branch`. |
 | Bundling the SDK inside the plugin; `languages.<lang>: {}` becoming valid | codegen-v2, separately (apimatic-io#2216 M1) |
 | The `quickstart` rewrite and the v3 retirement | apimatic-io#2216 M3 |
-| Subscription / entitlement enforcement on the new endpoint | Deliberately a **second PR** — see [D32](#d32) |
 | `docs/<language>.json` (generated MDX pages) in the artifact zip | Future — the layout reserves room for it, see [§4.4](#44-response-the-artifact-zip) |
 | `plugin/plugin.zip` in the artifact zip | Future — same |
 
@@ -35,21 +34,23 @@ wire, so the Azure Function can be written from it. Every claim under
 apimatic {quickstart | portal generate | portal serve}
   │
   │  zip src/  ──────────────────────────────────▶  apimatic-io
-  │                                                 POST api/sdk-artifacts
+  │                                                 POST api/portal-artifacts
   │                                                   │  X-APIMatic-UserId / TenantId
+  │                                                   │  X-APIMatic-SubscriptionFeatures
   │                                                   ▼
   │                                                 codegen-v2
-  │                                                 POST api/sdk-artifacts
-  │                                                   │
+  │                                                 POST api/portal-artifacts
+  │                                                   │  portal entitlement ──▶ 403
+  │                                                   ├─ ReadPortalArtifactsRequest
+  │                                                   ├─ language + plugin entitlement
   │                                                   ├─ ValidateSpecFile
-  │                                                   ├─ ValidateApimaticConfig
-  │                                                   ├─ fan out per language ──┐
-  │                                                   │    GenerateSdk          │
-  │                                                   │    GenerateCodeSamples  │
-  │                                                   └─ AggregateSdkArtifacts ─┘
+  │                                                   ├─ fan out per language ─────┐
+  │                                                   │    GenerateSdk             │
+  │                                                   │    GenerateCodeSamples     │
+  │                                                   └─ AggregatePortalArtifacts ─┘
   │                                                        one zip
   │  poll ◀────── status ──────────────────────────────────┤
-  │  download ◀── artifacts.zip ────────────────────────────┘
+  │  download ◀── portal-artifacts.zip ────────────────────┘
   │
   ├─ merge code-samples/<lang>.json into a COPY of the spec tree as x-codeSamples
   ├─ place sdk/<lang>.zip under the portal output's static assets
@@ -72,7 +73,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D2 | **Samples-only payload; the CLI merges.** The server never returns a rewritten spec. The CLI already parses every spec file, and a Stripe-sized document is tens of MB to upload and download again for a few hundred KB of samples. |
 | D3 | **The CLI uploads a build zip**, not a bare spec. D31 names the directory. |
 | D5 | **Ship the samples codegen-v2 renders**, value-bearing where the stack supports it. |
-| D6 | **No subscription language gate for now** — all of v4 is beta. Add the check when anything reaches stable. |
+| D6 | **Every `languages` key must be an allowed language on the subscription**, or the run fails with `SubscriptionError`. |
 | D8 | **Raw axios in a dedicated service**, not a new `@apimatic/sdk` controller, until a v4 TypeScript SDK of apimatic-io exists. The precedent is already in the file we extend. |
 
 ### Wire format
@@ -89,9 +90,9 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D19 | **Tab order: curl first, then languages in configured order, examples in catalog order** — and all tabs of one language stay adjacent: `curl, TypeScript · minimal, TypeScript · full, C# · minimal, …`. |
 | D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
-| D22 | **Reuse codegen-v2's status vocabulary verbatim.** The CLI's poller then needs no change. |
+| D22 | **Reuse codegen-v2's status vocabulary verbatim**, `SubscriptionError` included. The CLI's poller already handles all of it. |
 | D24 | **Webhooks stay curl-only.** The wire format reserves the space now — see D33. |
-| D26 | **The endpoint is `/api/sdk-artifacts`**, an all-or-nothing async orchestrator in codegen-v2 that takes a build directory and returns one zip of artifacts. The thing that crosses the wire is a **code-sample catalog**. |
+| D26 | **The endpoint is `/api/portal-artifacts`**, existing only to produce what portal generation needs — an all-or-nothing async orchestrator in codegen-v2 that takes a build directory and returns one zip of artifacts. The thing that crosses the wire is a **code-sample catalog**. |
 
 ### Build input, artifacts and budgets
 
@@ -104,7 +105,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D29 | **`apimatic.json` lives inside `src/`.** Today's `src/portal.json` becomes the `portal` property inside it. |
 | D30 | **Absent or empty `languages` is a validation error.** Curl-only portals may be allowed later; they are not allowed now. |
 | D31 | **`src/` *is* the build directory**, zipped exactly the way the SDK and plugin flows zip theirs. codegen-v2 learns to read `apimatic.json`. |
-| D32 | <a id="d32"></a>**Entitlement keys off field presence**: a `plugin` property means the context-plugin check applies, a `portal` property means the docs-as-code check applies. `apimatic.json` always exists; `plugin` is optional. **Ship in two PRs** — the endpoint without any subscription check first, so dev-environment iteration is not blocked, then the checks. |
+| D32 | <a id="d32"></a>**codegen-v2 enforces entitlement** from the `X-APIMatic-SubscriptionFeatures` header, in order: portal generation must be allowed, or the POST returns **403** before any work; every `languages` key must be allowed ([D6](#scope-and-transport)); a `plugin` property requires the context plugin. A failure after the POST ends the run with `SubscriptionError`. `plugin` is optional. |
 | D33 | **Artifact zip layout as in [§4.4](#44-response-the-artifact-zip)**, with `plugin/` and `docs/` reserved for later. |
 | D34 | **Func budget 25 min, CLI budget 30 min, poll interval 5s.** The client must always outlive the server, or it reports failures the server never had. |
 | D35 | <a id="d35"></a>**Artifacts are never written back into `src/`.** Everything the CLI unpacks lands in the built portal's output directory — `static/` inside it for the SDK zips — which `portal generate` already forces to sit outside the source tree. |
@@ -122,12 +123,12 @@ the wire, not about implementation.
 `api/` prefix in the attribute; the Functions host adds it.
 
 ```
-POST api/sdk-artifacts                 -> 202 { id }        multipart/form-data, file part `file`
-GET  api/sdk-artifacts/{id}/status     -> 200 { status, errors? }
-GET  api/sdk-artifacts/{id}/download   -> 200 application/zip
+POST api/portal-artifacts                 -> 202 { id }  |  403  |  400 bad subscription header
+GET  api/portal-artifacts/{id}/status     -> 200 { status, errors? }
+GET  api/portal-artifacts/{id}/download   -> 200 application/zip
 ```
 
-No query parameters. The language request travels inside the zip ([§4.2](#42-request-the-build-zip)).
+The POST is multipart/form-data with file part `file`. No query parameters. The language request travels inside the zip ([§4.2](#42-request-the-build-zip)).
 Return **202** on accept, matching the plugin trio; the SDK trio's 200 is the odd one out.
 
 **apimatic-io** — a fronting controller shaped like `ContextPluginApiController`, because
@@ -135,9 +136,9 @@ the CLI cannot call codegen-v2 directly: its triggers are `AuthorizationLevel.An
 and trust `X-APIMatic-*` headers that only apimatic-io may set.
 
 ```
-POST api/sdk-artifacts                 -> 202 { id, links: { status, download } }
-GET  api/sdk-artifacts/{id}/status     -> 200 { status, errors? }  |  302 -> download
-GET  api/sdk-artifacts/{id}/download   -> 200 application/zip
+POST api/portal-artifacts                 -> 202 { id, links: { status, download } }  |  403
+GET  api/portal-artifacts/{id}/status     -> 200 { status, errors? }  |  302 -> download
+GET  api/portal-artifacts/{id}/download   -> 200 application/zip
 ```
 
 Three details are load-bearing and all three already exist:
@@ -174,24 +175,26 @@ the first.
 ```jsonc
 {
   "languages": {                                     // >= 1 key, each from the Language enum
-    "typescript": { "publishing": { "…": "…" } },    // value = per-language settings, unread here
-    "csharp":     { "…": "…" }
+    "typescript": { "publishing": { "source": { "…": "…" } } },   // `publishing.source` required
+    "csharp":     { "publishing": { "source": { "…": "…" } } }
   },
-  "portal":  { /* today's portal.json */ },          // presence => docs-as-code entitlement applies
-  "plugin":  { /* today's plugin-config.json */ }    // optional; presence => generate a plugin
+  "portal":  { /* today's portal.json */ },          // unread here
+  "plugin":  { /* today's plugin-config.json */ }    // optional; presence => context-plugin entitlement
 }
 ```
 
-`languages` **keys** are the whole of the language request, in source order — which is the
-configured order [D19](#wire-format) sorts tabs by. `ValidateApimaticConfig` rejects an
-absent or empty object, and rejects a key outside the enum by naming the valid set.
+`languages` **keys** are the whole of the language request. `ReadPortalArtifactsRequest`
+validates the file with the same `ApimaticConfigValidator` the plugin flow uses: only
+`csharp`, `typescript` and `python` are recognised, other keys are ignored, and a file with
+none of the three is rejected. Generation order is fixed; tab order comes from the CLI's own
+read of `apimatic.json` ([D19](#wire-format)).
 
 ### 4.3 Status
 
 The token set is **closed**. Emit only what `GenerationStatus` already defines:
 
 ```
-Queued  ExecutionStarted  GeneratingArtifacts  Completed  Failed  ValidationError  Unknown
+Queued  ExecutionStarted  GeneratingArtifacts  Completed  Failed  ValidationError  SubscriptionError  Unknown
 ```
 
 Map every intermediate step — the whole fan-out included — onto `GeneratingArtifacts`.
@@ -286,11 +289,11 @@ Three rules the orchestrator must hold, all of which are ways to get burned by
 
 | Activity | State |
 |---|---|
+| `ReadPortalArtifactsRequest` | **new** — validates `apimatic.json` and returns its languages and whether `plugin` is present, which the orchestrator checks against the subscription |
 | `ValidateSpecFile` | exists — writes the parsed SDL every downstream activity reads |
-| `ValidateApimaticConfig` | **new** — `ValidatePluginConfig` is the template; reads `apimatic.json` instead |
 | `GenerateSdk` × N | exists — fan out, one activity per selected language |
 | `GenerateCodeSamples` × N | **new** — same parsed SDL, `RenderCodeSamples()` per language |
-| `AggregateSdkArtifacts` | **new** — assemble the zip of [§4.4](#44-response-the-artifact-zip) |
+| `AggregatePortalArtifacts` | **new** — assemble the zip of [§4.4](#44-response-the-artifact-zip) |
 | `PostGeneration` | exists — needs a third `GenerationOperation` variant |
 
 Records only, for everything passed to and from an activity.
@@ -326,8 +329,8 @@ endpoint is more than a copy of one.
 ### 5.3 Language capability
 
 `CanGenerateSdk` is true for **C#, TypeScript and Python** only. Java, PHP, Ruby and Go
-throw `NoSdkGenerator()` from `CreateBlueprint`; Go cannot even be a plugin language. So a
-`languages` key is validated against `CanGenerateSdk`, not against the seven-member enum.
+throw `NoSdkGenerator()` from `CreateBlueprint`; Go cannot even be a plugin language. The
+`apimatic.json` model therefore recognises only those three `languages` keys.
 
 ---
 
@@ -337,27 +340,23 @@ Very little. The fronting layer keeps **no record** of a generation: `/api/sdk/v
 `/api/plugin` pass codegen-v2's own id straight back, wrapped with apimatic-io's URLs.
 No Hangfire, no DB row.
 
-1. A controller — `[WebApiAuthorize]`, `[RoutePrefix("api/sdk-artifacts")]` — validating
+1. A controller — `[WebApiAuthorize]`, `[RoutePrefix("api/portal-artifacts")]` — validating
    the multipart `file` part the way both existing controllers do (presence, non-zero
    length, content-type in `application/zip` / `x-zip-compressed` / `octet-stream`). No
    `language` or `stability` form field: the zip carries the request.
 2. Three methods on `CodegenV2ApiService`, alongside the seven already there, adding
-   `X-APIMatic-UserId` / `X-APIMatic-TenantId` via `HttpRequestMessageFactory` and
-   forwarding `X-APIMatic-CallbackUrl` when the inbound request carries one.
+   `X-APIMatic-UserId` / `X-APIMatic-TenantId` / `X-APIMatic-SubscriptionFeatures` via
+   `HttpRequestMessageFactory` and forwarding `X-APIMatic-CallbackUrl` when the inbound
+   request carries one. The POST's 403 passes through to the CLI.
 3. Download re-wrapped as `FileStreamResult` — a direct stream pass-through, no
    re-packaging, no size limit. Unchanged from the SDK path.
 
-**Entitlement, PR 2** ([D32](#d32)). Today `/api/sdk/v2` checks *no* entitlement at all —
-only a hard-coded `CodeGeneratorVersion.V4.AvailableLanguages` allowlist — while
-`/api/plugin` gates on `CanGenerateContextPlugin` → `IsCursorIntegrationAllowed`. The new
-route gates on field presence: `plugin` present → the context-plugin check; `portal`
-present → `CanGenerateOnPremPortal`.
-
-> ⚠️ apimatic-io#2216 quotes a message for the latter that does not exist. The real one is
-> *"Docs as code is not allowed on your subscription"*.
-
-Checks run at generate time only, never on status or download — the existing comment in
-`GetContextPluginStatusCommandHandler` states that rule explicitly.
+**Entitlement** ([D32](#d32)) is enforced by codegen-v2; apimatic-io only sets
+`X-APIMatic-SubscriptionFeatures`, Base64 of the JSON the legacy v1 service already sends.
+Its feature names are legacy: `OnPremPortalGeneration` gates the portal, `CursorIntegration`
+the context plugin, and `BuildFeatures.Platforms` lists the allowed languages. A missing
+header allows nothing, so the POST returns 403. Checks run at generate time only, never on
+status or download.
 
 ---
 
@@ -369,9 +368,9 @@ Following the 5-layer stack in `.ai/instructions.md`:
 
 | Concern | Layer | Proposed |
 |---|---|---|
-| Call the endpoint, poll, download | Infrastructure service | `SdkArtifactsService` (`services/sdk-artifacts-service.ts`), axios-auth variant |
+| Call the endpoint, poll, download | Infrastructure service | `PortalArtifactsService` (`services/portal-artifacts-service.ts`), axios-auth variant |
 | Parse `code-samples/<lang>.json` | Types (value object) | `CodeSampleCatalog` |
-| The downloaded zip as a thing | Types (value object) | `SdkArtifacts` — `catalogs()`, `sdkZips()`, ignores unknown folders |
+| The downloaded zip as a thing | Types (value object) | `PortalArtifacts` — `catalogs()`, `sdkZips()`, ignores unknown folders |
 | Inject `x-codeSamples` | Application | pure: `(document, catalogs, languageOrder) -> document` |
 | Detect escaping `$ref`s | Application | pure: `(document, specRoot) -> FileName[]` |
 | Copy + annotate the spec tree, repoint slugs | Infrastructure | `PortalProjectService` |
@@ -504,7 +503,7 @@ before implementing** — it may have moved under review.
 | `/api/sdk/v2` performs **no** entitlement check — only a hard-coded v4 language allowlist | `GenerateSdkCommandHandler.cs:20-21`, `Domain/Enums/CodeGeneratorVersion.cs:9-16` |
 | `/api/plugin` gates on `CanGenerateContextPlugin` → `IsCursorIntegrationAllowed`, at generate time only | `GenerateContextPluginCommandHandler.cs:36-39`, `SubscriptionManager.cs:2140-2148` |
 | `CanGenerateOnPremPortal` message is *"Docs as code is not allowed on your subscription"* | `SubscriptionManager.cs:2120-2133` |
-| **Nothing named `sdk-artifacts` exists in the repo** | repo-wide grep |
+| **Nothing named `portal-artifacts` exists in the repo** | repo-wide grep |
 
 ---
 
