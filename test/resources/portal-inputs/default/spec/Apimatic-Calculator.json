@@ -22,6 +22,15 @@
         "summary": "Calculate",
         "description": "Calculates the expression using the specified operation.",
         "operationId": "Calculate",
+        "x-apimatic-codeSamples": [
+          {
+            "lang": "typescript",
+            "label": "TypeScript",
+            "sources": {
+              "_default": "const result = await calculator.calculate(OperationType.Sum, 4, 5);"
+            }
+          }
+        ],
         "parameters": [
           {
             "name": "operation",

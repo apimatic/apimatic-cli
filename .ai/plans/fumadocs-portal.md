@@ -147,8 +147,37 @@ from Google Fonts at runtime, Fumadocs page actions) except where noted.
   pages x document size: 150 Stripe operations produced 812 MB.
 - Request samples: only curl is generated (`createOpenAPIPage({ codeUsages })` with a
   registry holding the curl generator alone, `src/components/api-page.tsx`). Other
-  languages will come from `x-codeSamples` on each operation, added to the spec by a
-  later PR; the tabs already render those beside the generated one (verified).
+  languages come from `x-apimatic-codeSamples` on each operation, added to the spec by a
+  later PR: per language (`lang`, optional `label` and `id`), `sources` maps each
+  request-body example id to its snippet (`_default` when the operation declares no body
+  examples, the id Fumadocs gives its implicit one). `src/components/usage-tabs.tsx`
+  replaces the request-sample tabs (`content.renderAPIExampleUsageTabs`) and shows the
+  snippet for the example selected in the dropdown. With a dropdown, a language without a
+  snippet for the selected example shows a "No <label> sample for this example." note,
+  never another example's code; without one, the language's only snippet is used
+  whatever its key. `x-codeSamples` is not rendered, even when a user writes it: a static
+  entry cannot follow the dropdown, and fumadocs-openapi 11.4.1's own tabs render those
+  empty anyway, because they look generators up in the page-wide registry rather than the
+  per-operation one the entries are added to (found 2026-09-23; the earlier "verified"
+  note here was wrong). Verified in headless Chrome by switching examples.
+  The contract the extension has to meet, none of which the portal checks (a mismatch
+  degrades quietly instead of failing):
+  - `lang` is a Shiki language key from `src/lib/shiki-bundle.ts`: `csharp`, `go`,
+    `java`, `php`, `python`, `ruby` or `typescript` for the SDK languages. Anything
+    else (`ts`, `c#`) renders unhighlighted.
+  - `sources` keys are the keys of `requestBody.content[<type>].examples` for the media
+    type whose examples fill the dropdown: `application/json` when the body has it,
+    otherwise the first media type listed (`getPreferredType`). With a dropdown, a key
+    matching no example is never shown and an example without a key shows the note;
+    without one, a language's only snippet is shown whatever its key.
+  - One entry per language. The tab id is `id`, else `lang`; a later entry with the same
+    id replaces an earlier one, and an entry with the id `curl` replaces the generated
+    curl tab. `label` defaults to `lang`.
+  - Entries missing `lang` or `sources`, or with a non-string snippet, are skipped.
+
+  The later PR that merges the backend's samples into the spec validates this where it
+  reads them, warning the person building the portal about an unknown `lang` and about
+  `sources` keys that match no example.
 - Per-route `head()` with title, meta description (frontmatter or operation summary) and canonical URL.
 - Static Orama search index (`server.staticGET()`), `llms.txt` with a cheap per-page renderer (never serialize the spec per page).
 - Reads `portal.config.json` written by the CLI into the build directory (title, description, logo URL, absolute spec paths, absolute static dir); the content dir is the generated literal described above.
@@ -364,6 +393,17 @@ the new-layout branch in the sample repository.
   Chrome asynchronously with `--dump-dom`, and for the dev server add a
   virtual time budget and load twice); consider a gated e2e step on runners
   that ship a browser.
+- **Request-sample tabs on a fumadocs-openapi upgrade.** `src/components/usage-tabs.tsx`
+  replaces Fumadocs' tab renderer and copies its tab body (the example listener and
+  the server URL resolution from `ui/operation/usage-tabs.js`, plus two helpers from
+  `@fumadocs/api-docs/utils/url`). The template type-check catches a changed hook or
+  signature, and the end-to-end suite checks the operation page still carries
+  `x-apimatic-codeSamples`, but neither sees the tabs work: they render in the browser.
+  On every upgrade, diff the upstream `usage-tabs.js` against the copy, then build a
+  portal from a spec with an operation that has two request-body examples and a
+  `sources` entry for each, switch the dropdown in a browser, and confirm every SDK tab
+  changes (and that a language missing one example shows the note). A browser smoke
+  test (above) would automate this.
 - **Dev-server output.** `PortalDevServerService` stops relaying Vite's output
   once it sees the `Local:` line, so anything Vite reports afterwards is lost.
   Keep relaying, or at least surface errors.
