@@ -88,7 +88,20 @@ describe('PortalSourceContext', () => {
 
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
         kind: 'invalidConfig',
-        errors: ["'portal' is required."]
+        errors: ["'portal' is required."],
+        missingPortal: true
+      });
+    });
+
+    // There is a block to fix, so the quickstart hint would point away from it.
+    it('does not point at quickstart for a portal block that is not an object', async () => {
+      write('apimatic.json', JSON.stringify({ portal: 'Calc' }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal' must be a JSON object."],
+        missingPortal: false
       });
     });
 
@@ -98,8 +111,26 @@ describe('PortalSourceContext', () => {
 
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
         kind: 'invalidConfig',
-        errors: ['apimatic.json is not valid JSON.']
+        errors: ['apimatic.json is not valid JSON.'],
+        missingPortal: false
       });
+    });
+
+    // Reading through the config context turns a fault into a problem rather than a throw.
+    it('reports a file it cannot read as invalid, naming the fault', async () => {
+      writeConfig({ title: 'Calc' });
+      write('spec/api.json', OPENAPI);
+      const read = sinon.stub(FileService.prototype, 'getContents').rejects(new Error('EACCES: permission denied'));
+
+      try {
+        expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'invalidConfig',
+          errors: ['apimatic.json could not be read: EACCES: permission denied.'],
+          missingPortal: false
+        });
+      } finally {
+        read.restore();
+      }
     });
 
     it('ignores root keys it does not know', async () => {
@@ -136,7 +167,8 @@ describe('PortalSourceContext', () => {
         errors: [
           "'schemaVersion' is 2, which this version of the CLI does not read; it reads 1.",
           "'portal.title' is required and must be a non-empty string."
-        ]
+        ],
+        missingPortal: false
       });
     });
   });

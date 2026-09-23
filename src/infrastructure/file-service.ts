@@ -1,9 +1,9 @@
-import { randomUUID } from 'crypto';
-import fs from 'fs';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
 import fsExtra from 'fs-extra';
-import * as path from 'path';
-import { pipeline } from 'stream';
-import { promisify } from 'util';
+import * as path from 'node:path';
+import { pipeline } from 'node:stream';
+import { promisify } from 'node:util';
 import { FilePath } from '../types/file/filePath.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { Directory, DirectoryItem } from '../types/file/directory.js';

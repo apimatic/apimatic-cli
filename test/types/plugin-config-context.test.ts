@@ -65,28 +65,18 @@ describe('PluginConfigContext', () => {
       expect(await context.getPluginConfigState()).to.deep.equal({ state: 'missing' });
     });
 
-    it('is unreadable when the file is not valid JSON', async () => {
-      withFile('{ not json');
+    (
+      [
+        ['is unreadable when the file is not valid JSON', '{ not json', 'it is not valid JSON'],
+        ['is unreadable when the file is a JSON array', '[]', 'it is not a JSON object'],
+        ['says the file is empty rather than reporting a JSON syntax error', '', 'it is empty']
+      ] as const
+    ).forEach(([name, text, reason]) => {
+      it(name, async () => {
+        withFile(text);
 
-      const state = await context.getPluginConfigState();
-
-      expect(state).to.include({ state: 'unreadable', reason: 'it is not valid JSON' });
-    });
-
-    it('is unreadable when the file is a JSON array', async () => {
-      withFile('[]');
-
-      const state = await context.getPluginConfigState();
-
-      expect(state).to.include({ state: 'unreadable', reason: 'it is not a JSON object' });
-    });
-
-    it('says the file is empty rather than reporting a JSON syntax error', async () => {
-      withFile('');
-
-      const state = await context.getPluginConfigState();
-
-      expect(state).to.include({ state: 'unreadable', reason: 'it is empty' });
+        expect(await context.getPluginConfigState()).to.include({ state: 'unreadable', reason });
+      });
     });
 
     it('reads past the byte-order mark an editor left at the front of the file', async () => {

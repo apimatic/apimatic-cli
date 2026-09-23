@@ -1,7 +1,7 @@
 import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { ApimaticConfigContext } from './apimatic-config-context.js';
-import { findingSentences } from './apimatic-config/document.js';
+import { APIMATIC_CONFIG_FILE_NAME, findingSentences } from './apimatic-config/document.js';
 import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
@@ -82,21 +82,9 @@ export class PortalSourceContext {
 
   /** Reads and validates the whole source directory, or reports the first problem found. */
   public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
-    const state = await this.configContext.read();
-    if (state.state === 'missing') {
-      return err({ kind: 'missingConfig' });
-    }
-    if (state.state === 'unparseable') {
-      return err({ kind: 'invalidConfig', errors: findingSentences(state.findings) });
-    }
-
-    // Only the root and the portal block are this command's to judge: a malformed plugin or
-    // languages block belongs to the commands that write them, and must not fail a build.
-    // Everything found is reported together, so one edit fixes the file.
-    const rootErrors = findingSentences(state.document.findingsFor('root'));
-    const config = PortalConfig.fromBlock(state.document.portal());
-    if (config.isErr() || rootErrors.length > 0) {
-      return err({ kind: 'invalidConfig', errors: [...rootErrors, ...(config.isErr() ? config.error : [])] });
+    const config = await this.readConfig();
+    if (config.isErr()) {
+      return err(config.error);
     }
 
     // `parse` checks the shape of `logo`, not that the file is there -- and a missing logo
@@ -153,6 +141,34 @@ export class PortalSourceContext {
   }
 
   /**
+   * The `portal` block, or why it cannot be read. Only the root and the portal block are this
+   * command's to judge: a malformed plugin or languages block belongs to the commands that write
+   * them, and must not fail a build. Everything found is reported together, so one edit fixes
+   * the file.
+   */
+  private async readConfig(): Promise<Result<PortalConfig, PortalSourceProblem>> {
+    const state = await this.configContext.read();
+    if (state.state === 'missing') {
+      return err({ kind: 'missingConfig' });
+    }
+    if (state.state === 'unparseable') {
+      return err({ kind: 'invalidConfig', errors: findingSentences(state.findings), missingPortal: false });
+    }
+
+    const block = state.document.portal();
+    const rootErrors = findingSentences(state.document.findingsFor('root'));
+    const config = PortalConfig.fromBlock(block);
+    if (config.isErr() || rootErrors.length > 0) {
+      return err({
+        kind: 'invalidConfig',
+        errors: [...rootErrors, ...(config.isErr() ? config.error : [])],
+        missingPortal: block === undefined
+      });
+    }
+    return ok(config.value);
+  }
+
+  /**
    * Writes the smallest source tree `portal generate` and `portal serve` accept, with a
    * `portal` block described from the specification itself.
    */
@@ -161,10 +177,14 @@ export class PortalSourceContext {
 
     const config = await this.suggestedConfig(specPath);
     // The directory is empty when quickstart runs this, so the merge always creates the file.
-    // A write fault is thrown as the plain write before it was: there is no publish here to protect.
+    // A fault is thrown as the plain write before it was: there is no publish here to protect.
     const written = await this.configContext.merge(['portal'], (document) => document.with('portal', config.toJSON()));
     if (written.isErr()) {
-      throw new Error(`apimatic.json could not be written: ${written.error}`);
+      throw new Error(
+        written.error === 'unreadable'
+          ? `${APIMATIC_CONFIG_FILE_NAME} is already there and could not be read, so the portal was not written into it.`
+          : `${APIMATIC_CONFIG_FILE_NAME} could not be written.`
+      );
     }
 
     await this.fileService.createDirectoryIfNotExists(this.contentDirectory);

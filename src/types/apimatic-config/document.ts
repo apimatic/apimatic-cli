@@ -80,48 +80,62 @@ export class ApimaticConfigDocument {
   // corrupt the file. The identity checks are the plugin's own rules, reported here so the
   // portal path can leave them unread.
   private static analyze(root: Record<string, unknown>): ConfigFinding[] {
-    const findings: ConfigFinding[] = [];
+    return [
+      ...ApimaticConfigDocument.schemaVersionFindings(root.schemaVersion),
+      ...ApimaticConfigDocument.pluginFindings(root.plugin),
+      ...ApimaticConfigDocument.languagesFindings(root.languages)
+    ];
+  }
 
-    const schemaVersion = root.schemaVersion;
-    if (schemaVersion !== undefined && schemaVersion !== SCHEMA_VERSION) {
-      const written = JSON.stringify(schemaVersion);
-      findings.push({
+  private static schemaVersionFindings(schemaVersion: unknown): ConfigFinding[] {
+    if (schemaVersion === undefined || schemaVersion === SCHEMA_VERSION) {
+      return [];
+    }
+    const written = JSON.stringify(schemaVersion);
+    return [
+      {
         block: 'root',
         field: 'schemaVersion',
         problem: `is ${written}, which this version of the CLI does not read; it reads ${SCHEMA_VERSION}`
-      });
-    }
-
-    const plugin = root.plugin;
-    if (plugin !== undefined) {
-      if (!isJsonObject(plugin)) {
-        findings.push({ block: 'plugin', field: 'plugin', problem: NOT_A_JSON_OBJECT });
-      } else {
-        const id = plugin.pluginId;
-        if (typeof id === 'string' && (id.trim() === '' || !PLUGIN_ID_PATTERN.test(id))) {
-          findings.push({ block: 'plugin', field: 'plugin.pluginId', problem: MALFORMED_PLUGIN_ID });
-        }
-        const version = plugin.pluginVersion;
-        if (typeof version === 'string' && (version.trim() === '' || SemVersion.tryCreate(version).isErr())) {
-          findings.push({ block: 'plugin', field: 'plugin.pluginVersion', problem: MALFORMED_PLUGIN_VERSION });
-        }
       }
-    }
+    ];
+  }
 
-    const languages = root.languages;
-    if (languages !== undefined) {
-      if (!isJsonObject(languages)) {
-        findings.push({ block: 'languages', field: 'languages', problem: NOT_A_JSON_OBJECT });
-      } else {
-        for (const [language, entry] of Object.entries(languages)) {
-          if (!isJsonObject(entry)) {
-            findings.push({ block: 'languages', field: `languages.${language}`, problem: NOT_A_JSON_OBJECT });
-          }
-        }
-      }
+  private static pluginFindings(plugin: unknown): ConfigFinding[] {
+    if (plugin === undefined) {
+      return [];
     }
-
+    if (!isJsonObject(plugin)) {
+      return [{ block: 'plugin', field: 'plugin', problem: NOT_A_JSON_OBJECT }];
+    }
+    const findings: ConfigFinding[] = [];
+    const id = plugin.pluginId;
+    if (typeof id === 'string' && (id.trim() === '' || !PLUGIN_ID_PATTERN.test(id))) {
+      findings.push({ block: 'plugin', field: 'plugin.pluginId', problem: MALFORMED_PLUGIN_ID });
+    }
+    const version = plugin.pluginVersion;
+    if (typeof version === 'string' && (version.trim() === '' || SemVersion.tryCreate(version).isErr())) {
+      findings.push({ block: 'plugin', field: 'plugin.pluginVersion', problem: MALFORMED_PLUGIN_VERSION });
+    }
     return findings;
+  }
+
+  private static languagesFindings(languages: unknown): ConfigFinding[] {
+    if (languages === undefined) {
+      return [];
+    }
+    if (!isJsonObject(languages)) {
+      return [{ block: 'languages', field: 'languages', problem: NOT_A_JSON_OBJECT }];
+    }
+    return Object.entries(languages)
+      .filter(([, entry]) => !isJsonObject(entry))
+      .map(
+        ([language]): ConfigFinding => ({
+          block: 'languages',
+          field: `languages.${language}`,
+          problem: NOT_A_JSON_OBJECT
+        })
+      );
   }
 
   /** As written, whatever that is: the portal's own parser says what is wrong with it. */

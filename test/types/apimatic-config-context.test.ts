@@ -177,45 +177,44 @@ describe('ApimaticConfigContext', () => {
         expect(writtenConfig()).to.not.have.property('schemaVersion');
       });
 
-      it('keeps four-space indentation', async () => {
-        withFile('{\n    "portal": {\n        "title": "Calc"\n    }\n}\n');
+      // The writer keeps the layout it finds, one case per layout. Line endings are the one thing
+      // it does not keep, as the plan accepts, and a file with no indentation to read gets two spaces.
+      (
+        [
+          [
+            'keeps four-space indentation',
+            '{\n    "portal": {\n        "title": "Calc"\n    }\n}\n',
+            '{\n    "portal": {\n        "title": "Calc"\n    },\n    "languages": {}\n}\n'
+          ],
+          [
+            'keeps tab indentation',
+            '{\n\t"portal": {\n\t\t"title": "Calc"\n\t}\n}\n',
+            '{\n\t"portal": {\n\t\t"title": "Calc"\n\t},\n\t"languages": {}\n}\n'
+          ],
+          [
+            'keeps a missing trailing newline missing',
+            '{\n  "portal": {\n    "title": "Calc"\n  }\n}',
+            '{\n  "portal": {\n    "title": "Calc"\n  },\n  "languages": {}\n}'
+          ],
+          [
+            'falls back to two spaces for a file written on one line',
+            '{"portal":{"title":"Calc"}}',
+            '{\n  "portal": {\n    "title": "Calc"\n  },\n  "languages": {}\n}'
+          ],
+          [
+            'writes LF line endings over a CRLF file, keeping its indentation',
+            '{\r\n    "portal": {\r\n        "title": "Calc"\r\n    }\r\n}\r\n',
+            '{\n    "portal": {\n        "title": "Calc"\n    },\n    "languages": {}\n}\n'
+          ]
+        ] as const
+      ).forEach(([name, before, after]) => {
+        it(name, async () => {
+          withFile(before);
 
-        await context.merge(['languages'], (document) => document.with('languages', {}));
+          await context.merge(['languages'], (document) => document.with('languages', {}));
 
-        expect(written()).to.equal('{\n    "portal": {\n        "title": "Calc"\n    },\n    "languages": {}\n}\n');
-      });
-
-      it('keeps tab indentation', async () => {
-        withFile('{\n\t"portal": {\n\t\t"title": "Calc"\n\t}\n}\n');
-
-        await context.merge(['languages'], (document) => document.with('languages', {}));
-
-        expect(written()).to.equal('{\n\t"portal": {\n\t\t"title": "Calc"\n\t},\n\t"languages": {}\n}\n');
-      });
-
-      it('keeps a missing trailing newline missing', async () => {
-        withFile('{\n  "portal": {\n    "title": "Calc"\n  }\n}');
-
-        await context.merge(['languages'], (document) => document.with('languages', {}));
-
-        expect(written()).to.equal('{\n  "portal": {\n    "title": "Calc"\n  },\n  "languages": {}\n}');
-      });
-
-      it('falls back to two spaces for a file written on one line', async () => {
-        withFile('{"portal":{"title":"Calc"}}');
-
-        await context.merge(['languages'], (document) => document.with('languages', {}));
-
-        expect(written()).to.equal('{\n  "portal": {\n    "title": "Calc"\n  },\n  "languages": {}\n}');
-      });
-
-      // Accepted in the plan: line endings are the one thing the writer does not keep.
-      it('writes LF line endings over a CRLF file, keeping its indentation', async () => {
-        withFile('{\r\n    "portal": {\r\n        "title": "Calc"\r\n    }\r\n}\r\n');
-
-        await context.merge(['languages'], (document) => document.with('languages', {}));
-
-        expect(written()).to.equal('{\n    "portal": {\n        "title": "Calc"\n    },\n    "languages": {}\n}\n');
+          expect(written()).to.equal(after);
+        });
       });
     });
 

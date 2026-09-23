@@ -31,7 +31,8 @@ export interface PortalSource {
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
-  | { kind: 'invalidConfig'; errors: string[] }
+  // `missingPortal`: the block itself is absent, which is what quickstart sets up.
+  | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   | { kind: 'invalidNavigation'; errors: string[] }
   | { kind: 'unreadableContent' }
   | { kind: 'unreadableSpec'; fileName: FileName }

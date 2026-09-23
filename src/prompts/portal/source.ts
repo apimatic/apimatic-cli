@@ -20,6 +20,10 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
     case 'invalidConfig': {
       log.error(`The ${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} is not valid:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      // A file without the block is no worse off than no file: the same command sets it up.
+      if (problem.missingPortal) {
+        log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
+      }
       return;
     }
     case 'invalidNavigation': {
