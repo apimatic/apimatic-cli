@@ -1,5 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
-import { allOf, isJsonObject, isWebAddress, nonEmptyString, Parsed, unknownKeys } from './fields.js';
+import { isJsonObject } from '../../../utils/json-utils.js';
+import { allOf, isWebAddress, nonEmptyString, Parsed, unknownKeys } from './fields.js';
 
 const KNOWN = ['label', 'url'];
 

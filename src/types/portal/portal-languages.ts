@@ -1,7 +1,8 @@
 import { err, ok, Result } from 'neverthrow';
 import { ConfigFinding, findingSentences } from '../apimatic-config/document.js';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { Language } from '../sdk/generate.js';
-import { isJsonObject, quotedList } from './config/fields.js';
+import { quotedList } from './config/fields.js';
 
 const KNOWN_LANGUAGES: readonly string[] = Object.values(Language);
 

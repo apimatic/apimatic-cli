@@ -1,4 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { PLUGIN_ID_PATTERN } from '../plugin/plugin-config.js';
 import { SemVersion } from '../publish/version.js';
@@ -46,10 +47,6 @@ const NOT_A_JSON_OBJECT = 'is not a JSON object';
 const MALFORMED_PLUGIN_ID = `must be lower-case alphanumeric words separated by single dashes, for example 'acme-payments'`;
 
 const MALFORMED_PLUGIN_VERSION = `must be a version in the format major.minor.patch, for example '0.1.0'`;
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /** The parsed `apimatic.json`: its blocks, the keys around them in the order written, and what is wrong with it. */
 export class ApimaticConfigDocument {

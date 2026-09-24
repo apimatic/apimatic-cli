@@ -1,5 +1,6 @@
 import { parse as parseYaml } from 'yaml';
 import { FileName } from '../file/fileName.js';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
 
@@ -26,11 +27,7 @@ export class OpenApiDocument {
       // so each extension gets the parser built for it.
       const text = stripByteOrderMark(contents);
       const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text);
-      return new OpenApiDocument(
-        typeof document === 'object' && document !== null && !Array.isArray(document)
-          ? (document as Record<string, unknown>)
-          : {}
-      );
+      return new OpenApiDocument(isJsonObject(document) ? document : {});
     } catch {
       return undefined;
     }

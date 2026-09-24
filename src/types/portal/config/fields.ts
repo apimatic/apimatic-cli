@@ -1,4 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
+import { isJsonObject } from '../../../utils/json-utils.js';
 import { UrlPath } from '../../file/urlPath.js';
 import { unknownFieldErrors } from '../unknown-fields.js';
 
@@ -8,10 +9,6 @@ export type Parsed<T> = Result<T, string[]>;
 // path of that site.
 export function isWebAddress(text: string): boolean {
   return /^https?:\/\//i.test(text) && UrlPath.create(text) !== undefined;
-}
-
-export function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function namespace(value: unknown, path: string): Parsed<Record<string, unknown>> {

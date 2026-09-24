@@ -1,8 +1,9 @@
 import { err, Result } from 'neverthrow';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
-import { allOf, isJsonObject, unknownKeys } from './config/fields.js';
+import { allOf, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
