@@ -1,7 +1,7 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { Language } from '../../types/sdk/generate.js';
+import { Language, Stability } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
@@ -45,6 +45,13 @@ export default class SdkPublish extends Command {
       default: false,
       description: 'Generate the SDK locally for review without publishing.'
     }),
+    // v4 renders each language at beta first and stable later, so the level stays a choice even
+    // though the generator version is no longer one.
+    stability: Flags.string({
+      description: 'Stability level of the generated SDK',
+      options: Object.values(Stability).map((s) => s.valueOf()),
+      default: Stability.STABLE
+    })
   };
 
   static examples = [
@@ -65,7 +72,7 @@ export default class SdkPublish extends Command {
       'python'
     )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
       'dry-run'
-    )}`,
+    )}`
   ];
 
   async run() {
@@ -78,8 +85,10 @@ export default class SdkPublish extends Command {
         force,
         input,
         'publish-type': publishType,
-        'dry-run': dryRun
-      }
+        'dry-run': dryRun,
+        stability
+      },
+      metadata
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
@@ -108,7 +117,8 @@ export default class SdkPublish extends Command {
               version,
               language,
               ...(force && { force }),
-              'publish-type': publishTypes
+              'publish-type': publishTypes,
+              stability
             }),
             commandMetadata.shell
           );
@@ -123,6 +133,8 @@ export default class SdkPublish extends Command {
           publishTypes,
           force,
           dryRun,
+          stability as Stability,
+          metadata.flags.stability?.setFromDefault !== true,
           onPublishSdkError,
           profileId,
           version

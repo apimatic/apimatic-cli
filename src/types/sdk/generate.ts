@@ -17,6 +17,11 @@ export enum CodeGenerationVersion {
   V4 = 'v4'
 }
 
+export enum Stability {
+  STABLE = 'stable',
+  BETA = 'beta'
+}
+
 const languageMap: { [key: number]: Language } = {
   1: Language.CSHARP,
   2: Language.GO,
@@ -65,6 +70,26 @@ export const UPCOMING_LANGUAGES: readonly Language[] = [Language.JAVA, Language.
 /** Takes a string because config files name their languages, and a file may name anything. */
 export function isAvailableLanguage(language: string): language is Language {
   return AVAILABLE_LANGUAGES.includes(language as Language);
+}
+
+/**
+ * What v4 offers per language. Every renderer is beta today, but they reach stable one at a time,
+ * so this is a table rather than a constant: a language with both levels is one a user picks
+ * between, and the interactive flow asks as soon as there is something to ask.
+ */
+const V4_STABILITY_LEVELS: Partial<Record<Language, readonly Stability[]>> = {
+  [Language.CSHARP]: [Stability.BETA],
+  [Language.TYPESCRIPT]: [Stability.BETA],
+  [Language.PYTHON]: [Stability.BETA]
+};
+
+export function stabilityLevelsFor(language: Language): readonly Stability[] {
+  return V4_STABILITY_LEVELS[language] ?? [Stability.STABLE];
+}
+
+/** What a flow that never asks should send: the only level, until there is more than one. */
+export function defaultStability(language: Language): Stability {
+  return stabilityLevelsFor(language)[0];
 }
 
 /** The name a language is shown under everywhere, so one reads the same in every message. */

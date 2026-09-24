@@ -6,7 +6,7 @@ import { SdkContext } from '../../types/sdk-context.js';
 import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
-import { isAvailableLanguage, Language } from '../../types/sdk/generate.js';
+import { isAvailableLanguage, Language, Stability } from '../../types/sdk/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 
 export class GenerateAction {
@@ -26,6 +26,7 @@ export class GenerateAction {
     buildDirectory: DirectoryPath,
     destinationSdkDirectory: DirectoryPath,
     language: Language,
+    stability: Stability,
     force: boolean,
     zipSdk: boolean,
     apiVersion?: string,
@@ -109,6 +110,7 @@ export class GenerateAction {
         this.sdkGenerationService.generateSdk(
           buildZipPath,
           language,
+          stability,
           this.configDir,
           this.commandMetadata,
           this.authKey

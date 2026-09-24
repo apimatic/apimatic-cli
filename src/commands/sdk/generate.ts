@@ -2,7 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
-import { Language } from '../../types/sdk/generate.js';
+import { Language, Stability } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
@@ -35,6 +35,13 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
       default: false,
       description: 'Download the generated SDK as a .zip archive'
     }),
+    // v4 renders each language at beta first and stable later, so the level stays a choice even
+    // though the generator version is no longer one.
+    stability: Flags.string({
+      description: 'Stability level of the generated SDK',
+      options: Object.values(Stability).map((s) => s.valueOf()),
+      default: Stability.STABLE
+    }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
     ...FlagsProvider.authKey
@@ -50,7 +57,16 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
 
   async run() {
     const {
-      flags: { language, input, destination, force, zip: zipSdk, 'auth-key': authKey, 'api-version': apiVersion }
+      flags: {
+        language,
+        input,
+        destination,
+        force,
+        zip: zipSdk,
+        stability,
+        'auth-key': authKey,
+        'api-version': apiVersion
+      }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
@@ -64,7 +80,15 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
 
     intro('Generate SDK');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, apiVersion);
+    const result = await action.execute(
+      buildDirectory,
+      sdkDirectory,
+      language as Language,
+      stability as Stability,
+      force,
+      zipSdk,
+      apiVersion
+    );
     outro(result);
   }
 

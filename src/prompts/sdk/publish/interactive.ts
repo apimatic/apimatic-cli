@@ -10,7 +10,7 @@ import {
   PublishType
 } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel, Stability } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
 import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
@@ -157,6 +157,24 @@ export class SdkPublishInteractivePrompts {
 ` +
         `Available now: ${AVAILABLE_LANGUAGES.map(languageLabel).join(', ')}`
     );
+  }
+
+  public async selectStability(levels: readonly Stability[]): Promise<Stability | undefined> {
+    const stability = await select({
+      message: 'Select the stability level of the SDK:',
+      initialValue: levels[0],
+      options: levels.map((level) => ({ value: level, label: `${level}` }))
+    });
+
+    if (isCancel(stability)) {
+      return undefined;
+    }
+
+    return stability;
+  }
+
+  public noStabilitySelected() {
+    log.error('No stability level was selected.');
   }
 
   public async inputVersion(): Promise<SemVersion | undefined> {

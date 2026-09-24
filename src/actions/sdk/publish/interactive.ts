@@ -5,7 +5,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { AVAILABLE_LANGUAGES } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, stabilityLevelsFor } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
@@ -89,6 +89,14 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
+    // One level is not a question. The moment a language offers both, this asks.
+    const levels = stabilityLevelsFor(language);
+    const stability = levels.length === 1 ? levels[0] : await this.prompts.selectStability(levels);
+    if (!stability) {
+      this.prompts.noStabilitySelected();
+      return ActionResult.cancelled();
+    }
+
     const version = await this.prompts.inputVersion();
     if (!version) {
       this.prompts.noVersionSpecified();
@@ -101,7 +109,8 @@ export class SdkPublishInteractiveAction {
       profile: publishingProfile,
       language,
       version,
-      publishType: publishTypes
+      publishType: publishTypes,
+      stability: levels.length === 1 ? undefined : stability
     });
 
     this.prompts.publishingSummary(publishingSummary);
@@ -127,6 +136,7 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
+      stability,
       publishingSummary,
       onPublishSdkError
     );

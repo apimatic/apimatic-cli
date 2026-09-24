@@ -14,19 +14,12 @@ import { FileService } from '../file-service.js';
 import { apiClientFactory } from './api-client-factory.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { err, ok, Result } from 'neverthrow';
-import { Language } from '../../types/sdk/generate.js';
+import { Language, Stability } from '../../types/sdk/generate.js';
 import { handleServiceError, ServiceError } from '../service-error.js';
 import { GENERATION_TIMEOUT_MS, pollUntilCompleted, STATUS_POLL_INTERVAL_MS } from '../generation-status-poller.js';
 import { envInfo } from '../env-info.js';
 import { REQUEST_TIMEOUT_MS } from '../../config/axios-config.js';
 import { GenerationStatusResponse } from '../../types/api/generation-status.js';
-
-/**
- * v4 renders C#, TypeScript and Python as beta — the only level the CLI ever offered for it, back
- * when `--codegen-version` could pick v4 at all. Named here because it is now the single answer for
- * every generation, and the line to change when a language reaches stable.
- */
-const V4_STABILITY = StabilityLevelTag.Beta;
 
 const TIMING_DEFAULTS = {
   pollIntervalMs: STATUS_POLL_INTERVAL_MS,
@@ -50,6 +43,7 @@ export class SdkGenerationService {
   public async generateSdk(
     buildPath: FilePath,
     language: Language,
+    stability: Stability,
     configDir: DirectoryPath,
     commandMetadata: CommandMetadata,
     authKey: string | null
@@ -68,7 +62,7 @@ export class SdkGenerationService {
         this.CONTENT_TYPE,
         file,
         this.languageSdk[language],
-        V4_STABILITY
+        this.stabilityTag[stability]
       );
       generationId = response.result.id;
     } catch (error) {
@@ -157,6 +151,11 @@ export class SdkGenerationService {
       }
     });
   }
+
+  private readonly stabilityTag: Record<Stability, StabilityLevelTag> = {
+    [Stability.STABLE]: StabilityLevelTag.Stable,
+    [Stability.BETA]: StabilityLevelTag.Beta
+  };
 
   private readonly languageSdk: Record<Language, SdkLanguages> = {
     [Language.CSHARP]: SdkLanguages.Csharp,

@@ -5,7 +5,7 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { Language } from '../../../types/sdk/generate.js';
+import { Language, Stability } from '../../../types/sdk/generate.js';
 import { ActionResult } from '../../action-result.js';
 import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
@@ -29,6 +29,8 @@ export class SdkPublishNonInteractiveAction {
     publishTypes: PublishType[],
     force: boolean,
     dryRun: boolean,
+    stability: Stability,
+    stabilityWasProvided: boolean,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
     version?: string
@@ -108,7 +110,9 @@ export class SdkPublishNonInteractiveAction {
       profile: publishingProfile,
       language,
       version: semVersion,
-      publishType: publishTypes
+      publishType: publishTypes,
+      // Named only when the user chose it, so a run that took the default reads as the doc does.
+      stability: stabilityWasProvided ? stability : undefined
     });
     const outputDir = dryRun
       ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))
@@ -123,6 +127,7 @@ export class SdkPublishNonInteractiveAction {
       semVersion,
       publishingProfile,
       dryRun,
+      stability,
       publishingSummary,
       onPublishSdkError
     );

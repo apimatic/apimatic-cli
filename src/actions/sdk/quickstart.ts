@@ -12,7 +12,7 @@ import { ValidateAction } from '../api/validate.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GenerateAction } from './generate.js';
-import { Language, mapLanguages } from '../../types/sdk/generate.js';
+import { defaultStability, Language, mapLanguages } from '../../types/sdk/generate.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { ZipService } from '../../infrastructure/zip-service.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -208,6 +208,7 @@ export class SdkQuickstartAction {
         sourceDirectory,
         sdkDirectory,
         language as Language,
+        defaultStability(language as Language),
         true,
         false
       );

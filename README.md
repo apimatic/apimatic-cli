@@ -48,8 +48,9 @@ Documentation portals are now built on your machine from a `src/` directory, and
 
 Version 3 of the code generator is retired, and the CLI generates with version 4 only:
 
-- `--codegen-version` and `--stability` are gone from `sdk generate` and `sdk publish`. There
-  is no version left to choose.
+- `--codegen-version` is gone from `sdk generate` and `sdk publish`. There is no version left
+  to choose. `--stability` stays: version 4 renders each language at beta first and stable
+  later, so the level outlives the version it used to accompany.
 - C#, TypeScript and Python are the languages that can be generated. Java, Ruby, Go and PHP
   come back as each reaches version 4; until then both commands refuse them and say so.
 - `apimatic sdk save-changes` is gone, with `--track-changes` and `--skip-changes` on
@@ -433,7 +434,7 @@ Generate an SDK for your API
 ```
 USAGE
   $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--api-version <value>]
-    [--zip] [-i <value>] [-f] [-k <value>]
+    [--zip] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>  [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK
@@ -445,6 +446,8 @@ FLAGS
   -l, --language=<option>    (required) Programming language for SDK generation
                              <options: csharp|java|php|python|ruby|typescript|go>
       --api-version=<value>  Version of the API to use for SDK generation (if multiple versions exist)
+      --stability=<option>   [default: stable] Stability level of the generated SDK
+                             <options: stable|beta>
       --zip                  Download the generated SDK as a .zip archive
 
 DESCRIPTION
@@ -470,7 +473,7 @@ Generate and publish an SDK to a package registry and/or source repository
 ```
 USAGE
   $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript|go]
-    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run]
+    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--stability stable|beta]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
@@ -485,6 +488,8 @@ FLAGS
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.
                                   <options: package|sourcecode>
+      --stability=<option>        [default: stable] Stability level of the generated SDK
+                                  <options: stable|beta>
 
 DESCRIPTION
   Generate and publish an SDK to a package registry and/or source repository

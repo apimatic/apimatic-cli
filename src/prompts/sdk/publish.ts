@@ -6,7 +6,7 @@ import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { Language } from '../../types/sdk/generate.js';
+import { Language, Stability } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
@@ -102,12 +102,20 @@ export interface PublishingDetails {
   language: Language;
   version: SemVersion;
   publishType: PublishType[];
+  stability?: Stability;
 }
 
-export function formatPublishingDetails({ profile, language, version, publishType }: PublishingDetails): string {
+export function formatPublishingDetails({
+  profile,
+  language,
+  version,
+  publishType,
+  stability
+}: PublishingDetails): string {
   const targets = [...publishType]
-    .map((t) => (t === PublishType.PackagePublishing ? "Package" : "Source Code"))
-    .join(" + ");
+    .map((t) => (t === PublishType.PackagePublishing ? 'Package' : 'Source Code'))
+    .join(' + ');
 
-  return `\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`;
+  const level = stability ? `\n  Stability: ${stability}` : '';
+  return `\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}${level}`;
 }
