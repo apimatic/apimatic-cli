@@ -20,6 +20,7 @@ import { schemaUrlFor } from '../../types/apimatic-config/document.js';
 import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { deriveMetadata } from '../../types/plugin/plugin-config.js';
 import { ProjectContext } from '../../types/project-context.js';
+import { DEFAULT_PORTAL_PORT, PortalServeAction } from './serve.js';
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -194,10 +195,19 @@ export class PortalQuickstartAction {
       const structure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, structure);
 
-      // The wizard does not ask for the project's SDK languages yet, and a portal is not built
-      // without them, so it ends here and says what to add rather than starting a preview that
-      // refuses the project it just wrote.
-      this.prompts.nextSteps(scaffolded.value, inputDirectory);
+      // The wizard ends in the preview. The languages it just recorded are what a portal needs to
+      // be built, so there is nothing left to ask, and the next steps are said once it is on screen.
+      const result = await new PortalServeAction(this.configDir, this.commandMetadata, null).execute(
+        sourceDirectory,
+        DEFAULT_PORTAL_PORT,
+        true,
+        () => this.prompts.nextSteps(scaffolded.value)
+      );
+
+      if (result.isFailed()) {
+        return ActionResult.failed();
+      }
+
       return ActionResult.success();
     });
   };

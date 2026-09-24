@@ -11,7 +11,6 @@ import { createResourceInputFromInput, ResourceInput } from '../../types/file/re
 import { FileDownloadResponse } from '../../infrastructure/services/file-download-service.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
-import { LANGUAGES_EXAMPLE } from '../../types/portal/portal-languages.js';
 import { PortalScaffoldProblem } from '../../types/portal/portal-source.js';
 import { Language, languageLabel, PLUGIN_LANGUAGES, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
@@ -176,30 +175,19 @@ export class PortalQuickstartPrompts {
   }
 
   /**
-   * The `languages` block is the project's one list of SDK languages, which the plugin commands
-   * read too, hence the line on naming only what is shipped.
+   * Said while the preview is already running, so it is about what to change rather than how to
+   * start. The languages the wizard asked for are recorded, so nothing here asks for them again.
    */
-  public nextSteps(configFile: FilePath, projectDirectory: DirectoryPath): void {
+  public nextSteps(configFile: FilePath): void {
     const message = [
-      `1. Name the SDK languages your API ships in ${f.path(configFile)}, beside the ${f.var(
-        'portal'
-      )} block, for example:`,
+      `Change the name, logo and colours in the ${f.var('portal')} block of ${f.path(configFile)}; ` +
+        `your editor completes and checks it. Set ${f.var('portal.site.url')} to the address you will ` +
+        `host the portal at, for canonical links and a sitemap.`,
       '',
-      `     ${LANGUAGES_EXAMPLE}`,
+      `Add Markdown pages under ${f.var('src/content')} and more OpenAPI documents under ` +
+        `${f.var('src/spec')}. The preview reloads as you edit.`,
       '',
-      `   This is the project's one list of SDK languages: the plugin commands read it too, and ` +
-        `${f.cmdAlt('apimatic', 'sdk', 'publish')} adds to it, so name only the languages you ship.`,
-      '',
-      `2. Preview the portal with ${f.cmdAlt('apimatic', 'portal', 'serve')} ${f.flag(
-        'input',
-        projectDirectory.toString()
-      )}. It reloads as you edit.`,
-      '',
-      `Change the name, logo and colours in the ${f.var('portal')} block; your editor completes ` +
-        `and checks it. Set ${f.var('portal.site.url')} to the address you will host the portal at, for ` +
-        `canonical links and a sitemap. Add Markdown pages under ${f.var('src/content')} and more OpenAPI ` +
-        `documents under ${f.var('src/spec')}, and run ${f.cmdAlt('apimatic', 'portal', 'generate')} to ` +
-        `produce static files you can host.`,
+      `Run ${f.cmdAlt('apimatic', 'portal', 'generate')} to produce static files you can host.`,
       '',
       f.link(referenceDocumentationUrl)
     ].join('\n');
@@ -224,16 +212,22 @@ export class PortalQuickstartPrompts {
   // Everything is checked: a first portal covering every language it can is the answer one Enter
   // should give, and the four it cannot are named rather than left out silently.
   public async selectLanguages(): Promise<Language[] | undefined> {
-    const comingSoon = UPCOMING_LANGUAGES.map(languageLabel).join(', ');
     const selected = await multiselect<Language>({
-      message: `Which languages should your portal include?
-${f.description(`${comingSoon} are coming soon`)}`,
+      message: 'Which languages should your portal include?',
       options: PLUGIN_LANGUAGES.map((language) => ({ value: language, label: languageLabel(language) })),
       initialValues: [...PLUGIN_LANGUAGES],
       required: false
     });
 
-    return isCancel(selected) ? undefined : selected;
+    if (isCancel(selected)) {
+      return undefined;
+    }
+
+    // Under the answer rather than inside the question: it names what could not be chosen, which
+    // reads as a footnote to the choice and not as one more option in it.
+    log.message(f.hint(`${UPCOMING_LANGUAGES.map(languageLabel).join(', ')} are coming soon`));
+
+    return selected;
   }
 
   public noLanguagesSelected() {

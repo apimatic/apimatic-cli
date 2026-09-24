@@ -39,7 +39,9 @@ export class PortalServeAction {
   public readonly execute = async (
     sourceDirectory: DirectoryPath,
     port: number,
-    openInBrowser: boolean
+    openInBrowser: boolean,
+    /** Said once the preview is up, for a caller whose own last word belongs after it. */
+    onAfterServe?: () => void
   ): Promise<ActionResult> => {
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
@@ -91,6 +93,9 @@ export class PortalServeAction {
       this.prompts.portalServed(server.value.url, sourceDirectory);
       if (openInBrowser) {
         await this.launcherService.openUrlInBrowser(server.value.url);
+      }
+      if (onAfterServe) {
+        onAfterServe();
       }
 
       const configWatch = this.watchConfig(

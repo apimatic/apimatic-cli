@@ -6,7 +6,6 @@ import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import { PortalQuickstartAction } from '../../../src/actions/portal/quickstart';
 import { PortalQuickstartPrompts } from '../../../src/prompts/portal/quickstart';
-import { PortalDevServerService } from '../../../src/infrastructure/portal-dev-server-service';
 import { ApiValidatePrompts } from '../../../src/prompts/api/validate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
@@ -15,6 +14,7 @@ import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
+import { Language } from '../../../src/types/sdk/generate';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
 const SPEC = new FilePath(
@@ -74,22 +74,37 @@ describe('PortalQuickstartAction', () => {
     expect(prompts.specPathPrompt.called).to.be.false;
   });
 
-  // Nothing in the wizard asks for the project's SDK languages yet, and a preview refuses a
-  // project without one, so it ends at the scaffold and says what to add.
-  it('writes the project and ends with the next steps rather than a preview', async () => {
-    const serve = sinon.stub(PortalDevServerService.prototype, 'start');
+  // The wizard ends in a preview now, so this covers what it writes on the way there: the
+  // languages it was told, the plugin identity it derived, and the entries none of it belongs
+  // in a repository under. `prepare` is stopped so the test is about the writing, not the build.
+  it('records the languages and the derived plugin identity, then hands off to the preview', async () => {
+    prompts.selectLanguages.resolves([Language.TYPESCRIPT, Language.PYTHON]);
+    const prepare = sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
 
-    const result = await execute();
+    await execute();
 
-    expect(result.isFailed() || result.isCancelled(), 'the wizard failed').to.be.false;
     const written = JSON.parse(fs.readFileSync(path.join(project.toString(), 'src', 'apimatic.json'), 'utf8'));
-    expect(Object.keys(written)).to.deep.equal(['$schema', 'schemaVersion', 'portal']);
+    expect(written.languages).to.deep.equal({ typescript: {}, python: {} });
+    expect(written.plugin).to.deep.equal({
+      pluginId: 'project',
+      pluginName: 'project',
+      pluginVersion: '0.1.0',
+      license: 'MIT'
+    });
+    expect(written.portal, 'the portal block survives the language write').to.not.be.undefined;
+
     expect(fs.existsSync(path.join(project.toString(), 'src', 'spec', 'Apimatic-Calculator.json'))).to.be.true;
-    expect(prompts.nextSteps.calledOnce).to.be.true;
-    const [configFile, projectDirectory] = prompts.nextSteps.firstCall.args;
-    expect(configFile.isEqual(new FilePath(project.join('src'), new FileName('apimatic.json')))).to.be.true;
-    expect(projectDirectory.isEqual(project)).to.be.true;
-    expect(prompts.nextSteps.calledAfter(prompts.printDirectoryStructure)).to.be.true;
-    expect(serve.called).to.be.false;
+    expect(fs.readFileSync(path.join(project.toString(), '.gitignore'), 'utf8')).to.contain('/plugin/');
+
+    // Reaching the project build is the handoff: nothing else in the wizard prepares one.
+    expect(prepare.called, 'the wizard reached the preview').to.be.true;
   });
+
+  it('asks for nothing more and stops when no language is chosen', async () => {
+    prompts.selectLanguages.resolves([]);
+
+    expect((await execute()).isCancelled()).to.be.true;
+    expect(prompts.noLanguagesSelected.calledOnce).to.be.true;
+  });
+
 });
