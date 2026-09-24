@@ -171,6 +171,26 @@ describe('PortalArtifactsService', () => {
     });
   });
 
+  // How a finished run actually reports itself: the gateway redirects the status to the download
+  // rather than answering `Completed`, the same as it does for plugin generation. Read against the
+  // deployed service, which never sends a status body saying the run is done.
+  describe('a run the gateway reports by redirecting', () => {
+    beforeEach(async () => {
+      bundle = await bundleOf({ 'sdk/typescript.zip': 'PK typescript-sdk', 'plugin.zip': 'PK plugin' });
+      respondToStatus = (res) => {
+        res.writeHead(302, { Location: `/portal-artifacts/${GENERATION_ID}/download` });
+        res.end();
+      };
+    });
+
+    it('takes the redirect as the run having finished, and downloads', async () => {
+      const artifacts = (await generate())._unsafeUnwrap();
+
+      expect([...artifacts.sdks.keys()]).to.deep.equal(['typescript']);
+      expect(artifacts.plugin).to.not.be.undefined;
+    });
+  });
+
   it('uploads the source directory as the build', async () => {
     await generate();
 

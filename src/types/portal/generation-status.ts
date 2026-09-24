@@ -8,8 +8,9 @@
  * - `SubscriptionError` is reported here. A run refused for the endpoint itself is a 403 on the
  *   initiate call, but a run refused for *what it asked for* — a language or a context plugin the
  *   subscription does not carry — is decided inside the orchestrator and comes back as a status.
- * - `Completed` is sent on the wire. The plugin's status endpoint redirects to the download when a
- *   run finishes; this one answers 200 with the status, so nothing has to read a 302 as success.
+ * - `Completed` is never sent on the wire. Like the plugin's status endpoint, this one redirects
+ *   to the download when a run finishes, so the 302 is what the poll reads as success. The value
+ *   is named here because the poll needs one to report.
  */
 export enum PortalArtifactsGenerationStatus {
   Queued = 'Queued',

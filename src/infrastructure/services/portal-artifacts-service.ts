@@ -9,6 +9,7 @@ import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { CodeSampleCatalog, CodeSamples } from '../../types/portal/code-samples.js';
 import {
+  PortalArtifactsGenerationStatus,
   PortalArtifactsInitiatedResponse,
   PortalArtifactsStatusResponse
 } from '../../types/portal/generation-status.js';
@@ -150,8 +151,11 @@ export class PortalArtifactsService {
         return ok(response.data as PortalArtifactsStatusResponse);
       }
 
-      // Unlike plugin generation this endpoint answers 200 with `Completed` rather than
-      // redirecting, so a 302 here would be a contract change rather than a finished run.
+      // The gateway answers a finished run with a redirect to the download, the same as it does
+      // for plugin generation. The status body never says `Completed`; the 302 is what says it.
+      if (response.status === 302) {
+        return ok({ status: PortalArtifactsGenerationStatus.Completed });
+      }
 
       // `validateStatus` above stops axios throwing, so nothing reaches the catch block.
       if (response.status === 401) {
