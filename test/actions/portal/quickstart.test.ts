@@ -86,7 +86,9 @@ describe('PortalQuickstartAction', () => {
     expect(Object.keys(written)).to.deep.equal(['$schema', 'schemaVersion', 'portal']);
     expect(fs.existsSync(path.join(project.toString(), 'src', 'spec', 'Apimatic-Calculator.json'))).to.be.true;
     expect(prompts.nextSteps.calledOnce).to.be.true;
-    expect(prompts.nextSteps.firstCall.args[0].toString()).to.equal(project.toString());
+    const [configFile, projectDirectory] = prompts.nextSteps.firstCall.args;
+    expect(configFile.isEqual(new FilePath(project.join('src'), new FileName('apimatic.json')))).to.be.true;
+    expect(projectDirectory.isEqual(project)).to.be.true;
     expect(prompts.nextSteps.calledAfter(prompts.printDirectoryStructure)).to.be.true;
     expect(serve.called).to.be.false;
   });

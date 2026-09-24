@@ -3,7 +3,6 @@ import { isCancel, log, select, text } from '@clack/prompts';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { format as f, getTree } from '../format.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { removeQuotes } from '../../utils/string-utils.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
@@ -178,8 +177,7 @@ export class PortalQuickstartPrompts {
    * The `languages` block is the project's one list of SDK languages, which the plugin commands
    * read too, hence the line on naming only what is shipped.
    */
-  public nextSteps(projectDirectory: DirectoryPath): void {
-    const configFile = new FilePath(projectDirectory.join('src'), new FileName(APIMATIC_CONFIG_FILE_NAME));
+  public nextSteps(configFile: FilePath, projectDirectory: DirectoryPath): void {
     const message = [
       `1. Name the SDK languages your API ships in ${f.path(configFile)}, beside the ${f.var(
         'portal'

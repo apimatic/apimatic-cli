@@ -2,7 +2,7 @@ import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { ApimaticConfigContext } from './apimatic-config-context.js';
-import { ApimaticConfigDocument, findingSentences } from './apimatic-config/document.js';
+import { APIMATIC_CONFIG_FILE_NAME, ApimaticConfigDocument, findingSentences } from './apimatic-config/document.js';
 import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
@@ -272,8 +272,9 @@ export class PortalSourceContext {
    * including the ones the file service raises: the caller is a wizard that has asked its
    * questions already, and it reports what went wrong instead of crashing. `schemaUrl` is
    * the address the file names its schema by, which depends on the running CLI's version.
+   * Answers with the `apimatic.json` it wrote, which is what the user edits next.
    */
-  public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<void, PortalScaffoldProblem>> {
+  public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
       return await this.writeSourceTree(specPath, schemaUrl);
     } catch (error) {
@@ -281,7 +282,10 @@ export class PortalSourceContext {
     }
   }
 
-  private async writeSourceTree(specPath: FilePath, schemaUrl: string): Promise<Result<void, PortalScaffoldProblem>> {
+  private async writeSourceTree(
+    specPath: FilePath,
+    schemaUrl: string
+  ): Promise<Result<FilePath, PortalScaffoldProblem>> {
     await new SpecContext(this.specDirectory).install(specPath);
 
     const site = await this.suggestedSite(specPath);
@@ -319,7 +323,7 @@ export class PortalSourceContext {
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
       JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
     );
-    return ok(undefined);
+    return ok(new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
   }
 
   // A split specification arrives as an archive, whose parts are left to the build to read.

@@ -953,6 +953,13 @@ describe('PortalSourceContext', () => {
       expect(validate(JSON.parse(read('apimatic.json'))), JSON.stringify(validate.errors)).to.be.true;
     });
 
+    it('answers with the apimatic.json it wrote', async () => {
+      const configFile = await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      expect(configFile.isEqual(new FilePath(source, new FileName('apimatic.json')))).to.be.true;
+      expect(fs.existsSync(configFile.toString())).to.be.true;
+    });
+
     it('orders the sidebar with the welcome page first', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
 

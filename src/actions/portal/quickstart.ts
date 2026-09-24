@@ -169,7 +169,7 @@ export class PortalQuickstartAction {
       // The wizard does not ask for the project's SDK languages yet, and a portal is not built
       // without them, so it ends here and says what to add rather than starting a preview that
       // refuses the project it just wrote.
-      this.prompts.nextSteps(inputDirectory);
+      this.prompts.nextSteps(scaffolded.value, inputDirectory);
       return ActionResult.success();
     });
   };
