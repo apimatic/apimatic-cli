@@ -4,6 +4,7 @@ import path from 'path';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { envInfo } from '../../src/infrastructure/env-info';
+import { FileService } from '../../src/infrastructure/file-service';
 import { PortalPagesService } from '../../src/infrastructure/portal-pages-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { GeneratedPages } from '../../src/types/portal/generated-pages';
@@ -63,6 +64,17 @@ describe('PortalPagesService', () => {
       expect(read(file), file).to.not.contain('{{');
     }
     expect(read('sdks/csharp.mdx')).to.contain('title: "C#"');
+  });
+
+  // The dev server watches the directory, and could read a page truncated before it is written.
+  it('replaces each file whole rather than writing it in place', async () => {
+    const replace = sinon.spy(FileService.prototype, 'replaceContents');
+    const write = sinon.spy(FileService.prototype, 'writeContents');
+
+    (await service.write(generated, pagesFor()))._unsafeUnwrap();
+
+    expect(replace.callCount).to.equal(files().length);
+    expect(write.called).to.be.false;
   });
 
   it('writes nothing, and says so, when the pages are the same', async () => {

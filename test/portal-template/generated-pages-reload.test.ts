@@ -51,6 +51,16 @@ describe('generatedPagesReload', () => {
     }
   });
 
+  // The CLI writes each page under a temporary name beside it and renames it over; only the
+  // rename lands on a name the collection reads.
+  it('ignores the temporary file a page is written through, and reacts to its nav.json', () => {
+    const temporary = path.join(root, 'generated', 'sdks', 'go.mdx.0b6f2c.tmp');
+
+    expect(changesAfter('add', temporary)).to.be.empty;
+    expect(changesAfter('unlink', temporary)).to.be.empty;
+    expect(changesAfter('add', path.join(root, 'generated', 'sdks', 'nav.json'))).to.deep.equal([sourceModule]);
+  });
+
   it('applies only to the dev server, not the build', () => {
     expect(generatedPagesReload().apply).to.equal('serve');
   });

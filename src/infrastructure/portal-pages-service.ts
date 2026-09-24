@@ -35,11 +35,11 @@ export class PortalPagesService {
     }
     try {
       let changed = false;
-      for (const { folder, file, contents } of files.value) {
+      for (const { file, contents } of files.value) {
         const current = (await this.fileService.fileExists(file)) ? await this.fileService.getContents(file) : null;
         if (current !== contents) {
-          await this.fileService.createDirectoryIfNotExists(folder);
-          await this.fileService.writeContents(file, contents);
+          // Renamed over rather than written in place, which the watching dev server could read half-written.
+          await this.fileService.replaceContents(file, contents);
           changed = true;
         }
       }

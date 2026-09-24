@@ -292,8 +292,10 @@ that fails every request with a 500 until a restart (step 1, section 16).
 A small Vite plugin, `generatedPagesReload()` in a new
 `portal-template/generated-pages-reload.ts`, registered in `vite.config.ts` and
 applied under `serve` only, closes the gap: when the
-watcher reports an `add`, `unlink` or `unlinkDir` under `<root>/generated/`, it
-emits a `change` for `<root>/src/lib/source.ts`. Vite handles that as an edit to
+watcher reports an `add` or `unlink` of a page or `nav.json` under
+`<root>/generated/`, or an `unlinkDir` there, it emits a `change` for
+`<root>/src/lib/source.ts`. The temporary file each page is written through
+(below) is not one the collection reads, so it sets off nothing. Vite handles that as an edit to
 the module that declares the collections: it transforms it again, which
 expands the glob afresh, and reloads the server's program. Step 1 ran exactly
 this: a page added, a page removed, a folder removed and a folder added each
@@ -442,7 +444,10 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 - **`PortalPagesService`** (`src/infrastructure/portal-pages-service.ts`):
   reads the templates a `GeneratedPages` needs from `portal-pages/`, each once
   per write, renders it and writes it under a given directory. Each file is
-  written only when its contents differ, and files and section folders the
+  written only when its contents differ, and replaced whole, written beside
+  itself and renamed over, since the dev server watching the directory could
+  otherwise read it half-written (the rule #355's review set for the
+  appearance files, 2026-09-24). Files and section folders the
   pages no longer call for are deleted (the plugin's folder, when the block
   goes),
   and the answer says whether anything changed, which is the same contract

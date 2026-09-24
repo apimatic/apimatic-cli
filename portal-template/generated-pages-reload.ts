@@ -8,6 +8,12 @@ const GENERATED_DIRECTORY = 'generated';
 const SOURCE_MODULE = 'src/lib/source.ts';
 
 /**
+ * The files the collection reads: its pages and their `nav.json`. The CLI writes each one
+ * beside itself under a temporary name and renames it over, and those names are left out.
+ */
+const COLLECTED_FILE = /\.(md|mdx|json)$/;
+
+/**
  * fumadocs-mdx expands each collection into a glob of imports when it transforms
  * `src/lib/source.ts`, and under `vite dev` it does not expand it again when a file is added
  * or removed: an added page never appears, and a removed one fails every request until the
@@ -21,14 +27,19 @@ export function generatedPagesReload(): Plugin {
     configureServer(server) {
       const directory = path.resolve(server.config.root, GENERATED_DIRECTORY);
       const sourceModule = path.resolve(server.config.root, SOURCE_MODULE);
-      const onAddOrRemove = (file: string) => {
-        if (isInside(directory, file)) {
-          server.watcher.emit('change', sourceModule);
+      const reload = () => server.watcher.emit('change', sourceModule);
+      const onFileAddedOrRemoved = (file: string) => {
+        if (isInside(directory, file) && COLLECTED_FILE.test(file)) {
+          reload();
         }
       };
-      server.watcher.on('add', onAddOrRemove);
-      server.watcher.on('unlink', onAddOrRemove);
-      server.watcher.on('unlinkDir', onAddOrRemove);
+      server.watcher.on('add', onFileAddedOrRemoved);
+      server.watcher.on('unlink', onFileAddedOrRemoved);
+      server.watcher.on('unlinkDir', (folder: string) => {
+        if (isInside(directory, folder)) {
+          reload();
+        }
+      });
     }
   };
 }
