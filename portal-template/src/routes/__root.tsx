@@ -13,15 +13,16 @@ const loadPageTree = createServerFn({ method: 'GET' })
   .middleware([staticFunctionMiddleware])
   .handler(async () => ({ pageTree: await source.serializePageTree(source.getPageTree()) }));
 
-// A link rather than an `@import` in the stylesheet: a remote import nested in an imported
-// stylesheet lands mid-file once bundled, where browsers ignore it.
-const fontLinks = portal.fontsUrl
-  ? [
-      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' as const },
-      { rel: 'stylesheet', href: portal.fontsUrl }
-    ]
-  : [];
+// Linked from the page rather than imported by `app.css`, so the browser fetches it alongside the
+// stylesheet instead of after it.
+const fontLinks = [
+  { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+  { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' as const },
+  {
+    rel: 'stylesheet',
+    href: 'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap'
+  }
+];
 
 // Without one the browser tab shows the blank-document icon on every page.
 const iconLinks = portal.favicon

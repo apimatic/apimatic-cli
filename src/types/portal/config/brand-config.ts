@@ -1,14 +1,13 @@
 import { err, ok, Result } from 'neverthrow';
 import { Color } from './color.js';
 import { allOf, LightDark, lightDark, namespace, oneOf, optional, Parsed, unknownKeys } from './fields.js';
-import { Fonts } from './fonts.js';
 import { StaticAsset } from './static-asset.js';
 
 export const COLOR_MODES = ['light', 'dark', 'both'] as const;
 
 export type ColorMode = (typeof COLOR_MODES)[number];
 
-const KNOWN = ['logo', 'favicon', 'colors', 'fonts', 'colorMode'];
+const KNOWN = ['logo', 'favicon', 'colors', 'colorMode'];
 
 const KNOWN_COLORS = ['primary'];
 
@@ -79,11 +78,10 @@ export class BrandConfig {
     private readonly logo: Logo | null,
     private readonly favicon: StaticAsset | null,
     private readonly colors: BrandColors,
-    private readonly fonts: Fonts,
     private readonly colorMode: ColorMode
   ) {}
 
-  public static readonly defaults = new BrandConfig(null, null, BrandColors.defaults, Fonts.defaults, 'both');
+  public static readonly defaults = new BrandConfig(null, null, BrandColors.defaults, 'both');
 
   public static parse(value: unknown, path: string): Parsed<BrandConfig> {
     return namespace(value, path).andThen((data) =>
@@ -93,10 +91,9 @@ export class BrandConfig {
           optional(data.logo, (logo) => Logo.parse(logo, `${path}.logo`)),
           optional(data.favicon, (favicon) => StaticAsset.parse(favicon, `${path}.favicon`)),
           BrandColors.parse(data.colors, `${path}.colors`),
-          Fonts.parse(data.fonts, `${path}.fonts`),
           oneOf(data.colorMode, `${path}.colorMode`, COLOR_MODES, BrandConfig.defaults.colorMode)
         ])
-      ).map(([logo, favicon, colors, fonts, colorMode]) => new BrandConfig(logo, favicon, colors, fonts, colorMode))
+      ).map(([logo, favicon, colors, colorMode]) => new BrandConfig(logo, favicon, colors, colorMode))
     );
   }
 
@@ -110,10 +107,6 @@ export class BrandConfig {
 
   public brandColors(): BrandColors {
     return this.colors;
-  }
-
-  public brandFonts(): Fonts {
-    return this.fonts;
   }
 
   public mode(): ColorMode {
@@ -130,14 +123,12 @@ export class BrandConfig {
     logo?: ReturnType<Logo['toJSON']>;
     favicon?: string;
     colors: ReturnType<BrandColors['toJSON']>;
-    fonts: ReturnType<Fonts['toJSON']>;
     colorMode: ColorMode;
   } {
     return {
       ...(this.logo === null ? {} : { logo: this.logo.toJSON() }),
       ...(this.favicon === null ? {} : { favicon: this.favicon.toJSON() }),
       colors: this.colors.toJSON(),
-      fonts: this.fonts.toJSON(),
       colorMode: this.colorMode
     };
   }

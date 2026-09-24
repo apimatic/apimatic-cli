@@ -32,8 +32,6 @@ export interface PortalIdentity {
   logo: { light: string; dark: string } | null;
   /** Site-relative, with the image type its extension names, when it names one. */
   favicon: { url: string; type: string | null } | null;
-  /** The Google Fonts stylesheet, or null when both families are the system's own. */
-  fontsUrl: string | null;
   colorMode: ColorMode;
   links: PortalLink[];
   homeCta: PortalLink | null;
@@ -143,14 +141,12 @@ export class PortalConfig {
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
     const cta = this.home.callToAction();
-    const fontsUrl = this.brand.brandFonts().googleFontsUrl();
     return {
       name: this.site.siteName(),
       description: this.site.siteDescription(),
       siteUrl: origin === null ? null : origin.toString(),
       logo: logo === null ? null : { light: logo.light().siteUrl(), dark: logo.dark().siteUrl() },
       favicon: favicon === null ? null : { url: favicon.siteUrl(), type: favicon.imageType() },
-      fontsUrl: fontsUrl === null ? null : fontsUrl.toString(),
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
       homeCta: cta === null ? null : portalLink(cta),

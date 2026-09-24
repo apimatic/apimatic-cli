@@ -21,35 +21,20 @@ type Declarations = ReadonlyMap<string, string>;
  * can rewrite it whole when the block changes; rendered here so the CSS is tested without a build.
  */
 export class PortalStylesheet {
-  private constructor(
-    private readonly fontFamilies: Declarations,
-    private readonly light: Declarations,
-    private readonly dark: Declarations
-  ) {}
+  private constructor(private readonly light: Declarations, private readonly dark: Declarations) {}
 
   public static of(config: PortalConfig): PortalStylesheet {
-    const brand = config.brandSettings();
-    const fonts = brand.brandFonts();
-    const primary = brand.brandColors().primaryColors();
+    const primary = config.brandSettings().brandColors().primaryColors();
     const tokens = config.tokenOverrides();
 
     return new PortalStylesheet(
-      new Map([
-        ['--default-font-family', fonts.bodyFamily()],
-        ['--default-mono-font-family', fonts.monoFamily()]
-      ]),
       PortalStylesheet.modeDeclarations(primary?.light, tokens.lightTokens()),
       PortalStylesheet.modeDeclarations(primary?.dark, tokens.darkTokens())
     );
   }
 
   public toString(): string {
-    return [
-      HEADER,
-      PortalStylesheet.rule('@theme', this.fontFamilies),
-      PortalStylesheet.rule(LIGHT_SELECTOR, this.light),
-      PortalStylesheet.rule(DARK_SELECTOR, this.dark)
-    ]
+    return [HEADER, PortalStylesheet.rule(LIGHT_SELECTOR, this.light), PortalStylesheet.rule(DARK_SELECTOR, this.dark)]
       .filter((section) => section !== '')
       .join('\n\n')
       .concat('\n');

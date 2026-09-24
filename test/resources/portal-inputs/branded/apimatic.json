@@ -7,7 +7,6 @@
       "logo": { "light": "static/logo-light.svg", "dark": "static/logo-dark.svg" },
       "favicon": "static/favicon.svg",
       "colors": { "primary": "#1d4ed8" },
-      "fonts": { "body": "inter", "mono": "system" },
       "colorMode": "dark"
     },
     "navigation": {

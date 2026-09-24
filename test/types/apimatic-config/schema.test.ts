@@ -10,7 +10,6 @@ import {
 import { MODE_TOKENS } from '../../../src/types/portal/config/advanced-tokens';
 import { GROUP_BY } from '../../../src/types/portal/config/api-config';
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
-import { BODY_FONTS, MONO_FONTS } from '../../../src/types/portal/config/fonts';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate';
@@ -62,8 +61,6 @@ describe('apimatic.schema.json', () => {
     const brand = portal.brand.properties;
 
     const cases: [string, unknown, readonly string[]][] = [
-      ['brand.fonts.body', brand.fonts.properties.body.enum, BODY_FONTS],
-      ['brand.fonts.mono', brand.fonts.properties.mono.enum, MONO_FONTS],
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
       ['api.groupBy', portal.api.properties.groupBy.enum, GROUP_BY],
       ['advanced.tokens', schema.definitions.tokens.propertyNames.enum, MODE_TOKENS],
@@ -98,7 +95,6 @@ describe('apimatic.schema.json', () => {
             logo: { light: 'static/light.svg', dark: '.\\static\\dark.svg' },
             favicon: './static/favicon.ico',
             colors: { primary: { light: '#1d4ed8', dark: '#93c5fd' } },
-            fonts: { body: 'system', mono: 'ibm-plex-mono' },
             colorMode: 'dark'
           },
           navigation: {
@@ -168,8 +164,6 @@ describe('apimatic.schema.json', () => {
       ['an rgb colour', { brand: { colors: { primary: 'rgb(29 78 216)' } } }],
       ['an hsl colour', { brand: { colors: { primary: 'hsl(221, 83%, 53%)' } } }],
       ['an unknown colour key', { brand: { colors: { accent: '#fff' } } }],
-      ['a font off the shortlist', { brand: { fonts: { body: 'Comic Sans' } } }],
-      ['an unknown font key', { brand: { fonts: { heading: 'inter' } } }],
       ['an unknown colour mode', { brand: { colorMode: 'auto' } }],
       ['links that are not a list', { navigation: { links: {} } }],
       ['a link that is a string', { navigation: { links: ['Status'] } }],

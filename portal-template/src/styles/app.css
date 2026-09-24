@@ -2,9 +2,16 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
-/* Written by the CLI from the 'portal' block of apimatic.json: the fonts and the colour
-   overrides. Imported last, so what it sets outranks the theme and presets above. */
+/* Written by the CLI from the 'portal' block of apimatic.json: the colour overrides. Imported
+   last, so what it sets outranks the theme and presets above. */
 @import './theme.css';
+
+@theme {
+  --default-font-family: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+  --default-mono-font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+}
 
 @source not '../../dist';
 

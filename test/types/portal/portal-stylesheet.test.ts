@@ -17,25 +17,9 @@ describe('PortalStylesheet', () => {
     return body.split('\n').map((line) => line.trim());
   };
 
-  it('sets the default fonts for an empty block', () => {
-    const css = stylesheetFor({});
-
-    expect(ruleOf(css, '@theme')).to.deep.equal([
-      "--default-font-family: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';",
-      "--default-mono-font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"
-    ]);
-    // Nothing overrides the theme's colours, so no rule is written for either mode.
-    expect(ruleOf(css, LIGHT_SELECTOR)).to.be.undefined;
-    expect(ruleOf(css, DARK_SELECTOR)).to.be.undefined;
-  });
-
-  it('falls back to the system stacks alone for a system font', () => {
-    const css = stylesheetFor({ brand: { fonts: { body: 'system', mono: 'system' } } });
-
-    expect(ruleOf(css, '@theme')).to.deep.equal([
-      "--default-font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';",
-      "--default-mono-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"
-    ]);
+  // Nothing overrides the theme's colours, so no rule is written for either mode.
+  it('writes nothing but its header for an empty block', () => {
+    expect(stylesheetFor({})).to.match(/^\/\*[^\n]*\*\/\n$/);
   });
 
   it('sets a primary written once in both modes, with a foreground picked for it', () => {

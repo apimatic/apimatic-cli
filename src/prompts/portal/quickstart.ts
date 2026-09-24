@@ -194,7 +194,7 @@ export class PortalQuickstartPrompts {
         projectDirectory.toString()
       )}. It reloads as you edit.`,
       '',
-      `Change the name, colours and fonts in the ${f.var('portal')} block; your editor completes ` +
+      `Change the name, logo and colours in the ${f.var('portal')} block; your editor completes ` +
         `and checks it. Set ${f.var('portal.site.url')} to the address you will host the portal at, for ` +
         `canonical links and a sitemap. Add Markdown pages under ${f.var('src/content')} and more OpenAPI ` +
         `documents under ${f.var('src/spec')}, and run ${f.cmdAlt('apimatic', 'portal', 'generate')} to ` +

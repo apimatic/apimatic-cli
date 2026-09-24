@@ -176,31 +176,6 @@
                 }
               }
             },
-            "fonts": {
-              "type": "object",
-              "description": "Families from a fixed shortlist, loaded from Google Fonts; 'system' loads nothing and uses the reader's own.",
-              "additionalProperties": false,
-              "properties": {
-                "body": {
-                  "enum": [
-                    "geist",
-                    "inter",
-                    "ibm-plex-sans",
-                    "roboto",
-                    "open-sans",
-                    "source-sans-3",
-                    "manrope",
-                    "dm-sans",
-                    "system"
-                  ],
-                  "default": "geist"
-                },
-                "mono": {
-                  "enum": ["geist-mono", "jetbrains-mono", "ibm-plex-mono", "fira-code", "source-code-pro", "system"],
-                  "default": "geist-mono"
-                }
-              }
-            },
             "colorMode": {
               "enum": ["light", "dark", "both"],
               "default": "both",

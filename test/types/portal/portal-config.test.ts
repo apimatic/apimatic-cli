@@ -304,12 +304,15 @@ describe('PortalConfig', () => {
       });
     });
 
-    it('accepts the listed fonts and colour modes, and refuses others', () => {
-      const brand = config({ brand: { fonts: { body: 'inter', mono: 'system' }, colorMode: 'dark' } }).brandSettings();
-
-      expect(brand.brandFonts().bodyFamily()).to.match(/^'Inter', /);
-      expect(brand.mode()).to.equal('dark');
-      expect(errorsOf({ brand: { fonts: { body: 'Comic Sans' }, colorMode: 'auto' } })).to.have.lengthOf(2);
+    it('accepts the listed colour modes, and refuses others', () => {
+      expect(
+        config({ brand: { colorMode: 'dark' } })
+          .brandSettings()
+          .mode()
+      ).to.equal('dark');
+      expect(errorsOf({ brand: { colorMode: 'auto' } })).to.deep.equal([
+        "'portal.brand.colorMode' must be one of 'light', 'dark', 'both'."
+      ]);
     });
   });
 
@@ -503,7 +506,6 @@ describe('PortalConfig', () => {
         brand: {
           logo: { light: 'static/images/logo.png', dark: 'static/images/logo-dark.png' },
           favicon: 'static/favicon.svg',
-          fonts: { body: 'inter', mono: 'system' },
           colorMode: 'dark'
         },
         navigation: {
@@ -522,7 +524,6 @@ describe('PortalConfig', () => {
         siteUrl: 'https://docs.example.com',
         logo: { light: '/images/logo.png', dark: '/images/logo-dark.png' },
         favicon: { url: '/favicon.svg', type: 'image/svg+xml' },
-        fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap',
         colorMode: 'dark',
         links: [
           { label: 'Status', url: 'https://status.example.com', external: true },
@@ -540,8 +541,6 @@ describe('PortalConfig', () => {
         siteUrl: null,
         logo: null,
         favicon: null,
-        fontsUrl:
-          'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap',
         colorMode: 'both',
         links: [],
         homeCta: null,
@@ -575,17 +574,13 @@ describe('PortalConfig', () => {
       // A leading dot names a hidden file, not an extension.
       expect(typeOf('static/.png')).to.be.null;
     });
-
-    it('leaves the fonts stylesheet out when both families are the system ones', () => {
-      expect(config({ brand: { fonts: { body: 'system', mono: 'system' } } }).identity().fontsUrl).to.be.null;
-    });
   });
 
   describe('scaffolded', () => {
     it('spells out every default, so the block shows what can be set', () => {
       expect(JSON.parse(JSON.stringify(PortalConfig.scaffolded(suggested)))).to.deep.equal({
         site: { name: 'Spec Title', description: 'What the spec says.' },
-        brand: { colors: {}, fonts: { body: 'geist', mono: 'geist-mono' }, colorMode: 'both' },
+        brand: { colors: {}, colorMode: 'both' },
         navigation: { links: [] },
         home: {},
         api: { groupBy: 'tag', showDeprecated: true, showInternal: false },
@@ -608,7 +603,6 @@ describe('PortalConfig', () => {
           logo: { light: './static/light.svg', dark: 'static/dark.svg' },
           favicon: 'static/favicon.ico',
           colors: { primary: '#1d4ed8' },
-          fonts: { body: 'inter', mono: 'fira-code' },
           colorMode: 'light'
         },
         navigation: { links: [{ label: 'Status', url: 'https://status.test' }] },

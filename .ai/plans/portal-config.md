@@ -26,7 +26,7 @@ listed in section 2.
 ## 1. Goal and scope
 
 Give the `portal` block of `src/apimatic.json` the shape it will keep, make the
-portal brandable — logo, favicon, primary colour, fonts,
+portal brandable — logo, favicon, primary colour,
 light/dark mode, header links — and render the top level of the site as
 tabs. The tabs come from the root `nav.json`, which already orders the top
 level; `apimatic.json` says how the portal looks and behaves, `nav.json` says
@@ -72,7 +72,7 @@ Delivered as **one PR** (section 11).
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
 | Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. Fumadocs' neutral theme supplies every other token (section 15). |
-| Fonts | A validated shortlist plus `system`. No free text. Loaded from Google Fonts at runtime, as Geist is today; `system` makes no network request. |
+| Fonts | Geist and Geist Mono from Google Fonts, fixed in the template (section 15). |
 | Favicon default | The light logo; none when there is no logo. The APIMatic mark is never shipped onto a customer's domain. |
 | Site name default | Derived from `info.title` when the project has exactly one spec. With two or more, `site.name` is required. |
 | Unknown keys | Reported by dotted path, `'portal.brand.colour' is not a 'portal' setting.` No near-miss hints, including for today's flat keys: `title` is reported as unknown like any other key. The live `url`/`site` → `siteUrl` hints are deleted. |
@@ -82,7 +82,7 @@ Delivered as **one PR** (section 11).
 | Operation filtering | `api.showDeprecated` and `api.showInternal` are applied to the bundled document before pages are generated (section 7). |
 | Raw tokens | `advanced.tokens.{light,dark}` are validated by name and passed through. The contrast gate is post-MVP. |
 | Colour formats | `#rgb` and `#rrggbb` for `brand.colors.primary`, because the foreground derivation has to parse it (narrowed 2026-09-24, section 15). Raw tokens accept any CSS colour string. |
-| Key names | Deviations from the PM draft: `brand.colors`, `brand.colorMode`, `brand.fonts`, `navigation.links`, `api.showInternal`, and tabs in `nav.json` rather than a `sections` list. |
+| Key names | Deviations from the PM draft: `brand.colors`, `brand.colorMode`, `navigation.links`, `api.showInternal`, and tabs in `nav.json` rather than a `sections` list. |
 
 Rejected, with reasons:
 
@@ -143,7 +143,6 @@ Rejected, with reasons:
       "logo": { "light": "static/images/logo.svg", "dark": "static/images/logo-dark.svg" },
       "favicon": "static/favicon.ico",
       "colors": { "primary": { "light": "#1d4ed8", "dark": "#93c5fd" } },
-      "fonts": { "body": "geist", "mono": "geist-mono" },
       "colorMode": "both"
     },
     "navigation": {
@@ -182,8 +181,6 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.brand.logo` | string or `{light, dark}` | none | Paths relative to `src/` inside `static/`; a string sets both. Each file must exist. *As reviewed:* every name on the path must be there and not `.`, since `static//logo.png` finds the file and is then served as `//logo.png`, another host; each name is escaped in the URL; and the file must exist in the case written, since Windows and macOS find `Logo.PNG` for `logo.png` and the host does not. |
 | `portal.brand.favicon` | string | the light logo | Path inside `static/`; must exist. The link's `type` is set when the extension is known. The logo's path rules apply. |
 | `portal.brand.colors.primary` | colour or `{light, dark}` | the theme's | A string sets both modes. `#rgb` or `#rrggbb`, per section 2. |
-| `portal.brand.fonts.body` | enum | `geist` | `geist`, `inter`, `ibm-plex-sans`, `roboto`, `open-sans`, `source-sans-3`, `manrope`, `dm-sans`, `system`. |
-| `portal.brand.fonts.mono` | enum | `geist-mono` | `geist-mono`, `jetbrains-mono`, `ibm-plex-mono`, `fira-code`, `source-code-pro`, `system`. |
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
 | `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. *As reviewed:* a path is resolved as a browser resolves it and refused when that leaves the site (`/\host`, a tab after the slash), and written as resolved; an absolute URL must carry its `//`, since a browser reads `https:example.com` on an https site as a path of that site. |
 | `portal.home.cta` | `{label, url}` | none | Rendered under the title of the home page, including the fallback home. `label` and `url` follow the `links` rules. |
@@ -209,8 +206,7 @@ that addresses the build machine stays in `portal.config.json` behind
 
 Browser identity: `name`, `description`, `siteUrl`, `logo` (`{light, dark}` or
 null, the same URL twice for one image), `favicon` (`{url, type}` or null, the
-type from the extension), `fontsUrl` (the Google Fonts URL or null),
-`colorMode`, `links` and `homeCta` (each `{label, url, external}`),
+type from the extension), `colorMode`, `links` and `homeCta` (each `{label, url, external}`),
 `pageActions`. Tabs are not in it: they come from the page tree, which already
 carries `nav.json`.
 
@@ -228,7 +224,6 @@ content-directory `@source` line prepare already substitutes.
 | `brand.logo` | `layout.shared.tsx` `nav.title` | Two `<img>` with `dark:hidden` / `hidden dark:block`; the `dark` variant is defined by Fumadocs' `base.css`. |
 | `brand.favicon` | `__root.tsx` `links` | `<link rel="icon">` with `type` from the extension. |
 | `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the theme's `.dark` block and comes later, so a light-only value would win in dark mode. |
-| `brand.fonts` | `__root.tsx` head, `theme.css` | A `<link rel="stylesheet">` to the Google Fonts URL, then `@theme { --default-font-family; --default-mono-font-family }`. `system` emits no link and the OS stacks. A link rather than a CSS `@import` because a remote import nested inside an imported stylesheet lands mid-file after bundling, where browsers ignore it. |
 | `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
 | `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
 | `home.cta` | `$.tsx` | An anchor styled with `buttonVariants` from `fumadocs-ui/components/ui/button`, under the title of the index page and of the fallback home alike. |
@@ -368,18 +363,20 @@ under `portal serve` as they do today, tabs included, with no config watcher.
 - **`src/lib/layout.tsx`** (new): the notebook layout with `nav.mode: 'top'`
   and `tabMode: 'navbar'`, given the explicit `tabs` list. (Until the cut of
   section 15 it chose between four layouts, each with props of its own.)
-- **`app.css`**: keeps its `neutral.css` import, loses the Google Fonts and
-  Geist `@theme` lines, and gains a fixed `@import './theme.css'` after the
-  Fumadocs and OpenAPI presets, so the generated rules come last.
+- **`app.css`**: keeps its `neutral.css` import and its Geist `@theme`
+  families, now followed by Tailwind's fallback stacks, loses the Google Fonts
+  `@import`, and gains a fixed `@import './theme.css'` after the Fumadocs and
+  OpenAPI presets, so the generated rules come last.
 - **`src/styles/theme.css`** (written by the CLI, rewritten on re-apply):
-  `@theme` with the two font families, `:root:not(.dark)` with the light
-  primary trio and light tokens, `.dark` with the dark trio and dark tokens.
+  `:root:not(.dark)` with the light primary trio and light tokens, `.dark`
+  with the dark trio and dark tokens.
 - **`portal.identity.json`** (written by the CLI, rewritten on re-apply) and
   **`portal.ts`**, which imports it and exports it typed as `Portal`. The file
   holds the identity fields from section 4 and nothing else, which is what makes
   a whole-module JSON import safe here.
-- **`__root.tsx`**: favicon link; the Google Fonts stylesheet link;
-  `RootProvider` theme props from `colorMode`.
+- **`__root.tsx`**: favicon link; the fixed Google Fonts stylesheet link for
+  Geist, in place of `app.css`'s `@import`, so it loads alongside the
+  stylesheet; `RootProvider` theme props from `colorMode`.
 - **`layout.shared.tsx`**: two logos, `links`, `themeSwitch.enabled`.
 - **`$.tsx`**: the notebook layout's page components; the Home CTA.
 - **`src/lib/openapi-section.server.ts`**: already the one place both
@@ -455,13 +452,12 @@ would be dropped without a word; that is refused with a message naming
 Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 
 - **Types.** `PortalConfig` becomes the root of nested value objects, one per
-  namespace: `SiteConfig`, `BrandConfig` (holding `Logo`, `BrandColors`,
-  `Fonts`), `NavigationConfig`, `HomeConfig`, `ApiConfig`, `AiConfig`,
+  namespace: `SiteConfig`, `BrandConfig` (holding `Logo` and `BrandColors`),
+  `NavigationConfig`, `HomeConfig`, `ApiConfig`, `AiConfig`,
   `AdvancedTokens`. Each parses its own subtree and returns errors with dotted
-  paths; `PortalConfig.fromBlock` concatenates them. Two helpers: `Color` (parse
+  paths; `PortalConfig.fromBlock` concatenates them. One helper, `Color`: parse
   the accepted formats, relative luminance, WCAG contrast ratio, foreground
-  choice between the neutral preset's 98 % and 9 % greys) and the font table
-  (id, CSS family string, Google Fonts URL, fallback stack). `RENAMED_FIELDS`
+  choice between the neutral preset's 98 % and 9 % greys. `RENAMED_FIELDS`
   goes; `unknownFieldErrors` is called without a rename map.
 - **`PortalLanguages`** (new value object, `src/types/portal/`): built from
   `ApimaticConfigDocument.languages()` plus that block's findings. Refuses an
@@ -481,9 +477,8 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   missing when there are several, and checks the dark logo and the favicon
   exist as it checks the logo today. Warnings ride the Ok value the way
   `shadowedFiles` does, since the types layer cannot print.
-- **Stylesheet.** A `PortalStylesheet` value object renders `theme.css`, its
-  import lines included, and the Google Fonts URL from a completed config, so
-  the CSS is unit-testable without a build.
+- **Stylesheet.** A `PortalStylesheet` value object renders `theme.css` from a
+  completed config, so the CSS is unit-testable without a build.
 - **Project service.** `PortalProjectService` writes `theme.css`,
   `portal.identity.json` and the widened `portal.config.json`. The
   content-directory substitutions into `source.ts` and `app.css` stay; the
@@ -575,7 +570,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 
 - Value objects: every key's accepted and rejected forms, unknown keys at every
   level reported by dotted path, a flat `dev` key such as `title` reported as
-  unknown with no hint, colour formats, font ids, link and CTA URLs (absolute
+  unknown with no hint, colour formats, link and CTA URLs (absolute
   `https:`, site-relative `/x` accepted; `mailto:`, `docs/x`, `javascript:`
   refused), token keys (`--color-fd-accent` accepted; `accent` and
   `--color-fd-info` refused).
@@ -588,8 +583,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   dark logo and favicon reported.
 - `Color`: parsing, luminance against known values, the foreground choice on
   both sides of the crossover.
-- `PortalStylesheet`: the emitted CSS, `system` fonts emitting
-  no link, tokens landing after the primary, the light
+- `PortalStylesheet`: the emitted CSS, tokens landing after the primary, the light
   block scoped with `:not(.dark)`, both blocks present when the primary is one
   string.
 - `PortalNavigation`: `apimatic:sdks` accepted at the root, `apimatic:pages`
@@ -726,7 +720,7 @@ files the plugin and publishing commands create do not carry it, which keeps
 this PR to the portal. `PortalServeAction.execute` loses its `onAfterServe`
 hook, which only quickstart used; the language-step PR brings it back with the
 serve call. The e2e cases share one extra build: a `branded` fixture that sets
-forced dark, a primary, fonts, a header link and a CTA, and
+forced dark, a primary, a header link and a CTA, and
 hides a deprecated and an internal operation. It has no content directory, so it
 also covers the fallback home page and its Home tab. The sample repository's
 `v2` change is branch `saeedjamshaid/portal-config` in
@@ -899,3 +893,9 @@ none of them has shipped.
   preset or an accent colour can come back as a key beside it. The primary
   covers "make it ours"; eleven themes were eleven palettes to check every other
   setting against, several of which restyle the sidebar beyond any token.
+- **`brand.fonts`** is gone; every portal uses Geist and Geist Mono from Google
+  Fonts, which was the default, with the link in `__root.tsx` and the families
+  in `app.css`. A company's own brand font was rarely on the shortlist, so the
+  setting seldom delivered one, and each family's weight axis had to be checked
+  by hand against Google, where one wrong entry fails the whole font request.
+  The identity loses `fontsUrl`, and `theme.css` its `@theme` block.

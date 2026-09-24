@@ -298,16 +298,19 @@ const stylesheetOf = (output: DirectoryPath) => {
   it('ships what the browser is told, and nothing from the build-only config', () => {
     const scripts = scriptsOf(output);
 
-    expect(scripts.some((script) => script.text.includes('fontsUrl'))).to.be.true;
+    expect(scripts.some((script) => script.text.includes('pageActions'))).to.be.true;
     expect(
       scripts.filter((script) => /contentDir|staticDir/.test(script.text)).map((script) => script.name)
     ).to.deep.equal([]);
   });
 
-  it('loads the default fonts and the neutral theme', () => {
+  it('loads Geist and the neutral theme', () => {
+    const css = stylesheetOf(output);
+
     expect(read('index.html')).to.contain('https://fonts.googleapis.com/css2?family=Geist:wght@100..900');
+    expect(css).to.contain('--default-font-family:"Geist"');
     // The theme's light primary, which nothing in the fixture overrides.
-    expect(stylesheetOf(output)).to.match(/--color-fd-primary:#171717/);
+    expect(css).to.match(/--color-fd-primary:#171717/);
   });
 
   // The counterpart of the branded portal's forced mode: the same label, present here.
@@ -357,15 +360,6 @@ const stylesheetOf = (output: DirectoryPath) => {
       '.dark #nd-sidebar'
     ]);
     expect(overrides.every((rule) => (rule.index ?? -1) > themeDark)).to.be.true;
-    expect(css).to.contain('--default-font-family:"Inter"');
-  });
-
-  // Mono is the system's own, so only the body family is fetched.
-  it('loads only the fonts that are not the system’s own', () => {
-    const page = read('index.html');
-
-    expect(page).to.contain('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap');
-    expect(page).to.not.contain('family=Geist');
   });
 
   it('shows the logo for each mode, and the favicon with its type', () => {

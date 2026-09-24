@@ -29,8 +29,6 @@ export interface Portal {
   siteUrl: string | null;
   logo: PortalLogo | null;
   favicon: PortalFavicon | null;
-  /** The Google Fonts stylesheet, or null when both families are the system's own. */
-  fontsUrl: string | null;
   colorMode: PortalColorMode;
   links: PortalLink[];
   homeCta: PortalLink | null;
