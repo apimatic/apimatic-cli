@@ -19,6 +19,7 @@ import { envInfo } from '../../infrastructure/env-info.js';
 import { schemaUrlFor } from '../../types/apimatic-config/document.js';
 import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { deriveMetadata } from '../../types/plugin/plugin-config.js';
+import { ProjectContext } from '../../types/project-context.js';
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -185,6 +186,10 @@ export class PortalQuickstartAction {
         this.prompts.configNotWritten();
         return ActionResult.failed();
       }
+
+      // Written while the project is being made, because the files it names are generated on
+      // every build from here on and none of them belongs in a repository.
+      await new ProjectContext(inputDirectory).ignoreGeneratedFiles();
 
       const structure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, structure);
