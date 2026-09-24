@@ -747,7 +747,7 @@ build, lint on touched files and the affected tests green.
    and the synthetic SDKs tab's removal. Template unit tests, the existing ones
    moved onto the folders, and the test from step 2 that holds the two lists
    together. A build now carries the pages.
-5. **Serve.** The notice wording of section 7 (no case needs a restart) and
+5. **Serve.** *Done 2026-09-24.* The notice wording of section 7 (no case needs a restart) and
    its prompt test. The watcher already passes the pair, and the serve tests
    cover a language and a `plugin` block added, since step 3: `applyConfig`'s
    new signature needed the caller changed to compile.
