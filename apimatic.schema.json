@@ -40,8 +40,8 @@
     },
     "color": {
       "type": "string",
-      "description": "#rgb, #rrggbb, #rrggbbaa, rgb() or hsl(), for example '#1d4ed8'.",
-      "pattern": "^\\s*(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:[rR][gG][bB][aA]?|[hH][sS][lL][aA]?)\\([^()]*\\))\\s*$"
+      "description": "#rgb or #rrggbb, for example '#1d4ed8'.",
+      "pattern": "^\\s*#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\\s*$"
     },
     "link": {
       "type": "object",

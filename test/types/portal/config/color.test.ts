@@ -9,57 +9,23 @@ describe('Color', () => {
   };
 
   describe('create', () => {
-    it('reads every accepted form', () => {
-      for (const value of [
-        '#fff',
-        '#1d4ed8',
-        '#1D4ED8cc',
-        'rgb(29, 78, 216)',
-        'rgba(29, 78, 216, 0.5)',
-        'rgb(29 78 216)',
-        'rgb(29 78 216 / 50%)',
-        'rgb(10%, 30%, 85%)',
-        'hsl(221, 83%, 53%)',
-        'hsla(221, 83%, 53%, 0.8)',
-        'hsl(221deg 83% 53% / 0.8)',
-        // The space form may mix numbers and percentages, and take bare numbers for hsl.
-        'rgb(10% 30 85%)',
-        'hsl(221 83 53)',
-        'hsl(0.5turn 50% 50%)'
-      ]) {
+    it('reads both hex forms, in either case', () => {
+      for (const value of ['#fff', '#1d4ed8', '#1D4ED8', '#AbC']) {
         color(value);
       }
     });
 
-    it('reads a hue in any of the units CSS takes', () => {
-      const luminance = (value: string) => color(value).luminance();
-
-      expect(luminance('hsl(0.5turn 100% 50%)')).to.be.closeTo(luminance('hsl(180, 100%, 50%)'), 1e-9);
-      expect(luminance('hsl(200grad 100% 50%)')).to.be.closeTo(luminance('hsl(180, 100%, 50%)'), 1e-9);
-      expect(luminance(`hsl(${Math.PI}rad 100% 50%)`)).to.be.closeTo(luminance('hsl(180, 100%, 50%)'), 1e-9);
-    });
-
-    // A browser drops each of these as invalid, and every use of the primary with it.
-    it('refuses what CSS refuses in the comma form', () => {
-      for (const value of ['rgb(10%, 30, 85%)', 'rgba(29, 78%, 216, 0.5)', 'hsl(221, 83, 53%)']) {
-        expect(Color.create(value), value).to.be.undefined;
-      }
-    });
-
-    it('refuses what it cannot read the channels of', () => {
+    it('refuses every other form', () => {
       for (const value of [
         'blue',
-        'oklch(0.5 0.2 240)',
+        '1d4ed8',
         '#12345',
+        '#fffa',
+        '#1d4ed8cc',
         '#ggg',
-        'rgb(256, 0, 0)',
-        'rgb(1, 2)',
-        'rgb(1, 2, 3, 4, 5)',
-        'rgb(1 2 3 / 2)',
-        'hsl(221, 83, 53)',
-        'hsl(221, 101%, 53%)',
-        'hsl(221 101 53)',
-        'hsl(1turns 50% 50%)',
+        'rgb(29, 78, 216)',
+        'hsl(221, 83%, 53%)',
+        'oklch(0.5 0.2 240)',
         ''
       ]) {
         expect(Color.create(value), value).to.be.undefined;
@@ -76,17 +42,12 @@ describe('Color', () => {
       expect(color('#ffffff').luminance()).to.be.closeTo(1, 1e-9);
       expect(color('#000').luminance()).to.be.closeTo(0, 1e-9);
       expect(color('#808080').luminance()).to.be.closeTo(0.2159, 1e-4);
+      expect(color('#f00').luminance()).to.be.closeTo(0.2126, 1e-4);
+      expect(color('#00ff00').luminance()).to.be.closeTo(0.7152, 1e-4);
     });
 
-    it('converts hsl the way CSS does', () => {
-      expect(color('hsl(0, 100%, 50%)').luminance()).to.be.closeTo(0.2126, 1e-4);
-      expect(color('hsl(120, 100%, 50%)').luminance()).to.be.closeTo(0.7152, 1e-4);
-      expect(color('hsl(240deg 100% 50%)').luminance()).to.be.closeTo(0.0722, 1e-4);
-      expect(color('hsl(-120, 100%, 50%)').luminance()).to.be.closeTo(0.0722, 1e-4);
-    });
-
-    it('reads rgb percentages as fractions of full intensity', () => {
-      expect(color('rgb(100%, 100%, 100%)').luminance()).to.be.closeTo(1, 1e-9);
+    it('reads the short form as each digit doubled', () => {
+      expect(color('#1ad').luminance()).to.equal(color('#11aadd').luminance());
     });
   });
 

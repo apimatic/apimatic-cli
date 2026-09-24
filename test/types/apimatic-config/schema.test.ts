@@ -100,7 +100,7 @@ describe('apimatic.schema.json', () => {
           brand: {
             logo: { light: 'static/light.svg', dark: '.\\static\\dark.svg' },
             favicon: './static/favicon.ico',
-            colors: { preset: 'ocean', primary: { light: '#1d4ed8', dark: 'hsl(210, 90%, 80%)' } },
+            colors: { preset: 'ocean', primary: { light: '#1d4ed8', dark: '#93c5fd' } },
             fonts: { body: 'system', mono: 'ibm-plex-mono' },
             colorMode: 'dark'
           },
@@ -120,16 +120,13 @@ describe('apimatic.schema.json', () => {
       ['an address with a port', { site: { url: 'https://docs.example.com:8443' } }],
       ['one logo for both modes', { brand: { logo: 'static/images/logo.png' } }],
       ['a logo path with its dots inside a name', { brand: { logo: 'static/..hidden/logo.png' } }],
-      ['an eight-digit hex primary', { brand: { colors: { primary: '#1D4ED8cc' } } }],
-      ['a space-syntax rgb primary', { brand: { colors: { primary: 'rgb(29 78 216 / 50%)' } } }],
+      ['a three-digit hex primary', { brand: { colors: { primary: ' #FFF ' } } }],
       [
         'a token value that is a CSS function',
         { advanced: { tokens: { light: { '--color-fd-accent': 'color-mix(in oklab, #1d4ed8 10%, transparent)' } } } }
       ],
       ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }],
       ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }],
-      ['a hue written in turns', { brand: { colors: { primary: 'hsl(0.5turn 50% 50%)' } } }],
-      ['a space-syntax hsl primary with bare numbers', { brand: { colors: { primary: 'hsl(221 83 53)' } } }],
       [
         'a token value derived from another token',
         {
@@ -172,6 +169,9 @@ describe('apimatic.schema.json', () => {
       ['a named colour', { brand: { colors: { primary: 'blue' } } }],
       ['an oklch colour', { brand: { colors: { primary: 'oklch(0.5 0.2 240)' } } }],
       ['a four-digit hex colour', { brand: { colors: { primary: '#fffa' } } }],
+      ['an eight-digit hex colour', { brand: { colors: { primary: '#1D4ED8cc' } } }],
+      ['an rgb colour', { brand: { colors: { primary: 'rgb(29 78 216)' } } }],
+      ['an hsl colour', { brand: { colors: { primary: 'hsl(221, 83%, 53%)' } } }],
       ['an unknown colour key', { brand: { colors: { accent: '#fff' } } }],
       ['a font off the shortlist', { brand: { fonts: { body: 'Comic Sans' } } }],
       ['an unknown font key', { brand: { fonts: { heading: 'inter' } } }],
@@ -231,16 +231,6 @@ describe('apimatic.schema.json', () => {
         expect(schemaVerdict({ portal: block }).valid, 'schema').to.be.false;
       });
     }
-
-    // The schema checks a colour's form; what goes inside the parentheses is the CLI's to check.
-    it('leaves colour channels to the CLI', () => {
-      for (const primary of ['rgb(256, 0, 0)', 'rgb(10%, 30, 85%)', 'rgb(none 0 0)']) {
-        const block = { brand: { colors: { primary } } };
-
-        expect(portalAccepts(block), primary).to.be.false;
-        expect(schemaVerdict({ portal: block }).valid, primary).to.be.true;
-      }
-    });
 
     // A pattern cannot count parentheses.
     it('leaves unclosed parentheses in a token value to the CLI', () => {

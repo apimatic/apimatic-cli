@@ -299,21 +299,21 @@ describe('PortalConfig', () => {
         const single = config({ brand: { colors: { primary: '#1d4ed8' } } })
           .brandSettings()
           .brandColors();
-        const pair = config({ brand: { colors: { primary: { light: '#1d4ed8', dark: 'hsl(210, 90%, 80%)' } } } })
+        const pair = config({ brand: { colors: { primary: { light: '#1d4ed8', dark: '#93c5fd' } } } })
           .brandSettings()
           .brandColors();
 
         expect(single.primaryColors()?.light.toString()).to.equal('#1d4ed8');
         expect(single.primaryColors()?.dark.toString()).to.equal('#1d4ed8');
-        expect(pair.primaryColors()?.dark.toString()).to.equal('hsl(210, 90%, 80%)');
+        expect(pair.primaryColors()?.dark.toString()).to.equal('#93c5fd');
       });
 
-      it('refuses a primary it cannot read the channels of', () => {
+      it('refuses a primary that is not hex', () => {
         expect(errorsOf({ brand: { colors: { primary: 'blue' } } })).to.deep.equal([
-          "'portal.brand.colors.primary' must be a colour written as #rgb, #rrggbb, #rrggbbaa, rgb() or hsl(), for example '#1d4ed8'."
+          "'portal.brand.colors.primary' must be a colour written as #rgb or #rrggbb, for example '#1d4ed8'."
         ]);
         expect(
-          errorsOf({ brand: { colors: { primary: { light: '#fff', dark: 'oklch(0.5 0.2 240)' } } } })
+          errorsOf({ brand: { colors: { primary: { light: '#fff', dark: 'hsl(210, 90%, 80%)' } } } })
         ).to.have.lengthOf(1);
       });
     });

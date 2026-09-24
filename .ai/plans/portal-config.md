@@ -8,7 +8,9 @@ records what changed and why, so the older reasoning is not rediscovered.
 Findings made while implementing are marked *as built* or *verified* in the
 section they concern. A review of the whole branch the same day found gaps in
 input validation, the API filter, tabs and the serve watcher; each fix is
-marked *as reviewed* where its rule is stated.
+marked *as reviewed* where its rule is stated. On 2026-09-24 the block was
+trimmed for the first release; section 15 lists what was cut and why, and the
+sections above describe what remains.
 
 Builds on `.ai/plans/fumadocs-portal.md` (PR #343), `.ai/plans/portal-navigation.md`
 (`nav.json`, PR #346) and `.ai/plans/apimatic-config.md` (`apimatic.json`,
@@ -79,7 +81,7 @@ Delivered as **one PR** (section 11).
 | Generated files, not substitution | The CLI writes `portal.identity.json` (client-safe, imported by `portal.ts`) and `src/styles/theme.css`. Re-applying a config edit under `portal serve` is a plain write of those two files; the only substitutions left are the content-directory literals prepare makes once. |
 | Operation filtering | `api.showDeprecated` and `api.showInternal` are applied to the bundled document before pages are generated (section 7). |
 | Raw tokens | `advanced.tokens.{light,dark}` are validated by name and passed through. The contrast gate is post-MVP. |
-| Colour formats | `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `hsl()` for `brand.colors.primary`, because the foreground derivation has to parse it. Raw tokens accept any CSS colour string. |
+| Colour formats | `#rgb` and `#rrggbb` for `brand.colors.primary`, because the foreground derivation has to parse it (narrowed 2026-09-24, section 15). Raw tokens accept any CSS colour string. |
 | Key names | Deviations from the PM draft: `brand.colors.preset`, `brand.colorMode`, `brand.fonts`, `navigation.links`, `api.showInternal`, and tabs in `nav.json` rather than a `sections` list. |
 
 Rejected, with reasons:
@@ -181,7 +183,7 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.brand.logo` | string or `{light, dark}` | none | Paths relative to `src/` inside `static/`; a string sets both. Each file must exist. *As reviewed:* every name on the path must be there and not `.`, since `static//logo.png` finds the file and is then served as `//logo.png`, another host; each name is escaped in the URL; and the file must exist in the case written, since Windows and macOS find `Logo.PNG` for `logo.png` and the host does not. |
 | `portal.brand.favicon` | string | the light logo | Path inside `static/`; must exist. The link's `type` is set when the extension is known. The logo's path rules apply. |
 | `portal.brand.colors.preset` | enum | `neutral` | `neutral`, `black`, `vitepress`, `dusk`, `catppuccin`, `ocean`, `purple`, `solar`, `emerald`, `ruby`, `aspen`. |
-| `portal.brand.colors.primary` | colour or `{light, dark}` | the preset's | A string sets both modes. Formats per section 2, held to CSS's own rules for each: the comma form takes three numbers or three percentages, never a mix, and the space form also takes bare numbers for `hsl()`, and a hue in `deg`, `grad`, `rad` or `turn` (*as reviewed*). |
+| `portal.brand.colors.primary` | colour or `{light, dark}` | the preset's | A string sets both modes. `#rgb` or `#rrggbb`, per section 2. |
 | `portal.brand.fonts.body` | enum | `geist` | `geist`, `inter`, `ibm-plex-sans`, `roboto`, `open-sans`, `source-sans-3`, `manrope`, `dm-sans`, `system`. |
 | `portal.brand.fonts.mono` | enum | `geist-mono` | `geist-mono`, `jetbrains-mono`, `ibm-plex-mono`, `fira-code`, `source-code-pro`, `system`. |
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
@@ -883,3 +885,18 @@ Kept so the older reasoning is not re-litigated:
 - The schema covers the whole file; the draft's single-block schema is
   superseded.
 - Two PRs became one.
+
+## 15. Cut for the first release (2026-09-24)
+
+The first release keeps only the settings a portal needs to carry its owner's
+name, address and brand, so that there is less to build, test and keep working
+against Fumadocs. Where a setting is cut, the behaviour its default gave stays,
+fixed, so bringing one back later changes nothing for a portal that leaves it
+out. A block that still names a cut key is refused like any other unknown key:
+none of them has shipped.
+
+- **`brand.colors.primary` takes hex only.** `rgb()` and `hsl()`, in both CSS
+  syntaxes, and `#rrggbbaa` are refused. Brand guidelines give colours in hex,
+  and reading the functional forms to CSS's own rules was most of `Color`. A
+  see-through primary has no use on a button, and the contrast check ignored its
+  alpha anyway.
