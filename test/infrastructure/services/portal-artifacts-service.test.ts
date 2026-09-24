@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
-import { ServiceError } from '../../../src/infrastructure/service-error';
+import { ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { Endpoint } from '../../../src/types/portal/endpoint';
 
 describe('PortalArtifactsService', () => {
@@ -45,19 +45,38 @@ describe('PortalArtifactsService', () => {
     expect(samples.map((sample) => sample.lang)).to.deep.equal(['typescript', 'csharp', 'python']);
   });
 
-  it('fails when the configured file does not exist', async () => {
-    process.env.APIMATIC_CODE_SAMPLES_PATH = path.join(root, 'missing.json');
+  it('names the variable and the file when the file does not exist', async () => {
+    const missing = path.join(root, 'missing.json');
+    process.env.APIMATIC_CODE_SAMPLES_PATH = missing;
 
-    const result = await new PortalArtifactsService().generate();
+    const error = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
 
-    expect(result._unsafeUnwrapErr()).to.equal(ServiceError.NotFound);
+    expect(error.code).to.equal(ServiceErrorCode.NotFound);
+    expect(error.errorMessage).to.contain('APIMATIC_CODE_SAMPLES_PATH').and.contain(missing);
   });
 
-  it('fails on a catalog for an unknown language', async () => {
-    withSamples(JSON.stringify({ cobol: { paths: {} } }));
+  it('names the variable and the file when the file is not JSON', async () => {
+    withSamples('{ not json');
+
+    const error = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
+
+    expect(error.errorMessage).to.contain('APIMATIC_CODE_SAMPLES_PATH').and.contain('code-samples.json');
+  });
+
+  it('names the language whose catalog is malformed', async () => {
+    withSamples(JSON.stringify({ python: { paths: [] } }));
+
+    const error = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
+
+    expect(error.errorMessage).to.contain('python');
+  });
+
+  it('skips a key that is not a language', async () => {
+    withSamples(JSON.stringify({ version: 1, typescript: { paths: { '/payments': { GET: { Example: 'list()' } } } } }));
 
     const result = await new PortalArtifactsService().generate();
 
-    expect(result._unsafeUnwrapErr()).to.equal(ServiceError.InvalidResponse);
+    const samples = result._unsafeUnwrap().samplesFor(new Endpoint('GET', '/payments'));
+    expect(samples.map((sample) => sample.lang)).to.deep.equal(['typescript']);
   });
 });
