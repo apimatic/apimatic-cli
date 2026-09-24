@@ -5,7 +5,6 @@ import { Parameter, requestExamples, type RequestExample } from '@/lib/request-e
 
 interface ExampleSelection {
   operation: unknown;
-  parameters: Parameter[];
   examples: RequestExample[];
   selected: RequestExample;
   select: (id: string) => void;
@@ -29,13 +28,14 @@ function ExampleLayout({ usageTabs, responseTabs }: Readonly<{ usageTabs: ReactN
   const { route, examples: bodyExamples, setExample } = useOperationContext();
   const pathItem = schema.resolve(schema.dereferenced.paths?.[route]);
   const operation = pathItem?.[bodyExamples[0].data.method];
-  const parameters = useMemo(() => Parameter.listIn(operation, pathItem), [operation, pathItem]);
-  const examples = useMemo(() => requestExamples(bodyExamples, parameters), [bodyExamples, parameters]);
+  const examples = useMemo(
+    () => requestExamples(bodyExamples, Parameter.listIn(operation, pathItem)),
+    [bodyExamples, operation, pathItem]
+  );
   const [selectedId, setSelectedId] = useState(examples[0].id);
 
   const selection: ExampleSelection = {
     operation,
-    parameters,
     examples,
     selected: examples.find((example) => example.id === selectedId) ?? examples[0],
     select: (id) => {
