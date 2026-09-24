@@ -107,6 +107,20 @@ describe('withoutHiddenOperations', () => {
     });
   });
 
+  it('drops an emptied additionalOperations, and a path item it leaves with no operation', () => {
+    const document = documentWith({
+      '/pets': {
+        get: { operationId: 'list', responses: ok },
+        additionalOperations: { COPY: { operationId: 'copy', 'x-internal': true, responses: ok } }
+      },
+      '/admin': { additionalOperations: { PURGE: { operationId: 'purge', deprecated: true, responses: ok } } }
+    });
+
+    expect(pathsOf(withoutHiddenOperations(document, hideBoth))).to.deep.equal({
+      '/pets': { get: { operationId: 'list', responses: ok } }
+    });
+  });
+
   // Another path may share the component, so it is never edited; the path gets its own copy.
   it('follows a path item that is a reference, and inlines it only when something in it is hidden', () => {
     const shared = {

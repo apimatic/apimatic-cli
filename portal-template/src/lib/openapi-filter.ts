@@ -71,37 +71,37 @@ function pathItemShown(root: Json, item: unknown, filter: OperationFilter): unkn
   if (resolved['x-internal'] === true && !filter.showInternal) {
     return undefined;
   }
-
-  const copy: Json = { ...resolved };
-  let removed = false;
-  let remaining = 0;
-  for (const method of METHODS) {
-    if (!isObject(copy[method])) continue;
-    if (isHidden(copy[method], filter)) {
-      delete copy[method];
-      removed = true;
-    } else {
-      remaining += 1;
-    }
+  if (!operationsOf(resolved).some((operation) => isHidden(operation, filter))) {
+    return item;
   }
-  if (isObject(copy.additionalOperations)) {
-    const additional: Json = {};
-    for (const [method, operation] of Object.entries(copy.additionalOperations)) {
-      if (isObject(operation) && isHidden(operation, filter)) {
-        removed = true;
-      } else {
-        additional[method] = operation;
-        remaining += 1;
-      }
-    }
+  const copy = withoutHidden(resolved, filter);
+  return holdsOperation(copy) ? copy : undefined;
+}
+
+function withoutHidden(item: Json, filter: OperationFilter): Json {
+  const isShown = (operation: unknown) => !isObject(operation) || !isHidden(operation, filter);
+  const copy: Json = { ...item };
+  for (const method of METHODS) {
+    if (!isShown(copy[method])) delete copy[method];
+  }
+  if (isObject(item.additionalOperations)) {
+    const additional = Object.fromEntries(
+      Object.entries(item.additionalOperations).filter(([, operation]) => isShown(operation))
+    );
     if (Object.keys(additional).length > 0) copy.additionalOperations = additional;
     else delete copy.additionalOperations;
   }
+  return copy;
+}
 
-  if (!removed) {
-    return item;
-  }
-  return remaining > 0 ? copy : undefined;
+function holdsOperation(item: Json): boolean {
+  return METHODS.some((method) => isObject(item[method])) || isObject(item.additionalOperations);
+}
+
+/** The operations of a path item, OpenAPI 3.2's `additionalOperations` included. */
+function operationsOf(item: Json): Json[] {
+  const additional = isObject(item.additionalOperations) ? Object.values(item.additionalOperations) : [];
+  return [...METHODS.map((method) => item[method]), ...additional].filter(isObject);
 }
 
 /**
@@ -171,22 +171,11 @@ function withoutEmptiedTags(root: Json, shown: Json): void {
 
 /** Every tag an operation of the document carries. */
 function tagsUsed(document: Json): Set<string> {
-  const used = new Set<string>();
-  for (const items of [document.paths, document.webhooks]) {
-    if (!isObject(items)) continue;
-    for (const item of Object.values(items)) {
-      const resolved = resolvePathItem(document, item);
-      if (resolved === undefined) continue;
-      const additional = isObject(resolved.additionalOperations) ? Object.values(resolved.additionalOperations) : [];
-      for (const operation of [...METHODS.map((method) => resolved[method]), ...additional]) {
-        if (!isObject(operation) || !Array.isArray(operation.tags)) continue;
-        for (const tag of operation.tags) {
-          if (typeof tag === 'string') used.add(tag);
-        }
-      }
-    }
-  }
-  return used;
+  const tags = [document.paths, document.webhooks]
+    .flatMap((items) => (isObject(items) ? Object.values(items) : []))
+    .flatMap((item) => operationsOf(resolvePathItem(document, item) ?? {}))
+    .flatMap((operation): unknown[] => (Array.isArray(operation.tags) ? operation.tags : []));
+  return new Set(tags.filter((tag): tag is string => typeof tag === 'string'));
 }
 
 /** A JSON pointer into the document itself, such as `#/components/pathItems/Pets`. */
