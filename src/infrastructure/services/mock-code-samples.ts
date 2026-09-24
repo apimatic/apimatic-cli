@@ -51,8 +51,7 @@ export const MOCK_CODE_SAMPLES: ReadonlyArray<[Language, unknown]> = [
             ].join('\n')
           }
         }
-      },
-      webhooks: {}
+      }
     }
   ],
   [
@@ -106,8 +105,7 @@ export const MOCK_CODE_SAMPLES: ReadonlyArray<[Language, unknown]> = [
             ].join('\n')
           }
         }
-      },
-      webhooks: {}
+      }
     }
   ],
   [
@@ -156,8 +154,7 @@ export const MOCK_CODE_SAMPLES: ReadonlyArray<[Language, unknown]> = [
             ].join('\n')
           }
         }
-      },
-      webhooks: {}
+      }
     }
   ]
 ];
