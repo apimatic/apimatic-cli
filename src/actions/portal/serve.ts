@@ -5,6 +5,7 @@ import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { PortalArtifactsContext } from '../../types/portal-artifacts-context.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
@@ -61,16 +62,6 @@ export class PortalServeAction {
       return ActionResult.failed();
     }
 
-    const sourceContext = new PortalSourceContext(sourceDirectory);
-    const source = await sourceContext.resolve();
-    if (source.isErr()) {
-      this.prompts.sourceProblem(source.error, sourceDirectory);
-      return ActionResult.failed();
-    }
-    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {
       this.prompts.usingFallbackPort(port, servePort);
@@ -91,6 +82,21 @@ export class PortalServeAction {
       if (artifacts.isErr()) {
         return ActionResult.failed();
       }
+
+      // Placed before the source is read: `resolve` records whether `static/` is there, so a
+      // project getting its first SDK download would otherwise serve without one.
+      await new PortalArtifactsContext(sourceDirectory).place(artifacts.value);
+
+      const sourceContext = new PortalSourceContext(sourceDirectory);
+      const source = await sourceContext.resolve();
+      if (source.isErr()) {
+        this.prompts.sourceProblem(source.error, sourceDirectory);
+        return ActionResult.failed();
+      }
+      this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
+      this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
+      this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
+
       const codeSamples = artifacts.value.codeSamples;
       this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
 
