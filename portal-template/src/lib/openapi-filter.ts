@@ -109,49 +109,44 @@ function isInternal(node: Json): boolean {
   return node['x-internal'] === true;
 }
 
-/**
- * Drops the tags that only removed operations carried, and the groups left with no tag under
- * them, from `tags` and from Redocly's `x-tagGroups`. Fumadocs builds no folder for such a tag,
- * but every page's payload carries the document's tags, so a hidden section's name and
- * description would still reach the reader.
- */
+// Every page's payload carries the document's tags, so a hidden section's name would still reach the reader.
 function withoutEmptiedTags(root: Json, shown: Json): void {
   const kept = tagsUsed(shown);
   const emptied = new Set([...tagsUsed(root)].filter((name) => !kept.has(name)));
   if (emptied.size === 0) {
     return;
   }
-  const gone = Array.isArray(shown.tags) ? tagsThatGo(shown.tags, emptied, kept) : new Set<string>();
+  let gone = new Set<string>();
   if (Array.isArray(shown.tags)) {
+    gone = tagsThatGo(shown.tags, emptied, kept);
     shown.tags = shown.tags.filter((tag) => !isNamedIn(tag, gone));
   }
-  // Here a tag stands for the operations it carries, so one kept in `tags` only as a group goes.
+  // A tag stands for its operations here, so one kept in `tags` only as a group goes all the same.
+  const dropped = new Set([...emptied, ...gone]);
   if (Array.isArray(shown['x-tagGroups'])) {
     shown['x-tagGroups'] = (shown['x-tagGroups'] as unknown[]).flatMap((group) => {
       if (!isJsonObject(group) || !Array.isArray(group.tags)) return [group];
-      const tags = group.tags.filter((name) => typeof name !== 'string' || !(emptied.has(name) || gone.has(name)));
+      const tags = group.tags.filter((name) => typeof name !== 'string' || !dropped.has(name));
       return tags.length > 0 ? [{ ...group, tags }] : [];
     });
   }
 }
 
-/**
- * The names in `tags` that go: those only removed operations carried, and those no remaining
- * operation carries that grouped others, once every tag under them has gone. A tag that a
- * staying tag names as its `parent` stays, as the group it is, and one that neither carried an
- * operation nor grouped a tag was never the filter's to remove.
- */
+/** The names in `tags` that go: those only removed operations carried, and groups left holding none of the rest. */
 function tagsThatGo(tags: unknown[], emptied: Set<string>, kept: Set<string>): Set<string> {
   const groups = new Set(tags.flatMap(parentOf).filter((name) => !kept.has(name)));
   const names = tags.map(nameOf).filter((name): name is string => name !== undefined);
-  // Until no group is left holding only tags that went: each pass can empty the one above.
-  let gone = new Set<string>();
-  for (;;) {
-    const parents = new Set(tags.filter((tag) => !isNamedIn(tag, gone)).flatMap(parentOf));
-    const next = new Set(names.filter((name) => (emptied.has(name) || groups.has(name)) && !parents.has(name)));
-    if (next.size === gone.size) return gone;
-    gone = next;
+  // Grown up from the tags that stay regardless, so a cycle of groups holds nothing up on its own.
+  const staying = new Set(names.filter((name) => !emptied.has(name) && !groups.has(name)));
+  let size = -1;
+  while (staying.size !== size) {
+    size = staying.size;
+    for (const tag of tags) {
+      const name = nameOf(tag);
+      if (name === undefined || staying.has(name)) parentOf(tag).forEach((parent) => staying.add(parent));
+    }
   }
+  return new Set(names.filter((name) => !staying.has(name)));
 }
 
 function nameOf(tag: unknown): string | undefined {

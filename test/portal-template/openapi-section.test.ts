@@ -243,6 +243,27 @@ describe('withoutInternalOperations', () => {
     expect(shown['x-tagGroups']).to.deep.equal([{ name: 'Public', tags: ['pets'] }]);
   });
 
+  it('drops a cycle of groups, and a group under itself, that nothing staying holds up', () => {
+    const document = documentWith(
+      {
+        '/pets': { get: { operationId: 'list', tags: ['pets'], responses: ok } },
+        '/admin': { get: { operationId: 'admin', tags: ['A', 'B', 'C'], 'x-internal': true, responses: ok } }
+      },
+      {
+        tags: [
+          { name: 'pets' },
+          { name: 'A', description: 'Internal tools', parent: 'B' },
+          { name: 'B', parent: 'A' },
+          { name: 'C', parent: 'C' }
+        ]
+      }
+    );
+
+    const shown = withoutInternalOperations(document) as unknown as Record<string, unknown>;
+
+    expect(shown.tags).to.deep.equal([{ name: 'pets' }]);
+  });
+
   it('keeps a group while a tag under it stays, or a remaining operation carries it', () => {
     const document = documentWith(
       {
