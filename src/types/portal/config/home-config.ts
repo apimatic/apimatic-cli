@@ -4,7 +4,6 @@ import { Link } from './link.js';
 
 const KNOWN = ['cta'];
 
-/** `portal.home`: what the home page offers beyond its own content. */
 export class HomeConfig {
   private constructor(private readonly cta: Link | null) {}
 
@@ -19,7 +18,6 @@ export class HomeConfig {
     );
   }
 
-  /** The button under the home page's title, or null when there is none. */
   public callToAction(): Link | null {
     return this.cta;
   }

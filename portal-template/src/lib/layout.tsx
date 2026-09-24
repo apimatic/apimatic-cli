@@ -35,10 +35,8 @@ const PAGE_COMPONENTS: Record<PortalLayout, PageComponents> = {
   glass: glassPage
 };
 
-/** The page components of the layout the portal is configured with. */
 export const pageComponents: PageComponents = PAGE_COMPONENTS[portal.layout];
 
-/** The configured layout around a page, with the site's shared header options. */
 export function PortalLayout({ tree, children }: Readonly<{ tree: PageTree.Root; children: ReactNode }>) {
   const base = baseOptions();
   const tabs = useMemo(() => portalTabs(tree), [tree]);

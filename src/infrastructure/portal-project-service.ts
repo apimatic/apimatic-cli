@@ -160,8 +160,7 @@ export class PortalProjectService {
     }
 
     // Everything here addresses this machine, or is read only while the build is set up, so
-    // it stays behind `portal.server.ts` and the build's own config files. What the browser
-    // is told goes into a file of its own, below.
+    // it stays behind `portal.server.ts` and the build's own config files.
     const configuration = {
       specs,
       contentDir: this.toPosix(contentDirectory.toString()),
@@ -188,10 +187,9 @@ export class PortalProjectService {
   }
 
   /**
-   * Brings a running preview up to date with an edited `portal` block: the dev server picks
-   * the two files up and reloads the browser. Each is written only when its contents change,
-   * so an edit that leaves the site as it was -- a plugin command rewriting its own block --
-   * reloads nothing, and the answer says whether anything was written.
+   * The dev server picks the two files up and reloads the browser. Each is written only when
+   * its contents change, so an edit that leaves the site as it was, such as a plugin command
+   * rewriting its own block, reloads nothing; the answer says whether anything was written.
    */
   public async applyConfig(projectDirectory: DirectoryPath, config: PortalConfig): Promise<Result<boolean, string>> {
     try {
@@ -216,7 +214,6 @@ export class PortalProjectService {
   }
 
   /**
-   * The two files that carry what the `portal` block says about the site's look and identity.
    * The browser imports `portal.identity.json` whole, since a retained JSON module is not
    * tree-shaken per property, which is why it holds nothing that addresses this machine.
    */

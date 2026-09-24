@@ -27,10 +27,7 @@ export const MODE_TOKENS = [
 
 type Tokens = ReadonlyMap<string, string>;
 
-/**
- * `portal.advanced.tokens`: raw overrides of the preset's tokens, one set per mode. Values
- * are passed through as written: only the names are checked, and that each value is one value.
- */
+/** Values are passed through as written: only the names are checked, and that each value is one value. */
 export class AdvancedTokens {
   private constructor(private readonly light: Tokens, private readonly dark: Tokens) {}
 
@@ -58,7 +55,6 @@ export class AdvancedTokens {
     );
   }
 
-  /** The overrides for light mode, by custom-property name, in the order written. */
   public lightTokens(): Tokens {
     return this.light;
   }
@@ -95,11 +91,10 @@ export class AdvancedTokens {
     });
   }
 
-  // The value is written into the generated stylesheet as it stands. Refusing only what ends a
-  // declaration was not enough: an unclosed parenthesis, bracket or quote, or a trailing
-  // backslash, carries the value past its own declaration, and the build either fails naming
-  // no setting or drops both colour-mode blocks. Every CSS colour, `var()`, `calc()` and
-  // relative colour syntax included, is written with these characters alone.
+  // Written into the generated stylesheet as it stands, so nothing that could carry it past its
+  // own declaration gets through: an unclosed parenthesis, bracket or quote, or a trailing
+  // backslash, fails the build naming no setting or drops both colour-mode blocks. Every CSS
+  // colour, `var()`, `calc()` and relative colour syntax included, needs only these characters.
   private static cssValue(value: string, path: string): Parsed<string> {
     return /^[-A-Za-z0-9#%.,()/*+_ \t]+$/.test(value) && !value.includes('/*') && balanced(value)
       ? ok(value)

@@ -1,7 +1,6 @@
 import { Color } from './config/color.js';
 import { PortalConfig } from './portal-config.js';
 
-/** For whoever opens the build project: where the file came from, and where to change it. */
 const HEADER = "/* Written by the APIMatic CLI from the 'portal' block of src/apimatic.json. Edit that instead. */";
 
 /**
@@ -17,10 +16,9 @@ export const DARK_SELECTOR = '.dark, .dark #nd-sidebar';
 type Declarations = ReadonlyMap<string, string>;
 
 /**
- * The build project's `src/styles/theme.css`: the colour preset, the fonts and the colours the
- * `portal` block asks for. `app.css` imports it after the Fumadocs presets, so what it sets
- * comes last. A file of its own rather than a substitution, so `portal serve` can rewrite it
- * whole when the block changes; rendered here so the CSS is tested without a build.
+ * The build project's `src/styles/theme.css`. `app.css` imports it after the Fumadocs presets,
+ * so what it sets comes last. A file of its own rather than a substitution, so `portal serve`
+ * can rewrite it whole when the block changes; rendered here so the CSS is tested without a build.
  */
 export class PortalStylesheet {
   private constructor(
@@ -53,7 +51,6 @@ export class PortalStylesheet {
     );
   }
 
-  /** A mode with nothing to set gets no rule at all. */
   public toString(): string {
     return [
       HEADER,
@@ -67,10 +64,8 @@ export class PortalStylesheet {
       .concat('\n');
   }
 
-  /**
-   * What one mode sets: the primary trio first, then the raw tokens. A token naming one of the
-   * trio replaces it in place, so each property is declared once and the token still wins.
-   */
+  // A token naming one of the primary trio replaces it in place, so each property is declared
+  // once and the token still wins.
   private static modeDeclarations(primary: Color | undefined, tokens: Declarations): Declarations {
     const declarations = new Map<string, string>();
     if (primary !== undefined) {

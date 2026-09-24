@@ -10,7 +10,6 @@ const PERCENTAGE = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))%$/;
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const HUE = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))(deg|grad|rad|turn)?$/i;
 
-/** Degrees per unit a hue may be written in; a bare number is degrees. */
 const HUE_UNITS: Record<string, number> = { deg: 1, grad: 0.9, rad: 180 / Math.PI, turn: 360 };
 
 interface Channels {
@@ -21,9 +20,8 @@ interface Channels {
 }
 
 /**
- * A colour in one of the forms the primary colour may be written in. Only these are accepted,
- * rather than any CSS colour, because the foreground laid over the primary is chosen by
- * contrast, which needs the colour's channels.
+ * Only these forms are accepted, rather than any CSS colour, because the foreground laid over
+ * the primary is chosen by contrast, which needs the colour's channels.
  */
 export class Color {
   private constructor(private readonly written: string, private readonly rgb: Rgb) {}
@@ -52,7 +50,6 @@ export class Color {
     return (lighter + 0.05) / (darker + 0.05);
   }
 
-  /** The neutral preset's near-white or near-black, whichever reads better on this colour. */
   public foreground(): Color {
     return this.contrastWith(Color.light) >= this.contrastWith(Color.dark) ? Color.light : Color.dark;
   }
@@ -83,7 +80,6 @@ export class Color {
     return match[1].toLowerCase().startsWith('rgb') ? Color.rgbChannels(parts) : Color.hslChannels(parts);
   }
 
-  /** Both the legacy comma syntax and the space syntax with an optional `/ alpha`. */
   private static channels(inner: string): Channels | undefined {
     const trimmed = inner.trim();
     if (trimmed.includes(',')) {
@@ -147,7 +143,6 @@ export class Color {
     return NUMBER.test(alpha) && Color.within(Number(alpha), 1) !== undefined;
   }
 
-  /** `value` as a fraction of `scale`, or undefined when it lies outside it. */
   private static within(value: number, scale: number): number | undefined {
     return value >= 0 && value <= scale ? value / scale : undefined;
   }

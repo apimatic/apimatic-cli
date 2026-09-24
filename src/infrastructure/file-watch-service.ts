@@ -25,7 +25,6 @@ export interface FileWatch {
   close(): Promise<void>;
 }
 
-/** Tells a long-running command that a file it read at startup has been saved again. */
 export class FileWatchService {
   /**
    * Calls `onChange` once each save of the file has settled, and never twice at once. Saves

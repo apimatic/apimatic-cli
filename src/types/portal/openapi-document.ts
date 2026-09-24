@@ -51,9 +51,7 @@ export class OpenApiDocument {
   }
 
   /**
-   * What the portal is called and how it describes itself, until the `portal` block says
-   * otherwise. Both are written into generated files, so each is collapsed to one line first
-   * -- taking only the first line left the description cap unreachable for wrapped prose. The
+   * Both fields are written into generated files, so each is collapsed to one line. The
    * description stops at its first blank line: past it a specification's description is
    * usually a guide to the API, not a summary of it.
    */

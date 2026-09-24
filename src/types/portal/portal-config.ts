@@ -11,7 +11,6 @@ import { Layout, NavigationConfig } from './config/navigation-config.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
 
-/** A link in the portal's chrome, as the browser renders it. */
 export interface PortalLink {
   label: string;
   url: string;
@@ -43,13 +42,10 @@ export interface PortalIdentity {
   pageActions: boolean;
 }
 
-/** The block as a message names it: every setting's path starts with it. */
 const BLOCK = 'portal';
 
 const NAMESPACES = ['site', 'brand', 'navigation', 'home', 'api', 'ai', 'advanced'];
 
-// Immutable wrapper around the `portal` block of `src/apimatic.json`. User input goes through
-// `fromBlock`, which names every invalid setting; a new project's block comes from `scaffolded`.
 export class PortalConfig {
   private constructor(
     private readonly site: SiteConfig,
@@ -75,9 +71,9 @@ export class PortalConfig {
   }
 
   /**
-   * The `portal` block as the document parser hands it over, which is whatever the file holds
-   * under that key. `suggested` is what the only specification says about itself, or null when
-   * there are several; it fills the site's name and description when the block leaves them out.
+   * `block` is whatever the file holds under `portal`. `suggested` is what the only specification
+   * says about itself, or null when there are several; it fills the site's name and description
+   * when the block leaves them out.
    */
   public static fromBlock(block: unknown, suggested: SuggestedSite | null): Result<PortalConfig, string[]> {
     if (block === undefined) {
@@ -87,9 +83,8 @@ export class PortalConfig {
       return err([`'${BLOCK}' must be a JSON object.`]);
     }
 
-    // Every setting is reported at once rather than stopping at the first, so one edit fixes
-    // the file. Each parser hands back the value it accepted, so the constructor below is fed
-    // only what validation proved.
+    // Each parser hands back the value it accepted, so the constructor is fed only what
+    // validation proved.
     return allOf(
       unknownKeys(block, NAMESPACES, BLOCK),
       Result.combineWithAllErrors([
@@ -140,7 +135,6 @@ export class PortalConfig {
     return this.advanced;
   }
 
-  /** Every file the block names under `static/`, each once; each knows the setting that names it. */
   public staticFiles(): StaticAsset[] {
     return this.brand.files();
   }
@@ -166,7 +160,7 @@ export class PortalConfig {
     };
   }
 
-  /** The block as plain data, every namespace included, which is what quickstart writes. */
+  /** Every namespace included, defaults and all, which is what quickstart writes. */
   public toJSON(): PortalBlock {
     return {
       site: this.site.toJSON(),

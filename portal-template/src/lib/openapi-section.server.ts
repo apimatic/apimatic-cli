@@ -9,9 +9,6 @@ import { apiBaseDir } from './shared';
  * site and the prerender list so the URLs emitted at build time are the routes that exist.
  * One server per document, because `staticSource()` emits pages for every schema its server
  * knows about, so sharing a server across sections duplicates pages.
- *
- * The operations `portal.api` leaves out are removed from the bundled document before any
- * page is generated from it, so Fumadocs is handed the document already filtered.
  */
 export async function openApiSection(slug: string, file: string, api: ApiOptions) {
   const section = await createOpenAPI({

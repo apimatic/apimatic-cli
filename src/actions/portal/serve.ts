@@ -127,11 +127,9 @@ export class PortalServeAction {
   };
 
   /**
-   * Re-applies `apimatic.json` to the running preview each time it is saved, held to the rules
-   * a build applies: an edit a build would refuse is reported as `portal generate` would
-   * report it, and the preview keeps what it last accepted. Compared by what the preview shows
-   * rather than by the file's text, since the plugin commands rewrite the whole file to change
-   * their own block. What the build set-up reads once, `portal.api`, is not re-applied.
+   * Held to the rules a build applies: an edit a build would refuse is reported as `portal
+   * generate` would report it, and the preview keeps what it last accepted. `portal.api`, which
+   * the build set-up reads once, is not re-applied.
    */
   private watchConfig(
     sourceContext: PortalSourceContext,

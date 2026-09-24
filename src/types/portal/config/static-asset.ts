@@ -24,7 +24,7 @@ export class StaticAsset {
     /** As written, so the block serialises back to what the user typed. */
     private readonly written: string,
     private readonly relativePath: string,
-    /** The setting that names the file, which is what a report of it being missing points at. */
+    /** The setting that names the file, for the report when it is missing. */
     private readonly setting: string
   ) {}
 
@@ -41,7 +41,6 @@ export class StaticAsset {
     return ok(new StaticAsset(value, normalized, path));
   }
 
-  /** Where the file sits, given the project's `src/` directory. */
   public resolveIn(sourceDirectory: DirectoryPath): FilePath {
     const names = this.relativePath.split('/');
     const fileName = new FileName(names.pop() ?? '');
@@ -56,14 +55,13 @@ export class StaticAsset {
   }
 
   /**
-   * Where the file is served from: the `static/` prefix is the site root. Each name is escaped,
-   * since a `#`, `?` or `%` in it would otherwise end or alter the path.
+   * The `static/` prefix is the site root. Each name is escaped, since a `#`, `?` or `%` in it
+   * would otherwise end or alter the path.
    */
   public siteUrl(): string {
     return `/${this.relativePath.slice(STATIC_PREFIX.length).split('/').map(encodeURIComponent).join('/')}`;
   }
 
-  /** The image type the extension names, or null when it names none a browser is known to take. */
   public imageType(): string | null {
     const name = this.relativePath.slice(this.relativePath.lastIndexOf('/') + 1);
     const dot = name.lastIndexOf('.');

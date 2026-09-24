@@ -7,5 +7,4 @@ import type { ApiOptions } from '../../portal-config';
  */
 export const specs = portalConfig.specs as Record<string, string>;
 
-/** How the reference pages are grouped, and which operations they leave out. */
 export const api = portalConfig.api as ApiOptions;

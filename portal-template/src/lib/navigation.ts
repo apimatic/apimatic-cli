@@ -113,9 +113,6 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
 }
 
 /**
- * Makes each top-level node part of exactly one tab. Runs after `navigationTransformer`, so
- * the root it regroups is already in the order `nav.json` gives it.
- *
  * A tab is a root folder, which is how Fumadocs builds a tab bar: a top-level folder whose
  * `nav.json` sets `"root": true` becomes one, as does the API reference, and the loose nodes
  * are gathered into Home (the index page), SDKs (the generated pages) and Guides (everything
@@ -123,9 +120,8 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
  * the file does not place the index page itself. Tabs change no address: URLs come from slugs.
  *
  * Fumadocs never reads `root` itself: it takes a folder's metadata from `meta.json`, which the
- * content collection does not load. So a folder is built as any other, named by its title,
- * its index page or its directory, and only this decides which become tabs -- which is also
- * what keeps a `root` the CLI refuses, on a nested folder or the reference, from making one.
+ * content collection does not load. So only this decides which folders become tabs, which is
+ * also what keeps a `root` the CLI refuses, on a nested folder or the reference, from making one.
  */
 export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
@@ -167,7 +163,6 @@ function readSettings(context: NavigationContext, folderPath: string): Navigatio
   };
 }
 
-/** Whether a top-level folder's own `nav.json` makes it a tab. The reference is one regardless. */
 function isTabFolder(context: NavigationContext, folder: Folder): boolean {
   const folderPath = folder.$ref?.folder;
   return folderPath !== undefined && folderPath !== apiBaseDir && readSettings(context, folderPath)?.root === true;

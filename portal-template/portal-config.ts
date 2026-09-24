@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Portal } from './src/lib/portal-types';
 
-/** How the reference pages are grouped, and which operations they leave out. */
 export interface ApiOptions {
   groupBy: 'tag' | 'route' | 'none';
   showDeprecated: boolean;

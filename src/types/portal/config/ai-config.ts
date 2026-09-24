@@ -3,7 +3,6 @@ import { allOf, namespace, optionalBoolean, Parsed, unknownKeys } from './fields
 
 const KNOWN = ['pageActions'];
 
-/** `portal.ai`: what the portal offers AI assistants and the people using them. */
 export class AiConfig {
   private constructor(private readonly pageActions: boolean) {}
 

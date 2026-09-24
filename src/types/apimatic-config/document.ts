@@ -172,10 +172,7 @@ export class ApimaticConfigDocument {
     return this.findings.filter((finding) => blocks.includes(finding.block));
   }
 
-  /**
-   * The document pointing editors at the schema of the file, which gives them completions and
-   * checks as the user types. First among the keys, where a reader looks for it.
-   */
+  /** `$schema` goes first among the keys, where a reader looks for it. */
   public referencingSchema(schemaUrl: string): ApimaticConfigDocument {
     const rest = { ...this.root };
     delete rest.$schema;

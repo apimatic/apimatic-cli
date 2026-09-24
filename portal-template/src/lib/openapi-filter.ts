@@ -1,6 +1,5 @@
 import type { Document } from 'fumadocs-openapi';
 
-/** Which operations the reference documents. */
 export interface OperationFilter {
   showDeprecated: boolean;
   /** Whether operations marked `x-internal: true` are documented. */
@@ -16,14 +15,10 @@ const METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'tr
 type Json = Record<string, unknown>;
 
 /**
- * The bundled document without the operations the portal leaves out, from `paths` and
- * `webhooks` alike, without a path item that has none left, and without a tag that only
- * those operations carried. Filtering the document rather than the generated pages is what
- * keeps a hidden operation out of everything built from it: no page, no sidebar row, no
- * emptied tag folder, and no trace of it or its tag in another page's payload.
- *
- * Returns the very document it was given when nothing is left out. Nothing it was given is
- * modified.
+ * Filtering the document rather than the generated pages is what keeps a hidden operation out
+ * of everything built from it: no page, no sidebar row, no emptied tag folder, and no trace of
+ * it or its tag in another page's payload. Returns the very document it was given when nothing
+ * is left out, and modifies nothing it was given.
  */
 export function withoutHiddenOperations(document: Document, filter: OperationFilter): Document {
   if (filter.showDeprecated && filter.showInternal) {
@@ -98,7 +93,6 @@ function holdsOperation(item: Json): boolean {
   return METHODS.some((method) => isObject(item[method])) || isObject(item.additionalOperations);
 }
 
-/** The operations of a path item, OpenAPI 3.2's `additionalOperations` included. */
 function operationsOf(item: Json): Json[] {
   const additional = isObject(item.additionalOperations) ? Object.values(item.additionalOperations) : [];
   return [...METHODS.map((method) => item[method]), ...additional].filter(isObject);
@@ -169,7 +163,6 @@ function withoutEmptiedTags(root: Json, shown: Json): void {
   }
 }
 
-/** Every tag an operation of the document carries. */
 function tagsUsed(document: Json): Set<string> {
   const tags = [document.paths, document.webhooks]
     .flatMap((items) => (isObject(items) ? Object.values(items) : []))

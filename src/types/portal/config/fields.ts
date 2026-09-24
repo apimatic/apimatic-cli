@@ -2,13 +2,10 @@ import { err, ok, Result } from 'neverthrow';
 import { UrlPath } from '../../file/urlPath.js';
 import { unknownFieldErrors } from '../unknown-fields.js';
 
-/** What every field and namespace parser of the `portal` block answers with. */
 export type Parsed<T> = Result<T, string[]>;
 
-/**
- * An `http:` or `https:` address written out in full. The URL parser also takes
- * `https:example.com`, which a browser reads on an https site as a path of that site.
- */
+// The URL parser also takes `https:example.com`, which a browser on an https site reads as a
+// path of that site.
 export function isWebAddress(text: string): boolean {
   return /^https?:\/\//i.test(text) && UrlPath.create(text) !== undefined;
 }
@@ -17,10 +14,6 @@ export function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * A namespace of the block. Absent reads as empty, so every default in it applies; anything
- * but an object is refused, since nothing inside it could be read.
- */
 export function namespace(value: unknown, path: string): Parsed<Record<string, unknown>> {
   if (value === undefined) {
     return ok({});
@@ -28,14 +21,13 @@ export function namespace(value: unknown, path: string): Parsed<Record<string, u
   return isJsonObject(value) ? ok(value) : err([`'${path}' must be a JSON object.`]);
 }
 
-/** The keys of a namespace that the block does not define, each named by its dotted path. */
 export function unknownKeys(data: Record<string, unknown>, known: readonly string[], path: string): string[] {
   return unknownFieldErrors(data, new Set(known), (key) => `'${path}.${key}' is not a 'portal' setting.`);
 }
 
 /**
- * Every field's answer at once, after the namespace's unknown keys, so one edit fixes the
- * file. `fields` is what `Result.combineWithAllErrors` makes of the field parsers.
+ * Every error at once, unknown keys first, so one edit fixes the file. `fields` is what
+ * `Result.combineWithAllErrors` makes of the field parsers.
  */
 export function allOf<T>(unknown: string[], fields: Result<T, string[][]>): Parsed<T> {
   if (fields.isErr()) {
@@ -44,7 +36,6 @@ export function allOf<T>(unknown: string[], fields: Result<T, string[][]>): Pars
   return unknown.length > 0 ? err(unknown) : ok(fields.value);
 }
 
-/** One value per colour mode. */
 export interface LightDark<T> {
   light: T;
   dark: T;
@@ -52,7 +43,6 @@ export interface LightDark<T> {
   single: boolean;
 }
 
-/** A setting written once for both modes, or as `{ light, dark }` with both named. */
 export function lightDark<T>(
   value: unknown,
   path: string,
@@ -72,7 +62,6 @@ export function lightDark<T>(
   ).map(([light, dark]) => ({ light, dark, single: false }));
 }
 
-/** A setting with no default: absent is null rather than an error. */
 export function optional<T>(value: unknown, parse: (present: unknown) => Parsed<T>): Parsed<T | null> {
   return value === undefined ? ok(null) : parse(value);
 }

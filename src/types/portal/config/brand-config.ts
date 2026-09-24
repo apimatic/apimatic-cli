@@ -29,7 +29,6 @@ const KNOWN = ['logo', 'favicon', 'colors', 'fonts', 'colorMode'];
 
 const KNOWN_COLORS = ['preset', 'primary'];
 
-/** `portal.brand.logo`: one image for both colour modes, or one per mode. */
 export class Logo {
   private constructor(private readonly images: LightDark<StaticAsset>) {}
 
@@ -45,7 +44,6 @@ export class Logo {
     return this.images.dark;
   }
 
-  /** Each distinct file, once: a logo written as one path names one file. */
   public files(): StaticAsset[] {
     return this.images.light.isEqual(this.images.dark) ? [this.images.light] : [this.images.light, this.images.dark];
   }
@@ -56,7 +54,6 @@ export class Logo {
   }
 }
 
-/** `portal.brand.colors`: a Fumadocs preset, and optionally a primary colour laid over it. */
 export class BrandColors {
   private constructor(private readonly preset: ColorPreset, private readonly primary: LightDark<Color> | null) {}
 
@@ -102,7 +99,6 @@ export class BrandColors {
   }
 }
 
-/** `portal.brand`: what the portal looks like. */
 export class BrandConfig {
   private constructor(
     private readonly logo: Logo | null,
@@ -133,7 +129,6 @@ export class BrandConfig {
     return this.logo;
   }
 
-  /** The favicon the block names, or else the light logo; none when there is neither. */
   public faviconImage(): StaticAsset | null {
     return this.favicon ?? this.logo?.light() ?? null;
   }
@@ -150,7 +145,6 @@ export class BrandConfig {
     return this.colorMode;
   }
 
-  /** Every file the block names under `static/`, each once, with the setting that names it. */
   public files(): StaticAsset[] {
     const logos = this.logo?.files() ?? [];
     const favicon = this.favicon;

@@ -8,7 +8,6 @@ export type GroupBy = (typeof GROUP_BY)[number];
 
 const KNOWN = ['groupBy', 'showDeprecated', 'showInternal'];
 
-/** `portal.api`: how the reference pages are grouped, and which operations they leave out. */
 export class ApiConfig {
   private constructor(
     private readonly groupBy: GroupBy,

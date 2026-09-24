@@ -152,10 +152,9 @@ export class PortalSourceContext {
   }
 
   /**
-   * The config half of `resolve`, for `portal serve` to run on every edit to `apimatic.json`:
-   * the file read again and held to the same rules, so an edit is accepted exactly when a
-   * build would accept it. `suggested` is what `resolve` found in the specifications, which
-   * are not read again; changing them needs a restart anyway.
+   * The config half of `resolve`, for `portal serve` to run on every edit, so an edit is
+   * accepted exactly when a build would accept it. `suggested` is what `resolve` found in the
+   * specifications, which are not read again; changing them needs a restart anyway.
    */
   public async resolveConfig(suggested: SuggestedSite | null): Promise<Result<PortalConfig, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
@@ -194,10 +193,9 @@ export class PortalSourceContext {
   }
 
   /**
-   * The `portal` block, or why it cannot be built from. The root and the `languages` block are
-   * this command's to judge as well, since the portal documents the project's SDK languages; a
-   * malformed `plugin` block belongs to the plugin commands and must not fail a build.
-   * Everything found is reported together, so one edit fixes the file.
+   * The root and the `languages` block are this command's to judge as well, since the portal
+   * documents the project's SDK languages; a malformed `plugin` block belongs to the plugin
+   * commands and must not fail a build.
    */
   private static parseConfig(
     document: ApimaticConfigDocument,
@@ -265,14 +263,10 @@ export class PortalSourceContext {
   }
 
   /**
-   * Writes the source tree of a new portal, with a `portal` block described from the
-   * specification itself. It holds everything `portal generate` and `portal serve` need but
-   * the `languages` block, which names the project's SDK languages and which the user adds
-   * by hand until the wizard asks for them. Every fault is reported rather than thrown,
-   * including the ones the file service raises: the caller is a wizard that has asked its
-   * questions already, and it reports what went wrong instead of crashing. `schemaUrl` is
-   * the address the file names its schema by, which depends on the running CLI's version.
-   * Answers with the `apimatic.json` it wrote, which is what the user edits next.
+   * Writes everything `portal generate` and `portal serve` need but the `languages` block,
+   * which the user adds by hand until the wizard asks for it. Every fault is reported rather
+   * than thrown, the file service's included: the caller is a wizard that has asked its
+   * questions already. Answers with the `apimatic.json` it wrote.
    */
   public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
@@ -516,10 +510,7 @@ export class PortalSourceContext {
       .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }));
   }
 
-  /**
-   * Every specification in `spec/`, and what the only one says about itself. With several
-   * there is no such suggestion: no one of them speaks for the whole portal.
-   */
+  // With several specifications there is no suggested site: no one of them speaks for the portal.
   private async specs(): Promise<
     Result<{ specs: PortalSpec[]; suggested: SuggestedSite | null }, PortalSourceProblem>
   > {

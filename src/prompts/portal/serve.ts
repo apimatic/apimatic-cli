@@ -62,12 +62,8 @@ export class PortalServePrompts {
 
   public portalServed(url: UrlPath, sourceDirectory: DirectoryPath) {
     log.message(`The portal is running at ${f.link(url.toString())}`);
-    // The content directory is watched by the dev server, so a page's body and the order in
-    // its `nav.json` both reload, and the CLI watches `apimatic.json` and re-applies it. What
-    // is fixed is the set of pages, the specifications and how their pages are made: the
-    // build set-up reads those once. `nav.json` is validated once, here, and the build drops
-    // an entry it cannot resolve without a word, so a mistake typed during the preview would
-    // otherwise pass as the default order; `apimatic.json` is validated on every save.
+    // `nav.json` is validated only at startup, and the build drops an entry it cannot resolve
+    // without a word, which is why the note warns that a mistake typed later is ignored.
     noteWrapped(
       [
         `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +

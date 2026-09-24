@@ -35,7 +35,6 @@ export class Link {
     return this.url;
   }
 
-  /** Whether the link leaves the portal, which is what marks it as external. */
   public isExternal(): boolean {
     return this.external;
   }

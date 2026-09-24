@@ -15,9 +15,8 @@ const REQUIRED =
   `'apimatic sdk publish' adds to it.`;
 
 /**
- * The SDK languages the portal documents, read from the top-level `languages` block the
- * plugin commands share. An entry without a `publishing` record counts: it is a language the
- * project wants and has not published yet.
+ * Read from the top-level `languages` block the plugin commands share. An entry without a
+ * `publishing` record counts: it is a language the project wants and has not published yet.
  */
 export class PortalLanguages {
   private constructor(
@@ -25,10 +24,7 @@ export class PortalLanguages {
     private readonly published: ReadonlySet<Language>
   ) {}
 
-  /**
-   * `block` is the block when it is an object, and `findings` what the document found wrong
-   * with it, which already covers a block or an entry of the wrong shape.
-   */
+  /** `findings` already covers a block or an entry of the wrong shape, so neither is checked here. */
   public static fromBlock(
     block: Record<string, unknown> | undefined,
     findings: readonly ConfigFinding[]
@@ -50,7 +46,6 @@ export class PortalLanguages {
     return ok(new PortalLanguages(languages, new Set(published)));
   }
 
-  /** In the order the block lists them. */
   public all(): Language[] {
     return [...this.languages];
   }

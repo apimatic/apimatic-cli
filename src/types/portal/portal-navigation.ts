@@ -293,7 +293,6 @@ export class PortalNavigation {
     return [];
   }
 
-  /** Whether the file makes its folder a tab, which is only honoured where `rootErrors` allows it. */
   private static isTab(root: unknown, context: NavigationContext): boolean {
     return root === true && PortalNavigation.mayBeTab(context);
   }

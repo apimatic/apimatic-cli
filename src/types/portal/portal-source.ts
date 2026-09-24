@@ -14,9 +14,8 @@ export interface PortalSpec {
 export interface PortalSource {
   config: PortalConfig;
   /**
-   * What the only specification says about itself, which the config's name and description
-   * default to, or null with several. Kept so `portal serve` can judge an edited config by the
-   * same rules without reading the specifications again.
+   * What the only specification says about itself, or null with several. Kept so `portal serve`
+   * can judge an edited config without reading the specifications again.
    */
   suggestedSite: SuggestedSite | null;
   specs: PortalSpec[];
@@ -42,9 +41,7 @@ export type PortalScaffoldProblem =
   // `reason` is the message of whatever the file service raised, which nothing here can narrow.
   | { kind: 'sourceUnwritable'; reason: string };
 
-/** A file the block names that the build would not find. */
 export interface MissingStaticFile {
-  /** The setting that names it. */
   setting: string;
   file: FilePath;
   /**

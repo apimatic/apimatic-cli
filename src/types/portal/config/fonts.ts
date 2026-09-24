@@ -59,7 +59,6 @@ const MONO_STACK = "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Libe
 
 const KNOWN = ['body', 'mono'];
 
-/** `portal.brand.fonts`: one family for text and one for code, each from a fixed shortlist. */
 export class Fonts {
   private constructor(private readonly body: BodyFont, private readonly mono: MonoFont) {}
 
@@ -77,17 +76,14 @@ export class Fonts {
     );
   }
 
-  /** The CSS `font-family` value for text. */
   public bodyFamily(): string {
     return Fonts.family(this.body, SANS_STACK);
   }
 
-  /** The CSS `font-family` value for code. */
   public monoFamily(): string {
     return Fonts.family(this.mono, MONO_STACK);
   }
 
-  /** The stylesheet that loads both families, or null when both are the system's own. */
   public googleFontsUrl(): UrlPath | null {
     const families = [this.body, this.mono].flatMap((id) => (id === 'system' ? [] : [GOOGLE_FONTS[id]]));
     if (families.length === 0) {

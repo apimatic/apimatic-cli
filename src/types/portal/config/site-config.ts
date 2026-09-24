@@ -8,12 +8,10 @@ export interface SuggestedSite {
   description: string | null;
 }
 
-/** What a portal is called when nothing names it, not even its specification. */
 export const PLACEHOLDER_SITE: Readonly<SuggestedSite> = Object.freeze({ name: 'My API', description: null });
 
 const KNOWN = ['name', 'url', 'description'];
 
-/** `portal.site`: what the portal is called, where it is hosted, and how it describes itself. */
 export class SiteConfig {
   private constructor(
     private readonly name: string,
@@ -71,8 +69,7 @@ export class SiteConfig {
       : ok(suggested.name);
   }
 
-  // A blank description is the same as none; without this it shipped as the site
-  // description and as the og:description of every page.
+  // A blank description counts as none, so no page carries an empty og:description.
   private static validDescription(
     description: unknown,
     path: string,

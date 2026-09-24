@@ -151,7 +151,6 @@ function Home({ title, description }: Readonly<{ title: string; description: str
   );
 }
 
-/** The button `portal.home.cta` puts under the home page's title, on either kind of home page. */
 function HomeCallToAction() {
   const cta = portal.homeCta;
   if (!cta) return null;

@@ -8,7 +8,6 @@ export type Layout = (typeof LAYOUTS)[number];
 
 const KNOWN = ['layout', 'links'];
 
-/** `portal.navigation`: the layout the pages sit in, and the links in its header. */
 export class NavigationConfig {
   private constructor(private readonly layout: Layout, private readonly links: Link[]) {}
 
