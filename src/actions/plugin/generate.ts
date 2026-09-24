@@ -129,8 +129,7 @@ export class PluginGenerateAction {
       await pluginContext.save(tempPluginZipPath);
 
       this.prompts.pluginGenerated(pluginDirectory);
-      this.prompts.tryPluginLocally(pluginDirectory);
-      this.prompts.nextStepsPublishPlugin();
+      this.prompts.installPluginLocally(pluginDirectory);
       if (preview) {
         this.prompts.previewOnly();
       }
@@ -175,10 +174,7 @@ export class PluginGenerateAction {
    * worth failing a generation the user asked for, and `--auth-key` does not reach this call.
    */
   private readonly hasPublishingProfile = async (): Promise<boolean> => {
-    const profiles = await this.publishingApiService.getPublishingProfiles(
-      this.configDir,
-      this.commandMetadata.shell
-    );
+    const profiles = await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
 
     return profiles.isOk() && profiles.value.length > 0;
   };

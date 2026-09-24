@@ -4,7 +4,7 @@ import { ServiceError } from '../../infrastructure/service-error.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
-import { noteWrapped, withSpinner } from '../prompt.js';
+import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 import { Language, LANGUAGE_CHOICES } from '../../types/sdk/generate.js';
@@ -12,12 +12,6 @@ import { Language, LANGUAGE_CHOICES } from '../../types/sdk/generate.js';
 /** The names the SDK flows already show, so one language reads the same everywhere. */
 const labelOf = (language: string): string =>
   LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
-
-// Each link lands on the section that covers loading an unpublished folder, not the page it sits in.
-const CLAUDE_CODE_PLUGINS_URL = 'https://code.claude.com/docs/en/plugins#test-your-plugins-locally';
-const CURSOR_PLUGINS_URL = 'https://cursor.com/docs/plugins#test-plugins-locally';
-const VS_CODE_PLUGINS_URL = 'https://code.visualstudio.com/docs/agent-customization/agent-plugins#_use-local-plugins';
-const CODEX_PLUGINS_URL = 'https://developers.openai.com/plugins/build/plugins#install-a-local-plugin-manually';
 
 export class PluginGeneratePrompts {
   public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
@@ -175,25 +169,15 @@ export class PluginGeneratePrompts {
   }
 
   /**
-   * Each assistant loads an unpublished folder its own way — a flag, a fixed directory, a settings
-   * entry — and each documents it, so the note points at those pages rather than restating three
-   * procedures that would then have to be kept current.
+   * One command rather than a page of per-assistant instructions: the installer knows how each
+   * editor loads an unpublished folder, so naming it is both shorter and the only line that stays
+   * right when an editor changes its procedure.
+   *
+   * Double quotes around the path rather than `f.path`, for the reason `plugin publish` gives:
+   * single quotes are not quoting to `cmd.exe`, so a path with a space would break the line the
+   * user pastes.
    */
-  public tryPluginLocally(plugin: DirectoryPath) {
-    const message =
-      `Load the plugin from ${f.path(plugin)} to try it before publishing.\n\n` +
-      `${f.description('Claude Code')} ${f.link(CLAUDE_CODE_PLUGINS_URL)}\n` +
-      `${f.description('Cursor')} ${f.link(CURSOR_PLUGINS_URL)}\n` +
-      `${f.description('VS Code')} ${f.link(VS_CODE_PLUGINS_URL)}\n` +
-      `${f.description('Codex')} ${f.link(CODEX_PLUGINS_URL)}`;
-    noteWrapped(message, 'Try It Locally');
-  }
-
-  public nextStepsPublishPlugin() {
-    const message =
-      `Publish the plugin to GitHub so the people using your SDKs can install it.
-
-` + `Run '${f.cmdAlt('apimatic', 'plugin', 'publish')}' to see the commands.`;
-    noteWrapped(message, 'Next Steps');
+  public installPluginLocally(plugin: DirectoryPath) {
+    log.info(`Run '${f.cmdAlt('npx', 'context-plugins', 'install', `"${plugin}"`)}' to install your plugin.`);
   }
 }
