@@ -115,9 +115,13 @@ export class AdvancedTokens {
 function balanced(value: string): boolean {
   let depth = 0;
   for (const character of value) {
-    depth += character === '(' ? 1 : character === ')' ? -1 : 0;
-    if (depth < 0) {
-      return false;
+    if (character === '(') {
+      depth += 1;
+    } else if (character === ')') {
+      depth -= 1;
+      if (depth < 0) {
+        return false;
+      }
     }
   }
   return depth === 0;
