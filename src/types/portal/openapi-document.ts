@@ -132,7 +132,8 @@ function pathItemWithSamples(path: string, pathItem: JsonObject, codeSamples: Co
 }
 
 function withSamples(operation: JsonObject, samples: CodeSample[]): JsonObject {
-  return samples.length === 0 ? operation : { ...operation, [CODE_SAMPLES_EXTENSION]: samples };
+  const rest = Object.fromEntries(Object.entries(operation).filter(([key]) => key !== CODE_SAMPLES_EXTENSION));
+  return samples.length === 0 ? rest : { ...rest, [CODE_SAMPLES_EXTENSION]: samples };
 }
 
 function* references(node: unknown): Generator<string> {

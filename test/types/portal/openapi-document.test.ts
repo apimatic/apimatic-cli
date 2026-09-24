@@ -171,6 +171,18 @@ describe('OpenApiDocument', () => {
       expect(document.paths['/pets'].get[EXTENSION]).to.have.length(1);
     });
 
+    it('replaces the samples an operation already carries, even with none', () => {
+      const stale = [{ lang: 'typescript', label: 'TypeScript', sources: { _default: 'old()' } }];
+
+      const document = sampled({
+        openapi: '3.0.0',
+        paths: { '/pets': { get: { [EXTENSION]: stale } }, '/owners': { get: { [EXTENSION]: stale } } }
+      });
+
+      expect(document.paths['/pets'].get[EXTENSION][0].sources).to.deep.equal({ Example: 'list()' });
+      expect(document.paths['/owners'].get).to.not.have.property(EXTENSION);
+    });
+
     it('keeps the declaration order of paths and methods', () => {
       const document = sampled({ openapi: '3.0.0', paths: { '/pets': { post: {}, get: {} }, '/health': { get: {} } } });
 
