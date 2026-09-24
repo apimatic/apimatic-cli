@@ -153,24 +153,8 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "preset": {
-                  "enum": [
-                    "neutral",
-                    "black",
-                    "vitepress",
-                    "dusk",
-                    "catppuccin",
-                    "ocean",
-                    "purple",
-                    "solar",
-                    "emerald",
-                    "ruby",
-                    "aspen"
-                  ],
-                  "default": "neutral"
-                },
                 "primary": {
-                  "description": "Laid over the preset. One colour for both modes, or one per mode.",
+                  "description": "One colour for both modes, or one per mode.",
                   "anyOf": [
                     {
                       "$ref": "#/definitions/color"

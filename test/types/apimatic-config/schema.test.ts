@@ -9,7 +9,7 @@ import {
 } from '../../../src/types/apimatic-config/document';
 import { MODE_TOKENS } from '../../../src/types/portal/config/advanced-tokens';
 import { GROUP_BY } from '../../../src/types/portal/config/api-config';
-import { COLOR_MODES, COLOR_PRESETS } from '../../../src/types/portal/config/brand-config';
+import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
 import { BODY_FONTS, MONO_FONTS } from '../../../src/types/portal/config/fonts';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
@@ -62,7 +62,6 @@ describe('apimatic.schema.json', () => {
     const brand = portal.brand.properties;
 
     const cases: [string, unknown, readonly string[]][] = [
-      ['brand.colors.preset', brand.colors.properties.preset.enum, COLOR_PRESETS],
       ['brand.fonts.body', brand.fonts.properties.body.enum, BODY_FONTS],
       ['brand.fonts.mono', brand.fonts.properties.mono.enum, MONO_FONTS],
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
@@ -98,7 +97,7 @@ describe('apimatic.schema.json', () => {
           brand: {
             logo: { light: 'static/light.svg', dark: '.\\static\\dark.svg' },
             favicon: './static/favicon.ico',
-            colors: { preset: 'ocean', primary: { light: '#1d4ed8', dark: '#93c5fd' } },
+            colors: { primary: { light: '#1d4ed8', dark: '#93c5fd' } },
             fonts: { body: 'system', mono: 'ibm-plex-mono' },
             colorMode: 'dark'
           },
@@ -162,7 +161,6 @@ describe('apimatic.schema.json', () => {
         { brand: { logo: { light: 'static/a.svg', dark: 'static/b.svg', auto: 'x' } } }
       ],
       ['a favicon outside static', { brand: { favicon: 'favicon.ico' } }],
-      ['the shadcn preset', { brand: { colors: { preset: 'shadcn' } } }],
       ['a named colour', { brand: { colors: { primary: 'blue' } } }],
       ['an oklch colour', { brand: { colors: { primary: 'oklch(0.5 0.2 240)' } } }],
       ['a four-digit hex colour', { brand: { colors: { primary: '#fffa' } } }],
@@ -251,7 +249,7 @@ describe('apimatic.schema.json', () => {
       };
       collect(schema.definitions.portal, []);
 
-      expect(defaults.map(([setting]) => setting)).to.include.members(['brand.colors.preset', 'api.showInternal']);
+      expect(defaults.map(([setting]) => setting)).to.include.members(['brand.colorMode', 'api.showInternal']);
       for (const [setting, value] of defaults) {
         const actual = setting
           .split('.')

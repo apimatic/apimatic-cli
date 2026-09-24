@@ -264,7 +264,7 @@ describe('PortalServeAction', () => {
       const exited = new Promise<string>(() => undefined);
       start.callsFake(async () => {
         const config = originalConfig();
-        config.portal.brand.colors = { preset: 'ocean' };
+        config.portal.brand.colors = { primary: '#1d4ed8' };
         writeConfig(config);
         return ok({ url: SERVER_URL, exited, stop });
       });
@@ -274,7 +274,7 @@ describe('PortalServeAction', () => {
         // What the watch does on a recheck: handle the file as though it had just been saved.
         await (await watched).onChange();
 
-        expect(readProject('src/styles/theme.css')).to.contain("@import 'fumadocs-ui/css/ocean.css';");
+        expect(readProject('src/styles/theme.css')).to.contain('--color-fd-primary: #1d4ed8;');
         expect(prompts.configApplied.calledOnce).to.be.true;
       });
     });
@@ -282,12 +282,11 @@ describe('PortalServeAction', () => {
     it('rewrites both of the preview’s files for a brand change, and says so', async () => {
       await whileServing(async () => {
         const config = originalConfig();
-        config.portal.brand.colors = { preset: 'ocean', primary: '#1d4ed8' };
+        config.portal.brand.colors = { primary: '#1d4ed8' };
         config.portal.site.name = 'Renamed API';
 
         await save(config);
 
-        expect(readProject('src/styles/theme.css')).to.contain("@import 'fumadocs-ui/css/ocean.css';");
         expect(readProject('src/styles/theme.css')).to.contain('--color-fd-primary: #1d4ed8;');
         expect(JSON.parse(readProject('portal.identity.json')).name).to.equal('Renamed API');
         expect(prompts.configApplied.calledOnce).to.be.true;

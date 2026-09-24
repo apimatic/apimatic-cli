@@ -4,30 +4,13 @@ import { allOf, LightDark, lightDark, namespace, oneOf, optional, Parsed, unknow
 import { Fonts } from './fonts.js';
 import { StaticAsset } from './static-asset.js';
 
-/** Fumadocs' standalone theme files. `shadcn` is left out: it maps every token to a host application's own variables. */
-export const COLOR_PRESETS = [
-  'neutral',
-  'black',
-  'vitepress',
-  'dusk',
-  'catppuccin',
-  'ocean',
-  'purple',
-  'solar',
-  'emerald',
-  'ruby',
-  'aspen'
-] as const;
-
-export type ColorPreset = (typeof COLOR_PRESETS)[number];
-
 export const COLOR_MODES = ['light', 'dark', 'both'] as const;
 
 export type ColorMode = (typeof COLOR_MODES)[number];
 
 const KNOWN = ['logo', 'favicon', 'colors', 'fonts', 'colorMode'];
 
-const KNOWN_COLORS = ['preset', 'primary'];
+const KNOWN_COLORS = ['primary'];
 
 export class Logo {
   private constructor(private readonly images: LightDark<StaticAsset>) {}
@@ -55,40 +38,32 @@ export class Logo {
 }
 
 export class BrandColors {
-  private constructor(private readonly preset: ColorPreset, private readonly primary: LightDark<Color> | null) {}
+  private constructor(private readonly primary: LightDark<Color> | null) {}
 
-  public static readonly defaults = new BrandColors('neutral', null);
+  public static readonly defaults = new BrandColors(null);
 
   public static parse(value: unknown, path: string): Parsed<BrandColors> {
     return namespace(value, path).andThen((data) =>
       allOf(
         unknownKeys(data, KNOWN_COLORS, path),
         Result.combineWithAllErrors([
-          oneOf(data.preset, `${path}.preset`, COLOR_PRESETS, BrandColors.defaults.preset),
           optional(data.primary, (primary) => lightDark(primary, `${path}.primary`, BrandColors.parseColor))
         ])
-      ).map(([preset, primary]) => new BrandColors(preset, primary))
+      ).map(([primary]) => new BrandColors(primary))
     );
   }
 
-  public presetName(): ColorPreset {
-    return this.preset;
-  }
-
-  /** The primary for each mode, or null when the preset's own applies. */
+  /** The primary for each mode, or null when the theme's own applies. */
   public primaryColors(): { light: Color; dark: Color } | null {
     return this.primary === null ? null : { light: this.primary.light, dark: this.primary.dark };
   }
 
-  public toJSON(): { preset: ColorPreset; primary?: string | { light: string; dark: string } } {
+  public toJSON(): { primary?: string | { light: string; dark: string } } {
     if (this.primary === null) {
-      return { preset: this.preset };
+      return {};
     }
     const { light, dark, single } = this.primary;
-    return {
-      preset: this.preset,
-      primary: single ? light.toString() : { light: light.toString(), dark: dark.toString() }
-    };
+    return { primary: single ? light.toString() : { light: light.toString(), dark: dark.toString() } };
   }
 
   private static parseColor(value: unknown, path: string): Parsed<Color> {

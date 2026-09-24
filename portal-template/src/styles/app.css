@@ -1,8 +1,9 @@
 @import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
-/* Written by the CLI from the 'portal' block of apimatic.json: the colour preset, the fonts and
-   the colour overrides. Imported last, so what it sets outranks the presets above. */
+/* Written by the CLI from the 'portal' block of apimatic.json: the fonts and the colour
+   overrides. Imported last, so what it sets outranks the theme and presets above. */
 @import './theme.css';
 
 @source not '../../dist';

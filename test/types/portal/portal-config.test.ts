@@ -34,7 +34,6 @@ describe('PortalConfig', () => {
       expect(portal.siteOrigin()).to.be.null;
       expect(portal.brandSettings().logoImages()).to.be.null;
       expect(portal.brandSettings().faviconImage()).to.be.null;
-      expect(portal.brandSettings().brandColors().presetName()).to.equal('neutral');
       expect(portal.brandSettings().brandColors().primaryColors()).to.be.null;
       expect(portal.brandSettings().mode()).to.equal('both');
       expect(portal.navigationSettings().headerLinks()).to.be.empty;
@@ -282,18 +281,6 @@ describe('PortalConfig', () => {
     });
 
     describe('colors', () => {
-      it('accepts every preset and refuses any other', () => {
-        expect(
-          config({ brand: { colors: { preset: 'ocean' } } })
-            .brandSettings()
-            .brandColors()
-            .presetName()
-        ).to.equal('ocean');
-        expect(errorsOf({ brand: { colors: { preset: 'shadcn' } } })[0]).to.match(
-          /^'portal\.brand\.colors\.preset' must be one of 'neutral', /
-        );
-      });
-
       it('uses one primary for both modes, or one per mode', () => {
         const single = config({ brand: { colors: { primary: '#1d4ed8' } } })
           .brandSettings()
@@ -598,7 +585,7 @@ describe('PortalConfig', () => {
     it('spells out every default, so the block shows what can be set', () => {
       expect(JSON.parse(JSON.stringify(PortalConfig.scaffolded(suggested)))).to.deep.equal({
         site: { name: 'Spec Title', description: 'What the spec says.' },
-        brand: { colors: { preset: 'neutral' }, fonts: { body: 'geist', mono: 'geist-mono' }, colorMode: 'both' },
+        brand: { colors: {}, fonts: { body: 'geist', mono: 'geist-mono' }, colorMode: 'both' },
         navigation: { links: [] },
         home: {},
         api: { groupBy: 'tag', showDeprecated: true, showInternal: false },
@@ -620,7 +607,7 @@ describe('PortalConfig', () => {
         brand: {
           logo: { light: './static/light.svg', dark: 'static/dark.svg' },
           favicon: 'static/favicon.ico',
-          colors: { preset: 'ocean', primary: '#1d4ed8' },
+          colors: { primary: '#1d4ed8' },
           fonts: { body: 'inter', mono: 'fira-code' },
           colorMode: 'light'
         },

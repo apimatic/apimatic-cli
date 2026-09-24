@@ -304,9 +304,9 @@ const stylesheetOf = (output: DirectoryPath) => {
     ).to.deep.equal([]);
   });
 
-  it('loads the default fonts and imports the default preset', () => {
+  it('loads the default fonts and the neutral theme', () => {
     expect(read('index.html')).to.contain('https://fonts.googleapis.com/css2?family=Geist:wght@100..900');
-    // The neutral preset's light primary, which nothing in the fixture overrides.
+    // The theme's light primary, which nothing in the fixture overrides.
     expect(stylesheetOf(output)).to.match(/--color-fd-primary:#171717/);
   });
 
@@ -318,7 +318,7 @@ const stylesheetOf = (output: DirectoryPath) => {
 
 /**
  * A second portal, branded in every way the block allows at once, so one more build covers
- * the settings the default fixture leaves at their defaults: a preset and a primary, a forced
+ * the settings the default fixture leaves at their defaults: a primary colour, a forced
  * colour mode, header links, a call to action on the fallback home page, and a reference that
  * leaves its deprecated and internal operations out.
  */
@@ -342,21 +342,21 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   // The minifier may merge the two modes' rules when they match, as they do for a primary
   // written once, so the selectors and their place are checked rather than one spelling.
-  it('imports the preset and lays the primary over it in both modes, after the preset', () => {
+  it("lays the primary over the theme in both modes, after the theme's own rules", () => {
     const css = stylesheetOf(output);
-    // Ocean's own dark background, which only its file sets.
-    const presetDark = css.indexOf('.dark{--color-fd-background:#081021');
+    // The theme's own dark background, which nothing the CLI writes sets.
+    const themeDark = css.search(/\.dark\{--color-fd-background:/);
     const overrides = [...css.matchAll(/([^{}]+)\{--color-fd-primary:#1d4ed8;--color-fd-primary-foreground:#fafafa/g)];
     const selectors = overrides.flatMap((rule) => rule[1].split(',').map((selector) => selector.trim()));
 
-    expect(presetDark).to.not.equal(-1);
+    expect(themeDark).to.not.equal(-1);
     expect(selectors).to.include.members([
       ':root:not(.dark)',
       ':root:not(.dark) #nd-sidebar',
       '.dark',
       '.dark #nd-sidebar'
     ]);
-    expect(overrides.every((rule) => (rule.index ?? -1) > presetDark)).to.be.true;
+    expect(overrides.every((rule) => (rule.index ?? -1) > themeDark)).to.be.true;
     expect(css).to.contain('--default-font-family:"Inter"');
   });
 

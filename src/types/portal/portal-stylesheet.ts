@@ -5,10 +5,10 @@ const HEADER = "/* Written by the APIMatic CLI from the 'portal' block of src/ap
 
 /**
  * The light rule is scoped with `:not(.dark)`: a bare `:root` has the specificity of the
- * presets' `.dark` block and comes after it, so a colour meant for light mode would win in dark
- * mode too. Each rule also names the sidebar, which the layout renders as `#nd-sidebar` and
- * which some presets give tokens of its own -- neutral's muted and secondary in dark mode,
- * catppuccin's in both -- with an id that outranks either mode's rule.
+ * theme's `.dark` block and comes after it, so a colour meant for light mode would win in dark
+ * mode too. Each rule also names the sidebar, which the layout renders as `#nd-sidebar` and to
+ * which the neutral theme gives muted and secondary tokens of its own in dark mode, with an id
+ * that outranks either mode's rule.
  */
 export const LIGHT_SELECTOR = ':root:not(.dark), :root:not(.dark) #nd-sidebar';
 export const DARK_SELECTOR = '.dark, .dark #nd-sidebar';
@@ -16,13 +16,12 @@ export const DARK_SELECTOR = '.dark, .dark #nd-sidebar';
 type Declarations = ReadonlyMap<string, string>;
 
 /**
- * The build project's `src/styles/theme.css`. `app.css` imports it after the Fumadocs presets,
+ * The build project's `src/styles/theme.css`. `app.css` imports it after the Fumadocs theme,
  * so what it sets comes last. A file of its own rather than a substitution, so `portal serve`
  * can rewrite it whole when the block changes; rendered here so the CSS is tested without a build.
  */
 export class PortalStylesheet {
   private constructor(
-    private readonly imports: readonly string[],
     private readonly fontFamilies: Declarations,
     private readonly light: Declarations,
     private readonly dark: Declarations
@@ -35,7 +34,6 @@ export class PortalStylesheet {
     const tokens = config.tokenOverrides();
 
     return new PortalStylesheet(
-      [`fumadocs-ui/css/${brand.brandColors().presetName()}.css`],
       new Map([
         ['--default-font-family', fonts.bodyFamily()],
         ['--default-mono-font-family', fonts.monoFamily()]
@@ -48,7 +46,6 @@ export class PortalStylesheet {
   public toString(): string {
     return [
       HEADER,
-      this.imports.map((specifier) => `@import '${specifier}';`).join('\n'),
       PortalStylesheet.rule('@theme', this.fontFamilies),
       PortalStylesheet.rule(LIGHT_SELECTOR, this.light),
       PortalStylesheet.rule(DARK_SELECTOR, this.dark)

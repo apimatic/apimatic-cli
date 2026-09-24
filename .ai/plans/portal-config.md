@@ -26,7 +26,7 @@ listed in section 2.
 ## 1. Goal and scope
 
 Give the `portal` block of `src/apimatic.json` the shape it will keep, make the
-portal brandable — logo, favicon, colour preset, primary colour, fonts,
+portal brandable — logo, favicon, primary colour, fonts,
 light/dark mode, header links — and render the top level of the site as
 tabs. The tabs come from the root `nav.json`, which already orders the top
 level; `apimatic.json` says how the portal looks and behaves, `nav.json` says
@@ -71,7 +71,7 @@ Delivered as **one PR** (section 11).
 | Home | `content/index.md` rendered in the docs layout, in its own Home tab, with an optional CTA under the title from `portal.home.cta`. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. |
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
-| Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. The preset supplies every other token. |
+| Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. Fumadocs' neutral theme supplies every other token (section 15). |
 | Fonts | A validated shortlist plus `system`. No free text. Loaded from Google Fonts at runtime, as Geist is today; `system` makes no network request. |
 | Favicon default | The light logo; none when there is no logo. The APIMatic mark is never shipped onto a customer's domain. |
 | Site name default | Derived from `info.title` when the project has exactly one spec. With two or more, `site.name` is required. |
@@ -82,7 +82,7 @@ Delivered as **one PR** (section 11).
 | Operation filtering | `api.showDeprecated` and `api.showInternal` are applied to the bundled document before pages are generated (section 7). |
 | Raw tokens | `advanced.tokens.{light,dark}` are validated by name and passed through. The contrast gate is post-MVP. |
 | Colour formats | `#rgb` and `#rrggbb` for `brand.colors.primary`, because the foreground derivation has to parse it (narrowed 2026-09-24, section 15). Raw tokens accept any CSS colour string. |
-| Key names | Deviations from the PM draft: `brand.colors.preset`, `brand.colorMode`, `brand.fonts`, `navigation.links`, `api.showInternal`, and tabs in `nav.json` rather than a `sections` list. |
+| Key names | Deviations from the PM draft: `brand.colors`, `brand.colorMode`, `brand.fonts`, `navigation.links`, `api.showInternal`, and tabs in `nav.json` rather than a `sections` list. |
 
 Rejected, with reasons:
 
@@ -142,7 +142,7 @@ Rejected, with reasons:
     "brand": {
       "logo": { "light": "static/images/logo.svg", "dark": "static/images/logo-dark.svg" },
       "favicon": "static/favicon.ico",
-      "colors": { "preset": "neutral", "primary": { "light": "#1d4ed8", "dark": "#93c5fd" } },
+      "colors": { "primary": { "light": "#1d4ed8", "dark": "#93c5fd" } },
       "fonts": { "body": "geist", "mono": "geist-mono" },
       "colorMode": "both"
     },
@@ -181,8 +181,7 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.site.description` | string | first paragraph of `info.description` of the only spec, whitespace-collapsed, capped at 300 characters on a word boundary | Blank is none. A change from today's `OpenApiDocument.suggestedConfig`, which collapses the whole description: a paragraph ends at a blank line, so wrapped prose without one is still whole. |
 | `portal.brand.logo` | string or `{light, dark}` | none | Paths relative to `src/` inside `static/`; a string sets both. Each file must exist. *As reviewed:* every name on the path must be there and not `.`, since `static//logo.png` finds the file and is then served as `//logo.png`, another host; each name is escaped in the URL; and the file must exist in the case written, since Windows and macOS find `Logo.PNG` for `logo.png` and the host does not. |
 | `portal.brand.favicon` | string | the light logo | Path inside `static/`; must exist. The link's `type` is set when the extension is known. The logo's path rules apply. |
-| `portal.brand.colors.preset` | enum | `neutral` | `neutral`, `black`, `vitepress`, `dusk`, `catppuccin`, `ocean`, `purple`, `solar`, `emerald`, `ruby`, `aspen`. |
-| `portal.brand.colors.primary` | colour or `{light, dark}` | the preset's | A string sets both modes. `#rgb` or `#rrggbb`, per section 2. |
+| `portal.brand.colors.primary` | colour or `{light, dark}` | the theme's | A string sets both modes. `#rgb` or `#rrggbb`, per section 2. |
 | `portal.brand.fonts.body` | enum | `geist` | `geist`, `inter`, `ibm-plex-sans`, `roboto`, `open-sans`, `source-sans-3`, `manrope`, `dm-sans`, `system`. |
 | `portal.brand.fonts.mono` | enum | `geist-mono` | `geist-mono`, `jetbrains-mono`, `ibm-plex-mono`, `fira-code`, `source-code-pro`, `system`. |
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
@@ -228,8 +227,7 @@ content-directory `@source` line prepare already substitutes.
 | `site.*` | `__root.tsx`, `$.tsx` head, `seo.ts`, `llms.server.ts` | As today. |
 | `brand.logo` | `layout.shared.tsx` `nav.title` | Two `<img>` with `dark:hidden` / `hidden dark:block`; the `dark` variant is defined by Fumadocs' `base.css`. |
 | `brand.favicon` | `__root.tsx` `links` | `<link rel="icon">` with `type` from the extension. |
-| `brand.colors.preset` | `theme.css` | `@import 'fumadocs-ui/css/<preset>.css'` at the top of the generated file; today's fixed `neutral.css` line leaves `app.css`. |
-| `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the presets' `.dark` block and comes later, so a light-only value would win in dark mode. |
+| `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the theme's `.dark` block and comes later, so a light-only value would win in dark mode. |
 | `brand.fonts` | `__root.tsx` head, `theme.css` | A `<link rel="stylesheet">` to the Google Fonts URL, then `@theme { --default-font-family; --default-mono-font-family }`. `system` emits no link and the OS stacks. A link rather than a CSS `@import` because a remote import nested inside an imported stylesheet lands mid-file after bundling, where browsers ignore it. |
 | `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
 | `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
@@ -370,13 +368,12 @@ under `portal serve` as they do today, tabs included, with no config watcher.
 - **`src/lib/layout.tsx`** (new): the notebook layout with `nav.mode: 'top'`
   and `tabMode: 'navbar'`, given the explicit `tabs` list. (Until the cut of
   section 15 it chose between four layouts, each with props of its own.)
-- **`app.css`**: loses the Google Fonts, `neutral.css` and Geist `@theme` lines
-  and gains a fixed `@import './theme.css'` after the Fumadocs and OpenAPI
-  presets, so the generated rules come last.
-- **`src/styles/theme.css`** (written by the CLI, rewritten on re-apply): the
-  preset import, `@theme` with the
-  two font families, `:root:not(.dark)` with the light primary trio and light
-  tokens, `.dark` with the dark trio and dark tokens.
+- **`app.css`**: keeps its `neutral.css` import, loses the Google Fonts and
+  Geist `@theme` lines, and gains a fixed `@import './theme.css'` after the
+  Fumadocs and OpenAPI presets, so the generated rules come last.
+- **`src/styles/theme.css`** (written by the CLI, rewritten on re-apply):
+  `@theme` with the two font families, `:root:not(.dark)` with the light
+  primary trio and light tokens, `.dark` with the dark trio and dark tokens.
 - **`portal.identity.json`** (written by the CLI, rewritten on re-apply) and
   **`portal.ts`**, which imports it and exports it typed as `Portal`. The file
   holds the identity fields from section 4 and nothing else, which is what makes
@@ -591,7 +588,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   dark logo and favicon reported.
 - `Color`: parsing, luminance against known values, the foreground choice on
   both sides of the crossover.
-- `PortalStylesheet`: the emitted CSS for each preset, `system` fonts emitting
+- `PortalStylesheet`: the emitted CSS, `system` fonts emitting
   no link, tokens landing after the primary, the light
   block scoped with `:not(.dark)`, both blocks present when the primary is one
   string.
@@ -625,12 +622,12 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 - Fixtures: `test/resources/portal-inputs/default/apimatic.json` moves to the
   nested shape and gains a `languages` entry.
 - End-to-end, extending `test/e2e/portal-build.test.ts`: the default fixture;
-  the emitted CSS carries the preset's tokens and the primary override; a
+  the emitted CSS carries the theme's tokens and the primary override; a
   `colorMode: dark` fixture emits no theme switch and names `dark` in
   next-themes' inline script (the DOM check stays a manual headless-Chrome
   step); the `notebook-navbar` header carries the tabs; a `showDeprecated:
   false` fixture emits no page and no sidebar row for the deprecated operation;
-  one `glass` build succeeds and type-checks; the client-bundle assertion also
+  the client-bundle assertion also
   covers `portal.identity.json`.
 
 ## 10. Verified Fumadocs behaviour
@@ -729,7 +726,7 @@ files the plugin and publishing commands create do not carry it, which keeps
 this PR to the portal. `PortalServeAction.execute` loses its `onAfterServe`
 hook, which only quickstart used; the language-step PR brings it back with the
 serve call. The e2e cases share one extra build: a `branded` fixture that sets
-forced dark, ocean with a primary, fonts, a header link and a CTA, and
+forced dark, a primary, fonts, a header link and a CTA, and
 hides a deprecated and an internal operation. It has no content directory, so it
 also covers the fallback home page and its Home tab. The sample repository's
 `v2` change is branch `saeedjamshaid/portal-config` in
@@ -896,3 +893,9 @@ none of them has shipped.
   props that Fumadocs changes between versions, glass's own stylesheet, every
   layout's page components in the bundle (about 38 KB of script), and each
   other setting to be checked under each of them.
+- **`brand.colors.preset`** is gone; every portal uses Fumadocs' neutral theme,
+  which was the default, imported by `app.css` again rather than by the
+  generated `theme.css`. `brand.colors` stays an object holding `primary`, so a
+  preset or an accent colour can come back as a key beside it. The primary
+  covers "make it ours"; eleven themes were eleven palettes to check every other
+  setting against, several of which restyle the sidebar beyond any token.

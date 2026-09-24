@@ -316,7 +316,7 @@ describe('PortalSourceContext', () => {
     beforeEach(() => write('spec/api.json', OPENAPI));
 
     it('gives the config resolve gives, from the site the specifications suggested', async () => {
-      writeConfig({ brand: { colors: { preset: 'ocean' } } });
+      writeConfig({ brand: { colors: { primary: '#1d4ed8' } } });
       const resolved = (await resolve())._unsafeUnwrap();
 
       const reloaded = (await context().resolveConfig(resolved.suggestedSite))._unsafeUnwrap();

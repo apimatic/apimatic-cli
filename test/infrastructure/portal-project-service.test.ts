@@ -140,7 +140,7 @@ describe('PortalProjectService', () => {
     it('writes the stylesheet the block describes beside the one that imports it', async () => {
       const config = configFor({
         site: { name: 'My API' },
-        brand: { colors: { preset: 'ocean', primary: '#1d4ed8' } }
+        brand: { colors: { primary: '#1d4ed8' } }
       });
 
       (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
@@ -201,14 +201,14 @@ describe('PortalProjectService', () => {
     const identityFile = () => path.join(project.toString(), 'portal.identity.json');
 
     it('writes nothing, and says so, when the block makes the same site', async () => {
-      const config = configFor({ site: { name: 'My API' }, brand: { colors: { preset: 'ocean' } } });
+      const config = configFor({ site: { name: 'My API' }, brand: { colors: { primary: '#1d4ed8' } } });
       (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
       const before = [fs.statSync(themeFile()).mtimeMs, fs.statSync(identityFile()).mtimeMs];
 
       // Written differently, read the same: the comparison is of what the preview shows.
       const same = configFor({
         site: { name: 'My API' },
-        brand: { colors: { preset: 'ocean' } },
+        brand: { colors: { primary: '#1d4ed8' } },
         ai: { pageActions: true }
       });
       const applied = await service.applyConfig(project, same);
