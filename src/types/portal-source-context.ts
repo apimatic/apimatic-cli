@@ -207,8 +207,9 @@ export class PortalSourceContext {
 
   /**
    * The root and the `languages` block are this command's to judge as well, since the portal
-   * documents the project's SDK languages; a malformed `plugin` block belongs to the plugin
-   * commands and must not fail a build, so it counts as no block and gets no page.
+   * documents the project's SDK languages. The `plugin` block is the plugin commands' to judge,
+   * so it never fails a build and nothing in it is read: an object gets the context plugin page
+   * whatever it holds, and anything else counts as no block.
    */
   private static parseSettings(
     document: ApimaticConfigDocument,

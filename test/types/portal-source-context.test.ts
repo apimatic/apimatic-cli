@@ -621,6 +621,13 @@ describe('PortalSourceContext', () => {
       expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
     });
 
+    // Nothing in the block is read, so an identity the plugin commands would refuse still gets the page.
+    it('carries the context plugin page for a block whose identity is malformed', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: { pluginId: 'Bad Id!', pluginVersion: 'one' } });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.include('context-plugin/index.mdx');
+    });
+
     it('reads them again for portal serve', async () => {
       // Named, because nothing suggests a site when the specifications are not read again.
       writeFile({ portal: { site: { name: 'Calc' } }, languages: { go: {} }, plugin: {} });
