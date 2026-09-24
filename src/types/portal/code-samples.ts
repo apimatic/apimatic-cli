@@ -43,8 +43,6 @@ export class CodeSampleCatalog {
 }
 
 export class CodeSamples {
-  public static readonly none = new CodeSamples([]);
-
   constructor(private readonly catalogs: CodeSampleCatalog[]) {}
 
   public samplesFor(endpoint: Endpoint): CodeSample[] {
