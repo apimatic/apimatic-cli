@@ -7,7 +7,6 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginConfig, PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
-import { Language } from '../../types/sdk/generate.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { PluginRecordMetadataAction } from './record-metadata.js';
@@ -92,10 +91,19 @@ export class PluginGenerateAction {
       this.prompts.languagesNotIncluded(unsupported);
     }
 
-    const preview = await this.confirmBundledSdks(selection.filter((language) => !published.includes(language)));
-    if (preview === undefined) {
-      this.prompts.localPluginCancelled();
-      return ActionResult.cancelled();
+    const bundled = selection.filter((language) => !published.includes(language));
+    const profiles =
+      bundled.length === 0
+        ? undefined
+        : await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
+
+    const preview = profiles !== undefined && profiles.isOk() && profiles.value.length > 0;
+    if (preview) {
+      this.prompts.recommendPublishingFirst();
+      if (!(await this.prompts.confirmLocalPlugin())) {
+        this.prompts.localPluginCancelled();
+        return ActionResult.cancelled();
+      }
     }
 
     // `src/` is zipped as it sits on disk, so a byte-order mark the reader above looked past
@@ -107,38 +115,6 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    return await this.buildPlugin(buildDirectory, pluginContext, pluginDirectory, preview);
-  };
-
-  /**
-   * Whether the plugin is a preview, or `undefined` if the user stopped rather than build one.
-   * Only a language the plugin has to carry itself is worth a word about publishing; a run that
-   * adds nothing local is describing packages that already exist.
-   */
-  private readonly confirmBundledSdks = async (bundled: readonly Language[]): Promise<boolean | undefined> => {
-    if (bundled.length === 0) {
-      return false;
-    }
-
-    // The profile lookup is advisory only, so one that cannot answer is read as "no profile": a
-    // recommendation is not worth failing a generation the user asked for, and `--auth-key` does
-    // not reach this call.
-    const profiles = await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
-    if (profiles.isErr() || profiles.value.length === 0) {
-      return false;
-    }
-
-    this.prompts.recommendPublishingFirst();
-
-    return (await this.prompts.confirmLocalPlugin()) ? true : undefined;
-  };
-
-  private readonly buildPlugin = async (
-    buildDirectory: DirectoryPath,
-    pluginContext: PluginContext,
-    pluginDirectory: DirectoryPath,
-    preview: boolean
-  ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildDirectory);
