@@ -1,7 +1,8 @@
-import { dirname } from 'node:path';
+import { basename, dirname } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
+import { FilePath } from '../file/filePath.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { CodeSample, CodeSamples } from './code-samples.js';
 import { Endpoint } from './endpoint.js';
@@ -74,10 +75,11 @@ export class OpenApiDocument {
     return new OpenApiDocument({ ...this.document, paths });
   }
 
-  public refersOutside(directory: DirectoryPath): boolean {
+  /** The local files this document's `$ref`s name, resolved against the `directory` it sits in. */
+  public referencedFiles(directory: DirectoryPath): FilePath[] {
     return [...references(this.document)]
-      .map(referencedFile)
-      .some((file) => file !== undefined && !directory.contains(directory.resolve(dirname(file))));
+      .flatMap((reference) => referencedFile(reference) ?? [])
+      .map((file) => new FilePath(directory.resolve(dirname(file)), new FileName(basename(file))));
   }
 
   public format(): SpecFormat {

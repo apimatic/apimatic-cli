@@ -374,7 +374,7 @@ Following the 5-layer stack in `.ai/instructions.md`:
 | Parse `code-samples/<lang>.json` | Types (value object) | `CodeSampleCatalog` |
 | The downloaded zip as a thing | Types (value object) | `PortalArtifacts` — `catalogs()`, `sdkZips()`, ignores unknown folders |
 | Inject `x-apimatic-codeSamples` | Types (value object) | `OpenApiDocument.withCodeSamples(codeSamples) -> OpenApiDocument` |
-| Detect escaping `$ref`s | Types (value object) | `OpenApiDocument.refersOutside(specDirectory) -> boolean` |
+| Detect escaping `$ref`s | Types (value object) + Infrastructure | `OpenApiDocument.referencedFiles(directory) -> FilePath[]`, followed file to file by `PortalProjectService` |
 | Copy + annotate the spec tree, repoint slugs | Infrastructure | `PortalProjectService` |
 | Place `sdk/<lang>.zip` in the built site | Infrastructure | `PortalContext` — it already owns the output directory ([D35](#d35)) |
 | Poll loop | — | **reuse** `pollUntilCompleted`; [D22](#wire-format) makes it a no-change |
@@ -405,7 +405,7 @@ harmful: the customer's document is what must render.
 
 Escaping-ref detection is a scan of `$ref` string values: skip `#/...` (internal) and URLs
 (which resolve identically from anywhere), resolve the rest against the file's directory,
-test containment in `src/spec/`.
+test containment in `src/spec/`, and repeat in every file reached, since a nested file's `../` breaks the copy too.
 
 ### 7.3 Rendering the tabs
 
@@ -539,7 +539,7 @@ The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged ren
 - Declaration order preserved, not sorted.
 - A language present in `languages` but absent from the zip → its tabs are simply absent.
 - An unknown top-level folder in the artifact zip → ignored, not an error.
-- Escaping-`$ref` detection: internal `#/...` and URL refs do not count; a `../` ref does.
+- Escaping-`$ref` detection: internal `#/...` and URL refs do not count; a `../` ref does, in the spec or in any file it reaches.
 - A spec with an escaping ref keeps its slug pointed at the **original** file.
 
 **CLI, integration** (nock): 202 → poll → 302 → download; `Failed` with errors; a status

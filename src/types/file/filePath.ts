@@ -16,6 +16,10 @@ export class FilePath {
     return this.fileName;
   }
 
+  public directory(): DirectoryPath {
+    return this.directoryPath;
+  }
+
   public replaceDirectory(newDirectory: DirectoryPath): FilePath {
     return new FilePath(newDirectory, this.fileName);
   }

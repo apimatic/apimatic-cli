@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import path from 'path';
 import { OpenApiDocument, SpecFormat } from '../../../src/types/portal/openapi-document';
 import { FileName } from '../../../src/types/file/fileName';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
@@ -193,24 +194,22 @@ describe('OpenApiDocument', () => {
     });
   });
 
-  describe('refersOutside', () => {
+  describe('referencedFiles', () => {
     const specDirectory = new DirectoryPath('/project/src/spec');
-    const referring = (ref: string) =>
-      readJson({ openapi: '3.0.0', paths: { '/pets': { get: { responses: { 200: { $ref: ref } } } } } });
+    const referenced = (ref: string) =>
+      readJson({ openapi: '3.0.0', paths: { '/pets': { get: { responses: { 200: { $ref: ref } } } } } })
+        .referencedFiles(specDirectory)
+        .map(String);
 
     it('ignores internal references and URLs, which resolve the same from anywhere', () => {
-      expect(referring('#/components/responses/Ok').refersOutside(specDirectory)).to.be.false;
-      expect(referring('https://example.com/common.yaml#/Ok').refersOutside(specDirectory)).to.be.false;
+      expect(referenced('#/components/responses/Ok')).to.be.empty;
+      expect(referenced('https://example.com/common.yaml#/Ok')).to.be.empty;
     });
 
-    it('accepts a file beside or below the spec', () => {
-      expect(referring('./common.yaml#/Ok').refersOutside(specDirectory)).to.be.false;
-      expect(referring('shared/common.yaml').refersOutside(specDirectory)).to.be.false;
-    });
-
-    it('catches a file above the spec directory', () => {
-      expect(referring('../common.yaml#/Ok').refersOutside(specDirectory)).to.be.true;
-      expect(referring('shared/../../common.yaml').refersOutside(specDirectory)).to.be.true;
+    it('resolves a file against the directory the document sits in, dropping the fragment', () => {
+      expect(referenced('./common.yaml#/Ok')).to.deep.equal([path.resolve('/project/src/spec/common.yaml')]);
+      expect(referenced('shared/common.yaml')).to.deep.equal([path.resolve('/project/src/spec/shared/common.yaml')]);
+      expect(referenced('shared/../../common.yaml')).to.deep.equal([path.resolve('/project/src/common.yaml')]);
     });
   });
 

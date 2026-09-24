@@ -7,6 +7,7 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSamples } from '../types/portal/code-samples.js';
+import { OpenApiDocument } from '../types/portal/openapi-document.js';
 import { PortalSource, PortalSpec } from '../types/portal/portal-source.js';
 import { FileService } from './file-service.js';
 
@@ -101,7 +102,10 @@ export class PortalProjectService {
     const specDirectory = projectDirectory.join('spec');
     await this.fileService.copyDirectoryContents(source.specDirectory, specDirectory);
 
-    const unsampled = source.specs.filter((spec) => spec.document.refersOutside(source.specDirectory));
+    const refersOutside = await Promise.all(
+      source.specs.map((spec) => this.refersOutside(spec, source.specDirectory))
+    );
+    const unsampled = source.specs.filter((_, index) => refersOutside[index]);
     const specs = await Promise.all(
       source.specs.map((spec) =>
         unsampled.includes(spec) ? spec : this.writeWithCodeSamples(spec, specDirectory, codeSamples)
@@ -145,6 +149,24 @@ export class PortalProjectService {
       ? nodeOptions
       : `${nodeOptions} --max-old-space-size=4096`.trim();
     return environment;
+  }
+
+  // A `../` in a file the spec refers to breaks the copy as surely as one in the spec itself.
+  private async refersOutside(spec: PortalSpec, specDirectory: DirectoryPath): Promise<boolean> {
+    const visited = new Set([spec.file.toString()]);
+    const pending = spec.document.referencedFiles(spec.file.directory());
+    for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
+      if (!specDirectory.contains(file.directory())) {
+        return true;
+      }
+      if (visited.has(file.toString()) || !(await this.fileService.fileExists(file))) {
+        continue;
+      }
+      visited.add(file.toString());
+      const document = OpenApiDocument.parse(file.name(), await this.fileService.getContents(file));
+      pending.push(...(document?.referencedFiles(file.directory()) ?? []));
+    }
+    return false;
   }
 
   private async writeWithCodeSamples(

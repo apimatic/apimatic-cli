@@ -228,6 +228,17 @@ describe('PortalProjectService', () => {
       expect(sampled.source.specs[0].file).to.equal(spec.file);
       expect(sampled.unsampledSpecs.map(String)).to.deep.equal(['pets.json']);
     });
+
+    it('also keeps a spec on its original file when a file it refers to leaves spec/', async () => {
+      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: './schemas/responses.json' } }));
+      fs.mkdirSync(path.join(root, 'spec', 'schemas'));
+      fs.writeFileSync(path.join(root, 'spec', 'schemas', 'responses.json'), '{ "$ref": "../../shared/ok.json" }');
+
+      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+
+      expect(sampled.source.specs[0].file).to.equal(spec.file);
+      expect(sampled.unsampledSpecs.map(String)).to.deep.equal(['pets.json']);
+    });
   });
 
   describe('childEnvironment', () => {
