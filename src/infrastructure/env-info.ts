@@ -2,6 +2,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs-extra';
+import { DirectoryPath } from '../types/file/directoryPath.js';
 
 class EnvInfo {
   private static cachedCliVersion: string | null = null;
@@ -26,9 +27,7 @@ class EnvInfo {
     }
 
     try {
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = dirname(__filename);
-      const pkgPath = join(__dirname, '../../package.json');
+      const pkgPath = join(this.packageRoot().toString(), 'package.json');
       const pkgJson = fs.readFileSync(pkgPath, 'utf-8');
       const pkg = JSON.parse(pkgJson);
       const version = pkg.version || 'unknown';
@@ -37,6 +36,12 @@ class EnvInfo {
     } catch {
       return 'unknown';
     }
+  }
+
+  /** Where the CLI is installed: the directory holding its `package.json` and what it ships. */
+  public packageRoot(): DirectoryPath {
+    // This file sits two levels down, in `lib/infrastructure/` or, under tsx, `src/infrastructure/`.
+    return new DirectoryPath(join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
   }
 
   public getBaseUrl(): string | undefined {

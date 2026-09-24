@@ -3,7 +3,8 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
-import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
+import { GENERATED_DIRECTORY_NAME, TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
+import { PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
 import { PortalIdentity } from '../src/types/portal/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
 
@@ -32,6 +33,10 @@ function templateImports(): string[] {
     }
   }
   return specifiers;
+}
+
+function pageTemplateFiles(): string[] {
+  return fs.readdirSync(path.join(repositoryRoot, 'portal-pages'));
 }
 
 function templateFiles(): string[] {
@@ -70,11 +75,11 @@ describe('portal template packaging', () => {
     expect(TEMPLATE_DEPENDENCIES.filter((name) => !declared.has(name))).to.be.empty;
   });
 
-  it('is listed in the published files', () => {
-    expect(manifest.files).to.include('./portal-template');
+  it('is listed in the published files, with the page templates', () => {
+    expect(manifest.files).to.include.members(['./portal-template', './portal-pages']);
   });
 
-  it('ships every template file in the package', function () {
+  it('ships every template file and page template in the package', function () {
     this.timeout(120_000);
     const packed = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
       cwd: repositoryRoot,
@@ -83,9 +88,18 @@ describe('portal template packaging', () => {
     });
     const packedPaths = new Set<string>((JSON.parse(packed)[0].files as { path: string }[]).map((entry) => entry.path));
 
-    const missing = templateFiles().filter((file) => !packedPaths.has(`portal-template/${file}`));
+    const missing = [
+      ...templateFiles().map((file) => `portal-template/${file}`),
+      ...pageTemplateFiles().map((file) => `portal-pages/${file}`)
+    ].filter((file) => !packedPaths.has(file));
 
     expect(missing, 'template files missing from the published package').to.be.empty;
+  });
+
+  // `PortalPagesService` reads a template by the name `GeneratedPages` gives it, so one on
+  // either side alone is a page that fails to render, or a file nothing reads.
+  it('holds exactly the page templates the generated pages are rendered from', () => {
+    expect(pageTemplateFiles().sort()).to.deep.equal(PAGE_TEMPLATES.map((name) => `${name}.mdx`).sort());
   });
 
   it('keeps the content directory placeholder the CLI substitutes', () => {
@@ -119,6 +133,7 @@ describe('portal template packaging', () => {
     const generated = ['portal.config.json', 'portal.identity.json', 'src/styles/theme.css'];
 
     expect(templateFiles().filter((file) => generated.includes(file))).to.be.empty;
+    expect(templateFiles().filter((file) => file.startsWith(`${GENERATED_DIRECTORY_NAME}/`))).to.be.empty;
   });
 
   it('carries no nested .gitignore, which would drop files from the package', () => {

@@ -145,13 +145,14 @@ export class PortalServeAction {
         this.prompts.configRejected(reloaded.error, sourceDirectory);
         return;
       }
-      const { config } = reloaded.value;
+      const settings = reloaded.value;
+      const { config } = settings;
 
       if (preview.staticDirectoryNotServed(config)) {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
-      const applied = await this.projectService.applyConfig(projectDirectory, config);
+      const applied = await this.projectService.applyConfig(projectDirectory, settings);
       if (applied.isErr()) {
         this.prompts.configNotApplied(applied.error);
         return;

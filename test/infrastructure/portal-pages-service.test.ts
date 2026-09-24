@@ -1,0 +1,133 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { expect } from 'chai';
+import sinon from 'sinon';
+import { envInfo } from '../../src/infrastructure/env-info';
+import { PortalPagesService } from '../../src/infrastructure/portal-pages-service';
+import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { GeneratedPages } from '../../src/types/portal/generated-pages';
+import { PortalLanguages } from '../../src/types/portal/portal-languages';
+import { Language } from '../../src/types/sdk/generate';
+
+describe('PortalPagesService', () => {
+  const service = new PortalPagesService();
+  let root: string;
+  let generated: DirectoryPath;
+
+  const pagesFor = (languages: Record<string, object> = { typescript: {} }, plugin = false) =>
+    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin);
+
+  /** Every file written, relative to the generated directory. */
+  const files = () =>
+    fs
+      .readdirSync(generated.toString(), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) =>
+        path.relative(generated.toString(), path.join(entry.parentPath, entry.name)).split(path.sep).join('/')
+      )
+      .sort();
+
+  const read = (relative: string) => fs.readFileSync(path.join(generated.toString(), relative), 'utf8');
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-pages-'));
+    generated = new DirectoryPath(root).join('generated');
+  });
+
+  afterEach(() => {
+    sinon.restore();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('writes each page and nav.json into its section folder, and says so', async () => {
+    expect((await service.write(generated, pagesFor({ typescript: {} }, true)))._unsafeUnwrap()).to.be.true;
+
+    expect(files()).to.deep.equal([
+      'context-plugin/index.mdx',
+      'context-plugin/nav.json',
+      'sdks/index.mdx',
+      'sdks/nav.json',
+      'sdks/typescript.mdx'
+    ]);
+    expect(JSON.parse(read('sdks/nav.json'))).to.deep.equal({ title: 'SDKs', pages: ['typescript'] });
+  });
+
+  // The one run that holds the shipped templates and the data the generator gives them together.
+  it('renders every page from the shipped templates, leaving no placeholder behind', async () => {
+    const everyLanguage = Object.fromEntries(Object.values(Language).map((language) => [language, {}]));
+
+    (await service.write(generated, pagesFor(everyLanguage, true)))._unsafeUnwrap();
+
+    for (const file of files().filter((name) => name.endsWith('.mdx'))) {
+      expect(read(file), file).to.not.contain('{{');
+    }
+    expect(read('sdks/csharp.mdx')).to.contain('title: "C#"');
+  });
+
+  it('writes nothing, and says so, when the pages are the same', async () => {
+    (await service.write(generated, pagesFor()))._unsafeUnwrap();
+    const before = fs.statSync(path.join(generated.toString(), 'sdks/typescript.mdx')).mtimeMs;
+
+    expect((await service.write(generated, pagesFor()))._unsafeUnwrap()).to.be.false;
+    expect(fs.statSync(path.join(generated.toString(), 'sdks/typescript.mdx')).mtimeMs).to.equal(before);
+  });
+
+  it('deletes the page of a language removed, and reorders the rest', async () => {
+    (await service.write(generated, pagesFor({ typescript: {}, python: {} })))._unsafeUnwrap();
+
+    expect((await service.write(generated, pagesFor({ python: {} })))._unsafeUnwrap()).to.be.true;
+
+    expect(files()).to.deep.equal(['sdks/index.mdx', 'sdks/nav.json', 'sdks/python.mdx']);
+    expect(JSON.parse(read('sdks/nav.json')).pages).to.deep.equal(['python']);
+  });
+
+  it('deletes the context plugin folder when the block goes, and writes it again when it returns', async () => {
+    (await service.write(generated, pagesFor({ typescript: {} }, true)))._unsafeUnwrap();
+
+    expect((await service.write(generated, pagesFor()))._unsafeUnwrap()).to.be.true;
+    expect(fs.existsSync(path.join(generated.toString(), 'context-plugin'))).to.be.false;
+
+    expect((await service.write(generated, pagesFor({ typescript: {} }, true)))._unsafeUnwrap()).to.be.true;
+    expect(files()).to.include('context-plugin/index.mdx');
+  });
+
+  it('deletes anything else in the directory, which only it writes', async () => {
+    fs.mkdirSync(path.join(generated.toString(), 'sdks'), { recursive: true });
+    fs.writeFileSync(path.join(generated.toString(), 'stray.mdx'), '# Stray');
+    fs.writeFileSync(path.join(generated.toString(), 'sdks', 'ruby.mdx'), '# Ruby');
+
+    (await service.write(generated, pagesFor()))._unsafeUnwrap();
+
+    expect(files()).to.deep.equal(['sdks/index.mdx', 'sdks/nav.json', 'sdks/typescript.mdx']);
+  });
+
+  describe('when the templates are not what the pages need', () => {
+    const templates = () => path.join(root, 'package', 'portal-pages');
+
+    beforeEach(() => {
+      fs.mkdirSync(templates(), { recursive: true });
+      sinon.stub(envInfo, 'packageRoot').returns(new DirectoryPath(root).join('package'));
+    });
+
+    it('reports a missing template rather than throwing, and writes nothing', async () => {
+      const written = await service.write(generated, pagesFor());
+
+      expect(written._unsafeUnwrapErr()).to.equal(
+        "The portal page template 'sdks.mdx' is missing from this installation. Reinstall the CLI and try again."
+      );
+      expect(fs.existsSync(generated.toString())).to.be.false;
+    });
+
+    it('reports a placeholder the pages give no value for, naming the template', async () => {
+      fs.writeFileSync(path.join(templates(), 'sdks.mdx'), '# SDKs');
+      fs.writeFileSync(path.join(templates(), 'sdk.mdx'), '# {{name}} {{version}}');
+
+      const written = await service.write(generated, pagesFor());
+
+      expect(written._unsafeUnwrapErr()).to.equal(
+        "A portal page template could not be filled. sdk.mdx: '{{version}}' names a value the page is not given."
+      );
+    });
+  });
+});

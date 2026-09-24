@@ -1,5 +1,4 @@
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fsExtra from 'fs-extra';
 import { err, ok, Result } from 'neverthrow';
@@ -7,10 +6,12 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
-import { PortalSource } from '../types/portal/portal-source.js';
+import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
 import { errorMessage } from '../utils/error-utils.js';
+import { envInfo } from './env-info.js';
 import { FileService } from './file-service.js';
+import { PortalPagesService } from './portal-pages-service.js';
 
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
@@ -43,6 +44,12 @@ const IDENTITY_FILE_NAME = 'portal.identity.json';
 /** In `src/styles/`, beside `app.css`, which imports it. */
 const STYLESHEET_FILE_NAME = 'theme.css';
 
+/**
+ * Where the generated pages are written, inside the project: `src/lib/source.ts` names it as a
+ * relative literal, which the browser bundle carries, so the build directory is never published.
+ */
+export const GENERATED_DIRECTORY_NAME = 'generated';
+
 export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
   /** Vite's CLI entry point, resolved from the CLI's own dependencies. */
@@ -55,6 +62,7 @@ export interface PortalProjectPaths {
  */
 export class PortalProjectService {
   private readonly fileService = new FileService();
+  private readonly pagesService = new PortalPagesService();
   private readonly require = createRequire(import.meta.url);
 
   /** Checks this installation can run the portal build at all, before any work is done. */
@@ -86,6 +94,11 @@ export class PortalProjectService {
     await this.fileService.copyDirectoryContents(template, projectDirectory);
     await this.linkDependencies(projectDirectory);
     await this.writeConfiguration(projectDirectory, source);
+
+    const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
+    if (pages.isErr()) {
+      return err(pages.error);
+    }
 
     return ok({
       projectDirectory,
@@ -164,6 +177,7 @@ export class PortalProjectService {
     const configuration = {
       specs,
       contentDir: this.toPosix(contentDirectory.toString()),
+      generatedDir: this.toPosix(projectDirectory.join(GENERATED_DIRECTORY_NAME).toString()),
       staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
     };
 
@@ -186,14 +200,17 @@ export class PortalProjectService {
   }
 
   /**
-   * The dev server picks the two files up and reloads the browser. Each is written only when
-   * its contents change, so an edit that leaves the site as it was, such as a plugin command
+   * The dev server picks the files up and reloads the browser. Each is written only when its
+   * contents change, so an edit that leaves the site as it was, such as a plugin command
    * rewriting its own block, reloads nothing; the answer says whether anything was written.
    */
-  public async applyConfig(projectDirectory: DirectoryPath, config: PortalConfig): Promise<Result<boolean, string>> {
+  public async applyConfig(
+    projectDirectory: DirectoryPath,
+    settings: PortalSettings
+  ): Promise<Result<boolean, string>> {
+    let written = false;
     try {
-      let written = false;
-      for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
+      for (const [file, contents] of this.appearanceFiles(projectDirectory, settings.config)) {
         const current = (await this.fileService.fileExists(file)) ? await this.fileService.getContents(file) : null;
         if (current !== contents) {
           // Renamed over rather than written in place, which the watching dev server could read half-written.
@@ -201,10 +218,14 @@ export class PortalProjectService {
           written = true;
         }
       }
-      return ok(written);
     } catch (error) {
       return err(errorMessage(error));
     }
+    const pages = await this.pagesService.write(
+      projectDirectory.join(GENERATED_DIRECTORY_NAME),
+      settings.generatedPages
+    );
+    return pages.map((pagesWritten) => written || pagesWritten);
   }
 
   private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {
@@ -238,8 +259,7 @@ export class PortalProjectService {
   }
 
   private templateDirectory(): DirectoryPath | undefined {
-    const packageRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-    const template = new DirectoryPath(packageRoot).join('portal-template');
+    const template = envInfo.packageRoot().join('portal-template');
     return this.fileService.directoryExistsSync(template) ? template : undefined;
   }
 

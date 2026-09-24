@@ -220,13 +220,13 @@ describe('PortalServeAction', () => {
       source = new DirectoryPath(root).join('src');
       fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
 
-      // `prepare` is stubbed above; this one writes the two files a real one would, so the
-      // test can see what an edit changes.
+      // `prepare` is stubbed above; this one writes the files an edit can change, as a real one
+      // would, so the test can see what an edit changes.
       (PortalProjectService.prototype.prepare as sinon.SinonStub).callsFake(
         async (directory: DirectoryPath, portal: PortalSource) => {
           projectDirectory = directory;
           fs.mkdirSync(path.join(directory.toString(), 'src/styles'), { recursive: true });
-          (await new PortalProjectService().applyConfig(directory, portal.config))._unsafeUnwrap();
+          (await new PortalProjectService().applyConfig(directory, portal))._unsafeUnwrap();
           return ok({ projectDirectory: directory, viteBinary: new FilePath(directory, new FileName('vite.js')) });
         }
       );
@@ -294,18 +294,36 @@ describe('PortalServeAction', () => {
     });
 
     // `sdk publish` and `plugin generate` rewrite the whole file to change their own block.
+    // What `sdk publish` writes: the generated pages show a language, not where it was published.
     it('applies nothing, and says nothing, for a change outside what the preview shows', async () => {
       await whileServing(async () => {
-        const before = readProject('portal.identity.json');
+        const before = [readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')];
         const config = originalConfig();
-        config.plugin = { pluginId: 'calc', pluginVersion: '0.1.0' };
-        config.languages.python = {};
+        config.languages.typescript = {
+          publishing: { package: { name: 'calc', version: '1.0.0' }, codegenVersion: 'v4' }
+        };
 
         await save(config);
 
-        expect(readProject('portal.identity.json')).to.equal(before);
+        expect([readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')]).to.deep.equal(
+          before
+        );
         expect(prompts.configApplied.called).to.be.false;
         expect(prompts.configRejected.called).to.be.false;
+      });
+    });
+
+    it('writes the pages of a language and a plugin block added, and says the edit was applied', async () => {
+      await whileServing(async () => {
+        const config = originalConfig();
+        config.languages.python = {};
+        config.plugin = { pluginId: 'calc', pluginVersion: '0.1.0' };
+
+        await save(config);
+
+        expect(readProject('generated/sdks/python.mdx')).to.contain('title: "Python"');
+        expect(readProject('generated/context-plugin/index.mdx')).to.contain('Context Plugin');
+        expect(prompts.configApplied.calledOnce).to.be.true;
       });
     });
 

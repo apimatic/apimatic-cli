@@ -440,10 +440,11 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   when no page of that name exists, since `/plugin` is not reserved. The
   entries stay refused; only the hints are new.
 - **`PortalPagesService`** (`src/infrastructure/portal-pages-service.ts`):
-  reads the three templates from `portal-pages/` once, renders a
-  `GeneratedPages` and writes it under a given directory. Each file is written
-  only when its contents differ, files the plan no longer names are deleted
-  with any directory they leave empty (the plugin's, when the block goes),
+  reads the templates a `GeneratedPages` needs from `portal-pages/`, each once
+  per write, renders it and writes it under a given directory. Each file is
+  written only when its contents differ, and files and section folders the
+  pages no longer call for are deleted (the plugin's folder, when the block
+  goes),
   and the answer says whether anything changed, which is the same contract
   `applyConfig` has for the appearance files. A missing templates directory or
   a rendering failure is a `Result` error with a message, never a throw. The
@@ -731,7 +732,7 @@ build, lint on touched files and the affected tests green.
    prompt, `apimatic:plugin` in `PortalNavigation`, the navigation
    hints. CLI only; unit and prompt tests. The test holding the sections
    against `navigation.ts` waits for step 4, which exports the template's list.
-3. **Templates and the writer.** `portal-pages/` with the three placeholders,
+3. **Templates and the writer.** *Done 2026-09-24.* `portal-pages/` with the three placeholders,
    the shared package-root lookup, `PortalPagesService`,
    `PortalProjectService.prepare` and `applyConfig` writing the generated
    directory, `generatedDir` in `portal.config.json`, `files` in
@@ -744,8 +745,10 @@ build, lint on touched files and the affected tests green.
    and the synthetic SDKs tab's removal. Template unit tests, the existing ones
    moved onto the folders, and the test from step 2 that holds the two lists
    together. A build now carries the pages.
-5. **Serve.** The watcher passing the pair, the notice wording of section 7
-   (no case needs a restart), the serve tests.
+5. **Serve.** The notice wording of section 7 (no case needs a restart) and
+   its prompt test. The watcher already passes the pair, and the serve tests
+   cover a language and a `plugin` block added, since step 3: `applyConfig`'s
+   new signature needed the caller changed to compile.
 6. **Surfacing.** Fixtures (`apimatic:sdks` in the default root `nav.json`, a
    `plugin` block in the branded one, which has no `nav.json` and so shows the
    default tab order), the e2e cases, command descriptions and
