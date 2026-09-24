@@ -13,6 +13,15 @@ interface Reference {
   segments: string[];
 }
 
+interface Walk {
+  document: Node;
+  path: string[];
+  references: Map<Node, Reference>;
+  targets: Map<string, string[]>;
+  inStructure: WeakSet<object>;
+  inData: WeakSet<object>;
+}
+
 // Where the bundler embeds each referenced file, keyed by a hash of its location, and where it
 // records which location each hash stands for.
 const EXTERNAL = 'x-ext';
@@ -127,77 +136,121 @@ function hoistSchemas(document: Node, locations: Record<string, string>): void {
   const externals = document[EXTERNAL];
   if (!isNode(externals)) return;
 
-  const references = new Map<Node, Reference>();
-  const targets = new Map<string, string[]>();
-  const inStructure = new WeakSet<object>();
-  const inData = new WeakSet<object>();
-  const path: string[] = [];
+  const { references, targets } = collectReferences(document);
+  addPassedOnSchemas(document, targets);
+  if (targets.size === 0) return;
 
-  // Every reference is collected, since each one into a moved file has to follow it, but only
-  // those outside data say whether what they point to is a schema.
-  const visit = (value: unknown, data: boolean): void => {
-    if (typeof value !== 'object' || value === null) return;
-    if (inStructure.has(value) || (data && inData.has(value))) return;
-    (data ? inData : inStructure).add(value);
+  rewriteReferences(references, placeSchemas(document, targets, locations));
+  removeMovedFiles(document, externals, targets);
+}
 
-    if (Array.isArray(value)) {
-      value.forEach((item, index) => {
-        path.push(String(index));
-        visit(item, data);
-        path.pop();
-      });
-      return;
-    }
-
-    const node = value as Node;
-    const segments = typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
-    if (segments) {
-      references.set(node, { raw: (node.$ref as string).slice(2).split('/'), segments });
-      if (!data && isSchemaPosition(path) && isHoistable(document, segments)) targets.set(key(segments), segments);
-    }
-
-    // In these maps a key is a name, so `default` there is a response and `enum` a property.
-    const named = SCHEMA_MAPS.has(path.at(-1) ?? '') || path.at(-1) === 'responses' || isComponentMap(path);
-    for (const [name, child] of Object.entries(node)) {
-      path.push(name);
-      visit(child, data || (!named && DATA_KEYS.has(name)));
-      path.pop();
-    }
+// Every reference is collected, since each one into a moved file has to follow it, but only
+// those outside data say whether what they point to is a schema.
+function collectReferences(document: Node): Pick<Walk, 'references' | 'targets'> {
+  const walk: Walk = {
+    document,
+    path: [],
+    references: new Map(),
+    targets: new Map(),
+    inStructure: new WeakSet(),
+    inData: new WeakSet()
   };
-  visit(document, false);
+  visit(walk, document, false);
+  return walk;
+}
 
-  // A schema file that is nothing but a reference makes what it names a schema too, though
-  // nothing may reference that from a schema position itself. Entries added here are visited by
-  // this same loop.
+function visit(walk: Walk, value: unknown, data: boolean): void {
+  if (!firstVisit(walk, value, data)) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => visitChild(walk, String(index), item, data));
+    return;
+  }
+
+  const node = value as Node;
+  record(walk, node, data);
+  const named = isNamedMap(walk.path);
+  for (const [name, child] of Object.entries(node)) {
+    visitChild(walk, name, child, data || (!named && DATA_KEYS.has(name)));
+  }
+}
+
+function visitChild(walk: Walk, name: string, child: unknown, data: boolean): void {
+  walk.path.push(name);
+  visit(walk, child, data);
+  walk.path.pop();
+}
+
+function firstVisit(walk: Walk, value: unknown, data: boolean): value is object {
+  if (typeof value !== 'object' || value === null) return false;
+  if (walk.inStructure.has(value) || (data && walk.inData.has(value))) return false;
+  (data ? walk.inData : walk.inStructure).add(value);
+  return true;
+}
+
+function record(walk: Walk, node: Node, data: boolean): void {
+  const segments = typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
+  if (!segments) return;
+  walk.references.set(node, { raw: (node.$ref as string).slice(2).split('/'), segments });
+  if (!data && isSchemaPosition(walk.path) && isHoistable(walk.document, segments)) {
+    walk.targets.set(key(segments), segments);
+  }
+}
+
+// In these maps a key is a name, so `default` there is a response and `enum` a property.
+function isNamedMap(path: string[]): boolean {
+  const last = path.at(-1) ?? '';
+  return SCHEMA_MAPS.has(last) || last === 'responses' || isComponentMap(path);
+}
+
+// A schema file that is nothing but a reference makes what it names a schema too, though
+// nothing may reference that from a schema position itself. Entries added here are visited by
+// this same loop.
+function addPassedOnSchemas(document: Node, targets: Map<string, string[]>): void {
   for (const segments of targets.values()) {
     const node = resolve(document, segments);
     const next = isNode(node) && typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
     if (next && isHoistable(document, next) && !targets.has(key(next))) targets.set(key(next), next);
   }
+}
 
-  if (targets.size === 0) return;
-
-  if (!isNode(document.components)) document.components = {};
-  const components = document.components as Node;
-  if (!isNode(components.schemas)) components.schemas = {};
-  const schemas = components.schemas as Node;
-
-  // A component that is nothing but a reference to the file already names it; the file's
-  // content takes its place rather than sitting beside it under a second name.
-  const aliases = new Map<string, string>();
-  for (const [name, schema] of Object.entries(schemas)) {
-    if (!isNode(schema) || typeof schema.$ref !== 'string' || Object.keys(schema).length !== 1) continue;
-    const segments = pointerSegments(schema.$ref);
-    if (segments && !aliases.has(key(segments))) aliases.set(key(segments), name);
-  }
-
+/** Files each target under `components/schemas`, and returns the pointer to where each one went. */
+function placeSchemas(
+  document: Node,
+  targets: Map<string, string[]>,
+  locations: Record<string, string>
+): Map<string, string> {
+  const schemas = componentSchemas(document);
+  const aliases = findAliases(schemas);
   const moved = new Map<string, string>();
   for (const [target, segments] of targets) {
     const name = aliases.get(target) ?? uniqueName(schemas, preferredName(segments, locations));
     schemas[name] = resolve(document, segments);
     moved.set(target, `#/components/schemas/${escapeJsonPointer(name)}`);
   }
+  return moved;
+}
 
+function componentSchemas(document: Node): Node {
+  if (!isNode(document.components)) document.components = {};
+  const components = document.components as Node;
+  if (!isNode(components.schemas)) components.schemas = {};
+  return components.schemas as Node;
+}
+
+// A component that is nothing but a reference to the file already names it; the file's
+// content takes its place rather than sitting beside it under a second name.
+function findAliases(schemas: Node): Map<string, string> {
+  const aliases = new Map<string, string>();
+  for (const [name, schema] of Object.entries(schemas)) {
+    if (!isNode(schema) || typeof schema.$ref !== 'string' || Object.keys(schema).length !== 1) continue;
+    const segments = pointerSegments(schema.$ref);
+    if (segments && !aliases.has(key(segments))) aliases.set(key(segments), name);
+  }
+  return aliases;
+}
+
+function rewriteReferences(references: Map<Node, Reference>, moved: Map<string, string>): void {
   for (const [node, { raw, segments }] of references) {
     for (let length = segments.length; length >= 2; length--) {
       const pointer = moved.get(key(segments.slice(0, length)));
@@ -207,9 +260,11 @@ function hoistSchemas(document: Node, locations: Record<string, string>): void {
       }
     }
   }
+}
 
-  // Nothing points into a moved file any more, and left in place the upgrader would convert
-  // it a second time. A node moved out of a file stays in it: the file may still be used.
+// Nothing points into a moved file any more, and left in place the upgrader would convert it a
+// second time. A node moved out of a file stays in it: the file may still be used.
+function removeMovedFiles(document: Node, externals: Node, targets: Map<string, string[]>): void {
   for (const segments of targets.values()) {
     if (segments.length === 2) delete externals[segments[1]];
   }
