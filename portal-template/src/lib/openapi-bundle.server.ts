@@ -5,7 +5,7 @@ import { escapeJsonPointer } from '@scalar/json-magic/helpers/escape-json-pointe
 import { getSegmentsFromPath } from '@scalar/json-magic/helpers/get-segments-from-path';
 import { getValueByPath } from '@scalar/json-magic/helpers/get-value-by-path';
 
-type Node = Record<string, unknown>;
+type JsonObject = Record<string, unknown>;
 
 interface Reference {
   /** As written, so a rewrite keeps whatever escaping the rest of the pointer had. */
@@ -14,9 +14,9 @@ interface Reference {
 }
 
 interface Walk {
-  document: Node;
+  document: JsonObject;
   path: string[];
-  references: Map<Node, Reference>;
+  references: Map<JsonObject, Reference>;
   targets: Map<string, string[]>;
   inStructure: WeakSet<object>;
   inData: WeakSet<object>;
@@ -74,7 +74,7 @@ const UPGRADER_SCHEMA_SEGMENTS = new Set([
  */
 export async function bundleSpecification(file: string): Promise<Document> {
   const unresolved: string[] = [];
-  let document: Node;
+  let document: JsonObject;
   try {
     document = (await bundle(file, {
       plugins: [readFiles(), fetchUrls(), parseJson(), parseYaml()],
@@ -85,7 +85,7 @@ export async function bundleSpecification(file: string): Promise<Document> {
           unresolved.push(String(node.$ref));
         }
       }
-    })) as Node;
+    })) as JsonObject;
   } catch (error) {
     throw new Error(`[OpenAPI] Failed to resolve input: ${file}`, { cause: error });
   }
@@ -107,20 +107,20 @@ export async function bundleSpecification(file: string): Promise<Document> {
  * Fumadocs lists a document's operations by reading the methods off each path item without
  * following a `$ref`, so every operation behind one gets no page and no error says so.
  */
-function inlinePathItems(document: Node): void {
+function inlinePathItems(document: JsonObject): void {
   const paths = document.paths;
-  if (!isNode(paths)) return;
+  if (!isJsonObject(paths)) return;
   for (const [route, item] of Object.entries(paths)) paths[route] = dereference(document, item, new Set());
 }
 
 // Siblings of a `$ref` override what it points to, as OpenAPI 3.1 has it.
-function dereference(document: Node, item: unknown, seen: Set<string>): unknown {
-  if (!isNode(item) || typeof item.$ref !== 'string' || seen.has(item.$ref)) return item;
+function dereference(document: JsonObject, item: unknown, seen: Set<string>): unknown {
+  if (!isJsonObject(item) || typeof item.$ref !== 'string' || seen.has(item.$ref)) return item;
   seen.add(item.$ref);
   const { $ref, ...siblings } = item;
   const segments = pointerSegments($ref);
   const target = segments && dereference(document, resolve(document, segments), seen);
-  return isNode(target) ? { ...target, ...siblings } : item;
+  return isJsonObject(target) ? { ...target, ...siblings } : item;
 }
 
 /**
@@ -132,9 +132,9 @@ function dereference(document: Node, item: unknown, seen: Set<string>): unknown 
  * anything else by where it sits, so a 3.0 `example` at the top of a schema file becomes an
  * Example Object map where a schema's `examples` is a list of values.
  */
-function hoistSchemas(document: Node, locations: Record<string, string>): void {
+function hoistSchemas(document: JsonObject, locations: Record<string, string>): void {
   const externals = document[EXTERNAL];
-  if (!isNode(externals)) return;
+  if (!isJsonObject(externals)) return;
 
   const { references, targets } = collectReferences(document);
   addPassedOnSchemas(document, targets);
@@ -146,7 +146,7 @@ function hoistSchemas(document: Node, locations: Record<string, string>): void {
 
 // Every reference is collected, since each one into a moved file has to follow it, but only
 // those outside data say whether what they point to is a schema.
-function collectReferences(document: Node): Pick<Walk, 'references' | 'targets'> {
+function collectReferences(document: JsonObject): Pick<Walk, 'references' | 'targets'> {
   const walk: Walk = {
     document,
     path: [],
@@ -167,7 +167,7 @@ function visit(walk: Walk, value: unknown, data: boolean): void {
     return;
   }
 
-  const node = value as Node;
+  const node = value as JsonObject;
   record(walk, node, data);
   const named = isNamedMap(walk.path);
   for (const [name, child] of Object.entries(node)) {
@@ -188,7 +188,7 @@ function firstVisit(walk: Walk, value: unknown, data: boolean): value is object 
   return true;
 }
 
-function record(walk: Walk, node: Node, data: boolean): void {
+function record(walk: Walk, node: JsonObject, data: boolean): void {
   const segments = typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
   if (!segments) return;
   walk.references.set(node, { raw: (node.$ref as string).slice(2).split('/'), segments });
@@ -205,7 +205,7 @@ function isNamedMap(path: string[]): boolean {
 
 // A schema file that is nothing but a reference makes what it names a schema too, though
 // nothing may reference that from a schema position itself.
-function addPassedOnSchemas(document: Node, targets: Map<string, string[]>): void {
+function addPassedOnSchemas(document: JsonObject, targets: Map<string, string[]>): void {
   for (const segments of [...targets.values()]) {
     let next = passedOn(document, segments);
     while (next && !targets.has(key(next))) {
@@ -215,15 +215,15 @@ function addPassedOnSchemas(document: Node, targets: Map<string, string[]>): voi
   }
 }
 
-function passedOn(document: Node, segments: string[]): string[] | undefined {
+function passedOn(document: JsonObject, segments: string[]): string[] | undefined {
   const node = resolve(document, segments);
-  const next = isNode(node) && typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
+  const next = isJsonObject(node) && typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
   return next && isHoistable(document, next) ? next : undefined;
 }
 
 /** Files each target under `components/schemas`, and returns the pointer to where each one went. */
 function placeSchemas(
-  document: Node,
+  document: JsonObject,
   targets: Map<string, string[]>,
   locations: Record<string, string>
 ): Map<string, string> {
@@ -238,26 +238,26 @@ function placeSchemas(
   return moved;
 }
 
-function componentSchemas(document: Node): Node {
-  if (!isNode(document.components)) document.components = {};
-  const components = document.components as Node;
-  if (!isNode(components.schemas)) components.schemas = {};
-  return components.schemas as Node;
+function componentSchemas(document: JsonObject): JsonObject {
+  if (!isJsonObject(document.components)) document.components = {};
+  const components = document.components as JsonObject;
+  if (!isJsonObject(components.schemas)) components.schemas = {};
+  return components.schemas as JsonObject;
 }
 
 // A component that is nothing but a reference to the file already names it; the file's
 // content takes its place rather than sitting beside it under a second name.
-function findAliases(schemas: Node): Map<string, string> {
+function findAliases(schemas: JsonObject): Map<string, string> {
   const aliases = new Map<string, string>();
   for (const [name, schema] of Object.entries(schemas)) {
-    if (!isNode(schema) || typeof schema.$ref !== 'string' || Object.keys(schema).length !== 1) continue;
+    if (!isJsonObject(schema) || typeof schema.$ref !== 'string' || Object.keys(schema).length !== 1) continue;
     const segments = pointerSegments(schema.$ref);
     if (segments && !aliases.has(key(segments))) aliases.set(key(segments), name);
   }
   return aliases;
 }
 
-function rewriteReferences(references: Map<Node, Reference>, moved: Map<string, string>): void {
+function rewriteReferences(references: Map<JsonObject, Reference>, moved: Map<string, string>): void {
   for (const [node, { raw, segments }] of references) {
     for (let length = segments.length; length >= 2; length--) {
       const pointer = moved.get(key(segments.slice(0, length)));
@@ -271,7 +271,7 @@ function rewriteReferences(references: Map<Node, Reference>, moved: Map<string, 
 
 // Nothing points into a moved file any more, and left in place the upgrader would convert it a
 // second time. A node moved out of a file stays in it: the file may still be used.
-function removeMovedFiles(document: Node, externals: Node, targets: Map<string, string[]>): void {
+function removeMovedFiles(document: JsonObject, externals: JsonObject, targets: Map<string, string[]>): void {
   for (const segments of targets.values()) {
     if (segments.length === 2) delete externals[segments[1]];
   }
@@ -295,10 +295,10 @@ function isComponentMap(path: string[], length = path.length): boolean {
  * A node in an embedded file that the upgrader would not take for a schema where it sits. One
  * inside a schema it does recognise is upgraded, and named, as that schema's part.
  */
-function isHoistable(document: Node, segments: string[]): boolean {
+function isHoistable(document: JsonObject, segments: string[]): boolean {
   if (segments[0] !== EXTERNAL || segments.length < 2) return false;
   if (segments.some((segment) => UPGRADER_SCHEMA_SEGMENTS.has(segment) || segment.endsWith('Schema'))) return false;
-  return isNode(resolve(document, segments));
+  return isJsonObject(resolve(document, segments));
 }
 
 function preferredName(segments: string[], locations: Record<string, string>): string {
@@ -313,14 +313,14 @@ function baseName(location: string): string {
   return last.replace(/\.[^.]+$/, '');
 }
 
-function uniqueName(schemas: Node, name: string): string {
+function uniqueName(schemas: JsonObject, name: string): string {
   let candidate = name;
   let suffix = 1;
   while (Object.hasOwn(schemas, candidate)) candidate = `${name}-${++suffix}`;
   return candidate;
 }
 
-function resolve(document: Node, segments: string[]): unknown {
+function resolve(document: JsonObject, segments: string[]): unknown {
   return getValueByPath(document, segments).value;
 }
 
@@ -339,6 +339,6 @@ function key(segments: string[]): string {
   return JSON.stringify(segments);
 }
 
-function isNode(value: unknown): value is Node {
+function isJsonObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
