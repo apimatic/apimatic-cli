@@ -5,18 +5,16 @@ import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { PortalArtifactsContext } from '../../types/portal-artifacts-context.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
-import { withBuildDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
-import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { errorMessage } from '../../utils/error-utils.js';
+import { PreparePortalProjectAction } from './prepare-project.js';
 
 export const DEFAULT_PORTAL_PORT = 23513;
 
@@ -26,7 +24,6 @@ export class PortalServeAction {
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
-  private readonly artifactsService = new PortalArtifactsService();
   private readonly devServerService = new PortalDevServerService();
   private readonly fileWatchService = new FileWatchService();
   private readonly configDir: DirectoryPath;
@@ -67,47 +64,10 @@ export class PortalServeAction {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    // The artifacts live in this directory for as long as the preview needs them, so it wraps
-    // everything that reads them rather than being opened and closed around the call.
-    return await withDirPath(async (artifactsDirectory) => {
-      const artifacts = await this.prompts.generateArtifacts(
-        this.artifactsService.generate(
-          sourceDirectory,
-          artifactsDirectory,
-          this.configDir,
-          this.commandMetadata,
-          this.authKey
-        )
-      );
-      if (artifacts.isErr()) {
-        return ActionResult.failed();
-      }
-
-      // Placed before the source is read: `resolve` records whether `static/` is there, so a
-      // project getting its first SDK download would otherwise serve without one.
-      await new PortalArtifactsContext(sourceDirectory).place(artifacts.value);
-
-      const sourceContext = new PortalSourceContext(sourceDirectory);
-      const source = await sourceContext.resolve();
-      if (source.isErr()) {
-        this.prompts.sourceProblem(source.error, sourceDirectory);
-        return ActionResult.failed();
-      }
-      this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-      this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-      this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-
-      const codeSamples = artifacts.value.codeSamples;
-      this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
-
-      return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-        const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
-        if (project.isErr()) {
-          this.prompts.runtimeUnsupported(project.error);
-          return ActionResult.failed();
-        }
-
-        const server = await this.prompts.startPreview(this.devServerService.start(project.value, servePort));
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
+      sourceDirectory,
+      async (project, source) => {
+        const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
         if (server.isErr()) {
           this.prompts.startFailed(server.error.log);
@@ -119,12 +79,7 @@ export class PortalServeAction {
           await this.launcherService.openUrlInBrowser(server.value.url);
         }
 
-        const configWatch = this.watchConfig(
-          sourceContext,
-          source.value,
-          project.value.projectDirectory,
-          sourceDirectory
-        );
+        const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);
 
         this.clearStandardInput();
 
@@ -149,8 +104,8 @@ export class PortalServeAction {
           // Before the build directory goes: a save being handled writes into it.
           await configWatch?.close();
         }
-      });
-    });
+      }
+    );
   };
 
   /**
@@ -158,11 +113,11 @@ export class PortalServeAction {
    * generate` would report it, and the preview keeps what it last accepted.
    */
   private watchConfig(
-    sourceContext: PortalSourceContext,
     source: PortalSource,
     projectDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
+    const sourceContext = new PortalSourceContext(sourceDirectory);
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const applyEdit = async () => {

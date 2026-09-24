@@ -10,8 +10,6 @@ import { PortalAuthorizationService } from '../../../src/infrastructure/services
 import { PortalDevServerService } from '../../../src/infrastructure/portal-dev-server-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
 import { FileWatchService } from '../../../src/infrastructure/file-watch-service';
-import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
-import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 import { NetworkService } from '../../../src/infrastructure/network-service';
 import { LauncherService } from '../../../src/infrastructure/launcher-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
@@ -21,6 +19,7 @@ import { UrlPath } from '../../../src/types/file/urlPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { PortalSource } from '../../../src/types/portal/portal-source';
 import { PortalSourceContext } from '../../../src/types/portal-source-context';
+import { stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -30,7 +29,7 @@ const SERVER_URL = new UrlPath('http://127.0.0.1:23513');
 describe('PortalServeAction', () => {
   let root: string;
   let prompts: sinon.SinonStubbedInstance<PortalServePrompts>;
-  let runtimeProblem: sinon.SinonStub;
+  let shared: ReturnType<typeof stubPreparePortalProject>;
   let authorize: sinon.SinonStub;
   let getServerPort: sinon.SinonStub;
   let openUrlInBrowser: sinon.SinonStub;
@@ -48,14 +47,11 @@ describe('PortalServeAction', () => {
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
 
-    sinon
-      .stub(PortalArtifactsService.prototype, 'generate')
-      .resolves(ok(PortalArtifacts.none()));
+    shared = stubPreparePortalProject();
 
     prompts = sinon.stub(PortalServePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.startPreview.callsFake((fn) => fn);
-    prompts.generateArtifacts.callsFake((fn) => fn);
     prompts.blockExecution.returns(
       new Promise<void>((resolve) => {
         interrupt = resolve;
@@ -70,12 +66,6 @@ describe('PortalServeAction', () => {
     getServerPort = sinon.stub(NetworkService.prototype, 'getServerPort').resolves(PORT);
     openUrlInBrowser = sinon.stub(LauncherService.prototype, 'openUrlInBrowser').resolves();
 
-    runtimeProblem = sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null);
-    sinon
-      .stub(PortalProjectService.prototype, 'prepare')
-      .callsFake(async (projectDirectory) =>
-        ok({ projectDirectory, viteBinary: new FilePath(projectDirectory, new FileName('vite.js')) })
-      );
     authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
     // Never a real watch: most tests serve the shared fixture, which nothing may edit.
     watch = sinon
@@ -89,7 +79,7 @@ describe('PortalServeAction', () => {
   });
 
   it('stops before anything else when the installation cannot build a portal', async () => {
-    runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
+    shared.runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
 
     const result = await execute();
 
@@ -117,7 +107,7 @@ describe('PortalServeAction', () => {
     const result = await execute(empty);
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
     expect(start.called).to.be.false;
   });
 

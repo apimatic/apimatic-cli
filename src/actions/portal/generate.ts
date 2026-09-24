@@ -1,21 +1,17 @@
-import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
-import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { ActionResult } from '../action-result.js';
-import { PortalContext } from '../../types/portal-context.js';
-import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { PortalArtifactsContext } from '../../types/portal-artifacts-context.js';
-import { withBuildDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
-import { CommandMetadata } from '../../types/common/command-metadata.js';
-import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
-import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
+import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { PortalContext } from '../../types/portal-context.js';
+import { ActionResult } from '../action-result.js';
+import { PreparePortalProjectAction } from './prepare-project.js';
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
-  private readonly artifactsService = new PortalArtifactsService();
   private readonly buildService = new PortalBuildService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -67,47 +63,10 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
 
-    // The artifacts live in this directory for as long as the build needs them, so it wraps
-    // everything that reads them rather than being opened and closed around the call.
-    return await withDirPath(async (artifactsDirectory) => {
-      const artifacts = await this.prompts.generateArtifacts(
-        this.artifactsService.generate(
-          sourceDirectory,
-          artifactsDirectory,
-          this.configDir,
-          this.commandMetadata,
-          this.authKey
-        )
-      );
-      if (artifacts.isErr()) {
-        return ActionResult.failed();
-      }
-
-      // Placed before the source is read: `resolve` records whether `static/` is there, so a
-      // project getting its first SDK download would otherwise build without one.
-      await new PortalArtifactsContext(sourceDirectory).place(artifacts.value);
-
-      const sourceContext = new PortalSourceContext(sourceDirectory);
-      const source = await sourceContext.resolve();
-      if (source.isErr()) {
-        this.prompts.sourceProblem(source.error, sourceDirectory);
-        return ActionResult.failed();
-      }
-      this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-      this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-      this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-
-      const codeSamples = artifacts.value.codeSamples;
-      this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
-
-      return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-        const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
-        if (project.isErr()) {
-          this.prompts.runtimeUnsupported(project.error);
-          return ActionResult.failed();
-        }
-
-        const build = await this.prompts.buildPortal(this.buildService.build(project.value));
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
+      sourceDirectory,
+      async (project) => {
+        const build = await this.prompts.buildPortal(this.buildService.build(project));
 
         if (build.isErr()) {
           // Written before the temp directory is removed, so the log outlives the build.
@@ -125,7 +84,7 @@ export class GenerateAction {
         this.prompts.nextSteps(portalDirectory, zipPortal);
 
         return ActionResult.success();
-      });
-    });
+      }
+    );
   };
 }
