@@ -14,6 +14,7 @@ import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { errorMessage } from '../../utils/error-utils.js';
 
 export const DEFAULT_PORTAL_PORT = 23513;
 
@@ -140,7 +141,7 @@ export class PortalServeAction {
   ): FileWatch | undefined {
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
-    const reapply = async () => {
+    const applyEdit = async () => {
       const reloaded = await sourceContext.resolveConfig(source.suggestedSite);
       if (reloaded.isErr()) {
         preview.refuse();
@@ -164,6 +165,17 @@ export class PortalServeAction {
       }
       if (preview.show(config, applied.value)) {
         this.prompts.configApplied();
+      }
+    };
+
+    // The watch drops whatever its handler throws, so a fault no Result carries, such as the
+    // static directory turning unreadable mid-check, would otherwise leave the preview stale
+    // without a word.
+    const reapply = async () => {
+      try {
+        await applyEdit();
+      } catch (error) {
+        this.prompts.configNotApplied(errorMessage(error));
       }
     };
 

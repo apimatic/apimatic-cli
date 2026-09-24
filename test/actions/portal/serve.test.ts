@@ -18,6 +18,7 @@ import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { PortalSource } from '../../../src/types/portal/portal-source';
+import { PortalSourceContext } from '../../../src/types/portal-source-context';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -430,6 +431,23 @@ describe('PortalServeAction', () => {
 
         expect(prompts.configNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
         expect(prompts.configApplied.called).to.be.false;
+      });
+    });
+
+    it('reports a fault it did not expect while re-reading the file, and keeps watching', async () => {
+      await whileServing(async () => {
+        const resolveConfig = sinon
+          .stub(PortalSourceContext.prototype, 'resolveConfig')
+          .rejects(new Error('EBUSY: resource busy or locked'));
+        const config = originalConfig();
+        config.portal.site.name = 'Renamed API';
+
+        await save(config);
+
+        expect(prompts.configNotApplied.calledOnceWith('EBUSY: resource busy or locked')).to.be.true;
+        resolveConfig.restore();
+        await save(config);
+        expect(prompts.configApplied.calledOnce).to.be.true;
       });
     });
 
