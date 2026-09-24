@@ -212,8 +212,58 @@ describe('withoutInternalOperations', () => {
 
     const shown = withoutInternalOperations(document) as unknown as Record<string, unknown>;
 
-    expect(shown.tags).to.deep.equal([{ name: 'pets' }, { name: 'operations', kind: 'nav' }, { name: 'unused' }]);
+    expect(shown.tags).to.deep.equal([{ name: 'pets' }, { name: 'unused' }]);
     expect(shown['x-tagGroups']).to.deep.equal([{ name: 'Public', tags: ['pets'] }]);
+  });
+
+  // No operation carries a group of its own, so it is only ever emptied through its children.
+  it('drops a group once every tag under it has gone, and the group above that', () => {
+    const document = documentWith(
+      {
+        '/pets': { get: { operationId: 'list', tags: ['pets'], responses: ok } },
+        '/users': { get: { operationId: 'users', tags: ['Users'], 'x-internal': true, responses: ok } }
+      },
+      {
+        tags: [
+          { name: 'pets' },
+          { name: 'Platform' },
+          { name: 'Admin', description: 'Internal tools', parent: 'Platform' },
+          { name: 'Users', parent: 'Admin' }
+        ],
+        'x-tagGroups': [
+          { name: 'Public', tags: ['pets'] },
+          { name: 'Staff', tags: ['Admin', 'Users'] }
+        ]
+      }
+    );
+
+    const shown = withoutInternalOperations(document) as unknown as Record<string, unknown>;
+
+    expect(shown.tags).to.deep.equal([{ name: 'pets' }]);
+    expect(shown['x-tagGroups']).to.deep.equal([{ name: 'Public', tags: ['pets'] }]);
+  });
+
+  it('keeps a group while a tag under it stays, or a remaining operation carries it', () => {
+    const document = documentWith(
+      {
+        '/billing': { get: { operationId: 'invoices', tags: ['Billing'], responses: ok } },
+        '/refunds': { get: { operationId: 'refunds', tags: ['Refunds'], 'x-internal': true, responses: ok } },
+        '/users': { get: { operationId: 'users', tags: ['Users'], 'x-internal': true, responses: ok } }
+      },
+      {
+        tags: [
+          { name: 'Billing' },
+          { name: 'Refunds', parent: 'Billing' },
+          { name: 'Admin' },
+          { name: 'Users', parent: 'Admin' },
+          { name: 'Guides', parent: 'Admin' }
+        ]
+      }
+    );
+
+    const shown = withoutInternalOperations(document) as unknown as Record<string, unknown>;
+
+    expect(shown.tags).to.deep.equal([{ name: 'Billing' }, { name: 'Admin' }, { name: 'Guides', parent: 'Admin' }]);
   });
 
   it('keeps a tag a remaining operation still carries, and one a kept tag is grouped under', () => {

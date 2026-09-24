@@ -394,7 +394,8 @@ documented.
    a path item once bundled, with the fields beside each `$ref` winning, as
    Fumadocs reads them; and a tag that only hidden operations carried is dropped
    from `tags` and `x-tagGroups`, since every page's payload carries the
-   document's tags. Fumadocs 11.4.1 builds pages only for `get`, `put`, `post`,
+   document's tags, as is a group no remaining operation carries once every tag
+   under it has gone. Fumadocs 11.4.1 builds pages only for `get`, `put`, `post`,
    `delete`, `head` and `patch`, so filtering the other methods keeps them out of
    the payloads rather than off a page. Fumadocs itself gives an operation
    behind a path-item `$ref` under `paths` no page at all. The filter inlining
