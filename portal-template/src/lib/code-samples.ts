@@ -1,4 +1,4 @@
-import { isJsonObject } from './json-object';
+import { isJsonObject } from './json';
 
 export const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
 

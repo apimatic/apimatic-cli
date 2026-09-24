@@ -58,4 +58,88 @@ describe('FileService', () => {
       expect(fs.readdirSync(root)).to.deep.equal(['config.json']);
     });
   });
+
+  describe('replaceContentsIfChanged', () => {
+    const fileService = new FileService();
+    let root: string;
+    let target: FilePath;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+      target = new FilePath(new DirectoryPath(root), new FileName('theme.css'));
+    });
+
+    afterEach(() => {
+      sinon.restore();
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('replaces a file that holds something else, and says so', async () => {
+      fs.writeFileSync(target.toString(), 'old');
+      const replace = sinon.spy(FileService.prototype, 'replaceContents');
+
+      expect(await fileService.replaceContentsIfChanged(target, 'new')).to.be.true;
+
+      expect(fs.readFileSync(target.toString(), 'utf-8')).to.equal('new');
+      expect(replace.calledOnce).to.be.true;
+    });
+
+    it('creates a file that is not there, and says so', async () => {
+      expect(await fileService.replaceContentsIfChanged(target, 'new')).to.be.true;
+
+      expect(fs.readFileSync(target.toString(), 'utf-8')).to.equal('new');
+    });
+
+    // An empty file is still a file: only a missing one is written for empty contents.
+    it('leaves a file holding the same contents untouched, and says so', async () => {
+      fs.writeFileSync(target.toString(), '');
+      const replace = sinon.spy(FileService.prototype, 'replaceContents');
+
+      expect(await fileService.replaceContentsIfChanged(target, '')).to.be.false;
+
+      expect(replace.called).to.be.false;
+    });
+  });
+
+  describe('spelledOnDisk', () => {
+    const fileService = new FileService();
+    let root: DirectoryPath;
+    const fileAt = (...names: string[]) => {
+      const fileName = new FileName(names.pop() ?? '');
+      return new FilePath(root.join(...names), fileName);
+    };
+
+    beforeEach(() => {
+      root = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-')));
+      fs.mkdirSync(path.join(root.toString(), 'static', 'images'), { recursive: true });
+      fs.writeFileSync(path.join(root.toString(), 'static', 'images', 'logo.png'), '');
+    });
+
+    afterEach(() => {
+      fs.rmSync(root.toString(), { recursive: true, force: true });
+    });
+
+    it('answers with the file itself when it is spelt as on disk', async () => {
+      const file = fileAt('static', 'images', 'logo.png');
+
+      const found = await fileService.spelledOnDisk(root, file);
+
+      expect(found?.isEqual(file)).to.be.true;
+    });
+
+    it('answers with the spelling on disk of a file and the directories above it named in another case', async () => {
+      const found = await fileService.spelledOnDisk(root, fileAt('Static', 'Images', 'Logo.PNG'));
+
+      expect(found?.isEqual(fileAt('static', 'images', 'logo.png'))).to.be.true;
+    });
+
+    it('answers null for a file that is not there in any case', async () => {
+      expect(await fileService.spelledOnDisk(root, fileAt('static', 'images', 'icon.png'))).to.be.null;
+      expect(await fileService.spelledOnDisk(root, fileAt('static', 'logos', 'logo.png'))).to.be.null;
+    });
+
+    it('does not take a directory for the file', async () => {
+      expect(await fileService.spelledOnDisk(root, fileAt('static', 'images'))).to.be.null;
+    });
+  });
 });

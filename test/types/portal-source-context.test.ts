@@ -1,12 +1,15 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import Ajv from 'ajv';
 import { expect } from 'chai';
+import { Result } from 'neverthrow';
 import sinon from 'sinon';
 import { parse as parseYaml } from 'yaml';
 import { FileService } from '../../src/infrastructure/file-service';
+import { APIMATIC_SCHEMA_URL } from '../../src/types/apimatic-config/document';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
-import { PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
+import { PortalSettings, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
@@ -23,8 +26,13 @@ describe('PortalSourceContext', () => {
     fs.writeFileSync(target, contents);
   };
 
-  /** A configuration holding the given portal block and nothing else. */
-  const writeConfig = (portal: object) => write('apimatic.json', JSON.stringify({ portal }));
+  /** The smallest `languages` block the portal accepts. */
+  const LANGUAGES = { typescript: {} };
+
+  /** A configuration holding the given portal block and the smallest languages block. */
+  const writeConfig = (portal: object) => write('apimatic.json', JSON.stringify({ portal, languages: LANGUAGES }));
+
+  const REQUIRED_LANGUAGES = /^'languages' must name at least one SDK language/;
 
   const resolve = () => new PortalSourceContext(new DirectoryPath(root)).resolve();
 
@@ -35,6 +43,20 @@ describe('PortalSourceContext', () => {
   /** The hidden pages as the warning names them, relative to the source directory. */
   const hidden = (source: PortalSource): string[] =>
     source.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
+
+  /** Each file the block names that is not on disk: its setting, its path, and its spelling on disk in another case. */
+  const missingFiles = (result: Result<unknown, PortalSourceProblem>): [string, string, string | null][] => {
+    const problem = result._unsafeUnwrapErr();
+    if (problem.kind !== 'missingStaticFiles') {
+      throw new Error(`expected missing static files, got ${JSON.stringify(problem)}`);
+    }
+    const relative = (file: FilePath) => file.relativeTo(new DirectoryPath(root));
+    return problem.files.map(({ setting, file, foundAs }) => [
+      setting,
+      relative(file),
+      foundAs === null ? null : relative(foundAs)
+    ]);
+  };
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-source-'));
@@ -62,22 +84,75 @@ describe('PortalSourceContext', () => {
 
     it('reads inputs written with a byte-order mark', async () => {
       const mark = '﻿';
-      write('apimatic.json', mark + JSON.stringify({ portal: { title: 'Calc' } }));
+      write('apimatic.json', mark + JSON.stringify({ portal: { site: { name: 'Acme' } }, languages: LANGUAGES }));
       write('spec/api.json', mark + OPENAPI);
 
       const source = (await resolve())._unsafeUnwrap();
 
-      expect(source.config.siteTitle()).to.equal('Calc');
+      expect(source.config.siteTitle()).to.equal('Acme');
       expect(source.specs).to.have.lengthOf(1);
     });
 
     it('passes the field errors through when the config is invalid', async () => {
+      writeConfig({ site: { name: '' } });
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal.site.name' must be a non-empty string."],
+        missingPortal: false
+      });
+    });
+
+    it('names and describes the portal after its only specification when the block does not', async () => {
       writeConfig({});
+      write(
+        'spec/api.json',
+        JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1', description: 'Adds.\n\nMore.' } })
+      );
+
+      const { config } = (await resolve())._unsafeUnwrap();
+
+      expect(config.siteTitle()).to.equal('Calc');
+      expect(config.identity().description).to.equal('Adds.');
+    });
+
+    it('lets the block describe the portal instead, or not at all', async () => {
+      write(
+        'spec/api.json',
+        JSON.stringify({ openapi: '3.0.0', info: { title: 'Calc', version: '1', description: 'x' } })
+      );
+
+      writeConfig({ site: { description: 'Our docs.' } });
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.equal('Our docs.');
+      writeConfig({ site: { description: '' } });
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.be.null;
+    });
+
+    // No one of several specifications speaks for the whole portal.
+    it('requires a name when there are several specifications', async () => {
+      writeConfig({});
+      write('spec/a.json', OPENAPI);
+      write('spec/b.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal.site.name' is required when 'spec' holds more than one specification."],
+        missingPortal: false
+      });
+    });
+
+    it('requires a languages block, and lists it with the portal errors', async () => {
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: '' } } }));
       write('spec/api.json', OPENAPI);
 
       const problem = (await resolve())._unsafeUnwrapErr();
 
       expect(problem.kind).to.equal('invalidConfig');
+      const errors = problem.kind === 'invalidConfig' ? problem.errors : [];
+      expect(errors).to.have.lengthOf(2);
+      expect(errors[0]).to.equal("'portal.site.name' must be a non-empty string.");
+      expect(errors[1]).to.match(REQUIRED_LANGUAGES);
     });
 
     it('reports a missing portal block as the one thing wrong, whatever else the file holds', async () => {
@@ -93,7 +168,7 @@ describe('PortalSourceContext', () => {
 
     // There is a block to fix, so the quickstart hint would point away from it.
     it('does not point at quickstart for a portal block that is not an object', async () => {
-      write('apimatic.json', JSON.stringify({ portal: 'Calc' }));
+      write('apimatic.json', JSON.stringify({ portal: 'Calc', languages: LANGUAGES }));
       write('spec/api.json', OPENAPI);
 
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
@@ -116,7 +191,7 @@ describe('PortalSourceContext', () => {
 
     // Reading through the config context turns a fault into a problem rather than a throw.
     it('reports a file it cannot read as invalid, naming the fault', async () => {
-      writeConfig({ title: 'Calc' });
+      writeConfig({});
       write('spec/api.json', OPENAPI);
       const read = sinon.stub(FileService.prototype, 'getContents').rejects(new Error('EACCES: permission denied'));
 
@@ -134,71 +209,150 @@ describe('PortalSourceContext', () => {
     it('ignores root keys it does not know', async () => {
       write(
         'apimatic.json',
-        JSON.stringify({ $schema: 'https://example.com/schema.json', future: true, portal: { title: 'Calc' } })
+        JSON.stringify({ $schema: 'https://example.com/schema.json', future: true, portal: {}, languages: LANGUAGES })
       );
       write('spec/api.json', OPENAPI);
 
       expect((await resolve()).isOk()).to.be.true;
     });
 
-    // The plugin's blocks are the plugin commands' to judge; a broken one must not fail a build.
-    it('builds past malformed plugin and languages blocks', async () => {
-      write('apimatic.json', JSON.stringify({ portal: { title: 'Calc' }, languages: 'csharp', plugin: 7 }));
+    // The plugin's identity is the plugin commands' to judge; a broken one must not fail a build.
+    it('builds past a malformed plugin block', async () => {
+      write('apimatic.json', JSON.stringify({ portal: {}, languages: LANGUAGES, plugin: 7 }));
       write('spec/api.json', OPENAPI);
 
-      expect((await resolve())._unsafeUnwrap().config.siteTitle()).to.equal('Calc');
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The languages are the portal's too: they are the SDKs it documents.
+    it('refuses a malformed languages block, as the document found it', async () => {
+      write('apimatic.json', JSON.stringify({ portal: {}, languages: { typescript: 'yes' } }));
+      write('spec/api.json', OPENAPI);
+
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'languages.typescript' is not a JSON object."],
+        missingPortal: false
+      });
     });
 
     it('accepts the schema version it reads', async () => {
-      write('apimatic.json', JSON.stringify({ schemaVersion: 1, portal: { title: 'Calc' } }));
+      write('apimatic.json', JSON.stringify({ schemaVersion: 1, portal: {}, languages: LANGUAGES }));
       write('spec/api.json', OPENAPI);
 
       expect((await resolve()).isOk()).to.be.true;
     });
 
     it('refuses another schema version alongside the portal errors, so one edit fixes the file', async () => {
-      write('apimatic.json', JSON.stringify({ schemaVersion: 2, portal: {} }));
+      write(
+        'apimatic.json',
+        JSON.stringify({ schemaVersion: 2, portal: { site: { name: '' } }, languages: LANGUAGES })
+      );
       write('spec/api.json', OPENAPI);
 
       expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
         kind: 'invalidConfig',
         errors: [
           "'schemaVersion' is 2, which this version of the CLI does not read; it reads 1.",
-          "'portal.title' is required and must be a non-empty string."
+          "'portal.site.name' must be a non-empty string."
         ],
         missingPortal: false
       });
     });
   });
 
-  describe('logo', () => {
+  describe('static files', () => {
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
     it('reports a configured logo that is not on disk', async () => {
-      writeConfig({ title: 'Calc', logo: 'static/images/logo.png' });
-      write('spec/api.json', OPENAPI);
+      writeConfig({ brand: { logo: 'static/images/logo.png' } });
 
-      const problem = (await resolve())._unsafeUnwrapErr();
-
-      expect(problem).to.deep.equal({ kind: 'missingLogo', logoPath: 'static/images/logo.png' });
+      expect(missingFiles(await resolve())).to.deep.equal([['portal.brand.logo', 'static/images/logo.png', null]]);
     });
 
-    it('accepts a logo that is', async () => {
-      writeConfig({ title: 'Calc', logo: 'static/images/logo.png' });
-      write('spec/api.json', OPENAPI);
+    it('reports every missing file at once, each with the setting that names it', async () => {
+      writeConfig({
+        brand: { logo: { light: 'static/light.svg', dark: 'static/dark.svg' }, favicon: 'static/favicon.ico' }
+      });
+      write('static/light.svg', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.brand.logo.dark', 'static/dark.svg', null],
+        ['portal.brand.favicon', 'static/favicon.ico', null]
+      ]);
+    });
+
+    // Windows and macOS open `logo.png` for `Logo.PNG`, and the site then 404s on a host that
+    // does not, so every name on the way is matched exactly.
+    it('reports a file spelt in another case, with its spelling on disk', async () => {
+      writeConfig({ brand: { logo: 'static/Images/Logo.PNG', favicon: 'static/favicon.ico' } });
       write('static/images/logo.png', 'x');
+      write('static/favicon.ico', 'x');
+
+      expect(missingFiles(await resolve())).to.deep.equal([
+        ['portal.brand.logo', 'static/Images/Logo.PNG', 'static/images/logo.png']
+      ]);
+    });
+
+    it('accepts files that are there', async () => {
+      writeConfig({ brand: { logo: 'static/images/logo.png', favicon: 'static/favicon.ico' } });
+      write('static/images/logo.png', 'x');
+      write('static/favicon.ico', 'x');
 
       expect((await resolve()).isOk()).to.be.true;
     });
 
-    it('says nothing about a logo when none is configured', async () => {
-      writeConfig({ title: 'Calc' });
-      write('spec/api.json', OPENAPI);
+    it('says nothing when none is configured', async () => {
+      writeConfig({});
 
       expect((await resolve()).isOk()).to.be.true;
     });
   });
 
+  // What `portal serve` runs on each save of `apimatic.json`.
+  describe('resolveSettings', () => {
+    const context = () => new PortalSourceContext(new DirectoryPath(root));
+
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
+    it('gives the config resolve gives, from the site the specifications suggested', async () => {
+      writeConfig({ brand: { colors: { primary: '#1d4ed8' } } });
+      const resolved = (await resolve())._unsafeUnwrap();
+
+      const reloaded = (await context().resolveSettings(resolved.suggestedSite))._unsafeUnwrap();
+
+      expect(reloaded.config.toJSON()).to.deep.equal(resolved.config.toJSON());
+      expect(reloaded.config.siteTitle()).to.equal(resolved.config.siteTitle());
+    });
+
+    // The specifications are not read again, so with several the name is still required.
+    it('holds the file to the rules resolve holds it to', async () => {
+      writeConfig({});
+
+      const errors = (await context().resolveSettings(null))._unsafeUnwrapErr();
+
+      expect(errors).to.deep.equal({
+        kind: 'invalidConfig',
+        errors: ["'portal.site.name' is required when 'spec' holds more than one specification."],
+        missingPortal: false
+      });
+    });
+
+    it('reports a file the block names that is not on disk', async () => {
+      writeConfig({ site: { name: 'Calc' }, brand: { favicon: 'static/favicon.ico' } });
+
+      expect(missingFiles(await context().resolveSettings(null))).to.deep.equal([
+        ['portal.brand.favicon', 'static/favicon.ico', null]
+      ]);
+    });
+
+    it('reports a file removed while the preview runs', async () => {
+      expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+    });
+  });
+
   describe('spec discovery', () => {
-    beforeEach(() => writeConfig({ title: 'Calc' }));
+    beforeEach(() => writeConfig({ site: { name: 'Calc' } }));
 
     it('accepts json, yaml and yml documents, ordered by file name', async () => {
       write('spec/b.json', OPENAPI);
@@ -274,7 +428,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('lists the operations of a path item kept in another file under the path that mounts it', async () => {
-      writeConfig({ title: 'Calc' });
+      writeConfig({ site: { name: 'Calc' } });
       write('spec/paths/pets.yaml', JSON.stringify({ get: {}, post: {} }));
       write('spec/shared.json', JSON.stringify({ items: { owners: { delete: {} } } }));
       write(
@@ -299,7 +453,7 @@ describe('PortalSourceContext', () => {
 
   describe('optional directories', () => {
     beforeEach(() => {
-      writeConfig({ title: 'Calc' });
+      writeConfig({ site: { name: 'Calc' } });
       write('spec/api.json', OPENAPI);
     });
 
@@ -456,9 +610,130 @@ describe('PortalSourceContext', () => {
     });
   });
 
+  describe('the generated pages', () => {
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
+    const writeFile = (file: object) => write('apimatic.json', JSON.stringify(file));
+
+    /** Each generated page as its folder and file. */
+    const generated = (settings: PortalSettings) =>
+      settings.generatedPages.pages().map((page) => `${page.section.folder}/${page.fileName}`);
+
+    it('carries a page per language, in the order the block lists them', async () => {
+      writeFile({ portal: {}, languages: { python: {}, typescript: {} } });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.deep.equal([
+        'sdks/index.mdx',
+        'sdks/python.mdx',
+        'sdks/typescript.mdx'
+      ]);
+    });
+
+    it('carries the context plugin page only when there is a plugin block', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: {} });
+      expect(generated((await resolve())._unsafeUnwrap())).to.include('context-plugin/index.mdx');
+
+      writeFile({ portal: {}, languages: LANGUAGES });
+      expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
+    });
+
+    // The plugin commands judge the block; a build does not fail over it, and gets no page.
+    it('treats a plugin block that is not an object as no block', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: 'yes' });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
+    });
+
+    // Nothing in the block is read, so an identity the plugin commands would refuse still gets the page.
+    it('carries the context plugin page for a block whose identity is malformed', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: { pluginId: 'Bad Id!', pluginVersion: 'one' } });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.include('context-plugin/index.mdx');
+    });
+
+    it('reads them again for portal serve', async () => {
+      // Named, because nothing suggests a site when the specifications are not read again.
+      writeFile({ portal: { site: { name: 'Calc' } }, languages: { go: {} }, plugin: {} });
+
+      const reloaded = (await new PortalSourceContext(new DirectoryPath(root)).resolveSettings(null))._unsafeUnwrap();
+
+      expect(generated(reloaded)).to.deep.equal(['sdks/index.mdx', 'sdks/go.mdx', 'context-plugin/index.mdx']);
+    });
+  });
+
+  describe('the addresses the generated pages are served at', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', '# Home');
+    });
+
+    /** Each refused page as the file, where it would be served, and the section it collides with. */
+    const reserved = (problem: PortalSourceProblem): string[] => {
+      if (problem.kind !== 'reservedAddresses') {
+        throw new Error(`expected a 'reservedAddresses' problem, got '${problem.kind}'`);
+      }
+      return problem.pages
+        .map(({ file, address, section }) => `${file.relativeTo(new DirectoryPath(root))} ${address} ${section.folder}`)
+        .sort();
+    };
+
+    it('refuses every page the SDK pages would share an address with, naming each', async () => {
+      write('content/sdks.md', '# Mine');
+      write('content/sdks/setup.mdx', '# Setup');
+      write('content/(intro)/sdks.md', '# Grouped');
+      write('content/sdks/index.md', '# Index');
+
+      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'content/(intro)/sdks.md /sdks sdks',
+        'content/sdks.md /sdks sdks',
+        'content/sdks/index.md /sdks sdks',
+        'content/sdks/setup.mdx /sdks/setup sdks'
+      ]);
+    });
+
+    // Reserved with or without a plugin block, so adding one never refuses a page that built.
+    it('refuses a page at the context plugin address although there is no plugin block', async () => {
+      write('content/context-plugin.md', '# Mine');
+      write('content/context-plugin/faq.md', '# FAQ');
+
+      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'content/context-plugin.md /context-plugin context-plugin',
+        'content/context-plugin/faq.md /context-plugin/faq context-plugin'
+      ]);
+    });
+
+    // A group folder's name is not part of the address; only the folder it groups is.
+    it('accepts pages whose address only starts with the same letters, or sits deeper', async () => {
+      write('content/sdks-overview.md', '# Overview');
+      write('content/guides/sdks.md', '# Nested');
+      write('content/(sdks)/intro.md', '# Grouped');
+      write('content/plugin.md', '# Plugin');
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('leaves a nav.json alone in a directory of that name, which is no page', async () => {
+      write('content/sdks/nav.json', JSON.stringify({ pages: [] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('answers an entry that names a generated section with its token', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'sdks', 'context-plugin'] }));
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind === 'invalidNavigation' && problem.errors).to.deep.equal([
+        "content/nav.json: 'sdks' is not a page or folder in this directory. 'apimatic:sdks' positions the SDK pages.",
+        "content/nav.json: 'context-plugin' is not a page or folder in this directory. 'apimatic:plugin' positions the context plugin page."
+      ]);
+    });
+  });
+
   describe('nav.json', () => {
     beforeEach(() => {
-      writeConfig({ title: 'Calc' });
+      writeConfig({ site: { name: 'Calc' } });
       write('spec/api.json', OPENAPI);
       write('content/index.md', '# Home');
       write('content/authentication.md', '# Auth');
@@ -475,7 +750,7 @@ describe('PortalSourceContext', () => {
     it('accepts a file naming the pages beside it, and both tokens at the root', async () => {
       write(
         'content/nav.json',
-        JSON.stringify({ pages: ['index', 'apimatic:pages', 'authentication', 'apimatic:api'] })
+        JSON.stringify({ pages: ['index', 'apimatic:sdks', 'authentication', 'apimatic:api'] })
       );
 
       expect((await resolve()).isOk()).to.be.true;
@@ -511,6 +786,26 @@ describe('PortalSourceContext', () => {
       write('content/api/nav.json', JSON.stringify({ pages: ['overview', 'api', 'billing'] }));
 
       expect((await resolve()).isOk()).to.be.true;
+    });
+
+    // The walk is what tells a top-level folder from a nested one, which only it can know.
+    it('makes a tab of a folder directly under content, and of no folder deeper down', async () => {
+      write('content/tutorials/first-call.md', '# First call');
+      write('content/tutorials/nav.json', JSON.stringify({ root: true }));
+      write('content/tutorials/advanced/retries.md', '# Retries');
+      write('content/tutorials/advanced/nav.json', JSON.stringify({ root: true }));
+      write('content/api/overview.md', '# Overview');
+      write('content/api/nav.json', JSON.stringify({ root: true }));
+
+      const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
+
+      expect(errors).to.have.lengthOf(2);
+      expect(errors.find((error) => error.startsWith('content/api/nav.json: '))).to.contain(
+        'and the API reference is always one'
+      );
+      expect(errors.find((error) => error.startsWith('content/tutorials/advanced/nav.json: '))).to.contain(
+        "only a folder directly under 'content' can be one"
+      );
     });
 
     it('refuses a name shared by a page and a folder, since only the folder could be positioned', async () => {
@@ -725,8 +1020,14 @@ describe('PortalSourceContext', () => {
     };
 
     const scaffold = async (specPath: FilePath) =>
-      (await new PortalSourceContext(source).scaffold(specPath))._unsafeUnwrap();
+      (await new PortalSourceContext(source).scaffold(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
     const read = (relative: string) => fs.readFileSync(path.join(source.toString(), relative), 'utf8');
+
+    /** What the user adds by hand before the portal builds: nothing in quickstart writes it yet. */
+    const addLanguages = () => {
+      const file = path.join(source.toString(), 'apimatic.json');
+      fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), languages: LANGUAGES }));
+    };
 
     const frontMatterOf = (markdown: string): Record<string, unknown> => {
       const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(markdown);
@@ -738,8 +1039,12 @@ describe('PortalSourceContext', () => {
       source = new DirectoryPath(root).join('project').join('src');
     });
 
-    it('writes a source directory it accepts itself', async () => {
+    it('writes a source directory it accepts itself, once a language is named', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      const unnamed = (await new PortalSourceContext(source).resolve())._unsafeUnwrapErr();
+      expect(unnamed.kind === 'invalidConfig' ? unnamed.errors : []).to.have.lengthOf(1);
+      addLanguages();
 
       const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
       expect(resolved.config.siteTitle()).to.equal('Petstore');
@@ -747,14 +1052,48 @@ describe('PortalSourceContext', () => {
       expect(resolved.contentDirectory).to.not.be.null;
     });
 
-    it('describes the portal from the specification', async () => {
+    it('describes the portal from the specification, with every default spelled out', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
 
-      expect(JSON.parse(read('apimatic.json'))).to.deep.equal({
-        schemaVersion: 1,
-        portal: { title: 'Petstore', description: 'All the pets.' }
-      });
+      const written = JSON.parse(read('apimatic.json'));
+      // The schema first, where an editor looks for it, and no `languages` block: nothing in
+      // the wizard asks for the project's languages yet.
+      expect(Object.keys(written)).to.deep.equal(['$schema', 'schemaVersion', 'portal']);
+      expect(written.$schema).to.equal(APIMATIC_SCHEMA_URL);
+      expect(written.schemaVersion).to.equal(1);
+      expect(written.portal.site).to.deep.equal({ name: 'Petstore', description: 'All the pets.' });
+      expect(Object.keys(written.portal)).to.deep.equal(['site', 'brand', 'navigation', 'ai']);
       expect(read('apimatic.json').endsWith('\n')).to.be.true;
+    });
+
+    // Defaults are applied twice, on purpose: written into a new block, and filled in for a
+    // block written by hand. The two have to make the same portal.
+    it('writes a block that resolves to the portal an empty block makes', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+      addLanguages();
+      const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+
+      write('project/src/apimatic.json', JSON.stringify({ portal: {}, languages: LANGUAGES }));
+      const empty = (await new PortalSourceContext(source).resolve())._unsafeUnwrap().config;
+
+      expect(scaffolded.toJSON()).to.deep.equal(empty.toJSON());
+      expect(scaffolded.identity()).to.deep.equal(empty.identity());
+    });
+
+    // Every block the wizard writes has to pass the schema it points editors at.
+    it('writes a file the schema it names accepts', async () => {
+      await scaffold(writeSpec({ title: 'Petstore', version: '1', description: 'All the pets.' }));
+      const schema = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'apimatic.schema.json'), 'utf8'));
+      const validate = new Ajv({ strict: true, allErrors: true }).compile(schema);
+
+      expect(validate(JSON.parse(read('apimatic.json'))), JSON.stringify(validate.errors)).to.be.true;
+    });
+
+    it('answers with the apimatic.json it wrote', async () => {
+      const configFile = await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+
+      expect(configFile.isEqual(new FilePath(source, new FileName('apimatic.json')))).to.be.true;
+      expect(fs.existsSync(configFile.toString())).to.be.true;
     });
 
     it('orders the sidebar with the welcome page first', async () => {
@@ -767,6 +1106,7 @@ describe('PortalSourceContext', () => {
     // `meta.json`, which the CLI would not remark on and the sidebar would not honour.
     it('writes a navigation file the build reads, and nothing it ignores', async () => {
       await scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+      addLanguages();
 
       const contentFiles = fs.readdirSync(path.join(source.toString(), 'content')).sort();
       const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
@@ -780,7 +1120,7 @@ describe('PortalSourceContext', () => {
 
       await scaffold(new FilePath(new DirectoryPath(root).join('downloads'), new FileName('broken.json')));
 
-      expect(JSON.parse(read('apimatic.json'))).to.deep.equal({ schemaVersion: 1, portal: { title: 'My API' } });
+      expect(JSON.parse(read('apimatic.json')).portal.site).to.deep.equal({ name: 'My API' });
     });
 
     // The wizard asks its questions before it writes anything, so a fault here has to come back
@@ -788,7 +1128,10 @@ describe('PortalSourceContext', () => {
     it('reports a configuration it cannot write into rather than throwing', async () => {
       write('project/src/apimatic.json', '{ not json');
 
-      const scaffolded = await new PortalSourceContext(source).scaffold(writeSpec({ title: 'Petstore', version: '1' }));
+      const scaffolded = await new PortalSourceContext(source).scaffold(
+        writeSpec({ title: 'Petstore', version: '1' }),
+        APIMATIC_SCHEMA_URL
+      );
 
       expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({ kind: 'configUnreadable' });
     });
@@ -798,7 +1141,8 @@ describe('PortalSourceContext', () => {
 
       try {
         const scaffolded = await new PortalSourceContext(source).scaffold(
-          writeSpec({ title: 'Petstore', version: '1' })
+          writeSpec({ title: 'Petstore', version: '1' }),
+          APIMATIC_SCHEMA_URL
         );
 
         expect(scaffolded._unsafeUnwrapErr()).to.deep.equal({
@@ -821,7 +1165,7 @@ describe('PortalSourceContext', () => {
       expect(fs.existsSync(path.join(source.toString(), 'spec', 'openapi.json'))).to.be.true;
       expect(fs.existsSync(path.join(source.toString(), 'spec', 'paths', 'pets.json'))).to.be.true;
       // The parts of an archive are left to the build to read, so nothing names the portal yet.
-      expect(JSON.parse(read('apimatic.json'))).to.deep.equal({ schemaVersion: 1, portal: { title: 'My API' } });
+      expect(JSON.parse(read('apimatic.json')).portal.site).to.deep.equal({ name: 'My API' });
     });
 
     describe('the welcome page front matter', () => {

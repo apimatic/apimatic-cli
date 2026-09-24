@@ -1,5 +1,5 @@
 import { Language, LANGUAGE_CHOICES } from '../sdk/generate.js';
-import { isJsonObject } from '../common/json-object.js';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { Endpoint } from './endpoint.js';
 
 type Sources = Record<string, string>;

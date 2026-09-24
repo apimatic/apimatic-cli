@@ -1,5 +1,5 @@
 import type { useOperationContext } from 'fumadocs-openapi/ui';
-import { isJsonObject } from './json-object';
+import { isJsonObject } from './json';
 
 export type RequestExample = Pick<
   ReturnType<typeof useOperationContext>['examples'][number],

@@ -3,7 +3,7 @@ import { err, ok, Result } from 'neverthrow';
 import { CodeSampleCatalog, CodeSamples } from '../../types/portal/code-samples.js';
 import { Language } from '../../types/sdk/generate.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { isJsonObject } from '../../types/common/json-object.js';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { FileService } from '../file-service.js';
 
 export const SAMPLES_PATH_VARIABLE = 'APIMATIC_CODE_SAMPLES_PATH';

@@ -66,58 +66,60 @@ describe('OpenApiDocument', () => {
     });
   });
 
-  describe('suggestedConfig', () => {
+  describe('suggestedSite', () => {
     it('takes the title and description from the document', () => {
-      const config = withInfo({ title: 'Swagger Petstore', version: '1', description: 'Pets.' }).suggestedConfig();
+      const site = withInfo({ title: 'Swagger Petstore', version: '1', description: 'Pets.' }).suggestedSite();
 
-      expect(config.siteTitle()).to.equal('Swagger Petstore');
-      expect(config.siteDescription()).to.equal('Pets.');
+      expect(site).to.deep.equal({ name: 'Swagger Petstore', description: 'Pets.' });
     });
 
     it('reduces a title spanning several lines to one', () => {
-      expect(withInfo({ title: 'Swagger\nPetstore', version: '1' }).suggestedConfig().siteTitle()).to.equal(
-        'Swagger Petstore'
-      );
+      expect(withInfo({ title: 'Swagger\nPetstore', version: '1' }).suggestedSite().name).to.equal('Swagger Petstore');
     });
 
     it('caps a long description rather than stopping at its first line break', () => {
       const description = `First line of the summary.\n${'word '.repeat(200)}`;
 
-      const config = withInfo({ title: 'API', version: '1', description }).suggestedConfig();
+      const site = withInfo({ title: 'API', version: '1', description }).suggestedSite();
 
-      expect(config.siteDescription()).to.have.length.greaterThan(200);
-      expect(config.siteDescription()).to.have.length.at.most(300);
-      expect(config.siteDescription()).to.not.include('\n');
+      expect(site.description).to.have.length.greaterThan(200);
+      expect(site.description).to.have.length.at.most(300);
+      expect(site.description).to.not.include('\n');
+    });
+
+    it('stops the description at its first blank line', () => {
+      const description = '\n\nThe calculator API.\nIt adds numbers.\n\n## Authentication\n\nUse a key.';
+
+      expect(withInfo({ title: 'API', version: '1', description }).suggestedSite().description).to.equal(
+        'The calculator API. It adds numbers.'
+      );
     });
 
     it('cuts the description on a word boundary', () => {
       const description = 'sentence '.repeat(100).trim();
 
-      const capped = withInfo({ title: 'API', version: '1', description }).suggestedConfig().siteDescription();
+      const capped = withInfo({ title: 'API', version: '1', description }).suggestedSite().description;
 
       expect(capped).to.match(/sentence$/);
     });
 
     it('falls back to a placeholder when the document names no title', () => {
-      const config = withInfo({ version: '1' }).suggestedConfig();
-
-      expect(config.siteTitle()).to.equal('My API');
-      expect(config.siteDescription()).to.be.null;
+      expect(withInfo({ version: '1' }).suggestedSite()).to.deep.equal({ name: 'My API', description: null });
     });
 
     it('keeps the description when only the title is missing', () => {
-      const config = withInfo({ version: '1', description: 'Pets, and how to get them.' }).suggestedConfig();
-
-      expect(config.siteTitle()).to.equal('My API');
-      expect(config.siteDescription()).to.equal('Pets, and how to get them.');
+      expect(withInfo({ version: '1', description: 'Pets, and how to get them.' }).suggestedSite()).to.deep.equal({
+        name: 'My API',
+        description: 'Pets, and how to get them.'
+      });
     });
 
     it('ignores a title that is only whitespace', () => {
-      expect(withInfo({ title: '  \n  ', version: '1' }).suggestedConfig().siteTitle()).to.equal('My API');
+      expect(withInfo({ title: '  \n  ', version: '1' }).suggestedSite().name).to.equal('My API');
     });
 
     it('copes with a document that has no info block at all', () => {
-      expect(readJson({ openapi: '3.0.0' }).suggestedConfig().siteTitle()).to.equal('My API');
+      expect(readJson({ openapi: '3.0.0' }).suggestedSite().name).to.equal('My API');
     });
   });
 

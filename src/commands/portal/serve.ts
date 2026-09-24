@@ -10,9 +10,9 @@ const defaultPortText = String(DEFAULT_PORTAL_PORT);
 export default class PortalServe extends Command {
   static readonly summary = 'Preview your API Documentation Portal with live reload.';
 
-  static readonly description = `Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown pages in 'src/content' or reorder them in a 'nav.json'.
+  static readonly description = `Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown pages in 'src/content', reorder them in a 'nav.json', or change the 'portal', 'languages' or 'plugin' block of 'apimatic.json'.
 
-Adding or removing a page, editing 'apimatic.json', or changing which documents are in 'src/spec', needs the preview restarted.
+Adding or removing a page in 'src/content', creating 'src/static', or changing which documents are in 'src/spec', needs the preview restarted.
 
 Nothing is written to disk; run 'apimatic portal generate' to produce the static files.`;
 

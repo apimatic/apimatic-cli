@@ -8,34 +8,50 @@ import { prerenderPages } from '../../portal-template/prerender-pages';
 // so a URL missing here is a page that is never emitted, however many things link to it.
 describe('prerenderPages', () => {
   let contentDir: string;
+  let generatedDir: string;
 
-  const write = (relative: string, body = '# page\n') => {
-    const target = path.join(contentDir, relative);
+  const writeIn = (directory: string, relative: string, body: string) => {
+    const target = path.join(directory, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, body);
   };
+  const write = (relative: string, body = '# page\n') => writeIn(contentDir, relative, body);
 
-  const urlsFor = async (siteUrl: string | null = null) => {
-    const pages = await prerenderPages({
-      title: 'Calc',
-      description: null,
-      logoUrl: null,
-      siteUrl,
-      aiPageActions: true,
-      specs: {},
-      codeSamples: null,
-      contentDir,
-      staticDir: null
-    });
+  const urlsFor = async (siteUrl: string | null = null, specs: Record<string, string> = {}) => {
+    const pages = await prerenderPages(
+      { specs, codeSamples: null, contentDir, generatedDir, staticDir: null },
+      siteUrl
+    );
     return pages.map((page) => page.path);
   };
 
   beforeEach(() => {
     contentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prerender-'));
+    generatedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prerender-generated-'));
   });
 
   afterEach(() => {
     fs.rmSync(contentDir, { recursive: true, force: true });
+    fs.rmSync(generatedDir, { recursive: true, force: true });
+  });
+
+  it('lists the generated pages as it lists the user’s, each with its Markdown twin', async () => {
+    writeIn(generatedDir, 'sdks/index.mdx', '# SDKs\n');
+    writeIn(generatedDir, 'sdks/typescript.mdx', '# TypeScript\n');
+    writeIn(generatedDir, 'sdks/nav.json', '{ "title": "SDKs" }\n');
+    writeIn(generatedDir, 'context-plugin/index.mdx', '# Plugin\n');
+
+    const urls = await urlsFor();
+
+    expect(urls).to.include.members([
+      '/sdks',
+      '/sdks.md',
+      '/sdks/typescript',
+      '/sdks/typescript.md',
+      '/context-plugin',
+      '/context-plugin.md'
+    ]);
+    expect(urls.filter((url) => url.includes('nav'))).to.be.empty;
   });
 
   it('lists a page per Markdown file, with its Markdown twin', async () => {
@@ -82,9 +98,45 @@ describe('prerenderPages', () => {
 
     const urls = await urlsFor('https://docs.test');
 
-    for (const generated of ['/llms.txt.md', '/llms-full.txt.md', '/sitemap.xml.md', '/robots.txt.md', '/api/search.json.md']) {
+    for (const generated of [
+      '/llms.txt.md',
+      '/llms-full.txt.md',
+      '/sitemap.xml.md',
+      '/robots.txt.md',
+      '/api/search.json.md'
+    ]) {
       expect(urls, `asked for a Markdown twin of ${generated}`).to.not.include(generated);
     }
+  });
+
+  // Through the sections the site is built from: a page listed here and not built is a 404 in
+  // the output, and one built and not listed is never written.
+  it('lists the reference pages the site keeps, deprecated included and internal left out', async () => {
+    // Beside the pages, which only Markdown files are.
+    const spec = path.join(contentDir, 'pets.json');
+    const ok = { 200: { description: 'ok' } };
+    fs.writeFileSync(
+      spec,
+      JSON.stringify({
+        openapi: '3.1.0',
+        info: { title: 'Pets', version: '1' },
+        paths: {
+          '/pets': {
+            get: { operationId: 'listPets', tags: ['pets'], responses: ok },
+            post: { operationId: 'createPet', tags: ['pets'], deprecated: true, responses: ok },
+            delete: { operationId: 'purgePets', tags: ['pets'], 'x-internal': true, responses: ok }
+          }
+        }
+      })
+    );
+    const reference = (await urlsFor(null, { pets: spec })).filter((url) => url.startsWith('/api/pets/')).sort();
+
+    expect(reference).to.deep.equal([
+      '/api/pets/pets/createPet',
+      '/api/pets/pets/createPet.md',
+      '/api/pets/pets/listPets',
+      '/api/pets/pets/listPets.md'
+    ]);
   });
 
   it('suffixes each page once, however many pages there are', async () => {

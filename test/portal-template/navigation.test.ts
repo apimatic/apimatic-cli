@@ -1,12 +1,18 @@
 import { expect } from 'chai';
 import { loader } from 'fumadocs-core/source';
 import type { Node } from 'fumadocs-core/page-tree';
-import { GENERATED_SOURCE, navigationTransformer, OPENAPI_SOURCE } from '../../portal-template/src/lib/navigation';
+import {
+  GENERATED_SECTIONS as TEMPLATE_SECTIONS,
+  GENERATED_SOURCE,
+  navigationTransformer,
+  OPENAPI_SOURCE
+} from '../../portal-template/src/lib/navigation';
+import { GENERATED_SECTIONS as CLI_SECTIONS } from '../../src/types/portal/generated-pages';
 import { PortalNavigation } from '../../src/types/portal/portal-navigation';
 
 /**
  * The transformer against a real `loader()`. The sources are built in memory rather than on
- * disk, which is what lets a test add the generated source the template does not have yet.
+ * disk, so a test chooses exactly which generated folders exist.
  */
 describe('navigationTransformer', () => {
   type File = { type: 'page' | 'meta'; path: string; data: Record<string, unknown> };
@@ -48,6 +54,20 @@ describe('navigationTransformer', () => {
   const CONTENT = [page('index.mdx', 'Welcome'), page('authentication.mdx', 'Authentication')];
   const API = [page('petstore/pet/addPet.mdx', 'Add a pet'), page('petstore/store/inventory.mdx', 'Inventory')];
 
+  /** What the CLI writes: the SDKs folder, its languages in the block's order, not the alphabet's. */
+  const SDKS = [
+    page('sdks/index.mdx', 'SDKs overview'),
+    page('sdks/typescript.mdx', 'TypeScript'),
+    page('sdks/python.mdx', 'Python'),
+    titled('sdks/nav.json', 'SDKs', ['typescript', 'python'])
+  ];
+  /** The context plugin's folder, which holds only its index page. */
+  const PLUGIN = [
+    page('context-plugin/index.mdx', 'Plugin overview'),
+    titled('context-plugin/nav.json', 'Context Plugin')
+  ];
+  const GENERATED = [...SDKS, ...PLUGIN];
+
   describe('with no nav.json', () => {
     it('keeps Fumadocs’ order for the user’s own pages', () => {
       expect(treeOf({ docs: CONTENT, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
@@ -61,14 +81,15 @@ describe('navigationTransformer', () => {
       expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'Guides', 'API Reference']);
     });
 
-    it('still collects the injected pages at the anchor rather than among the user’s pages', () => {
+    it('still collects the generated sections at the anchor rather than among the user’s pages', () => {
       const docs = [...CONTENT, page('tutorials.mdx', 'Tutorials')];
 
-      expect(treeOf({ docs, generated: [page('sdks.mdx', 'SDKs')], openapi: API })).to.deep.equal([
+      expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
         'Welcome',
         'Authentication',
         'Tutorials',
         'SDKs',
+        'Context Plugin',
         'API Reference'
       ]);
     });
@@ -220,9 +241,9 @@ describe('navigationTransformer', () => {
     // With nothing of the user's named, everything named is what the CLI adds, and the
     // user's pages have no reason to drop below it.
     it('stays below every unnamed page when the file names only tokens', () => {
-      const docs = [...CONTENT, nav('nav.json', ['apimatic:pages', 'apimatic:api'])];
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:sdks', 'apimatic:api'])];
 
-      expect(treeOf({ docs, generated: [page('sdks.mdx', 'SDKs')], openapi: API })).to.deep.equal([
+      expect(treeOf({ docs, generated: SDKS, openapi: API })).to.deep.equal([
         'Welcome',
         'Authentication',
         'SDKs',
@@ -315,35 +336,48 @@ describe('navigationTransformer', () => {
     });
   });
 
-  describe('the injected pages', () => {
-    const GENERATED = [page('sdks.mdx', 'SDKs')];
-
-    it('go where the token names them', () => {
-      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:pages', 'authentication'])];
+  describe('the generated sections', () => {
+    it('each go where their own token names them', () => {
+      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:plugin', 'apimatic:sdks', 'authentication'])];
 
       expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
         'Welcome',
+        'Context Plugin',
         'SDKs',
         'Authentication',
         'API Reference'
       ]);
     });
 
+    it('leave a section whose token is not named at the anchor', () => {
+      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:sdks', 'authentication'])];
+
+      expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
+        'Welcome',
+        'SDKs',
+        'Authentication',
+        'Context Plugin',
+        'API Reference'
+      ]);
+    });
+
     // The anchor: after the user's content, before the API reference. A release that adds a
-    // generated page must not land it in the middle of a sidebar nobody touched.
-    it('collect at the anchor when the token is absent', () => {
+    // generated section must not land it in the middle of a sidebar nobody touched. The CLI's
+    // order holds there, although Fumadocs' own puts `context-plugin` before `sdks`.
+    it('collect at the anchor when no token is named, SDKs first', () => {
       const docs = [...CONTENT, nav('nav.json', ['authentication', 'index'])];
 
       expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
         'Authentication',
         'Welcome',
         'SDKs',
+        'Context Plugin',
         'API Reference'
       ]);
     });
 
     // Before the reference by default, but never above the user's own pages: a generated
-    // page has no business sitting above the home page because the file put the reference
+    // section has no business sitting above the home page because the file put the reference
     // first.
     it('follow the user’s pages when the file puts the API reference before them', () => {
       const docs = [...CONTENT, nav('nav.json', ['apimatic:api', 'index', 'authentication'])];
@@ -352,14 +386,15 @@ describe('navigationTransformer', () => {
         'API Reference',
         'Welcome',
         'Authentication',
-        'SDKs'
+        'SDKs',
+        'Context Plugin'
       ]);
     });
 
     it('follow the unnamed pages too when the reference is named before them', () => {
       const docs = [...CONTENT, nav('nav.json', ['apimatic:api', 'index'])];
 
-      expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
+      expect(treeOf({ docs, generated: SDKS, openapi: API })).to.deep.equal([
         'API Reference',
         'Welcome',
         'Authentication',
@@ -374,13 +409,39 @@ describe('navigationTransformer', () => {
         'Authentication',
         'Welcome',
         'SDKs',
+        'Context Plugin',
         'API Reference'
       ]);
     });
 
-    it('resolve to nothing when there is no generated source, which is the case today', () => {
-      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:pages', 'authentication'])];
+    // Its only page is the folder's index, which is not among its children, so a folder
+    // judged by its children alone would pass for the user's and be swept up with them.
+    it('recognise the context plugin’s folder, which holds only its index page', () => {
+      const docs = [...CONTENT, nav('nav.json', ['...', 'index'])];
 
+      expect(treeOf({ docs, generated: PLUGIN, openapi: API })).to.deep.equal([
+        'Authentication',
+        'Welcome',
+        'Context Plugin',
+        'API Reference'
+      ]);
+    });
+
+    it('keep the SDKs folder in the order its own nav.json gives, named by it', () => {
+      const tree = build({ docs: CONTENT, generated: SDKS, openapi: API }).pageTree.children;
+
+      expect(names(childrenOf(tree, 'SDKs'))).to.deep.equal(['TypeScript', 'Python']);
+    });
+
+    it('resolve a token to nothing when its section is not generated', () => {
+      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:plugin', 'authentication'])];
+
+      expect(treeOf({ docs, generated: SDKS, openapi: API })).to.deep.equal([
+        'Welcome',
+        'Authentication',
+        'SDKs',
+        'API Reference'
+      ]);
       expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
     });
   });
@@ -471,6 +532,8 @@ describe('navigationTransformer', () => {
       PortalNavigation.validate(JSON.stringify({ pages: [entry, 'index'] }), {
         label: 'content/nav.json',
         isContentRoot: true,
+        isTopLevel: false,
+        isApiDirectory: false,
         becomesFolder: true,
         childNames: ['index', 'authentication']
       }).isOk();
@@ -489,15 +552,26 @@ describe('navigationTransformer', () => {
       expect(treeOf({ docs, openapi: API })).to.deep.equal(['API Reference', 'Welcome', 'Authentication']);
     });
 
-    it('accepts and applies the injected pages token', () => {
-      expect(accepts('apimatic:pages')).to.be.true;
+    it('accepts and applies the SDKs token', () => {
+      expect(accepts('apimatic:sdks')).to.be.true;
 
-      const docs = [...CONTENT, nav('nav.json', ['apimatic:pages', 'index', 'authentication'])];
-      expect(treeOf({ docs, generated: [page('sdks.mdx', 'SDKs')] })).to.deep.equal([
-        'SDKs',
-        'Welcome',
-        'Authentication'
-      ]);
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:sdks', 'index', 'authentication'])];
+      expect(treeOf({ docs, generated: SDKS })).to.deep.equal(['SDKs', 'Welcome', 'Authentication']);
+    });
+
+    it('accepts and applies the context plugin token', () => {
+      expect(accepts('apimatic:plugin')).to.be.true;
+
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:plugin', 'index', 'authentication'])];
+      expect(treeOf({ docs, generated: PLUGIN })).to.deep.equal(['Context Plugin', 'Welcome', 'Authentication']);
+    });
+
+    // The CLI writes each section's folder and refuses the user's pages at its address; the
+    // template finds the folder by the same name and orders the sections the same way.
+    it('names the same sections, by the same folders and tokens, in the same order', () => {
+      expect(TEMPLATE_SECTIONS.map(({ token, folder }) => ({ token, folder }))).to.deep.equal(
+        CLI_SECTIONS.map(({ token, folder }) => ({ token, folder }))
+      );
     });
   });
 

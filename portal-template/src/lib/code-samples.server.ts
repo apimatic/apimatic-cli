@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Document } from 'fumadocs-openapi';
 import { CODE_SAMPLES_EXTENSION } from './code-samples';
-import { isJsonObject, type JsonObject } from './json-object';
+import { isJsonObject, type JsonObject } from './json';
 
 /** Each endpoint's code samples, keyed by path and then by upper-case method, as the CLI writes them. */
 export type SamplesByEndpoint = Record<string, Record<string, unknown[]>>;

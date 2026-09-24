@@ -47,6 +47,12 @@ src/
   static/               served verbatim at the site root
 ```
 
+*Amended 2026-09-23:* the v1 shape below is superseded by the nested block of
+`.ai/plans/portal-config.md` (`site`, `brand`, `navigation`, `home`, `api`, `ai`,
+`advanced`), which also requires a top-level `languages` entry. The text below
+is kept as it was. *Amended 2026-09-24:* the first release trims that block to
+`site`, `brand`, `navigation` and `ai` (that plan's section 15).
+
 The `portal` block, v1 shape:
 
 ```json
@@ -100,12 +106,40 @@ last. Inside the reference there is one section per spec file in filename
 order, grouped by tag — except for a single specification, whose section level
 is inlined. See `.ai/plans/portal-navigation.md`.
 
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`): the top level is shown as
+tabs, and two of them are pages the CLI generates: SDKs, an SDKs page and one
+page per language in the `languages` block, positioned by `apimatic:sdks`; and
+Context Plugin, when there is a `plugin` block, positioned by `apimatic:plugin`.
+Unnamed, both sit before the API reference.
+
 ## 4. Template (`portal-template/`)
 
 Shipped inside the npm package (add to `files`). Derived from the spike, which
 was itself based on the official `tanstack-start-openapi` and
 `tanstack-start-spa` Fumadocs examples. Kept as the spike has it (Geist fonts
 from Google Fonts at runtime, Fumadocs page actions) except where noted.
+
+*Amended 2026-09-23* (`.ai/plans/portal-config.md`, sections 4 and 6): the
+fixed `neutral.css` import and the Geist lines have left `app.css`. The preset,
+the fonts and the colour overrides are in a `src/styles/theme.css` the CLI
+generates, which `app.css` imports last, and the fonts load through a head
+link. The identity literal substituted into `portal.ts` is gone: `portal.ts`
+imports a CLI-written `portal.identity.json`, and `portal.config.json` holds
+only what the build set-up reads. The layout is chosen in `src/lib/layout.tsx`.
+
+*Amended 2026-09-24* (`.ai/plans/portal-config.md`, section 15): the first
+release cuts the preset, the fonts and the layout. `app.css` imports
+`neutral.css` again and sets Geist and Geist Mono in `@theme`, `__root.tsx`
+links their Google Fonts stylesheet, the generated `theme.css` holds only the
+primary colour's two rules, and `layout.tsx` renders the notebook layout alone.
+
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 4 and 6):
+`src/lib/source.ts` declares a second collection over the relative literal
+`'generated'`, where the CLI writes the SDK and context plugin pages from the
+templates in the package's `portal-pages/`; `source.server.ts` passes it to
+`loader()` under the `generated` key, and `vite.config.ts` registers a
+serve-only plugin that reloads the collection when a generated page is added
+or removed.
 
 - `vite.config.ts`: `fumadocsMdx()`, `tailwindcss()`, `react()`, and
   `tanstackStart({ spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true } }, pages: [...], prerender: { crawlLinks: false }, importProtection: { behavior: 'error' } })`.
@@ -277,7 +311,7 @@ Follow the five-layer conventions in `.ai/instructions.md` and the skills in
 - Large, densely connected APIs still yield large output folders (section 5:
   a Stripe-shaped spec approaches 1 GB at full size). The remaining lever is the
   second copy of each page's payload; see section 12.
-- Generated site is not self-contained: Geist fonts load from Google Fonts at runtime and Fumadocs' page actions link to ChatGPT/Claude/Cursor (decided to keep as-is for v1).
+- Generated site is not self-contained: Geist fonts load from Google Fonts at runtime and Fumadocs' page actions link to ChatGPT/Claude/Cursor (decided to keep as-is for v1). *Amended 2026-09-23:* the fonts are now a shortlist in `portal.brand.fonts`, each still from Google Fonts, and `system` for both makes no font request at all; `portal.ai.pageActions: false` removes the external links. *Amended 2026-09-24:* the shortlist is cut for the first release, so Geist and Geist Mono are fixed and load from Google Fonts again, as in v1; `portal.ai.pageActions: false` still removes the external links.
 - Verified on Windows only; macOS/Linux via the new CI matrix.
 - Try-it playground requires CORS on the customer's API (Fumadocs' proxy needs a server). Out of scope.
 - Fumadocs UI is mid-transition to `@fumadocs/base-ui`; fumadocs-openapi has had three majors in about a year; several single-maintainer and 0.x packages in the tree (`lucide-react`, `yuku-analyzer` with native binaries, `zbsearch`, `h3` RC). Mitigated by pinning and the e2e test.

@@ -3,10 +3,10 @@ import { parse as parseYaml } from 'yaml';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
+import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
-import { isJsonObject, JsonObject } from '../common/json-object.js';
+import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
 import { Endpoint } from './endpoint.js';
-import { PortalConfig } from './portal-config.js';
 
 /**
  * Whether a parsed document is one a portal can be built from. `format` names what it is
@@ -88,16 +88,16 @@ export class OpenApiDocument {
   }
 
   /**
-   * A `portal` block to start from, so the wizard has one question fewer to ask. Both fields
-   * are written into generated files, so each is collapsed to one line first -- taking only
-   * the first line left the description cap unreachable for wrapped prose.
+   * Both fields are written into generated files, so each is collapsed to one line. The
+   * description stops at its first blank line: past it a specification's description is
+   * usually a guide to the API, not a summary of it.
    */
-  public suggestedConfig(): PortalConfig {
+  public suggestedSite(): SuggestedSite {
     const info = this.document.info;
     const fields = isJsonObject(info) ? info : {};
-    const title = oneLine(fields.title) ?? PortalConfig.placeholder.siteTitle();
-    const description = oneLine(fields.description);
-    return PortalConfig.create(title, description === null ? null : cap(description, DESCRIPTION_LIMIT));
+    const name = oneLine(fields.title) ?? PLACEHOLDER_SITE.name;
+    const description = oneLine(firstParagraph(fields.description));
+    return { name, description: description === null ? null : cap(description, DESCRIPTION_LIMIT) };
   }
 
   private paths(): JsonObject {
@@ -137,6 +137,10 @@ function valueAt(document: JsonObject, pointer: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function firstParagraph(value: unknown): unknown {
+  return typeof value === 'string' ? value.trim().split(/\n\s*\n/)[0] : value;
 }
 
 // Version keys are strings in well-formed documents; anything else is named rather than

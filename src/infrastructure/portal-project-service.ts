@@ -1,5 +1,4 @@
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fsExtra from 'fs-extra';
 import { err, ok, Result } from 'neverthrow';
@@ -7,8 +6,13 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSamples } from '../types/portal/code-samples.js';
-import { PortalSource } from '../types/portal/portal-source.js';
+import { PortalConfig } from '../types/portal/portal-config.js';
+import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
+import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
+import { errorMessage } from '../utils/error-utils.js';
+import { envInfo } from './env-info.js';
 import { FileService } from './file-service.js';
+import { PortalPagesService } from './portal-pages-service.js';
 
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
@@ -35,7 +39,18 @@ export const TEMPLATE_DEPENDENCIES = [
 ];
 
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
-const PORTAL_IDENTITY_PLACEHOLDER = "'__APIMATIC_PORTAL_IDENTITY__'";
+
+/** Beside `portal.config.json`; `src/lib/portal.ts` imports it. */
+const IDENTITY_FILE_NAME = 'portal.identity.json';
+
+/** In `src/styles/`, beside `app.css`, which imports it. */
+const STYLESHEET_FILE_NAME = 'theme.css';
+
+/**
+ * Where the generated pages are written, inside the project: `src/lib/source.ts` names it as a
+ * relative literal, which the browser bundle carries, so the build directory is never published.
+ */
+export const GENERATED_DIRECTORY_NAME = 'generated';
 
 export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
@@ -49,6 +64,7 @@ export interface PortalProjectPaths {
  */
 export class PortalProjectService {
   private readonly fileService = new FileService();
+  private readonly pagesService = new PortalPagesService();
   private readonly require = createRequire(import.meta.url);
 
   /** Checks this installation can run the portal build at all, before any work is done. */
@@ -81,6 +97,11 @@ export class PortalProjectService {
     await this.fileService.copyDirectoryContents(template, projectDirectory);
     await this.linkDependencies(projectDirectory);
     await this.writeConfiguration(projectDirectory, source, await this.writeCodeSamples(projectDirectory, codeSamples));
+
+    const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
+    if (pages.isErr()) {
+      return err(pages.error);
+    }
 
     return ok({
       projectDirectory,
@@ -168,16 +189,13 @@ export class PortalProjectService {
       specs[spec.slug] = this.toPosix(spec.file.toString());
     }
 
-    // Only the portal's identity reaches the browser; everything else in the configuration
-    // addresses this machine and stays behind `portal.server.ts`. A JSON module is retained
-    // whole once client code imports it, so this is substituted into `portal.ts` as a literal.
-    const identity = source.config.identity();
-
+    // Everything here addresses this machine, so it stays behind `portal.server.ts` and the
+    // build's own config files.
     const configuration = {
-      ...identity,
       specs,
       codeSamples: codeSamples === null ? null : this.toPosix(codeSamples.toString()),
       contentDir: this.toPosix(contentDirectory.toString()),
+      generatedDir: this.toPosix(projectDirectory.join(GENERATED_DIRECTORY_NAME).toString()),
       staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
     };
 
@@ -186,8 +204,7 @@ export class PortalProjectService {
       JSON.stringify(configuration, null, 2)
     );
 
-    const portalModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('portal.ts'));
-    await this.substitute(portalModule, PORTAL_IDENTITY_PLACEHOLDER, JSON.stringify(identity));
+    await this.writeAppearance(projectDirectory, source.config);
 
     // A literal because Fumadocs' `defineDocs` macro rejects anything it cannot read at
     // compile time. Tailwind needs the same path to scan the user's pages: its automatic
@@ -198,6 +215,52 @@ export class PortalProjectService {
 
     const stylesheet = new FilePath(projectDirectory.join('src').join('styles'), new FileName('app.css'));
     await this.substitute(stylesheet, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);
+  }
+
+  /**
+   * The dev server picks the files up and reloads the browser. Each is written only when its
+   * contents change, so an edit that leaves the site as it was, such as a plugin command
+   * rewriting its own block, reloads nothing; the answer says whether anything was written.
+   */
+  public async applyConfig(
+    projectDirectory: DirectoryPath,
+    settings: PortalSettings
+  ): Promise<Result<boolean, string>> {
+    let written = false;
+    try {
+      for (const [file, contents] of this.appearanceFiles(projectDirectory, settings.config)) {
+        if (await this.fileService.replaceContentsIfChanged(file, contents)) {
+          written = true;
+        }
+      }
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+    const pages = await this.pagesService.write(
+      projectDirectory.join(GENERATED_DIRECTORY_NAME),
+      settings.generatedPages
+    );
+    return pages.map((pagesWritten) => written || pagesWritten);
+  }
+
+  private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {
+    for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
+      await this.fileService.writeContents(file, contents);
+    }
+  }
+
+  /**
+   * The browser imports `portal.identity.json` whole, since a retained JSON module is not
+   * tree-shaken per property, which is why it holds nothing that addresses this machine.
+   */
+  private appearanceFiles(projectDirectory: DirectoryPath, config: PortalConfig): [FilePath, string][] {
+    return [
+      [new FilePath(projectDirectory, new FileName(IDENTITY_FILE_NAME)), JSON.stringify(config.identity(), null, 2)],
+      [
+        new FilePath(projectDirectory.join('src').join('styles'), new FileName(STYLESHEET_FILE_NAME)),
+        PortalStylesheet.of(config).toString()
+      ]
+    ];
   }
 
   private async substitute(file: FilePath, placeholder: string, literal: string): Promise<void> {
@@ -211,8 +274,7 @@ export class PortalProjectService {
   }
 
   private templateDirectory(): DirectoryPath | undefined {
-    const packageRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-    const template = new DirectoryPath(packageRoot).join('portal-template');
+    const template = envInfo.packageRoot().join('portal-template');
     return this.fileService.directoryExistsSync(template) ? template : undefined;
   }
 

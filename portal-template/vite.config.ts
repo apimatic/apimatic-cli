@@ -4,18 +4,20 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
-import { readPortalConfig } from './portal-config.ts';
+import { generatedPagesReload } from './generated-pages-reload.ts';
+import { readPortalConfig, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
 
 export default defineConfig(async () => {
-  const portalConfig = await readPortalConfig();
-  const pages = await prerenderPages(portalConfig);
+  const [portalConfig, identity] = await Promise.all([readPortalConfig(), readPortalIdentity()]);
+  const pages = await prerenderPages(portalConfig, identity.siteUrl);
   const publicDir: string | false = portalConfig.staticDir ?? false;
 
   return {
     publicDir,
     plugins: [
+      generatedPagesReload(),
       fumadocsMdx(),
       specReload(portalConfig.specs),
       tailwindcss(),

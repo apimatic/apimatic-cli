@@ -1,5 +1,5 @@
-import { confirm, isCancel, log } from '@clack/prompts';
-import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
+import { log } from '@clack/prompts';
+import { Language } from '../../types/sdk/generate.js';
 import { format as f } from '../format.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 
@@ -11,24 +11,6 @@ export class PluginRecordSdkPrompts {
         : `Created ${f.var(APIMATIC_CONFIG_FILE_NAME)} and added ${f.var(language)}. `) +
       `Run '${f.cmdAlt('apimatic', 'plugin', 'generate')}' to build your context plugin.`;
     log.info(message);
-  }
-
-  public codegenVersionMismatch(language: Language, actual: CodeGenerationVersion, expected: CodeGenerationVersion) {
-    const message =
-      `${f.var(APIMATIC_CONFIG_FILE_NAME)} records ${f.var(language)} against ${f.var(actual)}, ` +
-      `but this SDK was generated with ${f.var(expected)}. ` +
-      `Recording it overwrites ${f.var(actual)} with ${f.var(expected)}.`;
-    log.warn(message);
-  }
-
-  public async confirmCodegenVersionOverwrite(): Promise<boolean> {
-    const overwrite = await confirm({ message: 'Do you want to proceed?', initialValue: true });
-
-    if (isCancel(overwrite)) {
-      return false;
-    }
-
-    return overwrite;
   }
 
   public noSourceRepository(language: Language) {

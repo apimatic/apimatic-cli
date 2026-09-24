@@ -3,8 +3,13 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
-import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
-import { PortalConfig } from '../src/types/portal/portal-config';
+import { GENERATED_DIRECTORY_NAME, TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
+import { PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
+import { PortalIdentity } from '../src/types/portal/portal-config';
+import type { Portal } from '../portal-template/src/lib/portal-types';
+
+/** True only when the two types are identical, every nested field and union member included. */
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 const repositoryRoot = process.cwd();
 const templateRoot = path.join(repositoryRoot, 'portal-template');
@@ -28,6 +33,10 @@ function templateImports(): string[] {
     }
   }
   return specifiers;
+}
+
+function pageTemplateFiles(): string[] {
+  return fs.readdirSync(path.join(repositoryRoot, 'portal-pages'));
 }
 
 function templateFiles(): string[] {
@@ -66,11 +75,11 @@ describe('portal template packaging', () => {
     expect(TEMPLATE_DEPENDENCIES.filter((name) => !declared.has(name))).to.be.empty;
   });
 
-  it('is listed in the published files', () => {
-    expect(manifest.files).to.include('./portal-template');
+  it('is listed in the published files, with the page templates', () => {
+    expect(manifest.files).to.include.members(['./portal-template', './portal-pages']);
   });
 
-  it('ships every template file in the package', function () {
+  it('ships every template file and page template in the package', function () {
     this.timeout(120_000);
     const packed = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
       cwd: repositoryRoot,
@@ -79,9 +88,18 @@ describe('portal template packaging', () => {
     });
     const packedPaths = new Set<string>((JSON.parse(packed)[0].files as { path: string }[]).map((entry) => entry.path));
 
-    const missing = templateFiles().filter((file) => !packedPaths.has(`portal-template/${file}`));
+    const missing = [
+      ...templateFiles().map((file) => `portal-template/${file}`),
+      ...pageTemplateFiles().map((file) => `portal-pages/${file}`)
+    ].filter((file) => !packedPaths.has(file));
 
     expect(missing, 'template files missing from the published package').to.be.empty;
+  });
+
+  // `PortalPagesService` reads a template by the name `GeneratedPages` gives it, so one on
+  // either side alone is a page that fails to render, or a file nothing reads.
+  it('holds exactly the page templates the generated pages are rendered from', () => {
+    expect(pageTemplateFiles().sort()).to.deep.equal(PAGE_TEMPLATES.map((name) => `${name}.mdx`).sort());
   });
 
   it('keeps the content directory placeholder the CLI substitutes', () => {
@@ -91,15 +109,45 @@ describe('portal template packaging', () => {
     expect(source).to.contain("'__APIMATIC_CONTENT_DIR__'");
   });
 
-  // The two sides are compiled apart, so nothing else holds the browser's `Portal` interface to
-  // the object the CLI substitutes into it.
-  it('declares exactly the identity fields the CLI writes', () => {
-    const source = fs.readFileSync(path.join(templateRoot, 'src/lib/portal.ts'), 'utf8');
-    const block = /export interface Portal \{([\s\S]*?)\n\}/.exec(source);
-    const declared = [...(block?.[1] ?? '').matchAll(/^\s*(\w+):/gm)].map((match) => match[1]).sort();
+  // The literal reaches the browser bundle as the collection's base, so it must stay relative;
+  // it must also be the directory the CLI writes the generated pages into.
+  it('compiles the generated pages from the directory the CLI writes them to, by a relative name', () => {
+    const source = fs.readFileSync(path.join(templateRoot, 'src/lib/source.ts'), 'utf8');
 
-    expect(declared).to.not.be.empty;
-    expect(declared).to.deep.equal(Object.keys(PortalConfig.create('Acme').identity()).sort());
+    expect(source).to.match(new RegExp(`defineDocs\\(\\{\\s*dir: '${GENERATED_DIRECTORY_NAME}',`));
+  });
+
+  it('registers the plugin that reloads the generated pages under portal serve', () => {
+    const config = fs.readFileSync(path.join(templateRoot, 'vite.config.ts'), 'utf8');
+
+    expect(config).to.contain('generatedPagesReload()');
+  });
+
+  // The generated primary has the theme's own specificity, so it wins only by coming after it.
+  it('imports the neutral theme, and the stylesheet the CLI generates after everything else', () => {
+    const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
+    const imports = [...stylesheet.matchAll(/@import\s+'([^']+)'/g)].map((match) => match[1]);
+
+    expect(imports).to.include('fumadocs-ui/css/neutral.css');
+    expect(imports[imports.length - 1]).to.equal('./theme.css');
+  });
+
+  // The two sides are compiled apart and the template casts the files it reads, so nothing else
+  // holds them together: a field or a value only one side knows builds a portal that is quietly
+  // missing it. The compiler checks this when `pretest` runs; the assertion only reports it.
+  it('declares exactly what the CLI writes for it', () => {
+    const identity: Equal<Portal, PortalIdentity> = true;
+
+    expect(identity).to.equal(true);
+  });
+
+  // The CLI writes these into the prepared project; a copy in the template would be a second
+  // set of defaults that nothing but a stray local build ever read, and it would ship.
+  it('ships none of the files the CLI generates', () => {
+    const generated = ['portal.config.json', 'portal.identity.json', 'src/styles/theme.css'];
+
+    expect(templateFiles().filter((file) => generated.includes(file))).to.be.empty;
+    expect(templateFiles().filter((file) => file.startsWith(`${GENERATED_DIRECTORY_NAME}/`))).to.be.empty;
   });
 
   it('carries no nested .gitignore, which would drop files from the package', () => {

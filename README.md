@@ -26,15 +26,26 @@ $ apimatic quickstart
 Documentation portals are now built on your machine from a `src/` directory, and
 `APIMATIC-BUILD.json` no longer configures them:
 
-- Describe the portal in the `portal` block of `src/apimatic.json` (`title`, `description`,
-  `logo`, `siteUrl`). Running `apimatic quickstart` scaffolds one. The same file carries the
-  context plugin's identity in `plugin` and the SDKs you publish in `languages`, which
-  `plugin generate` and `sdk publish` write; `src/plugin-config.json` is no longer read, so run
-  those two commands again after upgrading and delete the old file.
+- Describe the portal in the `portal` block of `src/apimatic.json`: `site` (its name, address
+  and description), `brand` (logo, favicon, primary colour and colour mode), `navigation`
+  (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
+  with every default spelled out, and the file's `$schema` lets your editor complete and check it.
+- A portal also needs the project's SDK languages, at least one, in the same file's
+  `languages` block, for example `"languages": { "typescript": {} }`. `plugin generate` and
+  `sdk publish` both write to it, and the context plugin reads it too, so name only the languages
+  you ship. The same file carries the plugin's identity in `plugin`; `src/plugin-config.json` is
+  no longer read, so run `plugin generate` and `sdk publish` again after upgrading and delete the
+  old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
-  `title` there names the folder it sits in.
+  `title` there names the folder it sits in. The top level of the portal is shown as tabs:
+  Home, Guides, SDKs, Context Plugin, the API reference, and any folder directly under
+  `src/content/` whose own `nav.json` sets `"root": true`. The root `nav.json` places the
+  tabs the CLI makes with `apimatic:sdks`, `apimatic:plugin` and `apimatic:api`.
+- The SDKs tab has a page per language in the `languages` block, and the Context Plugin tab
+  appears when there is a `plugin` block. Their addresses, `/sdks` and `/context-plugin`, are
+  kept for them, so a page in `src/content/` that would be served there is refused.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
@@ -46,7 +57,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.3.1 win32-x64 node-v23.4.0
+@apimatic/cli/1.3.1 win32-x64 node-v24.19.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -246,7 +257,7 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46
 
 ## `apimatic plugin generate`
 
-Generate a context plugin for your published SDKs.
+Generate a context plugin for your SDKs.
 
 ```
 USAGE
@@ -260,10 +271,10 @@ FLAGS
   -k, --auth-key=<value>     override current authentication state with an authentication key.
 
 DESCRIPTION
-  Generate a context plugin for your published SDKs.
+  Generate a context plugin for your SDKs.
 
   Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
-  containing a `src` directory with an `apimatic.json`.
+  containing a `src` directory with your API specification — `apimatic.json` is created if it is not there.
 
 EXAMPLES
   apimatic plugin generate
@@ -322,7 +333,8 @@ DESCRIPTION
   Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
 
   The portal is built on your machine and written as static files you can host anywhere. Configure it with
-  'src/apimatic.json'.
+  'src/apimatic.json', whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block,
+  when there is one, a page for the context plugin.
 
 EXAMPLES
   apimatic portal generate
@@ -353,10 +365,11 @@ DESCRIPTION
   Preview your API Documentation Portal with live reload.
 
   Serves the portal described by 'src/apimatic.json' from your machine, reloading the browser as you edit the Markdown
-  pages in 'src/content' or reorder them in a 'nav.json'.
+  pages in 'src/content', reorder them in a 'nav.json', or change the 'portal', 'languages' or 'plugin' block of
+  'apimatic.json'.
 
-  Adding or removing a page, editing 'apimatic.json', or changing which documents are in 'src/spec', needs the preview
-  restarted.
+  Adding or removing a page in 'src/content', creating 'src/static', or changing which documents are in 'src/spec',
+  needs the preview restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 

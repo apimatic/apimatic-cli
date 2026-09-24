@@ -10,7 +10,7 @@ export default class PortalGenerate extends Command {
 
   static readonly description = `Builds a documentation portal from the OpenAPI documents and Markdown pages in your 'src' directory.
 
-The portal is built on your machine and written as static files you can host anywhere. Configure it with 'src/apimatic.json'.`;
+The portal is built on your machine and written as static files you can host anywhere. Configure it with 'src/apimatic.json', whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block, when there is one, a page for the context plugin.`;
 
   static readonly cmdTxt = format.cmd('apimatic', 'portal', 'generate');
 

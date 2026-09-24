@@ -11,15 +11,18 @@ const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
  * collapsed sidebar folders and never sees the `.md` URLs the page actions fetch, so
  * the list is computed here from the same sources the site is built from.
  */
-export async function prerenderPages(config: PortalConfig): Promise<{ path: string }[]> {
+export async function prerenderPages(config: PortalConfig, siteUrl: string | null): Promise<{ path: string }[]> {
   const urls = new Set<string>(['/', '/api/search.json', '/llms.txt', '/llms-full.txt']);
   // Both need absolute URLs, so they are only emitted for a portal that declares its address.
-  if (config.siteUrl) {
+  if (siteUrl) {
     urls.add('/sitemap.xml');
     urls.add('/robots.txt');
   }
 
   for (const url of await contentUrls(config.contentDir)) urls.add(url);
+  // The CLI keeps the user's pages away from the generated ones' addresses, so the two
+  // directories never collide and can be listed apart.
+  for (const url of await contentUrls(config.generatedDir)) urls.add(url);
   for (const url of await openApiUrls(config.specs)) urls.add(url);
 
   // The copy is load-bearing, not redundant: this loop adds to `urls`, and a `Set` visits
@@ -63,6 +66,7 @@ async function contentUrls(contentDir: string): Promise<string[]> {
   return urls;
 }
 
+// Through the same sections as the site, so an internal operation gets no page here either.
 async function openApiUrls(specs: Record<string, string>): Promise<string[]> {
   const sources = Object.fromEntries(
     await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file, null)]))

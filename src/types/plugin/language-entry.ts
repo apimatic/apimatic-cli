@@ -1,79 +1,27 @@
 import { GitConfiguration, PackageConfigurationForLanguage } from '../publish/package-settings-configuration.js';
-import { SemVersion, SemVersionString } from '../publish/version.js';
-import { CodeGenerationVersion, Language } from '../sdk/generate.js';
-import { LanguagePublishingEntry, LanguageSource, PluginLanguageEntry } from './plugin-config.js';
+import { SemVersion } from '../publish/version.js';
+import { Language } from '../sdk/generate.js';
+import { LanguageSource, PluginLanguageEntry } from './plugin-config.js';
 
 const GITHUB_BASE_URL = 'https://github.com';
 
-type LanguagePublishingBuilder<L extends Language> = (
-  source: LanguageSource | undefined,
-  packageConfiguration: PackageConfigurationForLanguage[L] | undefined,
-  version: SemVersionString,
-  codegenVersion: CodeGenerationVersion
-) => LanguagePublishingEntry<L>;
-
 /**
- * One builder per language, each checked against that language's own profile fields and its own
- * publishing shape. A single builder taking every language's configuration at once can only reach
- * those fields through a cast, which is what let a mismatched pair compile.
- */
-const publishingBuilders: { [L in Language]: LanguagePublishingBuilder<L> } = {
-  [Language.CSHARP]: (source, configuration, version, codegenVersion) => ({
-    source,
-    package: configuration?.packageId ? { packageId: configuration.packageId, version } : undefined,
-    codegenVersion
-  }),
-  [Language.JAVA]: (source, configuration, version, codegenVersion) => ({
-    source,
-    package:
-      configuration?.groupId && configuration.artifactId
-        ? { groupId: configuration.groupId, artifactId: configuration.artifactId, version }
-        : undefined,
-    codegenVersion
-  }),
-  [Language.PHP]: (source, configuration, version, codegenVersion) => ({
-    source,
-    package:
-      configuration?.vendorName && configuration.projectName
-        ? { vendorName: configuration.vendorName, projectName: configuration.projectName, version }
-        : undefined,
-    codegenVersion
-  }),
-  [Language.PYTHON]: (source, configuration, version, codegenVersion) => ({
-    source,
-    package: configuration?.name ? { name: configuration.name, version } : undefined,
-    codegenVersion
-  }),
-  [Language.RUBY]: (source, configuration, version, codegenVersion) => ({
-    source,
-    package: configuration?.name ? { name: configuration.name, version } : undefined,
-    codegenVersion
-  }),
-  [Language.TYPESCRIPT]: (source, configuration, version, codegenVersion) => ({
-    source,
-    package: configuration?.name ? { name: configuration.name, version } : undefined,
-    codegenVersion
-  }),
-  [Language.GO]: (source, configuration, version, codegenVersion) => ({
-    source,
-    package: configuration?.packageName ? { packageName: configuration.packageName, version } : undefined,
-    codegenVersion
-  })
-};
-
-/**
- * The version rides inside the package block, so a source-only publish records no version at all —
- * there is no package for it to describe.
+ * What a publish records about one language. The profile's package configuration is written
+ * through as it stands — the service reads the package's name out of it, so it is what identifies
+ * a published package, and every language's settings are its own shape.
+ *
+ * The version rides in `package`, which a source-only publish leaves out: nothing was released
+ * for it to describe. The configuration is written either way, because it says how the package is
+ * set up rather than that one exists.
  */
 export function buildLanguageEntry<L extends Language>(
   language: L,
   gitConfiguration: GitConfiguration | undefined,
   packageConfiguration: PackageConfigurationForLanguage[L] | undefined,
-  packageVersion: SemVersion,
-  codegenVersion: CodeGenerationVersion
+  packageVersion: SemVersion | undefined
 ): PluginLanguageEntry<L> {
   const repositoryName = gitConfiguration?.repositoryName?.trim();
-  const source = repositoryName
+  const source: LanguageSource | undefined = repositoryName
     ? {
         repositoryUrl: `${GITHUB_BASE_URL}/${repositoryName}`,
         branch: gitConfiguration?.branch ? gitConfiguration.branch : undefined
@@ -81,6 +29,10 @@ export function buildLanguageEntry<L extends Language>(
     : undefined;
 
   return {
-    publishing: publishingBuilders[language](source, packageConfiguration, packageVersion.toString(), codegenVersion)
+    publishing: {
+      source,
+      package: packageVersion ? { version: packageVersion.toString() } : undefined,
+      packageConfiguration
+    }
   };
 }
