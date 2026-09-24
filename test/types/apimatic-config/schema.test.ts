@@ -162,6 +162,7 @@ describe('apimatic.schema.json', () => {
         { navigation: { links: [{ label: 'x', url: '/\\example.com' }] } }
       ],
       ['a link to another host through a tab', { navigation: { links: [{ label: 'x', url: '/\t/example.com' }] } }],
+      ['a link with an empty segment', { navigation: { links: [{ label: 'x', url: '/docs//page' }] } }],
       [
         'a link to another host past a dot segment',
         { navigation: { links: [{ label: 'x', url: '/.//example.com' }] } }

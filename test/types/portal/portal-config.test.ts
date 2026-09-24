@@ -347,10 +347,10 @@ describe('PortalConfig', () => {
       }
     });
 
-    // Each stays on the portal as written, but resolves to the path `//example.com`, which the
-    // header would write out as a link to another site.
-    it('refuses a page whose dot segments leave two slashes at the front of its path', () => {
+    // Past its dot segments each resolves to `//example.com`, which the header writes out as another site.
+    it('refuses a page with an empty segment in its path', () => {
       for (const url of [
+        '/docs//page',
         '/.//example.com',
         '/..//example.com',
         '/%2e//example.com',
