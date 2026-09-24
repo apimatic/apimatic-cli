@@ -241,8 +241,7 @@ describe('PortalProjectService', () => {
       expect(fs.statSync(themeFile()).mtimeMs).to.equal(before);
     });
 
-    // The dev server is watching both files, and one truncated before it is written can reach
-    // it empty.
+    // The dev server is watching both files, and could read one truncated before it is written.
     it('replaces each file whole rather than writing it in place', async () => {
       (await service.prepare(project, sourceFor()))._unsafeUnwrap();
       const replace = sinon.spy(FileService.prototype, 'replaceContents');

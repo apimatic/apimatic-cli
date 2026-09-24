@@ -189,8 +189,6 @@ export class PortalProjectService {
    * The dev server picks the two files up and reloads the browser. Each is written only when
    * its contents change, so an edit that leaves the site as it was, such as a plugin command
    * rewriting its own block, reloads nothing; the answer says whether anything was written.
-   * Each is replaced whole rather than written in place, which the watching dev server could
-   * read truncated.
    */
   public async applyConfig(projectDirectory: DirectoryPath, config: PortalConfig): Promise<Result<boolean, string>> {
     try {
@@ -198,6 +196,7 @@ export class PortalProjectService {
       for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
         const current = (await this.fileService.fileExists(file)) ? await this.fileService.getContents(file) : null;
         if (current !== contents) {
+          // Renamed over rather than written in place, which the watching dev server could read half-written.
           await this.fileService.replaceContents(file, contents);
           written = true;
         }

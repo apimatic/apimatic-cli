@@ -16,7 +16,6 @@ function isDanglingLink(error: unknown): boolean {
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
-/** The entry named exactly `name`, or else the one named `name` in another case. */
 function spelling<T>(name: string, entries: T[], nameOf: (entry: T) => string): T | undefined {
   return (
     entries.find((entry) => nameOf(entry) === name) ??
@@ -140,12 +139,7 @@ export class FileService {
     return (await this.listEntries(dir)).subDirectories;
   }
 
-  /**
-   * `file` as it is spelt on disk, or null when it is not there in any case. Every name on the
-   * way from `root` is looked up by code point first, and only then without regard to case: on
-   * Windows and macOS `Logo.PNG` also opens `logo.png`, which a web server that matches names
-   * by code point would not serve.
-   */
+  // By code point first: Windows and macOS open `logo.png` for `Logo.PNG`, where a web server would not.
   public async spelledOnDisk(root: DirectoryPath, file: FilePath): Promise<FilePath | null> {
     const names = path.relative(root.toString(), file.toString()).split(path.sep);
     const fileName = names.pop() ?? '';

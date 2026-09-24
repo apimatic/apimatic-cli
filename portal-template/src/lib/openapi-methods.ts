@@ -1,8 +1,4 @@
-/**
- * The fixed fields of a path item that hold an operation, OpenAPI 3.2's `query` included.
- * Fumadocs builds pages for fewer of them, but any it keeps rides along in every page's payload.
- * The methods 3.2 allows beyond these sit apart, under `additionalOperations`.
- */
+// Every path-item field holding an operation: Fumadocs pages fewer, but the rest still ride along in payloads.
 export const OPERATION_METHODS: readonly string[] = [
   'get',
   'put',
