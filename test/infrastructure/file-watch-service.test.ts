@@ -33,7 +33,11 @@ describe('FileWatchService', () => {
     await settled();
   };
 
-  const watchFile = (
+  /**
+   * Starts the watch, then gives it time to go live: macOS's FSEvents starts its stream on a
+   * thread of its own, and can drop a save made the moment `fs.watch` returns.
+   */
+  const watchFile = async (
     onChange: () => Promise<void>,
     onFailed: (reason: string) => void = () => undefined,
     directory = root
@@ -41,6 +45,7 @@ describe('FileWatchService', () => {
     watch = service
       .watch(new DirectoryPath(directory), new FileName('apimatic.json'), onChange, onFailed)
       ._unsafeUnwrap();
+    await pause(SETTLE_MS * 2);
   };
 
   beforeEach(async () => {
@@ -58,7 +63,7 @@ describe('FileWatchService', () => {
 
   it('reports a save once it has settled, however many events it arrived as', async () => {
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       calls += 1;
     });
 
@@ -74,7 +79,7 @@ describe('FileWatchService', () => {
   // the file itself would be left watching the file that was replaced.
   it('keeps reporting after the file is replaced by a rename', async () => {
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       calls += 1;
     });
 
@@ -90,7 +95,7 @@ describe('FileWatchService', () => {
 
   it('ignores the other files in the directory', async () => {
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       calls += 1;
     });
 
@@ -106,7 +111,7 @@ describe('FileWatchService', () => {
     let active = 0;
     let overlapped = false;
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       active += 1;
       overlapped ||= active > 1;
       calls += 1;
@@ -127,7 +132,7 @@ describe('FileWatchService', () => {
   // The one handled next reads the file as the last of them left it.
   it('handles the saves made while one is being handled once, however many there were', async () => {
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       calls += 1;
       await pause(SETTLE_MS * 8);
     });
@@ -146,7 +151,7 @@ describe('FileWatchService', () => {
 
   it('keeps reporting after a save whose handling fails', async () => {
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       calls += 1;
       throw new Error('the handler broke');
     });
@@ -161,7 +166,7 @@ describe('FileWatchService', () => {
 
   it('handles the file on request, as though it had just been saved', async () => {
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       calls += 1;
     });
 
@@ -177,7 +182,7 @@ describe('FileWatchService', () => {
     const failures: string[] = [];
     let calls = 0;
     try {
-      watchFile(
+      await watchFile(
         async () => {
           calls += 1;
         },
@@ -198,7 +203,7 @@ describe('FileWatchService', () => {
 
   it('reports nothing once closed, not even a save already settling', async () => {
     let calls = 0;
-    watchFile(async () => {
+    await watchFile(async () => {
       calls += 1;
     });
 
@@ -212,7 +217,7 @@ describe('FileWatchService', () => {
   it('waits, on closing, for a save it is still handling', async () => {
     let started = false;
     let finished = false;
-    watchFile(async () => {
+    await watchFile(async () => {
       started = true;
       await pause(SETTLE_MS * 4);
       finished = true;
@@ -237,7 +242,7 @@ describe('FileWatchService', () => {
       this.skip();
     }
     let calls = 0;
-    watchFile(
+    await watchFile(
       async () => {
         calls += 1;
       },
