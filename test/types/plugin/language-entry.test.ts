@@ -1,11 +1,12 @@
 import { expect } from 'chai';
 import { buildLanguageEntry } from '../../../src/types/plugin/language-entry';
 import {
+  CSharpPackageConfiguration,
   GitConfiguration,
   PackageConfigurationForLanguage
 } from '../../../src/types/publish/package-settings-configuration';
 import { SemVersion } from '../../../src/types/publish/version';
-import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate';
+import { Language } from '../../../src/types/sdk/generate';
 
 const gitConfig = (repositoryName: string, branch = 'main'): GitConfiguration => ({
   isEnabled: true,
@@ -16,106 +17,93 @@ const gitConfig = (repositoryName: string, branch = 'main'): GitConfiguration =>
 
 const VERSION = SemVersion.tryCreate('1.2.3')._unsafeUnwrap();
 
+const CSHARP_CONFIGURATION = {
+  packageId: 'Acme.Payments.Sdk',
+  authors: 'Acme',
+  description: null,
+  title: null,
+  packageTags: null,
+  repositoryUrl: null,
+  repositoryType: null,
+  packageProjectUrl: null,
+  packageIcon: null,
+  packageReleaseNotes: null,
+  copyright: null
+} satisfies CSharpPackageConfiguration;
+
 describe('buildLanguageEntry', () => {
   describe('source', () => {
     it('resolves a repository name against GitHub', () => {
-      const result = buildLanguageEntry(
-        Language.CSHARP,
-        gitConfig('acme/acme-payments-csharp'),
-        undefined,
-        VERSION,
-        CodeGenerationVersion.V4
-      );
+      const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/acme-payments-csharp'), undefined, VERSION);
 
-      expect(result).to.deep.equal({
-        publishing: {
-          source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
-          package: undefined,
-          codegenVersion: 'v4'
-        }
+      expect(result.publishing?.source).to.deep.equal({
+        repositoryUrl: 'https://github.com/acme/acme-payments-csharp',
+        branch: 'main'
       });
     });
 
     it('omits the branch when the profile does not name one', () => {
-      const result = buildLanguageEntry(
-        Language.GO,
-        gitConfig('acme/sdk', ''),
-        undefined,
-        VERSION,
-        CodeGenerationVersion.V3
-      );
+      const result = buildLanguageEntry(Language.GO, gitConfig('acme/sdk', ''), undefined, VERSION);
 
       expect(result.publishing?.source?.branch).to.be.undefined;
     });
 
     it('omits the source when the profile has no git configuration', () => {
-      const result = buildLanguageEntry(Language.CSHARP, undefined, undefined, VERSION, CodeGenerationVersion.V3);
-
-      expect(result.publishing?.source).to.be.undefined;
+      expect(buildLanguageEntry(Language.CSHARP, undefined, undefined, VERSION).publishing?.source).to.be.undefined;
     });
 
     it('omits the source when the repository name is blank', () => {
-      const result = buildLanguageEntry(Language.CSHARP, gitConfig('   '), undefined, VERSION, CodeGenerationVersion.V3);
-
-      expect(result.publishing?.source).to.be.undefined;
+      expect(buildLanguageEntry(Language.CSHARP, gitConfig('   '), undefined, VERSION).publishing?.source).to.be
+        .undefined;
     });
   });
 
-  describe('package', () => {
-    // The profile configurations carry a dozen presentational fields the entry never reads.
-    const packageFor = <L extends Language>(language: L, configuration: object) =>
-      buildLanguageEntry(
-        language,
-        gitConfig('acme/sdk'),
-        configuration as PackageConfigurationForLanguage[L],
-        VERSION,
-        CodeGenerationVersion.V3
-      ).publishing?.package;
+  // The service reads the package's name out of the configuration, so it is written through as the
+  // profile holds it rather than picked apart into a name this CLI chose a shape for.
+  describe('package configuration', () => {
+    it('writes the profile configuration as it stands', () => {
+      const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), CSHARP_CONFIGURATION, VERSION);
 
-    it('names a C# package by its package id', () => {
-      expect(packageFor(Language.CSHARP, { packageId: 'Acme.Payments.Sdk' })).to.deep.equal({
-        packageId: 'Acme.Payments.Sdk',
-        version: '1.2.3'
-      });
+      expect(result.publishing?.packageConfiguration).to.deep.equal(CSHARP_CONFIGURATION);
     });
 
-    it('names a Java package by both halves of its coordinate', () => {
-      expect(packageFor(Language.JAVA, { groupId: 'io.acme', artifactId: 'acme-sdk' })).to.deep.equal({
-        groupId: 'io.acme',
-        artifactId: 'acme-sdk',
-        version: '1.2.3'
-      });
+    it('carries each language its own shape', () => {
+      const npm = { name: '@acme/sdk' } as PackageConfigurationForLanguage[Language.TYPESCRIPT];
+
+      const result = buildLanguageEntry(Language.TYPESCRIPT, gitConfig('acme/sdk'), npm, VERSION);
+
+      expect(result.publishing?.packageConfiguration).to.deep.equal(npm);
     });
 
-    it('names a PHP package by vendor and project', () => {
-      expect(packageFor(Language.PHP, { vendorName: 'acme', projectName: 'sdk' })).to.deep.equal({
-        vendorName: 'acme',
-        projectName: 'sdk',
-        version: '1.2.3'
-      });
-    });
+    // Written even when nothing was released: it says how the package is set up, not that one
+    // exists, and the service requires it beside any publishing block.
+    it('writes the configuration for a source-only publish', () => {
+      const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), CSHARP_CONFIGURATION, undefined);
 
-    it('names a Go package by its package name', () => {
-      expect(packageFor(Language.GO, { packageName: 'acmesdk' })).to.deep.equal({
-        packageName: 'acmesdk',
-        version: '1.2.3'
-      });
-    });
-
-    for (const language of [Language.TYPESCRIPT, Language.PYTHON, Language.RUBY]) {
-      it(`names a ${language} package by its single name`, () => {
-        expect(packageFor(language, { name: '@acme/sdk' })).to.deep.equal({ name: '@acme/sdk', version: '1.2.3' });
-      });
-    }
-
-    it('omits the package when the profile configures none', () => {
-      const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), undefined, VERSION, CodeGenerationVersion.V3);
-
+      expect(result.publishing?.packageConfiguration).to.deep.equal(CSHARP_CONFIGURATION);
       expect(result.publishing?.package).to.be.undefined;
     });
 
-    it('omits the package when the configuration is missing half its identity', () => {
-      expect(packageFor(Language.JAVA, { groupId: 'io.acme' })).to.be.undefined;
+    it('omits the configuration when the profile has none', () => {
+      const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), undefined, VERSION);
+
+      expect(result.publishing?.packageConfiguration).to.be.undefined;
+    });
+  });
+
+  // The version rides in `package`, which is all a release records: the name is in the
+  // configuration, so there is nothing else for it to carry.
+  describe('release', () => {
+    it('records the published version and nothing else', () => {
+      const result = buildLanguageEntry(Language.CSHARP, gitConfig('acme/sdk'), CSHARP_CONFIGURATION, VERSION);
+
+      expect(result.publishing?.package).to.deep.equal({ version: '1.2.3' });
+    });
+
+    it('records no release when nothing was published', () => {
+      const result = buildLanguageEntry(Language.PYTHON, gitConfig('acme/sdk'), undefined, undefined);
+
+      expect(result.publishing?.package).to.be.undefined;
     });
   });
 });

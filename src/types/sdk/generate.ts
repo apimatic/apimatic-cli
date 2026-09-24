@@ -1,23 +1,23 @@
-import { NonEmptyArray } from "../utils.js";
+import { NonEmptyArray } from '../utils.js';
 
 export enum Language {
-  CSHARP = "csharp",
-  JAVA = "java",
-  PHP = "php",
-  PYTHON = "python",
-  RUBY = "ruby",
-  TYPESCRIPT = "typescript",
-  GO = "go"
+  CSHARP = 'csharp',
+  JAVA = 'java',
+  PHP = 'php',
+  PYTHON = 'python',
+  RUBY = 'ruby',
+  TYPESCRIPT = 'typescript',
+  GO = 'go'
 }
 
 export enum CodeGenerationVersion {
-  V3 = "v3",
-  V4 = "v4"
+  V3 = 'v3',
+  V4 = 'v4'
 }
 
 export enum Stability {
-  STABLE = "stable",
-  BETA = "beta"
+  STABLE = 'stable',
+  BETA = 'beta'
 }
 
 const languageMap: { [key: number]: Language } = {
@@ -27,7 +27,7 @@ const languageMap: { [key: number]: Language } = {
   8: Language.PHP,
   16: Language.PYTHON,
   32: Language.RUBY,
-  128: Language.TYPESCRIPT,
+  128: Language.TYPESCRIPT
 };
 
 export function mapLanguages(languageFlag: number): Language[] {
@@ -43,22 +43,26 @@ export function mapLanguages(languageFlag: number): Language[] {
  * are selectable.
  */
 export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
-  { label: "Typescript", value: Language.TYPESCRIPT },
-  { label: "Ruby", value: Language.RUBY },
-  { label: "Python", value: Language.PYTHON },
-  { label: "Java", value: Language.JAVA },
-  { label: "C#", value: Language.CSHARP },
-  { label: "PHP", value: Language.PHP },
-  { label: "Go", value: Language.GO }
+  { label: 'Typescript', value: Language.TYPESCRIPT },
+  { label: 'Ruby', value: Language.RUBY },
+  { label: 'Python', value: Language.PYTHON },
+  { label: 'Java', value: Language.JAVA },
+  { label: 'C#', value: Language.CSHARP },
+  { label: 'PHP', value: Language.PHP },
+  { label: 'Go', value: Language.GO }
 ];
+
+// java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the config says.
+export const PLUGIN_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
+
+export function isPluginLanguage(language: string): language is Language {
+  return PLUGIN_LANGUAGES.includes(language as Language);
+}
 
 export class CodegenOption {
   public static readonly v3 = new CodegenOption(CodeGenerationVersion.V3, Stability.STABLE);
 
-  private constructor(
-    private readonly version: CodeGenerationVersion,
-    private readonly stability: Stability
-  ) {}
+  private constructor(private readonly version: CodeGenerationVersion, private readonly stability: Stability) {}
 
   public static create(version: CodeGenerationVersion, stability: Stability): CodegenOption {
     if (version === CodeGenerationVersion.V3) {

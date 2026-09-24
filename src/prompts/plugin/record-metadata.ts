@@ -15,6 +15,10 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 export type PluginMetadataResult = { metadata: PluginMetadata } | { cancelled: string };
 
 export class PluginRecordMetadataPrompts {
+  public metadataCancelled(reason: string) {
+    log.warn(`${reason}. Exiting without generating a plugin.`);
+  }
+
   public spinnerAccountInfo(fn: Promise<Result<SubscriptionInfo, ServiceError>>) {
     return withSpinner(
       'Retrieving your subscription info',

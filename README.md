@@ -31,10 +31,11 @@ Documentation portals are now built on your machine from a `src/` directory, and
   (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
   with every default spelled out, and the file's `$schema` lets your editor complete and check it.
 - A portal also needs the project's SDK languages, at least one, in the same file's
-  `languages` block, for example `"languages": { "typescript": {} }`. `sdk publish` adds to it,
-  and the context plugin reads it too, so name only the languages you ship. The same file
-  carries the plugin's identity in `plugin`; `src/plugin-config.json` is no longer read, so run
-  `plugin generate` and `sdk publish` again after upgrading and delete the old file.
+  `languages` block, for example `"languages": { "typescript": {} }`. `plugin generate` and
+  `sdk publish` both write to it, and the context plugin reads it too, so name only the languages
+  you ship. The same file carries the plugin's identity in `plugin`; `src/plugin-config.json` is
+  no longer read, so run `plugin generate` and `sdk publish` again after upgrading and delete the
+  old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
@@ -52,7 +53,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.3.1 win32-x64 node-v23.4.0
+@apimatic/cli/1.3.1 win32-x64 node-v24.19.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -252,7 +253,7 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46
 
 ## `apimatic plugin generate`
 
-Generate a context plugin for your published SDKs.
+Generate a context plugin for your SDKs.
 
 ```
 USAGE
@@ -266,10 +267,10 @@ FLAGS
   -k, --auth-key=<value>     override current authentication state with an authentication key.
 
 DESCRIPTION
-  Generate a context plugin for your published SDKs.
+  Generate a context plugin for your SDKs.
 
   Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
-  containing a `src` directory with an `apimatic.json`.
+  containing a `src` directory with your API specification — `apimatic.json` is created if it is not there.
 
 EXAMPLES
   apimatic plugin generate

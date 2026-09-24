@@ -1,11 +1,15 @@
+import { err } from 'neverthrow';
+import { ServiceError } from '../../infrastructure/service-error.js';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
+import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PluginConfigContext, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
+import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { PluginRecordMetadataAction } from './record-metadata.js';
@@ -13,6 +17,7 @@ import { PluginRecordMetadataAction } from './record-metadata.js';
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
   private readonly pluginService: PluginService = new PluginService();
+  private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -33,8 +38,7 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.exists())) {
+    if (!(await new BuildContext(buildDirectory).exists())) {
       this.prompts.srcDirectoryDoesNotExist(buildDirectory);
       return ActionResult.failed();
     }
@@ -46,64 +50,90 @@ export class PluginGenerateAction {
     }
 
     const configContext = new PluginConfigContext(buildDirectory);
-    let configState = await configContext.getPluginConfigState();
+    const configState = await configContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     }
 
-    if (configState.state === 'missing' || !configState.hasMetadata()) {
-      const metadataResult = await new PluginRecordMetadataAction(
-        this.configDir,
-        this.commandMetadata,
-        this.authKey
-      ).execute(buildDirectory);
-      if (metadataResult.isCancelled()) {
-        this.prompts.metadataCancelled(metadataResult.getMessage());
-        return ActionResult.cancelled();
-      }
-      if (!metadataResult.isSuccess()) {
-        return metadataResult.discardValue();
-      }
-      configState = metadataResult.getValue();
+    const identified =
+      configState.state === 'present' && configState.hasMetadata()
+        ? ActionResult.success(configState)
+        : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(
+            buildDirectory
+          );
+    if (!identified.isSuccess()) {
+      return identified.discardValue();
     }
 
-    if (!configState.hasPublishedSdks()) {
-      this.prompts.noPublishedSdks();
-      this.prompts.nextStepsPublishSdks();
-      return ActionResult.success();
+    const config = identified.getValue();
+    const selection = await this.prompts.selectLanguages(config);
+    if (!selection?.length) {
+      this.prompts.noLanguagesSelected();
+      return ActionResult.cancelled();
     }
 
-    // `src/` is zipped as it sits on disk, so a byte-order mark the reader above looked past
-    // would travel to a service that reads the file with its own parser. Done here rather than
-    // on the read: a run that stops short of the zip has no reason to rewrite the file.
-    const prepared = await configContext.removeByteOrderMark();
-    if (prepared.isErr()) {
-      this.prompts.configNotPrepared(prepared.error, buildDirectory);
+    this.prompts.languagesNotIncluded(config.unsupportedLanguages());
+
+    // Asked before the config is written, so a declined run leaves no language claimed in it.
+    const couldPublishInstead =
+      selection.some((language) => !config.publishedLanguages().includes(language)) &&
+      (
+        await this.prompts.checkPublishingProfiles(
+          this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell, this.authKey)
+        )
+      )
+        .andThen(PublishingProfiles.create)
+        .map((profiles) => profiles.getActiveProfiles().length > 0)
+        .unwrapOr(false);
+    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin())) {
+      this.prompts.localPluginCancelled();
+      return ActionResult.cancelled();
+    }
+
+    const recorded = await configContext.recordLanguages(selection);
+    if (recorded.isErr()) {
+      this.prompts.configNotPrepared(recorded.error, buildDirectory);
       return ActionResult.failed();
     }
 
-    return await withDirPath(async (tempDirectory) => {
-      const tempContext = new TempContext(tempDirectory);
-      const buildZipPath = await tempContext.zip(buildDirectory);
-
-      const response = await this.prompts.generatePlugin(
-        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
-      );
-
-      if (response.isErr()) {
-        this.prompts.pluginGenerationError(response.error.errorMessage);
-        return ActionResult.failed();
+    const generated = await withDirPath(async (tempDirectory) => {
+      const staged = await configContext.stageUpload(tempDirectory, selection);
+      if (staged.isErr()) {
+        return err(staged.error);
       }
 
-      const tempPluginZipPath = await tempContext.save(response.value);
-      await pluginContext.save(tempPluginZipPath);
+      const tempContext = new TempContext(tempDirectory);
+      const response = await this.prompts.generatePlugin(
+        this.pluginService.generatePlugin(
+          await tempContext.zip(staged.value),
+          this.configDir,
+          this.commandMetadata,
+          this.authKey
+        )
+      );
 
-      this.prompts.pluginGenerated(pluginDirectory);
-      this.prompts.tryPluginLocally(pluginDirectory);
-      this.prompts.nextStepsPublishPlugin();
-
-      return ActionResult.success();
+      return await response.asyncMap(async (stream) => pluginContext.save(await tempContext.save(stream)));
     });
+    if (generated.isErr()) {
+      this.reportGenerationProblem(generated.error, buildDirectory);
+      return ActionResult.failed();
+    }
+
+    this.prompts.installPluginLocally(pluginDirectory);
+    if (couldPublishInstead) {
+      this.prompts.previewOnly();
+    }
+
+    return ActionResult.success();
   };
+
+  /** A staging fault and a generation fault land here alike; only the wording differs. */
+  private readonly reportGenerationProblem = (
+    problem: ServiceError | PluginConfigWriteFailure,
+    buildDirectory: DirectoryPath
+  ) =>
+    typeof problem === 'string'
+      ? this.prompts.configNotPrepared(problem, buildDirectory)
+      : this.prompts.pluginGenerationError(problem.errorMessage);
 }

@@ -150,7 +150,7 @@ Rejected:
   published yet" is expressed — the state local plugin generation turns into a
   bundled SDK.
   `codegenVersion` stays, inside `publishing`, because the mismatch check
-  in `PluginConfigPresent.assertNoCodegenVersionMismatch` depends on it.
+  in `PluginConfig.assertNoCodegenVersionMismatch` depends on it.
   `packageConfiguration` and `source.repositoryType` from the design sketch are
   not modelled in this release. A hand-written file carrying `packageConfiguration`
   keeps it, because unknown fields in these blocks are preserved. A hand-written
@@ -233,7 +233,7 @@ Changed:
   of the `plugin` and `languages` blocks over `ApimaticConfigContext` on the
   same directory: `getPluginConfigState()`, `upsertMetadata()`,
   `upsertLanguage()` keep their signatures and results, and the JSON-level
-  checks it duplicated are gone. `PluginConfigPresent` is unchanged; it is
+  checks it duplicated are gone. `PluginConfig` is unchanged; it is
   constructed from `{ ...plugin, languages }`, which is the shape it already
   reads. `present` keeps meaning "the document parsed with nothing wrong in the
   plugin's blocks", never "the `plugin` block is there": a document without one
@@ -244,7 +244,7 @@ Changed:
   project that publishes SDKs before it builds a plugin.
 - `PluginConfigData` splits into `PluginIdentityData` (the `plugin` block, with
   the index signature) and the existing `PluginLanguages`; `PluginConfigData`
-  is the two together, which `PluginConfigPresent` judges. `PLUGIN_ID_PATTERN`
+  is the two together, which `PluginConfig` judges. `PLUGIN_ID_PATTERN`
   moves to `types/plugin/plugin-config.ts` so the document can use it without
   reaching into the context.
 - `PortalSourceContext` keeps its constructor and reads the document through
