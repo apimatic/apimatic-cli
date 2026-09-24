@@ -222,7 +222,7 @@ export class PortalSourceContext {
     for (const asset of config.staticFiles()) {
       const file = asset.resolveIn(this.sourceDirectory);
       const found = await this.spelledOnDisk(file);
-      if (found === null || found.toString() !== file.toString()) {
+      if (!found?.isEqual(file)) {
         missing.push({ setting: asset.settingPath(), file, foundAs: found });
       }
     }
