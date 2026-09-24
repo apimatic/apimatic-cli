@@ -320,8 +320,8 @@ const stylesheetOf = (output: DirectoryPath) => {
 });
 
 /**
- * A second portal, branded in every way the block allows at once, so one more build covers
- * the settings the default fixture leaves at their defaults: a primary colour, a forced
+ * A second portal, so one more build covers the brand and navigation settings the default
+ * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
  * colour mode and header links. Its specification has a deprecated and an internal operation,
  * and it has no content directory, so it also covers the fallback home page.
  */

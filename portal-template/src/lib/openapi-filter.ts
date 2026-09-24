@@ -9,7 +9,7 @@ const METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'tr
 type Json = Record<string, unknown>;
 
 /**
- * The operations marked `x-internal: true` left out. Filtering the document rather than the
+ * Leaves out the operations marked `x-internal: true`. Filtering the document rather than the
  * generated pages is what keeps one out of everything built from it: no page, no sidebar row,
  * no emptied tag folder, and no trace of it or its tag in another page's payload. Returns the
  * very document it was given when nothing is left out, and modifies nothing it was given.
