@@ -110,7 +110,8 @@ Rejected, with reasons:
   navbar rules and a fourth page type in the routes, for a CTA a button covers.
 - **Tinting accent, secondary and muted from the primary.** Hue and chroma math
   per preset, and it fights presets like `vitepress` and `ocean` that restyle
-  surfaces themselves. `advanced.tokens` is the escape hatch.
+  surfaces themselves. `advanced.tokens` was the escape hatch until section 15
+  cut it.
 - **Free-text Google Fonts family names.** A typo only shows as a fallback font
   at runtime, and the weight axis differs per family so the URL cannot be
   derived reliably.
@@ -319,8 +320,8 @@ hook), and regroups the children into one `Folder` per tab with `root: true`:
 - Every portal has at least Home and API, so there is always a tab switcher.
   The single-tab inlining rule of the 2026-09-21 draft is dropped.
 
-The switcher renders in the top bar for `notebook-navbar`, and as a dropdown at
-the top of the sidebar for the other three layouts. `nav.json` edits reload
+The switcher renders in the top bar, the notebook layout's `navbar` mode, which
+is the one layout since section 15. `nav.json` edits reload
 under `portal serve` as they do today, tabs included, with no config watcher.
 
 ### Validation (CLI, `PortalNavigation`)
@@ -756,7 +757,8 @@ verified to build 22 pages with this branch's CLI.
   `{`, `}` or `/*` would reach past its declaration. *Added in step 3:* the
   parser and the schema refuse those. *As reviewed:* not enough; see the
   token row of section 3. `portal-stylesheet.test.ts` now compiles the
-  generated file through Tailwind for every preset.
+  generated file through Tailwind for every preset. *Moot since section 15:*
+  no token is written, and the test compiles against the neutral theme alone.
 - A bundled document handed back to `createOpenAPI` as a document object
   round-trips: `x-ext` references stay resolvable and the pages match those the
   file-path server produced for an unfiltered spec. *Verified in step 5* by
@@ -774,11 +776,13 @@ verified to build 22 pages with this branch's CLI.
 - The client bundle carries `portal.identity.json` whole and nothing else from
   the CLI-written files.
 - Bundle delta from importing all four layouts statically. *Measured in step
-  3:* about 38 KB of script, 8 KB gzipped, over notebook alone.
+  3:* about 38 KB of script, 8 KB gzipped, over notebook alone. *Moot since
+  section 15:* only notebook is imported.
 - The Google Fonts weight axis for each shortlisted family; the CSS2 URL
-  differs between variable fonts (`wght@100..900`) and static ones.
+  differs between variable fonts (`wght@100..900`) and static ones. *Moot
+  since section 15:* only Geist and Geist Mono load, both variable.
 - A `full` OpenAPI page under the glass layout. *Verified in step 3* in
-  headless Chrome.
+  headless Chrome. *Moot since section 15.*
 - The watcher's comparison must be on the resolved config, not the file text:
   the plugin writers re-serialise the whole file, so a text diff would re-apply
   on every `sdk publish`. *Done in step 6* by comparing the generated files'
@@ -823,6 +827,10 @@ plans are implemented.
   `portal.ts` becomes a JSON import.
 - Section 9: the Google Fonts risk now covers a shortlist and has a `system`
   opt-out.
+
+*2026-09-24:* the cuts of section 15 are recorded as second dated amendments in
+`fumadocs-portal.md` sections 3, 4 and 9, and in the release notes of
+`apimatic-config.md` section 13.
 
 ## 14. What changed from the 2026-09-21 draft
 
