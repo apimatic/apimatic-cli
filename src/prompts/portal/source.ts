@@ -14,7 +14,7 @@ import { format as f } from '../format.js';
 export function reportSourceProblem(
   problem: PortalSourceProblem,
   sourceDirectory: DirectoryPath,
-  offerQuickstart = true
+  { offerQuickstart = true }: { offerQuickstart?: boolean } = {}
 ): void {
   const quickstart = `Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`;
   switch (problem.kind) {
