@@ -17,7 +17,7 @@ export function reportUnsampledSpecs(fileNames: FileName[]): void {
     return;
   }
   const names = fileNames.map((fileName) => f.var(fileName.toString())).join(', ');
-  log.warn(`${names} refers to files outside ${f.var('spec')}, so its reference pages are built without code samples.`);
+  log.warn(`Code samples are left off the reference pages of ${names}, since their $refs reach outside ${f.var('spec')}.`);
 }
 
 export function reportUnplacedSamples(endpoints: string[]): void {
