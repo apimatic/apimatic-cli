@@ -58,6 +58,7 @@
         "@oclif/core": "^4.2.8",
         "@oclif/plugin-autocomplete": "^3.2.24",
         "@oclif/plugin-help": "^6.2.26",
+        "@scalar/json-magic": "0.13.4",
         "@tailwindcss/vite": "4.3.3",
         "@tanstack/react-router": "1.170.33",
         "@tanstack/react-start": "1.168.50",
