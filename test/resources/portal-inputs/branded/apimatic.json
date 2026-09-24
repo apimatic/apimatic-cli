@@ -12,7 +12,6 @@
     "navigation": {
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
     },
-    "home": { "cta": { "label": "Browse the pets", "url": "/api/pets/pets/listPets" } },
     "api": { "showDeprecated": false }
   },
   "languages": { "typescript": {} }

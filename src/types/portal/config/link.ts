@@ -6,7 +6,7 @@ const KNOWN = ['label', 'url'];
 /** Stands in for the portal's own address, which is not known here; `.invalid` never resolves (RFC 6761). */
 const PORTAL_ORIGIN = 'https://portal.invalid';
 
-/** A labelled link in the portal's chrome: a header link, or the home page's call to action. */
+/** A labelled link in the portal's header. */
 export class Link {
   private constructor(
     private readonly label: string,

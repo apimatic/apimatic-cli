@@ -918,15 +918,7 @@ describe('PortalSourceContext', () => {
       expect(written.$schema).to.equal(APIMATIC_SCHEMA_URL);
       expect(written.schemaVersion).to.equal(1);
       expect(written.portal.site).to.deep.equal({ name: 'Petstore', description: 'All the pets.' });
-      expect(Object.keys(written.portal)).to.deep.equal([
-        'site',
-        'brand',
-        'navigation',
-        'home',
-        'api',
-        'ai',
-        'advanced'
-      ]);
+      expect(Object.keys(written.portal)).to.deep.equal(['site', 'brand', 'navigation', 'api', 'ai', 'advanced']);
       expect(read('apimatic.json').endsWith('\n')).to.be.true;
     });
 

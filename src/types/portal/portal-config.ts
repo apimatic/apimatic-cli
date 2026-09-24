@@ -5,7 +5,6 @@ import { AiConfig } from './config/ai-config.js';
 import { ApiConfig } from './config/api-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, isJsonObject, unknownKeys } from './config/fields.js';
-import { HomeConfig } from './config/home-config.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
@@ -34,21 +33,19 @@ export interface PortalIdentity {
   favicon: { url: string; type: string | null } | null;
   colorMode: ColorMode;
   links: PortalLink[];
-  homeCta: PortalLink | null;
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
 }
 
 const BLOCK = 'portal';
 
-const NAMESPACES = ['site', 'brand', 'navigation', 'home', 'api', 'ai', 'advanced'];
+const NAMESPACES = ['site', 'brand', 'navigation', 'api', 'ai', 'advanced'];
 
 export class PortalConfig {
   private constructor(
     private readonly site: SiteConfig,
     private readonly brand: BrandConfig,
     private readonly navigation: NavigationConfig,
-    private readonly home: HomeConfig,
     private readonly api: ApiConfig,
     private readonly ai: AiConfig,
     private readonly advanced: AdvancedTokens
@@ -60,7 +57,6 @@ export class PortalConfig {
       SiteConfig.suggested(site),
       BrandConfig.defaults,
       NavigationConfig.defaults,
-      HomeConfig.defaults,
       ApiConfig.defaults,
       AiConfig.defaults,
       AdvancedTokens.defaults
@@ -88,7 +84,6 @@ export class PortalConfig {
         SiteConfig.parse(block.site, `${BLOCK}.site`, suggested),
         BrandConfig.parse(block.brand, `${BLOCK}.brand`),
         NavigationConfig.parse(block.navigation, `${BLOCK}.navigation`),
-        HomeConfig.parse(block.home, `${BLOCK}.home`),
         ApiConfig.parse(block.api, `${BLOCK}.api`),
         AiConfig.parse(block.ai, `${BLOCK}.ai`),
         AdvancedTokens.parse(block.advanced, `${BLOCK}.advanced`)
@@ -116,10 +111,6 @@ export class PortalConfig {
     return this.navigation;
   }
 
-  public homeSettings(): HomeConfig {
-    return this.home;
-  }
-
   public apiSettings(): ApiConfig {
     return this.api;
   }
@@ -140,7 +131,6 @@ export class PortalConfig {
     const origin = this.site.origin();
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
-    const cta = this.home.callToAction();
     return {
       name: this.site.siteName(),
       description: this.site.siteDescription(),
@@ -149,7 +139,6 @@ export class PortalConfig {
       favicon: favicon === null ? null : { url: favicon.siteUrl(), type: favicon.imageType() },
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
-      homeCta: cta === null ? null : portalLink(cta),
       pageActions: this.ai.offersPageActions()
     };
   }
@@ -160,7 +149,6 @@ export class PortalConfig {
       site: this.site.toJSON(),
       brand: this.brand.toJSON(),
       navigation: this.navigation.toJSON(),
-      home: this.home.toJSON(),
       api: this.api.toJSON(),
       ai: this.ai.toJSON(),
       advanced: this.advanced.toJSON()
@@ -176,7 +164,6 @@ export interface PortalBlock {
   site: ReturnType<SiteConfig['toJSON']>;
   brand: ReturnType<BrandConfig['toJSON']>;
   navigation: ReturnType<NavigationConfig['toJSON']>;
-  home: ReturnType<HomeConfig['toJSON']>;
   api: ReturnType<ApiConfig['toJSON']>;
   ai: ReturnType<AiConfig['toJSON']>;
   advanced: ReturnType<AdvancedTokens['toJSON']>;

@@ -68,7 +68,7 @@ Delivered as **one PR** (section 11).
 | Content tabs | A folder directly under `content/` becomes its own tab when its own `nav.json` sets `"root": true` — Fumadocs' own key for the same thing. Otherwise it stays a group in the Guides sidebar. |
 | Tab labels | Fixed for the three tabs no folder backs: "Home", "Guides", "SDKs". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. Only root-level tabs are affected; nothing nested changes. |
 | Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. |
-| Home | `content/index.md` rendered in the docs layout, in its own Home tab, with an optional CTA under the title from `portal.home.cta`. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. |
+| Home | `content/index.md` rendered in the docs layout, in its own Home tab. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. |
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
 | Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. Fumadocs' neutral theme supplies every other token (section 15). |
@@ -148,7 +148,6 @@ Rejected, with reasons:
     "navigation": {
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
     },
-    "home": { "cta": { "label": "Get an API key", "url": "/authentication" } },
     "api": { "groupBy": "tag", "showDeprecated": true, "showInternal": false },
     "ai": { "pageActions": true },
     "advanced": { "tokens": { "light": {}, "dark": {} } }
@@ -183,7 +182,6 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.brand.colors.primary` | colour or `{light, dark}` | the theme's | A string sets both modes. `#rgb` or `#rrggbb`, per section 2. |
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
 | `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. *As reviewed:* a path is resolved as a browser resolves it and refused when that leaves the site (`/\host`, a tab after the slash), and written as resolved; an absolute URL must carry its `//`, since a browser reads `https:example.com` on an https site as a path of that site. |
-| `portal.home.cta` | `{label, url}` | none | Rendered under the title of the home page, including the fallback home. `label` and `url` follow the `links` rules. |
 | `portal.api.groupBy` | enum | `tag` | `tag`, `route`, `none`; Fumadocs' own values. Changes operation URLs: `tag` yields `/api/<spec>/<tag>/<operation>`, `route` `/api/<spec>/<path>/<method>`, `none` `/api/<spec>/<operation>`. |
 | `portal.api.showDeprecated` | boolean | `true` | `true` keeps deprecated operations, struck through in the sidebar as Fumadocs already renders them. |
 | `portal.api.showInternal` | boolean | `false` | Operations carrying `x-internal: true`. |
@@ -206,7 +204,7 @@ that addresses the build machine stays in `portal.config.json` behind
 
 Browser identity: `name`, `description`, `siteUrl`, `logo` (`{light, dark}` or
 null, the same URL twice for one image), `favicon` (`{url, type}` or null, the
-type from the extension), `colorMode`, `links` and `homeCta` (each `{label, url, external}`),
+type from the extension), `colorMode`, `links` (each `{label, url, external}`),
 `pageActions`. Tabs are not in it: they come from the page tree, which already
 carries `nav.json`.
 
@@ -226,7 +224,6 @@ content-directory `@source` line prepare already substitutes.
 | `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the theme's `.dark` block and comes later, so a light-only value would win in dark mode. |
 | `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
 | `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
-| `home.cta` | `$.tsx` | An anchor styled with `buttonVariants` from `fumadocs-ui/components/ui/button`, under the title of the index page and of the fallback home alike. |
 | `api.*` | `openapi-section.server.ts` | `groupBy` passes through to `staticSource`; the two `show*` flags filter the bundled document (section 7). |
 | `ai.pageActions` | `$.tsx` | As today. |
 | `advanced.tokens` | `theme.css` | Appended to the same `:root:not(.dark)` / `.dark` blocks after the primary, so a light-only token never reaches dark mode. *As reviewed:* each block also names `#nd-sidebar`, the id every layout gives the sidebar, because neutral (dark), catppuccin and vitepress set `muted`, `secondary` and `muted-foreground` there, and an id outranks a rule for the mode alone. `dusk` and `vitepress` also set the sidebar's `background-color` directly, which no token reaches. |
@@ -378,7 +375,7 @@ under `portal serve` as they do today, tabs included, with no config watcher.
   Geist, in place of `app.css`'s `@import`, so it loads alongside the
   stylesheet; `RootProvider` theme props from `colorMode`.
 - **`layout.shared.tsx`**: two logos, `links`, `themeSwitch.enabled`.
-- **`$.tsx`**: the notebook layout's page components; the Home CTA.
+- **`$.tsx`**: the notebook layout's page components.
 - **`src/lib/openapi-section.server.ts`**: already the one place both
   `openapi.server.ts` and `prerender-pages.ts` build a section from. It takes the
   `api` options, bundles, filters (section 7) and calls `staticSource` with the
@@ -453,7 +450,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 
 - **Types.** `PortalConfig` becomes the root of nested value objects, one per
   namespace: `SiteConfig`, `BrandConfig` (holding `Logo` and `BrandColors`),
-  `NavigationConfig`, `HomeConfig`, `ApiConfig`, `AiConfig`,
+  `NavigationConfig`, `ApiConfig`, `AiConfig`,
   `AdvancedTokens`. Each parses its own subtree and returns errors with dotted
   paths; `PortalConfig.fromBlock` concatenates them. One helper, `Color`: parse
   the accepted formats, relative luminance, WCAG contrast ratio, foreground
@@ -523,7 +520,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 - **Quickstart.** `scaffold` writes, through `ApimaticConfigContext.merge`,
   `$schema`, `schemaVersion` and a populated `portal` block: the derived `site`
   fields and every brand, navigation, API and AI default spelled out.
-  `site.url` stays absent and the closing note names it; `home.cta` stays absent.
+  `site.url` stays absent and the closing note names it.
   `PortalConfig.toJSON`'s "minimal" rule goes with it. No `languages` block is
   written: the user adds it by hand, so the action stops after the scaffold
   rather than serving a project that cannot validate (decided 2026-09-23,
@@ -570,7 +567,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 
 - Value objects: every key's accepted and rejected forms, unknown keys at every
   level reported by dotted path, a flat `dev` key such as `title` reported as
-  unknown with no hint, colour formats, link and CTA URLs (absolute
+  unknown with no hint, colour formats, link URLs (absolute
   `https:`, site-relative `/x` accepted; `mailto:`, `docs/x`, `javascript:`
   refused), token keys (`--color-fd-accent` accepted; `accent` and
   `--color-fd-info` refused).
@@ -720,7 +717,7 @@ files the plugin and publishing commands create do not carry it, which keeps
 this PR to the portal. `PortalServeAction.execute` loses its `onAfterServe`
 hook, which only quickstart used; the language-step PR brings it back with the
 serve call. The e2e cases share one extra build: a `branded` fixture that sets
-forced dark, a primary, a header link and a CTA, and
+forced dark, a primary and a header link, and
 hides a deprecated and an internal operation. It has no content directory, so it
 also covers the fallback home page and its Home tab. The sample repository's
 `v2` change is branch `saeedjamshaid/portal-config` in
@@ -899,3 +896,7 @@ none of them has shipped.
   setting seldom delivered one, and each family's weight axis had to be checked
   by hand against Google, where one wrong entry fails the whole font request.
   The identity loses `fontsUrl`, and `theme.css` its `@theme` block.
+- **`home.cta`** is gone, and the `home` namespace with it; no home page has a
+  button under its title, which was the default. A portal that wants a landing
+  page writes `content/index.md`, which can link wherever it likes. The
+  identity loses `homeCta`.

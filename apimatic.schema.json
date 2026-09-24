@@ -196,20 +196,6 @@
             }
           }
         },
-        "home": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "cta": {
-              "allOf": [
-                {
-                  "$ref": "#/definitions/link"
-                }
-              ],
-              "description": "A button under the home page's title."
-            }
-          }
-        },
         "api": {
           "type": "object",
           "additionalProperties": false,

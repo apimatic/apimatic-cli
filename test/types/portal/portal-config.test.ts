@@ -37,7 +37,6 @@ describe('PortalConfig', () => {
       expect(portal.brandSettings().brandColors().primaryColors()).to.be.null;
       expect(portal.brandSettings().mode()).to.equal('both');
       expect(portal.navigationSettings().headerLinks()).to.be.empty;
-      expect(portal.homeSettings().callToAction()).to.be.null;
       expect(portal.apiSettings().grouping()).to.equal('tag');
       expect(portal.apiSettings().showsDeprecated()).to.be.true;
       expect(portal.apiSettings().showsInternal()).to.be.false;
@@ -379,27 +378,6 @@ describe('PortalConfig', () => {
     });
   });
 
-  describe('home', () => {
-    it('takes a call to action under the same rules as a header link', () => {
-      const cta = config({ home: { cta: { label: 'Get a key', url: '/authentication' } } })
-        .homeSettings()
-        .callToAction();
-
-      expect(cta?.href()).to.equal('/authentication');
-      expect(errorsOf({ home: { cta: { label: 'Get a key', url: 'authentication' } } })).to.have.lengthOf(1);
-      expect(errorsOf({ home: { cta: 'Get a key', hero: true } })).to.deep.equal([
-        "'portal.home.hero' is not a 'portal' setting.",
-        "'portal.home.cta' must be a JSON object with 'label' and 'url'."
-      ]);
-    });
-
-    it('serialises a call to action back as plain data', () => {
-      expect(config({ home: { cta: { label: 'Start', url: '/start' } } }).toJSON().home).to.deep.equal({
-        cta: { label: 'Start', url: '/start' }
-      });
-    });
-  });
-
   describe('api', () => {
     it('takes Fumadocs’ grouping values and the two filters', () => {
       const api = config({ api: { groupBy: 'route', showDeprecated: false, showInternal: true } }).apiSettings();
@@ -514,7 +492,6 @@ describe('PortalConfig', () => {
             { label: 'Changelog', url: '/changelog' }
           ]
         },
-        home: { cta: { label: 'Get a key', url: '/authentication' } },
         ai: { pageActions: false }
       });
 
@@ -529,7 +506,6 @@ describe('PortalConfig', () => {
           { label: 'Status', url: 'https://status.example.com', external: true },
           { label: 'Changelog', url: '/changelog', external: false }
         ],
-        homeCta: { label: 'Get a key', url: '/authentication', external: false },
         pageActions: false
       });
     });
@@ -543,7 +519,6 @@ describe('PortalConfig', () => {
         favicon: null,
         colorMode: 'both',
         links: [],
-        homeCta: null,
         pageActions: true
       });
     });
@@ -582,7 +557,6 @@ describe('PortalConfig', () => {
         site: { name: 'Spec Title', description: 'What the spec says.' },
         brand: { colors: {}, colorMode: 'both' },
         navigation: { links: [] },
-        home: {},
         api: { groupBy: 'tag', showDeprecated: true, showInternal: false },
         ai: { pageActions: true },
         advanced: { tokens: { light: {}, dark: {} } }
@@ -606,7 +580,6 @@ describe('PortalConfig', () => {
           colorMode: 'light'
         },
         navigation: { links: [{ label: 'Status', url: 'https://status.test' }] },
-        home: { cta: { label: 'Start', url: '/start' } },
         api: { groupBy: 'none', showDeprecated: false, showInternal: true },
         ai: { pageActions: false },
         advanced: { tokens: { light: { '--color-fd-accent': '#eee' }, dark: {} } }

@@ -6,9 +6,7 @@ import { PortalLayout } from '@/lib/layout';
 import { getPageMarkdownUrl } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
-import Link from 'fumadocs-core/link';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
-import { buttonVariants } from 'fumadocs-ui/components/ui/button';
 import {
   DocsBody,
   DocsDescription,
@@ -90,8 +88,7 @@ const serverLoader = createServerFn({
       title: page.data.title,
       description: page.data.description ?? null,
       path: page.path,
-      markdownUrl: getPageMarkdownUrl(page).url,
-      isHome: slugs.length === 0
+      markdownUrl: getPageMarkdownUrl(page).url
     };
   });
 
@@ -119,7 +116,7 @@ async function loadPage(slugs: string[]) {
   }
 }
 
-function Content({ path, markdownUrl, isHome }: Readonly<{ path: string; markdownUrl: string; isHome: boolean }>) {
+function Content({ path, markdownUrl }: Readonly<{ path: string; markdownUrl: string }>) {
   const page = docs.getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
 
@@ -130,7 +127,6 @@ function Content({ path, markdownUrl, isHome }: Readonly<{ path: string; markdow
     <DocsPage toc={toc}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
-      {isHome ? <HomeCallToAction /> : null}
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
@@ -149,24 +145,10 @@ function Home({ title, description }: Readonly<{ title: string; description: str
     <DocsPage>
       <DocsTitle>{title}</DocsTitle>
       {description ? <DocsDescription>{description}</DocsDescription> : null}
-      <HomeCallToAction />
       <DocsBody>
         <p>Use the navigation to browse the API reference and guides.</p>
       </DocsBody>
     </DocsPage>
-  );
-}
-
-function HomeCallToAction() {
-  const cta = portal.homeCta;
-  if (!cta) return null;
-  return (
-    // Tucked under the description as the page actions are, so the title block reads as one.
-    <div className="-mt-4 mb-8">
-      <Link href={cta.url} external={cta.external} className={buttonVariants({ variant: 'primary' })}>
-        {cta.label}
-      </Link>
-    </div>
   );
 }
 
@@ -190,7 +172,7 @@ function Page() {
   } else {
     content = (
       <Suspense>
-        <Content path={page.path} markdownUrl={page.markdownUrl} isHome={page.isHome} />
+        <Content path={page.path} markdownUrl={page.markdownUrl} />
       </Suspense>
     );
   }

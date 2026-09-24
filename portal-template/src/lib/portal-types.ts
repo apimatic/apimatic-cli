@@ -31,7 +31,6 @@ export interface Portal {
   favicon: PortalFavicon | null;
   colorMode: PortalColorMode;
   links: PortalLink[];
-  homeCta: PortalLink | null;
   /** Whether each page offers to open itself in an external AI assistant. */
   pageActions: boolean;
 }

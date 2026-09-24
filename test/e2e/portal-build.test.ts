@@ -322,8 +322,8 @@ const stylesheetOf = (output: DirectoryPath) => {
 /**
  * A second portal, branded in every way the block allows at once, so one more build covers
  * the settings the default fixture leaves at their defaults: a primary colour, a forced
- * colour mode, header links, a call to action on the fallback home page, and a reference that
- * leaves its deprecated and internal operations out.
+ * colour mode, header links, and a reference that leaves its deprecated and internal
+ * operations out. It has no content directory, so it also covers the fallback home page.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -382,16 +382,13 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(page).to.not.contain('aria-label="Toggle Theme"');
   });
 
-  // The API tab and the sidebar link to the same operation, so the button is matched by its
-  // label as well as its address.
-  it('builds a home page without an index page, with the call to action and a tab of its own', () => {
+  it('builds a home page without an index page, with the header link and a tab of its own', () => {
     const page = read('index.html');
     const tree = fs
       .readdirSync(path.join(output.toString(), '__tsr/staticServerFnCache'))
       .map((name) => fs.readFileSync(path.join(output.toString(), '__tsr/staticServerFnCache', name), 'utf8'))
       .find((text) => text.includes('"pageTree"'));
 
-    expect(page).to.match(/<a [^>]*href="\/api\/pets\/pets\/listPets"[^>]*>Browse the pets<\/a>/);
     expect(page).to.contain('href="https://status.example.com"');
     expect(tree, 'no page tree').to.not.be.undefined;
     expect(tree).to.contain('/tab/home');

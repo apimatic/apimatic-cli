@@ -103,7 +103,6 @@ describe('apimatic.schema.json', () => {
               { label: 'Home', url: '/' }
             ]
           },
-          home: { cta: { label: 'Start', url: '/start' } },
           api: { groupBy: 'none', showDeprecated: false, showInternal: true },
           ai: { pageActions: false },
           advanced: { tokens: { light: { '--color-fd-accent': '#eee' }, dark: {} } }
@@ -185,8 +184,6 @@ describe('apimatic.schema.json', () => {
       ['an empty link', { navigation: { links: [{ label: 'x', url: '' }] } }],
       ['a blank link label', { navigation: { links: [{ label: ' ', url: '/' }] } }],
       ['a link with an unknown key', { navigation: { links: [{ label: 'x', url: '/', icon: 'x' }] } }],
-      ['a call to action that is a string', { home: { cta: 'Start' } }],
-      ['an unknown home key', { home: { hero: true } }],
       ['an unknown grouping', { api: { groupBy: 'path' } }],
       ['a filter that is not a boolean', { api: { showDeprecated: 'no' } }],
       ['an inverted filter name', { api: { hideInternal: true } }],
