@@ -172,6 +172,25 @@ describe('bundleSpecification', () => {
     });
   });
 
+  it('stops following a chain of schema files that loops', async () => {
+    write('Pet.yaml', { $ref: './Animal.yaml' });
+    write('Animal.yaml', { $ref: './Being.yaml' });
+    write('Being.yaml', { $ref: './Animal.yaml' });
+    const file = write('openapi.yaml', {
+      openapi: '3.1.0',
+      info,
+      paths: { '/pets': { get: operation({ $ref: './Pet.yaml' }) } }
+    });
+
+    const document: any = await bundleSpecification(file);
+
+    expect(document.components.schemas).to.deep.equal({
+      Pet: { $ref: '#/components/schemas/Animal' },
+      Animal: { $ref: '#/components/schemas/Being' },
+      Being: { $ref: '#/components/schemas/Animal' }
+    });
+  });
+
   it('names a schema after a file whose name is not ASCII', async () => {
     write('宠物.yaml', { type: 'object' });
     const file = write('openapi.yaml', {

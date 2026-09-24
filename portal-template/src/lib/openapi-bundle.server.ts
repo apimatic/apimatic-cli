@@ -137,7 +137,7 @@ function hoistSchemas(document: JsonObject, locations: Record<string, string>): 
   if (!isJsonObject(externals)) return;
 
   const { references, targets } = collectReferences(document);
-  addPassedOnSchemas(document, targets);
+  for (const [target, segments] of passedOnSchemas(document, targets)) targets.set(target, segments);
   if (targets.size === 0) return;
 
   rewriteReferences(references, placeSchemas(document, targets, locations));
@@ -205,14 +205,16 @@ function isNamedMap(path: string[]): boolean {
 
 // A schema file that is nothing but a reference makes what it names a schema too, though
 // nothing may reference that from a schema position itself.
-function addPassedOnSchemas(document: JsonObject, targets: Map<string, string[]>): void {
-  for (const segments of [...targets.values()]) {
+function passedOnSchemas(document: JsonObject, targets: Map<string, string[]>): Map<string, string[]> {
+  const found = new Map<string, string[]>();
+  for (const segments of targets.values()) {
     let next = passedOn(document, segments);
-    while (next && !targets.has(key(next))) {
-      targets.set(key(next), next);
+    while (next && !targets.has(key(next)) && !found.has(key(next))) {
+      found.set(key(next), next);
       next = passedOn(document, next);
     }
   }
+  return found;
 }
 
 function passedOn(document: JsonObject, segments: string[]): string[] | undefined {
