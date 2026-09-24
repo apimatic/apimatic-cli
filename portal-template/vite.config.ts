@@ -48,7 +48,14 @@ export default defineConfig(async () => {
         { find: 'tslib', replacement: 'tslib/tslib.es6.js' },
         // Anchored, so `shiki/core` and the per-language modules the replacement itself
         // imports still resolve to the real package. See `src/lib/shiki-bundle.ts`.
-        { find: /^shiki$/, replacement: fileURLToPath(new URL('./src/lib/shiki-bundle.ts', import.meta.url)) }
+        { find: /^shiki$/, replacement: fileURLToPath(new URL('./src/lib/shiki-bundle.ts', import.meta.url)) },
+        // The package does not export it. See `src/lib/fumadocs-openapi-encode.d.ts`.
+        {
+          find: 'fumadocs-openapi/encode',
+          replacement: fileURLToPath(
+            new URL('./node_modules/fumadocs-openapi/dist/requests/media/encode.js', import.meta.url)
+          )
+        }
       ]
     }
   };

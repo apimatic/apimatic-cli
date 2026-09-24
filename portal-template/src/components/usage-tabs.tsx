@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { encodeRequestData } from 'fumadocs-openapi/encode';
 import { CodeBlockTab, CodeBlockTabs, CodeBlockTabsList, CodeBlockTabsTrigger } from 'fumadocs-ui/components/codeblock';
 import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock.core';
 import { useOperationContext, useRenderContext, useServerContext } from 'fumadocs-openapi/ui';
 import { pathnameFromRequest, type CodeUsageGenerator } from 'fumadocs-openapi/requests/generators';
 import { joinURL, resolveServerUrl } from '@fumadocs/api-docs/utils/url';
 import { CodeSample } from '@/lib/code-samples';
+import { Parameter, requestExamples } from '@/lib/request-examples';
 
 interface UsageTab {
   id: string;
@@ -78,22 +80,30 @@ function CodeBlock({ lang, code }: Readonly<{ lang: string; code: string }>) {
   return <DynamicCodeBlock lang={lang} code={code} highlighter={() => shiki.getOrInit()} options={shikiOptions} />;
 }
 
-function useOperation(): unknown {
+function usePathItem() {
   const { schema } = useRenderContext();
-  const { route, examples } = useOperationContext();
-  return schema.resolve(schema.dereferenced.paths?.[route])?.[examples[0].data.method];
+  const { route } = useOperationContext();
+  return schema.resolve(schema.dereferenced.paths?.[route]);
+}
+
+function useOperation(): unknown {
+  const { examples } = useOperationContext();
+  return usePathItem()?.[examples[0].data.method];
 }
 
 function useSelectedRequest() {
-  const { examples, example, addListener, removeListener } = useOperationContext();
-  const [request, setRequest] = useState(() => examples.find((item) => item.id === example)?.encoded);
-
-  useEffect(() => {
-    const listener = (_: unknown, encoded: typeof request) => setRequest(encoded);
-    addListener(listener);
-    return () => removeListener(listener);
-  }, [addListener, removeListener]);
-  return request;
+  const { mediaAdapters } = useRenderContext();
+  const { examples, example } = useOperationContext();
+  const parameters = Parameter.listIn(useOperation(), usePathItem());
+  const selected = requestExamples(examples, parameters).find((item) => item.id === example);
+  return (
+    selected &&
+    encodeRequestData(
+      selected.data,
+      mediaAdapters,
+      parameters.map((parameter) => parameter.definition)
+    )
+  );
 }
 
 function useServerUrl(): string {
