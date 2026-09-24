@@ -78,7 +78,7 @@ either can be added later without rework.
 | Format owner | APIMatic. The CLI validates; the template applies. Fumadocs never interprets the file. |
 | File name | `nav.json`, one per content directory. Not `meta.json`, and not `toc.json` (that name was just retired with `toc.yml`). |
 | Shape | A `pages` array of strings. |
-| Tokens | `apimatic:pages` for the injected pages, `apimatic:api` for the API reference. (Amended 2026-09-23: `apimatic:pages` is now `apimatic:sdks`.) |
+| Tokens | `apimatic:pages` for the injected pages, `apimatic:api` for the API reference. (Amended 2026-09-23: `apimatic:pages` is now `apimatic:sdks`.) (Amended 2026-09-24, `.ai/plans/generated-pages.md`: `apimatic:sdks` positions the SDKs folder alone, and `apimatic:plugin` joins it for the context plugin's.) |
 | Where the order is applied | A page-tree transformer in the template. Nothing is written into the user's `src/`, and nothing is generated into the build project. |
 | Metadata collection | Restricted to `**/nav.json`, so no other JSON in the content directory is loaded (section 5). |
 | Scope of control | Content pages, the injected pages, the API reference as one unit. No operation-level ordering. |
@@ -160,6 +160,13 @@ in the `nav.json` of a folder directly under `content/` other than
 `content/api/`; `true` makes that folder a tab of its own. The root file's
 order now also orders the tabs.
 
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 2 and 5): the
+generated pages are two folders, each a tab of its own, and each token claims
+one of them rather than every injected page. `apimatic:sdks` positions the SDKs
+folder, served at `/sdks`, and a third token, `apimatic:plugin`, positions the
+context plugin's, served at `/context-plugin`. Both are accepted in the content
+root's file whether or not their folder exists, and refused anywhere else.
+
 Errors are collected and reported together, in the style of
 `PortalConfig.parse`, through the existing `invalidConfig` problem kind. The
 CLI validates in `PortalSourceContext.resolve()`, which runs before
@@ -214,6 +221,16 @@ build fails, naming both files.
 One thing still to verify before this is locked: that two `defineDocs` calls
 coexist in one template. It is a short check against the existing template, not
 a spike.
+
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`): implemented as two
+folders, `generated/sdks/` and `generated/context-plugin/`, compiled over the
+relative literal `'generated'` rather than a second placeholder: the literal is
+embedded in the browser bundle, and an absolute one would publish the build
+directory. The `childNames` problem above is answered by reserving `/sdks` and
+`/context-plugin` for the CLI rather than adding the names: a content page that
+would be served at either is refused by `PortalSourceContext.resolve()`, naming
+each file, and an entry naming either folder is refused with its token as the
+hint.
 
 ## 5. How the order is applied
 
@@ -286,6 +303,11 @@ at the anchor when there is no rest token.
   root `index` is an ordinary child and is ordered like any other page.
 - Before the SDK page ships: `apimatic:pages` resolves to nothing and is not an
   error, so a `nav.json` written today keeps working when the page arrives.
+- *Amended 2026-09-24* (`.ai/plans/generated-pages.md`): the injected pages are
+  now two generated folders. Unnamed, they collect at the anchor in the CLI's
+  order, SDKs then Context Plugin, rather than Fumadocs' path order, which
+  would put `context-plugin` first; `apimatic:plugin` resolves to nothing
+  without a `plugin` block.
 
 ## 7. API reference structure
 
@@ -570,6 +592,9 @@ marked **(ran it)** were additionally observed in a running dev server on
    literal into the stylesheet, where it resolves against a different
    directory. The e2e test records it as pending rather than asserting it.
    Decide whether a published portal may name the build machine at all.
+   *(2026-09-24: unchanged for the content directory. The generated pages'
+   collection publishes only the word `generated`; `.ai/plans/generated-pages.md`,
+   section 9.)*
 
 Deferred, to be decided when the SDK page is built rather than now:
 
@@ -580,7 +605,9 @@ Deferred, to be decided when the SDK page is built rather than now:
    to one page or to a folder's worth without either the format or the
    transformer changing. Decide it against how a portal with several languages
    actually reads, which is easier to judge once the single-language page
-   exists.
+   exists. *Answered 2026-09-24* (`.ai/plans/generated-pages.md`): a folder,
+   with an SDKs page and a page per language, and the context plugin in a
+   folder and a tab of its own.
 
 Deliberately not open: what the second generated page is. It is answered when
 the SDK page is working end to end, and nothing in this plan depends on the
@@ -659,7 +686,9 @@ Second change, additionally:
   the specification paths and the project directory stay out, and that much is
   asserted, but the content directory is published. Section 11, question 3.
 - Second change: collision between the generated page and a user page fails the
-  build naming both files.
+  build naming both files. *(2026-09-24: the refusal of a content page at a
+  reserved address, which names each file; `.ai/plans/generated-pages.md`,
+  section 8.)*
 
 ## 15. Risks
 

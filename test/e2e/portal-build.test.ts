@@ -221,9 +221,9 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   // The only end-to-end proof that `nav.json` reaches the build: the Vite glob, the macro's
   // `meta.files` restriction and the transformer over real on-disk storage.
-  it('orders the sidebar by nav.json, with the API reference where the token names it', () => {
+  it('orders the sidebar by nav.json, with the SDKs and the API reference where their tokens name them', () => {
     const tree = read(treeCacheFiles()[0]);
-    const order = ['Welcome', 'API Reference', 'Authentication'].map((name) => tree.indexOf(`"${name}"`));
+    const order = ['Welcome', 'SDKs', 'API Reference', 'Authentication'].map((name) => tree.indexOf(`"${name}"`));
 
     expect(
       order.every((at) => at !== -1),
@@ -282,6 +282,7 @@ const stylesheetOf = (output: DirectoryPath) => {
       page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
     const positions = [
       tab('/', 'Home'),
+      tab('/sdks', 'SDKs'),
       tab('/api/apimatic-calculator/simple-calculator/Calculate', 'API Reference'),
       tab('/authentication', 'Guides')
     ];
@@ -291,6 +292,26 @@ const stylesheetOf = (output: DirectoryPath) => {
       'a tab is missing'
     ).to.be.true;
     expect(positions).to.deep.equal([...positions].sort((left, right) => left - right));
+  });
+
+  // The fixture's `languages` block names TypeScript; the pages come from the shipped templates.
+  it('writes the SDK pages, with the Markdown twins the page actions fetch', () => {
+    expect(exists('sdks/index.html')).to.be.true;
+    expect(exists('sdks/typescript/index.html')).to.be.true;
+    expect(exists('sdks.md')).to.be.true;
+    expect(read('sdks/typescript.md')).to.contain('Installation and usage for the TypeScript SDK');
+  });
+
+  it('lists each language in the SDKs tab of the sidebar', () => {
+    const tree = read(treeCacheFiles()[0]);
+
+    expect(tree.indexOf('"SDKs"')).to.not.equal(-1);
+    expect(tree.indexOf('"TypeScript"')).to.be.greaterThan(tree.indexOf('"SDKs"'));
+  });
+
+  it('writes no context plugin page for a project without a plugin block', () => {
+    expect(exists('context-plugin/index.html')).to.be.false;
+    expect(read('index.html')).to.not.contain('>Context Plugin</span>');
   });
 
   // The browser imports `portal.identity.json` whole, which is safe only because nothing in
@@ -323,7 +344,8 @@ const stylesheetOf = (output: DirectoryPath) => {
  * A second portal, so one more build covers the brand and navigation settings the default
  * fixture leaves at their defaults: a logo per mode, a favicon, a primary colour, a forced
  * colour mode and header links. Its specification has a deprecated and an internal operation,
- * and it has no content directory, so it also covers the fallback home page.
+ * and it has no content directory, so it also covers the fallback home page and the default
+ * order of the tabs. Its `plugin` block covers the context plugin page.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -388,6 +410,31 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(tree, 'no page tree').to.not.be.undefined;
     expect(tree).to.contain('/tab/home');
     expect(tree).to.contain('/page/home');
+  });
+
+  it('writes the context plugin page, and its Markdown twin, for the plugin block', () => {
+    expect(exists('context-plugin/index.html')).to.be.true;
+    expect(read('context-plugin.md')).to.contain('How to install the context plugin');
+  });
+
+  // No nav.json, so the defaults: the generated tabs before the reference, in the CLI's order,
+  // where Fumadocs' own, by path, would put the context plugin's folder first.
+  it('puts the generated tabs before the API reference, SDKs first, when nothing orders them', () => {
+    const page = read('index.html');
+    const tab = (href: string, name: string) =>
+      page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
+    const positions = [
+      tab('/', 'Home'),
+      tab('/sdks', 'SDKs'),
+      tab('/context-plugin', 'Context Plugin'),
+      tab('/api/[^"]+', 'API Reference')
+    ];
+
+    expect(
+      positions.every((at) => at !== -1),
+      'a tab is missing'
+    ).to.be.true;
+    expect(positions).to.deep.equal([...positions].sort((left, right) => left - right));
   });
 
   it('documents the deprecated operation and leaves the internal one out, pages and sidebar alike', () => {

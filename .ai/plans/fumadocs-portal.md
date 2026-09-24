@@ -106,6 +106,12 @@ last. Inside the reference there is one section per spec file in filename
 order, grouped by tag — except for a single specification, whose section level
 is inlined. See `.ai/plans/portal-navigation.md`.
 
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`): the top level is shown as
+tabs, and two of them are pages the CLI generates: SDKs, an SDKs page and one
+page per language in the `languages` block, positioned by `apimatic:sdks`; and
+Context Plugin, when there is a `plugin` block, positioned by `apimatic:plugin`.
+Unnamed, both sit before the API reference.
+
 ## 4. Template (`portal-template/`)
 
 Shipped inside the npm package (add to `files`). Derived from the spike, which
@@ -126,6 +132,14 @@ release cuts the preset, the fonts and the layout. `app.css` imports
 `neutral.css` again and sets Geist and Geist Mono in `@theme`, `__root.tsx`
 links their Google Fonts stylesheet, the generated `theme.css` holds only the
 primary colour's two rules, and `layout.tsx` renders the notebook layout alone.
+
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 4 and 6):
+`src/lib/source.ts` declares a second collection over the relative literal
+`'generated'`, where the CLI writes the SDK and context plugin pages from the
+templates in the package's `portal-pages/`; `source.server.ts` passes it to
+`loader()` under the `generated` key, and `vite.config.ts` registers a
+serve-only plugin that reloads the collection when a generated page is added
+or removed.
 
 - `vite.config.ts`: `fumadocsMdx()`, `tailwindcss()`, `react()`, and
   `tanstackStart({ spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true } }, pages: [...], prerender: { crawlLinks: false }, importProtection: { behavior: 'error' } })`.

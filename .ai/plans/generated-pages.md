@@ -1,9 +1,9 @@
 # Plan: the generated SDK and context plugin pages
 
 Status: designed 2026-09-24 and committed on `saeedjamshaid/portal-config` so it
-travels with PR #355, which it builds on. **Step 1 done** (section 16); the rest
-is implemented on `saeedjamshaid/generated-pages`, a PR stacked on #355
-(section 12). The questions asked and answered the same day are recorded in
+travels with PR #355, which it builds on. **Implemented 2026-09-24** on
+`saeedjamshaid/generated-pages`, PR #360, stacked on #355 (section 12); every
+step of section 13 is done. The questions asked and answered the same day are recorded in
 section 2, section 14 records what an adversarial review of the first draft
 changed, section 15 records the later decision to give the context plugin page
 a tab of its own, and section 16 what the step 1 spike changed.
@@ -659,7 +659,7 @@ address; the reservation is exact-case, as `content/api/` is.
 
 ## 11. Changes to the other plans
 
-Made in the implementation PR's last step, as dated amendments:
+Made in the implementation PR's last step, as dated amendments (done 2026-09-24):
 
 `.ai/plans/portal-navigation.md`:
 
@@ -751,7 +751,7 @@ build, lint on touched files and the affected tests green.
    its prompt test. The watcher already passes the pair, and the serve tests
    cover a language and a `plugin` block added, since step 3: `applyConfig`'s
    new signature needed the caller changed to compile.
-6. **Surfacing.** Fixtures (`apimatic:sdks` in the default root `nav.json`, a
+6. **Surfacing.** *Done 2026-09-24.* Fixtures (`apimatic:sdks` in the default root `nav.json`, a
    `plugin` block in the branded one, which has no `nav.json` and so shows the
    default tab order), the e2e cases, command descriptions and
    the README by hand and through `pnpm readme`, the amendments of section 11,
