@@ -610,8 +610,10 @@ whole series, not this PR alone.
   record them again, then delete the old file. The server reads `apimatic.json`
   from the uploaded `src/`.
 - The documentation portal is described by the `portal` block of
-  `src/apimatic.json` — `site`, `brand`, `navigation`, `home`, `api`, `ai` and
-  `advanced` (amended 2026-09-23; it listed the flat `dev` keys) — and needs at
+  `src/apimatic.json` — `site`, `brand`, `navigation` and `ai` (amended
+  2026-09-23, when it listed the flat `dev` keys, and 2026-09-24, when it listed
+  the `home`, `api` and `advanced` namespaces the first release cut; see
+  `.ai/plans/portal-config.md` section 15) — and needs at
   least one entry in the file's `languages` block;
   `APIMATIC-BUILD.json` no longer configures it. `apimatic quickstart` scaffolds
   the file. Portals are built on your machine from `src/spec/`, `src/content/`
