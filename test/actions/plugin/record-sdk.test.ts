@@ -195,12 +195,6 @@ describe('PluginRecordSdkAction', () => {
     expect(pluginConfigUnreadable.calledOnce).to.be.true;
   });
 
-  it('records on the --update-plugin-config path', async () => {
-    await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
-
-    expect(Object.keys(writtenConfig().languages)).to.deep.equal(['csharp']);
-  });
-
   it('warns and records nothing when the config cannot be read', async () => {
     await fsExtra.writeFile(configPath(), '{ not json');
     const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');

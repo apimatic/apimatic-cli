@@ -5,7 +5,7 @@ import { CommandMetadata } from '../../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishingProfileItem, PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { CodegenOption, Language } from '../../../types/sdk/generate.js';
+import { Language } from '../../../types/sdk/generate.js';
 import { ActionResult } from '../../action-result.js';
 import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
@@ -29,9 +29,6 @@ export class SdkPublishNonInteractiveAction {
     publishTypes: PublishType[],
     force: boolean,
     dryRun: boolean,
-    codegenOption: CodegenOption,
-    stabilityWasProvided: boolean,
-    updatePluginConfig: boolean,
     onPublishSdkError: (errorMessage: string) => void,
     profileId?: string,
     version?: string
@@ -111,10 +108,11 @@ export class SdkPublishNonInteractiveAction {
       profile: publishingProfile,
       language,
       version: semVersion,
-      publishType: publishTypes,
-      codegenOption
+      publishType: publishTypes
     });
-    const outputDir = dryRun ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk')) : sdkDirectory;
+    const outputDir = dryRun
+      ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))
+      : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
       buildDirectory,
       outputDir,
@@ -125,8 +123,6 @@ export class SdkPublishNonInteractiveAction {
       semVersion,
       publishingProfile,
       dryRun,
-      codegenOption,
-      stabilityWasProvided,
       publishingSummary,
       onPublishSdkError
     );
@@ -138,18 +134,10 @@ export class SdkPublishNonInteractiveAction {
     }
 
     // A dry run publishes nothing, so recording it would claim an SDK that does not exist anywhere.
-    if (updatePluginConfig) {
-      if (dryRun) {
-        this.prompts.dryRunPluginConfigNotice();
-      } else {
-        await new PluginRecordSdkAction().execute(
-          buildDirectory,
-          language,
-          publishingProfile,
-          publishTypes,
-          semVersion
-        );
-      }
+    if (dryRun) {
+      this.prompts.dryRunPluginConfigNotice();
+    } else {
+      await new PluginRecordSdkAction().execute(buildDirectory, language, publishingProfile, publishTypes, semVersion);
     }
 
     return ActionResult.success();

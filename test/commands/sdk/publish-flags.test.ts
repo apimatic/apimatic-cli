@@ -1,48 +1,51 @@
 import { expect } from 'chai';
 import { Parser } from '@oclif/core';
 import SdkPublish from '../../../src/commands/sdk/publish.js';
-import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
 
 const parse = (argv: string[]) => Parser.parse(argv, { flags: SdkPublish.flags as never, strict: true } as never);
 
-// `warnIfStabilityIgnored` decides whether to fire from oclif's `setFromDefault` metadata rather
-// than from the flag's value, because `--stability stable` on V3 is ignored just as silently as
-// `--stability beta`. This is the codebase's first use of parse metadata, so the mechanism itself
-// is worth pinning down: if oclif ever stops reporting it, the warning fails open and silently.
-describe('sdk publish codegen flags', () => {
-  it('defaults to v3 and stable when neither flag is passed', async () => {
-    const { flags } = (await parse([])) as never as { flags: Record<string, unknown> };
+const rejects = async (argv: string[]): Promise<Error> => {
+  let thrown: unknown;
+  try {
+    await parse(argv);
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown, `expected ${argv.join(' ')} to be rejected`).to.be.an('error');
+  return thrown as Error;
+};
 
-    expect(flags['codegen-version']).to.equal(CodeGenerationVersion.V3);
-    expect(flags.stability).to.equal(Stability.STABLE);
+// v3 generation is retired, so the two flags that chose between generators are gone, and with them
+// the flag that asked whether a publish should record itself. A run that still passes one is told
+// it is unknown rather than having it quietly ignored — these pin that they are really gone, not
+// merely undocumented.
+describe('sdk publish retired flags', () => {
+  it('no longer accepts a code generator version', async () => {
+    expect((await rejects(['--codegen-version', 'v4'])).message).to.contain('codegen-version');
   });
 
-  it('accepts the v4 combination', async () => {
-    const { flags } = (await parse(['--codegen-version', 'v4', '--stability', 'beta'])) as never as {
-      flags: Record<string, unknown>;
-    };
-
-    expect(flags['codegen-version']).to.equal(CodeGenerationVersion.V4);
-    expect(flags.stability).to.equal(Stability.BETA);
+  it('no longer accepts a stability level', async () => {
+    expect((await rejects(['--stability', 'beta'])).message).to.contain('stability');
   });
 
-  it('rejects a codegen version the CLI does not know', async () => {
-    let thrown: unknown;
-    try {
-      await parse(['--codegen-version', 'v5']);
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).to.be.an('error');
-    expect((thrown as Error).message).to.contain('v5');
+  // Recording a publish is bookkeeping, not a decision: it always happens now.
+  it('no longer accepts --update-plugin-config', async () => {
+    expect((await rejects(['--update-plugin-config'])).message).to.contain('update-plugin-config');
   });
 
-  it('does not filter languages by codegen version, leaving that to the service', async () => {
-    const { flags } = (await parse(['--codegen-version', 'v4', '--language', 'typescript'])) as never as {
-      flags: Record<string, unknown>;
-    };
+  it('still parses the flags a publish is actually made of', async () => {
+    const { flags } = (await parse([
+      '--profile-id',
+      'a1b2c3d4e5f6a1b2c3d4e5f6',
+      '--language',
+      'typescript',
+      '--version',
+      '1.0.0',
+      '--publish-type',
+      'package'
+    ])) as never as { flags: Record<string, unknown> };
 
     expect(flags.language).to.equal('typescript');
+    expect(flags.version).to.equal('1.0.0');
   });
 });

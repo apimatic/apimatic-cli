@@ -23,8 +23,7 @@ const COMMANDS: CommandMapping[] = [
   { id: 'publishing profile list', fileParts: ['commands', 'publishing', 'profile', 'list.js'] },
   { id: 'quickstart', fileParts: ['commands', 'quickstart.js'] },
   { id: 'sdk generate', fileParts: ['commands', 'sdk', 'generate.js'] },
-  { id: 'sdk publish', fileParts: ['commands', 'sdk', 'publish.js'] },
-  { id: 'sdk save-changes', fileParts: ['commands', 'sdk', 'save-changes.js'] }
+  { id: 'sdk publish', fileParts: ['commands', 'sdk', 'publish.js'] }
 ];
 
 const BIN_NAME = 'apimatic'; // matches package.json oclif.bin

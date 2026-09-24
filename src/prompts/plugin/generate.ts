@@ -8,7 +8,7 @@ import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
-import { Language, LANGUAGE_CHOICES, PLUGIN_LANGUAGES } from '../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language, LANGUAGE_CHOICES } from '../../types/sdk/generate.js';
 
 /** The names the SDK flows already show, so one language reads the same everywhere. */
 const labelOf = (language: string): string =>
@@ -85,7 +85,7 @@ export class PluginGeneratePrompts {
 
     const selected = await multiselect<Language>({
       message: 'Which languages should your plugin include?',
-      options: PLUGIN_LANGUAGES.map((language) => ({
+      options: AVAILABLE_LANGUAGES.map((language) => ({
         value: language,
         label: labelOf(language),
         hint: published.includes(language) ? 'published' : undefined

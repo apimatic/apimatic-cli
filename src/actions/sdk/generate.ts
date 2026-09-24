@@ -6,10 +6,8 @@ import { SdkContext } from '../../types/sdk-context.js';
 import { SdkGeneratePrompts } from '../../prompts/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { TempContext } from '../../types/temp-context.js';
-import { CodegenOption, Language } from '../../types/sdk/generate.js';
-import { MergeSourceTreeAction } from './merge-source-tree.js';
+import { isAvailableLanguage, Language } from '../../types/sdk/generate.js';
 import { BuildContext } from '../../types/build-context.js';
-import { SemVersion } from '../../types/publish/version.js';
 
 export class GenerateAction {
   private readonly prompts: SdkGeneratePrompts = new SdkGeneratePrompts();
@@ -30,15 +28,15 @@ export class GenerateAction {
     language: Language,
     force: boolean,
     zipSdk: boolean,
-    skipChanges: boolean,
-    trackChanges: boolean,
-    codegenOption: CodegenOption,
-    stabilityWasProvided: boolean,
     apiVersion?: string,
-    packageVersion?: SemVersion,
     packageSettingsDirectory?: DirectoryPath
-  ): Promise<ActionResult<{ sourceTreeTrackingInitiated: boolean; conflictsResolved: boolean }>> => {
-    this.prompts.warnIfStabilityIgnored(codegenOption, stabilityWasProvided);
+  ): Promise<ActionResult> => {
+    // Refused here rather than by the flag parser, so the answer names what is coming back instead
+    // of listing the values the flag happens to accept.
+    if (!isAvailableLanguage(language)) {
+      this.prompts.languageNotAvailable(language);
+      return ActionResult.failed();
+    }
 
     if (buildDirectory.isEqual(destinationSdkDirectory)) {
       this.prompts.sameBuildAndSdkDir(buildDirectory);
@@ -97,8 +95,7 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const hasSdkSourceTree = await buildContext.hasSdkSourceTree(language);
-    const sdkContext = new SdkContext(language, destinationSdkDirectory, skipChanges && hasSdkSourceTree, version);
+    const sdkContext = new SdkContext(language, destinationSdkDirectory, version);
     if (!force && (await sdkContext.exists()) && !(await this.prompts.overwriteSdk(destinationSdkDirectory))) {
       this.prompts.destinationDirNotEmpty();
       return ActionResult.cancelled();
@@ -108,39 +105,13 @@ export class GenerateAction {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await buildContext.getBuildZipPath(tempDirectory, packageSettingsDirectory);
 
-      if (codegenOption.isV4()) {
-        this.prompts.sdkCustomizationsNotSupportedForV4();
-
-        const response = await this.prompts.generateV4SDK(
-          this.sdkGenerationService.generateV4Sdk(
-            buildZipPath,
-            language,
-            codegenOption.stabilityLevel(),
-            this.configDir,
-            this.commandMetadata,
-            this.authKey
-          )
-        );
-
-        if (response.isErr()) {
-          this.prompts.sdkGenerationServiceError(response.error);
-          return ActionResult.failed();
-        }
-
-        const responseSdkZipPath = await tempContext.save(response.value);
-        const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
-        this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
-        return ActionResult.success();
-      }
-
-      const response = await this.prompts.generateSDK(
+      const response = await this.prompts.generateSdk(
         this.sdkGenerationService.generateSdk(
           buildZipPath,
           language,
           this.configDir,
           this.commandMetadata,
-          this.authKey,
-          packageVersion
+          this.authKey
         )
       );
 
@@ -149,36 +120,11 @@ export class GenerateAction {
         return ActionResult.failed();
       }
 
-      const responseSdkZipPath = await tempContext.save(response.value.sdk);
+      const responseSdkZipPath = await tempContext.save(response.value);
       const tempSdk = await sdkContext.loadSdkInTempDirectory(tempDirectory, responseSdkZipPath);
+      this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
 
-      if (!trackChanges && !hasSdkSourceTree) {
-        this.prompts.sdkGenerated(await sdkContext.save(tempSdk, zipSdk));
-        return ActionResult.success();
-      }
-
-      const sdkSourceTreeTempFilePath = await tempContext.save(response.value.sdkSourceTree);
-
-      const tempSdkWithSourceTree = await sdkContext.loadSdkWithSourceTreeInTempDirectory(
-        tempDirectory,
-        responseSdkZipPath,
-        sdkSourceTreeTempFilePath
-      );
-      const destinationSourceTreePath = buildContext.getSdkSourceTree(language);
-
-      const mergeSourceTree = new MergeSourceTreeAction();
-      return await mergeSourceTree.execute(
-        tempSdkWithSourceTree,
-        tempSdk,
-        destinationSourceTreePath,
-        trackChanges,
-        skipChanges,
-        hasSdkSourceTree,
-        language,
-        destinationSdkDirectory,
-        version,
-        zipSdk
-      );
+      return ActionResult.success();
     });
   };
 }

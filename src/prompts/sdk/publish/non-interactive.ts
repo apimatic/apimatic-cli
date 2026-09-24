@@ -89,10 +89,11 @@ export class SdkPublishNonInteractivePrompts {
     );
   }
 
+  /** A publish records itself, and a dry run is the one publish that has nothing to record. */
   public dryRunPluginConfigNotice() {
     const message =
-      `${f.flag('update-plugin-config')} was ignored because ${f.flag('dry-run')} does not publish the SDK. ` +
-      `Re-run without ${f.flag('dry-run')} to record it in ${f.var(APIMATIC_CONFIG_FILE_NAME)}.`;
+      `Nothing was recorded in ${f.var(APIMATIC_CONFIG_FILE_NAME)} because ${f.flag('dry-run')} does not ` +
+      `publish the SDK. Re-run without ${f.flag('dry-run')} to record it.`;
     log.info(message);
   }
 }

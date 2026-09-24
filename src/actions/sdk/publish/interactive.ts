@@ -5,7 +5,7 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { getCodegenOptions } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
@@ -75,18 +75,18 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfile = PublishingProfile.create(publishingProfileItem);
 
-    const language = await this.prompts.selectLanguage(publishingProfile);
+    // The profile can enable a language the v4 generator does not render yet. Offering it would
+    // end the run at generation, after the version and the confirmation had already been asked for.
+    const offered = publishingProfile.getEnabledLanguages().filter((enabled) => AVAILABLE_LANGUAGES.includes(enabled));
+    if (offered.length === 0) {
+      this.prompts.noAvailableLanguageOnProfile(publishingProfile.getEnabledLanguages());
+      return ActionResult.failed();
+    }
+
+    const language = await this.prompts.selectLanguage(publishingProfile, offered);
     if (!language) {
       this.prompts.noLanguageSelected();
       return ActionResult.cancelled();
-    }
-
-    const codegenOptions = getCodegenOptions(language);
-    const codegenOption = codegenOptions.length === 1 ? codegenOptions[0]
-      : await this.prompts.selectCodegenVersion(codegenOptions);
-    if (!codegenOption) {
-        this.prompts.noCodegenVersionSelected();
-        return ActionResult.cancelled();
     }
 
     const version = await this.prompts.inputVersion();
@@ -101,8 +101,7 @@ export class SdkPublishInteractiveAction {
       profile: publishingProfile,
       language,
       version,
-      publishType: publishTypes,
-      codegenOption: codegenOptions.length === 1 ? undefined : codegenOption
+      publishType: publishTypes
     });
 
     this.prompts.publishingSummary(publishingSummary);
@@ -128,8 +127,6 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
-      codegenOption,
-      false,
       publishingSummary,
       onPublishSdkError
     );
@@ -140,15 +137,9 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    if (await this.prompts.confirmRecordSdk()) {
-      await new PluginRecordSdkAction().execute(
-        buildDirectory,
-        language,
-        publishingProfile,
-        publishTypes,
-        version
-      );
-    }
+    // Bookkeeping, not a decision: nobody publishes an SDK and then wants their plugin to keep
+    // describing a local copy. It happens, and says so.
+    await new PluginRecordSdkAction().execute(buildDirectory, language, publishingProfile, publishTypes, version);
 
     return ActionResult.success();
   };

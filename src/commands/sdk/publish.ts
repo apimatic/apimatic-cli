@@ -1,7 +1,7 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { CodeGenerationVersion, CodegenOption, Language, Stability } from '../../types/sdk/generate.js';
+import { Language } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
@@ -30,9 +30,7 @@ export default class SdkPublish extends Command {
     language: Flags.string({
       char: 'l',
       description: 'Language of the SDK to generate and publish.',
-      options: Object.values(Language)
-        .filter((l) => l !== Language.GO)
-        .map((l) => l.valueOf())
+      options: Object.values(Language).map((l) => l.valueOf())
     }),
     ...FlagsProvider.force,
     ...FlagsProvider.input,
@@ -47,21 +45,6 @@ export default class SdkPublish extends Command {
       default: false,
       description: 'Generate the SDK locally for review without publishing.'
     }),
-    'codegen-version': Flags.string({
-      description: 'Version of the code generator to use',
-      options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
-      default: CodeGenerationVersion.V3
-    }),
-    stability: Flags.string({
-      description: 'Stability level of the generated SDK',
-      options: Object.values(Stability).map((s) => s.valueOf()),
-      default: Stability.STABLE
-    }),
-    'update-plugin-config': Flags.boolean({
-      default: false,
-      description:
-        "Record the published SDK in 'src/apimatic.json', creating the file if it does not exist. Interactive runs are asked instead."
-    })
   };
 
   static examples = [
@@ -75,7 +58,7 @@ export default class SdkPublish extends Command {
     )}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'b2c3d4e5f6a1b2c3d4e5f6a1')} ${format.flag(
       'language',
-      'java'
+      'csharp'
     )} ${format.flag('version', '2.0.0')} ${format.flag('publish-type', PublishType.SourceCodePublishing)}`,
     `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'c3d4e5f6a1b2c3d4e5f6a1b2')} ${format.flag(
       'language',
@@ -83,13 +66,6 @@ export default class SdkPublish extends Command {
     )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
       'dry-run'
     )}`,
-    `${SdkPublish.cmdTxt} ${format.flag('profile-id', 'd4e5f6a1b2c3d4e5f6a1b2c3')} ${format.flag(
-      'language',
-      'csharp'
-    )} ${format.flag('version', '1.0.0')} ${format.flag('publish-type', PublishType.PackagePublishing)} ${format.flag(
-      'codegen-version',
-      'v4'
-    )} ${format.flag('stability', 'beta')}`
   ];
 
   async run() {
@@ -102,12 +78,8 @@ export default class SdkPublish extends Command {
         force,
         input,
         'publish-type': publishType,
-        'dry-run': dryRun,
-        'codegen-version': codegenVersion,
-        stability,
-        'update-plugin-config': updatePluginConfig
-      },
-      metadata
+        'dry-run': dryRun
+      }
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
@@ -136,9 +108,7 @@ export default class SdkPublish extends Command {
               version,
               language,
               ...(force && { force }),
-              'publish-type': publishTypes,
-              'codegen-version': codegenVersion,
-              stability
+              'publish-type': publishTypes
             }),
             commandMetadata.shell
           );
@@ -153,9 +123,6 @@ export default class SdkPublish extends Command {
           publishTypes,
           force,
           dryRun,
-          CodegenOption.create(codegenVersion as CodeGenerationVersion, stability as Stability),
-          metadata.flags.stability?.setFromDefault !== true,
-          updatePluginConfig,
           onPublishSdkError,
           profileId,
           version

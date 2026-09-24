@@ -1,125 +1,71 @@
-import { Command, Flags } from "@oclif/core";
-import { DirectoryPath } from "../../types/file/directoryPath.js";
-import { FlagsProvider } from "../../types/flags-provider.js";
-import { GenerateAction } from "../../actions/sdk/generate.js";
-import { CodeGenerationVersion, CodegenOption, Language, Stability } from "../../types/sdk/generate.js";
-import { CommandMetadata } from "../../types/common/command-metadata.js";
-import { format, intro, outro } from "../../prompts/format.js";
-import { SdkChangesTrackedEvent } from "../../types/events/sdk-changes-tracked.js";
-import { TelemetryService } from "../../infrastructure/services/telemetry-service.js";
-import { SdkConflictsResolvedEvent } from "../../types/events/sdk-conflicts-resolved.js";
+import { Command, Flags } from '@oclif/core';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { FlagsProvider } from '../../types/flags-provider.js';
+import { GenerateAction } from '../../actions/sdk/generate.js';
+import { Language } from '../../types/sdk/generate.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { format, intro, outro } from '../../prompts/format.js';
 
 export default class SdkGenerate extends Command {
-  static readonly summary = "Generate an SDK for your API";
+  static readonly summary = 'Generate an SDK for your API';
 
-  static readonly description = `Generate Software Development Kits (SDKs) from API specifications.
-Supports multiple programming languages including Java, C#, Python, JavaScript, and more.`;
+  static readonly description = `Generate a Software Development Kit (SDK) from an API specification.
+C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way.`;
 
-  static readonly cmdTxt = format.cmd("apimatic", "sdk", "generate");
+  static readonly cmdTxt = format.cmd('apimatic', 'sdk', 'generate');
 
   static flags = {
+    // Every language stays here so one that is coming back is answered by the command rather than
+    // rejected as an unknown value; the action says which are available.
     language: Flags.string({
-      char: "l",
+      char: 'l',
       required: true,
-      description: "Programming language for SDK generation",
-      options: Object.values(Language).map((p) => p.valueOf()),
+      description: 'Programming language for SDK generation',
+      options: Object.values(Language).map((p) => p.valueOf())
     }),
     destination: Flags.string({
-      char: "d",
-      description: "[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated"
+      char: 'd',
+      description:
+        '[default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK will be generated'
     }),
-    "skip-changes": Flags.boolean({
-      default: false,
-      description: "Do not apply the saved changes to the generated SDK"
-    }),
-    "api-version": Flags.string({
-      description: "Version of the API to use for SDK generation (if multiple versions exist)"
+    'api-version': Flags.string({
+      description: 'Version of the API to use for SDK generation (if multiple versions exist)'
     }),
     zip: Flags.boolean({
       default: false,
-      description: "Download the generated SDK as a .zip archive"
-    }),
-    "track-changes": Flags.boolean({
-      default: false,
-      description: "Enable change tracking for SDK generation (only required for initial setup)"
-    }),
-    "codegen-version": Flags.string({
-      description: "Version of the code generator to use",
-      options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
-      default: CodeGenerationVersion.V3
-    }),
-    "stability": Flags.string({
-      description: "Stability level of the generated SDK",
-      options: Object.values(Stability).map((s) => s.valueOf()),
-      default: Stability.STABLE
+      description: 'Download the generated SDK as a .zip archive'
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
-    ...FlagsProvider.authKey,
+    ...FlagsProvider.authKey
   };
 
   static examples = [
-    `${SdkGenerate.cmdTxt} ${format.flag("language", "java")}`,
-    `${SdkGenerate.cmdTxt} ${format.flag("language", "csharp")} ${format.flag("input", "./")}`,
-    `${SdkGenerate.cmdTxt} ${format.flag("language", "python")} ${format.flag("destination", "./sdk")} ${format.flag(
-      "zip"
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'typescript')}`,
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'csharp')} ${format.flag('input', './')}`,
+    `${SdkGenerate.cmdTxt} ${format.flag('language', 'python')} ${format.flag('destination', './sdk')} ${format.flag(
+      'zip'
     )}`
   ];
 
   async run() {
     const {
-      flags: { language,
-        input,
-        destination,
-        force,
-        zip: zipSdk,
-        "auth-key": authKey,
-        "skip-changes": skipChanges,
-        "track-changes": trackChanges,
-        "api-version": apiVersion,
-        "codegen-version": codegenVersion,
-        stability
-      },
-      metadata
+      flags: { language, input, destination, force, zip: zipSdk, 'auth-key': authKey, 'api-version': apiVersion }
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
-    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
+    const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
+    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
       shell: this.config.shell
     };
-    const telemetryService = new TelemetryService(this.getConfigDir());
 
-    intro("Generate SDK");
+    intro('Generate SDK');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(
-      buildDirectory,
-      sdkDirectory,
-      language as Language,
-      force,
-      zipSdk,
-      skipChanges,
-      trackChanges,
-      CodegenOption.create(codegenVersion as CodeGenerationVersion, stability as Stability),
-      metadata.flags.stability?.setFromDefault !== true,
-      apiVersion
-    );
+    const result = await action.execute(buildDirectory, sdkDirectory, language as Language, force, zipSdk, apiVersion);
     outro(result);
-    await result.mapAll(
-      async (res) => {
-        if (res?.sourceTreeTrackingInitiated) {
-          await telemetryService.trackEvent(new SdkChangesTrackedEvent(language), commandMetadata.shell);
-        }
-        if (res?.conflictsResolved) {
-          await telemetryService.trackEvent(new SdkConflictsResolvedEvent(language), commandMetadata.shell);
-        }
-      },
-      async () => {},
-      async () => {}
-    );
   }
 
   private readonly getConfigDir = () => {

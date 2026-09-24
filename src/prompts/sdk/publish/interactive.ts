@@ -10,7 +10,7 @@ import {
   PublishType
 } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
-import { CodegenOption, Language } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../../types/sdk/generate.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
 import { SDK_PUBLISHING_OVERVIEW_URL } from '../../publishing/links.js';
@@ -118,8 +118,11 @@ export class SdkPublishInteractivePrompts {
     log.error('No publishing profile was selected.');
   }
 
-  public async selectLanguage(publishingProfile: PublishingProfile): Promise<Language | undefined> {
-    const options = publishingProfile.getEnabledLanguages().map((language) => ({
+  public async selectLanguage(
+    publishingProfile: PublishingProfile,
+    offered: readonly Language[]
+  ): Promise<Language | undefined> {
+    const options = offered.map((language) => ({
       value: language,
       label: `${language} (${publishingProfile
         .getPublishTypesForLanguage(language)
@@ -143,22 +146,17 @@ export class SdkPublishInteractivePrompts {
     log.error('No language was selected for publishing.');
   }
 
-  public async selectCodegenVersion(options: readonly CodegenOption[]): Promise<CodegenOption | undefined> {
-    const codegenOption = await select({
-      message: 'Select the Code Generator version:',
-      initialValue: options[0],
-      options: options.map((option) => ({ value: option, label: `${option}` }))
-    });
-
-    if (isCancel(codegenOption)) {
-      return undefined;
-    }
-
-    return codegenOption;
-  }
-
-  public noCodegenVersionSelected() {
-    log.error('No Code Generator version was selected.');
+  /**
+   * The profile is configured for languages the CLI cannot generate yet. Named rather than
+   * reported as an empty list, so the reason reads as timing rather than a broken profile.
+   */
+  public noAvailableLanguageOnProfile(enabled: readonly Language[]) {
+    log.error(
+      `This publishing profile is configured for ${enabled.map(languageLabel).join(', ')}, ` +
+        `and none of those can be generated yet.
+` +
+        `Available now: ${AVAILABLE_LANGUAGES.map(languageLabel).join(', ')}`
+    );
   }
 
   public async inputVersion(): Promise<SemVersion | undefined> {
@@ -192,16 +190,6 @@ export class SdkPublishInteractivePrompts {
     const result = await confirm({ message: 'Do you want to proceed?' });
     if (isCancel(result)) return false;
     return result;
-  }
-
-  public async confirmRecordSdk(): Promise<boolean> {
-    const message =
-      `Update configuration for context plugin generation?` +
-      f.continuation(`See '${f.cmdAlt('apimatic', 'plugin', 'generate')} ${f.flag('help')}' for more information.`);
-
-    const record = await confirm({ message, initialValue: true });
-    if (isCancel(record)) return false;
-    return record;
   }
 
   public publishingCancelled() {

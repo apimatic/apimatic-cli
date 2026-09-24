@@ -9,7 +9,7 @@ import { Status } from '@apimatic/sdk';
 import { SdkGenerationService } from '../../../src/infrastructure/services/sdk-generation-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FilePath } from '../../../src/types/file/filePath';
-import { Language, Stability } from '../../../src/types/sdk/generate';
+import { Language } from '../../../src/types/sdk/generate';
 import { ServiceError, ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { envInfo } from '../../../src/infrastructure/env-info';
 
@@ -110,29 +110,14 @@ describe('SdkGenerationService generation status polling', () => {
   describe('generateSdk', () => {
     const generateSdk = () => service.generateSdk(buildPath, Language.TYPESCRIPT, configDir, metadata, AUTH_KEY);
 
-    it('polls the sdk status path and downloads both artifacts once complete', async () => {
+    it('polls the v4 status path and downloads once complete', async () => {
       respondToStatus = (res) => redirectToDownload(res);
 
       const result = await generateSdk();
 
       expect(result.isOk(), 'generation should succeed').to.be.true;
-      const { sdk, sdkSourceTree } = result._unsafeUnwrap();
-      expect(await drain(sdk)).to.be.greaterThan(0);
-      expect(await drain(sdkSourceTree)).to.be.greaterThan(0);
-      expect(statusRequests.map((request) => request.url)).to.deep.equal([`/sdk/${GENERATION_ID}/status`]);
-    });
-
-    it('reports sdk merge conflicts with their own wording', async () => {
-      respondToStatus = statusBody({
-        status: Status.ValidationError,
-        errors: { sdkMergeFailed: ['java', 'python'] }
-      });
-
-      const result = await generateSdk();
-
-      expect(errorFrom(result).errorMessage).to.equal(
-        'SDK generation failed for these languages due to merge conflict.\n- java\n- python'
-      );
+      expect(await drain(result._unsafeUnwrap())).to.be.greaterThan(0);
+      expect(statusRequests.map((request) => request.url)).to.deep.equal([`/sdk/v2/${GENERATION_ID}/status`]);
     });
 
     it('passes through the HTML sdk generation embeds in messages', async () => {
@@ -148,28 +133,8 @@ describe('SdkGenerationService generation status polling', () => {
       expect(errorFrom(result).errorMessage).to.equal('One or more validation errors occurred.\n- ' + message);
     });
   });
-
-  describe('generateV4Sdk', () => {
-    it('polls the v4 sdk status path and downloads once complete', async () => {
-      respondToStatus = (res) => redirectToDownload(res);
-
-      const result = await service.generateV4Sdk(
-        buildPath,
-        Language.CSHARP,
-        Stability.BETA,
-        configDir,
-        metadata,
-        AUTH_KEY
-      );
-
-      expect(result.isOk(), 'generation should succeed').to.be.true;
-      expect(await drain(result._unsafeUnwrap() as NodeJS.ReadableStream)).to.be.greaterThan(0);
-      expect(statusRequests.map((request) => request.url)).to.deep.equal([`/sdk/v2/${GENERATION_ID}/status`]);
-    });
-  });
-
-  // Each flow names itself in the timeout message, so each one's wiring is pinned separately.
-  // Before the shared poller these three polled a stuck generation forever.
+  // The timeout message names the flow it came from, so its wiring is pinned here.
+  // Before the shared poller this polled a stuck generation forever.
   describe('giving up on a generation that never finishes', () => {
     const impatient = () => new SdkGenerationService({ pollIntervalMs: 1, generationTimeoutMs: 15 });
 
@@ -179,20 +144,6 @@ describe('SdkGenerationService generation status polling', () => {
 
     it('bounds sdk generation', async () => {
       const result = await impatient().generateSdk(buildPath, Language.TYPESCRIPT, configDir, metadata, AUTH_KEY);
-
-      expect(errorFrom(result).code).to.equal(ServiceErrorCode.Timeout);
-      expect(errorFrom(result).errorMessage).to.equal('SDK generation timed out.');
-    });
-
-    it('bounds v4 sdk generation', async () => {
-      const result = await impatient().generateV4Sdk(
-        buildPath,
-        Language.CSHARP,
-        Stability.BETA,
-        configDir,
-        metadata,
-        AUTH_KEY
-      );
 
       expect(errorFrom(result).code).to.equal(ServiceErrorCode.Timeout);
       expect(errorFrom(result).errorMessage).to.equal('SDK generation timed out.');

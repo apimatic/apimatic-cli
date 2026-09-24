@@ -8,7 +8,7 @@ import { PublishType } from '../../types/publish-api/publishing-profile-item.js'
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { ProfileId } from '../../types/publish/profile-id.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodegenOption, Language } from '../../types/sdk/generate.js';
+import { Language } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
 import { TempContext } from '../../types/temp-context.js';
@@ -34,8 +34,6 @@ export class SdkPublishAction {
     semVersion: SemVersion,
     publishingProfile: PublishingProfile,
     dryRun: boolean,
-    codegenOption: CodegenOption,
-    stabilityWasProvided: boolean,
     publishingSummary: string,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
@@ -56,12 +54,7 @@ export class SdkPublishAction {
         language,
         force,
         false,
-        false,
-        false,
-        codegenOption,
-        stabilityWasProvided,
         undefined,
-        semVersion,
         packageSettingsDirectory
       );
       if (sdkGenerationResult.isFailed()) {

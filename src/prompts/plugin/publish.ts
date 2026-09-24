@@ -80,10 +80,11 @@ export class PluginPublishPrompts {
 
   /**
    * Double quotes rather than `f.path`: single quotes are not quoting to `cmd.exe`, so a path
-   * containing spaces would break the line the user pastes.
+   * containing spaces would break the line the user pastes. Relative where it can be, because the
+   * reader is standing in the directory above it.
    */
   private changeDirectory(pluginDirectory: DirectoryPath): string {
-    return f.cmdAlt('cd', `"${pluginDirectory}"`);
+    return f.cmdAlt('cd', `"${f.relative(pluginDirectory)}"`);
   }
 
   private createRepository(release: PluginReleaseData): string {

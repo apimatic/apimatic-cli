@@ -6,7 +6,7 @@ import { PublishLogItem } from '../../types/publish-api/publish-log.js';
 import { PublishingInfo } from '../../types/publish-api/publishing-info.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodegenOption, Language } from '../../types/sdk/generate.js';
+import { Language } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { format as f } from '../format.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
@@ -102,20 +102,12 @@ export interface PublishingDetails {
   language: Language;
   version: SemVersion;
   publishType: PublishType[];
-  codegenOption?: CodegenOption;
 }
 
-export function formatPublishingDetails({
-  profile,
-  language,
-  version,
-  publishType,
-  codegenOption
-}: PublishingDetails): string {
+export function formatPublishingDetails({ profile, language, version, publishType }: PublishingDetails): string {
   const targets = [...publishType]
     .map((t) => (t === PublishType.PackagePublishing ? "Package" : "Source Code"))
     .join(" + ");
 
-  const generator = codegenOption ? `\n  Generator: ${codegenOption}` : "";
-  return `\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}${generator}`;
+  return `\n\n  Profile:   ${profile}\n  Language:  ${language}\n  Version:   ${version}\n  Targets:   ${targets}`;
 }

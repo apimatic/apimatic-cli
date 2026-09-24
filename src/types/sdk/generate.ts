@@ -1,5 +1,3 @@
-import { NonEmptyArray } from '../utils.js';
-
 export enum Language {
   CSHARP = 'csharp',
   JAVA = 'java',
@@ -10,14 +8,13 @@ export enum Language {
   GO = 'go'
 }
 
+/**
+ * Only v4 is generated now. The enum keeps `V3` because `apimatic.json` files written by earlier
+ * versions record it, and reading one has to be able to say what it says.
+ */
 export enum CodeGenerationVersion {
   V3 = 'v3',
   V4 = 'v4'
-}
-
-export enum Stability {
-  STABLE = 'stable',
-  BETA = 'beta'
 }
 
 const languageMap: { [key: number]: Language } = {
@@ -43,7 +40,7 @@ export function mapLanguages(languageFlag: number): Language[] {
  * are selectable.
  */
 export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
-  { label: 'Typescript', value: Language.TYPESCRIPT },
+  { label: 'TypeScript', value: Language.TYPESCRIPT },
   { label: 'Ruby', value: Language.RUBY },
   { label: 'Python', value: Language.PYTHON },
   { label: 'Java', value: Language.JAVA },
@@ -52,60 +49,25 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
   { label: 'Go', value: Language.GO }
 ];
 
-// java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the config says.
-export const PLUGIN_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
-
-export function isPluginLanguage(language: string): language is Language {
-  return PLUGIN_LANGUAGES.includes(language as Language);
-}
-
-export class CodegenOption {
-  public static readonly v3 = new CodegenOption(CodeGenerationVersion.V3, Stability.STABLE);
-
-  private constructor(private readonly version: CodeGenerationVersion, private readonly stability: Stability) {}
-
-  public static create(version: CodeGenerationVersion, stability: Stability): CodegenOption {
-    if (version === CodeGenerationVersion.V3) {
-      return CodegenOption.v3;
-    }
-    return new CodegenOption(version, stability);
-  }
-
-  public isV3(): boolean {
-    return this.version === CodeGenerationVersion.V3;
-  }
-
-  public isV4(): boolean {
-    return this.version === CodeGenerationVersion.V4;
-  }
-
-  public stabilityLevel(): Stability {
-    return this.stability;
-  }
-
-  public codeGenerationVersion(): CodeGenerationVersion {
-    return this.version;
-  }
-
-  public toString(): string {
-    return `${this.version.toUpperCase()} (${this.stability})`;
-  }
-}
+/**
+ * The languages the v4 code generator renders. With v3 retired these are the only SDKs the CLI can
+ * produce, so a language outside this list is refused before anything is uploaded — and a plugin
+ * cannot carry one whatever its config says.
+ */
+export const AVAILABLE_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
 
 /**
- * For validating only interactive `sdk publish/generate` commands.
- * Non-interactive validation is handled server-side by codegen API.
+ * The four that leave with v3. They are named in the refusal rather than left out of it: a user
+ * whose language is coming back reads something different from one who mistyped.
  */
-export const CODEGEN_OPTIONS: Readonly<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>> = {
-  [Language.CSHARP]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
-  [Language.GO]: [CodegenOption.v3],
-  [Language.JAVA]: [CodegenOption.v3],
-  [Language.PHP]: [CodegenOption.v3],
-  [Language.PYTHON]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
-  [Language.RUBY]: [CodegenOption.v3],
-  [Language.TYPESCRIPT]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)]
-};
+export const UPCOMING_LANGUAGES: readonly Language[] = [Language.JAVA, Language.RUBY, Language.GO, Language.PHP];
 
-export function getCodegenOptions(language: Language): Readonly<NonEmptyArray<CodegenOption>> {
-  return CODEGEN_OPTIONS[language];
+/** Takes a string because config files name their languages, and a file may name anything. */
+export function isAvailableLanguage(language: string): language is Language {
+  return AVAILABLE_LANGUAGES.includes(language as Language);
+}
+
+/** The name a language is shown under everywhere, so one reads the same in every message. */
+export function languageLabel(language: Language): string {
+  return LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
 }
