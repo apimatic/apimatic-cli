@@ -4,6 +4,15 @@ This file provides guidance to Claude Code when working in this repository.
 
 Read `.ai/instructions.md` for full project instructions (architecture, conventions, branching, testing, commits).
 
+## Principles
+
+Apply these when writing and reviewing code:
+
+- **Reuse infra** — network, file I/O, OS calls, sleep, time: use existing services, Node.js standard libraries and built-in JS APIs.
+- **Comments are a design smell** — improve the design until they are unnecessary; if one is unavoidable, keep it to one line.
+- **Readability is king** — simple names, simple domain models, composed with simple functions that turn one type into another instead of passing primitives around.
+- **Validate once, up front** — no repeated runtime type checks; later code works with guaranteed types.
+
 ## Skills
 
 Reference these files as needed for scaffolding:
