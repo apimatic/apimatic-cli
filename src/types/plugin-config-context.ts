@@ -68,21 +68,16 @@ export class PluginConfig {
    * not include them.
    */
   public unsupportedLanguages(): readonly string[] {
-    const languages = this.config.languages;
-    if (typeof languages !== 'object' || languages === null) {
-      return [];
-    }
-
-    return Object.keys(languages).filter((language) => !isPluginLanguage(language));
+    return Object.keys(this.config.languages).filter((language) => !isPluginLanguage(language));
   }
 
+  /**
+   * `configOf` is the only way into this class and it settles `languages` to an object — the
+   * document hands back nothing else, and a file whose `languages` is not one is `unreadable`
+   * before a config is built. So both readers below take the object as given.
+   */
   private languageEntries(): [Language, PluginLanguages[Language]][] {
-    const languages = this.config.languages;
-    if (typeof languages !== 'object' || languages === null) {
-      return [];
-    }
-
-    return Object.entries(languages).filter(([language]) => isPluginLanguage(language)) as [
+    return Object.entries(this.config.languages).filter(([language]) => isPluginLanguage(language)) as [
       Language,
       PluginLanguages[Language]
     ][];
