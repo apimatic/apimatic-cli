@@ -1,8 +1,12 @@
 import { createFileRoute, getRouteApi, isNotFound, isRedirect, notFound } from '@tanstack/react-router';
-import { DocsLayout } from 'fumadocs-ui/layouts/notebook';
 import { createServerFn } from '@tanstack/react-start';
 import { docs } from '@/lib/source';
 import { source } from '@/lib/source.server';
+import { PortalLayout } from '@/lib/layout';
+import { getPageMarkdownUrl } from '@/lib/shared';
+import { portal } from '@/lib/portal';
+import { absoluteUrl, canonicalLink } from '@/lib/seo';
+import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import {
   DocsBody,
   DocsDescription,
@@ -11,11 +15,6 @@ import {
   MarkdownCopyButton,
   ViewOptionsPopover
 } from 'fumadocs-ui/layouts/notebook/page';
-import { baseOptions } from '@/lib/layout.shared';
-import { getPageMarkdownUrl } from '@/lib/shared';
-import { portal } from '@/lib/portal';
-import { absoluteUrl, canonicalLink } from '@/lib/seo';
-import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { Suspense, use, type ReactNode } from 'react';
 import { useMDXComponents } from '@/components/mdx';
@@ -36,7 +35,7 @@ export const Route = createFileRoute('/$')({
     return data;
   },
   head: ({ loaderData, params }) => {
-    const title = loaderData && loaderData.type !== 'home' ? `${loaderData.title} | ${portal.title}` : portal.title;
+    const title = loaderData && loaderData.type !== 'home' ? `${loaderData.title} | ${portal.name}` : portal.name;
     const description = loaderData?.description ?? portal.description;
     const splat = params._splat?.replace(/\/$/, '') ?? '';
     const pageUrl = splat.length > 0 ? `/${splat}` : '/';
@@ -50,7 +49,7 @@ export const Route = createFileRoute('/$')({
         { property: 'og:title', content: title },
         ...(description ? [{ property: 'og:description', content: description }] : []),
         { property: 'og:type', content: 'website' },
-        { property: 'og:site_name', content: portal.title },
+        { property: 'og:site_name', content: portal.name },
         ...(absolute ? [{ property: 'og:url', content: absolute }] : []),
         { name: 'twitter:card', content: 'summary' }
       ],
@@ -70,7 +69,7 @@ const serverLoader = createServerFn({
     if (!page) {
       // A project without content/index.md(x) still gets a landing page.
       if (slugs.length === 0) {
-        return { type: 'home' as const, title: portal.title, description: portal.description };
+        return { type: 'home' as const, title: portal.name, description: portal.description };
       }
       throw notFound();
     }
@@ -132,7 +131,7 @@ function Content({ path, markdownUrl }: Readonly<{ path: string; markdownUrl: st
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         {/* Sends the reader to an external AI vendor, so a portal published under someone
             else's brand can turn it off. */}
-        {portal.aiPageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
+        {portal.pageActions ? <ViewOptionsPopover markdownUrl={markdownUrl} /> : null}
       </div>
       <DocsBody>
         <PageBody components={useMDXComponents()} />
@@ -178,10 +177,5 @@ function Page() {
     );
   }
 
-  const base = baseOptions();
-  return (
-    <DocsLayout {...base} nav={{ ...base.nav, mode: 'top' }} tree={pageTree}>
-      {content}
-    </DocsLayout>
-  );
+  return <PortalLayout tree={pageTree}>{content}</PortalLayout>;
 }

@@ -1,0 +1,32 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Pets", "version": "1.0.0", "description": "Pets, with a brand of their own." },
+  "servers": [{ "url": "https://pets.example.com" }],
+  "tags": [{ "name": "pets" }],
+  "paths": {
+    "/pets": {
+      "get": {
+        "operationId": "listPets",
+        "tags": ["pets"],
+        "summary": "List pets",
+        "responses": { "200": { "description": "The pets." } }
+      },
+      "post": {
+        "operationId": "createPet",
+        "tags": ["pets"],
+        "summary": "Create a pet",
+        "deprecated": true,
+        "responses": { "201": { "description": "The pet, created." } }
+      }
+    },
+    "/pets/audit": {
+      "get": {
+        "operationId": "auditPets",
+        "tags": ["pets"],
+        "summary": "Audit the pets",
+        "x-internal": true,
+        "responses": { "200": { "description": "The audit." } }
+      }
+    }
+  }
+}

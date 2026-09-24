@@ -7,7 +7,6 @@ import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { LoginAction } from '../auth/login.js';
 import { ActionResult } from '../action-result.js';
-import { DEFAULT_PORTAL_PORT, PortalServeAction } from './serve.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { ValidateAction } from '../api/validate.js';
 import { SpecContext } from '../../types/spec-context.js';
@@ -16,6 +15,8 @@ import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { envInfo } from '../../infrastructure/env-info.js';
+import { schemaUrlFor } from '../../types/apimatic-config/document.js';
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -35,8 +36,9 @@ export class PortalQuickstartAction {
   }
 
   public readonly execute = async (): Promise<ActionResult> => {
-    // Asked before anything is written: the flow ends in `portal serve`, which refuses on an
-    // older Node, and refusing after the project is scaffolded leaves a tree to clean up.
+    // Asked before anything is written: the user's next command is `portal serve`, which
+    // refuses an installation missing the portal build's dependencies, and learning that after
+    // the wizard leaves a tree to clean up.
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
       this.prompts.runtimeUnsupported(runtimeProblem);
@@ -51,7 +53,8 @@ export class PortalQuickstartAction {
       }
     }
 
-    // Checked before any question is asked: `portal serve` refuses without this entitlement.
+    // Checked before any question is asked: `portal serve`, the next command, refuses without
+    // this entitlement.
     const authorization = await this.authorizationService.authorize(this.configDir, this.commandMetadata.shell, null);
     if (authorization.isErr()) {
       this.prompts.authorizationFailed(authorization.error);
@@ -117,8 +120,8 @@ export class PortalQuickstartAction {
       }
 
       // The validation above accepts Swagger 2.0, which a portal cannot be built from. Asked
-      // here rather than by `portal serve` below, which refuses only once the project is
-      // written -- and the directory prompt then rejects the non-empty tree it just created.
+      // here rather than left to `portal serve`, which refuses only once the project is
+      // written -- and running the wizard again then rejects the non-empty tree it created.
       const format = await this.specFormat(specPath);
       if (!format.supported) {
         if (format.format === null) {
@@ -151,7 +154,10 @@ export class PortalQuickstartAction {
       }
 
       const sourceDirectory = inputDirectory.join('src');
-      const scaffolded = await new PortalSourceContext(sourceDirectory).scaffold(specPath);
+      const scaffolded = await new PortalSourceContext(sourceDirectory).scaffold(
+        specPath,
+        schemaUrlFor(envInfo.getCLIVersion())
+      );
       if (scaffolded.isErr()) {
         this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
         return ActionResult.failed();
@@ -160,15 +166,10 @@ export class PortalQuickstartAction {
       const structure = await this.fileService.getDirectory(sourceDirectory);
       this.prompts.printDirectoryStructure(inputDirectory, structure);
 
-      const portalServeAction = new PortalServeAction(this.configDir, this.commandMetadata, null);
-      const result = await portalServeAction.execute(sourceDirectory, DEFAULT_PORTAL_PORT, true, () => {
-        this.prompts.nextSteps();
-      });
-
-      if (result.isFailed()) {
-        return ActionResult.failed();
-      }
-
+      // The wizard does not ask for the project's SDK languages yet, and a portal is not built
+      // without them, so it ends here and says what to add rather than starting a preview that
+      // refuses the project it just wrote.
+      this.prompts.nextSteps(scaffolded.value, inputDirectory);
       return ActionResult.success();
     });
   };

@@ -4,6 +4,7 @@ import { fetchUrls, parseJson, parseYaml, readFiles } from '@scalar/json-magic/b
 import { escapeJsonPointer } from '@scalar/json-magic/helpers/escape-json-pointer';
 import { getSegmentsFromPath } from '@scalar/json-magic/helpers/get-segments-from-path';
 import { getValueByPath } from '@scalar/json-magic/helpers/get-value-by-path';
+import { isJsonObject } from './json';
 
 type JsonObject = Record<string, unknown>;
 
@@ -339,8 +340,4 @@ function pointerSegments(ref: string): string[] | undefined {
 
 function key(segments: string[]): string {
   return JSON.stringify(segments);
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

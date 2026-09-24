@@ -3,7 +3,7 @@ import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons';
 import { openapiPlugin } from 'fumadocs-openapi/server';
 import { docsRoute } from './shared';
 import { docs } from './source';
-import { navigationTransformer, OPENAPI_SOURCE } from './navigation';
+import { navigationTransformer, OPENAPI_SOURCE, tabsTransformer } from './navigation';
 import { openApiSource } from './openapi.server';
 
 // Reads every OpenAPI document off disk, so this only runs at build time, inside server
@@ -16,7 +16,8 @@ export const source = loader(
     plugins: [lucideIconsPlugin(), openapiPlugin()],
     // No fallback tree: it is built from the files that became no node, and `nav.json` never
     // does, so every build would otherwise grow a second tree that nothing renders and that
-    // the sidebar payload carries to every visitor.
-    pageTree: { transformers: [navigationTransformer()], generateFallback: false }
+    // the sidebar payload carries to every visitor. The tabs are formed from the root once it
+    // is ordered, which is why their transformer comes second.
+    pageTree: { transformers: [navigationTransformer(), tabsTransformer()], generateFallback: false }
   }
 );

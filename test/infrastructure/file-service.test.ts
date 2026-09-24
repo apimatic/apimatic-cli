@@ -58,4 +58,46 @@ describe('FileService', () => {
       expect(fs.readdirSync(root)).to.deep.equal(['config.json']);
     });
   });
+
+  describe('spelledOnDisk', () => {
+    const fileService = new FileService();
+    let root: DirectoryPath;
+    const fileAt = (...names: string[]) => {
+      const fileName = new FileName(names.pop() ?? '');
+      return new FilePath(root.join(...names), fileName);
+    };
+
+    beforeEach(() => {
+      root = new DirectoryPath(fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-')));
+      fs.mkdirSync(path.join(root.toString(), 'static', 'images'), { recursive: true });
+      fs.writeFileSync(path.join(root.toString(), 'static', 'images', 'logo.png'), '');
+    });
+
+    afterEach(() => {
+      fs.rmSync(root.toString(), { recursive: true, force: true });
+    });
+
+    it('answers with the file itself when it is spelt as on disk', async () => {
+      const file = fileAt('static', 'images', 'logo.png');
+
+      const found = await fileService.spelledOnDisk(root, file);
+
+      expect(found?.isEqual(file)).to.be.true;
+    });
+
+    it('answers with the spelling on disk of a file and the directories above it named in another case', async () => {
+      const found = await fileService.spelledOnDisk(root, fileAt('Static', 'Images', 'Logo.PNG'));
+
+      expect(found?.isEqual(fileAt('static', 'images', 'logo.png'))).to.be.true;
+    });
+
+    it('answers null for a file that is not there in any case', async () => {
+      expect(await fileService.spelledOnDisk(root, fileAt('static', 'images', 'icon.png'))).to.be.null;
+      expect(await fileService.spelledOnDisk(root, fileAt('static', 'logos', 'logo.png'))).to.be.null;
+    });
+
+    it('does not take a directory for the file', async () => {
+      expect(await fileService.spelledOnDisk(root, fileAt('static', 'images'))).to.be.null;
+    });
+  });
 });

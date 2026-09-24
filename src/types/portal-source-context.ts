@@ -2,15 +2,23 @@ import { err, ok, Result } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { ApimaticConfigContext } from './apimatic-config-context.js';
-import { findingSentences } from './apimatic-config/document.js';
+import { APIMATIC_CONFIG_FILE_NAME, ApimaticConfigDocument, findingSentences } from './apimatic-config/document.js';
 import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
+import { PortalLanguages } from './portal/portal-languages.js';
 import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
-import { PortalScaffoldProblem, PortalSource, PortalSourceProblem, PortalSpec } from './portal/portal-source.js';
+import {
+  MissingStaticFile,
+  PortalScaffoldProblem,
+  PortalSource,
+  PortalSourceProblem,
+  PortalSpec
+} from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -83,21 +91,22 @@ export class PortalSourceContext {
 
   /** Reads and validates the whole source directory, or reports the first problem found. */
   public async resolve(): Promise<Result<PortalSource, PortalSourceProblem>> {
-    const config = await this.readConfig();
+    const document = await this.readConfigDocument();
+    if (document.isErr()) {
+      return err(document.error);
+    }
+
+    // Read before the block is parsed: the block's site name and description default to what
+    // the only specification says about itself.
+    const discovered = await this.specs();
+    if (discovered.isErr()) {
+      return err(discovered.error);
+    }
+    const { specs, suggested } = discovered.value;
+
+    const config = await this.configFrom(document.value, suggested);
     if (config.isErr()) {
       return err(config.error);
-    }
-
-    // `parse` checks the shape of `logo`, not that the file is there -- and a missing logo
-    // renders as a broken image on every page of a build that otherwise reports success.
-    const logoPath = config.value.logoPath();
-    if (logoPath !== null && !(await this.fileService.fileExists(this.resolveInSource(logoPath)))) {
-      return err({ kind: 'missingLogo', logoPath });
-    }
-
-    const specs = await this.specs();
-    if (specs.isErr()) {
-      return err(specs.error);
     }
 
     const staticDirectory = (await this.fileService.directoryExists(this.staticDirectory))
@@ -122,32 +131,57 @@ export class PortalSourceContext {
 
     // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
     // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
-    const navigation = await this.navigation(contentTree, specs.value);
+    const navigation = await this.navigation(contentTree, specs);
     if (navigation.errors.length > 0) {
       return err({ kind: 'invalidNavigation', errors: navigation.errors });
     }
 
     return ok({
       config: config.value,
-      specs: specs.value,
+      suggestedSite: suggested,
+      specs,
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
       hiddenPages:
         contentTree === null
           ? []
-          : PortalSourceContext.hiddenPages(PortalSourceContext.contentPages(contentTree), specs.value),
+          : PortalSourceContext.hiddenPages(PortalSourceContext.contentPages(contentTree), specs),
       ignoredNavigationFiles: navigation.ignoredFiles
     });
   }
 
   /**
-   * The `portal` block, or why it cannot be read. Only the root and the portal block are this
-   * command's to judge: a malformed plugin or languages block belongs to the commands that write
-   * them, and must not fail a build. Everything found is reported together, so one edit fixes
-   * the file.
+   * The config half of `resolve`, for `portal serve` to run on every edit, so an edit is
+   * accepted exactly when a build would accept it. `suggested` is what `resolve` found in the
+   * specifications, which are not read again; changing them needs a restart anyway.
    */
-  private async readConfig(): Promise<Result<PortalConfig, PortalSourceProblem>> {
+  public async resolveConfig(suggested: SuggestedSite | null): Promise<Result<PortalConfig, PortalSourceProblem>> {
+    const document = await this.readConfigDocument();
+    if (document.isErr()) {
+      return err(document.error);
+    }
+    return this.configFrom(document.value, suggested);
+  }
+
+  private async configFrom(
+    document: ApimaticConfigDocument,
+    suggested: SuggestedSite | null
+  ): Promise<Result<PortalConfig, PortalSourceProblem>> {
+    const config = PortalSourceContext.parseConfig(document, suggested);
+    if (config.isErr()) {
+      return err(config.error);
+    }
+    // The block checks the shape of each path, not that the file is there -- and a missing
+    // logo renders as a broken image on every page of a build that otherwise reports success.
+    const missingFiles = await this.missingStaticFiles(config.value);
+    if (missingFiles.length > 0) {
+      return err({ kind: 'missingStaticFiles', files: missingFiles });
+    }
+    return ok(config.value);
+  }
+
+  private async readConfigDocument(): Promise<Result<ApimaticConfigDocument, PortalSourceProblem>> {
     const state = await this.configContext.read();
     if (state.state === 'missing') {
       return err({ kind: 'missingConfig' });
@@ -155,40 +189,72 @@ export class PortalSourceContext {
     if (state.state === 'unparseable') {
       return err({ kind: 'invalidConfig', errors: findingSentences(state.findings), missingPortal: false });
     }
+    return ok(state.document);
+  }
 
-    const block = state.document.portal();
-    const rootErrors = findingSentences(state.document.findingsFor('root'));
-    const config = PortalConfig.fromBlock(block);
-    if (config.isErr() || rootErrors.length > 0) {
-      return err({
-        kind: 'invalidConfig',
-        errors: [...rootErrors, ...(config.isErr() ? config.error : [])],
-        missingPortal: block === undefined
-      });
+  /**
+   * The root and the `languages` block are this command's to judge as well, since the portal
+   * documents the project's SDK languages; a malformed `plugin` block belongs to the plugin
+   * commands and must not fail a build.
+   */
+  private static parseConfig(
+    document: ApimaticConfigDocument,
+    suggested: SuggestedSite | null
+  ): Result<PortalConfig, PortalSourceProblem> {
+    const block = document.portal();
+    const config = PortalConfig.fromBlock(block, suggested);
+    const languages = PortalLanguages.fromBlock(document.languages(), document.findingsFor('languages'));
+    const errors = [
+      ...findingSentences(document.findingsFor('root')),
+      ...(config.isErr() ? config.error : []),
+      ...(languages.isErr() ? languages.error : [])
+    ];
+    if (config.isErr() || errors.length > 0) {
+      return err({ kind: 'invalidConfig', errors, missingPortal: block === undefined });
     }
     return ok(config.value);
   }
 
+  private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {
+    const missing: MissingStaticFile[] = [];
+    for (const asset of config.staticFiles()) {
+      const file = asset.resolveIn(this.sourceDirectory);
+      const found = await this.fileService.spelledOnDisk(this.sourceDirectory, file);
+      if (!found?.isEqual(file)) {
+        missing.push({ setting: asset.settingPath(), file, foundAs: found });
+      }
+    }
+    return missing;
+  }
+
   /**
-   * Writes the smallest source tree `portal generate` and `portal serve` accept, with a
-   * `portal` block described from the specification itself. Every fault is reported rather
-   * than thrown, including the ones the file service raises: the caller is a wizard that has
-   * asked its questions already, and it reports what went wrong instead of crashing.
+   * Writes everything `portal generate` and `portal serve` need but the `languages` block,
+   * which the user adds by hand until the wizard asks for it. Every fault is reported rather
+   * than thrown, the file service's included: the caller is a wizard that has asked its
+   * questions already. Answers with the `apimatic.json` it wrote.
    */
-  public async scaffold(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
+  public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
-      return await this.writeSourceTree(specPath);
+      return await this.writeSourceTree(specPath, schemaUrl);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
   }
 
-  private async writeSourceTree(specPath: FilePath): Promise<Result<void, PortalScaffoldProblem>> {
+  private async writeSourceTree(
+    specPath: FilePath,
+    schemaUrl: string
+  ): Promise<Result<FilePath, PortalScaffoldProblem>> {
     await new SpecContext(this.specDirectory).install(specPath);
 
-    const config = await this.suggestedConfig(specPath);
+    const site = await this.suggestedSite(specPath);
+    const config = PortalConfig.scaffolded(site);
     // The directory is empty when quickstart runs this, so the merge always creates the file.
-    const written = await this.configContext.merge(['portal'], (document) => document.with('portal', config.toJSON()));
+    // Every default is spelled out, so the block shows what can be set, and the schema lets an
+    // editor complete and check the rest.
+    const written = await this.configContext.merge(['portal'], (document) =>
+      document.referencingSchema(schemaUrl).with('portal', config.toJSON())
+    );
     if (written.isErr()) {
       return err({ kind: written.error === 'unreadable' ? 'configUnreadable' : 'configUnwritable' });
     }
@@ -216,26 +282,16 @@ export class PortalSourceContext {
       new FilePath(this.contentDirectory, new FileName(NAVIGATION_FILE_NAME)),
       JSON.stringify({ pages: ['index', '...'] }, null, 2) + '\n'
     );
-    return ok(undefined);
+    return ok(new FilePath(this.sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME)));
   }
 
   // A split specification arrives as an archive, whose parts are left to the build to read.
-  private async suggestedConfig(specPath: FilePath): Promise<PortalConfig> {
+  private async suggestedSite(specPath: FilePath): Promise<SuggestedSite> {
     if (await this.fileService.isZipFile(specPath)) {
-      return PortalConfig.placeholder;
+      return PLACEHOLDER_SITE;
     }
     const document = await this.readDocument(specPath);
-    return document === undefined ? PortalConfig.placeholder : document.suggestedConfig();
-  }
-
-  /** A `/`-separated path relative to `src/`, as `PortalConfig` reports it, as a file path. */
-  private resolveInSource(relativePath: string): FilePath {
-    const segments = relativePath.split('/');
-    const fileName = new FileName(segments.pop() ?? '');
-    return new FilePath(
-      segments.reduce((directory, segment) => directory.join(segment), this.sourceDirectory),
-      fileName
-    );
+    return document === undefined ? PLACEHOLDER_SITE : document.suggestedSite();
   }
 
   /**
@@ -256,7 +312,8 @@ export class PortalSourceContext {
     const visit = async (
       directory: Directory,
       isContentRoot: boolean,
-      isApiDirectory: boolean
+      isApiDirectory: boolean,
+      isTopLevel: boolean
     ): Promise<DirectoryScan> => {
       const childNames: string[] = [];
       const pageNames = new Set<string>();
@@ -270,7 +327,7 @@ export class PortalSourceContext {
         // holds only a `nav.json`, but the template drops it again to keep to this rule.
         if (item instanceof Directory) {
           const isApiChild = isContentRoot && item.directoryPath.leafName() === API_REFERENCE_NAME;
-          const child = await visit(item, false, isApiChild);
+          const child = await visit(item, false, isApiChild, isContentRoot);
           childErrors.push(...child.errors);
           if (child.holdsPage) {
             holdsPage = true;
@@ -345,6 +402,8 @@ export class PortalSourceContext {
           const checked = PortalNavigation.validate(contents, {
             label,
             isContentRoot,
+            isTopLevel,
+            isApiDirectory,
             becomesFolder,
             childNames
           });
@@ -357,7 +416,7 @@ export class PortalSourceContext {
       return { holdsPage, errors: [...errors, ...childErrors] };
     };
 
-    const root = await visit(contentTree, true, false);
+    const root = await visit(contentTree, true, false, false);
     return { errors: root.errors, ignoredFiles };
   }
 
@@ -416,8 +475,14 @@ export class PortalSourceContext {
       .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }));
   }
 
-  private async specs(): Promise<Result<PortalSpec[], PortalSourceProblem>> {
+  // With several specifications there is no suggested site: no one of them speaks for the portal.
+  private async specs(): Promise<
+    Result<{ specs: PortalSpec[]; suggested: SuggestedSite | null }, PortalSourceProblem>
+  > {
     const specs: PortalSpec[] = [];
+    // Only the first is kept: it is the one that speaks for the portal when it is alone, and
+    // specifications run to megabytes.
+    let first: OpenApiDocument | undefined;
     const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
 
     for (const fileName of await this.specFileNames()) {
@@ -438,12 +503,13 @@ export class PortalSourceContext {
       }
 
       specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file });
+      first ??= document;
     }
 
-    if (specs.length === 0) {
+    if (first === undefined) {
       return err({ kind: 'noSpecs' });
     }
-    return ok(specs);
+    return ok({ specs, suggested: specs.length === 1 ? first.suggestedSite() : null });
   }
 
   private async specFileNames(): Promise<FileName[]> {

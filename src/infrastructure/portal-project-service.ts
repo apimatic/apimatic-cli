@@ -6,7 +6,10 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { PortalConfig } from '../types/portal/portal-config.js';
 import { PortalSource } from '../types/portal/portal-source.js';
+import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
+import { errorMessage } from '../utils/error-utils.js';
 import { FileService } from './file-service.js';
 
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
@@ -33,7 +36,12 @@ export const TEMPLATE_DEPENDENCIES = [
 ];
 
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
-const PORTAL_IDENTITY_PLACEHOLDER = "'__APIMATIC_PORTAL_IDENTITY__'";
+
+/** Beside `portal.config.json`; `src/lib/portal.ts` imports it. */
+const IDENTITY_FILE_NAME = 'portal.identity.json';
+
+/** In `src/styles/`, beside `app.css`, which imports it. */
+const STYLESHEET_FILE_NAME = 'theme.css';
 
 export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
@@ -151,13 +159,9 @@ export class PortalProjectService {
       specs[spec.slug] = this.toPosix(spec.file.toString());
     }
 
-    // Only the portal's identity reaches the browser; everything else in the configuration
-    // addresses this machine and stays behind `portal.server.ts`. A JSON module is retained
-    // whole once client code imports it, so this is substituted into `portal.ts` as a literal.
-    const identity = source.config.identity();
-
+    // Everything here addresses this machine, so it stays behind `portal.server.ts` and the
+    // build's own config files.
     const configuration = {
-      ...identity,
       specs,
       contentDir: this.toPosix(contentDirectory.toString()),
       staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
@@ -168,8 +172,7 @@ export class PortalProjectService {
       JSON.stringify(configuration, null, 2)
     );
 
-    const portalModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('portal.ts'));
-    await this.substitute(portalModule, PORTAL_IDENTITY_PLACEHOLDER, JSON.stringify(identity));
+    await this.writeAppearance(projectDirectory, source.config);
 
     // A literal because Fumadocs' `defineDocs` macro rejects anything it cannot read at
     // compile time. Tailwind needs the same path to scan the user's pages: its automatic
@@ -180,6 +183,48 @@ export class PortalProjectService {
 
     const stylesheet = new FilePath(projectDirectory.join('src').join('styles'), new FileName('app.css'));
     await this.substitute(stylesheet, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);
+  }
+
+  /**
+   * The dev server picks the two files up and reloads the browser. Each is written only when
+   * its contents change, so an edit that leaves the site as it was, such as a plugin command
+   * rewriting its own block, reloads nothing; the answer says whether anything was written.
+   */
+  public async applyConfig(projectDirectory: DirectoryPath, config: PortalConfig): Promise<Result<boolean, string>> {
+    try {
+      let written = false;
+      for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
+        const current = (await this.fileService.fileExists(file)) ? await this.fileService.getContents(file) : null;
+        if (current !== contents) {
+          // Renamed over rather than written in place, which the watching dev server could read half-written.
+          await this.fileService.replaceContents(file, contents);
+          written = true;
+        }
+      }
+      return ok(written);
+    } catch (error) {
+      return err(errorMessage(error));
+    }
+  }
+
+  private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {
+    for (const [file, contents] of this.appearanceFiles(projectDirectory, config)) {
+      await this.fileService.writeContents(file, contents);
+    }
+  }
+
+  /**
+   * The browser imports `portal.identity.json` whole, since a retained JSON module is not
+   * tree-shaken per property, which is why it holds nothing that addresses this machine.
+   */
+  private appearanceFiles(projectDirectory: DirectoryPath, config: PortalConfig): [FilePath, string][] {
+    return [
+      [new FilePath(projectDirectory, new FileName(IDENTITY_FILE_NAME)), JSON.stringify(config.identity(), null, 2)],
+      [
+        new FilePath(projectDirectory.join('src').join('styles'), new FileName(STYLESHEET_FILE_NAME)),
+        PortalStylesheet.of(config).toString()
+      ]
+    ];
   }
 
   private async substitute(file: FilePath, placeholder: string, literal: string): Promise<void> {

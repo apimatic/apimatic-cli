@@ -16,6 +16,13 @@ function isDanglingLink(error: unknown): boolean {
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
+function spelling<T>(name: string, entries: T[], nameOf: (entry: T) => string): T | undefined {
+  return (
+    entries.find((entry) => nameOf(entry) === name) ??
+    entries.find((entry) => nameOf(entry).toLowerCase() === name.toLowerCase())
+  );
+}
+
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
@@ -130,6 +137,24 @@ export class FileService {
 
   public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
     return (await this.listEntries(dir)).subDirectories;
+  }
+
+  // By code point first: Windows and macOS open `logo.png` for `Logo.PNG`, where a web server would not.
+  public async spelledOnDisk(root: DirectoryPath, file: FilePath): Promise<FilePath | null> {
+    const names = path.relative(root.toString(), file.toString()).split(path.sep);
+    const fileName = names.pop() ?? '';
+    let directory = root;
+    for (const name of names) {
+      const { subDirectories } = await this.listEntries(directory);
+      const match = spelling(name, subDirectories, (subDirectory) => path.basename(subDirectory.toString()));
+      if (match === undefined) {
+        return null;
+      }
+      directory = match;
+    }
+    const { fileNames } = await this.listEntries(directory);
+    const match = spelling(fileName, fileNames, (candidate) => candidate.toString());
+    return match === undefined ? null : new FilePath(directory, match);
   }
 
   // The direct children of `dir`, split into files and directories; both empty when it cannot

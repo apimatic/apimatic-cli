@@ -2,6 +2,14 @@
 
 Status: in progress, 2026-09-22. Branch `saeedjamshaid/apimatic-config`, cut from `dev`.
 
+**Amended 2026-09-23** by `.ai/plans/portal-config.md`, whose PR changes this
+plan in five places, each noted where it applies: the `portal generate` half of
+"requires a `languages` entry" lands in that PR (section 1); the portal path
+now reads `languages` findings, and an unknown `portal` key gets no near-miss
+hint (section 2); its portal-config bullet is superseded (section 10); and the
+release notes name the new `portal` namespaces and the `languages` requirement
+(section 13).
+
 ## 1. Goal and scope
 
 One file, `src/apimatic.json`, sitting where `src/portal.json` and
@@ -29,7 +37,10 @@ blocks it finds and writes the ones it does not; then `portal generate`
 requires `portal` and at least one entry in `languages`, and `plugin generate`
 requires `plugin` and at least one `languages` entry carrying what plugin
 generation needs. Where a decision below is shaped by what a later PR will do,
-its row says so.
+its row says so. *(Amended 2026-09-23: the `portal generate` half, for
+`portal serve` too, lands with `.ai/plans/portal-config.md`, as at least one
+`languages` entry keyed by a known language; the `plugin generate` half stays
+in this series.)*
 
 The backend is changed alongside this series to read `plugin` and `languages`
 from the `apimatic.json` inside the `src/` it is sent, and this PR merges only
@@ -55,13 +66,13 @@ called); the backend change itself.
 | Location | `<input>/src/apimatic.json`, where the two files it replaces sit today. Decided 2026-09-22 (section 11): `sdk generate` and `plugin generate` upload `src/` wholesale and the backend reads `plugin` and `languages` from the `apimatic.json` inside that upload, so the file travels with `src/`. The portal block rides along and the server ignores it. |
 | Root keys | `$schema`, `schemaVersion`, `portal`, `plugin`, `languages`. All optional at the file level; each command requires what it needs (section 4). |
 | `schemaVersion` | Optional. Accepted when absent or `1`. Any other value is an error naming the CLI version that reads it, so a future format is refused rather than misread. Written by the create path only (writer row). |
-| `$schema` | Accepted and ignored, as the portal-config plan already says. Not written by the scaffold until the schema file exists. |
+| `$schema` | Accepted and ignored, as the portal-config plan already says. Not written by the scaffold until the schema file exists. *(Amended 2026-09-23: `apimatic.schema.json` exists, and the quickstart scaffold writes `$schema` first in the file; files the plugin and publishing commands create do not carry it.)* |
 | Ownership per block | `portal` is user-authored. In this release the CLI writes it once, from quickstart, and never again; the quickstart PR that adopts an existing directory (section 1) writes it into a file that already exists, which is why the writer below knows no block. `plugin` and `languages` are shared, as `plugin-config.json` was designed to be: the user may edit them and the CLI merges into them after `plugin generate` and `sdk publish`. |
-| Validation per block | `portal` keeps today's strictness: every field validated, unknown fields reported with the near-miss hint. `plugin` and `languages` keep today's leniency: shape checks that protect the merge, unknown fields preserved, and the two `plugin` checks that make the file `unreadable` today — `PLUGIN_ID_PATTERN` on `pluginId`, semver on `pluginVersion` — kept as `plugin` findings (decided 2026-09-22, section 11). The two policies already exist; they now apply to blocks instead of files. |
+| Validation per block | `portal` keeps today's strictness: every field validated, unknown fields reported with the near-miss hint. `plugin` and `languages` keep today's leniency: shape checks that protect the merge, unknown fields preserved, and the two `plugin` checks that make the file `unreadable` today — `PLUGIN_ID_PATTERN` on `pluginId`, semver on `pluginVersion` — kept as `plugin` findings (decided 2026-09-22, section 11). The two policies already exist; they now apply to blocks instead of files. *(Amended 2026-09-23: the near-miss hints are gone. An unknown `portal` key is reported by its dotted path with no hint, as the portal-config plan decides for keys that never shipped.)* |
 | Byte-order mark | Stripped, then parsed. `portal.json` strips one today and `plugin-config.json` refuses one as `unreadable`; with one file the parser has to pick, and stripping is the only choice that cannot break a project that works today. The plugin path's byte-order-mark `reason` is deleted. Windows is where a byte-order mark comes from — Notepad and PowerShell redirection write it — and it is now the portal's file too. Reading past a mark is enough only while the file stays here: `plugin generate` zips `src/` and sends it to a parser that is not this one, so that path takes the mark off the file before the zip (section 6). Only the mark is removed; the rest of the file is written back byte for byte, so a layout the CLI never chose survives a rewrite it never asked for. |
 | Unknown root keys | Ignored, and preserved untouched by the writers — the same leniency `plugin` and `languages` get, for the same reason: a file written by a later CLI that adds a root block must still be readable by this one, which is what `schemaVersion` exists to gate instead. No near-miss hint at the root; a misspelled block is reported only as the required block being absent. |
 | A required block is absent | Reported by the command that needs it, naming the block and nothing else: `'portal' is required`. That is the whole root-level report, so a user who wrote `portla` is told what is missing rather than what is unrecognised. |
-| Which findings reach which command | Every finding carries the block it came from. `portal generate` and `portal serve` see root-level and `portal` findings; the plugin path sees root-level, `plugin` and `languages`, and never `portal`. A malformed `languages` entry therefore cannot fail a portal build, which is what the ownership split above and the invariants in section 4 both require. When `portal generate` later reads `languages` (the series' last PR, and `x-codeSamples` after it), it opts into those findings deliberately and this row is revisited. |
+| Which findings reach which command | Every finding carries the block it came from. `portal generate` and `portal serve` see root-level and `portal` findings; the plugin path sees root-level, `plugin` and `languages`, and never `portal`. A malformed `languages` entry therefore cannot fail a portal build, which is what the ownership split above and the invariants in section 4 both require. When `portal generate` later reads `languages` (the series' last PR, and `x-codeSamples` after it), it opts into those findings deliberately and this row is revisited. *Revisited 2026-09-23 as anticipated (`.ai/plans/portal-config.md`, section 8): the portal path reads `root` and `languages` findings, so a malformed `languages` block now fails a portal build; the plugin path is unchanged.* |
 | Writer | Read the document, hand the whole of it to the caller's `apply`, write back the whole of what comes back. The writer knows no block: this release's two callers replace `plugin` and `languages`, and the quickstart PR replaces `portal` without reopening it. Every key the caller did not touch keeps its position, a block the caller adds is appended after the last key — so section 3's order is what a file created whole looks like, and a project that publishes SDKs before it builds a plugin ends up with `languages` before `plugin` — and the file is written with the indentation it already uses and the trailing newline as found. A file the writer creates gets two spaces, a trailing newline and `schemaVersion: 1`; a merge into a file that lacks `schemaVersion` adds nothing (decided 2026-09-22, section 11). Today's two writers disagree on the newline (the plugin writer omits it, the portal scaffold appends it), so it is decided here rather than left to whichever runs first. Preserving indentation and the newline is new behaviour, not preserved behaviour (section 8). The write goes through `FileService.replaceContents`: the content is written to a temporary file beside the target and renamed over it, so a torn write cannot destroy a hand-authored `portal` block, and the temporary file is removed if the rename fails, so a failed write leaves nothing behind. A file that exists but cannot be parsed is left alone, as today. |
 | Legacy files | `src/plugin-config.json` is not read, not imported and not mentioned by the CLI. Same rule as the 1.x portal setup: the release notes carry the move, the CLI carries no migration messaging. `src/portal.json` needs no rule: no released CLI ever wrote one — npm `latest` is 1.5.0 and `beta` is 1.3.0-beta.2, and both trees predate the Fumadocs portal — so only a directory built from `dev` holds one. The break users actually meet is `APIMATIC-BUILD.json`'s portal settings and `src/plugin-config.json`, and that is what the notes describe (section 9). |
 | `--update-plugin-config` | Keeps its name this release; only its description changes to say `apimatic.json`. Renaming is a separate decision. |
@@ -433,7 +444,10 @@ major.
   generated command blocks, so it is not edited by hand: the README is
   regenerated once the command and flag strings change, and the regeneration is
   part of step 7.
-- `.ai/plans/portal-config.md`: the schema file becomes `apimatic.schema.json`
+- *(Superseded 2026-09-23: `.ai/plans/portal-config.md` was rewritten for
+  `apimatic.json` and is implemented; its schema covers the whole file and its
+  `portal` block is the nested one. The bullet below is kept as it was.)*
+  `.ai/plans/portal-config.md`: the schema file becomes `apimatic.schema.json`
   with the `portal` block as one definition; `$schema` URL follows. The
   scaffold section writes `src/apimatic.json`. Its `sdks.languages` is dropped
   and its "Rejected: top-level `languages`" entry reversed: the portal derives
@@ -596,7 +610,11 @@ whole series, not this PR alone.
   record them again, then delete the old file. The server reads `apimatic.json`
   from the uploaded `src/`.
 - The documentation portal is described by the `portal` block of
-  `src/apimatic.json` (`title`, `description`, `logo`, `siteUrl`);
+  `src/apimatic.json` — `site`, `brand`, `navigation` and `ai` (amended
+  2026-09-23, when it listed the flat `dev` keys, and 2026-09-24, when it listed
+  the `home`, `api` and `advanced` namespaces the first release cut; see
+  `.ai/plans/portal-config.md` section 15) — and needs at
+  least one entry in the file's `languages` block;
   `APIMATIC-BUILD.json` no longer configures it. `apimatic quickstart` scaffolds
   the file. Portals are built on your machine from `src/spec/`, `src/content/`
   and `src/static/`.

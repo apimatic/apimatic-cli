@@ -1,9 +1,24 @@
 import { err, ok, Result } from 'neverthrow';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { PLUGIN_ID_PATTERN } from '../plugin/plugin-config.js';
 import { SemVersion } from '../publish/version.js';
 
 export const APIMATIC_CONFIG_FILE_NAME = 'apimatic.json';
+
+/** Where editors find the file's schema: the copy the published package carries, for this major. */
+export const APIMATIC_SCHEMA_URL = 'https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json';
+
+/**
+ * The schema address a file written by this version of the CLI carries. jsDelivr resolves a
+ * major range to its newest stable release and never to a prerelease, so `@2` leads nowhere
+ * until 2.0.0 ships; a prerelease names its own version instead, which jsDelivr serves exactly.
+ */
+export function schemaUrlFor(cliVersion: string): string {
+  return /^\d+\.\d+\.\d+-\S+$/.test(cliVersion)
+    ? `https://cdn.jsdelivr.net/npm/@apimatic/cli@${cliVersion}/apimatic.schema.json`
+    : APIMATIC_SCHEMA_URL;
+}
 
 /** The one format this CLI reads. A file naming another is refused rather than misread. */
 export const SCHEMA_VERSION = 1;
@@ -32,10 +47,6 @@ const NOT_A_JSON_OBJECT = 'is not a JSON object';
 const MALFORMED_PLUGIN_ID = `must be lower-case alphanumeric words separated by single dashes, for example 'acme-payments'`;
 
 const MALFORMED_PLUGIN_VERSION = `must be a version in the format major.minor.patch, for example '0.1.0'`;
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /** The parsed `apimatic.json`: its blocks, the keys around them in the order written, and what is wrong with it. */
 export class ApimaticConfigDocument {
@@ -133,9 +144,7 @@ export class ApimaticConfigDocument {
         return [{ block: 'languages', field: `languages.${language}`, problem: NOT_A_JSON_OBJECT }];
       }
       if (entry.publishing !== undefined && !isJsonObject(entry.publishing)) {
-        return [
-          { block: 'languages', field: `languages.${language}.publishing`, problem: NOT_A_JSON_OBJECT }
-        ];
+        return [{ block: 'languages', field: `languages.${language}.publishing`, problem: NOT_A_JSON_OBJECT }];
       }
       return [];
     });
@@ -158,6 +167,13 @@ export class ApimaticConfigDocument {
 
   public findingsFor(...blocks: ConfigBlock[]): ConfigFinding[] {
     return this.findings.filter((finding) => blocks.includes(finding.block));
+  }
+
+  /** `$schema` goes first among the keys, where a reader looks for it. */
+  public referencingSchema(schemaUrl: string): ApimaticConfigDocument {
+    const rest = { ...this.root };
+    delete rest.$schema;
+    return ApimaticConfigDocument.of({ $schema: schemaUrl, ...rest });
   }
 
   /**

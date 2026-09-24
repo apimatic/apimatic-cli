@@ -20,6 +20,11 @@ export class FilePath {
     return new FilePath(newDirectory, this.fileName);
   }
 
+  /** The same path, spelt the same way: `Logo.png` is not `logo.png`. */
+  public isEqual(other: FilePath): boolean {
+    return this.directoryPath.isEqual(other.directoryPath) && this.fileName.compare(other.fileName) === 0;
+  }
+
   public toString(): string {
     return path.join(this.directoryPath.toString(), this.fileName.toString());
   }

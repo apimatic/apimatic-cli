@@ -220,7 +220,7 @@ describe('navigationTransformer', () => {
     // With nothing of the user's named, everything named is what the CLI adds, and the
     // user's pages have no reason to drop below it.
     it('stays below every unnamed page when the file names only tokens', () => {
-      const docs = [...CONTENT, nav('nav.json', ['apimatic:pages', 'apimatic:api'])];
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:sdks', 'apimatic:api'])];
 
       expect(treeOf({ docs, generated: [page('sdks.mdx', 'SDKs')], openapi: API })).to.deep.equal([
         'Welcome',
@@ -319,7 +319,7 @@ describe('navigationTransformer', () => {
     const GENERATED = [page('sdks.mdx', 'SDKs')];
 
     it('go where the token names them', () => {
-      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:pages', 'authentication'])];
+      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:sdks', 'authentication'])];
 
       expect(treeOf({ docs, generated: GENERATED, openapi: API })).to.deep.equal([
         'Welcome',
@@ -379,7 +379,7 @@ describe('navigationTransformer', () => {
     });
 
     it('resolve to nothing when there is no generated source, which is the case today', () => {
-      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:pages', 'authentication'])];
+      const docs = [...CONTENT, nav('nav.json', ['index', 'apimatic:sdks', 'authentication'])];
 
       expect(treeOf({ docs, openapi: API })).to.deep.equal(['Welcome', 'Authentication', 'API Reference']);
     });
@@ -471,6 +471,8 @@ describe('navigationTransformer', () => {
       PortalNavigation.validate(JSON.stringify({ pages: [entry, 'index'] }), {
         label: 'content/nav.json',
         isContentRoot: true,
+        isTopLevel: false,
+        isApiDirectory: false,
         becomesFolder: true,
         childNames: ['index', 'authentication']
       }).isOk();
@@ -489,10 +491,10 @@ describe('navigationTransformer', () => {
       expect(treeOf({ docs, openapi: API })).to.deep.equal(['API Reference', 'Welcome', 'Authentication']);
     });
 
-    it('accepts and applies the injected pages token', () => {
-      expect(accepts('apimatic:pages')).to.be.true;
+    it('accepts and applies the SDKs token', () => {
+      expect(accepts('apimatic:sdks')).to.be.true;
 
-      const docs = [...CONTENT, nav('nav.json', ['apimatic:pages', 'index', 'authentication'])];
+      const docs = [...CONTENT, nav('nav.json', ['apimatic:sdks', 'index', 'authentication'])];
       expect(treeOf({ docs, generated: [page('sdks.mdx', 'SDKs')] })).to.deep.equal([
         'SDKs',
         'Welcome',
