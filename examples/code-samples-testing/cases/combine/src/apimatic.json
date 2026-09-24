@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "portal": { "title": "Combine examples" },
-  "languages": {
-    "csharp": { "publishing": { "source": { "repositoryUrl": "https://github.com/example/combine-dotnet" }, "package": { "packageId": "Combine.Sdk", "version": "1.0.0" } } },
-    "typescript": { "publishing": { "source": { "repositoryUrl": "https://github.com/example/combine-ts" }, "package": { "name": "combine-sdk", "version": "1.0.0" } } },
-    "python": { "publishing": { "source": { "repositoryUrl": "https://github.com/example/combine-py" }, "package": { "name": "combine-sdk", "version": "1.0.0" } } }
-  }
-}
