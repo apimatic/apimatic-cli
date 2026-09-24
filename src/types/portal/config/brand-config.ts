@@ -112,6 +112,8 @@ export class BrandConfig {
     private readonly colorMode: ColorMode
   ) {}
 
+  public static readonly defaults = new BrandConfig(null, null, BrandColors.defaults, Fonts.defaults, 'both');
+
   public static parse(value: unknown, path: string): Parsed<BrandConfig> {
     return namespace(value, path).andThen((data) =>
       allOf(
@@ -126,8 +128,6 @@ export class BrandConfig {
       ).map(([logo, favicon, colors, fonts, colorMode]) => new BrandConfig(logo, favicon, colors, fonts, colorMode))
     );
   }
-
-  public static readonly defaults = new BrandConfig(null, null, BrandColors.defaults, Fonts.defaults, 'both');
 
   public logoImages(): Logo | null {
     return this.logo;
