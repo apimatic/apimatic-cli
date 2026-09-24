@@ -34,15 +34,18 @@ function ExampleLayout({ usageTabs, responseTabs }: Readonly<{ usageTabs: ReactN
   );
   const [selectedId, setSelectedId] = useState(examples[0].id);
 
-  const selection: ExampleSelection = {
-    operation,
-    examples,
-    selected: examples.find((example) => example.id === selectedId) ?? examples[0],
-    select: (id) => {
-      setSelectedId(id);
-      setExample(id);
-    }
-  };
+  const selection = useMemo<ExampleSelection>(
+    () => ({
+      operation,
+      examples,
+      selected: examples.find((example) => example.id === selectedId) ?? examples[0],
+      select: (id) => {
+        setSelectedId(id);
+        setExample(id);
+      }
+    }),
+    [operation, examples, selectedId, setExample]
+  );
   return (
     <SelectionContext.Provider value={selection}>
       <div className="prose-no-margin">
