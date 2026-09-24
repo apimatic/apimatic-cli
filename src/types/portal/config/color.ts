@@ -111,7 +111,7 @@ export class Color {
       }
       return NUMBER.test(value) ? Color.within(Number(value), 255) : undefined;
     });
-    if (channels.some((channel) => channel === undefined)) {
+    if (channels.includes(undefined)) {
       return undefined;
     }
     const [red, green, blue] = channels as number[];
