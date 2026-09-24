@@ -68,6 +68,10 @@ export class ApimaticConfigContext {
    * missing file starts from the empty document. A file that exists but cannot be parsed is
    * left alone rather than overwritten, and a write fault is reported rather than thrown: this
    * runs after work that already succeeded, and nothing here may turn that into a crash.
+   *
+   * A merge that leaves the document as it found it writes nothing, so re-running a command with
+   * the same answers leaves the file exactly as the user last saved it — its layout, and the line
+   * endings `serialize` does not keep, included.
    */
   public async merge(
     blocks: readonly ConfigBlockName[],
@@ -88,8 +92,13 @@ export class ApimaticConfigContext {
     }
 
     const next = apply(document);
+    const serialized = next.serialize(format.indent, format.trailingNewline);
+    if (loaded !== undefined && serialized === document.serialize(format.indent, format.trailingNewline)) {
+      return ok(next);
+    }
+
     try {
-      await this.fileService.replaceContents(this.configFile, next.serialize(format.indent, format.trailingNewline));
+      await this.fileService.replaceContents(this.configFile, serialized);
     } catch {
       return err('unwritable');
     }

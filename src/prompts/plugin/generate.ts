@@ -1,6 +1,7 @@
 import { confirm, isCancel, log, multiselect } from '@clack/prompts';
 import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
+import { PublishingProfileItem } from '../../types/publish-api/publishing-profile-item.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
@@ -14,13 +15,20 @@ const labelOf = (language: string): string =>
   LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
 
 export class PluginGeneratePrompts {
-  public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>, plugin: DirectoryPath) {
-    const location = f.muted(` — ${f.relativePath(plugin)}`);
+  /**
+   * The spinner covers the service call only. Where the plugin landed is said afterwards, by
+   * `installPluginLocally`, because until the save has run there is nothing at that path.
+   */
+  public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
+    return withSpinner('Generating Context Plugin', 'Plugin generated successfully.', 'Plugin Generation failed.', fn);
+  }
 
+  /** Advisory, and slow enough to look like a hang without a spinner over it. */
+  public checkPublishingProfiles(fn: Promise<Result<PublishingProfileItem[], ServiceError>>) {
     return withSpinner(
-      'Generating Context Plugin',
-      `Plugin generated successfully${location}`,
-      'Plugin Generation failed.',
+      'Checking your publishing profiles',
+      'Publishing profiles checked.',
+      'Could not check your publishing profiles.',
       fn
     );
   }
@@ -130,12 +138,12 @@ export class PluginGeneratePrompts {
    * alone; saying so is the only way the omission is visible.
    */
   public languagesNotIncluded(languages: readonly string[]) {
+    const one = languages.length === 1;
+    const names = languages.map((language) => labelOf(language)).join(', ');
+
     log.warn(
-      `${languages.join(', ')} cannot be included in a context plugin and ${
-        languages.length === 1 ? 'is' : 'are'
-      } left out of this one. ${f.var(APIMATIC_CONFIG_FILE_NAME)} keeps ${
-        languages.length === 1 ? 'its entry' : 'their entries'
-      } unchanged.`
+      `${names} cannot be included in a context plugin and ${one ? 'is' : 'are'} left out of this one. ` +
+        `${f.var(APIMATIC_CONFIG_FILE_NAME)} keeps ${one ? 'its entry' : 'their entries'} unchanged.`
     );
   }
 
@@ -144,7 +152,7 @@ export class PluginGeneratePrompts {
    * a profile means they are able to publish, not that they want to right now — so this is a
    * recommendation and a confirm, never a fork into another command.
    */
-  public recommendPublishingFirst() {
+  private recommendPublishingFirst() {
     log.warn(
       `You have a publishing profile set up.\n` +
         `We recommend publishing your SDK first for a better plugin experience.`
@@ -152,6 +160,8 @@ export class PluginGeneratePrompts {
   }
 
   public async confirmLocalPlugin(): Promise<boolean> {
+    this.recommendPublishingFirst();
+
     const proceed = await confirm({
       message: 'Do you still want to continue with a local plugin?',
       initialValue: true

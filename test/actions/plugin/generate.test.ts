@@ -320,7 +320,7 @@ describe('PluginGenerateAction', () => {
       // The entry is the record of where the SDK went, so a selection cannot take it out of the
       // file. The prompt puts a cleared published language back and says so; this is the other
       // half of that promise — even a selection that arrives without it leaves the entry alone.
-      it('never drops a language the config already names', async () => {
+      it('never drops a published language the config already names', async () => {
         await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
         selectLanguages.resolves([Language.TYPESCRIPT]);
         generated();
@@ -328,6 +328,18 @@ describe('PluginGenerateAction', () => {
         await execute();
 
         expect(writtenConfig().languages).to.deep.equal({ csharp: CSHARP, typescript: {} });
+      });
+
+      // The service reads the languages out of the zipped config, so a cleared checkbox that never
+      // reaches the file is a checkbox that does nothing.
+      it('drops an unpublished language the user cleared', async () => {
+        await writeConfig({ plugin: METADATA, languages: { csharp: {}, typescript: {} } });
+        selectLanguages.resolves([Language.TYPESCRIPT]);
+        generated();
+
+        await execute();
+
+        expect(writtenConfig().languages).to.deep.equal({ typescript: {} });
       });
 
       // The one way this command ends with no plugin, and the exit code is the point: `success()`
@@ -374,10 +386,14 @@ describe('PluginGenerateAction', () => {
     });
 
     describe('publishing profile', () => {
-      const hasProfile = () => getPublishingProfiles.resolves(ok([{ id: 'profile-1' }]));
+      // `sdk publish`'s own test of a usable profile: one with nothing enabled can publish
+      // nothing, so it is not a profile as far as the recommendation is concerned.
+      const hasProfile = () =>
+        getPublishingProfiles.resolves(
+          ok([{ id: 'profile-1', cSharpGitConfiguration: { isEnabled: true, repositoryName: 'acme/acme-csharp' } }])
+        );
 
       const stubProfilePrompts = () => ({
-        recommend: sinon.stub(PluginGeneratePrompts.prototype, 'recommendPublishingFirst'),
         confirm: sinon.stub(PluginGeneratePrompts.prototype, 'confirmLocalPlugin').resolves(true),
         preview: sinon.stub(PluginGeneratePrompts.prototype, 'previewOnly')
       });
@@ -392,9 +408,24 @@ describe('PluginGenerateAction', () => {
         const result = await execute();
 
         expect(result.isSuccess()).to.be.true;
-        expect(prompts.recommend.calledBefore(prompts.confirm)).to.be.true;
+        expect(prompts.confirm.called).to.be.true;
         expect(generatePlugin.called).to.be.true;
         expect(prompts.preview.called).to.be.true;
+      });
+
+      // A profile with no language enabled cannot publish anything, so recommending it would send
+      // the user to a command that refuses them.
+      it('says nothing when the only profile has no language enabled', async () => {
+        await writeConfig({ plugin: METADATA, languages: {} });
+        selectLanguages.resolves([Language.CSHARP]);
+        getPublishingProfiles.resolves(ok([{ id: 'profile-1' }]));
+        const prompts = stubProfilePrompts();
+        const generatePlugin = generated();
+
+        expect((await execute()).isSuccess()).to.be.true;
+        expect(prompts.confirm.called).to.be.false;
+        expect(prompts.preview.called).to.be.false;
+        expect(generatePlugin.called).to.be.true;
       });
 
       it('cancels without generating when the user declines', async () => {
@@ -410,6 +441,8 @@ describe('PluginGenerateAction', () => {
 
         expect(result.isCancelled()).to.be.true;
         expect(generatePlugin.called).to.be.false;
+        // A run the user stopped may not leave the file claiming a language they never got.
+        expect(writtenConfig().languages).to.deep.equal({});
       });
 
       // A user without a profile cannot act on "publish for production", so the run ends at the
@@ -421,7 +454,6 @@ describe('PluginGenerateAction', () => {
         generated();
 
         expect((await execute()).isSuccess()).to.be.true;
-        expect(prompts.recommend.called).to.be.false;
         expect(prompts.confirm.called).to.be.false;
         expect(prompts.preview.called).to.be.false;
       });
@@ -435,7 +467,7 @@ describe('PluginGenerateAction', () => {
         generated();
 
         expect((await execute()).isSuccess()).to.be.true;
-        expect(prompts.recommend.called).to.be.false;
+        expect(prompts.confirm.called).to.be.false;
         expect(prompts.preview.called).to.be.false;
       });
 
@@ -448,7 +480,7 @@ describe('PluginGenerateAction', () => {
         const generatePlugin = generated();
 
         expect((await execute()).isSuccess()).to.be.true;
-        expect(prompts.recommend.called).to.be.false;
+        expect(prompts.confirm.called).to.be.false;
         expect(generatePlugin.called).to.be.true;
       });
     });

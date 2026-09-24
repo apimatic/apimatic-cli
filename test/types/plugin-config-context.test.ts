@@ -127,7 +127,7 @@ describe('PluginConfigContext', () => {
     it('reads a file whose portal block is malformed', async () => {
       withConfig({ portal: 'not a portal', languages: { csharp: CSHARP_ENTRY } });
 
-      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
+      expect(presentState(await context.getPluginConfigState()).publishedLanguages()).to.not.be.empty;
     });
 
     const reasonOf = async (document: object) => {
@@ -215,7 +215,7 @@ describe('PluginConfigContext', () => {
 
       const state = await context.getPluginConfigState();
 
-      expect(presentState(state).hasPublishedSdks()).to.be.false;
+      expect(presentState(state).publishedLanguages()).to.be.empty;
     });
 
     it('reports neither metadata nor languages for a bare file', async () => {
@@ -224,7 +224,7 @@ describe('PluginConfigContext', () => {
       const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.false;
-      expect(present.hasPublishedSdks()).to.be.false;
+      expect(present.publishedLanguages()).to.be.empty;
     });
 
     it('reports neither metadata nor languages for a file holding only the portal block', async () => {
@@ -233,7 +233,7 @@ describe('PluginConfigContext', () => {
       const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.false;
-      expect(present.hasPublishedSdks()).to.be.false;
+      expect(present.publishedLanguages()).to.be.empty;
     });
 
     it('reports languages without metadata for a file written by sdk publish', async () => {
@@ -242,7 +242,7 @@ describe('PluginConfigContext', () => {
       const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.false;
-      expect(present.hasPublishedSdks()).to.be.true;
+      expect(present.publishedLanguages()).to.not.be.empty;
     });
 
     it('reports metadata without languages for a file written by plugin generate', async () => {
@@ -251,7 +251,7 @@ describe('PluginConfigContext', () => {
       const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.true;
-      expect(present.hasPublishedSdks()).to.be.false;
+      expect(present.publishedLanguages()).to.be.empty;
     });
 
     it('reports both once the config is complete', async () => {
@@ -260,38 +260,7 @@ describe('PluginConfigContext', () => {
       const present = presentState(await context.getPluginConfigState());
 
       expect(present.hasMetadata()).to.be.true;
-      expect(present.hasPublishedSdks()).to.be.true;
-    });
-
-    it('does not count a language recorded with neither a source nor a package', async () => {
-      withConfig({ languages: { csharp: UNPUBLISHED_ENTRY } });
-
-      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.false;
-    });
-
-    it('counts a language published as source only', async () => {
-      withConfig({ languages: { csharp: SOURCE_ONLY_ENTRY } });
-
-      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
-    });
-
-    it('counts a language published as package only', async () => {
-      withConfig({ languages: { csharp: PACKAGE_ONLY_ENTRY } });
-
-      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
-    });
-
-    it('counts a published language recorded alongside one with neither half', async () => {
-      withConfig({
-        languages: {
-          csharp: UNPUBLISHED_ENTRY,
-          typescript: {
-            publishing: { package: { name: '@acme/sdk', version: '1.2.3' }, codegenVersion: CodeGenerationVersion.V3 }
-          }
-        }
-      });
-
-      expect(presentState(await context.getPluginConfigState()).hasPublishedSdks()).to.be.true;
+      expect(present.publishedLanguages()).to.not.be.empty;
     });
 
     it('refuses a blank plugin id before metadata is considered', async () => {
@@ -503,7 +472,7 @@ describe('PluginConfigContext', () => {
       const state = (await context.upsertMetadata(METADATA))._unsafeUnwrap();
 
       expect(state.hasMetadata()).to.be.true;
-      expect(state.hasPublishedSdks()).to.be.false;
+      expect(state.publishedLanguages()).to.be.empty;
     });
 
     it('reports the language it just wrote, alongside metadata written earlier', async () => {
@@ -511,7 +480,7 @@ describe('PluginConfigContext', () => {
 
       const state = (await context.upsertLanguage(Language.CSHARP, CSHARP_ENTRY))._unsafeUnwrap();
 
-      expect(state.hasPublishedSdks()).to.be.true;
+      expect(state.publishedLanguages()).to.not.be.empty;
       expect(state.hasMetadata()).to.be.true;
       expect(state.hasNoSourceRepository(Language.CSHARP)).to.be.false;
     });
@@ -684,6 +653,39 @@ describe('PluginConfigContext', () => {
 
       expect(state.requestedLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
       expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP]);
+    });
+
+    // The service reads the block out of the zipped file, so an entry left behind is a language
+    // the plugin still covers. Clearing a checkbox has to reach the file to mean anything.
+    it('drops an unpublished language the selection no longer names', async () => {
+      withConfig({ languages: { csharp: UNPUBLISHED_ENTRY, python: {}, typescript: {} } });
+
+      expect((await context.requestLanguages([Language.CSHARP])).isOk()).to.be.true;
+      expect(writtenDocument().languages).to.deep.equal({ csharp: UNPUBLISHED_ENTRY });
+    });
+
+    // Its entry records where the SDK actually went; dropping it would delete that record.
+    it('keeps a published language the selection drops', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY, python: {} } });
+
+      expect((await context.requestLanguages([Language.PYTHON])).isOk()).to.be.true;
+      expect(writtenDocument().languages).to.deep.equal({ csharp: CSHARP_ENTRY, python: {} });
+    });
+
+    // java, php, ruby and go were never the selection's to decide.
+    it('leaves a language a plugin cannot carry alone', async () => {
+      withConfig({ languages: { java: CSHARP_ENTRY, go: {}, python: {} } });
+
+      expect((await context.requestLanguages([Language.CSHARP])).isOk()).to.be.true;
+      expect(writtenDocument().languages).to.deep.equal({ java: CSHARP_ENTRY, go: {}, csharp: {} });
+    });
+
+    it('reports a dropped language as no longer named', async () => {
+      withConfig({ languages: { csharp: {}, python: {} } });
+
+      const state = (await context.requestLanguages([Language.PYTHON]))._unsafeUnwrap();
+
+      expect(state.requestedLanguages()).to.deep.equal([Language.PYTHON]);
     });
   });
 

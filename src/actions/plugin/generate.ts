@@ -7,6 +7,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginConfig, PluginConfigContext, PluginConfigState } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
+import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { PluginRecordMetadataAction } from './record-metadata.js';
@@ -66,25 +67,23 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    const recorded = await configContext.requestLanguages(selection);
-    if (recorded.isErr()) {
-      this.prompts.configNotPrepared(recorded.error, buildDirectory);
-      return ActionResult.failed();
-    }
-
-    const unsupported = recorded.value.unsupportedLanguages();
+    const unsupported = config.unsupportedLanguages();
     if (unsupported.length > 0) {
       this.prompts.languagesNotIncluded(unsupported);
     }
 
-    const bundled = selection.filter((language) => !published.includes(language));
-    const preview = bundled.length > 0 && (await this.hasPublishingProfile());
-    if (preview) {
-      this.prompts.recommendPublishingFirst();
-      if (!(await this.prompts.confirmLocalPlugin())) {
-        this.prompts.localPluginCancelled();
-        return ActionResult.cancelled();
-      }
+    // Asked before the config is written: a user who declines here has generated nothing, and a
+    // run they stopped may not leave the file claiming languages they never got.
+    const preview = selection.some((language) => !published.includes(language)) && (await this.hasPublishingProfile());
+    if (preview && !(await this.prompts.confirmLocalPlugin())) {
+      this.prompts.localPluginCancelled();
+      return ActionResult.cancelled();
+    }
+
+    const recorded = await configContext.requestLanguages(selection);
+    if (recorded.isErr()) {
+      this.prompts.configNotPrepared(recorded.error, buildDirectory);
+      return ActionResult.failed();
     }
 
     // `src/` is zipped as it sits on disk, so a byte-order mark the reader above looked past
@@ -124,13 +123,23 @@ export class PluginGenerateAction {
   };
 
   /**
+   * Whether the user could publish instead — `sdk publish`'s own test, so the two commands agree
+   * on what having a profile means: a profile with no enabled languages cannot publish anything.
+   *
    * Advisory only, so a lookup that cannot answer is read as "no profile": a recommendation is not
    * worth failing a generation the user asked for, and `--auth-key` does not reach this call.
    */
   private readonly hasPublishingProfile = async (): Promise<boolean> => {
-    const profiles = await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
+    const profiles = await this.prompts.checkPublishingProfiles(
+      this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell)
+    );
+    if (profiles.isErr()) {
+      return false;
+    }
 
-    return profiles.isOk() && profiles.value.length > 0;
+    return PublishingProfiles.create(profiles.value)
+      .map((found) => found.getActiveProfiles().length > 0)
+      .unwrapOr(false);
   };
 
   private readonly buildPlugin = async (
@@ -144,8 +153,7 @@ export class PluginGenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generatePlugin(
-        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey),
-        pluginDirectory
+        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
       );
 
       if (response.isErr()) {

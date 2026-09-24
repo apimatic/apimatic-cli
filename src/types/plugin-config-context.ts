@@ -17,6 +17,10 @@ import { CodeGenerationVersion, isPluginLanguage, Language, PLUGIN_LANGUAGES } f
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
+/** Published means a reader can reach the SDK: a repository, a registry, or both. */
+const isPublished = (entry: PluginLanguageEntry<Language> | undefined): boolean =>
+  Boolean(entry?.publishing?.source ?? entry?.publishing?.package);
+
 export type PluginConfigState =
   | { state: 'missing' }
   | { state: 'unreadable'; reason: string; path: FilePath }
@@ -31,13 +35,9 @@ export class PluginConfig {
     return new PluginConfig(config);
   }
 
-  public hasPublishedSdks(): boolean {
-    return this.publishedLanguages().length > 0;
-  }
-
   public publishedLanguages(): readonly Language[] {
     return this.languageEntries()
-      .filter(([, entry]) => entry?.publishing?.source || entry?.publishing?.package)
+      .filter(([, entry]) => isPublished(entry))
       .map(([language]) => language);
   }
 
@@ -170,19 +170,36 @@ export class PluginConfigContext {
     });
   }
 
+  /**
+   * Records the languages the plugin covers, as a set rather than an addition: one the selection
+   * drops loses its entry, which is the only thing that makes clearing a checkbox mean anything —
+   * the service reads this block out of the zipped file, not the answers that produced it.
+   *
+   * Two kinds of entry are never dropped. A published one records where its SDK actually went, so
+   * removing it would delete that record; and a language a plugin cannot carry — java, php, ruby,
+   * go — was never the selection's to decide. An entry that stays is left byte-identical: this
+   * writes what is missing and edits nothing, so a selection can neither blank a repository URL
+   * nor restate one. A run that changes nothing does not rewrite the file.
+   */
   public async requestLanguages(
     languages: readonly Language[]
   ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
-    const state = await this.getPluginConfigState();
-    if (state.state === 'present' && languages.every((language) => state.requestedLanguages().includes(language))) {
-      return ok(state);
-    }
-
     return await this.merge((document) => {
-      const recorded: PluginLanguages = { ...(document.languages() as PluginLanguages | undefined) };
+      const existing = document.languages() ?? {};
+      const covered = new Set<string>(languages);
+      const recorded: Record<string, unknown> = {};
+
+      for (const [language, entry] of Object.entries(existing)) {
+        const keep =
+          covered.has(language) || !isPluginLanguage(language) || isPublished(entry as PluginLanguageEntry<Language>);
+        if (keep) {
+          recorded[language] = entry;
+        }
+      }
       for (const language of languages) {
         recorded[language] ??= {};
       }
+
       return document.with('languages', recorded);
     });
   }
