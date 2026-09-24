@@ -24,6 +24,9 @@ const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
 // Not `x-codeSamples`: fumadocs makes each of those a fixed tab that the example selector cannot switch.
 const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
 
+// The options @scalar/json-magic bundles with, so a spec reads here as it does in the portal.
+const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
+
 type JsonObject = Record<string, unknown>;
 
 /** A specification as written to disk, read the one way the wizard and the build agree on. */
@@ -39,7 +42,7 @@ export class OpenApiDocument {
       // JSON is valid YAML, but the YAML parser is far slower and specs run to megabytes,
       // so each extension gets the parser built for it.
       const text = stripByteOrderMark(contents);
-      const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text);
+      const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text, YAML_OPTIONS);
       return new OpenApiDocument(
         typeof document === 'object' && document !== null && !Array.isArray(document) ? (document as JsonObject) : {}
       );

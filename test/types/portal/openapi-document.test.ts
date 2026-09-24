@@ -196,6 +196,22 @@ describe('OpenApiDocument', () => {
   });
 
   describe('endpoints', () => {
+    it('reads YAML as the portal bundler does, merging keys and allowing many aliases', () => {
+      const aliases = Array.from({ length: 150 }, (_, index) => `  a${index}: *ops`);
+      const yaml = [
+        'openapi: 3.0.0',
+        'ops: &ops',
+        '  get: {}',
+        'paths:',
+        '  /merged:',
+        '    <<: *ops',
+        'many:',
+        ...aliases
+      ].join('\n');
+
+      expect(read(yaml, YAML_FILE).endpoints().map(String)).to.deep.equal(['GET /merged']);
+    });
+
     it('lists the inline operations of every path', () => {
       const document = readJson({
         openapi: '3.0.0',
