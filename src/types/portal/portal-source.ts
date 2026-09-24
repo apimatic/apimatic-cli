@@ -1,6 +1,7 @@
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
+import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
 import { GeneratedPages, GeneratedSection } from './generated-pages.js';
 import { PortalConfig } from './portal-config.js';
@@ -9,6 +10,8 @@ import { PortalConfig } from './portal-config.js';
 export interface PortalSpec {
   slug: string;
   file: FilePath;
+  /** Its operations, including those behind a `$ref` path item. */
+  endpoints: Endpoint[];
 }
 
 /** What `apimatic.json` decides about a portal, which `portal serve` reads again on every edit. */

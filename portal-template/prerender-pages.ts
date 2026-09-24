@@ -69,7 +69,7 @@ async function contentUrls(contentDir: string): Promise<string[]> {
 // Through the same sections as the site, so an internal operation gets no page here either.
 async function openApiUrls(specs: Record<string, string>): Promise<string[]> {
   const sources = Object.fromEntries(
-    await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file)]))
+    await Promise.all(Object.entries(specs).map(async ([id, file]) => [id, await openApiSection(id, file, null)]))
   );
   if (Object.keys(sources).length === 0) return [];
   return loader(sources, { baseUrl: '/' })

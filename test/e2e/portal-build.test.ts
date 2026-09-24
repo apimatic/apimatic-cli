@@ -8,11 +8,20 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
+import { Language } from '../../src/types/sdk/generate';
 import { ensureBuildDirectoryBase, removeBuildDirectoryBase } from '../../src/infrastructure/tmp-extensions';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
 const enabled = process.env.APIMATIC_E2E === '1';
+
+const CALCULATE_SAMPLE = 'const result = await calculator.calculate(OperationType.Sum, 4, 5);';
+const CODE_SAMPLES = new CodeSamples([
+  CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+    paths: { '/{operation}': { GET: { Example: CALCULATE_SAMPLE } } }
+  }) as CodeSampleCatalog
+]);
 
 interface BuiltPortal {
   base: string;
@@ -22,7 +31,7 @@ interface BuiltPortal {
 }
 
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
-async function buildFixture(name: string): Promise<BuiltPortal> {
+async function buildFixture(name: string, codeSamples = new CodeSamples([])): Promise<BuiltPortal> {
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name);
   const base = await ensureBuildDirectoryBase(fixture);
   const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
@@ -31,7 +40,7 @@ async function buildFixture(name: string): Promise<BuiltPortal> {
 
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });
-  const prepared = (await new PortalProjectService().prepare(project, source))._unsafeUnwrap();
+  const prepared = (await new PortalProjectService().prepare(project, source, codeSamples))._unsafeUnwrap();
 
   const build = await new PortalBuildService().build(prepared);
   if (build.isErr()) {
@@ -104,7 +113,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   let output: DirectoryPath;
 
   before(async () => {
-    built = await buildFixture('default');
+    built = await buildFixture('default', CODE_SAMPLES);
     ({ project, output } = built);
   });
 
@@ -261,6 +270,13 @@ const stylesheetOf = (output: DirectoryPath) => {
 
     expect(unusable, 'grammars for languages a portal cannot contain').to.deep.equal([]);
     expect(assets.length, 'asset count').to.be.below(150);
+  });
+
+  it('carries the code samples placed on the operation into its page data', () => {
+    const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
+
+    expect(page).to.contain('x-apimatic-codeSamples');
+    expect(page).to.contain('calculator.calculate(OperationType.Sum, 4, 5)');
   });
 
   it('keeps an operation page small', () => {

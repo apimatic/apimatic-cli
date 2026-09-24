@@ -13,11 +13,15 @@ import {
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
+import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
 import { GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../src/types/portal/portal-languages';
 import { PortalSource } from '../../src/types/portal/portal-source';
 import { PortalStylesheet } from '../../src/types/portal/portal-stylesheet';
+import { Language } from '../../src/types/sdk/generate';
+
+const NO_SAMPLES = new CodeSamples([]);
 
 describe('PortalProjectService', () => {
   const service = new PortalProjectService();
@@ -49,7 +53,8 @@ describe('PortalProjectService', () => {
     specs: [
       {
         slug: 'calculator',
-        file: new FilePath(new DirectoryPath(root).join('spec'), new FileName('api.json'))
+        file: new FilePath(new DirectoryPath(root).join('spec'), new FileName('api.json')),
+        endpoints: []
       }
     ],
     contentDirectory: null,
@@ -98,7 +103,7 @@ describe('PortalProjectService', () => {
 
   describe('prepare', () => {
     it('links every dependency the template imports, resolved to a real package', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       const modules = path.join(project.toString(), 'node_modules');
       const linked = fs
@@ -118,24 +123,30 @@ describe('PortalProjectService', () => {
     });
 
     it('copies the template rather than moving it', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       expect(fs.existsSync(path.join(process.cwd(), 'portal-template', 'vite.config.ts'))).to.be.true;
       expect(fs.existsSync(path.join(project.toString(), 'vite.config.ts'))).to.be.true;
     });
 
     it('writes the specs and the directories into the build-only config', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       const config = readConfig();
-      expect(Object.keys(config).sort()).to.deep.equal(['contentDir', 'generatedDir', 'specs', 'staticDir']);
+      expect(Object.keys(config).sort()).to.deep.equal([
+        'codeSamples',
+        'contentDir',
+        'generatedDir',
+        'specs',
+        'staticDir'
+      ]);
       expect(Object.keys(config.specs)).to.deep.equal(['calculator']);
       expect(config.specs.calculator).to.contain('api.json');
     });
 
     it('writes the generated pages into the project, and names their directory in the build-only config', async () => {
       (
-        await service.prepare(project, sourceFor({ generatedPages: pagesFor({ typescript: {} }, true) }))
+        await service.prepare(project, sourceFor({ generatedPages: pagesFor({ typescript: {} }, true) }), NO_SAMPLES)
       )._unsafeUnwrap();
 
       expect(generatedFiles()).to.deep.equal([
@@ -156,7 +167,7 @@ describe('PortalProjectService', () => {
         brand: { logo: 'static/images/logo.png' }
       });
 
-      (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ config }), NO_SAMPLES))._unsafeUnwrap();
 
       expect(readIdentity()).to.deep.equal(config.identity());
       expect(readIdentity().logo).to.deep.equal({ light: '/images/logo.png', dark: '/images/logo.png' });
@@ -169,7 +180,7 @@ describe('PortalProjectService', () => {
       const contentDirectory = new DirectoryPath(root).join('content');
       fs.mkdirSync(contentDirectory.toString(), { recursive: true });
 
-      (await service.prepare(project, sourceFor({ contentDirectory })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ contentDirectory }), NO_SAMPLES))._unsafeUnwrap();
 
       const identity = fs.readFileSync(path.join(project.toString(), 'portal.identity.json'), 'utf8');
       expect(identity).to.not.contain(root.split(path.sep).join('/'));
@@ -183,7 +194,7 @@ describe('PortalProjectService', () => {
         brand: { colors: { primary: '#1d4ed8' } }
       });
 
-      (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ config }), NO_SAMPLES))._unsafeUnwrap();
 
       const styles = path.join(project.toString(), 'src/styles');
       expect(fs.readFileSync(path.join(styles, 'theme.css'), 'utf8')).to.equal(PortalStylesheet.of(config).toString());
@@ -191,7 +202,7 @@ describe('PortalProjectService', () => {
     });
 
     it('leaves no identity placeholder in the module the browser receives', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       const module = fs.readFileSync(path.join(project.toString(), 'src/lib/portal.ts'), 'utf8');
       expect(module).to.not.contain('__APIMATIC_');
@@ -199,7 +210,7 @@ describe('PortalProjectService', () => {
     });
 
     it('reports no static directory when the project has none', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       expect(readConfig().staticDir).to.be.null;
     });
@@ -208,7 +219,7 @@ describe('PortalProjectService', () => {
       const contentDirectory = new DirectoryPath(root).join('content');
       fs.mkdirSync(contentDirectory.toString(), { recursive: true });
 
-      (await service.prepare(project, sourceFor({ contentDirectory })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ contentDirectory }), NO_SAMPLES))._unsafeUnwrap();
 
       const module = fs.readFileSync(path.join(project.toString(), 'src/lib/source.ts'), 'utf8');
       expect(module).to.not.contain('__APIMATIC_CONTENT_DIR__');
@@ -219,7 +230,7 @@ describe('PortalProjectService', () => {
       const contentDirectory = new DirectoryPath(root).join('content');
       fs.mkdirSync(contentDirectory.toString(), { recursive: true });
 
-      (await service.prepare(project, sourceFor({ contentDirectory })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ contentDirectory }), NO_SAMPLES))._unsafeUnwrap();
 
       const stylesheet = fs.readFileSync(path.join(project.toString(), 'src/styles/app.css'), 'utf8');
       expect(stylesheet).to.not.contain('__APIMATIC_CONTENT_DIR__');
@@ -227,11 +238,47 @@ describe('PortalProjectService', () => {
     });
 
     it('creates an empty content directory when the project has none, so the build has one to read', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       const config = readConfig();
       expect(fs.existsSync(config.contentDir)).to.be.true;
       expect(fs.readdirSync(config.contentDir)).to.be.empty;
+    });
+  });
+
+  describe('code samples', () => {
+    const codeSamples = new CodeSamples([
+      CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+        paths: { '/pets': { GET: { Example: 'await client.pets.list();' } } },
+        webhooks: {}
+      }) as CodeSampleCatalog
+    ]);
+
+    it('writes the samples beside the configuration, keyed by path and method, and names them in it', async () => {
+      (await service.prepare(project, sourceFor(), codeSamples))._unsafeUnwrap();
+
+      const config = readConfig();
+      expect(config.codeSamples).to.equal(path.join(project.toString(), 'code-samples.json').split(path.sep).join('/'));
+      expect(JSON.parse(fs.readFileSync(config.codeSamples, 'utf8'))).to.deep.equal({
+        '/pets': {
+          GET: [{ lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }]
+        }
+      });
+    });
+
+    it('points each spec at its own file, samples or not', async () => {
+      const source = sourceFor();
+
+      (await service.prepare(project, source, codeSamples))._unsafeUnwrap();
+
+      expect(readConfig().specs.calculator).to.equal(source.specs[0].file.toString().split(path.sep).join('/'));
+    });
+
+    it('names no samples when there are none', async () => {
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
+
+      expect(readConfig().codeSamples).to.be.null;
+      expect(fs.existsSync(path.join(project.toString(), 'code-samples.json'))).to.be.false;
     });
   });
 
@@ -242,7 +289,7 @@ describe('PortalProjectService', () => {
 
     it('writes nothing, and says so, when the block makes the same site', async () => {
       const config = configFor({ site: { name: 'My API' }, brand: { colors: { primary: '#1d4ed8' } } });
-      (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ config }), NO_SAMPLES))._unsafeUnwrap();
       const before = [fs.statSync(themeFile()).mtimeMs, fs.statSync(identityFile()).mtimeMs];
 
       // Written differently, read the same: the comparison is of what the preview shows.
@@ -258,7 +305,7 @@ describe('PortalProjectService', () => {
     });
 
     it('rewrites both files for a brand change, to what a fresh build would write', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
       const config = configFor({
         site: { name: 'My API' },
         brand: { colors: { primary: '#1d4ed8' }, colorMode: 'dark' }
@@ -271,7 +318,7 @@ describe('PortalProjectService', () => {
     });
 
     it('leaves the stylesheet alone when only what the browser is told changes', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
       const before = fs.statSync(themeFile()).mtimeMs;
 
       const renamed = configFor({ site: { name: 'Renamed API' } });
@@ -283,7 +330,7 @@ describe('PortalProjectService', () => {
 
     // The dev server is watching both files, and could read one truncated before it is written.
     it('replaces each file whole rather than writing it in place', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
       const replace = sinon.spy(FileService.prototype, 'replaceContents');
       const write = sinon.spy(FileService.prototype, 'writeContents');
 
@@ -305,7 +352,7 @@ describe('PortalProjectService', () => {
     });
 
     it('writes the page for a language added, and says so', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
       const config = sourceFor().config;
 
       const applied = await service.applyConfig(project, settingsFor(config, pagesFor({ typescript: {}, go: {} })));
@@ -315,7 +362,7 @@ describe('PortalProjectService', () => {
     });
 
     it('writes the context plugin folder for a plugin block added, and removes it with the block', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
       const config = sourceFor().config;
 
       expect(

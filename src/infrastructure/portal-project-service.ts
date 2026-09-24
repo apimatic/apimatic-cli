@@ -5,6 +5,7 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { CodeSamples } from '../types/portal/code-samples.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
 import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
@@ -17,6 +18,7 @@ import { PortalPagesService } from './portal-pages-service.js';
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
 export const TEMPLATE_DEPENDENCIES = [
+  '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',
   '@tanstack/react-router',
@@ -77,7 +79,8 @@ export class PortalProjectService {
 
   public async prepare(
     projectDirectory: DirectoryPath,
-    source: PortalSource
+    source: PortalSource,
+    codeSamples: CodeSamples
   ): Promise<Result<PortalProjectPaths, string>> {
     const template = this.templateDirectory();
     if (template === undefined) {
@@ -93,7 +96,7 @@ export class PortalProjectService {
 
     await this.fileService.copyDirectoryContents(template, projectDirectory);
     await this.linkDependencies(projectDirectory);
-    await this.writeConfiguration(projectDirectory, source);
+    await this.writeConfiguration(projectDirectory, source, await this.writeCodeSamples(projectDirectory, codeSamples));
 
     const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
     if (pages.isErr()) {
@@ -143,6 +146,16 @@ export class PortalProjectService {
     return environment;
   }
 
+  // The template places the samples on the specs as it bundles them, so the specs are read where they are.
+  private async writeCodeSamples(projectDirectory: DirectoryPath, codeSamples: CodeSamples): Promise<FilePath | null> {
+    if (codeSamples.isEmpty()) {
+      return null;
+    }
+    const file = new FilePath(projectDirectory, new FileName('code-samples.json'));
+    await this.fileService.writeContents(file, JSON.stringify(codeSamples.toJson()));
+    return file;
+  }
+
   private async linkDependencies(projectDirectory: DirectoryPath): Promise<void> {
     const modules = projectDirectory.join('node_modules');
     await this.fileService.createDirectoryIfNotExists(modules);
@@ -161,7 +174,11 @@ export class PortalProjectService {
     }
   }
 
-  private async writeConfiguration(projectDirectory: DirectoryPath, source: PortalSource): Promise<void> {
+  private async writeConfiguration(
+    projectDirectory: DirectoryPath,
+    source: PortalSource,
+    codeSamples: FilePath | null
+  ): Promise<void> {
     const contentDirectory = source.contentDirectory ?? projectDirectory.join('content');
     if (source.contentDirectory === null) {
       await this.fileService.createDirectoryIfNotExists(contentDirectory);
@@ -176,6 +193,7 @@ export class PortalProjectService {
     // build's own config files.
     const configuration = {
       specs,
+      codeSamples: codeSamples === null ? null : this.toPosix(codeSamples.toString()),
       contentDir: this.toPosix(contentDirectory.toString()),
       generatedDir: this.toPosix(projectDirectory.join(GENERATED_DIRECTORY_NAME).toString()),
       staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())

@@ -18,7 +18,10 @@ describe('prerenderPages', () => {
   const write = (relative: string, body = '# page\n') => writeIn(contentDir, relative, body);
 
   const urlsFor = async (siteUrl: string | null = null, specs: Record<string, string> = {}) => {
-    const pages = await prerenderPages({ specs, contentDir, generatedDir, staticDir: null }, siteUrl);
+    const pages = await prerenderPages(
+      { specs, codeSamples: null, contentDir, generatedDir, staticDir: null },
+      siteUrl
+    );
     return pages.map((page) => page.path);
   };
 

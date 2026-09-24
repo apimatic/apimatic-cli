@@ -7,10 +7,15 @@ import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
 import { PortalSaveProblem } from '../../types/portal-context.js';
 import { Result } from 'neverthrow';
+import {
+  CodeSamplesFileFailure,
+  GeneratedCodeSamples
+} from '../../infrastructure/services/portal-artifacts-service.js';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
+import { generateCodeSamples, reportIgnoredSampleKeys, reportUnplacedSamples } from './code-samples.js';
 
 function describeSaveProblem(problem: PortalSaveProblem): string {
   switch (problem.kind) {
@@ -72,6 +77,18 @@ export class PortalGeneratePrompts {
 
   public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
     reportIgnoredNavigationFiles(files, sourceDirectory);
+  }
+
+  public generateCodeSamples(fn: Promise<Result<GeneratedCodeSamples, CodeSamplesFileFailure>>) {
+    return generateCodeSamples(fn);
+  }
+
+  public ignoredSampleKeys(keys: string[]) {
+    reportIgnoredSampleKeys(keys);
+  }
+
+  public unplacedSamples(endpoints: string[]) {
+    reportUnplacedSamples(endpoints);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

@@ -7,6 +7,7 @@ import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readPortalConfig, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
+import { specReload } from './spec-reload.ts';
 
 export default defineConfig(async () => {
   const [portalConfig, identity] = await Promise.all([readPortalConfig(), readPortalIdentity()]);
@@ -18,6 +19,7 @@ export default defineConfig(async () => {
     plugins: [
       generatedPagesReload(),
       fumadocsMdx(),
+      specReload(portalConfig.specs),
       tailwindcss(),
       tanstackStart({
         // Without a mask path the shell is rendered at "/" and no index.html is written;

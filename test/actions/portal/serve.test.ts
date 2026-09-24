@@ -49,6 +49,7 @@ describe('PortalServeAction', () => {
     prompts = sinon.stub(PortalServePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.startPreview.callsFake((fn) => fn);
+    prompts.generateCodeSamples.callsFake((fn) => fn);
     prompts.blockExecution.returns(
       new Promise<void>((resolve) => {
         interrupt = resolve;

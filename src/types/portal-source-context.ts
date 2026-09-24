@@ -8,6 +8,7 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
+import { Endpoint } from './portal/endpoint.js';
 import { GENERATED_SECTIONS, GeneratedPages } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
@@ -539,7 +540,7 @@ export class PortalSourceContext {
         return err({ kind: 'unsupportedSpec', fileName, format: format.format });
       }
 
-      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file });
+      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file, endpoints: await this.endpoints(document, file) });
       first ??= document;
     }
 
@@ -560,6 +561,17 @@ export class PortalSourceContext {
       .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
       .filter((fileName) => SPEC_EXTENSIONS.some((extension) => fileName.hasExtension(extension)))
       .sort((left, right) => left.compare(right));
+  }
+
+  // A path item in another file is read from it; one that file refers on to again is not followed.
+  private async endpoints(document: OpenApiDocument, file: FilePath): Promise<Endpoint[]> {
+    const referenced = await Promise.all(
+      document.pathItemReferences(file.directory()).map(async ({ path, file: target, pointer }) => {
+        const targetDocument = await this.readDocument(target);
+        return targetDocument?.endpointsAt(path, pointer) ?? [];
+      })
+    );
+    return [...document.endpoints(), ...referenced.flat()];
   }
 
   private async readDocument(file: FilePath): Promise<OpenApiDocument | undefined> {

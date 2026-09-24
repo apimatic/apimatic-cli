@@ -25,7 +25,7 @@ const languages = {
   ruby: () => import('shiki/dist/langs/ruby.mjs'),
   typescript: () => import('shiki/dist/langs/typescript.mjs'),
 
-  // Request samples: curl, and the shapes a response or a specification is shown in.
+  // Shell commands, and the shapes a response or a specification is shown in.
   http: () => import('shiki/dist/langs/http.mjs'),
   json: () => import('shiki/dist/langs/json.mjs'),
   jsonc: () => import('shiki/dist/langs/jsonc.mjs'),
