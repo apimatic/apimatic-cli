@@ -118,7 +118,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Payment'
-      # No declared examples: the only snippet is keyed by the "Example" sentinel.
+      # No declared examples: the only snippet is keyed by the "Example" placeholder.
       x-apimatic-codeSamples:
         - lang: typescript
           label: TypeScript

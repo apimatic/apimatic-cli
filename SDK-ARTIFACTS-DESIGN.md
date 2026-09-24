@@ -82,7 +82,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 |---|---|
 | D9 | **The CLI synthesizes the zip**, with the language request carried by a config file inside it, mirroring how `plugin-config.json` drives the plugin flow. |
 | D11 | **Key a sample on `path` + `method`.** That is the document's own addressing and is guaranteed to be present and to match; `operationId` is optional in OpenAPI and codegen-v2 synthesizes one when it is absent. |
-| D12 | **Carry every declared example** on the wire, keyed by its OpenAPI `examples:` map key. |
+| D12 | **Carry every declared example** on the wire, keyed by its OpenAPI `examples:` map key, and **special-case no key**: `"Example"` is only the placeholder for an operation's one snippet, so a spec's own `Example` beside other examples is kept like any other. |
 | D13 | **Copy the spec tree into the temp project and annotate the copy.** Relative `$ref`s then keep resolving. See D20 for refs that escape `src/spec/`. |
 | D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. |
 | D17 | The Func wiring is the critical path and is what this document specifies. |
@@ -256,11 +256,11 @@ Rules, all of which the consumer depends on:
   it. **Method is uppercase.**
 - **The example id is the OpenAPI `examples:` map key** — the same key fumadocs' example
   selector switches on, so a snippet lines up with the example it was rendered from.
-- **`"Example"` is a reserved sentinel**, not a real id. An operation's id set is the union
-  of its members' declared example names; a position the spec left silent carries the name
-  `"Example"`. It is filtered out, and stands in only when the union would otherwise be
-  empty. **It never matches an example**: the portal shows it only as the only snippet of
-  an operation with one example, which fumadocs names `_default`.
+- **`"Example"` is a placeholder only when it is the one key**: an operation that declares
+  no example gets its single snippet under `"Example"`. Beside other keys it is an ordinary
+  example id a spec may declare, so neither the CLI nor the portal filters or renames it
+  ([D12](#wire-format)). The portal shows an operation's only snippet for its only example,
+  which fumadocs names `_default`, whatever the key.
 - **Code is raw and unfenced.** The consumer wraps it in whatever it writes into.
 - **Declaration order is authorial intent and is preserved.** Do not sort.
 
@@ -520,8 +520,9 @@ The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged ren
 **CLI, unit.** Injection is a pure function, so most of this needs no filesystem:
 
 - A catalog entry keyed by a path/method the document does not contain → warn, do not fail.
-- The `"Example"` sentinel shows only for an operation with one example; a language
-  without a snippet for the selected example shows a note.
+- An operation's only snippet shows for its only example whatever its key; `"Example"`
+  beside other keys is kept as an ordinary id; a language without a snippet for the
+  selected example shows a note.
 - Tab order: curl first, then languages in configured order.
 - A path item that is itself a `$ref` → skipped without throwing.
 - Non-method keys on a path item (`summary`, `parameters`, `servers`) → not treated as
