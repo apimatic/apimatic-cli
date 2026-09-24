@@ -1,6 +1,5 @@
 import { err, Result } from 'neverthrow';
 import { UrlPath } from '../file/urlPath.js';
-import { AdvancedTokens } from './config/advanced-tokens.js';
 import { AiConfig } from './config/ai-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, isJsonObject, unknownKeys } from './config/fields.js';
@@ -38,15 +37,14 @@ export interface PortalIdentity {
 
 const BLOCK = 'portal';
 
-const NAMESPACES = ['site', 'brand', 'navigation', 'ai', 'advanced'];
+const NAMESPACES = ['site', 'brand', 'navigation', 'ai'];
 
 export class PortalConfig {
   private constructor(
     private readonly site: SiteConfig,
     private readonly brand: BrandConfig,
     private readonly navigation: NavigationConfig,
-    private readonly ai: AiConfig,
-    private readonly advanced: AdvancedTokens
+    private readonly ai: AiConfig
   ) {}
 
   /** The block quickstart writes: the specification's own name and description, and every default spelled out. */
@@ -55,8 +53,7 @@ export class PortalConfig {
       SiteConfig.suggested(site),
       BrandConfig.defaults,
       NavigationConfig.defaults,
-      AiConfig.defaults,
-      AdvancedTokens.defaults
+      AiConfig.defaults
     );
   }
 
@@ -81,8 +78,7 @@ export class PortalConfig {
         SiteConfig.parse(block.site, `${BLOCK}.site`, suggested),
         BrandConfig.parse(block.brand, `${BLOCK}.brand`),
         NavigationConfig.parse(block.navigation, `${BLOCK}.navigation`),
-        AiConfig.parse(block.ai, `${BLOCK}.ai`),
-        AdvancedTokens.parse(block.advanced, `${BLOCK}.advanced`)
+        AiConfig.parse(block.ai, `${BLOCK}.ai`)
       ])
     ).map((namespaces) => new PortalConfig(...namespaces));
   }
@@ -111,10 +107,6 @@ export class PortalConfig {
     return this.ai;
   }
 
-  public tokenOverrides(): AdvancedTokens {
-    return this.advanced;
-  }
-
   public staticFiles(): StaticAsset[] {
     return this.brand.files();
   }
@@ -141,8 +133,7 @@ export class PortalConfig {
       site: this.site.toJSON(),
       brand: this.brand.toJSON(),
       navigation: this.navigation.toJSON(),
-      ai: this.ai.toJSON(),
-      advanced: this.advanced.toJSON()
+      ai: this.ai.toJSON()
     };
   }
 }
@@ -156,5 +147,4 @@ export interface PortalBlock {
   brand: ReturnType<BrandConfig['toJSON']>;
   navigation: ReturnType<NavigationConfig['toJSON']>;
   ai: ReturnType<AiConfig['toJSON']>;
-  advanced: ReturnType<AdvancedTokens['toJSON']>;
 }

@@ -353,12 +353,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     const selectors = overrides.flatMap((rule) => rule[1].split(',').map((selector) => selector.trim()));
 
     expect(themeDark).to.not.equal(-1);
-    expect(selectors).to.include.members([
-      ':root:not(.dark)',
-      ':root:not(.dark) #nd-sidebar',
-      '.dark',
-      '.dark #nd-sidebar'
-    ]);
+    expect(selectors).to.include.members([':root:not(.dark)', '.dark']);
     expect(overrides.every((rule) => (rule.index ?? -1) > themeDark)).to.be.true;
   });
 

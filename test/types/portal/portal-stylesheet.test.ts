@@ -50,19 +50,11 @@ describe('PortalStylesheet', () => {
   // A bare `:root` has the specificity of the theme's `.dark` block and comes after it, so a
   // colour meant for light mode would win in dark mode as well.
   it('scopes the light rule away from dark mode', () => {
-    const css = stylesheetFor({ advanced: { tokens: { light: { '--color-fd-accent': '#eee' } } } });
+    const css = stylesheetFor({ brand: { colors: { primary: '#1d4ed8' } } });
 
-    expect(LIGHT_SELECTOR.split(', ').every((selector) => selector.startsWith(':root:not(.dark)'))).to.be.true;
+    expect(LIGHT_SELECTOR).to.equal(':root:not(.dark)');
     expect(css).to.contain(`\n${LIGHT_SELECTOR} {\n`);
     expect(css).to.not.match(/^:root \{/m);
-    expect(ruleOf(css, DARK_SELECTOR)).to.be.undefined;
-  });
-
-  // The layout renders the sidebar as `#nd-sidebar`, and the neutral theme gives it tokens of
-  // its own under that id, which outranks a rule for the mode alone.
-  it('sets each mode on the sidebar too, since the theme gives it tokens of its own', () => {
-    expect(LIGHT_SELECTOR.split(', ')).to.include(':root:not(.dark) #nd-sidebar');
-    expect(DARK_SELECTOR.split(', ')).to.include('.dark #nd-sidebar');
   });
 
   describe('compiled as the build compiles it', () => {
@@ -96,61 +88,19 @@ describe('PortalStylesheet', () => {
       return (await compile(app, { base: styles, loadStylesheet })).build([]);
     };
 
-    const tokens = {
-      '--color-fd-accent': 'color-mix(in oklab, var(--color-fd-primary) 10%, transparent)',
-      '--color-fd-muted': 'oklch(from var(--color-fd-primary) calc(l * 0.9) c h)',
-      '--color-fd-card': 'rgb(0 0 0 / 50%)'
-    };
-
-    it("keeps every override, after the neutral theme's own rules", async () => {
+    it("keeps each mode's primary, after the neutral theme's own rules", async () => {
       const output = await compiled(
-        stylesheetFor({
-          brand: { colors: { primary: { light: '#1d4ed8', dark: '#93c5fd' } } },
-          advanced: { tokens: { light: tokens, dark: tokens } }
-        })
+        stylesheetFor({ brand: { colors: { primary: { light: '#1d4ed8', dark: '#93c5fd' } } } })
       );
 
-      const light = output.indexOf(`${LIGHT_SELECTOR} {`);
-      const dark = output.indexOf(`${DARK_SELECTOR} {`);
+      const light = output.indexOf(`\n${LIGHT_SELECTOR} {`);
+      const dark = output.indexOf(`\n${DARK_SELECTOR} {`, light);
       expect(light, 'light rule').to.be.above(-1);
       expect(dark, 'dark rule').to.be.above(light);
       // What the theme sets outside `@theme` comes first, so equal specificity loses to these.
-      for (const own of ['.dark #nd-sidebar {', '.dark {']) {
-        const at = output.indexOf(`\n${own}`);
-        expect(at, own).to.be.above(-1).and.below(light);
-      }
-      for (const [name, value] of Object.entries(tokens)) {
-        expect(output.split(`${name}: ${value};`).length - 1, name).to.equal(2);
-      }
+      expect(output.indexOf('\n.dark {')).to.be.above(-1).and.below(light);
+      expect(output.slice(light, dark)).to.contain('--color-fd-primary: #1d4ed8;');
+      expect(output.slice(dark)).to.contain('--color-fd-primary: #93c5fd;');
     });
-  });
-
-  it('writes the tokens after the primary, in the order written', () => {
-    const css = stylesheetFor({
-      brand: { colors: { primary: '#1d4ed8' } },
-      advanced: { tokens: { dark: { '--color-fd-card': '#111', '--color-fd-accent': '#222' } } }
-    });
-
-    expect(ruleOf(css, DARK_SELECTOR)).to.deep.equal([
-      '--color-fd-primary: #1d4ed8;',
-      '--color-fd-primary-foreground: hsl(0, 0%, 98%);',
-      '--color-fd-ring: #1d4ed8;',
-      '--color-fd-card: #111;',
-      '--color-fd-accent: #222;'
-    ]);
-  });
-
-  // Declared once, so what the rule says is what applies, and the token still wins.
-  it('lets a token replace the primary it names, in place', () => {
-    const css = stylesheetFor({
-      brand: { colors: { primary: '#1d4ed8' } },
-      advanced: { tokens: { light: { '--color-fd-ring': 'hsl(220, 100%, 64%)' } } }
-    });
-
-    expect(ruleOf(css, LIGHT_SELECTOR)).to.deep.equal([
-      '--color-fd-primary: #1d4ed8;',
-      '--color-fd-primary-foreground: hsl(0, 0%, 98%);',
-      '--color-fd-ring: hsl(220, 100%, 64%);'
-    ]);
   });
 });

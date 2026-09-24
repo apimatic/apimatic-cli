@@ -7,7 +7,6 @@ import {
   ApimaticConfigDocument,
   SCHEMA_VERSION
 } from '../../../src/types/apimatic-config/document';
-import { MODE_TOKENS } from '../../../src/types/portal/config/advanced-tokens';
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
@@ -61,7 +60,6 @@ describe('apimatic.schema.json', () => {
 
     const cases: [string, unknown, readonly string[]][] = [
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
-      ['advanced.tokens', schema.definitions.tokens.propertyNames.enum, MODE_TOKENS],
       ['languages', schema.definitions.languages.propertyNames.enum, Object.values(Language)],
       [
         'languages.*.publishing.codegenVersion',
@@ -101,26 +99,15 @@ describe('apimatic.schema.json', () => {
               { label: 'Home', url: '/' }
             ]
           },
-          ai: { pageActions: false },
-          advanced: { tokens: { light: { '--color-fd-accent': '#eee' }, dark: {} } }
+          ai: { pageActions: false }
         }
       ],
       ['an address with a port', { site: { url: 'https://docs.example.com:8443' } }],
       ['one logo for both modes', { brand: { logo: 'static/images/logo.png' } }],
       ['a logo path with its dots inside a name', { brand: { logo: 'static/..hidden/logo.png' } }],
       ['a three-digit hex primary', { brand: { colors: { primary: ' #FFF ' } } }],
-      [
-        'a token value that is a CSS function',
-        { advanced: { tokens: { light: { '--color-fd-accent': 'color-mix(in oklab, #1d4ed8 10%, transparent)' } } } }
-      ],
       ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }],
-      ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }],
-      [
-        'a token value derived from another token',
-        {
-          advanced: { tokens: { dark: { '--color-fd-ring': 'oklch(from var(--color-fd-primary) calc(l * 0.9) c h)' } } }
-        }
-      ]
+      ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }]
     ];
 
     const invalid: [string, object][] = [
@@ -181,19 +168,7 @@ describe('apimatic.schema.json', () => {
       ['an empty link', { navigation: { links: [{ label: 'x', url: '' }] } }],
       ['a blank link label', { navigation: { links: [{ label: ' ', url: '/' }] } }],
       ['a link with an unknown key', { navigation: { links: [{ label: 'x', url: '/', icon: 'x' }] } }],
-      ['page actions that are not a boolean', { ai: { pageActions: 'no' } }],
-      ['a short token name', { advanced: { tokens: { light: { accent: '#eee' } } } }],
-      ['a token set once for both modes', { advanced: { tokens: { light: { '--color-fd-info': 'blue' } } } }],
-      ['an empty token value', { advanced: { tokens: { dark: { '--color-fd-ring': '' } } } }],
-      ['a token value closing its rule', { advanced: { tokens: { dark: { '--color-fd-ring': 'red } body {' } } } }],
-      ['a token value ending its declaration', { advanced: { tokens: { light: { '--color-fd-ring': 'red; x: y' } } } }],
-      ['a token value opening a comment', { advanced: { tokens: { light: { '--color-fd-ring': 'red /* x' } } } }],
-      ['a token value opening a string', { advanced: { tokens: { light: { '--color-fd-ring': '"red' } } } }],
-      ['a token value opening a bracket', { advanced: { tokens: { light: { '--color-fd-ring': '[a' } } } }],
-      ['a token value ending in an escape', { advanced: { tokens: { light: { '--color-fd-ring': 'red\\' } } } }],
-      ['a token value marked important', { advanced: { tokens: { light: { '--color-fd-ring': 'red !important' } } } }],
-      ['tokens that are not an object', { advanced: { tokens: [] } }],
-      ['an unknown advanced key', { advanced: { css: 'x' } }]
+      ['page actions that are not a boolean', { ai: { pageActions: 'no' } }]
     ];
 
     for (const [label, block] of valid) {
@@ -210,14 +185,6 @@ describe('apimatic.schema.json', () => {
         expect(schemaVerdict({ portal: block }).valid, 'schema').to.be.false;
       });
     }
-
-    // A pattern cannot count parentheses.
-    it('leaves unclosed parentheses in a token value to the CLI', () => {
-      const block = { advanced: { tokens: { light: { '--color-fd-ring': 'rgb(10 20 30' } } } };
-
-      expect(portalAccepts(block)).to.be.false;
-      expect(schemaVerdict({ portal: block }).valid).to.be.true;
-    });
 
     it('offers the defaults the parser applies', () => {
       // The scaffolded block spells out every default, and reads back as the portal an empty

@@ -58,36 +58,6 @@
         }
       }
     },
-    "tokens": {
-      "type": "object",
-      "description": "Overrides of the preset's colour tokens, by their full custom-property name. Values pass through as written.",
-      "propertyNames": {
-        "enum": [
-          "--color-fd-background",
-          "--color-fd-foreground",
-          "--color-fd-muted",
-          "--color-fd-muted-foreground",
-          "--color-fd-popover",
-          "--color-fd-popover-foreground",
-          "--color-fd-card",
-          "--color-fd-card-foreground",
-          "--color-fd-border",
-          "--color-fd-primary",
-          "--color-fd-primary-foreground",
-          "--color-fd-secondary",
-          "--color-fd-secondary-foreground",
-          "--color-fd-accent",
-          "--color-fd-accent-foreground",
-          "--color-fd-ring",
-          "--color-fd-overlay"
-        ]
-      },
-      "additionalProperties": {
-        "type": "string",
-        "description": "A single CSS value, such as '#1d4ed8' or 'oklch(0.6 0.2 260)': letters, digits, spaces and # % . , ( ) / * + - _, with every parenthesis closed and no comment.",
-        "pattern": "^\\s*(?!.*/\\*)[-A-Za-z0-9#%.,()/*+_](?:[-A-Za-z0-9#%.,()/*+_ \\t]*[-A-Za-z0-9#%.,()/*+_])?\\s*$"
-      }
-    },
     "portal": {
       "type": "object",
       "description": "The documentation portal that 'apimatic portal generate' and 'apimatic portal serve' build.",
@@ -204,24 +174,6 @@
               "type": "boolean",
               "default": true,
               "description": "Whether each page offers to open itself in an external AI assistant."
-            }
-          }
-        },
-        "advanced": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "tokens": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "light": {
-                  "$ref": "#/definitions/tokens"
-                },
-                "dark": {
-                  "$ref": "#/definitions/tokens"
-                }
-              }
             }
           }
         }

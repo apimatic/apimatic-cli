@@ -1,4 +1,4 @@
-# Plan: the `portal` block v2 — site, brand, tabs and API options
+# Plan: the `portal` block v2 — site, brand and tabs
 
 Status: rewritten 2026-09-23 for `src/apimatic.json`, and implemented the same
 day on `saeedjamshaid/portal-config`, one commit per step of section 11. The
@@ -43,7 +43,7 @@ when `spec/` holds two or more specifications. Everything else is optional.
 
 In scope: the block's schema, the `languages` requirement on the portal path,
 CLI-side validation and defaults, tabs from `nav.json`, the template changes
-that apply each key, the API section options, re-applying the config under
+that apply each key, leaving internal operations out of the API reference, re-applying the config under
 `portal serve`, the quickstart scaffold, and `apimatic.schema.json` for editors.
 
 Out of scope:
@@ -54,7 +54,7 @@ Out of scope:
 - Writing `languages` for a portal project. For now the user adds it to
   `src/apimatic.json` by hand; a quickstart step that writes it is a separate
   PR (section 12).
-- A contrast gate on raw token overrides, i18n, the AI section's pages, and a
+- Raw token overrides (section 15), i18n, the AI section's pages, and a
   hidden sidebar on the Home tab.
 
 Delivered as **one PR** (section 11).
@@ -80,8 +80,7 @@ Delivered as **one PR** (section 11).
 | Defaults | Applied twice, deliberately: the scaffold writes every default into the block ("ship populated"), and `resolve()` fills them for a hand-written minimal block. An explicit default and an absent key produce the same portal. |
 | Generated files, not substitution | The CLI writes `portal.identity.json` (client-safe, imported by `portal.ts`) and `src/styles/theme.css`. Re-applying a config edit under `portal serve` is a plain write of those two files; the only substitutions left are the content-directory literals prepare makes once. |
 | Operation filtering | Operations marked `x-internal: true` are left out of the bundled document before pages are generated, and deprecated ones are documented, struck through (section 7). Fixed, with the reference grouped by tag (section 15). |
-| Raw tokens | `advanced.tokens.{light,dark}` are validated by name and passed through. The contrast gate is post-MVP. |
-| Colour formats | `#rgb` and `#rrggbb` for `brand.colors.primary`, because the foreground derivation has to parse it (narrowed 2026-09-24, section 15). Raw tokens accept any CSS colour string. |
+| Colour formats | `#rgb` and `#rrggbb` for `brand.colors.primary`, because the foreground derivation has to parse it (narrowed 2026-09-24, section 15). |
 | Key names | Deviations from the PM draft: `brand.colors`, `brand.colorMode`, `navigation.links`, and tabs in `nav.json` rather than a `sections` list. |
 
 Rejected, with reasons:
@@ -148,8 +147,7 @@ Rejected, with reasons:
     "navigation": {
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
     },
-    "ai": { "pageActions": true },
-    "advanced": { "tokens": { "light": {}, "dark": {} } }
+    "ai": { "pageActions": true }
   },
   "languages": {
     "typescript": {
@@ -182,7 +180,6 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
 | `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. *As reviewed:* a path is resolved as a browser resolves it and refused when that leaves the site (`/\host`, a tab after the slash), and written as resolved; an absolute URL must carry its `//`, since a browser reads `https:example.com` on an https site as a path of that site. |
 | `portal.ai.pageActions` | boolean | `true` | Today's `aiPageActions`, moved. |
-| `portal.advanced.tokens.light`, `.dark` | map | `{}` | Keys are the full custom-property name, as browser dev tools show it: `"--color-fd-accent"`, not `"accent"`. Each must be `--color-fd-` followed by one of the seventeen token names in section 10. Values are non-empty strings without `;`, `{`, `}` or `/*`, and pass through. *As reviewed:* refusing those was not enough, since an unclosed parenthesis, bracket or quote, or a trailing backslash, also runs past the declaration. A value is now made only of letters, digits, spaces and `# % . , ( ) / * + - _`, with its parentheses balanced and no `/*`, which still writes every CSS colour, `var()`, `calc()` and relative colour syntax. The schema checks the characters; the balance is the CLI's. |
 | `languages` | map | none, required | At least one entry. Keys are `Language` values from `src/types/sdk/generate.ts`: `csharp`, `java`, `php`, `python`, `ruby`, `typescript`, `go`. Each value an object, and its `publishing`, when present, an object too — both shape checks are `ApimaticConfigDocument`'s findings, which the portal now reads (section 8). Nothing inside `publishing` is checked by the portal in this release. |
 
 Every error carries its dotted path from the root, and every error is reported
@@ -220,7 +217,6 @@ content-directory `@source` line prepare already substitutes.
 | `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
 | `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
 | `ai.pageActions` | `$.tsx` | As today. |
-| `advanced.tokens` | `theme.css` | Appended to the same `:root:not(.dark)` / `.dark` blocks after the primary, so a light-only token never reaches dark mode. *As reviewed:* each block also names `#nd-sidebar`, the id every layout gives the sidebar, because neutral (dark), catppuccin and vitepress set `muted`, `secondary` and `muted-foreground` there, and an id outranks a rule for the mode alone. `dusk` and `vitepress` also set the sidebar's `background-color` directly, which no token reaches. |
 | `languages` | nowhere yet | Validated only. The SDK page reads it when it lands. |
 
 ## 5. Tabs from `nav.json`
@@ -359,8 +355,8 @@ under `portal serve` as they do today, tabs included, with no config watcher.
   `@import`, and gains a fixed `@import './theme.css'` after the Fumadocs and
   OpenAPI presets, so the generated rules come last.
 - **`src/styles/theme.css`** (written by the CLI, rewritten on re-apply):
-  `:root:not(.dark)` with the light primary trio and light tokens, `.dark`
-  with the dark trio and dark tokens.
+  `:root:not(.dark)` with the light primary trio and `.dark` with the dark
+  one, or no rule at all when the block sets no primary.
 - **`portal.identity.json`** (written by the CLI, rewritten on re-apply) and
   **`portal.ts`**, which imports it and exports it typed as `Portal`. The file
   holds the identity fields from section 4 and nothing else, which is what makes
@@ -441,8 +437,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 
 - **Types.** `PortalConfig` becomes the root of nested value objects, one per
   namespace: `SiteConfig`, `BrandConfig` (holding `Logo` and `BrandColors`),
-  `NavigationConfig`, `AiConfig`,
-  `AdvancedTokens`. Each parses its own subtree and returns errors with dotted
+  `NavigationConfig` and `AiConfig`. Each parses its own subtree and returns errors with dotted
   paths; `PortalConfig.fromBlock` concatenates them. One helper, `Color`: parse
   the accepted formats, relative luminance, WCAG contrast ratio, foreground
   choice between the neutral preset's 98 % and 9 % greys. `RENAMED_FIELDS`
@@ -559,8 +554,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   level reported by dotted path, a flat `dev` key such as `title` reported as
   unknown with no hint, colour formats, link URLs (absolute
   `https:`, site-relative `/x` accepted; `mailto:`, `docs/x`, `javascript:`
-  refused), token keys (`--color-fd-accent` accepted; `accent` and
-  `--color-fd-info` refused).
+  refused).
 - `PortalLanguages`: absent, empty, not an object, an unknown key, an entry that
   is not an object, a `publishing` that is not an object, one valid entry with
   no `publishing` block, one with a full `publishing` record.
@@ -570,9 +564,8 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   dark logo and favicon reported.
 - `Color`: parsing, luminance against known values, the foreground choice on
   both sides of the crossover.
-- `PortalStylesheet`: the emitted CSS, tokens landing after the primary, the light
-  block scoped with `:not(.dark)`, both blocks present when the primary is one
-  string.
+- `PortalStylesheet`: the emitted CSS, the light block scoped with
+  `:not(.dark)`, both blocks present when the primary is one string.
 - `PortalNavigation`: `apimatic:sdks` accepted at the root, `apimatic:pages`
   reported, `root` accepted on a top-level folder and refused at the root, in a
   nested folder, in `content/api/`, and when not a boolean.
@@ -864,6 +857,10 @@ fixed, so bringing one back later changes nothing for a portal that leaves it
 out. A block that still names a cut key is refused like any other unknown key:
 none of them has shipped.
 
+What remains is `site.name`, `site.url`, `site.description`, `brand.logo`,
+`brand.favicon`, `brand.colors.primary`, `brand.colorMode`, `navigation.links`
+and `ai.pageActions`.
+
 - **`brand.colors.primary` takes hex only.** `rgb()` and `hsl()`, in both CSS
   syntaxes, and `#rrggbbaa` are refused. Brand guidelines give colours in hex,
   and reading the functional forms to CSS's own rules was most of `Color`. A
@@ -902,3 +899,13 @@ none of them has shipped.
   restart-needed notice, since nothing left in the block is read only at
   startup. The operationId check of section 7 stays, with a message that no
   longer names the setting.
+- **`advanced.tokens`** is gone, and the `advanced` namespace with it; no
+  Fumadocs colour variable but the primary trio can be set, which was the
+  default. It tied the public config to Fumadocs' internal variable names,
+  which an upgrade could rename under a published config, and it was the one
+  setting written raw into CSS, which is what its character and parenthesis
+  checks were for. With only the primary written, `theme.css` no longer names
+  `#nd-sidebar`: the neutral theme gives the sidebar muted and secondary tokens
+  of its own, which only a token could clash with, and none of the primary
+  trio, which the sidebar inherits (checked against `fumadocs-ui` 16.15.8, the
+  pinned version).

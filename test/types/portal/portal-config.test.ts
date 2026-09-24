@@ -38,7 +38,6 @@ describe('PortalConfig', () => {
       expect(portal.brandSettings().mode()).to.equal('both');
       expect(portal.navigationSettings().headerLinks()).to.be.empty;
       expect(portal.aiSettings().offersPageActions()).to.be.true;
-      expect(portal.tokenOverrides().lightTokens().size).to.equal(0);
       expect(portal.staticFiles()).to.be.empty;
     });
 
@@ -388,80 +387,6 @@ describe('PortalConfig', () => {
     });
   });
 
-  describe('advanced tokens', () => {
-    it('keeps the overrides per mode, by their full custom-property name', () => {
-      const tokens = config({
-        advanced: { tokens: { light: { '--color-fd-accent': ' #eee ' }, dark: { '--color-fd-accent': '#222' } } }
-      }).tokenOverrides();
-
-      expect([...tokens.lightTokens()]).to.deep.equal([['--color-fd-accent', '#eee']]);
-      expect([...tokens.darkTokens()]).to.deep.equal([['--color-fd-accent', '#222']]);
-    });
-
-    it('refuses a namespace of the wrong shape, and a key it does not know, at each level', () => {
-      expect(errorsOf({ advanced: { tokens: [], css: 'x' } })).to.deep.equal([
-        "'portal.advanced.css' is not a 'portal' setting.",
-        "'portal.advanced.tokens' must be a JSON object."
-      ]);
-      expect(errorsOf({ advanced: { tokens: { light: 'x', system: {} } } })).to.deep.equal([
-        "'portal.advanced.tokens.system' is not a 'portal' setting.",
-        "'portal.advanced.tokens.light' must be a JSON object."
-      ]);
-    });
-
-    it('refuses a short name, a token set once for both modes, and an empty value', () => {
-      const errors = errorsOf({
-        advanced: { tokens: { light: { accent: '#eee', '--color-fd-info': 'blue' }, dark: { '--color-fd-ring': '' } } }
-      });
-
-      expect(errors).to.have.lengthOf(3);
-      expect(errors[0]).to.match(
-        /^'portal\.advanced\.tokens\.light\.accent' is not a token the preset sets per colour mode/
-      );
-      expect(errors[2]).to.equal("'portal.advanced.tokens.dark.--color-fd-ring' must be a non-empty string.");
-    });
-
-    // The value is written into the generated stylesheet as it stands. An unclosed parenthesis,
-    // bracket or quote, or a trailing backslash, runs on into the next declaration: the build
-    // then fails naming no setting, or drops both colour-mode blocks.
-    it('refuses a value that would reach past its own declaration', () => {
-      const values = [
-        'red; x: y',
-        'red } body {',
-        'red /* note',
-        'rgb(10 20 30',
-        'url(x',
-        'red)',
-        '"red',
-        "'red'",
-        '[a',
-        'red\\',
-        'red !important',
-        'red\nblue'
-      ];
-
-      for (const value of values) {
-        expect(errorsOf({ advanced: { tokens: { light: { '--color-fd-ring': value } } } }), value).to.deep.equal([
-          "'portal.advanced.tokens.light.--color-fd-ring' must be a single CSS value, such as '#1d4ed8' or " +
-            "'oklch(0.6 0.2 260)': letters, digits, spaces and '# % . , ( ) / * + - _', with every parenthesis " +
-            'closed and no comment.'
-        ]);
-      }
-    });
-
-    it('accepts any CSS colour, including functions of other tokens', () => {
-      for (const value of [
-        'rgb(0 0 0 / 50%)',
-        'transparent',
-        'color-mix(in oklab, var(--color-fd-primary) 10%, transparent)',
-        'oklch(from var(--color-fd-primary) calc(l * 0.9) c h)',
-        'light-dark(#fff, #000)'
-      ]) {
-        expect(parse({ advanced: { tokens: { dark: { '--color-fd-accent': value } } } }).isOk(), value).to.be.true;
-      }
-    });
-  });
-
   describe('identity', () => {
     it('resolves every file to its site URL and the address to its origin', () => {
       const portal = config({
@@ -542,8 +467,7 @@ describe('PortalConfig', () => {
         site: { name: 'Spec Title', description: 'What the spec says.' },
         brand: { colors: {}, colorMode: 'both' },
         navigation: { links: [] },
-        ai: { pageActions: true },
-        advanced: { tokens: { light: {}, dark: {} } }
+        ai: { pageActions: true }
       });
     });
 
@@ -564,8 +488,7 @@ describe('PortalConfig', () => {
           colorMode: 'light'
         },
         navigation: { links: [{ label: 'Status', url: 'https://status.test' }] },
-        ai: { pageActions: false },
-        advanced: { tokens: { light: { '--color-fd-accent': '#eee' }, dark: {} } }
+        ai: { pageActions: false }
       };
 
       expect(JSON.parse(JSON.stringify(config(block, null)))).to.deep.equal(block);
