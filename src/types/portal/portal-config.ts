@@ -150,13 +150,14 @@ export class PortalConfig {
     const logo = this.brand.logoImages();
     const favicon = this.brand.faviconImage();
     const cta = this.home.callToAction();
+    const fontsUrl = this.brand.brandFonts().googleFontsUrl();
     return {
       name: this.site.siteName(),
       description: this.site.siteDescription(),
       siteUrl: origin === null ? null : origin.toString(),
       logo: logo === null ? null : { light: logo.light().siteUrl(), dark: logo.dark().siteUrl() },
       favicon: favicon === null ? null : { url: favicon.siteUrl(), type: favicon.imageType() },
-      fontsUrl: this.brand.brandFonts().googleFontsUrl(),
+      fontsUrl: fontsUrl === null ? null : fontsUrl.toString(),
       layout: this.navigation.layoutName(),
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),

@@ -6,7 +6,7 @@ describe('Fonts', () => {
 
   it('defaults to Geist, as the template does today', () => {
     expect(fonts(undefined).toJSON()).to.deep.equal({ body: 'geist', mono: 'geist-mono' });
-    expect(fonts({}).googleFontsUrl()).to.equal(
+    expect(String(fonts({}).googleFontsUrl())).to.equal(
       'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap'
     );
   });
@@ -22,14 +22,14 @@ describe('Fonts', () => {
     expect(system.bodyFamily()).to.match(/^ui-sans-serif, /);
     expect(system.monoFamily()).to.match(/^ui-monospace, /);
     expect(system.googleFontsUrl()).to.be.null;
-    expect(fonts({ body: 'system', mono: 'fira-code' }).googleFontsUrl()).to.equal(
+    expect(String(fonts({ body: 'system', mono: 'fira-code' }).googleFontsUrl())).to.equal(
       'https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap'
     );
   });
 
   // IBM Plex Mono is static: a range fails the whole stylesheet request with a 400.
   it('names the weights of a static family as a list', () => {
-    expect(fonts({ body: 'system', mono: 'ibm-plex-mono' }).googleFontsUrl()).to.contain(
+    expect(String(fonts({ body: 'system', mono: 'ibm-plex-mono' }).googleFontsUrl())).to.contain(
       'family=IBM+Plex+Mono:wght@100;200;300;400;500;600;700'
     );
   });

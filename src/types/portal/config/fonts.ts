@@ -1,4 +1,5 @@
 import { Result } from 'neverthrow';
+import { UrlPath } from '../../file/urlPath.js';
 import { allOf, namespace, oneOf, Parsed, unknownKeys } from './fields.js';
 
 export const BODY_FONTS = [
@@ -87,7 +88,7 @@ export class Fonts {
   }
 
   /** The stylesheet that loads both families, or null when both are the system's own. */
-  public googleFontsUrl(): string | null {
+  public googleFontsUrl(): UrlPath | null {
     const families = [this.body, this.mono].flatMap((id) => (id === 'system' ? [] : [GOOGLE_FONTS[id]]));
     if (families.length === 0) {
       return null;
@@ -95,7 +96,7 @@ export class Fonts {
     const query = families
       .map(({ family, weights }) => `family=${family.replaceAll(' ', '+')}:wght@${weights}`)
       .join('&');
-    return `https://fonts.googleapis.com/css2?${query}&display=swap`;
+    return new UrlPath(`https://fonts.googleapis.com/css2?${query}&display=swap`);
   }
 
   public toJSON(): { body: BodyFont; mono: MonoFont } {
