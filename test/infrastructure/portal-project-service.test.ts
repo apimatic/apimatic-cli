@@ -3,6 +3,8 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import semver from 'semver';
+import sinon from 'sinon';
+import { FileService } from '../../src/infrastructure/file-service';
 import { PortalProjectService, TEMPLATE_DEPENDENCIES } from '../../src/infrastructure/portal-project-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
@@ -46,6 +48,7 @@ describe('PortalProjectService', () => {
   });
 
   afterEach(() => {
+    sinon.restore();
     // Node's own removal deletes the links, never what they point at. A shell recursive
     // delete would follow a junction on Windows and empty the CLI's own node_modules.
     fs.rmSync(root, { recursive: true, force: true });
@@ -238,10 +241,26 @@ describe('PortalProjectService', () => {
       expect(fs.statSync(themeFile()).mtimeMs).to.equal(before);
     });
 
-    it('reports a project it cannot write into rather than throwing', async () => {
-      const missing = new DirectoryPath(root).join('nowhere');
+    // The dev server is watching both files, and one truncated before it is written can reach
+    // it empty.
+    it('replaces each file whole rather than writing it in place', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      const replace = sinon.spy(FileService.prototype, 'replaceContents');
+      const write = sinon.spy(FileService.prototype, 'writeContents');
 
-      const applied = await service.applyConfig(missing, configFor({ site: { name: 'My API' } }));
+      const config = configFor({ site: { name: 'Renamed API' }, brand: { colors: { primary: '#1d4ed8' } } });
+      expect((await service.applyConfig(project, config))._unsafeUnwrap()).to.be.true;
+
+      expect(replace.args.map(([file]) => file.toString())).to.deep.equal([identityFile(), themeFile()]);
+      expect(write.called).to.be.false;
+    });
+
+    // A file where the project's directories should be: nothing can be written beneath it.
+    it('reports a project it cannot write into rather than throwing', async () => {
+      const blocked = new DirectoryPath(root).join('blocked');
+      fs.writeFileSync(blocked.toString(), '');
+
+      const applied = await service.applyConfig(blocked, configFor({ site: { name: 'My API' } }));
 
       expect(applied.isErr()).to.be.true;
     });

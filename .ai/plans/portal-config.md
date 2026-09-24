@@ -497,7 +497,9 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   `PortalSourceContext.resolveConfig(suggested)` is the split-out half, fed the
   `suggestedSite` that `PortalSource` now carries from startup.
   `PortalProjectService.applyConfig` writes each generated file only when its
-  contents change, and its answer is what "a real change" means. The watcher
+  contents change, and its answer is what "a real change" means. *As
+  reviewed:* it replaces each one whole, written beside it and renamed over,
+  since the watching dev server could read one written in place truncated. The watcher
   failing to start is reported, and the preview serves regardless. *As
   reviewed:* the file is read again once the watch starts, since a save made
   while the preview started, which can take a minute, reached no watch; saves
