@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
@@ -12,8 +13,11 @@ describe('reportSourceProblem', () => {
   let error: sinon.SinonStub;
   let message: sinon.SinonStub;
 
-  /** Everything printed, in order, colours and all. */
-  const printed = () => [...error.getCalls(), ...message.getCalls()].map((call) => String(call.args[0])).join('\n');
+  // Without its colours, which picocolors adds on Windows and in CI whatever the terminal.
+  const printed = () =>
+    [...error.getCalls(), ...message.getCalls()]
+      .map((call) => stripVTControlCharacters(String(call.args[0])))
+      .join('\n');
 
   beforeEach(() => {
     error = sinon.stub(log, 'error');
