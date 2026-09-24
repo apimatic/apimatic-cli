@@ -15,10 +15,7 @@ const labelOf = (language: string): string =>
   LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
 
 export class PluginGeneratePrompts {
-  /**
-   * The spinner covers the service call only. Where the plugin landed is said afterwards, by
-   * `installPluginLocally`, because until the save has run there is nothing at that path.
-   */
+  // The spinner covers the service call only; until the save has run there is no path to name.
   public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
     return withSpinner('Generating Context Plugin', 'Plugin generated successfully.', 'Plugin Generation failed.', fn);
   }
@@ -83,16 +80,6 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  public metadataCancelled(reason: string) {
-    log.warn(`${reason}. Exiting without generating a plugin.`);
-  }
-
-  /**
-   * A published language is offered checked and stays checked. Its entry records where the SDK
-   * actually went, so dropping it from the plugin would either leave that record describing
-   * something the plugin does not mention or delete it outright; the label says so rather than
-   * leaving a checkbox that does nothing when it is cleared.
-   */
   public async selectLanguages(config: PluginConfig): Promise<Language[] | undefined> {
     const published = config.publishedLanguages();
 
@@ -101,66 +88,40 @@ export class PluginGeneratePrompts {
       options: PLUGIN_LANGUAGES.map((language) => ({
         value: language,
         label: labelOf(language),
-        hint: published.includes(language) ? 'published — always included' : undefined
+        hint: published.includes(language) ? 'published' : undefined
       })),
       initialValues: [...config.initialLanguages()],
       required: false
     });
 
-    if (isCancel(selected)) {
-      return undefined;
-    }
-
-    const cleared = published.filter((language) => !selected.includes(language));
-    if (cleared.length > 0) {
-      log.info(this.publishedLanguagesKeptNote(cleared));
-    }
-
-    return [...new Set([...selected, ...published])];
-  }
-
-  /** Says what was added back, so a cleared checkbox never passes without a word. */
-  private publishedLanguagesKeptNote(languages: readonly Language[]): string {
-    const names = languages.map((language) => labelOf(language)).join(', ');
-
-    return (
-      `${names} stays in the plugin: ${f.var(APIMATIC_CONFIG_FILE_NAME)} records where its SDK is ` +
-      `published, and the plugin describes what that file names.`
-    );
+    return isCancel(selected) ? undefined : selected;
   }
 
   public noLanguagesSelected() {
     log.warn('No languages selected. Exiting without generating a plugin.');
   }
 
-  /**
-   * java, php, ruby and go have no v4 renderer, so the service drops them. Their entries are left
-   * alone; saying so is the only way the omission is visible.
-   */
+  // Saying so is the only way the omission is visible; their entries are left alone.
   public languagesNotIncluded(languages: readonly string[]) {
-    const one = languages.length === 1;
+    if (languages.length === 0) {
+      return;
+    }
+
+    const [verb, entries] = languages.length === 1 ? ['is', 'its entry'] : ['are', 'their entries'];
     const names = languages.map((language) => labelOf(language)).join(', ');
 
     log.warn(
-      `${names} cannot be included in a context plugin and ${one ? 'is' : 'are'} left out of this one. ` +
-        `${f.var(APIMATIC_CONFIG_FILE_NAME)} keeps ${one ? 'its entry' : 'their entries'} unchanged.`
+      `${names} cannot be included in a context plugin and ${verb} left out of this one. ` +
+        `${f.var(APIMATIC_CONFIG_FILE_NAME)} keeps ${entries} unchanged.`
     );
   }
 
-  /**
-   * Stated once, before building something local, and only where the user could act on it. Having
-   * a profile means they are able to publish, not that they want to right now — so this is a
-   * recommendation and a confirm, never a fork into another command.
-   */
-  private recommendPublishingFirst() {
+  // A recommendation and a confirm, never a fork: having a profile is not wanting to publish now.
+  public async confirmLocalPlugin(): Promise<boolean> {
     log.warn(
       `You have a publishing profile set up.\n` +
         `We recommend publishing your SDK first for a better plugin experience.`
     );
-  }
-
-  public async confirmLocalPlugin(): Promise<boolean> {
-    this.recommendPublishingFirst();
 
     const proceed = await confirm({
       message: 'Do you still want to continue with a local plugin?',
@@ -177,25 +138,14 @@ export class PluginGeneratePrompts {
     );
   }
 
-  /**
-   * Shown only where a profile exists. A user without one cannot act on "publish for production",
-   * so for them the run ends at the instructions above rather than on a caveat they cannot clear.
-   */
+  // Only where a profile exists: a user without one cannot act on it.
   public previewOnly() {
     log.warn('Context plugin is preview only.\nFor production, publish your SDK and plugin.');
   }
 
-  /**
-   * One command rather than a page of per-assistant instructions: the installer knows how each
-   * editor loads an unpublished folder, so naming it is both shorter and the only line that stays
-   * right when an editor changes its procedure.
-   *
-   * Double quotes around the path rather than `f.path`, for the reason `plugin publish` gives:
-   * single quotes are not quoting to `cmd.exe`, so a path with a space would break the line the
-   * user pastes.
-   */
+  // Double quotes, not `f.path`: single quotes are not quoting to `cmd.exe`.
   public installPluginLocally(plugin: DirectoryPath) {
-    const quotedPath = `"${f.relativePath(plugin)}"`;
+    const quotedPath = `"${plugin.relativeTo(DirectoryPath.workingDirectory())}"`;
     const command = f.cmdAlt('npx', 'context-plugins', 'install', quotedPath);
 
     log.info(`Run '${command}' to install your plugin.`);

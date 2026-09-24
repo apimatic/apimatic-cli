@@ -21,17 +21,18 @@ export class PublishingApiService {
 
   public async getPublishingProfiles(
     configDir: DirectoryPath,
-    shell: string
+    shell: string,
+    authKey: string | null = null
   ): Promise<Result<PublishingProfileItem[], ServiceError>> {
     const authInfo: AuthInfo | null = await getAuthInfo(configDir.toString());
     // `auth logout` blanks config.json rather than deleting it, so a logged-out user
     // still has a non-null AuthInfo with an empty key — check the key, not the object.
-    if (!authInfo?.authKey) {
+    const token = authKey || authInfo?.authKey;
+    if (!token) {
       return err(ServiceError.unauthorizedWithHint(null));
     }
 
     try {
-      const token = authInfo.authKey;
       const response = await this.axiosInstance(shell, token).get(`/publishing-profile/user`);
 
       if (response.status === 200) {

@@ -1,4 +1,5 @@
-import { err, ok, Result } from 'neverthrow';
+import { err, ok, Result, ResultAsync } from 'neverthrow';
+import { FileService } from '../infrastructure/file-service.js';
 import { ApimaticConfigContext, ApimaticConfigWriteFailure } from './apimatic-config-context.js';
 import { ApimaticConfigDocument, ConfigBlockName, findingClause } from './apimatic-config/document.js';
 import { DirectoryPath } from './file/directoryPath.js';
@@ -29,45 +30,45 @@ export type PluginConfigState =
 export class PluginConfig {
   public readonly state = 'present' as const;
 
-  private constructor(private readonly config: PluginConfigData) {}
+  private constructor(
+    private readonly config: PluginConfigData,
+    private readonly entries: readonly [Language, PluginLanguages[Language]][],
+    private readonly unsupported: readonly string[]
+  ) {}
 
+  /** The one place `languages` is sorted into what a plugin can carry and what it cannot. */
   public static create(config: PluginConfigData): PluginConfig {
-    return new PluginConfig(config);
+    const entries: [Language, PluginLanguages[Language]][] = [];
+    const unsupported: string[] = [];
+
+    for (const [language, entry] of Object.entries(config.languages)) {
+      if (isPluginLanguage(language)) {
+        entries.push([language, entry as PluginLanguages[Language]]);
+      } else {
+        unsupported.push(language);
+      }
+    }
+
+    return new PluginConfig(config, entries, unsupported);
   }
 
   public publishedLanguages(): readonly Language[] {
-    return this.languageEntries()
-      .filter(([, entry]) => isPublished(entry))
-      .map(([language]) => language);
+    return this.entries.filter(([, entry]) => isPublished(entry)).map(([language]) => language);
   }
 
-  public requestedLanguages(): readonly Language[] {
-    return this.languageEntries().map(([language]) => language);
-  }
-
-  /**
-   * The languages a plugin prompt comes up with checked. A config that names languages has already
-   * made the choice. One that names none has not chosen against any of them — a first run, or a
-   * project that has only ever had a spec — and for it the plugin covering everything is both the
-   * common answer and the one a single Enter gives.
-   */
+  // A config naming none has not chosen against any: covering everything is what one Enter gives.
   public initialLanguages(): readonly Language[] {
-    const requested = this.requestedLanguages();
+    const requested = this.entries.map(([language]) => language);
 
     return requested.length > 0 ? requested : PLUGIN_LANGUAGES;
   }
 
   public unsupportedLanguages(): readonly string[] {
-    return Object.keys(this.config.languages).filter((language) => !isPluginLanguage(language));
+    return this.unsupported;
   }
 
-  private languageEntries(): [Language, PluginLanguages[Language]][] {
-    return Object.entries(this.config.languages).filter(([language]) => isPluginLanguage(language)) as [
-      Language,
-      PluginLanguages[Language]
-    ][];
-  }
-
+  // Checked, not trusted: the config arrives through a cast of parsed JSON, so a hand-edited
+  // file can hold a number where the type promises a string.
   public hasMetadata(): boolean {
     const isNonBlankString = (value: unknown) => typeof value === 'string' && value.trim() !== '';
     return isNonBlankString(this.config.pluginId) && isNonBlankString(this.config.pluginName);
@@ -126,8 +127,35 @@ export type PluginConfigWriteFailure = ApimaticConfigWriteFailure;
 
 const OWNED_BLOCKS: readonly ConfigBlockName[] = ['plugin', 'languages'];
 
+/**
+ * A `languages` block holding what the selection covers plus every entry `keep` speaks for.
+ * Existing keys stay in place, so a merge that changes nothing writes nothing.
+ */
+const recorded = (
+  document: ApimaticConfigDocument,
+  languages: readonly Language[],
+  keep: (language: string, entry: PluginLanguageEntry<Language> | undefined) => boolean
+): Record<string, unknown> => {
+  const existing = document.languages() ?? {};
+  const covered = new Set<string>(languages);
+  const kept = Object.entries(existing).filter(
+    ([language, entry]) => covered.has(language) || keep(language, entry as PluginLanguageEntry<Language>)
+  );
+  const added = languages.filter((language) => !(language in existing)).map((language) => [language, {}]);
+
+  return Object.fromEntries([...kept, ...added]);
+};
+
+/** In the user's file a cleared language goes, unless its entry records where an SDK was published. */
+const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | undefined): boolean =>
+  !isPluginLanguage(language) || isPublished(entry);
+
+/** In the upload only the covered languages remain, beside the ones a plugin never carries. */
+const isNotPluginLanguage = (language: string): boolean => !isPluginLanguage(language);
+
 export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
+  private readonly fileService = new FileService();
 
   constructor(private readonly buildDirectory: DirectoryPath) {
     this.configContext = new ApimaticConfigContext(this.buildDirectory);
@@ -149,10 +177,6 @@ export class PluginConfigContext {
     return PluginConfig.create(PluginConfigContext.configOf(state.document));
   }
 
-  public async removeByteOrderMark(): Promise<Result<void, PluginConfigWriteFailure>> {
-    return await this.configContext.removeByteOrderMark();
-  }
-
   public async upsertMetadata(
     metadata: PluginMetadata,
     author?: PluginAuthor
@@ -170,38 +194,32 @@ export class PluginConfigContext {
     });
   }
 
-  /**
-   * Records the languages the plugin covers, as a set rather than an addition: one the selection
-   * drops loses its entry, which is the only thing that makes clearing a checkbox mean anything —
-   * the service reads this block out of the zipped file, not the answers that produced it.
-   *
-   * Two kinds of entry are never dropped. A published one records where its SDK actually went, so
-   * removing it would delete that record; and a language a plugin cannot carry — java, php, ruby,
-   * go — was never the selection's to decide. An entry that stays is left byte-identical: this
-   * writes what is missing and edits nothing, so a selection can neither blank a repository URL
-   * nor restate one. A run that changes nothing does not rewrite the file.
-   */
-  public async requestLanguages(
+  // A published entry survives a cleared checkbox: only `sdk publish` can write that record.
+  public async recordLanguages(
     languages: readonly Language[]
   ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
-    return await this.merge((document) => {
-      const existing = document.languages() ?? {};
-      const covered = new Set<string>(languages);
-      const recorded: Record<string, unknown> = {};
+    return await this.merge((document) => document.with('languages', recorded(document, languages, keepsRecord)));
+  }
 
-      for (const [language, entry] of Object.entries(existing)) {
-        const keep =
-          covered.has(language) || !isPluginLanguage(language) || isPublished(entry as PluginLanguageEntry<Language>);
-        if (keep) {
-          recorded[language] = entry;
-        }
-      }
-      for (const language of languages) {
-        recorded[language] ??= {};
-      }
+  /**
+   * The `src/` to upload: a copy whose `languages` names exactly what the plugin covers. The
+   * user's file keeps the published entries this run leaves out; the service reads the copy.
+   */
+  public async stageUpload(
+    into: DirectoryPath,
+    languages: readonly Language[]
+  ): Promise<Result<DirectoryPath, PluginConfigWriteFailure>> {
+    const staged = into.join('build');
+    await this.fileService.copyDirectoryContents(this.buildDirectory, staged);
 
-      return document.with('languages', recorded);
-    });
+    const config = new ApimaticConfigContext(staged);
+    const covered = await config.merge(OWNED_BLOCKS, (document) =>
+      document.with('languages', recorded(document, languages, isNotPluginLanguage))
+    );
+
+    // The merge writes nothing when it changes nothing, so a mark on the copy can outlive it —
+    // and the service reads this file with a parser that will not look past one.
+    return await covered.asyncAndThen(() => new ResultAsync(config.removeByteOrderMark())).map(() => staged);
   }
 
   public async upsertLanguage<L extends Language>(

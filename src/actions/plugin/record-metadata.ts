@@ -37,6 +37,7 @@ export class PluginRecordMetadataAction {
   public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult<PluginConfig>> => {
     const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
+      this.prompts.metadataCancelled(input.cancelled);
       return ActionResult.cancelled(input.cancelled);
     }
 

@@ -615,16 +615,16 @@ describe('PluginConfigContext', () => {
     });
   });
 
-  describe('requestLanguages', () => {
+  describe('recordLanguages', () => {
     it('adds a language the config does not carry as an entry with no publishing record', async () => {
       withConfig({ languages: {} });
 
-      expect((await context.requestLanguages([Language.CSHARP, Language.PYTHON])).isOk()).to.be.true;
+      expect((await context.recordLanguages([Language.CSHARP, Language.PYTHON])).isOk()).to.be.true;
       expect(writtenDocument().languages).to.deep.equal({ csharp: {}, python: {} });
     });
 
     it('creates the file when there is none', async () => {
-      expect((await context.requestLanguages([Language.TYPESCRIPT])).isOk()).to.be.true;
+      expect((await context.recordLanguages([Language.TYPESCRIPT])).isOk()).to.be.true;
       expect(writtenDocument()).to.deep.equal({ schemaVersion: 1, languages: { typescript: {} } });
     });
 
@@ -633,7 +633,7 @@ describe('PluginConfigContext', () => {
     it('leaves a published entry exactly as it was', async () => {
       withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
-      await context.requestLanguages([Language.CSHARP, Language.PYTHON]);
+      await context.recordLanguages([Language.CSHARP, Language.PYTHON]);
 
       expect(writtenDocument().languages).to.deep.equal({ csharp: CSHARP_ENTRY, python: {} });
     });
@@ -642,16 +642,16 @@ describe('PluginConfigContext', () => {
       const original = '{\n\t"languages": {"csharp": {}}\n}\n';
       withFile(original);
 
-      expect((await context.requestLanguages([Language.CSHARP])).isOk()).to.be.true;
+      expect((await context.recordLanguages([Language.CSHARP])).isOk()).to.be.true;
       expect(written()).to.equal(original);
     });
 
     it('reports the languages the config now names', async () => {
       withConfig({ languages: { csharp: CSHARP_ENTRY } });
 
-      const state = (await context.requestLanguages([Language.PYTHON]))._unsafeUnwrap();
+      const state = (await context.recordLanguages([Language.PYTHON]))._unsafeUnwrap();
 
-      expect(state.requestedLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
+      expect(state.initialLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
       expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP]);
     });
 
@@ -660,7 +660,7 @@ describe('PluginConfigContext', () => {
     it('drops an unpublished language the selection no longer names', async () => {
       withConfig({ languages: { csharp: UNPUBLISHED_ENTRY, python: {}, typescript: {} } });
 
-      expect((await context.requestLanguages([Language.CSHARP])).isOk()).to.be.true;
+      expect((await context.recordLanguages([Language.CSHARP])).isOk()).to.be.true;
       expect(writtenDocument().languages).to.deep.equal({ csharp: UNPUBLISHED_ENTRY });
     });
 
@@ -668,7 +668,7 @@ describe('PluginConfigContext', () => {
     it('keeps a published language the selection drops', async () => {
       withConfig({ languages: { csharp: CSHARP_ENTRY, python: {} } });
 
-      expect((await context.requestLanguages([Language.PYTHON])).isOk()).to.be.true;
+      expect((await context.recordLanguages([Language.PYTHON])).isOk()).to.be.true;
       expect(writtenDocument().languages).to.deep.equal({ csharp: CSHARP_ENTRY, python: {} });
     });
 
@@ -676,16 +676,16 @@ describe('PluginConfigContext', () => {
     it('leaves a language a plugin cannot carry alone', async () => {
       withConfig({ languages: { java: CSHARP_ENTRY, go: {}, python: {} } });
 
-      expect((await context.requestLanguages([Language.CSHARP])).isOk()).to.be.true;
+      expect((await context.recordLanguages([Language.CSHARP])).isOk()).to.be.true;
       expect(writtenDocument().languages).to.deep.equal({ java: CSHARP_ENTRY, go: {}, csharp: {} });
     });
 
     it('reports a dropped language as no longer named', async () => {
       withConfig({ languages: { csharp: {}, python: {} } });
 
-      const state = (await context.requestLanguages([Language.PYTHON]))._unsafeUnwrap();
+      const state = (await context.recordLanguages([Language.PYTHON]))._unsafeUnwrap();
 
-      expect(state.requestedLanguages()).to.deep.equal([Language.PYTHON]);
+      expect(state.initialLanguages()).to.deep.equal([Language.PYTHON]);
     });
   });
 
@@ -706,7 +706,7 @@ describe('PluginConfigContext', () => {
       const state = await present();
 
       expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT]);
-      expect(state.requestedLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
+      expect(state.initialLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
     });
 
     // java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the file
@@ -716,7 +716,7 @@ describe('PluginConfigContext', () => {
 
       const state = await present();
 
-      expect(state.requestedLanguages()).to.deep.equal([Language.CSHARP]);
+      expect(state.initialLanguages()).to.deep.equal([Language.CSHARP]);
       expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP]);
       expect(state.unsupportedLanguages()).to.deep.equal(['java', 'go']);
     });

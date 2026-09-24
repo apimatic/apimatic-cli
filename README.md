@@ -46,7 +46,7 @@ $ npm install -g @apimatic/cli
 $ apimatic COMMAND
 running command...
 $ apimatic (--version)
-@apimatic/cli/1.3.1 win32-x64 node-v23.4.0
+@apimatic/cli/1.3.1 win32-x64 node-v24.19.0
 $ apimatic --help [COMMAND]
 USAGE
   $ apimatic COMMAND
@@ -262,10 +262,8 @@ FLAGS
 DESCRIPTION
   Generate a context plugin for your SDKs.
 
-  Generate a context plugin that teaches an AI coding assistant how to use your SDKs. You choose the languages it
-  covers; one whose SDK is not published yet is generated and bundled inside the plugin, so nothing has to be
-  published first. Requires an input directory containing a `src` directory with your API specification —
-  `apimatic.json` is created if it is not there.
+  Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
+  containing a `src` directory with your API specification — `apimatic.json` is created if it is not there.
 
 EXAMPLES
   apimatic plugin generate

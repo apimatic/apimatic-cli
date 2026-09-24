@@ -47,6 +47,9 @@ describe('PluginGenerateAction', () => {
   const writeConfig = (config: object) => fsExtra.writeJson(configPath(), config);
   const writtenConfig = () => fsExtra.readJsonSync(configPath());
 
+  /** The config the service actually reads: the copy, not the user's file. */
+  const uploadedConfig = () => JSON.parse(uploaded['apimatic.json']);
+
   const execute = (force = false) =>
     action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(pluginDirectory), force);
 
@@ -188,8 +191,9 @@ describe('PluginGenerateAction', () => {
     });
 
     // The CLI reads past a mark an editor left at the front of the file, but the server parses
-    // the file itself, so it must not travel with one. Nothing else about the file changes.
-    it('carries no byte-order mark, and the rest of the file as written', async () => {
+    // the file itself, so it must not travel with one. The user's own file is left as they saved
+    // it, mark included: only the copy that is uploaded is rewritten.
+    it('uploads no byte-order mark, and leaves the file as written', async () => {
       generated();
       const body =
         '{\r\n' +
@@ -201,7 +205,7 @@ describe('PluginGenerateAction', () => {
       expect((await execute()).isSuccess()).to.be.true;
 
       expect(uploaded['apimatic.json']).to.equal(body);
-      expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(body);
+      expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(BOM + body);
     });
 
     it('fails rather than uploading a marked file it could not rewrite', async () => {
@@ -317,10 +321,9 @@ describe('PluginGenerateAction', () => {
         expect(config.initialLanguages()).to.deep.equal([Language.CSHARP]);
       });
 
-      // The entry is the record of where the SDK went, so a selection cannot take it out of the
-      // file. The prompt puts a cleared published language back and says so; this is the other
-      // half of that promise — even a selection that arrives without it leaves the entry alone.
-      it('never drops a published language the config already names', async () => {
+      // The entry records where the SDK went, and only `sdk publish` can write that again, so
+      // clearing the checkbox leaves the file alone.
+      it('keeps the record of a published language the user cleared', async () => {
         await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
         selectLanguages.resolves([Language.TYPESCRIPT]);
         generated();
@@ -328,6 +331,30 @@ describe('PluginGenerateAction', () => {
         await execute();
 
         expect(writtenConfig().languages).to.deep.equal({ csharp: CSHARP, typescript: {} });
+      });
+
+      // ...and the plugin still does not cover it. The service reads the uploaded copy, which
+      // names exactly what was checked.
+      it('leaves a cleared published language out of the upload', async () => {
+        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
+        selectLanguages.resolves([Language.TYPESCRIPT]);
+        generated();
+
+        await execute();
+
+        expect(Object.keys(uploadedConfig().languages)).to.deep.equal(['typescript']);
+      });
+
+      // Clearing every box is an answer, not an empty one: nothing is generated, published or not.
+      it('cancels when every language is cleared, even where one is published', async () => {
+        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
+        selectLanguages.resolves([]);
+        const generatePlugin = generated();
+
+        const result = await execute();
+
+        expect(result.isCancelled()).to.be.true;
+        expect(generatePlugin.called).to.be.false;
       });
 
       // The service reads the languages out of the zipped config, so a cleared checkbox that never
@@ -489,7 +516,7 @@ describe('PluginGenerateAction', () => {
       await fsExtra.remove(configPath());
       cancelsMetadata();
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
-      const metadataCancelled = sinon.stub(PluginGeneratePrompts.prototype, 'metadataCancelled');
+      const metadataCancelled = sinon.stub(PluginRecordMetadataPrompts.prototype, 'metadataCancelled');
 
       const result = await execute();
 
@@ -503,7 +530,7 @@ describe('PluginGenerateAction', () => {
       await fsExtra.remove(configPath());
       cancelsMetadata('A plugin version is required');
       sinon.stub(PluginService.prototype, 'generatePlugin');
-      const metadataCancelled = sinon.stub(PluginGeneratePrompts.prototype, 'metadataCancelled');
+      const metadataCancelled = sinon.stub(PluginRecordMetadataPrompts.prototype, 'metadataCancelled');
 
       await execute();
 
