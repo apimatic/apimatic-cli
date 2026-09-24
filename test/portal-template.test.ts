@@ -4,9 +4,7 @@ import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
 import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
-import { ApiConfig } from '../src/types/portal/config/api-config';
 import { PortalIdentity } from '../src/types/portal/portal-config';
-import type { ApiOptions } from '../portal-template/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
 
 /** True only when the two types are identical, every nested field and union member included. */
@@ -102,9 +100,8 @@ describe('portal template packaging', () => {
   // missing it. The compiler checks this when `pretest` runs; the assertion only reports it.
   it('declares exactly what the CLI writes for it', () => {
     const identity: Equal<Portal, PortalIdentity> = true;
-    const api: Equal<ApiOptions, ReturnType<ApiConfig['toJSON']>> = true;
 
-    expect([identity, api]).to.deep.equal([true, true]);
+    expect(identity).to.equal(true);
   });
 
   // The CLI writes these into the prepared project; a copy in the template would be a second

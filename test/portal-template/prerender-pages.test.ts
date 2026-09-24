@@ -2,7 +2,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import type { ApiOptions } from '../../portal-template/portal-config';
 import { prerenderPages } from '../../portal-template/prerender-pages';
 
 // The list this builds is the whole of what a static build writes: TanStack's crawler is off,
@@ -16,20 +15,8 @@ describe('prerenderPages', () => {
     fs.writeFileSync(target, body);
   };
 
-  const urlsFor = async (
-    siteUrl: string | null = null,
-    specs: Record<string, string> = {},
-    api: Partial<ApiOptions> = {}
-  ) => {
-    const pages = await prerenderPages(
-      {
-        specs,
-        contentDir,
-        staticDir: null,
-        api: { groupBy: 'tag', showDeprecated: true, showInternal: false, ...api }
-      },
-      siteUrl
-    );
+  const urlsFor = async (siteUrl: string | null = null, specs: Record<string, string> = {}) => {
+    const pages = await prerenderPages({ specs, contentDir, staticDir: null }, siteUrl);
     return pages.map((page) => page.path);
   };
 
@@ -96,9 +83,9 @@ describe('prerenderPages', () => {
     }
   });
 
-  // Through the options the site is built with: a page listed here and not built is a 404 in
+  // Through the sections the site is built from: a page listed here and not built is a 404 in
   // the output, and one built and not listed is never written.
-  it('lists the reference pages portal.api keeps, at the addresses its grouping gives them', async () => {
+  it('lists the reference pages the site keeps, deprecated included and internal left out', async () => {
     // Beside the pages, which only Markdown files are.
     const spec = path.join(contentDir, 'pets.json');
     const ok = { 200: { description: 'ok' } };
@@ -116,20 +103,13 @@ describe('prerenderPages', () => {
         }
       })
     );
-    const reference = async (api: Partial<ApiOptions>) =>
-      (await urlsFor(null, { pets: spec }, api)).filter((url) => url.startsWith('/api/pets/')).sort();
+    const reference = (await urlsFor(null, { pets: spec })).filter((url) => url.startsWith('/api/pets/')).sort();
 
-    expect(await reference({})).to.deep.equal([
+    expect(reference).to.deep.equal([
       '/api/pets/pets/createPet',
       '/api/pets/pets/createPet.md',
       '/api/pets/pets/listPets',
       '/api/pets/pets/listPets.md'
-    ]);
-    expect(await reference({ groupBy: 'route', showDeprecated: false, showInternal: true })).to.deep.equal([
-      '/api/pets/pets/delete',
-      '/api/pets/pets/delete.md',
-      '/api/pets/pets/get',
-      '/api/pets/pets/get.md'
     ]);
   });
 

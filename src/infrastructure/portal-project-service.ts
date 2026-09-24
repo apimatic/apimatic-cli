@@ -159,13 +159,12 @@ export class PortalProjectService {
       specs[spec.slug] = this.toPosix(spec.file.toString());
     }
 
-    // Everything here addresses this machine, or is read only while the build is set up, so
-    // it stays behind `portal.server.ts` and the build's own config files.
+    // Everything here addresses this machine, so it stays behind `portal.server.ts` and the
+    // build's own config files.
     const configuration = {
       specs,
       contentDir: this.toPosix(contentDirectory.toString()),
-      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString()),
-      api: source.config.apiSettings().toJSON()
+      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
     };
 
     await this.fileService.writeContents(

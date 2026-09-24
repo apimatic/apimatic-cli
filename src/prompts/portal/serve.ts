@@ -76,10 +76,8 @@ export class PortalServePrompts {
           )} is only reported when the preview starts; until then an entry or a title that the build would ` +
           `refuse is ignored here.`,
         '',
-        `Adding or removing a page, creating ${f.path(sourceDirectory.join('static'))}, changing ${f.var(
-          'portal.api'
-        )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview ` +
-          `restarted.`,
+        `Adding or removing a page, creating ${f.path(sourceDirectory.join('static'))}, or changing which ` +
+          `documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
@@ -95,13 +93,6 @@ export class PortalServePrompts {
   public configRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
     reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
     log.message('The preview keeps showing what it last accepted until the file is fixed.');
-  }
-
-  /** The prerender list and the reference pages are made once, from the settings at startup. */
-  public restartNeeded() {
-    log.warn(
-      `The ${f.var('portal.api')} settings changed. Restart the preview to regroup or filter the API reference.`
-    );
   }
 
   public configNotApplied(reason: string) {

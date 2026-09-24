@@ -3,22 +3,19 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import type { Document } from 'fumadocs-openapi';
-import type { ApiOptions } from '../../portal-template/portal-config';
-import { withoutHiddenOperations } from '../../portal-template/src/lib/openapi-filter';
+import { withoutInternalOperations } from '../../portal-template/src/lib/openapi-filter';
 import { openApiSection } from '../../portal-template/src/lib/openapi-section.server';
 
 const ok = { 200: { description: 'ok' } };
 
-describe('withoutHiddenOperations', () => {
-  const hideBoth = { showDeprecated: false, showInternal: false };
-
+describe('withoutInternalOperations', () => {
   const documentWith = (paths: Record<string, unknown>, extra: Record<string, unknown> = {}): Document =>
     ({ openapi: '3.1.0', info: { title: 'Pets', version: '1' }, paths, ...extra } as unknown as Document);
 
   const pathsOf = (document: Document) =>
     (document as unknown as { paths: Record<string, Record<string, unknown>> }).paths;
 
-  it('removes a deprecated operation and an internal one, and keeps the rest of the path item', () => {
+  it('removes an internal operation, and keeps the rest of the path item, deprecated operations included', () => {
     const document = documentWith({
       '/pets': {
         parameters: [{ name: 'limit', in: 'query' }],
@@ -28,9 +25,10 @@ describe('withoutHiddenOperations', () => {
       }
     });
 
-    expect(pathsOf(withoutHiddenOperations(document, hideBoth))['/pets']).to.deep.equal({
+    expect(pathsOf(withoutInternalOperations(document))['/pets']).to.deep.equal({
       parameters: [{ name: 'limit', in: 'query' }],
-      get: { operationId: 'list', responses: ok }
+      get: { operationId: 'list', responses: ok },
+      post: { operationId: 'create', deprecated: true, responses: ok }
     });
   });
 
@@ -40,31 +38,16 @@ describe('withoutHiddenOperations', () => {
       '/admin': { parameters: [], get: { operationId: 'admin', 'x-internal': true, responses: ok } }
     });
 
-    expect(Object.keys(pathsOf(withoutHiddenOperations(document, hideBoth)))).to.deep.equal(['/pets']);
-  });
-
-  it('keeps what each setting shows', () => {
-    const document = documentWith({
-      '/pets': {
-        post: { operationId: 'create', deprecated: true, responses: ok },
-        put: { operationId: 'replace', 'x-internal': true, responses: ok }
-      }
-    });
-
-    const methods = (showDeprecated: boolean, showInternal: boolean) =>
-      Object.keys(pathsOf(withoutHiddenOperations(document, { showDeprecated, showInternal }))['/pets'] ?? {});
-
-    expect(methods(true, false)).to.deep.equal(['post']);
-    expect(methods(false, true)).to.deep.equal(['put']);
+    expect(Object.keys(pathsOf(withoutInternalOperations(document)))).to.deep.equal(['/pets']);
   });
 
   // Only an actual `true` hides: `x-internal: "true"` is a vendor value like any other.
   it('hides only on true', () => {
     const document = documentWith({
-      '/pets': { get: { operationId: 'list', deprecated: 'yes', 'x-internal': 'true', responses: ok } }
+      '/pets': { get: { operationId: 'list', 'x-internal': 'true', responses: ok } }
     });
 
-    expect(withoutHiddenOperations(document, hideBoth)).to.equal(document);
+    expect(withoutInternalOperations(document)).to.equal(document);
   });
 
   it('removes the webhooks it hides as it does the paths', () => {
@@ -78,7 +61,7 @@ describe('withoutHiddenOperations', () => {
       }
     );
 
-    const shown = withoutHiddenOperations(document, hideBoth) as unknown as { webhooks: Record<string, unknown> };
+    const shown = withoutInternalOperations(document) as unknown as { webhooks: Record<string, unknown> };
     expect(Object.keys(shown.webhooks)).to.deep.equal(['born']);
   });
 
@@ -88,13 +71,13 @@ describe('withoutHiddenOperations', () => {
       '/admin': { 'x-internal': true, get: { operationId: 'admin', responses: ok } }
     });
 
-    expect(Object.keys(pathsOf(withoutHiddenOperations(document, hideBoth)))).to.deep.equal(['/pets']);
+    expect(Object.keys(pathsOf(withoutInternalOperations(document)))).to.deep.equal(['/pets']);
   });
 
   it('filters the operations OpenAPI 3.2 adds: query, and those under additionalOperations', () => {
     const document = documentWith({
       '/pets': {
-        query: { operationId: 'search', deprecated: true, responses: ok },
+        query: { operationId: 'search', 'x-internal': true, responses: ok },
         additionalOperations: {
           COPY: { operationId: 'copy', 'x-internal': true, responses: ok },
           LINK: { operationId: 'link', responses: ok }
@@ -102,7 +85,7 @@ describe('withoutHiddenOperations', () => {
       }
     });
 
-    expect(pathsOf(withoutHiddenOperations(document, hideBoth))['/pets']).to.deep.equal({
+    expect(pathsOf(withoutInternalOperations(document))['/pets']).to.deep.equal({
       additionalOperations: { LINK: { operationId: 'link', responses: ok } }
     });
   });
@@ -113,10 +96,10 @@ describe('withoutHiddenOperations', () => {
         get: { operationId: 'list', responses: ok },
         additionalOperations: { COPY: { operationId: 'copy', 'x-internal': true, responses: ok } }
       },
-      '/admin': { additionalOperations: { PURGE: { operationId: 'purge', deprecated: true, responses: ok } } }
+      '/admin': { additionalOperations: { PURGE: { operationId: 'purge', 'x-internal': true, responses: ok } } }
     });
 
-    expect(pathsOf(withoutHiddenOperations(document, hideBoth))).to.deep.equal({
+    expect(pathsOf(withoutInternalOperations(document))).to.deep.equal({
       '/pets': { get: { operationId: 'list', responses: ok } }
     });
   });
@@ -135,7 +118,7 @@ describe('withoutHiddenOperations', () => {
       { components: { pathItems: { Pets: shared, Cats: { get: { operationId: 'cats', responses: ok } } } } }
     );
 
-    const paths = pathsOf(withoutHiddenOperations(document, hideBoth));
+    const paths = pathsOf(withoutInternalOperations(document));
 
     expect(paths['/pets']).to.deep.equal({ summary: 'Pets', get: { operationId: 'list', responses: ok } });
     expect(paths['/cats']).to.deep.equal({ $ref: '#/components/pathItems/Cats' });
@@ -157,13 +140,13 @@ describe('withoutHiddenOperations', () => {
           abc1234: { post: { operationId: 'adopted', 'x-internal': true, responses: ok } },
           def5678: {
             post: { operationId: 'born', responses: ok },
-            put: { operationId: 'reborn', deprecated: true, responses: ok }
+            put: { operationId: 'reborn', 'x-internal': true, responses: ok }
           }
         }
       }
     );
 
-    const shown = withoutHiddenOperations(document, hideBoth) as unknown as { webhooks: Record<string, unknown> };
+    const shown = withoutInternalOperations(document) as unknown as { webhooks: Record<string, unknown> };
 
     expect(shown.webhooks).to.deep.equal({ born: { post: { operationId: 'born', responses: ok } } });
   });
@@ -187,7 +170,7 @@ describe('withoutHiddenOperations', () => {
       }
     );
 
-    const shown = withoutHiddenOperations(document, hideBoth) as unknown as Record<string, Record<string, unknown>>;
+    const shown = withoutInternalOperations(document) as unknown as Record<string, Record<string, unknown>>;
 
     expect(Object.keys(shown.paths)).to.deep.equal(['/pets']);
     expect(shown.webhooks).to.deep.equal({});
@@ -199,7 +182,7 @@ describe('withoutHiddenOperations', () => {
       '/admin': { get: { operationId: 'admin', 'x-internal': true, responses: ok } }
     });
 
-    expect(pathsOf(withoutHiddenOperations(document, hideBoth))).to.deep.equal({
+    expect(pathsOf(withoutInternalOperations(document))).to.deep.equal({
       '/pets': { $ref: '#/components/pathItems/100%' }
     });
   });
@@ -227,7 +210,7 @@ describe('withoutHiddenOperations', () => {
       }
     );
 
-    const shown = withoutHiddenOperations(document, hideBoth) as unknown as Record<string, unknown>;
+    const shown = withoutInternalOperations(document) as unknown as Record<string, unknown>;
 
     expect(shown.tags).to.deep.equal([{ name: 'pets' }, { name: 'operations', kind: 'nav' }, { name: 'unused' }]);
     expect(shown['x-tagGroups']).to.deep.equal([{ name: 'Public', tags: ['pets'] }]);
@@ -242,33 +225,32 @@ describe('withoutHiddenOperations', () => {
       { tags: [{ name: 'pets', parent: 'animals' }, { name: 'shared' }, { name: 'animals' }] }
     );
 
-    const shown = withoutHiddenOperations(document, hideBoth) as unknown as Record<string, unknown>;
+    const shown = withoutInternalOperations(document) as unknown as Record<string, unknown>;
 
     expect(shown.tags).to.deep.equal([{ name: 'pets', parent: 'animals' }, { name: 'shared' }, { name: 'animals' }]);
   });
 
   it('returns the document it was given when nothing is hidden', () => {
-    const document = documentWith({
-      '/pets': { get: { operationId: 'list', responses: ok } },
-      '/admin': { get: { operationId: 'admin', 'x-internal': true, responses: ok } }
+    const plain = documentWith({
+      '/pets': {
+        get: { operationId: 'list', responses: ok },
+        post: { operationId: 'create', deprecated: true, responses: ok }
+      }
     });
 
-    const plain = documentWith({ '/pets': { get: { operationId: 'list', responses: ok } } });
-
-    expect(withoutHiddenOperations(document, { showDeprecated: true, showInternal: true })).to.equal(document);
-    expect(withoutHiddenOperations(plain, hideBoth)).to.equal(plain);
+    expect(withoutInternalOperations(plain)).to.equal(plain);
   });
 
   it('leaves the document it was given untouched', () => {
     const document = documentWith({
       '/pets': {
         get: { operationId: 'list', responses: ok },
-        post: { operationId: 'create', deprecated: true, responses: ok }
+        post: { operationId: 'create', 'x-internal': true, responses: ok }
       }
     });
     const before = JSON.stringify(document);
 
-    withoutHiddenOperations(document, hideBoth);
+    withoutInternalOperations(document);
 
     expect(JSON.stringify(document)).to.equal(before);
   });
@@ -277,7 +259,6 @@ describe('withoutHiddenOperations', () => {
 /** The section built from a real file, through the same server and bundler the site uses. */
 describe('openApiSection', () => {
   let directory: string;
-  const DEFAULTS: ApiOptions = { groupBy: 'tag', showDeprecated: true, showInternal: false };
 
   beforeEach(() => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'openapi-section-'));
@@ -321,54 +302,34 @@ describe('openApiSection', () => {
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  const sectionFor = (api: Partial<ApiOptions> = {}) =>
-    openApiSection('pets', path.join(directory, 'api.json'), { ...DEFAULTS, ...api });
+  const section = () => openApiSection('pets', path.join(directory, 'api.json'));
 
-  /** Each generated page's path, with forward slashes whatever the platform joined it with. */
-  const pagesOf = async (api: Partial<ApiOptions> = {}) =>
-    (await sectionFor(api)).files
-      .filter((file) => file.type === 'page')
-      .map((file) => file.path.split(path.sep).join('/'));
+  /** Each generated file's path, with forward slashes whatever the platform joined it with. */
+  const filesOf = async () => (await section()).files.map((file) => file.path.split(path.sep).join('/'));
 
-  it('documents deprecated operations and leaves internal ones out by default', async () => {
-    expect(await pagesOf()).to.have.members([
-      'api/pets/pets/listPets.mdx',
-      'api/pets/pets/createPet.mdx',
-      'api/pets/pets/getPet.mdx'
-    ]);
-  });
-
-  // No page is the whole of it: the tag that held only hidden operations gets no folder
+  // No page is the whole of it: the tag that held only internal operations gets no folder
   // either, since its metadata is generated from the same document.
-  it('leaves no page, and no tag folder, for what it hides', async () => {
-    const files = (await sectionFor({ showDeprecated: false })).files.map((file) =>
-      file.path.split(path.sep).join('/')
-    );
+  it('documents deprecated operations, grouped by tag, and leaves internal ones out, folder and all', async () => {
+    const files = await filesOf();
 
     expect(files.filter((file) => file.endsWith('.mdx'))).to.have.members([
       'api/pets/pets/listPets.mdx',
+      'api/pets/pets/createPet.mdx',
       'api/pets/pets/getPet.mdx'
     ]);
     expect(files.some((file) => file.includes('/admin'))).to.be.false;
   });
 
-  it('documents internal operations and webhooks when asked to', async () => {
-    expect(await pagesOf({ showInternal: true })).to.include.members([
-      'api/pets/admin/internalOp.mdx',
-      'api/pets/pets/petAdopted.mdx'
-    ]);
-  });
-
-  // Every page carries the bundled document for the playground, so a hidden operation left
+  // Every page carries the bundled document for the playground, so an internal operation left
   // in it would still reach the reader.
-  it('keeps the hidden operations out of each page’s payload too, and its external references intact', async () => {
-    const page = (await sectionFor({ showDeprecated: false })).files.find((file) => file.path.endsWith('getPet.mdx'));
+  it('keeps the internal operations out of each page’s payload too, and its external references intact', async () => {
+    const page = (await section()).files.find((file) => file.path.endsWith('getPet.mdx'));
     const bundled = (
       page?.data as { getOpenAPIPageProps: () => { payload: { bundled: Record<string, any> } } }
     ).getOpenAPIPageProps().payload.bundled;
 
     expect(Object.keys(bundled.paths)).to.deep.equal(['/pets', '/pets/{id}']);
-    expect(bundled.paths['/pets']).to.not.have.property('post');
+    expect(bundled.webhooks ?? {}).to.not.have.property('petAdopted');
     const reference = bundled.paths['/pets/{id}'].get.responses[200].content['application/json'].schema.$ref as string;
     expect(reference).to.match(/^#\//);
     const target = reference
@@ -378,64 +339,29 @@ describe('openApiSection', () => {
     expect(target).to.deep.equal({ type: 'object', properties: { name: { type: 'string' } } });
   });
 
-  // `groupBy` decides the addresses, not only the sidebar.
-  it('groups the pages the way the block says, which moves their addresses', async () => {
-    expect(await pagesOf({ groupBy: 'none' })).to.have.members([
-      'api/pets/listPets.mdx',
-      'api/pets/createPet.mdx',
-      'api/pets/getPet.mdx'
-    ]);
-    expect(await pagesOf({ groupBy: 'route' })).to.have.members([
-      'api/pets/pets/get.mdx',
-      'api/pets/pets/post.mdx',
-      'api/pets/pets/id/get.mdx'
-    ]);
-  });
-
-  /** Rewrites the specification with the given paths and webhooks. */
-  const writeSpecification = (paths: Record<string, unknown>, webhooks: Record<string, unknown> = {}) =>
+  it('refuses two operations that one operationId would give one page', async () => {
     fs.writeFileSync(
       path.join(directory, 'api.json'),
-      JSON.stringify({ openapi: '3.1.0', info: { title: 'Pets', version: '1' }, paths, webhooks })
-    );
-
-  const metaFiles = async (api: Partial<ApiOptions>) =>
-    (await sectionFor(api)).files
-      .filter((file) => file.type === 'meta')
-      .map((file) => ({ path: file.path.split(path.sep).join('/'), pages: (file.data as { pages: string[] }).pages }));
-
-  // The operations on `/` form a folder named '', the section itself, and Fumadocs writes a
-  // second meta.json there that the section's own one hides.
-  it('lists the operations on the root path in the section, grouped by route', async () => {
-    writeSpecification({
-      '/': { get: { operationId: 'status', responses: ok } },
-      '/pets': { get: { operationId: 'listPets', responses: ok } }
-    });
-
-    const metas = await metaFiles({ groupBy: 'route' });
-
-    expect(metas.filter((meta) => meta.path === 'api/pets/meta.json')).to.deep.equal([
-      { path: 'api/pets/meta.json', pages: ['get', 'pets'] }
-    ]);
-  });
-
-  it('refuses two operations that grouping by route would give one page', async () => {
-    writeSpecification(
-      { '/pets': { post: { operationId: 'createPet', responses: ok } } },
-      { pets: { post: { operationId: 'petCreated', responses: ok } } }
+      JSON.stringify({
+        openapi: '3.1.0',
+        info: { title: 'Pets', version: '1' },
+        paths: {
+          '/pets': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } },
+          '/cats': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } }
+        }
+      })
     );
 
     let failure: unknown;
     try {
-      await sectionFor({ groupBy: 'route' });
+      await section();
     } catch (error) {
       failure = error;
     }
 
     expect((failure as Error | undefined)?.message).to.equal(
-      "[OpenAPI] Two operations of 'pets' would share the page api/pets/pets/post.mdx, so one would be left " +
-        "out. Group the reference by 'tag' or 'none' in portal.api.groupBy."
+      "[OpenAPI] Two operations of 'pets' would share the page api/pets/pets/createPet.mdx, so one would be left " +
+        'out. Give each operation an operationId of its own.'
     );
-    expect(await pagesOf({ groupBy: 'tag' })).to.have.lengthOf(2);
   });
 });

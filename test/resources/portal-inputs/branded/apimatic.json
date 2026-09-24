@@ -11,8 +11,7 @@
     },
     "navigation": {
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
-    },
-    "api": { "showDeprecated": false }
+    }
   },
   "languages": { "typescript": {} }
 }

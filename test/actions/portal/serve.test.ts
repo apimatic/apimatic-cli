@@ -354,35 +354,6 @@ describe('PortalServeAction', () => {
       });
     });
 
-    // The reference pages and the prerender list are made from `portal.api` once, at startup.
-    it('says a restart is needed when portal.api changes, once, and applies the rest', async () => {
-      await whileServing(async () => {
-        const config = originalConfig();
-        config.portal.api = { groupBy: 'route' };
-
-        await save(config);
-        await save({ ...config, portal: { ...config.portal, ai: { pageActions: false } } });
-
-        expect(prompts.restartNeeded.calledOnce).to.be.true;
-        expect(JSON.parse(readProject('portal.identity.json')).pageActions).to.be.false;
-      });
-    });
-
-    // Changed back, the preview is what the file says again; changed once more, it is not.
-    it('says nothing when portal.api goes back to what the preview runs with, and says so again after', async () => {
-      await whileServing(async () => {
-        const regrouped = originalConfig();
-        regrouped.portal.api = { groupBy: 'route' };
-
-        await save(regrouped);
-        await save(originalConfig());
-        expect(prompts.restartNeeded.calledOnce).to.be.true;
-
-        await save(regrouped);
-        expect(prompts.restartNeeded.calledTwice).to.be.true;
-      });
-    });
-
     // Vite reads its public directory once, and one missing at startup is served as none.
     it('says once that the files of a static directory made while it runs need a restart', async () => {
       fs.rmSync(path.join(source.toString(), 'static'), { recursive: true });

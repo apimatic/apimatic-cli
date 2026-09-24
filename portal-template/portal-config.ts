@@ -1,13 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Portal } from './src/lib/portal-types';
 
-export interface ApiOptions {
-  groupBy: 'tag' | 'route' | 'none';
-  showDeprecated: boolean;
-  /** Whether operations marked `x-internal: true` are documented. */
-  showInternal: boolean;
-}
-
 /** Written by the CLI next to this file before every build or dev-server start. */
 export interface PortalConfig {
   /** Section slug -> absolute path of an OpenAPI document. */
@@ -15,7 +8,6 @@ export interface PortalConfig {
   /** Absolute. Always exists, and may be empty. */
   contentDir: string;
   staticDir: string | null;
-  api: ApiOptions;
 }
 
 export async function readPortalConfig(): Promise<PortalConfig> {

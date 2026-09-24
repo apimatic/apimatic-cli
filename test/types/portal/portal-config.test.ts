@@ -37,9 +37,6 @@ describe('PortalConfig', () => {
       expect(portal.brandSettings().brandColors().primaryColors()).to.be.null;
       expect(portal.brandSettings().mode()).to.equal('both');
       expect(portal.navigationSettings().headerLinks()).to.be.empty;
-      expect(portal.apiSettings().grouping()).to.equal('tag');
-      expect(portal.apiSettings().showsDeprecated()).to.be.true;
-      expect(portal.apiSettings().showsInternal()).to.be.false;
       expect(portal.aiSettings().offersPageActions()).to.be.true;
       expect(portal.tokenOverrides().lightTokens().size).to.equal(0);
       expect(portal.staticFiles()).to.be.empty;
@@ -60,13 +57,13 @@ describe('PortalConfig', () => {
           theme: {},
           site: { title: 'x' },
           brand: { colors: { accent: '#fff' } },
-          api: { hideInternal: true }
+          ai: { hideActions: true }
         })
       ).to.deep.equal([
         "'portal.theme' is not a 'portal' setting.",
         "'portal.site.title' is not a 'portal' setting.",
         "'portal.brand.colors.accent' is not a 'portal' setting.",
-        "'portal.api.hideInternal' is not a 'portal' setting."
+        "'portal.ai.hideActions' is not a 'portal' setting."
       ]);
     });
 
@@ -94,7 +91,7 @@ describe('PortalConfig', () => {
         theme: {},
         site: { name: '', url: 'https://x.test/docs' },
         brand: { colorMode: 'sepia' },
-        api: { groupBy: 'path' }
+        ai: { pageActions: 'no' }
       });
 
       expect(errors).to.have.lengthOf(5);
@@ -378,18 +375,6 @@ describe('PortalConfig', () => {
     });
   });
 
-  describe('api', () => {
-    it('takes Fumadocs’ grouping values and the two filters', () => {
-      const api = config({ api: { groupBy: 'route', showDeprecated: false, showInternal: true } }).apiSettings();
-
-      expect([api.grouping(), api.showsDeprecated(), api.showsInternal()]).to.deep.equal(['route', false, true]);
-      expect(errorsOf({ api: { groupBy: 'path', showDeprecated: 'no' } })).to.deep.equal([
-        "'portal.api.groupBy' must be one of 'tag', 'route', 'none'.",
-        "'portal.api.showDeprecated' must be true or false."
-      ]);
-    });
-  });
-
   describe('ai', () => {
     // Each page offers to open itself in ChatGPT, Claude, Cursor or Scira. A portal
     // published under someone else's brand carries that endorsement, so it can be refused.
@@ -557,7 +542,6 @@ describe('PortalConfig', () => {
         site: { name: 'Spec Title', description: 'What the spec says.' },
         brand: { colors: {}, colorMode: 'both' },
         navigation: { links: [] },
-        api: { groupBy: 'tag', showDeprecated: true, showInternal: false },
         ai: { pageActions: true },
         advanced: { tokens: { light: {}, dark: {} } }
       });
@@ -580,7 +564,6 @@ describe('PortalConfig', () => {
           colorMode: 'light'
         },
         navigation: { links: [{ label: 'Status', url: 'https://status.test' }] },
-        api: { groupBy: 'none', showDeprecated: false, showInternal: true },
         ai: { pageActions: false },
         advanced: { tokens: { light: { '--color-fd-accent': '#eee' }, dark: {} } }
       };

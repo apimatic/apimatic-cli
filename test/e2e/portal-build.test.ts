@@ -322,8 +322,8 @@ const stylesheetOf = (output: DirectoryPath) => {
 /**
  * A second portal, branded in every way the block allows at once, so one more build covers
  * the settings the default fixture leaves at their defaults: a primary colour, a forced
- * colour mode, header links, and a reference that leaves its deprecated and internal
- * operations out. It has no content directory, so it also covers the fallback home page.
+ * colour mode and header links. Its specification has a deprecated and an internal operation,
+ * and it has no content directory, so it also covers the fallback home page.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -395,9 +395,9 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(tree).to.contain('/page/home');
   });
 
-  it('leaves the deprecated and the internal operations out, pages and sidebar alike', () => {
+  it('documents the deprecated operation and leaves the internal one out, pages and sidebar alike', () => {
     expect(exists('api/pets/pets/listPets/index.html')).to.be.true;
-    expect(exists('api/pets/pets/createPet/index.html')).to.be.false;
+    expect(exists('api/pets/pets/createPet/index.html')).to.be.true;
     expect(exists('api/pets/pets/auditPets/index.html')).to.be.false;
 
     const everything = fs
@@ -405,7 +405,7 @@ const stylesheetOf = (output: DirectoryPath) => {
       .map((name) => fs.readFileSync(path.join(output.toString(), '__tsr/staticServerFnCache', name), 'utf8'))
       .join('\n');
     expect(everything).to.contain('List pets');
-    expect(everything).to.not.contain('Create a pet');
+    expect(everything).to.contain('Create a pet');
     expect(everything).to.not.contain('Audit the pets');
   });
 });

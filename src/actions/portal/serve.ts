@@ -128,8 +128,7 @@ export class PortalServeAction {
 
   /**
    * Held to the rules a build applies: an edit a build would refuse is reported as `portal
-   * generate` would report it, and the preview keeps what it last accepted. `portal.api`, which
-   * the build set-up reads once, is not re-applied.
+   * generate` would report it, and the preview keeps what it last accepted.
    */
   private watchConfig(
     sourceContext: PortalSourceContext,
@@ -148,11 +147,7 @@ export class PortalServeAction {
       }
       const config = reloaded.value;
 
-      const notices = preview.noticesFor(config);
-      if (notices.restartNeeded) {
-        this.prompts.restartNeeded();
-      }
-      if (notices.staticDirectoryNotServed) {
+      if (preview.staticDirectoryNotServed(config)) {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 

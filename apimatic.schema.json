@@ -196,27 +196,6 @@
             }
           }
         },
-        "api": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "groupBy": {
-              "enum": ["tag", "route", "none"],
-              "default": "tag",
-              "description": "How operations are grouped in the sidebar, which also decides their URLs."
-            },
-            "showDeprecated": {
-              "type": "boolean",
-              "default": true,
-              "description": "Whether deprecated operations are documented, struck through in the sidebar."
-            },
-            "showInternal": {
-              "type": "boolean",
-              "default": false,
-              "description": "Whether operations marked 'x-internal: true' are documented."
-            }
-          }
-        },
         "ai": {
           "type": "object",
           "additionalProperties": false,

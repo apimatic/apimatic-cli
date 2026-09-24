@@ -70,7 +70,7 @@ describe('bundleSpecification', () => {
       }
     });
 
-    const section = await openApiSection('api', file, { groupBy: 'tag', showDeprecated: true, showInternal: false });
+    const section = await openApiSection('api', file);
     const titles = section.files
       .filter((entry) => entry.type === 'page')
       .map((entry) => (entry.data as { title?: string }).title);

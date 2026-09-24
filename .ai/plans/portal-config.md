@@ -79,10 +79,10 @@ Delivered as **one PR** (section 11).
 | JSON schema | `apimatic.schema.json` describes the whole file: root lenient, `portal` strict, `plugin` and `languages` typed with additional properties allowed. Ships in the npm package, referenced from a CDN URL; the scaffold writes `$schema`. A test keeps the `portal` definition and the parser in step. |
 | Defaults | Applied twice, deliberately: the scaffold writes every default into the block ("ship populated"), and `resolve()` fills them for a hand-written minimal block. An explicit default and an absent key produce the same portal. |
 | Generated files, not substitution | The CLI writes `portal.identity.json` (client-safe, imported by `portal.ts`) and `src/styles/theme.css`. Re-applying a config edit under `portal serve` is a plain write of those two files; the only substitutions left are the content-directory literals prepare makes once. |
-| Operation filtering | `api.showDeprecated` and `api.showInternal` are applied to the bundled document before pages are generated (section 7). |
+| Operation filtering | Operations marked `x-internal: true` are left out of the bundled document before pages are generated, and deprecated ones are documented, struck through (section 7). Fixed, with the reference grouped by tag (section 15). |
 | Raw tokens | `advanced.tokens.{light,dark}` are validated by name and passed through. The contrast gate is post-MVP. |
 | Colour formats | `#rgb` and `#rrggbb` for `brand.colors.primary`, because the foreground derivation has to parse it (narrowed 2026-09-24, section 15). Raw tokens accept any CSS colour string. |
-| Key names | Deviations from the PM draft: `brand.colors`, `brand.colorMode`, `navigation.links`, `api.showInternal`, and tabs in `nav.json` rather than a `sections` list. |
+| Key names | Deviations from the PM draft: `brand.colors`, `brand.colorMode`, `navigation.links`, and tabs in `nav.json` rather than a `sections` list. |
 
 Rejected, with reasons:
 
@@ -148,7 +148,6 @@ Rejected, with reasons:
     "navigation": {
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
     },
-    "api": { "groupBy": "tag", "showDeprecated": true, "showInternal": false },
     "ai": { "pageActions": true },
     "advanced": { "tokens": { "light": {}, "dark": {} } }
   },
@@ -182,9 +181,6 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.brand.colors.primary` | colour or `{light, dark}` | the theme's | A string sets both modes. `#rgb` or `#rrggbb`, per section 2. |
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
 | `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. *As reviewed:* a path is resolved as a browser resolves it and refused when that leaves the site (`/\host`, a tab after the slash), and written as resolved; an absolute URL must carry its `//`, since a browser reads `https:example.com` on an https site as a path of that site. |
-| `portal.api.groupBy` | enum | `tag` | `tag`, `route`, `none`; Fumadocs' own values. Changes operation URLs: `tag` yields `/api/<spec>/<tag>/<operation>`, `route` `/api/<spec>/<path>/<method>`, `none` `/api/<spec>/<operation>`. |
-| `portal.api.showDeprecated` | boolean | `true` | `true` keeps deprecated operations, struck through in the sidebar as Fumadocs already renders them. |
-| `portal.api.showInternal` | boolean | `false` | Operations carrying `x-internal: true`. |
 | `portal.ai.pageActions` | boolean | `true` | Today's `aiPageActions`, moved. |
 | `portal.advanced.tokens.light`, `.dark` | map | `{}` | Keys are the full custom-property name, as browser dev tools show it: `"--color-fd-accent"`, not `"accent"`. Each must be `--color-fd-` followed by one of the seventeen token names in section 10. Values are non-empty strings without `;`, `{`, `}` or `/*`, and pass through. *As reviewed:* refusing those was not enough, since an unclosed parenthesis, bracket or quote, or a trailing backslash, also runs past the declaration. A value is now made only of letters, digits, spaces and `# % . , ( ) / * + - _`, with its parentheses balanced and no `/*`, which still writes every CSS colour, `var()`, `calc()` and relative colour syntax. The schema checks the characters; the balance is the CLI's. |
 | `languages` | map | none, required | At least one entry. Keys are `Language` values from `src/types/sdk/generate.ts`: `csharp`, `java`, `php`, `python`, `ruby`, `typescript`, `go`. Each value an object, and its `publishing`, when present, an object too — both shape checks are `ApimaticConfigDocument`'s findings, which the portal now reads (section 8). Nothing inside `publishing` is checked by the portal in this release. |
@@ -208,8 +204,7 @@ type from the extension), `colorMode`, `links` (each `{label, url, external}`),
 `pageActions`. Tabs are not in it: they come from the page tree, which already
 carries `nav.json`.
 
-Server-only (`portal.config.json`): `specs`, `contentDir`, `staticDir`, and
-`api` (`groupBy`, `showDeprecated`, `showInternal`). The prerender list also
+Server-only (`portal.config.json`): `specs`, `contentDir` and `staticDir`. The prerender list also
 needs `siteUrl`, which `vite.config.ts` reads from `portal.identity.json`.
 
 Generated stylesheet: the CLI writes `src/styles/theme.css` into the build
@@ -224,7 +219,6 @@ content-directory `@source` line prepare already substitutes.
 | `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the theme's `.dark` block and comes later, so a light-only value would win in dark mode. |
 | `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
 | `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
-| `api.*` | `openapi-section.server.ts` | `groupBy` passes through to `staticSource`; the two `show*` flags filter the bundled document (section 7). |
 | `ai.pageActions` | `$.tsx` | As today. |
 | `advanced.tokens` | `theme.css` | Appended to the same `:root:not(.dark)` / `.dark` blocks after the primary, so a light-only token never reaches dark mode. *As reviewed:* each block also names `#nd-sidebar`, the id every layout gives the sidebar, because neutral (dark), catppuccin and vitepress set `muted`, `secondary` and `muted-foreground` there, and an id outranks a rule for the mode alone. `dusk` and `vitepress` also set the sidebar's `background-color` directly, which no token reaches. |
 | `languages` | nowhere yet | Validated only. The SDK page reads it when it lands. |
@@ -377,26 +371,23 @@ under `portal serve` as they do today, tabs included, with no config watcher.
 - **`layout.shared.tsx`**: two logos, `links`, `themeSwitch.enabled`.
 - **`$.tsx`**: the notebook layout's page components.
 - **`src/lib/openapi-section.server.ts`**: already the one place both
-  `openapi.server.ts` and `prerender-pages.ts` build a section from. It takes the
-  `api` options, bundles, filters (section 7) and calls `staticSource` with the
-  configured `groupBy` instead of today's hard-coded `'tag'`.
-  `prerender-pages.ts` passes them from the `PortalConfig` it already reads.
-- **`portal-config.ts`**: the server-only interface gains `api`.
+  `openapi.server.ts` and `prerender-pages.ts` build a section from. It bundles,
+  filters (section 7) and calls `staticSource` grouped by tag, as today.
 
 ## 7. Deprecated and internal operations
 
 Fumadocs stores `deprecated` on each generated page's `_openapi` metadata and
-renders it struck through, so `showDeprecated: true` costs nothing. It has no
-notion of `x-internal`.
+renders it struck through, so deprecated operations are documented as they
+are. It has no notion of `x-internal`, and an internal operation is never
+documented.
 
 `openApiSection` filters the document, not the pages:
 
 1. Create the server on the file path as today and take `getSchema(id).bundled`,
    the document with every external reference already folded into
    `#/components` or `x-ext`.
-2. Walk `paths` and `webhooks`. Remove an operation when it is `deprecated` and
-   `showDeprecated` is false, or carries `x-internal: true` and `showInternal`
-   is false. Remove a path item left with no operations. As built in step 5
+2. Walk `paths` and `webhooks`. Remove an operation when it carries
+   `x-internal: true`. Remove a path item left with no operations. As built in step 5
    (`src/lib/openapi-filter.ts`): OpenAPI 3.2's `query` and
    `additionalOperations` are filtered too; `x-internal: true` on a path item
    hides the whole path; a path item that is a `#/…` reference is followed, and
@@ -436,13 +427,13 @@ filtered document too. `llms.server.ts`, `sitemap.server.ts`, the search index
 and the prerender list all go through `openApiSection` or the loader, so they
 follow.
 
-*As reviewed:* `groupBy: route` has two Fumadocs defects that the setting makes
-reachable, both handled in `openApiSection` after `staticSource`. The
-operations on `/` form a folder named `''`, the section itself, so two
-`meta.json` land there and whichever wins hides the other's pages; they are
-merged. And a path and a webhook of one name share their page files, so one
-would be dropped without a word; that is refused with a message naming
-`portal.api.groupBy`.
+*As reviewed:* `groupBy: route` had two Fumadocs defects, handled in
+`openApiSection` until `groupBy` was cut (section 15): the operations on `/`
+formed a folder named `''` whose `meta.json` hid the section's own, and a path
+and a webhook of one name shared a page. One check stays: grouped by tag,
+Fumadocs names a page after its tag and operationId, so two operations sharing
+an operationId would share a page and one would be dropped without a word.
+`openApiSection` refuses that, asking for an operationId of each one's own.
 
 ## 8. CLI changes
 
@@ -450,7 +441,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 
 - **Types.** `PortalConfig` becomes the root of nested value objects, one per
   namespace: `SiteConfig`, `BrandConfig` (holding `Logo` and `BrandColors`),
-  `NavigationConfig`, `ApiConfig`, `AiConfig`,
+  `NavigationConfig`, `AiConfig`,
   `AdvancedTokens`. Each parses its own subtree and returns errors with dotted
   paths; `PortalConfig.fromBlock` concatenates them. One helper, `Color`: parse
   the accepted formats, relative luminance, WCAG contrast ratio, foreground
@@ -497,9 +488,8 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   real change that parses, it asks `PortalProjectService` to rewrite
   `theme.css` and `portal.identity.json`, which Vite hot-reloads. On failure
   the prompts print the same errors `generate` would and the last good state
-  stays. Changes to `portal.api.*` and to the specs still need a restart,
-  because `vite.config.ts` and the prerender list read them once; the prompt
-  says so when those keys change. The serve command description and
+  stays. Changes to the specs still need a restart, because `vite.config.ts`
+  and the prerender list read them once. The serve command description and
   `prompts/portal/serve.ts` stop saying every `apimatic.json` edit needs a
   restart. As built in step 6: `FileWatchService` (`src/infrastructure/`)
   watches the source directory rather than the file, so an editor's
@@ -557,7 +547,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   (`schemaUrlFor`, decided 2026-09-23). The schema's `$id` stays `@2`.
 - **Prompts.** New source problems: a missing dark logo or favicon named with
   its key; `site.name` required for several specs; the languages errors; the
-  serve watcher's re-applied, rejected and restart-needed messages.
+  serve watcher's re-applied and rejected messages.
 - **Messages elsewhere.** `portal-navigation.ts` names `portal.site.name`;
   README's "Upgrading from 1.x" names the new keys (`site`, `brand`, ...) and
   the `languages` requirement; the README is regenerated if a command or flag
@@ -599,7 +589,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   `generate` message and the last good files kept;
   a change outside `portal` and `languages` re-applies nothing;
   a brand change rewrites both generated files; an invalid edit keeps the last
-  good files and reports; a `portal.api` change reports restart-needed.
+  good files and reports.
 - Template units, in `test/portal-template/`, on synthetic trees: Home, Guides,
   a `root: true` folder and API to four root folders in first-appearance order;
   Home moved first when `index` is not named and kept in place when it is;
@@ -607,17 +597,17 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   created; `root: true` ignored on a nested folder and on `api`; the synthetic
   Home node when there is no index; folder-tab and API
   labels from `nav.json` `title`; the explicit tab list (a URL found through
-  nested folders, `$folder` bound); the document filter (deprecated and internal
-  operations removed, an emptied path item removed, `x-ext` references intact,
-  the defaults leaving the document untouched).
+  nested folders, `$folder` bound); the document filter (internal operations
+  removed and deprecated ones kept, an emptied path item removed, `x-ext`
+  references intact, a document with nothing internal left untouched).
 - Fixtures: `test/resources/portal-inputs/default/apimatic.json` moves to the
   nested shape and gains a `languages` entry.
 - End-to-end, extending `test/e2e/portal-build.test.ts`: the default fixture;
   the emitted CSS carries the theme's tokens and the primary override; a
   `colorMode: dark` fixture emits no theme switch and names `dark` in
   next-themes' inline script (the DOM check stays a manual headless-Chrome
-  step); the `notebook-navbar` header carries the tabs; a `showDeprecated:
-  false` fixture emits no page and no sidebar row for the deprecated operation;
+  step); the `notebook-navbar` header carries the tabs; an internal operation
+  gets no page and no sidebar row, and a deprecated one does;
   the client-bundle assertion also
   covers `portal.identity.json`.
 
@@ -718,7 +708,7 @@ this PR to the portal. `PortalServeAction.execute` loses its `onAfterServe`
 hook, which only quickstart used; the language-step PR brings it back with the
 serve call. The e2e cases share one extra build: a `branded` fixture that sets
 forced dark, a primary and a header link, and
-hides a deprecated and an internal operation. It has no content directory, so it
+documents a deprecated operation while hiding an internal one. It has no content directory, so it
 also covers the fallback home page and its Home tab. The sample repository's
 `v2` change is branch `saeedjamshaid/portal-config` in
 `sample-docs-as-code-portal`: `portal.json` → `apimatic.json`, `meta.json` →
@@ -900,3 +890,15 @@ none of them has shipped.
   button under its title, which was the default. A portal that wants a landing
   page writes `content/index.md`, which can link wherever it likes. The
   identity loses `homeCta`.
+- **`api.groupBy`, `api.showDeprecated` and `api.showInternal`** are gone, and
+  the `api` namespace with them. The reference is grouped by tag, deprecated
+  operations are documented and struck through, and operations marked
+  `x-internal: true` are always left out, which were the defaults. Specs are
+  written around tags, and a grouping that moved every page's URL was a setting
+  to regret after publishing; showing deprecated operations is a matter of
+  taste; and hiding internal ones is the safe behaviour, which stays built in.
+  With them go the route-grouping workarounds in `openApiSection`, the `api`
+  field of `portal.config.json` and its type check, and `portal serve`'s
+  restart-needed notice, since nothing left in the block is read only at
+  startup. The operationId check of section 7 stays, with a message that no
+  longer names the setting.

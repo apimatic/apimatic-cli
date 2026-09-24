@@ -8,7 +8,6 @@ import {
   SCHEMA_VERSION
 } from '../../../src/types/apimatic-config/document';
 import { MODE_TOKENS } from '../../../src/types/portal/config/advanced-tokens';
-import { GROUP_BY } from '../../../src/types/portal/config/api-config';
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
@@ -62,7 +61,6 @@ describe('apimatic.schema.json', () => {
 
     const cases: [string, unknown, readonly string[]][] = [
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
-      ['api.groupBy', portal.api.properties.groupBy.enum, GROUP_BY],
       ['advanced.tokens', schema.definitions.tokens.propertyNames.enum, MODE_TOKENS],
       ['languages', schema.definitions.languages.propertyNames.enum, Object.values(Language)],
       [
@@ -103,7 +101,6 @@ describe('apimatic.schema.json', () => {
               { label: 'Home', url: '/' }
             ]
           },
-          api: { groupBy: 'none', showDeprecated: false, showInternal: true },
           ai: { pageActions: false },
           advanced: { tokens: { light: { '--color-fd-accent': '#eee' }, dark: {} } }
         }
@@ -184,9 +181,6 @@ describe('apimatic.schema.json', () => {
       ['an empty link', { navigation: { links: [{ label: 'x', url: '' }] } }],
       ['a blank link label', { navigation: { links: [{ label: ' ', url: '/' }] } }],
       ['a link with an unknown key', { navigation: { links: [{ label: 'x', url: '/', icon: 'x' }] } }],
-      ['an unknown grouping', { api: { groupBy: 'path' } }],
-      ['a filter that is not a boolean', { api: { showDeprecated: 'no' } }],
-      ['an inverted filter name', { api: { hideInternal: true } }],
       ['page actions that are not a boolean', { ai: { pageActions: 'no' } }],
       ['a short token name', { advanced: { tokens: { light: { accent: '#eee' } } } }],
       ['a token set once for both modes', { advanced: { tokens: { light: { '--color-fd-info': 'blue' } } } }],
@@ -240,7 +234,7 @@ describe('apimatic.schema.json', () => {
       };
       collect(schema.definitions.portal, []);
 
-      expect(defaults.map(([setting]) => setting)).to.include.members(['brand.colorMode', 'api.showInternal']);
+      expect(defaults.map(([setting]) => setting)).to.include.members(['brand.colorMode', 'ai.pageActions']);
       for (const [setting, value] of defaults) {
         const actual = setting
           .split('.')
@@ -261,7 +255,7 @@ describe('apimatic.schema.json', () => {
       };
       collect(schema.definitions.portal, []);
 
-      expect(settings).to.have.length.greaterThan(20);
+      expect(settings).to.have.length.greaterThan(10);
       for (const setting of settings) {
         const block = setting.reduceRight<unknown>((value, key) => ({ [key]: value }), { probe: true });
         const errors = PortalConfig.fromBlock(block, suggested).match(

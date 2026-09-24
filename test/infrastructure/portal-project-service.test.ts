@@ -98,16 +98,13 @@ describe('PortalProjectService', () => {
       expect(fs.existsSync(path.join(project.toString(), 'vite.config.ts'))).to.be.true;
     });
 
-    it('writes the specs and the API options into the build-only config', async () => {
-      const source = sourceFor({ config: configFor({ site: { name: 'My API' }, api: { groupBy: 'route' } }) });
-
-      (await service.prepare(project, source))._unsafeUnwrap();
+    it('writes the specs and the directories into the build-only config', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
 
       const config = readConfig();
-      expect(Object.keys(config).sort()).to.deep.equal(['api', 'contentDir', 'specs', 'staticDir']);
+      expect(Object.keys(config).sort()).to.deep.equal(['contentDir', 'specs', 'staticDir']);
       expect(Object.keys(config.specs)).to.deep.equal(['calculator']);
       expect(config.specs.calculator).to.contain('api.json');
-      expect(config.api).to.deep.equal({ groupBy: 'route', showDeprecated: true, showInternal: false });
     });
 
     it('writes what the browser is told into a file of its own', async () => {

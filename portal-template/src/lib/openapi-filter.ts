@@ -1,11 +1,5 @@
 import type { Document } from 'fumadocs-openapi';
 
-export interface OperationFilter {
-  showDeprecated: boolean;
-  /** Whether operations marked `x-internal: true` are documented. */
-  showInternal: boolean;
-}
-
 /**
  * The fixed fields of a path item that hold an operation, OpenAPI 3.2's `query` included.
  * Fumadocs builds pages for fewer of them, but any it keeps rides along in every page's payload.
@@ -15,18 +9,15 @@ const METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'tr
 type Json = Record<string, unknown>;
 
 /**
- * Filtering the document rather than the generated pages is what keeps a hidden operation out
- * of everything built from it: no page, no sidebar row, no emptied tag folder, and no trace of
- * it or its tag in another page's payload. Returns the very document it was given when nothing
- * is left out, and modifies nothing it was given.
+ * The operations marked `x-internal: true` left out. Filtering the document rather than the
+ * generated pages is what keeps one out of everything built from it: no page, no sidebar row,
+ * no emptied tag folder, and no trace of it or its tag in another page's payload. Returns the
+ * very document it was given when nothing is left out, and modifies nothing it was given.
  */
-export function withoutHiddenOperations(document: Document, filter: OperationFilter): Document {
-  if (filter.showDeprecated && filter.showInternal) {
-    return document;
-  }
+export function withoutInternalOperations(document: Document): Document {
   const root = document as unknown as Json;
-  const paths = pathItemsShown(root, root.paths, filter);
-  const webhooks = pathItemsShown(root, root.webhooks, filter);
+  const paths = pathItemsShown(root, root.paths);
+  const webhooks = pathItemsShown(root, root.webhooks);
   if (paths === root.paths && webhooks === root.webhooks) {
     return document;
   }
@@ -38,14 +29,14 @@ export function withoutHiddenOperations(document: Document, filter: OperationFil
 }
 
 /** The map as given when nothing in it is hidden, else a copy without what is. */
-function pathItemsShown(root: Json, items: unknown, filter: OperationFilter): unknown {
+function pathItemsShown(root: Json, items: unknown): unknown {
   if (!isObject(items)) {
     return items;
   }
   let changed = false;
   const kept: Json = {};
   for (const [key, item] of Object.entries(items)) {
-    const shown = pathItemShown(root, item, filter);
+    const shown = pathItemShown(root, item);
     if (shown !== item) changed = true;
     if (shown !== undefined) kept[key] = shown;
   }
@@ -57,24 +48,24 @@ function pathItemsShown(root: Json, items: unknown, filter: OperationFilter): un
  * are, or undefined when none is left. A path item that is a reference into the document is
  * followed, and inlined only when something in it is hidden: another path may share it.
  */
-function pathItemShown(root: Json, item: unknown, filter: OperationFilter): unknown {
+function pathItemShown(root: Json, item: unknown): unknown {
   const resolved = resolvePathItem(root, item);
   if (resolved === undefined) {
     return item;
   }
   // A whole path can be marked internal, as a single operation can.
-  if (resolved['x-internal'] === true && !filter.showInternal) {
+  if (isInternal(resolved)) {
     return undefined;
   }
-  if (!operationsOf(resolved).some((operation) => isHidden(operation, filter))) {
+  if (!operationsOf(resolved).some(isInternal)) {
     return item;
   }
-  const copy = withoutHidden(resolved, filter);
+  const copy = withoutInternal(resolved);
   return holdsOperation(copy) ? copy : undefined;
 }
 
-function withoutHidden(item: Json, filter: OperationFilter): Json {
-  const isShown = (operation: unknown) => !isObject(operation) || !isHidden(operation, filter);
+function withoutInternal(item: Json): Json {
+  const isShown = (operation: unknown) => !isObject(operation) || !isInternal(operation);
   const copy: Json = { ...item };
   for (const method of METHODS) {
     if (!isShown(copy[method])) delete copy[method];
@@ -118,11 +109,8 @@ function resolvePathItem(root: Json, item: unknown, seen = new Set<string>()): J
   return target === undefined ? item : { ...target, ...siblings };
 }
 
-function isHidden(operation: Json, filter: OperationFilter): boolean {
-  return (
-    (operation.deprecated === true && !filter.showDeprecated) ||
-    (operation['x-internal'] === true && !filter.showInternal)
-  );
+function isInternal(node: Json): boolean {
+  return node['x-internal'] === true;
 }
 
 /**
