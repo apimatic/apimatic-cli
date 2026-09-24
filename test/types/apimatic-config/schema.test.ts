@@ -10,7 +10,7 @@ import {
 import { COLOR_MODES } from '../../../src/types/portal/config/brand-config';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
-import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate';
+import { Language } from '../../../src/types/sdk/generate';
 
 /** As much of a schema object as the walks below read. */
 interface SchemaNode {
@@ -60,12 +60,7 @@ describe('apimatic.schema.json', () => {
 
     const cases: [string, unknown, readonly string[]][] = [
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
-      ['languages', schema.definitions.languages.propertyNames.enum, Object.values(Language)],
-      [
-        'languages.*.publishing.codegenVersion',
-        schema.definitions.languageEntry.properties.publishing.properties.codegenVersion.enum,
-        Object.values(CodeGenerationVersion)
-      ]
+      ['languages', schema.definitions.languages.propertyNames.enum, Object.values(Language)]
     ];
 
     for (const [setting, offered, accepted] of cases) {
@@ -268,7 +263,7 @@ describe('apimatic.schema.json', () => {
       ['a language wanted but not yet published', { typescript: {} }],
       [
         'a published language',
-        { python: { publishing: { package: { name: 'calc', version: '1.0.0' }, codegenVersion: 'v4' } } }
+        { python: { publishing: { package: { version: '1.0.0' }, packageConfiguration: { name: 'calc' } } } }
       ],
       [
         'keys this CLI does not model, beside and inside the record',
@@ -306,7 +301,7 @@ describe('apimatic.schema.json', () => {
 
     // The portal reads only which languages there are; the record is typed for the editor.
     it('types the publishing record, which the portal does not read', () => {
-      const languages = { csharp: { publishing: { codegenVersion: 'v9' } } };
+      const languages = { csharp: { publishing: { source: 'github.com/acme/calc' } } };
 
       expect(languagesAccepted(languages)).to.be.true;
       expect(schemaVerdict({ languages }).valid).to.be.false;
