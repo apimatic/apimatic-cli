@@ -2,7 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
-import { Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
@@ -35,8 +35,13 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
       default: false,
       description: 'Download the generated SDK as a .zip archive'
     }),
-    // v4 renders each language at beta first and stable later, so the level stays a choice even
-    // though the generator version is no longer one.
+    // One value today. It stays a flag so the switch to the next generator is a value a caller
+    // passes rather than a release that silently changes what they get.
+    'codegen-version': Flags.string({
+      description: 'Version of the code generator to use',
+      options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
+      default: CodeGenerationVersion.V4
+    }),
     stability: Flags.string({
       description: 'Stability level of the generated SDK',
       options: Object.values(Stability).map((s) => s.valueOf()),

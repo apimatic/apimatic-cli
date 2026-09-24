@@ -1,7 +1,7 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
@@ -45,8 +45,13 @@ export default class SdkPublish extends Command {
       default: false,
       description: 'Generate the SDK locally for review without publishing.'
     }),
-    // v4 renders each language at beta first and stable later, so the level stays a choice even
-    // though the generator version is no longer one.
+    // One value today. It stays a flag so the switch to the next generator is a value a caller
+    // passes rather than a release that silently changes what they get.
+    'codegen-version': Flags.string({
+      description: 'Version of the code generator to use',
+      options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
+      default: CodeGenerationVersion.V4
+    }),
     stability: Flags.string({
       description: 'Stability level of the generated SDK',
       options: Object.values(Stability).map((s) => s.valueOf()),
@@ -86,7 +91,8 @@ export default class SdkPublish extends Command {
         input,
         'publish-type': publishType,
         'dry-run': dryRun,
-        stability
+        stability,
+        'codegen-version': codegenVersion
       },
       metadata
     } = await this.parse(SdkPublish);
@@ -118,7 +124,8 @@ export default class SdkPublish extends Command {
               language,
               ...(force && { force }),
               'publish-type': publishTypes,
-              stability
+              stability,
+              'codegen-version': codegenVersion
             }),
             commandMetadata.shell
           );

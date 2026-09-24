@@ -9,11 +9,10 @@ export enum Language {
 }
 
 /**
- * Only v4 is generated now. The enum keeps `V3` because `apimatic.json` files written by earlier
- * versions record it, and reading one has to be able to say what it says.
+ * The versions this CLI can generate with. v3 is retired, so v4 is the only one — but it stays an
+ * enum rather than a constant because the next one is a line here and nothing else.
  */
 export enum CodeGenerationVersion {
-  V3 = 'v3',
   V4 = 'v4'
 }
 

@@ -48,9 +48,10 @@ Documentation portals are now built on your machine from a `src/` directory, and
 
 Version 3 of the code generator is retired, and the CLI generates with version 4 only:
 
-- `--codegen-version` is gone from `sdk generate` and `sdk publish`. There is no version left
-  to choose. `--stability` stays: version 4 renders each language at beta first and stable
-  later, so the level outlives the version it used to accompany.
+- `--codegen-version` now takes `v4` and nothing else, and defaults to it. The flag stays so
+  that moving to a later generator is something you ask for rather than something a release
+  changes underneath you. `--stability` stays too: version 4 renders each language at beta
+  first and stable later.
 - C#, TypeScript and Python are the languages that can be generated. Java, Ruby, Go and PHP
   come back as each reaches version 4; until then both commands refuse them and say so.
 - `apimatic sdk save-changes` is gone, with `--track-changes` and `--skip-changes` on
@@ -434,21 +435,23 @@ Generate an SDK for your API
 ```
 USAGE
   $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--api-version <value>]
-    [--zip] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
+    [--zip] [--codegen-version v4] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
 
 FLAGS
-  -d, --destination=<value>  [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where the SDK
-                             will be generated
-  -f, --force                overwrite changes without asking for user consent.
-  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
-                             API specifications and configuration files.
-  -k, --auth-key=<value>     override current authentication state with an authentication key.
-  -l, --language=<option>    (required) Programming language for SDK generation
-                             <options: csharp|java|php|python|ruby|typescript|go>
-      --api-version=<value>  Version of the API to use for SDK generation (if multiple versions exist)
-      --stability=<option>   [default: stable] Stability level of the generated SDK
-                             <options: stable|beta>
-      --zip                  Download the generated SDK as a .zip archive
+  -d, --destination=<value>       [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where
+                                  the SDK will be generated
+  -f, --force                     overwrite changes without asking for user consent.
+  -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
+                                  includes API specifications and configuration files.
+  -k, --auth-key=<value>          override current authentication state with an authentication key.
+  -l, --language=<option>         (required) Programming language for SDK generation
+                                  <options: csharp|java|php|python|ruby|typescript|go>
+      --api-version=<value>       Version of the API to use for SDK generation (if multiple versions exist)
+      --codegen-version=<option>  [default: v4] Version of the code generator to use
+                                  <options: v4>
+      --stability=<option>        [default: stable] Stability level of the generated SDK
+                                  <options: stable|beta>
+      --zip                       Download the generated SDK as a .zip archive
 
 DESCRIPTION
   Generate an SDK for your API
@@ -473,7 +476,8 @@ Generate and publish an SDK to a package registry and/or source repository
 ```
 USAGE
   $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript|go]
-    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--stability stable|beta]
+    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v4] [--stability
+    stable|beta]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
@@ -484,6 +488,8 @@ FLAGS
                                   <options: csharp|java|php|python|ruby|typescript|go>
   -p, --profile-id=<value>        Id of the publishing profile to use.
   -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
+      --codegen-version=<option>  [default: v4] Version of the code generator to use
+                                  <options: v4>
       --dry-run                   Generate the SDK locally for review without publishing.
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.

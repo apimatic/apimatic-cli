@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { Parser } from '@oclif/core';
 import SdkPublish from '../../../src/commands/sdk/publish.js';
-import { Stability } from '../../../src/types/sdk/generate.js';
+import { CodeGenerationVersion, Stability } from '../../../src/types/sdk/generate.js';
 
 const parse = (argv: string[]) => Parser.parse(argv, { flags: SdkPublish.flags as never, strict: true } as never);
 
@@ -16,19 +16,32 @@ const rejects = async (argv: string[]): Promise<Error> => {
   return thrown as Error;
 };
 
-// v3 generation is retired, so the flag that chose between generators is gone, and with it the
-// flag that asked whether a publish should record itself. A run that still passes one is told it
-// is unknown rather than having it quietly ignored — these pin that they are really gone, not
-// merely undocumented. `--stability` is not among them: v4 renders each language at beta first and
-// stable later, so the level outlives the version.
-describe('sdk publish retired flags', () => {
-  it('no longer accepts a code generator version', async () => {
-    expect((await rejects(['--codegen-version', 'v4'])).message).to.contain('codegen-version');
-  });
-
-  // Recording a publish is bookkeeping, not a decision: it always happens now.
+// Recording a publish is bookkeeping, not a decision, so the flag that asked is gone. A run that
+// still passes it is told it is unknown rather than having it quietly ignored — this pins that it
+// is really gone, not merely undocumented.
+describe('sdk publish flags', () => {
   it('no longer accepts --update-plugin-config', async () => {
     expect((await rejects(['--update-plugin-config'])).message).to.contain('update-plugin-config');
+  });
+
+  // v3 is retired, so v4 is the only value — but the flag stays, because the next generator should
+  // be something a caller asks for rather than something a release changes underneath them.
+  it('accepts the one code generator version there is', async () => {
+    const { flags } = (await parse(['--codegen-version', 'v4'])) as never as {
+      flags: Record<string, unknown>;
+    };
+
+    expect(flags['codegen-version']).to.equal(CodeGenerationVersion.V4);
+  });
+
+  it('defaults to that version when the flag is not passed', async () => {
+    const { flags } = (await parse([])) as never as { flags: Record<string, unknown> };
+
+    expect(flags['codegen-version']).to.equal(CodeGenerationVersion.V4);
+  });
+
+  it('refuses the retired version rather than generating something else', async () => {
+    expect((await rejects(['--codegen-version', 'v3'])).message).to.contain('v3');
   });
 
   it('still chooses a stability level, which outlived the generator version', async () => {
