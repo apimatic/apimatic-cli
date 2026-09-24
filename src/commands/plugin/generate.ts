@@ -6,10 +6,10 @@ import { FlagsProvider } from '../../types/flags-provider.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
 export default class PluginGenerate extends Command {
-  static readonly summary = 'Generate a context plugin for your published SDKs.';
+  static readonly summary = 'Generate a context plugin for your SDKs.';
 
   static readonly description =
-    'Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory containing a `src` directory with an `apimatic.json`.';
+    'Generate a context plugin that teaches an AI coding assistant how to use your SDKs. You choose the languages it covers; one whose SDK is not published yet is generated and bundled inside the plugin, so nothing has to be published first. Requires an input directory containing a `src` directory with your API specification — `apimatic.json` is created if it is not there.';
 
   static readonly cmdTxt = format.cmd('apimatic', 'plugin', 'generate');
 

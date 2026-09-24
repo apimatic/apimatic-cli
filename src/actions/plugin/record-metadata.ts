@@ -4,7 +4,7 @@ import { SubscriptionInfo } from '../../types/api/account.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginAuthor, PluginMetadata } from '../../types/plugin/plugin-config.js';
-import { PluginConfigContext, PluginConfigPresent } from '../../types/plugin-config-context.js';
+import { PluginConfig, PluginConfigContext } from '../../types/plugin-config-context.js';
 import { ActionResult } from '../action-result.js';
 
 /**
@@ -34,9 +34,7 @@ export class PluginRecordMetadataAction {
     this.authKey = authKey;
   }
 
-  public readonly execute = async (
-    buildDirectory: DirectoryPath
-  ): Promise<ActionResult<PluginConfigPresent>> => {
+  public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult<PluginConfig>> => {
     const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
       return ActionResult.cancelled(input.cancelled);

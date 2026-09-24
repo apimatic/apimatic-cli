@@ -645,4 +645,112 @@ describe('PluginConfigContext', () => {
       expect(written()).to.equal(original);
     });
   });
+
+  describe('requestLanguages', () => {
+    it('adds a language the config does not carry as an entry with no publishing record', async () => {
+      withConfig({ languages: {} });
+
+      expect((await context.requestLanguages([Language.CSHARP, Language.PYTHON])).isOk()).to.be.true;
+      expect(writtenDocument().languages).to.deep.equal({ csharp: {}, python: {} });
+    });
+
+    it('creates the file when there is none', async () => {
+      expect((await context.requestLanguages([Language.TYPESCRIPT])).isOk()).to.be.true;
+      expect(writtenDocument()).to.deep.equal({ schemaVersion: 1, languages: { typescript: {} } });
+    });
+
+    // The published entry records where the SDK actually went. Asking for that language again is
+    // not a reason to touch it.
+    it('leaves a published entry exactly as it was', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
+
+      await context.requestLanguages([Language.CSHARP, Language.PYTHON]);
+
+      expect(writtenDocument().languages).to.deep.equal({ csharp: CSHARP_ENTRY, python: {} });
+    });
+
+    it('does not rewrite the file when every language is already recorded', async () => {
+      const original = '{\n\t"languages": {"csharp": {}}\n}\n';
+      withFile(original);
+
+      expect((await context.requestLanguages([Language.CSHARP])).isOk()).to.be.true;
+      expect(written()).to.equal(original);
+    });
+
+    it('reports the languages the config now names', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
+
+      const state = (await context.requestLanguages([Language.PYTHON]))._unsafeUnwrap();
+
+      expect(state.requestedLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
+      expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP]);
+    });
+  });
+
+  describe('language sets', () => {
+    const present = async () => {
+      const state = await context.getPluginConfigState();
+      if (state.state !== 'present') {
+        expect.fail(`expected a present config, got ${state.state}`);
+      }
+      return state;
+    };
+
+    it('counts a language as published when either half is recorded', async () => {
+      withConfig({
+        languages: { csharp: SOURCE_ONLY_ENTRY, typescript: PACKAGE_ONLY_ENTRY, python: UNPUBLISHED_ENTRY }
+      });
+
+      const state = await present();
+
+      expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT]);
+      expect(state.requestedLanguages()).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
+    });
+
+    // java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the file
+    // says. They are named rather than silently counted in.
+    it('separates the languages a plugin cannot carry from the ones it can', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY, java: CSHARP_ENTRY, go: {} } });
+
+      const state = await present();
+
+      expect(state.requestedLanguages()).to.deep.equal([Language.CSHARP]);
+      expect(state.publishedLanguages()).to.deep.equal([Language.CSHARP]);
+      expect(state.unsupportedLanguages()).to.deep.equal(['java', 'go']);
+    });
+
+    it('names nothing unsupported when the config carries only plugin languages', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY } });
+
+      expect((await present()).unsupportedLanguages()).to.deep.equal([]);
+    });
+
+    it('offers the languages the config names as the ones already chosen', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY, python: UNPUBLISHED_ENTRY } });
+
+      expect((await present()).initialLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
+    });
+
+    // A project that has never named a language has not chosen against any of them, and the plugin
+    // covering everything is the answer a single Enter should give.
+    it('offers every language a plugin can carry when the config names none', async () => {
+      withConfig({ languages: {} });
+
+      expect((await present()).initialLanguages()).to.deep.equal([
+        Language.CSHARP,
+        Language.TYPESCRIPT,
+        Language.PYTHON
+      ]);
+    });
+
+    it('offers every language when the config names only ones a plugin cannot carry', async () => {
+      withConfig({ languages: { java: CSHARP_ENTRY } });
+
+      expect((await present()).initialLanguages()).to.deep.equal([
+        Language.CSHARP,
+        Language.TYPESCRIPT,
+        Language.PYTHON
+      ]);
+    });
+  });
 });

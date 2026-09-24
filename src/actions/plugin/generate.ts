@@ -1,10 +1,11 @@
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
+import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PluginConfig, PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
@@ -13,6 +14,7 @@ import { PluginRecordMetadataAction } from './record-metadata.js';
 export class PluginGenerateAction {
   private readonly prompts: PluginGeneratePrompts = new PluginGeneratePrompts();
   private readonly pluginService: PluginService = new PluginService();
+  private readonly publishingApiService: PublishingApiService = new PublishingApiService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
   private readonly authKey: string | null;
@@ -33,8 +35,7 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.exists())) {
+    if (!(await new BuildContext(buildDirectory).exists())) {
       this.prompts.srcDirectoryDoesNotExist(buildDirectory);
       return ActionResult.failed();
     }
@@ -46,13 +47,16 @@ export class PluginGenerateAction {
     }
 
     const configContext = new PluginConfigContext(buildDirectory);
-    let configState = await configContext.getPluginConfigState();
+    const configState = await configContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     }
 
-    if (configState.state === 'missing' || !configState.hasMetadata()) {
+    let config: PluginConfig;
+    if (configState.state === 'present' && configState.hasMetadata()) {
+      config = configState;
+    } else {
       const metadataResult = await new PluginRecordMetadataAction(
         this.configDir,
         this.commandMetadata,
@@ -65,13 +69,41 @@ export class PluginGenerateAction {
       if (!metadataResult.isSuccess()) {
         return metadataResult.discardValue();
       }
-      configState = metadataResult.getValue();
+
+      config = metadataResult.getValue();
     }
 
-    if (!configState.hasPublishedSdks()) {
-      this.prompts.noPublishedSdks();
-      this.prompts.nextStepsPublishSdks();
-      return ActionResult.success();
+    const published = config.publishedLanguages();
+    const selection = await this.prompts.selectLanguages(config);
+    if (!selection?.length) {
+      this.prompts.noLanguagesSelected();
+      return ActionResult.cancelled();
+    }
+
+    const recorded = await configContext.requestLanguages(selection);
+    if (recorded.isErr()) {
+      this.prompts.configNotPrepared(recorded.error, buildDirectory);
+      return ActionResult.failed();
+    }
+
+    const unsupported = recorded.value.unsupportedLanguages();
+    if (unsupported.length > 0) {
+      this.prompts.languagesNotIncluded(unsupported);
+    }
+
+    const bundled = selection.filter((language) => !published.includes(language));
+    const profiles =
+      bundled.length === 0
+        ? undefined
+        : await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
+
+    const preview = profiles !== undefined && profiles.isOk() && profiles.value.length > 0;
+    if (preview) {
+      this.prompts.recommendPublishingFirst();
+      if (!(await this.prompts.confirmLocalPlugin())) {
+        this.prompts.localPluginCancelled();
+        return ActionResult.cancelled();
+      }
     }
 
     // `src/` is zipped as it sits on disk, so a byte-order mark the reader above looked past
@@ -88,7 +120,8 @@ export class PluginGenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generatePlugin(
-        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
+        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey),
+        pluginDirectory
       );
 
       if (response.isErr()) {
@@ -99,9 +132,10 @@ export class PluginGenerateAction {
       const tempPluginZipPath = await tempContext.save(response.value);
       await pluginContext.save(tempPluginZipPath);
 
-      this.prompts.pluginGenerated(pluginDirectory);
-      this.prompts.tryPluginLocally(pluginDirectory);
-      this.prompts.nextStepsPublishPlugin();
+      this.prompts.installPluginLocally(pluginDirectory);
+      if (preview) {
+        this.prompts.previewOnly();
+      }
 
       return ActionResult.success();
     });

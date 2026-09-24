@@ -28,7 +28,7 @@ Documentation portals are now built on your machine from a `src/` directory, and
 
 - Describe the portal in the `portal` block of `src/apimatic.json` (`title`, `description`,
   `logo`, `siteUrl`). Running `apimatic quickstart` scaffolds one. The same file carries the
-  context plugin's identity in `plugin` and the SDKs you publish in `languages`, which
+  context plugin's identity in `plugin` and the languages your plugin covers in `languages`, which
   `plugin generate` and `sdk publish` write; `src/plugin-config.json` is no longer read, so run
   those two commands again after upgrading and delete the old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
@@ -246,7 +246,7 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.46
 
 ## `apimatic plugin generate`
 
-Generate a context plugin for your published SDKs.
+Generate a context plugin for your SDKs.
 
 ```
 USAGE
@@ -260,10 +260,12 @@ FLAGS
   -k, --auth-key=<value>     override current authentication state with an authentication key.
 
 DESCRIPTION
-  Generate a context plugin for your published SDKs.
+  Generate a context plugin for your SDKs.
 
-  Generate a context plugin that teaches an AI coding assistant how to use your SDKs. Requires an input directory
-  containing a `src` directory with an `apimatic.json`.
+  Generate a context plugin that teaches an AI coding assistant how to use your SDKs. You choose the languages it
+  covers; one whose SDK is not published yet is generated and bundled inside the plugin, so nothing has to be
+  published first. Requires an input directory containing a `src` directory with your API specification —
+  `apimatic.json` is created if it is not there.
 
 EXAMPLES
   apimatic plugin generate
