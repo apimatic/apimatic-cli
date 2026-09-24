@@ -1,4 +1,4 @@
-import nodePath from 'path';
+import nodePath from 'node:path';
 import pc from 'picocolors';
 import { intro as i, outro as o } from '@clack/prompts';
 import { ActionResult } from '../actions/action-result.js';

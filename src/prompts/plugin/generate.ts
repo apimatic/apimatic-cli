@@ -15,9 +15,11 @@ const labelOf = (language: string): string =>
 
 export class PluginGeneratePrompts {
   public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>, plugin: DirectoryPath) {
+    const location = f.muted(` — ${f.relativePath(plugin)}`);
+
     return withSpinner(
       'Generating Context Plugin',
-      `Plugin generated successfully${f.muted(` — ${f.relativePath(plugin)}`)}`,
+      `Plugin generated successfully${location}`,
       'Plugin Generation failed.',
       fn
     );
