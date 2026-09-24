@@ -11,6 +11,7 @@ import { createResourceInputFromInput, ResourceInput } from '../../types/file/re
 import { FileDownloadResponse } from '../../infrastructure/services/file-download-service.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
+import { LANGUAGES_EXAMPLE } from '../../types/portal/portal-languages.js';
 import { PortalScaffoldProblem } from '../../types/portal/portal-source.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
@@ -183,7 +184,7 @@ export class PortalQuickstartPrompts {
         'portal'
       )} block, for example:`,
       '',
-      `     "languages": { "typescript": {} }`,
+      `     ${LANGUAGES_EXAMPLE}`,
       '',
       `   This is the project's one list of SDK languages: the plugin commands read it too, and ` +
         `${f.cmdAlt('apimatic', 'sdk', 'publish')} adds to it, so name only the languages you ship.`,

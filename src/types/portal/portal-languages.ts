@@ -5,10 +5,12 @@ import { isJsonObject, quotedList } from './config/fields.js';
 
 const KNOWN_LANGUAGES: readonly string[] = Object.values(Language);
 
+export const LANGUAGES_EXAMPLE = '"languages": { "typescript": {} }';
+
 // Written out in full so the one-line fix is in the message: nothing in the portal's own
 // commands writes this block yet.
 const REQUIRED =
-  `'languages' must name at least one SDK language, for example "languages": { "typescript": {} }. ` +
+  `'languages' must name at least one SDK language, for example ${LANGUAGES_EXAMPLE}. ` +
   `It is the project's one list of SDK languages, which the plugin commands read too, and ` +
   `'apimatic sdk publish' adds to it.`;
 
