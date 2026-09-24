@@ -406,8 +406,8 @@ describe('PortalServeAction', () => {
 
     it('reports a fault it did not expect while re-reading the file, and keeps watching', async () => {
       await whileServing(async () => {
-        const resolveConfig = sinon
-          .stub(PortalSourceContext.prototype, 'resolveConfig')
+        const resolveSettings = sinon
+          .stub(PortalSourceContext.prototype, 'resolveSettings')
           .rejects(new Error('EBUSY: resource busy or locked'));
         const config = originalConfig();
         config.portal.site.name = 'Renamed API';
@@ -415,7 +415,7 @@ describe('PortalServeAction', () => {
         await save(config);
 
         expect(prompts.configNotApplied.calledOnceWith('EBUSY: resource busy or locked')).to.be.true;
-        resolveConfig.restore();
+        resolveSettings.restore();
         await save(config);
         expect(prompts.configApplied.calledOnce).to.be.true;
       });

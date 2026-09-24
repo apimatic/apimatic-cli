@@ -9,7 +9,9 @@ import { PortalProjectService, TEMPLATE_DEPENDENCIES } from '../../src/infrastru
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
+import { GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
+import { PortalLanguages } from '../../src/types/portal/portal-languages';
 import { PortalSource } from '../../src/types/portal/portal-source';
 import { PortalStylesheet } from '../../src/types/portal/portal-stylesheet';
 
@@ -22,6 +24,7 @@ describe('PortalProjectService', () => {
 
   const sourceFor = (overrides: Partial<PortalSource> = {}): PortalSource => ({
     config: configFor({ site: { name: 'My API' } }),
+    generatedPages: GeneratedPages.of(PortalLanguages.fromBlock({ typescript: {} }, [])._unsafeUnwrap(), false),
     suggestedSite: null,
     specs: [
       {

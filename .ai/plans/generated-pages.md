@@ -61,7 +61,7 @@ gains no key; and quickstart, which writes nothing new.
 | Tab labels | "SDKs" and "Context Plugin", fixed, as portal-config section 2 decided for the tabs the CLI names. Set by `title` in each folder's generated `nav.json`, which the transformer already applies to any folder below the root, so the labels are the CLI's whatever the design team titles the index pages. |
 | Plugin page condition | The `plugin` key holds a JSON object, which is what `ApimaticConfigDocument.plugin()` answers; a bare `{}` counts. Nothing in the block is read or checked: the backend validates the file on the coming `portal generate` call and refuses an empty or invalid block, so a malformed block here is treated as absent and left to that call. |
 | Language order | As written in the `languages` block. `sdk publish` appends, and the user reorders by editing the file. |
-| Reserved addresses | `/sdks` and `/context-plugin`, each with everything below it, are the CLI's. A content page whose slugs begin with either name is refused by `PortalSourceContext.resolve()` naming each file: `content/sdks.md`, `content/sdks.mdx`, anything under `content/sdks/`, the same for `context-plugin`, and the same behind a `(group)` folder, which the content source drops from the address (`getSlugs('(intro)/sdks.mdx')` is `['sdks']`). Two pages at one address are settled without a word by whichever source was scanned last (portal-navigation, section 10). `/context-plugin` is reserved with or without a `plugin` block, so adding the block never starts refusing a page that built the day before. A root `nav.json` entry `sdks` or `context-plugin` is refused as today, with a hint naming the token, and so is `plugin` when no page of that name exists, since the token invites the guess. |
+| Reserved addresses | `/sdks` and `/context-plugin`, each with everything below it, are the CLI's. A content page whose slugs begin with either name is refused by `PortalSourceContext.resolve()` naming each file: `content/sdks.md`, `content/sdks.mdx`, anything under `content/sdks/`, the same for `context-plugin`, and the same behind a `(group)` folder, which the content source drops from the address (`getSlugs('(intro)/sdks.mdx')` is `['sdks']`). Without the refusal, two pages at one address would fail the build with Fumadocs' opaque `Duplicated slugs` error, or, when one of them is an index page, move it to `…/index` without a word (the slugs plugin of `fumadocs-core@16.15.8`, read on 2026-09-24). `/context-plugin` is reserved with or without a `plugin` block, so adding the block never starts refusing a page that built the day before. A root `nav.json` entry `sdks` or `context-plugin` is refused as today, with a hint naming the token, and so is `plugin` when no page of that name exists, since the token invites the guess. |
 | Templates | Three `.mdx` files in a new top-level `portal-pages/` directory, shipped in the npm package beside `portal-template/`. Dynamic text is `{{key}}`. A renderer of a few lines substitutes flat string keys and refuses an unknown or unfilled key, so a template and its data cannot drift silently. No dependency today; mustache, whose `{{key}}` is the same, is adopted when the real templates need sections (section 10). Rendering happens before MDX compilation, so the braces never reach MDX. |
 | Data today | `sdks.mdx` and `context-plugin.mdx` take `{}`. `sdk.mdx` takes `{ language, name }`, the enum value and a display name, so the per-language pages have distinct titles and sidebar rows. Everything else waits for the backend data. |
 | Display names | A `Record<Language, string>` beside `GeneratedPages`: `csharp` C#, `go` Go, `java` Java, `php` PHP, `python` Python, `ruby` Ruby, `typescript` TypeScript. `LANGUAGE_CHOICES` in `src/types/sdk/generate.ts` spells "Typescript" for the quickstart prompt and is left alone. |
@@ -199,7 +199,10 @@ Rules the renderer holds them to, which the design team's pages inherit:
   and the key; a key the template does not use is fine.
 - Nothing else between double braces is accepted yet, so a section such as
   `{{#languages}}` is refused today rather than written through as text; it
-  arrives with mustache (section 10).
+  arrives with mustache (section 10). That includes a JSX object written
+  straight inside an expression, `style={{ color: 'red' }}`: the refusal says
+  to write it `style={ { color: 'red' } }`, which is the same JSX. The
+  template's own components style with Tailwind classes, so the case is rare.
 - Values are written as they are, with no escaping. When mustache is adopted,
   it is configured not to HTML-escape either, so `{{key}}` keeps its meaning
   and no template needs `{{{key}}}`.
@@ -405,34 +408,35 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   as the AI one portal-config expects, is one entry. The languages come from
   `PortalLanguages.all()`, which keeps the block's key order.
 - **`PortalSource`** gains `generatedPages: GeneratedPages`, computed in
-  `PortalSourceContext.parseConfig` from the `PortalLanguages` it already
-  builds and discards, and from `document.plugin() !== undefined`. What
-  `resolveConfig` answers for the watcher widens from `PortalConfig` to the
-  pair of `config` and `generatedPages` (a `PortalSettings` type in
-  `portal-source.ts`), so a `languages` edit under `portal serve` reaches the
-  generator by the same path a `portal` edit reaches the identity file. Every
-  `PortalSource` literal in the tests, and the `resolveConfig` stub in
-  `test/actions/portal/serve.test.ts`, gains the field.
+  `PortalSourceContext.parseSettings` (formerly `parseConfig`) from the
+  `PortalLanguages` it already builds and discards, and from
+  `document.plugin() !== undefined`. `PortalSource` extends a new
+  `PortalSettings`, the pair of `config` and `generatedPages`, and what the
+  watcher calls widens to answer it: `resolveConfig` becomes
+  `resolveSettings`, so a `languages` edit under `portal serve` reaches the
+  generator by the same path a `portal` edit reaches the identity file. The
+  `PortalSource` literal in the project-service tests and the stub in
+  `test/actions/portal/serve.test.ts` follow.
 - **Reserved addresses.** `resolve()` walks the content tree already; from the
-  pages it collects, it takes each one's path segments with `(group)` folders
-  dropped, as `getSlugs` drops them, and refuses every page whose first
-  segment is a section's name, or whose only segment is that name with `.md`
-  or `.mdx`, as a new `PortalSourceProblem` variant, `{ kind:
-  'reservedAddress'; name: string; files: FilePath[] }`, one per name, before
-  the navigation scan. `reportSourceProblem` names each file relative to
-  `src/` and says which generated page the address is kept for. A `nav.json`
-  alone under `content/sdks/` or `content/context-plugin/` is not a page and is
-  left to the walk, which already treats a directory with no page as no
-  folder.
+  pages it collects, it computes each one's slugs as `getSlugs` does (`(group)`
+  folders dropped, an `index` page at its folder's address) and refuses every
+  page whose first slug is a section's folder, before the navigation scan. One
+  `PortalSourceProblem` carries them all, `{ kind: 'reservedAddresses'; pages:
+  { file, address, section }[] }`, since `resolve` answers with one problem;
+  `reportSourceProblem` lists each file relative to `src/`, where it would be
+  served, the section's address when that differs, and what it is kept for. A
+  `nav.json` alone under `content/sdks/` or `content/context-plugin/` is not a
+  page and is left to the walk, which already treats a directory with no page
+  as no folder.
 - **Tokens.** `PortalNavigation` accepts `apimatic:plugin` beside
   `apimatic:sdks` and `apimatic:api`, at the content root only, with or
   without a `plugin` block, and the unknown-token message lists all three.
   `INJECTED_PAGES_TOKEN` gives way to the sections' tokens.
 - **Navigation hints.** `PortalNavigation.suggestion` answers an entry of
-  `sdks` at the content root with "The SDK pages are positioned with
-  'apimatic:sdks'." and one of `context-plugin` or `plugin` with "The context
-  plugin page is positioned with 'apimatic:plugin'.", as it answers `api` with
-  the API token. `plugin` is the guess the token invites, and is answered only
+  `sdks` at the content root with "'apimatic:sdks' positions the SDK pages."
+  and one of `context-plugin` or `plugin` with "'apimatic:plugin' positions
+  the context plugin page.", as it answers `api` with the API token; the
+  sentence puts the token first so its verb agrees whatever the section. `plugin` is the guess the token invites, and is answered only
   when no page of that name exists, since `/plugin` is not reserved. The
   entries stay refused; only the hints are new.
 - **`PortalPagesService`** (`src/infrastructure/portal-pages-service.ts`):
@@ -721,9 +725,9 @@ build, lint on touched files and the affected tests green.
    read the `source.ts` chunk for the collection's `base` and grep the output
    for the project directory; write a utility class in a generated page and
    read the CSS. Nothing from this step is kept but the findings.
-2. **Types.** `PageTemplate`, `GeneratedPages` with the sections, the display
+2. **Types.** *Done 2026-09-24.* `PageTemplate`, `GeneratedPages` with the sections, the display
    names and the `nav.json` titles, `PortalSource.generatedPages`,
-   `resolveConfig` answering the pair, the reserved-address refusal and its
+   `resolveSettings` answering the pair, the reserved-address refusal and its
    prompt, `apimatic:plugin` in `PortalNavigation`, the navigation
    hints. CLI only; unit and prompt tests. The test holding the sections
    against `navigation.ts` waits for step 4, which exports the template's list.

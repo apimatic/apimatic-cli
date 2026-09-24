@@ -39,6 +39,24 @@ export function reportSourceProblem(
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
       return;
     }
+    case 'reservedAddresses': {
+      const one = problem.pages.length === 1;
+      const lines = problem.pages.map(({ file, address, section }) => {
+        const kept = `/${section.folder}`;
+        const within = address === kept ? '' : `, under ${f.var(kept)}`;
+        return `  • ${f.var(file.relativeTo(sourceDirectory))}, at ${f.var(address)}${within}, which is kept for ${
+          section.description
+        }`;
+      });
+      log.error(
+        one
+          ? `A page in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
+          : `Pages in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
+      );
+      log.message(lines.join('\n'));
+      log.message(one ? 'Rename or move the page.' : 'Rename or move each page.');
+      return;
+    }
     case 'unreadableContent': {
       log.error(
         `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
