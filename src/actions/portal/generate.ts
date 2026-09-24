@@ -3,7 +3,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { ActionResult } from '../action-result.js';
 import { PortalContext } from '../../types/portal-context.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { withBuildDirectory } from '../../infrastructure/tmp-extensions.js';
+import { withBuildDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
@@ -76,39 +76,50 @@ export class GenerateAction {
       return ActionResult.cancelled();
     }
 
-    const generated = await this.prompts.generateCodeSamples(this.artifactsService.generate());
-    if (generated.isErr()) {
-      return ActionResult.failed();
-    }
-    const codeSamples = generated.value.samples;
-    this.prompts.ignoredSampleKeys(generated.value.ignoredKeys);
-    this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
-
-    return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
-      if (project.isErr()) {
-        this.prompts.runtimeUnsupported(project.error);
+    // The artifacts live in this directory for as long as the build needs them, so it wraps
+    // everything that reads them rather than being opened and closed around the call.
+    return await withDirPath(async (artifactsDirectory) => {
+      const artifacts = await this.prompts.generateArtifacts(
+        this.artifactsService.generate(
+          sourceDirectory,
+          artifactsDirectory,
+          this.configDir,
+          this.commandMetadata,
+          this.authKey
+        )
+      );
+      if (artifacts.isErr()) {
         return ActionResult.failed();
       }
+      const codeSamples = artifacts.value.codeSamples;
+      this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
 
-      const build = await this.prompts.buildPortal(this.buildService.build(project.value));
+      return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
+        const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
+        if (project.isErr()) {
+          this.prompts.runtimeUnsupported(project.error);
+          return ActionResult.failed();
+        }
 
-      if (build.isErr()) {
-        // Written before the temp directory is removed, so the log outlives the build.
-        const logPath = await portalContext.saveBuildLog(build.error.log);
-        this.prompts.buildFailed(build.error.log, logPath);
-        return ActionResult.failed();
-      }
+        const build = await this.prompts.buildPortal(this.buildService.build(project.value));
 
-      const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
-      if (saved.isErr()) {
-        return ActionResult.failed();
-      }
+        if (build.isErr()) {
+          // Written before the temp directory is removed, so the log outlives the build.
+          const logPath = await portalContext.saveBuildLog(build.error.log);
+          this.prompts.buildFailed(build.error.log, logPath);
+          return ActionResult.failed();
+        }
 
-      this.prompts.portalGenerated(portalDirectory);
-      this.prompts.nextSteps(portalDirectory, zipPortal);
+        const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
+        if (saved.isErr()) {
+          return ActionResult.failed();
+        }
 
-      return ActionResult.success();
+        this.prompts.portalGenerated(portalDirectory);
+        this.prompts.nextSteps(portalDirectory, zipPortal);
+
+        return ActionResult.success();
+      });
     });
   };
 }

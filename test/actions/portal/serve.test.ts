@@ -10,6 +10,8 @@ import { PortalAuthorizationService } from '../../../src/infrastructure/services
 import { PortalDevServerService } from '../../../src/infrastructure/portal-dev-server-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
 import { FileWatchService } from '../../../src/infrastructure/file-watch-service';
+import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
+import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 import { NetworkService } from '../../../src/infrastructure/network-service';
 import { LauncherService } from '../../../src/infrastructure/launcher-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
@@ -46,10 +48,14 @@ describe('PortalServeAction', () => {
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
 
+    sinon
+      .stub(PortalArtifactsService.prototype, 'generate')
+      .resolves(ok(PortalArtifacts.none()));
+
     prompts = sinon.stub(PortalServePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.startPreview.callsFake((fn) => fn);
-    prompts.generateCodeSamples.callsFake((fn) => fn);
+    prompts.generateArtifacts.callsFake((fn) => fn);
     prompts.blockExecution.returns(
       new Promise<void>((resolve) => {
         interrupt = resolve;

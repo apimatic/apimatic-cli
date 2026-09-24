@@ -7,15 +7,13 @@ import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
 import { PortalSaveProblem } from '../../types/portal-context.js';
 import { Result } from 'neverthrow';
-import {
-  CodeSamplesFileFailure,
-  GeneratedCodeSamples
-} from '../../infrastructure/services/portal-artifacts-service.js';
+import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
+import { ServiceError } from '../../infrastructure/service-error.js';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
-import { generateCodeSamples, reportIgnoredSampleKeys, reportUnplacedSamples } from './code-samples.js';
+import { generateArtifacts, reportUnplacedSamples } from './code-samples.js';
 
 function describeSaveProblem(problem: PortalSaveProblem): string {
   switch (problem.kind) {
@@ -79,12 +77,8 @@ export class PortalGeneratePrompts {
     reportIgnoredNavigationFiles(files, sourceDirectory);
   }
 
-  public generateCodeSamples(fn: Promise<Result<GeneratedCodeSamples, CodeSamplesFileFailure>>) {
-    return generateCodeSamples(fn);
-  }
-
-  public ignoredSampleKeys(keys: string[]) {
-    reportIgnoredSampleKeys(keys);
+  public generateArtifacts(fn: Promise<Result<PortalArtifacts, ServiceError>>) {
+    return generateArtifacts(fn);
   }
 
   public unplacedSamples(endpoints: string[]) {

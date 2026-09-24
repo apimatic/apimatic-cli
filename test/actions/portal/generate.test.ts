@@ -9,8 +9,12 @@ import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
+import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
+import { CodeSampleCatalog, CodeSamples } from '../../../src/types/portal/code-samples';
+import { Language } from '../../../src/types/sdk/generate';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
 import { FileService } from '../../../src/infrastructure/file-service';
+import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
@@ -20,6 +24,14 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shel
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
 
+/** The catalogs the merged fixture expects, read the way the service reads them. */
+const samplesFromFixture = (): CodeSamples => {
+  const json = JSON.parse(fs.readFileSync('test/resources/code-samples.json', 'utf8')) as Record<string, unknown>;
+  return new CodeSamples(
+    Object.entries(json).map(([language, catalog]) => CodeSampleCatalog.fromJson(language as Language, catalog)!)
+  );
+};
+
 describe('GenerateAction', () => {
   let root: string;
   let portalDirectory: DirectoryPath;
@@ -28,6 +40,7 @@ describe('GenerateAction', () => {
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
   let prepare: sinon.SinonStub;
+  let artifacts: sinon.SinonStub;
 
   const execute = (source = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
@@ -54,10 +67,12 @@ describe('GenerateAction', () => {
     fs.writeFileSync(path.join(builtSite.toString(), 'index.html'), '<html></html>');
     fs.writeFileSync(path.join(builtSite.toString(), '_shell.html'), '<html></html>');
 
+    artifacts = sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(PortalArtifacts.none()));
+
     prompts = sinon.stub(PortalGeneratePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.buildPortal.callsFake((fn) => fn);
-    prompts.generateCodeSamples.callsFake((fn) => fn);
+    prompts.generateArtifacts.callsFake((fn) => fn);
     prompts.savePortal.callsFake((fn) => fn);
     prompts.overwritePortal.resolves(true);
 
@@ -76,8 +91,8 @@ describe('GenerateAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('fails without building when the code samples cannot be generated', async () => {
-    sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(err({ file: 'code-samples.json', problem: { kind: 'missing' as const } }));
+  it('fails without building when the artifacts cannot be generated', async () => {
+    artifacts.resolves(err(ServiceError.ServerError));
 
     const result = await execute();
 
@@ -87,9 +102,9 @@ describe('GenerateAction', () => {
   });
 
   it("builds from the user's own specs, handing the project their code samples", async () => {
-    process.env.APIMATIC_CODE_SAMPLES_PATH = 'test/resources/code-samples.json';
+    artifacts.resolves(ok(new PortalArtifacts(samplesFromFixture(), new Map(), undefined)));
 
-    const result = await execute(CODE_SAMPLES_FIXTURE).finally(() => delete process.env.APIMATIC_CODE_SAMPLES_PATH);
+    const result = await execute(CODE_SAMPLES_FIXTURE);
 
     expect(result.isSuccess()).to.be.true;
     const [, source, codeSamples] = prepare.firstCall.args;
