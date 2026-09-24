@@ -219,47 +219,12 @@ export class PortalSourceContext {
     const missing: MissingStaticFile[] = [];
     for (const asset of config.staticFiles()) {
       const file = asset.resolveIn(this.sourceDirectory);
-      const found = await this.spelledOnDisk(file);
+      const found = await this.fileService.spelledOnDisk(this.sourceDirectory, file);
       if (!found?.isEqual(file)) {
         missing.push({ setting: asset.settingPath(), file, foundAs: found });
       }
     }
     return missing;
-  }
-
-  /**
-   * The file as it is spelt on disk, or null when it is not there in any case. Every name on
-   * the way from `src/` is looked up by code point first, as the hosts portals are published
-   * to look it up, because on Windows and macOS `Logo.PNG` also opens `logo.png`.
-   */
-  private async spelledOnDisk(file: FilePath): Promise<FilePath | null> {
-    const names = file.relativeTo(this.sourceDirectory).split('/');
-    const fileName = names.pop() ?? '';
-    let directory = this.sourceDirectory;
-    for (const name of names) {
-      const subdirectories = await this.fileService.getSubDirectoriesPaths(directory);
-      const match = PortalSourceContext.spelling(
-        name,
-        subdirectories.map((subdirectory) => subdirectory.leafName())
-      );
-      if (match === undefined) {
-        return null;
-      }
-      directory = directory.join(match);
-    }
-    const fileNames = await this.fileService.getFileNames(directory);
-    const match = PortalSourceContext.spelling(
-      fileName,
-      fileNames.map((candidate) => candidate.toString())
-    );
-    return match === undefined ? null : new FilePath(directory, new FileName(match));
-  }
-
-  private static spelling(name: string, candidates: string[]): string | undefined {
-    return (
-      candidates.find((candidate) => candidate === name) ??
-      candidates.find((candidate) => candidate.toLowerCase() === name.toLowerCase())
-    );
   }
 
   /**

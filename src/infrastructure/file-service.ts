@@ -16,6 +16,14 @@ function isDanglingLink(error: unknown): boolean {
   return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
+/** The entry named exactly `name`, or else the one named `name` in another case. */
+function spelling<T>(name: string, entries: T[], nameOf: (entry: T) => string): T | undefined {
+  return (
+    entries.find((entry) => nameOf(entry) === name) ??
+    entries.find((entry) => nameOf(entry).toLowerCase() === name.toLowerCase())
+  );
+}
+
 export class FileService {
   public async fileExists(file: FilePath): Promise<boolean> {
     try {
@@ -130,6 +138,29 @@ export class FileService {
 
   public async getSubDirectoriesPaths(dir: DirectoryPath): Promise<DirectoryPath[]> {
     return (await this.listEntries(dir)).subDirectories;
+  }
+
+  /**
+   * `file` as it is spelt on disk, or null when it is not there in any case. Every name on the
+   * way from `root` is looked up by code point first, and only then without regard to case: on
+   * Windows and macOS `Logo.PNG` also opens `logo.png`, which a web server that matches names
+   * by code point would not serve.
+   */
+  public async spelledOnDisk(root: DirectoryPath, file: FilePath): Promise<FilePath | null> {
+    const names = path.relative(root.toString(), file.toString()).split(path.sep);
+    const fileName = names.pop() ?? '';
+    let directory = root;
+    for (const name of names) {
+      const { subDirectories } = await this.listEntries(directory);
+      const match = spelling(name, subDirectories, (subDirectory) => path.basename(subDirectory.toString()));
+      if (match === undefined) {
+        return null;
+      }
+      directory = match;
+    }
+    const { fileNames } = await this.listEntries(directory);
+    const match = spelling(fileName, fileNames, (candidate) => candidate.toString());
+    return match === undefined ? null : new FilePath(directory, match);
   }
 
   // The direct children of `dir`, split into files and directories; both empty when it cannot
