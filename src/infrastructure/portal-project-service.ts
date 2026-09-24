@@ -107,7 +107,7 @@ export class PortalProjectService {
     );
     const unsampled = source.specs.filter((_, index) => refersOutside[index]);
     const specs = await Promise.all(
-      source.specs.map((spec) =>
+      source.specs.map(async (spec) =>
         unsampled.includes(spec) ? spec : this.writeWithCodeSamples(spec, specDirectory, codeSamples)
       )
     );
