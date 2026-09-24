@@ -9,6 +9,7 @@ import { FilePath } from '../types/file/filePath.js';
 import { CodeSamples } from '../types/portal/code-samples.js';
 import { OpenApiDocument } from '../types/portal/openapi-document.js';
 import { PortalSource, PortalSpec } from '../types/portal/portal-source.js';
+import { SpecCopy } from '../types/portal/spec-copy.js';
 import { errorMessage } from '../utils/error-utils.js';
 import { FileService } from './file-service.js';
 
@@ -48,6 +49,7 @@ export interface PortalProjectPaths {
 export interface SampledSource {
   source: PortalSource;
   unsampledSpecs: FileName[];
+  specCopy: SpecCopy;
 }
 
 /**
@@ -100,7 +102,7 @@ export class PortalProjectService {
     codeSamples: CodeSamples
   ): Promise<Result<SampledSource, string>> {
     if (codeSamples.isEmpty()) {
-      return ok({ source, unsampledSpecs: [] });
+      return ok({ source, unsampledSpecs: [], specCopy: SpecCopy.none() });
     }
     try {
       return ok(await this.copyWithCodeSamples(projectDirectory.join('spec'), source, codeSamples));
@@ -124,7 +126,11 @@ export class PortalProjectService {
         unsampled.includes(spec) ? spec : this.writeWithCodeSamples(spec, specDirectory, codeSamples)
       )
     );
-    return { source: { ...source, specs }, unsampledSpecs: unsampled.map((spec) => spec.file.name()) };
+    return {
+      source: { ...source, specs },
+      unsampledSpecs: unsampled.map((spec) => spec.file.name()),
+      specCopy: SpecCopy.of(source.specDirectory, specDirectory)
+    };
   }
 
   /**

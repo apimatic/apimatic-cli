@@ -9,6 +9,7 @@ import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
+import { SpecCopy } from '../../../src/types/portal/spec-copy';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
 import { ServiceError } from '../../../src/infrastructure/service-error';
 import { FileService } from '../../../src/infrastructure/file-service';
@@ -71,7 +72,7 @@ describe('GenerateAction', () => {
       );
     addCodeSamples = sinon
       .stub(PortalProjectService.prototype, 'addCodeSamples')
-      .callsFake(async (_projectDirectory, source) => ok({ source, unsampledSpecs: [] }));
+      .callsFake(async (_projectDirectory, source) => ok({ source, unsampledSpecs: [], specCopy: SpecCopy.none() }));
     authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
     build = sinon.stub(PortalBuildService.prototype, 'build').resolves(ok({ output: builtSite, pageCount: 3 }));
   });

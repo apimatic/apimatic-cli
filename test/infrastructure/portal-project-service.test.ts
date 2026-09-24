@@ -211,6 +211,7 @@ describe('PortalProjectService', () => {
       ]);
       expect(JSON.parse(fs.readFileSync(spec.file.toString(), 'utf8'))).to.deep.equal(petsSpec());
       expect(sampled.unsampledSpecs).to.be.empty;
+      expect(sampled.specCopy.restorePaths(copy.file.toString())).to.equal(spec.file.toString());
     });
 
     it('leaves every spec on its original file, unnamed, when there are no samples', async () => {

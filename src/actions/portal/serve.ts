@@ -93,7 +93,7 @@ export class PortalServeAction {
       const server = await this.prompts.startPreview(this.devServerService.start(project.value, servePort));
 
       if (server.isErr()) {
-        this.prompts.startFailed(server.error.log);
+        this.prompts.startFailed(sampled.value.specCopy.restorePaths(server.error.log));
         return ActionResult.failed();
       }
 
@@ -114,7 +114,7 @@ export class PortalServeAction {
       const outcome = await Promise.race([interrupted, stopped]);
 
       if (outcome.kind === 'exited') {
-        this.prompts.previewStopped(outcome.output);
+        this.prompts.previewStopped(sampled.value.specCopy.restorePaths(outcome.output));
         return ActionResult.failed();
       }
 

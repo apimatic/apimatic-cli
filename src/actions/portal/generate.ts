@@ -100,8 +100,9 @@ export class GenerateAction {
 
       if (build.isErr()) {
         // Written before the temp directory is removed, so the log outlives the build.
-        const logPath = await portalContext.saveBuildLog(build.error.log);
-        this.prompts.buildFailed(build.error.log, logPath);
+        const log = sampled.value.specCopy.restorePaths(build.error.log);
+        const logPath = await portalContext.saveBuildLog(log);
+        this.prompts.buildFailed(log, logPath);
         return ActionResult.failed();
       }
 
