@@ -95,6 +95,15 @@ describe('portal template packaging', () => {
     expect(source).to.contain("'__APIMATIC_CONTENT_DIR__'");
   });
 
+  // The generated primary has the theme's own specificity, so it wins only by coming after it.
+  it('imports the neutral theme, and the stylesheet the CLI generates after everything else', () => {
+    const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
+    const imports = [...stylesheet.matchAll(/@import\s+'([^']+)'/g)].map((match) => match[1]);
+
+    expect(imports).to.include('fumadocs-ui/css/neutral.css');
+    expect(imports[imports.length - 1]).to.equal('./theme.css');
+  });
+
   // The two sides are compiled apart and the template casts the files it reads, so nothing else
   // holds them together: a field or a value only one side knows builds a portal that is quietly
   // missing it. The compiler checks this when `pretest` runs; the assertion only reports it.
