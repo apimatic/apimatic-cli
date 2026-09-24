@@ -109,6 +109,20 @@ describe('portal template packaging', () => {
     expect(source).to.contain("'__APIMATIC_CONTENT_DIR__'");
   });
 
+  // The literal reaches the browser bundle as the collection's base, so it must stay relative;
+  // it must also be the directory the CLI writes the generated pages into.
+  it('compiles the generated pages from the directory the CLI writes them to, by a relative name', () => {
+    const source = fs.readFileSync(path.join(templateRoot, 'src/lib/source.ts'), 'utf8');
+
+    expect(source).to.match(new RegExp(`defineDocs\\(\\{\\s*dir: '${GENERATED_DIRECTORY_NAME}',`));
+  });
+
+  it('registers the plugin that reloads the generated pages under portal serve', () => {
+    const config = fs.readFileSync(path.join(templateRoot, 'vite.config.ts'), 'utf8');
+
+    expect(config).to.contain('generatedPagesReload()');
+  });
+
   // The generated primary has the theme's own specificity, so it wins only by coming after it.
   it('imports the neutral theme, and the stylesheet the CLI generates after everything else', () => {
     const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');

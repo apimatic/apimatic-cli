@@ -482,12 +482,13 @@ Nothing changes in `apimatic.schema.json`, `PortalConfig`, `PortalLanguages`,
   the SDKs order file with its title; several keep the block's order; the
   `context-plugin/` folder, its index and its titled `nav.json` appear only
   with a `plugin` block, and nothing about the plugin lands under `sdks/`;
-  each language's display name; every template name it uses exists in
-  `portal-pages/`, and each placeholder renders with the data the plan gives
-  it (the one test that holds the templates and the generator together); the
-  sections and their tokens are the ones `navigation.ts` exports, imported
-  from the template as the template units import it (the one test that holds
-  the CLI and the transformer together).
+  each language's display name. That every template it names ships in
+  `portal-pages/`, and nothing else does, is checked in
+  `portal-template.test.ts`; that each renders with the data it is given,
+  every language and the plugin included, in the `PortalPagesService` tests.
+  That the sections and their tokens are the ones `navigation.ts` exports is
+  checked in `test/portal-template/navigation.test.ts`, beside the existing
+  cases holding the token vocabulary both halves share.
 - `PortalSourceContext`: `generatedPages` carries the block's languages in
   order and the plugin section only with the block; `content/sdks.md`,
   `content/sdks.mdx`, a page under `content/sdks/`, `content/(intro)/sdks.md`,
@@ -731,14 +732,15 @@ build, lint on touched files and the affected tests green.
    `resolveSettings` answering the pair, the reserved-address refusal and its
    prompt, `apimatic:plugin` in `PortalNavigation`, the navigation
    hints. CLI only; unit and prompt tests. The test holding the sections
-   against `navigation.ts` waits for step 4, which exports the template's list.
+   against `navigation.ts` waited for step 4, which exports the template's list.
 3. **Templates and the writer.** *Done 2026-09-24.* `portal-pages/` with the three placeholders,
    the shared package-root lookup, `PortalPagesService`,
    `PortalProjectService.prepare` and `applyConfig` writing the generated
    directory, `generatedDir` in `portal.config.json`, `files` in
    `package.json`, the packaging and project-service tests. The template does
    not read the directory yet, so a build at this point is unchanged.
-4. **Template.** The second `defineDocs`, the third loader source, `$.tsx` and
+4. **Template.** *Done 2026-09-24; the end-to-end build and the template's
+   type-check pass with the pages in it.* The second `defineDocs`, the third loader source, `$.tsx` and
    `llms.server.ts` split by collection, `prerender-pages.ts` and
    `portal-config.ts`, the reload plugin in `vite.config.ts`, the
    transformer's folder support, the sections table and its tokens, the tabs,

@@ -8,24 +8,47 @@ import { prerenderPages } from '../../portal-template/prerender-pages';
 // so a URL missing here is a page that is never emitted, however many things link to it.
 describe('prerenderPages', () => {
   let contentDir: string;
+  let generatedDir: string;
 
-  const write = (relative: string, body = '# page\n') => {
-    const target = path.join(contentDir, relative);
+  const writeIn = (directory: string, relative: string, body: string) => {
+    const target = path.join(directory, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, body);
   };
+  const write = (relative: string, body = '# page\n') => writeIn(contentDir, relative, body);
 
   const urlsFor = async (siteUrl: string | null = null, specs: Record<string, string> = {}) => {
-    const pages = await prerenderPages({ specs, contentDir, staticDir: null }, siteUrl);
+    const pages = await prerenderPages({ specs, contentDir, generatedDir, staticDir: null }, siteUrl);
     return pages.map((page) => page.path);
   };
 
   beforeEach(() => {
     contentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prerender-'));
+    generatedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prerender-generated-'));
   });
 
   afterEach(() => {
     fs.rmSync(contentDir, { recursive: true, force: true });
+    fs.rmSync(generatedDir, { recursive: true, force: true });
+  });
+
+  it('lists the generated pages as it lists the user’s, each with its Markdown twin', async () => {
+    writeIn(generatedDir, 'sdks/index.mdx', '# SDKs\n');
+    writeIn(generatedDir, 'sdks/typescript.mdx', '# TypeScript\n');
+    writeIn(generatedDir, 'sdks/nav.json', '{ "title": "SDKs" }\n');
+    writeIn(generatedDir, 'context-plugin/index.mdx', '# Plugin\n');
+
+    const urls = await urlsFor();
+
+    expect(urls).to.include.members([
+      '/sdks',
+      '/sdks.md',
+      '/sdks/typescript',
+      '/sdks/typescript.md',
+      '/context-plugin',
+      '/context-plugin.md'
+    ]);
+    expect(urls.filter((url) => url.includes('nav'))).to.be.empty;
   });
 
   it('lists a page per Markdown file, with its Markdown twin', async () => {
