@@ -7,14 +7,20 @@ import { ServiceError } from '../../../src/infrastructure/service-error';
 import { Endpoint } from '../../../src/types/portal/endpoint';
 
 describe('PortalArtifactsService', () => {
+  const exported = process.env.APIMATIC_CODE_SAMPLES_PATH;
   let root: string;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-artifacts-'));
+    delete process.env.APIMATIC_CODE_SAMPLES_PATH;
   });
 
   afterEach(() => {
-    delete process.env.APIMATIC_CODE_SAMPLES_PATH;
+    if (exported === undefined) {
+      delete process.env.APIMATIC_CODE_SAMPLES_PATH;
+    } else {
+      process.env.APIMATIC_CODE_SAMPLES_PATH = exported;
+    }
     fs.rmSync(root, { recursive: true, force: true });
   });
 
