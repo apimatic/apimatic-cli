@@ -5,7 +5,7 @@ import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfig, PluginConfigContext } from '../../types/plugin-config-context.js';
+import { PluginConfig, PluginConfigContext, PluginConfigState } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
@@ -53,26 +53,12 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    let config: PluginConfig;
-    if (configState.state === 'present' && configState.hasMetadata()) {
-      config = configState;
-    } else {
-      const metadataResult = await new PluginRecordMetadataAction(
-        this.configDir,
-        this.commandMetadata,
-        this.authKey
-      ).execute(buildDirectory);
-      if (metadataResult.isCancelled()) {
-        this.prompts.metadataCancelled(metadataResult.getMessage());
-        return ActionResult.cancelled();
-      }
-      if (!metadataResult.isSuccess()) {
-        return metadataResult.discardValue();
-      }
-
-      config = metadataResult.getValue();
+    const identified = await this.configWithMetadata(configState, buildDirectory);
+    if (!identified.isSuccess()) {
+      return identified.discardValue();
     }
 
+    const config = identified.getValue();
     const published = config.publishedLanguages();
     const selection = await this.prompts.selectLanguages(config);
     if (!selection?.length) {
@@ -92,12 +78,7 @@ export class PluginGenerateAction {
     }
 
     const bundled = selection.filter((language) => !published.includes(language));
-    const profiles =
-      bundled.length === 0
-        ? undefined
-        : await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
-
-    const preview = profiles !== undefined && profiles.isOk() && profiles.value.length > 0;
+    const preview = bundled.length > 0 && (await this.hasPublishingProfile());
     if (preview) {
       this.prompts.recommendPublishingFirst();
       if (!(await this.prompts.confirmLocalPlugin())) {
@@ -115,6 +96,49 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
+    return await this.buildPlugin(buildDirectory, pluginContext, pluginDirectory, preview);
+  };
+
+  /**
+   * The config once it is known to carry an identity: the one already on disk, or the one
+   * `plugin record-metadata` writes when it is not. A cancel is reported here because only this
+   * step knows it was the metadata prompt the user walked away from.
+   */
+  private readonly configWithMetadata = async (
+    configState: PluginConfigState,
+    buildDirectory: DirectoryPath
+  ): Promise<ActionResult<PluginConfig>> => {
+    if (configState.state === 'present' && configState.hasMetadata()) {
+      return ActionResult.success(configState);
+    }
+
+    const recorded = await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(
+      buildDirectory
+    );
+    if (recorded.isCancelled()) {
+      this.prompts.metadataCancelled(recorded.getMessage());
+      return ActionResult.cancelled();
+    }
+
+    return recorded;
+  };
+
+  /**
+   * Advisory only, so a lookup that cannot answer is read as "no profile": a recommendation is not
+   * worth failing a generation the user asked for, and `--auth-key` does not reach this call.
+   */
+  private readonly hasPublishingProfile = async (): Promise<boolean> => {
+    const profiles = await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
+
+    return profiles.isOk() && profiles.value.length > 0;
+  };
+
+  private readonly buildPlugin = async (
+    buildDirectory: DirectoryPath,
+    pluginContext: PluginContext,
+    pluginDirectory: DirectoryPath,
+    preview: boolean
+  ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildDirectory);
