@@ -316,6 +316,30 @@ describe('PluginGenerateAction', () => {
         expect(initial).to.deep.equal([Language.CSHARP]);
       });
 
+      // A project that has never named a language has not chosen against any of them, and the
+      // plugin covering everything is the answer a single Enter should give.
+      it('pre-checks every language when the config names none', async () => {
+        await writeConfig({ plugin: METADATA, languages: {} });
+        generated();
+
+        await execute();
+
+        const [, , initial] = selectLanguages.firstCall.args;
+        expect(initial).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
+      });
+
+      it('pre-checks every language when the config names only ones a plugin cannot carry', async () => {
+        const java = { publishing: { source: { repositoryUrl: 'https://github.com/acme/acme-java' } } };
+        await writeConfig({ plugin: METADATA, languages: { java } });
+        sinon.stub(PluginGeneratePrompts.prototype, 'languagesNotIncluded');
+        generated();
+
+        await execute();
+
+        const [, , initial] = selectLanguages.firstCall.args;
+        expect(initial).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
+      });
+
       // The published entry is the record of where the SDK went. Clearing its checkbox cannot take
       // it out of the plugin, so the language is put back and the user is told.
       it('keeps a published language that was cleared, and says so', async () => {

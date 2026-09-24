@@ -149,7 +149,14 @@ export class PluginGenerateAction {
     const published = config.publishedLanguages();
     const requested = config.requestedLanguages();
 
-    const chosen = await this.prompts.selectLanguages(PLUGIN_LANGUAGES, published, requested);
+    // A config that names languages has already made the choice, so it is what comes up checked.
+    // One that names none has not chosen yet — a first run, or a project that has only ever had a
+    // spec — and for it the plugin covering everything is both the common answer and the one that
+    // makes the command useful with a single Enter. Nothing is checked only if there is nothing
+    // to check.
+    const initial = requested.length > 0 ? requested : PLUGIN_LANGUAGES;
+
+    const chosen = await this.prompts.selectLanguages(PLUGIN_LANGUAGES, published, initial);
     if (chosen === undefined) {
       return undefined;
     }
