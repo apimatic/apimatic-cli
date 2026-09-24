@@ -228,11 +228,6 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "layout": {
-              "enum": ["docs", "notebook", "notebook-navbar", "glass"],
-              "default": "notebook-navbar",
-              "description": "The page layout. 'notebook-navbar' puts the tabs in the header; the others show them at the top of the sidebar."
-            },
             "links": {
               "type": "array",
               "description": "Links in the header and the mobile menu.",

@@ -6,7 +6,7 @@ const HEADER = "/* Written by the APIMatic CLI from the 'portal' block of src/ap
 /**
  * The light rule is scoped with `:not(.dark)`: a bare `:root` has the specificity of the
  * presets' `.dark` block and comes after it, so a colour meant for light mode would win in dark
- * mode too. Each rule also names the sidebar, which every layout renders as `#nd-sidebar` and
+ * mode too. Each rule also names the sidebar, which the layout renders as `#nd-sidebar` and
  * which some presets give tokens of its own -- neutral's muted and secondary in dark mode,
  * catppuccin's in both -- with an id that outranks either mode's rule.
  */
@@ -34,14 +34,8 @@ export class PortalStylesheet {
     const primary = brand.brandColors().primaryColors();
     const tokens = config.tokenOverrides();
 
-    // Glass is the one layout `preset.css` leaves out; its utility classes are scanned from here.
-    const imports = [
-      `fumadocs-ui/css/${brand.brandColors().presetName()}.css`,
-      ...(config.navigationSettings().layoutName() === 'glass' ? ['fumadocs-ui/css/generated/glass.css'] : [])
-    ];
-
     return new PortalStylesheet(
-      imports,
+      [`fumadocs-ui/css/${brand.brandColors().presetName()}.css`],
       new Map([
         ['--default-font-family', fonts.bodyFamily()],
         ['--default-mono-font-family', fonts.monoFamily()]

@@ -11,7 +11,6 @@ import { MODE_TOKENS } from '../../../src/types/portal/config/advanced-tokens';
 import { GROUP_BY } from '../../../src/types/portal/config/api-config';
 import { COLOR_MODES, COLOR_PRESETS } from '../../../src/types/portal/config/brand-config';
 import { BODY_FONTS, MONO_FONTS } from '../../../src/types/portal/config/fonts';
-import { LAYOUTS } from '../../../src/types/portal/config/navigation-config';
 import { PortalConfig } from '../../../src/types/portal/portal-config';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { CodeGenerationVersion, Language } from '../../../src/types/sdk/generate';
@@ -67,7 +66,6 @@ describe('apimatic.schema.json', () => {
       ['brand.fonts.body', brand.fonts.properties.body.enum, BODY_FONTS],
       ['brand.fonts.mono', brand.fonts.properties.mono.enum, MONO_FONTS],
       ['brand.colorMode', brand.colorMode.enum, COLOR_MODES],
-      ['navigation.layout', portal.navigation.properties.layout.enum, LAYOUTS],
       ['api.groupBy', portal.api.properties.groupBy.enum, GROUP_BY],
       ['advanced.tokens', schema.definitions.tokens.propertyNames.enum, MODE_TOKENS],
       ['languages', schema.definitions.languages.propertyNames.enum, Object.values(Language)],
@@ -105,7 +103,6 @@ describe('apimatic.schema.json', () => {
             colorMode: 'dark'
           },
           navigation: {
-            layout: 'glass',
             links: [
               { label: 'Status', url: 'https://status.test' },
               { label: 'Home', url: '/' }
@@ -176,7 +173,6 @@ describe('apimatic.schema.json', () => {
       ['a font off the shortlist', { brand: { fonts: { body: 'Comic Sans' } } }],
       ['an unknown font key', { brand: { fonts: { heading: 'inter' } } }],
       ['an unknown colour mode', { brand: { colorMode: 'auto' } }],
-      ['the flux layout', { navigation: { layout: 'flux' } }],
       ['links that are not a list', { navigation: { links: {} } }],
       ['a link that is a string', { navigation: { links: ['Status'] } }],
       ['a link without an address', { navigation: { links: [{ label: 'x' }] } }],

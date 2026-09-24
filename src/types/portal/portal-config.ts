@@ -7,7 +7,7 @@ import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, isJsonObject, unknownKeys } from './config/fields.js';
 import { HomeConfig } from './config/home-config.js';
 import { Link } from './config/link.js';
-import { Layout, NavigationConfig } from './config/navigation-config.js';
+import { NavigationConfig } from './config/navigation-config.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
 import { StaticAsset } from './config/static-asset.js';
 
@@ -34,7 +34,6 @@ export interface PortalIdentity {
   favicon: { url: string; type: string | null } | null;
   /** The Google Fonts stylesheet, or null when both families are the system's own. */
   fontsUrl: string | null;
-  layout: Layout;
   colorMode: ColorMode;
   links: PortalLink[];
   homeCta: PortalLink | null;
@@ -152,7 +151,6 @@ export class PortalConfig {
       logo: logo === null ? null : { light: logo.light().siteUrl(), dark: logo.dark().siteUrl() },
       favicon: favicon === null ? null : { url: favicon.siteUrl(), type: favicon.imageType() },
       fontsUrl: fontsUrl === null ? null : fontsUrl.toString(),
-      layout: this.navigation.layoutName(),
       colorMode: this.brand.mode(),
       links: this.navigation.headerLinks().map(portalLink),
       homeCta: cta === null ? null : portalLink(cta),

@@ -27,7 +27,7 @@ listed in section 2.
 
 Give the `portal` block of `src/apimatic.json` the shape it will keep, make the
 portal brandable — logo, favicon, colour preset, primary colour, fonts,
-light/dark mode, layout, header links — and render the top level of the site as
+light/dark mode, header links — and render the top level of the site as
 tabs. The tabs come from the root `nav.json`, which already orders the top
 level; `apimatic.json` says how the portal looks and behaves, `nav.json` says
 how it is arranged.
@@ -70,7 +70,7 @@ Delivered as **one PR** (section 11).
 | Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. |
 | Home | `content/index.md` rendered in the docs layout, in its own Home tab, with an optional CTA under the title from `portal.home.cta`. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. |
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
-| Layouts | `docs`, `notebook`, `notebook-navbar`, `glass`. Default `notebook-navbar`. `flux` is not exposed. |
+| Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
 | Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. The preset supplies every other token. |
 | Fonts | A validated shortlist plus `system`. No free text. Loaded from Google Fonts at runtime, as Geist is today; `system` makes no network request. |
 | Favicon default | The light logo; none when there is no logo. The APIMatic mark is never shipped onto a customer's domain. |
@@ -147,7 +147,6 @@ Rejected, with reasons:
       "colorMode": "both"
     },
     "navigation": {
-      "layout": "notebook-navbar",
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
     },
     "home": { "cta": { "label": "Get an API key", "url": "/authentication" } },
@@ -187,7 +186,6 @@ happens before any release, so no reader of version 1 ever saw the flat shape.
 | `portal.brand.fonts.body` | enum | `geist` | `geist`, `inter`, `ibm-plex-sans`, `roboto`, `open-sans`, `source-sans-3`, `manrope`, `dm-sans`, `system`. |
 | `portal.brand.fonts.mono` | enum | `geist-mono` | `geist-mono`, `jetbrains-mono`, `ibm-plex-mono`, `fira-code`, `source-code-pro`, `system`. |
 | `portal.brand.colorMode` | enum | `both` | `light`, `dark`, `both`. A forced mode hides the switch and the `D` hotkey. |
-| `portal.navigation.layout` | enum | `notebook-navbar` | `docs`, `notebook`, `notebook-navbar`, `glass`. |
 | `portal.navigation.links[]` | `{label, url}` | `[]` | Rendered in the navbar and the mobile menu. `label` a non-empty string. `url` an absolute `http:` or `https:` URL, marked external, or a site-relative path starting with `/`; anything else (`mailto:`, a bare `docs/x`, `javascript:`) is refused. *As reviewed:* a path is resolved as a browser resolves it and refused when that leaves the site (`/\host`, a tab after the slash), and written as resolved; an absolute URL must carry its `//`, since a browser reads `https:example.com` on an https site as a path of that site. |
 | `portal.home.cta` | `{label, url}` | none | Rendered under the title of the home page, including the fallback home. `label` and `url` follow the `links` rules. |
 | `portal.api.groupBy` | enum | `tag` | `tag`, `route`, `none`; Fumadocs' own values. Changes operation URLs: `tag` yields `/api/<spec>/<tag>/<operation>`, `route` `/api/<spec>/<path>/<method>`, `none` `/api/<spec>/<operation>`. |
@@ -212,7 +210,7 @@ that addresses the build machine stays in `portal.config.json` behind
 
 Browser identity: `name`, `description`, `siteUrl`, `logo` (`{light, dark}` or
 null, the same URL twice for one image), `favicon` (`{url, type}` or null, the
-type from the extension), `fontsUrl` (the Google Fonts URL or null), `layout`,
+type from the extension), `fontsUrl` (the Google Fonts URL or null),
 `colorMode`, `links` and `homeCta` (each `{label, url, external}`),
 `pageActions`. Tabs are not in it: they come from the page tree, which already
 carries `nav.json`.
@@ -234,7 +232,6 @@ content-directory `@source` line prepare already substitutes.
 | `brand.colors.primary` | `theme.css` | `:root:not(.dark) { --color-fd-primary; --color-fd-primary-foreground; --color-fd-ring }` and the dark trio under `.dark`. Both blocks always emitted. The light block is scoped with `:not(.dark)` because a bare `:root` has the same specificity as the presets' `.dark` block and comes later, so a light-only value would win in dark mode. |
 | `brand.fonts` | `__root.tsx` head, `theme.css` | A `<link rel="stylesheet">` to the Google Fonts URL, then `@theme { --default-font-family; --default-mono-font-family }`. `system` emits no link and the OS stacks. A link rather than a CSS `@import` because a remote import nested inside an imported stylesheet lands mid-file after bundling, where browsers ignore it. |
 | `brand.colorMode` | `__root.tsx` `RootProvider`, layout props | `theme={{ forcedTheme, enableSystem: false, hotKey: false }}` when forced; `themeSwitch={{ enabled: false }}` on the layout. `both` is Fumadocs' default. |
-| `navigation.layout` | new `src/lib/layout.tsx`, `theme.css` | One switch that exports the layout and page components for the chosen layout (section 6). For glass, `theme.css` also imports `fumadocs-ui/css/generated/glass.css`. |
 | `navigation.links` | `layout.shared.tsx` `links` | Fumadocs `MainItemType` `{ text, url, external }`. |
 | `home.cta` | `$.tsx` | An anchor styled with `buttonVariants` from `fumadocs-ui/components/ui/button`, under the title of the index page and of the fallback home alike. |
 | `api.*` | `openapi-section.server.ts` | `groupBy` passes through to `staticSource`; the two `show*` flags filter the bundled document (section 7). |
@@ -370,20 +367,14 @@ under `portal serve` as they do today, tabs included, with no config watcher.
   becomes `apimatic:sdks`; `readSettings` returns `root`.
 - **`src/lib/tabs.ts`** (new): the explicit tab list, kept apart from
   `layout.tsx` so it is unit-testable without the generated identity file.
-- **`src/lib/layout.tsx`** (new): maps `portal.layout` to the layout component
-  and its page module, and returns the layout props each needs. Notebook takes
-  `nav.mode: 'top'` and `tabMode: 'sidebar' | 'navbar'`; docs has no `nav.mode`
-  and its own `tabMode: 'top' | 'auto'`, left at the default; glass's `sidebar`
-  prop is only `collapsible`, and its page module exposes only `toc`, `full`
-  and `tableOfContent`. The same module computes the explicit `tabs` list. All
-  four modules are imported statically; if the bundle grows by more than a few
-  hundred kilobytes, the import specifiers become a prepare-time substitution
-  instead (section 12).
+- **`src/lib/layout.tsx`** (new): the notebook layout with `nav.mode: 'top'`
+  and `tabMode: 'navbar'`, given the explicit `tabs` list. (Until the cut of
+  section 15 it chose between four layouts, each with props of its own.)
 - **`app.css`**: loses the Google Fonts, `neutral.css` and Geist `@theme` lines
   and gains a fixed `@import './theme.css'` after the Fumadocs and OpenAPI
   presets, so the generated rules come last.
 - **`src/styles/theme.css`** (written by the CLI, rewritten on re-apply): the
-  preset import, the glass import when the layout is glass, `@theme` with the
+  preset import, `@theme` with the
   two font families, `:root:not(.dark)` with the light primary trio and light
   tokens, `.dark` with the dark trio and dark tokens.
 - **`portal.identity.json`** (written by the CLI, rewritten on re-apply) and
@@ -393,7 +384,7 @@ under `portal serve` as they do today, tabs included, with no config watcher.
 - **`__root.tsx`**: favicon link; the Google Fonts stylesheet link;
   `RootProvider` theme props from `colorMode`.
 - **`layout.shared.tsx`**: two logos, `links`, `themeSwitch.enabled`.
-- **`$.tsx`**: components from `layout.tsx`; the Home CTA.
+- **`$.tsx`**: the notebook layout's page components; the Home CTA.
 - **`src/lib/openapi-section.server.ts`**: already the one place both
   `openapi.server.ts` and `prerender-pages.ts` build a section from. It takes the
   `api` options, bundles, filters (section 7) and calls `staticSource` with the
@@ -601,7 +592,7 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
 - `Color`: parsing, luminance against known values, the foreground choice on
   both sides of the crossover.
 - `PortalStylesheet`: the emitted CSS for each preset, `system` fonts emitting
-  no link, glass adding its import, tokens landing after the primary, the light
+  no link, tokens landing after the primary, the light
   block scoped with `:not(.dark)`, both blocks present when the primary is one
   string.
 - `PortalNavigation`: `apimatic:sdks` accepted at the root, `apimatic:pages`
@@ -738,7 +729,7 @@ files the plugin and publishing commands create do not carry it, which keeps
 this PR to the portal. `PortalServeAction.execute` loses its `onAfterServe`
 hook, which only quickstart used; the language-step PR brings it back with the
 serve call. The e2e cases share one extra build: a `branded` fixture that sets
-glass, forced dark, ocean with a primary, fonts, a header link and a CTA, and
+forced dark, ocean with a primary, fonts, a header link and a CTA, and
 hides a deprecated and an internal operation. It has no content directory, so it
 also covers the fallback home page and its Home tab. The sample repository's
 `v2` change is branch `saeedjamshaid/portal-config` in
@@ -900,3 +891,8 @@ none of them has shipped.
   and reading the functional forms to CSS's own rules was most of `Color`. A
   see-through primary has no use on a button, and the contrast check ignored its
   alpha anyway.
+- **`navigation.layout`** is gone; every portal uses the notebook layout with
+  the tabs in the header, which was the default. Four layouts meant four sets of
+  props that Fumadocs changes between versions, glass's own stylesheet, every
+  layout's page components in the bundle (about 38 KB of script), and each
+  other setting to be checked under each of them.

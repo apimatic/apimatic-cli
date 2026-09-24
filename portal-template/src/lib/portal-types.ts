@@ -1,8 +1,6 @@
 // Kept out of `portal.ts`, which imports the generated `portal.identity.json`, so the CLI's tests
 // can compare these with the type the CLI writes that file from, without a prepared project.
 
-export type PortalLayout = 'docs' | 'notebook' | 'notebook-navbar' | 'glass';
-
 export type PortalColorMode = 'light' | 'dark' | 'both';
 
 export interface PortalLink {
@@ -33,7 +31,6 @@ export interface Portal {
   favicon: PortalFavicon | null;
   /** The Google Fonts stylesheet, or null when both families are the system's own. */
   fontsUrl: string | null;
-  layout: PortalLayout;
   colorMode: PortalColorMode;
   links: PortalLink[];
   homeCta: PortalLink | null;

@@ -3,7 +3,7 @@ import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
 
 /**
  * One tab per root folder at the top of the tree, which is every top-level node once the tabs
- * transformer has run. Given to the layouts rather than left to Fumadocs, which links a tab to
+ * transformer has run. Given to the layout rather than left to Fumadocs, which links a tab to
  * its folder's first direct page and so leaves out a tab holding only folders -- as the API
  * reference does whenever its operations are grouped. Each stays bound to its folder, which is
  * how the active tab is found.

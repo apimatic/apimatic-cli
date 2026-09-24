@@ -274,7 +274,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(result.exitCode, result.all).to.equal(0);
   });
 
-  // The default layout puts the tab bar in the header, and the prerendered page carries it,
+  // The layout puts the tab bar in the header, and the prerendered page carries it,
   // so the tabs are there before any script runs.
   it('renders the top level as tabs in the header, in the order nav.json gives', () => {
     const page = read('index.html');
@@ -319,19 +319,18 @@ const stylesheetOf = (output: DirectoryPath) => {
 /**
  * A second portal, branded in every way the block allows at once, so one more build covers
  * the settings the default fixture leaves at their defaults: a preset and a primary, a forced
- * colour mode, the glass layout, header links, a call to action on the fallback home page, and
- * a reference that leaves its deprecated and internal operations out.
+ * colour mode, header links, a call to action on the fallback home page, and a reference that
+ * leaves its deprecated and internal operations out.
  */
 (enabled ? describe : describe.skip)('portal build, branded (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
   let built: BuiltPortal | undefined;
-  let project: DirectoryPath;
   let output: DirectoryPath;
 
   before(async () => {
     built = await buildFixture('branded');
-    ({ project, output } = built);
+    ({ output } = built);
   });
 
   after(async () => {
@@ -340,12 +339,6 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   const read = (relative: string) => fs.readFileSync(path.join(output.toString(), relative), 'utf8');
   const exists = (relative: string) => fs.existsSync(path.join(output.toString(), relative));
-
-  it('type-checks with the glass layout', async () => {
-    const result = await typeCheck(project);
-
-    expect(result.exitCode, result.all).to.equal(0);
-  });
 
   // The minifier may merge the two modes' rules when they match, as they do for a primary
   // written once, so the selectors and their place are checked rather than one spelling.

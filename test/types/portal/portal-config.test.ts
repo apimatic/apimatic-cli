@@ -37,7 +37,6 @@ describe('PortalConfig', () => {
       expect(portal.brandSettings().brandColors().presetName()).to.equal('neutral');
       expect(portal.brandSettings().brandColors().primaryColors()).to.be.null;
       expect(portal.brandSettings().mode()).to.equal('both');
-      expect(portal.navigationSettings().layoutName()).to.equal('notebook-navbar');
       expect(portal.navigationSettings().headerLinks()).to.be.empty;
       expect(portal.homeSettings().callToAction()).to.be.null;
       expect(portal.apiSettings().grouping()).to.equal('tag');
@@ -328,15 +327,6 @@ describe('PortalConfig', () => {
   });
 
   describe('navigation', () => {
-    it('accepts the four layouts, and refuses flux', () => {
-      expect(
-        config({ navigation: { layout: 'glass' } })
-          .navigationSettings()
-          .layoutName()
-      ).to.equal('glass');
-      expect(errorsOf({ navigation: { layout: 'flux' } })).to.have.lengthOf(1);
-    });
-
     it('marks a link to another site external and a page of the portal not', () => {
       const links = config({
         navigation: {
@@ -530,7 +520,6 @@ describe('PortalConfig', () => {
           colorMode: 'dark'
         },
         navigation: {
-          layout: 'glass',
           links: [
             { label: 'Status', url: 'https://status.example.com' },
             { label: 'Changelog', url: '/changelog' }
@@ -547,7 +536,6 @@ describe('PortalConfig', () => {
         logo: { light: '/images/logo.png', dark: '/images/logo-dark.png' },
         favicon: { url: '/favicon.svg', type: 'image/svg+xml' },
         fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap',
-        layout: 'glass',
         colorMode: 'dark',
         links: [
           { label: 'Status', url: 'https://status.example.com', external: true },
@@ -567,7 +555,6 @@ describe('PortalConfig', () => {
         favicon: null,
         fontsUrl:
           'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap',
-        layout: 'notebook-navbar',
         colorMode: 'both',
         links: [],
         homeCta: null,
@@ -612,7 +599,7 @@ describe('PortalConfig', () => {
       expect(JSON.parse(JSON.stringify(PortalConfig.scaffolded(suggested)))).to.deep.equal({
         site: { name: 'Spec Title', description: 'What the spec says.' },
         brand: { colors: { preset: 'neutral' }, fonts: { body: 'geist', mono: 'geist-mono' }, colorMode: 'both' },
-        navigation: { layout: 'notebook-navbar', links: [] },
+        navigation: { links: [] },
         home: {},
         api: { groupBy: 'tag', showDeprecated: true, showInternal: false },
         ai: { pageActions: true },
@@ -637,7 +624,7 @@ describe('PortalConfig', () => {
           fonts: { body: 'inter', mono: 'fira-code' },
           colorMode: 'light'
         },
-        navigation: { layout: 'docs', links: [{ label: 'Status', url: 'https://status.test' }] },
+        navigation: { links: [{ label: 'Status', url: 'https://status.test' }] },
         home: { cta: { label: 'Start', url: '/start' } },
         api: { groupBy: 'none', showDeprecated: false, showInternal: true },
         ai: { pageActions: false },

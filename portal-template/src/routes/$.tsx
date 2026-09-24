@@ -2,20 +2,26 @@ import { createFileRoute, getRouteApi, isNotFound, isRedirect, notFound } from '
 import { createServerFn } from '@tanstack/react-start';
 import { docs } from '@/lib/source';
 import { source } from '@/lib/source.server';
-import { pageComponents, PortalLayout } from '@/lib/layout';
+import { PortalLayout } from '@/lib/layout';
 import { getPageMarkdownUrl } from '@/lib/shared';
 import { portal } from '@/lib/portal';
 import { absoluteUrl, canonicalLink } from '@/lib/seo';
 import Link from 'fumadocs-core/link';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { buttonVariants } from 'fumadocs-ui/components/ui/button';
+import {
+  DocsBody,
+  DocsDescription,
+  DocsPage,
+  DocsTitle,
+  MarkdownCopyButton,
+  ViewOptionsPopover
+} from 'fumadocs-ui/layouts/notebook/page';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { Suspense, use, type ReactNode } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 import { OpenAPIPage } from '@/components/api-page';
 import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
-
-const { DocsBody, DocsDescription, DocsPage, DocsTitle, MarkdownCopyButton, ViewOptionsPopover } = pageComponents;
 
 const rootRoute = getRouteApi('__root__');
 

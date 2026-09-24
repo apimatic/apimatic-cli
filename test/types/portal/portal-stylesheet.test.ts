@@ -44,17 +44,6 @@ describe('PortalStylesheet', () => {
     });
   }
 
-  it('imports the glass layout styles only for the glass layout', () => {
-    expect(importsOf(stylesheetFor({ navigation: { layout: 'glass' } }))).to.deep.equal([
-      'fumadocs-ui/css/neutral.css',
-      'fumadocs-ui/css/generated/glass.css'
-    ]);
-    expect(fs.existsSync(path.join('node_modules', 'fumadocs-ui/css/generated/glass.css'))).to.be.true;
-    for (const layout of ['docs', 'notebook', 'notebook-navbar']) {
-      expect(importsOf(stylesheetFor({ navigation: { layout } })), layout).to.have.lengthOf(1);
-    }
-  });
-
   it('falls back to the system stacks alone for a system font', () => {
     const css = stylesheetFor({ brand: { fonts: { body: 'system', mono: 'system' } } });
 
@@ -100,7 +89,7 @@ describe('PortalStylesheet', () => {
     expect(ruleOf(css, DARK_SELECTOR)).to.be.undefined;
   });
 
-  // Every layout renders the sidebar as `#nd-sidebar`, and neutral, catppuccin and vitepress
+  // The layout renders the sidebar as `#nd-sidebar`, and neutral, catppuccin and vitepress
   // give it tokens of their own under that id, which outranks a rule for the mode alone.
   it('sets each mode on the sidebar too, since presets give it tokens of its own', () => {
     expect(LIGHT_SELECTOR.split(', ')).to.include(':root:not(.dark) #nd-sidebar');
@@ -148,7 +137,6 @@ describe('PortalStylesheet', () => {
         const output = await compiled(
           stylesheetFor({
             brand: { colors: { preset, primary: { light: '#1d4ed8', dark: '#93c5fd' } } },
-            navigation: { layout: 'glass' },
             advanced: { tokens: { light: tokens, dark: tokens } }
           })
         );
@@ -199,7 +187,7 @@ describe('PortalStylesheet', () => {
   });
 
   it('keeps every import ahead of the rules, as CSS requires', () => {
-    const css = stylesheetFor({ navigation: { layout: 'glass' }, brand: { colors: { primary: '#1d4ed8' } } });
+    const css = stylesheetFor({ brand: { colors: { primary: '#1d4ed8' } } });
     const lastImport = css.lastIndexOf('@import');
     const firstRule = css.indexOf('{');
 

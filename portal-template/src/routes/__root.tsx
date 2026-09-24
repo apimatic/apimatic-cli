@@ -29,7 +29,7 @@ const iconLinks = portal.favicon
   : [];
 
 // A portal fixed to one mode keeps to it whatever the visitor's system prefers, and offers no
-// way out: the layouts hide the switch, and the `D` hotkey is turned off here.
+// way out: the layout hides the switch, and the `D` hotkey is turned off here.
 const theme =
   portal.colorMode === 'both'
     ? undefined
