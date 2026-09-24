@@ -1,6 +1,6 @@
 # Testing code samples in a built portal
 
-How to build a portal from a code-sample catalog of your choosing, serve it on a port, and
+How to build a portal from a code-sample catalog, written by hand or by codegen-v2, serve it on a port, and
 check its request-sample tabs in a real browser. Everything needed lives in
 [`examples/code-samples-testing/`](examples/code-samples-testing). The design being tested
 is [SDK-ARTIFACTS-DESIGN.md](SDK-ARTIFACTS-DESIGN.md) §4.5 and §7.3.
@@ -14,7 +14,8 @@ browser.
 | Path | What it is |
 |---|---|
 | `cases/<case>/src/` | A portal project (`apimatic.json`, `content/`, `spec/`), the directory `--input` would point at the parent of |
-| `cases/<case>/catalogs.json` | The catalogs to merge: `[[language, catalog], …]`, each catalog shaped as the `code-samples/<language>.json` of §4.5. Tab order is this array's order |
+| `cases/<case>/catalogs.json` | The catalogs to merge: `[[language, catalog], …]`, each catalog shaped as the `code-samples/<language>.json` of §4.5, written by hand or by `codegen-catalogs.sh`. Tab order is this array's order |
+| `codegen-catalogs.sh` | Zips `cases/<case>/src`, sends it to a codegen-v2 Functions host's `POST /api/portal-artifacts`, polls it, and writes the returned `code-samples/*.json` over `cases/<case>/catalogs.json` (see [§5](#5-other-cases)) |
 | `build.mts` | Builds `cases/<case>` into an output directory through the CLI's own code path: `CodeSampleCatalog.fromJson` → `PortalSourceContext.resolve` → `PortalProjectService.addCodeSamples` → `prepare` → `PortalBuildService.build` → `PortalContext.save` |
 | `static-server.mjs` | Serves a built portal on a port, answering unknown paths with `404.html` as a static host would |
 | `browser/lib.mjs` | Playwright helpers the checks share: open a page, read the tabs, pick an example, read a tab's code |
@@ -23,7 +24,8 @@ browser.
 `portal generate` and `portal serve` always take their samples from the fixed catalog in
 `src/infrastructure/services/mock-code-samples.ts`, which only fits
 `test/resources/portal-inputs/code-samples`. `build.mts` exists so a case can bring its
-own catalog. It skips the account check, so it needs no login.
+own catalog, including one codegen-v2 produced for that case's spec. It skips the account
+check, so it needs no login.
 
 ## 2. Start a portal instance
 
@@ -97,6 +99,7 @@ selected.
 |---|---|---|---|
 | `pathref` | as §2 | `case-pathref.mjs`, 14 | Path items and operations written as `$ref`s, in the same file and another. Records a fumadocs-openapi bug (still in 12.0.2): its page listing reads a `$ref`'d path item without resolving it, so such operations get **no page**, and an operation `$ref` gets a page under `unknown/…/get` with none of its details. The checks marked `KNOWN FUMADOCS BUG` will fail once that is fixed; update them then |
 | `edge` | as §2 | `case-edge.mjs`, 25 | All seven languages in catalog order and an empty catalog adding nothing; curl resolving server variables; example ids with a space, a slash and non-ASCII; `<script>` in a snippet shown as text and never run; a 400-line snippet, highlighted; an untagged operation; a webhook page with no SDK tabs |
+| `combine` | as §2 | `case-combine.mjs`, 108 | Body and parameter `examples` with overlapping and disjoint ids, against the real codegen-v2 catalog (`GA-dev-branch` 7b8e0e30). The selector lists the body's ids, or, when the body names none (no `examples`, a singular `example`, a lone `Example` key), the first query, header or path parameter's; cURL and the TypeScript tab bind each parameter's value for the selected id. What still differs: `Example` beside a named body id shows the note, since codegen never emits it; values fumadocs samples (`"string"`) and codegen invents (`"some example string"`, or an optional body left out); and a two-media-type body, where codegen's one snippet sends no body |
 | payments | the real CLI, below | `case-payments.mjs`, 28 | The shipped commands end to end, with the mock catalog |
 
 The payments case runs the commands a user runs, so it needs `pnpm build` and a login
@@ -112,9 +115,30 @@ pnpm apimatic portal serve --input "$SCRATCH/payments" --port 4201
 
 `case-payments.mjs` runs against either port.
 
-To add a scenario, copy a case directory, edit its `src/spec/` and `catalogs.json`, and
-write a `browser/case-<name>.mjs` from the helpers in `lib.mjs`. A catalog the CLI rejects
-stops `build.mts` with `catalogs.json holds a catalog the CLI rejects`.
+To add a scenario, copy a case directory, edit its `src/spec/`, write `catalogs.json` by
+hand or fetch it from codegen-v2, and write a `browser/case-<name>.mjs` from the helpers in
+`lib.mjs`. A catalog the CLI rejects stops `build.mts` with `catalogs.json holds a catalog
+the CLI rejects`.
+
+To fetch it, run codegen-v2's Functions host from a checkout of the branch under test. Its
+`local.settings.json` points Durable storage at HTTPS Azurite; `func` skips a setting the
+environment already defines, so plain-HTTP Azurite needs no certificate. Start `func` from
+the build output: started from the project directory it finds no functions.
+
+```bash
+azurite --silent --location "$SCRATCH/azurite"                                  # keep running
+cd <codegen-v2>/src/CodegenV2.Func && dotnet build && cd bin/Debug/net10.0
+AzureWebJobsStorage=UseDevelopmentStorage=true func start --port 7071            # keep running
+bash examples/code-samples-testing/codegen-catalogs.sh examples/code-samples-testing/cases/combine "$SCRATCH/codegen"
+```
+
+The script sends the `X-APIMatic-SubscriptionFeatures` header that allows portal artifacts
+and C#, TypeScript and Python, and fails unless the run ends `Completed`. The case's
+`apimatic.json` must declare each language under `languages` with a `publishing` block
+carrying `source.repositoryUrl` and a `package` with its name and `version`, or the run
+ends `ValidationError`. Every declared language returns an SDK, but only TypeScript returns
+a catalog today, so `catalogs.json` holds TypeScript alone. The catalog is deterministic: a
+rerun writes the same file.
 
 ## 6. Gotchas
 
@@ -128,7 +152,9 @@ stops `build.mts` with `catalogs.json holds a catalog the CLI rejects`.
   before reading it, and for it to close before the next click.
 - **Code in `page.evaluate`** runs in the browser but is linted as Node; pass it as a
   string (`page.evaluate('window.__xss')`).
-- **Servers keep running** after the checks. Stop them with
+- **Servers keep running** after the checks, and a port another session's server holds
+  makes a new one exit with `EADDRINUSE` while the checks run against the other build.
+  Check the owner before trusting a run, and stop your own with
   `Get-NetTCPConnection -LocalPort <ports> -State Listen | % { Stop-Process -Id $_.OwningProcess }`
   in PowerShell.
 - **Rebuilding into a served directory** is fine: the static server reads from disk on
