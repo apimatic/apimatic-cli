@@ -6,7 +6,7 @@ import { useOperationContext, useRenderContext, useServerContext } from 'fumadoc
 import { pathnameFromRequest, type CodeUsageGenerator } from 'fumadocs-openapi/requests/generators';
 import { joinURL, resolveServerUrl } from '@fumadocs/api-docs/utils/url';
 import { CodeSample } from '@/lib/code-samples';
-import { Parameter, requestExamples } from '@/lib/request-examples';
+import { useExampleSelection } from './example-layout';
 
 interface UsageTab {
   id: string;
@@ -27,7 +27,7 @@ function UsageTabs() {
       label: generator.label ?? generator.lang,
       body: <GeneratedCode generator={generator} />
     })),
-    ...CodeSample.listIn(useOperation()).map((sample) => ({
+    ...CodeSample.listIn(useExampleSelection().operation).map((sample) => ({
       id: sample.lang,
       label: sample.label,
       body: <SampleCode sample={sample} />
@@ -54,8 +54,8 @@ function UsageTabs() {
 }
 
 function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
-  const { examples, example } = useOperationContext();
-  const source = sample.sourceFor(example, examples.length);
+  const { examples, selected } = useExampleSelection();
+  const source = sample.sourceFor(selected.id, examples.length);
 
   if (source === undefined) {
     return <p className="px-4 py-3 text-sm text-fd-muted-foreground">No {sample.label} sample for this example.</p>;
@@ -66,10 +66,14 @@ function SampleCode({ sample }: Readonly<{ sample: CodeSample }>) {
 function GeneratedCode({ generator }: Readonly<{ generator: CodeUsageGenerator }>) {
   const { mediaAdapters } = useRenderContext();
   const { route } = useOperationContext();
-  const request = useSelectedRequest();
+  const { selected, parameters } = useExampleSelection();
   const serverUrl = useServerUrl();
 
-  if (!request) return null;
+  const request = encodeRequestData(
+    selected.data,
+    mediaAdapters,
+    parameters.map((parameter) => parameter.definition)
+  );
   const url = joinURL(serverUrl, pathnameFromRequest(route, request));
   const code = generator.generate({ ...request, url }, { mediaAdapters, custom: null });
   return <CodeBlock lang={generator.lang} code={code} />;
@@ -78,32 +82,6 @@ function GeneratedCode({ generator }: Readonly<{ generator: CodeUsageGenerator }
 function CodeBlock({ lang, code }: Readonly<{ lang: string; code: string }>) {
   const { shiki, shikiOptions } = useRenderContext();
   return <DynamicCodeBlock lang={lang} code={code} highlighter={() => shiki.getOrInit()} options={shikiOptions} />;
-}
-
-function usePathItem() {
-  const { schema } = useRenderContext();
-  const { route } = useOperationContext();
-  return schema.resolve(schema.dereferenced.paths?.[route]);
-}
-
-function useOperation(): unknown {
-  const { examples } = useOperationContext();
-  return usePathItem()?.[examples[0].data.method];
-}
-
-function useSelectedRequest() {
-  const { mediaAdapters } = useRenderContext();
-  const { examples, example } = useOperationContext();
-  const parameters = Parameter.listIn(useOperation(), usePathItem());
-  const selected = requestExamples(examples, parameters).find((item) => item.id === example);
-  return (
-    selected &&
-    encodeRequestData(
-      selected.data,
-      mediaAdapters,
-      parameters.map((parameter) => parameter.definition)
-    )
-  );
 }
 
 function useServerUrl(): string {

@@ -6,12 +6,20 @@ type Location = 'path' | 'query' | 'header' | 'cookie';
 
 interface Example {
   value: unknown;
+  summary?: string;
+  description?: string;
 }
+
+// Fumadocs upgrades a 3.0 document's singular `example` into an example keyed `default`.
+const PLACEHOLDER_IDS = new Set(['_default', 'default', 'Example']);
+
+// The order codegen-v2 consults when the request body names no example ids.
+const NAMING_ORDER: Location[] = ['query', 'header', 'path'];
 
 export class Parameter {
   private constructor(
     public readonly definition: object,
-    private readonly location: Location,
+    public readonly location: Location,
     private readonly name: string,
     private readonly examples: Map<string, Example>
   ) {}
@@ -28,6 +36,10 @@ export class Parameter {
     return new Parameter(entry, entry.in, entry.name, new Map(examples));
   }
 
+  public namedExamples(): [string, Example][] {
+    return [...this.examples].filter(([id]) => !PLACEHOLDER_IDS.has(id));
+  }
+
   public withValueFor(id: string, data: RequestData): RequestData {
     const example = this.examples.get(id);
     return example === undefined
@@ -37,10 +49,21 @@ export class Parameter {
 }
 
 export function requestExamples(bodyExamples: RequestExample[], parameters: Parameter[]): RequestExample[] {
-  return bodyExamples.map((example) => ({
+  return namedExamples(bodyExamples, parameters).map((example) => ({
     ...example,
     data: parameters.reduce((data, parameter) => parameter.withValueFor(example.id, data), example.data)
   }));
+}
+
+function namedExamples(bodyExamples: RequestExample[], parameters: Parameter[]): RequestExample[] {
+  const [only] = bodyExamples;
+  const named = NAMING_ORDER.flatMap((location) =>
+    parameters.filter((parameter) => parameter.location === location).map((parameter) => parameter.namedExamples())
+  ).find((examples) => examples.length > 0);
+  if (bodyExamples.length > 1 || !PLACEHOLDER_IDS.has(only.id) || named === undefined) {
+    return bodyExamples;
+  }
+  return named.map(([id, { summary, description }]) => ({ id, name: summary || id, description, data: only.data }));
 }
 
 function parametersOf(node: unknown): unknown[] {
