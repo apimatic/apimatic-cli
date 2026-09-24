@@ -99,6 +99,9 @@ export class PortalProjectService {
     source: PortalSource,
     codeSamples: CodeSamples
   ): Promise<SampledSource> {
+    if (codeSamples.isEmpty()) {
+      return { source, unsampledSpecs: [] };
+    }
     const specDirectory = projectDirectory.join('spec');
     await this.fileService.copyDirectoryContents(source.specDirectory, specDirectory);
 

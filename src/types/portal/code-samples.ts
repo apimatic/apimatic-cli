@@ -45,6 +45,10 @@ export class CodeSampleCatalog {
 export class CodeSamples {
   constructor(private readonly catalogs: CodeSampleCatalog[]) {}
 
+  public isEmpty(): boolean {
+    return this.catalogs.length === 0;
+  }
+
   public samplesFor(endpoint: Endpoint): CodeSample[] {
     return this.catalogs.flatMap((catalog) => catalog.sampleFor(endpoint) ?? []);
   }

@@ -211,6 +211,16 @@ describe('PortalProjectService', () => {
       expect(sampled.unsampledSpecs).to.be.empty;
     });
 
+    it('leaves every spec on its original file, unnamed, when there are no samples', async () => {
+      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: '../shared/responses.json' } }));
+
+      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), new CodeSamples([]));
+
+      expect(sampled.source.specs[0].file).to.equal(spec.file);
+      expect(sampled.unsampledSpecs).to.be.empty;
+      expect(fs.existsSync(path.join(project.toString(), 'spec'))).to.be.false;
+    });
+
     it('copies the files a spec refers to, so its relative references still resolve', async () => {
       const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: './responses.json' } }));
       fs.writeFileSync(path.join(root, 'spec', 'responses.json'), '{}');
