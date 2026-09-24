@@ -1,13 +1,10 @@
 import { createOpenAPIPage } from 'fumadocs-openapi/ui';
 import { createCodeUsageGeneratorRegistry } from 'fumadocs-openapi/requests/generators';
-import { curl } from 'fumadocs-openapi/requests/generators/curl';
 import { renderExampleLayout } from './example-layout';
 import { renderUsageTabs } from './usage-tabs';
 
-const codeUsages = createCodeUsageGeneratorRegistry();
-codeUsages.add('curl', curl);
-
 export const OpenAPIPage = createOpenAPIPage({
-  codeUsages,
+  // Without a registry of its own, Fumadocs registers and bundles every request generator it has.
+  codeUsages: createCodeUsageGeneratorRegistry(),
   content: { renderAPIExampleLayout: renderExampleLayout, renderAPIExampleUsageTabs: renderUsageTabs }
 });
