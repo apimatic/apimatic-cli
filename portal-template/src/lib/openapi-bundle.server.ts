@@ -191,18 +191,18 @@ function hoistSchemas(document: Node, locations: Record<string, string>): void {
     if (segments && !aliases.has(key(segments))) aliases.set(key(segments), name);
   }
 
-  const moved = new Map<string, string[]>();
+  const moved = new Map<string, string>();
   for (const [target, segments] of targets) {
     const name = aliases.get(target) ?? uniqueName(schemas, preferredName(segments, locations));
     schemas[name] = resolve(document, segments);
-    moved.set(target, ['components', 'schemas', name]);
+    moved.set(target, `#/components/schemas/${escapeJsonPointer(name)}`);
   }
 
   for (const [node, { raw, segments }] of references) {
     for (let length = segments.length; length >= 2; length--) {
-      const destination = moved.get(key(segments.slice(0, length)));
-      if (destination) {
-        node.$ref = `#/${[...destination.map(escapeJsonPointer), ...raw.slice(length)].join('/')}`;
+      const pointer = moved.get(key(segments.slice(0, length)));
+      if (pointer) {
+        node.$ref = [pointer, ...raw.slice(length)].join('/');
         break;
       }
     }
