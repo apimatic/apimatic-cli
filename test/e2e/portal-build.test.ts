@@ -8,11 +8,20 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
+import { Language } from '../../src/types/sdk/generate';
 import { ensureBuildDirectoryBase, removeBuildDirectoryBase } from '../../src/infrastructure/tmp-extensions';
 
 // A real Vite build takes tens of seconds and needs every runtime dependency installed,
 // so it stays out of the default run. CI switches it on for the platform matrix.
 const enabled = process.env.APIMATIC_E2E === '1';
+
+const CALCULATE_SAMPLE = 'const result = await calculator.calculate(OperationType.Sum, 4, 5);';
+const CODE_SAMPLES = new CodeSamples([
+  CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
+    paths: { '/{operation}': { GET: { Example: CALCULATE_SAMPLE } } }
+  }) as CodeSampleCatalog
+]);
 
 (enabled ? describe : describe.skip)('portal build (end to end)', function () {
   this.timeout(10 * 60 * 1000);
@@ -32,7 +41,9 @@ const enabled = process.env.APIMATIC_E2E === '1';
 
     project = new DirectoryPath(root).join('build');
     fs.mkdirSync(project.toString(), { recursive: true });
-    const prepared = (await new PortalProjectService().prepare(project, source))._unsafeUnwrap();
+    const projectService = new PortalProjectService();
+    const sampled = await projectService.addCodeSamples(project, source, CODE_SAMPLES);
+    const prepared = (await projectService.prepare(project, sampled.source))._unsafeUnwrap();
 
     const build = await new PortalBuildService().build(prepared);
     if (build.isErr()) {
@@ -199,7 +210,7 @@ const enabled = process.env.APIMATIC_E2E === '1';
     expect(assets.length, 'asset count').to.be.below(150);
   });
 
-  it('keeps the code samples in the operation page data', () => {
+  it('carries the code samples the CLI merged into the spec into the operation page data', () => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
 
     expect(page).to.contain('x-apimatic-codeSamples');
