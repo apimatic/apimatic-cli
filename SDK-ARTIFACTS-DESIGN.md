@@ -392,8 +392,8 @@ slug → **absolute path** into `src/spec/`. That is the whole seam ([D13](#wire
    order, and name it in `portal.config.json` as `codeSamples` (`null` when there are none).
 2. The template's `openApiSection` bundles each spec as before, then `placeCodeSamples`
    walks `paths` and gives each operation its endpoint's list as `x-apimatic-codeSamples`,
-   replacing any the operation already carries. With `codeSamples: null` the spec is left
-   as written.
+   replacing any the operation already carries. With `codeSamples: null` every operation's
+   own are dropped, so a spec renders the same samples with or without the file.
 
 Placement runs after `bundleSpecification` has inlined path items, so an operation behind a
 `$ref`, into the document or another file, is annotated like an inline one. Paths that
@@ -424,7 +424,8 @@ path items behind a `#/` reference, and path items in another local file, which
 
 `api-page.tsx` gives fumadocs an empty generator registry and replaces two of its slots.
 Fumadocs' selector lists request body examples only, so `example-layout.tsx` replaces it
-with one over `request-examples.ts`: the body's examples, or, when the body names none — no
+with one over `request-examples.ts`: the body's examples, or, for an operation with SDK
+samples whose body names none — no
 `examples`, or a lone placeholder key, `Example` or the `default` fumadocs' 3.0 → 3.1
 upgrade gives a singular `example` — the ids of the first parameter that names any, in
 codegen-v2's order. `usage-tabs.tsx` replaces the usage tabs with fumadocs' cURL tab and one

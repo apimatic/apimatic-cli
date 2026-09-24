@@ -8,17 +8,17 @@ export type SamplesByEndpoint = Record<string, Record<string, unknown[]>>;
 
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
-export async function readCodeSamples(file: string | null): Promise<SamplesByEndpoint | null> {
-  return file === null ? null : (JSON.parse(await readFile(file, 'utf8')) as SamplesByEndpoint);
+export async function readCodeSamples(file: string | null): Promise<SamplesByEndpoint> {
+  return file === null ? {} : (JSON.parse(await readFile(file, 'utf8')) as SamplesByEndpoint);
 }
 
 /**
  * Gives every operation the samples of its endpoint, replacing any it already carries. Placed
  * after bundling, so an operation behind a path-item `$ref` is reached like an inline one.
  */
-export function placeCodeSamples(document: Document, samples: SamplesByEndpoint | null): Document {
+export function placeCodeSamples(document: Document, samples: SamplesByEndpoint): Document {
   const paths = (document as JsonObject).paths;
-  if (samples === null || !isJsonObject(paths)) return document;
+  if (!isJsonObject(paths)) return document;
   for (const [route, item] of Object.entries(paths)) {
     if (isJsonObject(item)) paths[route] = pathItemWithSamples(item, samples[route] ?? {});
   }

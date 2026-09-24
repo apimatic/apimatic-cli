@@ -67,10 +67,10 @@ describe('placeCodeSamples', () => {
     expect(document.paths['/owners'].get).to.not.have.property(EXTENSION);
   });
 
-  it('leaves the document as written when the build has no code samples', () => {
+  it('drops the samples an operation carries when the build has no samples file', async () => {
     const written = { paths: { '/pets': { get: { ...operation('List'), [EXTENSION]: [typescript('own')] } } } };
 
-    expect(placed(written, null)).to.deep.equal(written);
+    expect(placed(written, await readCodeSamples(null)).paths['/pets'].get).to.not.have.property(EXTENSION);
   });
 
   it('gives two paths that share one operation object their own samples', () => {
