@@ -27,10 +27,9 @@ Documentation portals are now built on your machine from a `src/` directory, and
 `APIMATIC-BUILD.json` no longer configures them:
 
 - Describe the portal in the `portal` block of `src/apimatic.json`: `site` (its name, address
-  and description), `brand` (logo, favicon, colours, fonts and colour mode), `navigation`
-  (layout and header links), `home`, `api`, `ai` and `advanced`. Running `apimatic quickstart`
-  scaffolds the block with every default spelled out, and the file's `$schema` lets your editor
-  complete and check it.
+  and description), `brand` (logo, favicon, primary colour and colour mode), `navigation`
+  (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
+  with every default spelled out, and the file's `$schema` lets your editor complete and check it.
 - A portal also needs the project's SDK languages, at least one, in the same file's
   `languages` block, for example `"languages": { "typescript": {} }`. `sdk publish` adds to it,
   and the context plugin reads it too, so name only the languages you ship. The same file
