@@ -5,6 +5,7 @@
 @import 'fumadocs-openapi/css/preset.css';
 
 @source not '../../dist';
+@source not '../../spec';
 
 /* Tailwind's automatic detection is rooted at this project, and the user's Markdown lives
    outside it, so a utility class written in a page produced no CSS at all. The CLI
