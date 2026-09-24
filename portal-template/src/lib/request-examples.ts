@@ -6,6 +6,7 @@ export type RequestExample = Pick<
   'id' | 'name' | 'description'
 >;
 type Location = 'path' | 'query' | 'header' | 'cookie';
+type Resolve = (node: unknown) => unknown;
 
 interface Example {
   summary?: string;
@@ -24,15 +25,21 @@ export class Parameter {
     private readonly examples: Map<string, Example>
   ) {}
 
-  public static listIn(operation: unknown, pathItem: unknown): Parameter[] {
-    return [...parametersOf(operation), ...parametersOf(pathItem)].flatMap((entry) => Parameter.from(entry) ?? []);
+  public static listIn(operation: unknown, pathItem: unknown, resolve: Resolve): Parameter[] {
+    return [...parametersOf(operation), ...parametersOf(pathItem)].flatMap(
+      (entry) => Parameter.from(resolve(entry), resolve) ?? []
+    );
   }
 
-  private static from(entry: unknown): Parameter | undefined {
+  private static from(entry: unknown, resolve: Resolve): Parameter | undefined {
     if (!isJsonObject(entry) || !isLocation(entry.in) || typeof entry.name !== 'string') {
       return undefined;
     }
-    const examples = isJsonObject(entry.examples) ? Object.entries(entry.examples).filter(isExampleEntry) : [];
+    const examples = isJsonObject(entry.examples)
+      ? Object.entries(entry.examples)
+          .map(([id, example]): [string, unknown] => [id, resolve(example)])
+          .filter(isExampleEntry)
+      : [];
     return new Parameter(entry.in, new Map(examples));
   }
 

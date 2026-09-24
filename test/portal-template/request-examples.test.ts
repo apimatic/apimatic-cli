@@ -9,8 +9,16 @@ const parameter = (location: string, name: string, ...ids: string[]) => ({
   examples: Object.fromEntries(ids.map((id) => [id, { value: `${name}-${id}` }]))
 });
 
+const components: Record<string, unknown> = {
+  '#/components/parameters/View': parameter('query', 'view', 'summary', 'full'),
+  '#/components/examples/Summary': { summary: 'Summary', value: 'summary' }
+};
+
+const resolve = (node: unknown): unknown =>
+  typeof node === 'object' && node !== null && '$ref' in node ? components[String(node.$ref)] : node;
+
 const idsOf = (bodyExamples: RequestExample[], ...parameters: object[]) =>
-  requestExamples(bodyExamples, Parameter.listIn({ parameters }, {})).map((item) => item.id);
+  requestExamples(bodyExamples, Parameter.listIn({ parameters }, {}, resolve)).map((item) => item.id);
 
 describe('requestExamples', () => {
   it('keeps the request body examples, whatever ids the parameters name', () => {
@@ -70,7 +78,8 @@ describe('requestExamples', () => {
             }
           ]
         },
-        {}
+        {},
+        resolve
       )
     );
 
@@ -84,10 +93,29 @@ describe('requestExamples', () => {
   it('reads parameters declared on the path item', () => {
     const examples = requestExamples(
       [example('_default')],
-      Parameter.listIn({}, { parameters: [parameter('path', 'itemId', 'a', 'b')] })
+      Parameter.listIn({}, { parameters: [parameter('path', 'itemId', 'a', 'b')] }, resolve)
     );
 
     expect(examples.map((item) => item.id)).to.deep.equal(['a', 'b']);
+  });
+
+  it('follows a parameter that is a reference', () => {
+    expect(idsOf([example('_default')], { $ref: '#/components/parameters/View' })).to.deep.equal(['summary', 'full']);
+  });
+
+  it('follows a parameter example that is a reference', () => {
+    const [first] = requestExamples(
+      [example('_default')],
+      Parameter.listIn(
+        {
+          parameters: [{ in: 'query', name: 'view', examples: { summary: { $ref: '#/components/examples/Summary' } } }]
+        },
+        {},
+        resolve
+      )
+    );
+
+    expect([first.id, first.name]).to.deep.equal(['summary', 'Summary']);
   });
 
   it('skips malformed parameters and examples without a value', () => {
@@ -100,7 +128,8 @@ describe('requestExamples', () => {
           { in: 'query', name: 'view', examples: { external: { externalValue: 'https://example.com/a' } } }
         ]
       },
-      undefined
+      undefined,
+      resolve
     );
 
     expect(requestExamples([example('_default')], parameters).map((item) => item.id)).to.deep.equal(['_default']);

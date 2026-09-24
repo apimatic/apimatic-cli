@@ -29,8 +29,8 @@ function ExampleLayout({ usageTabs, responseTabs }: Readonly<{ usageTabs: ReactN
   const pathItem = schema.resolve(schema.dereferenced.paths?.[route]);
   const operation = pathItem?.[bodyExamples[0].data.method];
   const examples = useMemo(
-    () => requestExamples(bodyExamples, Parameter.listIn(operation, pathItem)),
-    [bodyExamples, operation, pathItem]
+    () => requestExamples(bodyExamples, Parameter.listIn(operation, pathItem, schema.resolve)),
+    [bodyExamples, operation, pathItem, schema]
   );
   const [selectedId, setSelectedId] = useState(examples[0].id);
 
