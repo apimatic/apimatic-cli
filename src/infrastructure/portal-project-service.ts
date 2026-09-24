@@ -13,6 +13,7 @@ import { FileService } from './file-service.js';
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
 export const TEMPLATE_DEPENDENCIES = [
+  '@scalar/json-magic',
   '@tailwindcss/vite',
   '@tanstack/react-router',
   '@tanstack/react-start',

@@ -8,4 +8,4 @@ import { curl } from 'fumadocs-openapi/requests/generators/curl';
 const codeUsages = createCodeUsageGeneratorRegistry();
 codeUsages.add('curl', curl);
 
-export const OpenAPIPage = createOpenAPIPage({ codeUsages });
+export const OpenAPIPage = createOpenAPIPage({ codeUsages, generateTypeScriptDefinitions: false });
