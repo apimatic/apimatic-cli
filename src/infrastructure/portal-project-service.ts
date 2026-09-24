@@ -18,6 +18,7 @@ export const TEMPLATE_DEPENDENCIES = [
   '@tanstack/react-start',
   '@tanstack/start-static-server-functions',
   '@vitejs/plugin-react',
+  'cn',
   'fumadocs-core',
   'fumadocs-mdx',
   'fumadocs-openapi',

@@ -67,6 +67,7 @@
         "ansis": "^3.17.0",
         "async-mutex": "^0.5.0",
         "axios": "^1.8.1",
+        "cn": "0.2.6",
         "execa": "^9.6.0",
         "fast-levenshtein": "^3.0.0",
         "form-data": "^4.0.2",

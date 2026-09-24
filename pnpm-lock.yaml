@@ -66,6 +66,9 @@ importers:
       axios:
         specifier: ^1.8.1
         version: 1.16.0
+      cn:
+        specifier: 0.2.6
+        version: 0.2.6
       execa:
         specifier: ^9.6.0
         version: 9.6.1
