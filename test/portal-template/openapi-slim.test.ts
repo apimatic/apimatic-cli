@@ -14,15 +14,23 @@ const document = {
   paths: {
     '/pets': {
       parameters: [{ $ref: '#/components/parameters/Page' }],
-      get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet' } } } } } }
+      get: {
+        responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet' } } } } }
+      }
     },
     '/owners': {
-      get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Owner' } } } } } }
+      get: {
+        responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Owner' } } } } }
+      }
     }
   },
   webhooks: {
-    petAdopted: { post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet' } } } } } },
-    ownerMoved: { post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/Owner' } } } } } }
+    petAdopted: {
+      post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet' } } } } }
+    },
+    ownerMoved: {
+      post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/Owner' } } } } }
+    }
   },
   components: {
     securitySchemes: { apiKey: { type: 'apiKey', in: 'header', name: 'X-Key' } },
@@ -109,11 +117,23 @@ describe('slimOpenAPIPageProps', () => {
     const escaped = {
       openapi: '3.1.0',
       info: document.info,
-      paths: { '/x': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/a~1b%20c' } } } } } } } },
+      paths: {
+        '/x': {
+          get: {
+            responses: {
+              '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/a~1b%20c' } } } }
+            }
+          }
+        }
+      },
       components: { schemas: { 'a/b c': { type: 'string' }, other: { type: 'string' } } }
     };
     const slim = bundledOf(
-      slimOpenAPIPageProps({ document: 'escaped', payload: { bundled: escaped as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+      slimOpenAPIPageProps({
+        document: 'escaped',
+        payload: { bundled: escaped as never },
+        operations: [{ path: '/x', method: 'get' }]
+      } as Props)
     );
 
     expect(Object.keys(slim.components.schemas)).to.deep.equal(['a/b c']);
@@ -122,7 +142,11 @@ describe('slimOpenAPIPageProps', () => {
   it('does not invent sections a document never had', () => {
     const bare = { openapi: '3.1.0', info: document.info, paths: { '/x': { get: {} } } };
     const slim = bundledOf(
-      slimOpenAPIPageProps({ document: 'bare', payload: { bundled: bare as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+      slimOpenAPIPageProps({
+        document: 'bare',
+        payload: { bundled: bare as never },
+        operations: [{ path: '/x', method: 'get' }]
+      } as Props)
     );
 
     expect(slim).to.not.have.property('webhooks');
@@ -137,7 +161,11 @@ describe('slimOpenAPIPageProps', () => {
       components: { schemas: { Unused: { type: 'string' } } }
     };
     const slim = bundledOf(
-      slimOpenAPIPageProps({ document: 'x', payload: { bundled: noneReached as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+      slimOpenAPIPageProps({
+        document: 'x',
+        payload: { bundled: noneReached as never },
+        operations: [{ path: '/x', method: 'get' }]
+      } as Props)
     );
 
     expect(slim).to.not.have.property('components');
@@ -151,8 +179,16 @@ describe('slimOpenAPIPageProps', () => {
         '/pets/{id}': {
           summary: 'One pet',
           parameters: [{ $ref: '#/components/parameters/Id' }],
-          get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/GetBody' } } } } } },
-          delete: { responses: { '204': { content: { 'application/json': { schema: { $ref: '#/components/schemas/DeleteBody' } } } } } }
+          get: {
+            responses: {
+              '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/GetBody' } } } }
+            }
+          },
+          delete: {
+            responses: {
+              '204': { content: { 'application/json': { schema: { $ref: '#/components/schemas/DeleteBody' } } } }
+            }
+          }
         }
       },
       components: {
@@ -214,11 +250,23 @@ describe('slimOpenAPIPageProps', () => {
     const deep = {
       openapi: '3.1.0',
       info: document.info,
-      paths: { '/x': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet/properties/id' } } } } } } } },
+      paths: {
+        '/x': {
+          get: {
+            responses: {
+              '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Pet/properties/id' } } } }
+            }
+          }
+        }
+      },
       components: { schemas: { Pet: { properties: { id: { type: 'string' } } }, Unused: { type: 'string' } } }
     };
     const slim = bundledOf(
-      slimOpenAPIPageProps({ document: 'deep', payload: { bundled: deep as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+      slimOpenAPIPageProps({
+        document: 'deep',
+        payload: { bundled: deep as never },
+        operations: [{ path: '/x', method: 'get' }]
+      } as Props)
     );
 
     expect(Object.keys(slim.components.schemas)).to.deep.equal(['Pet']);
@@ -229,8 +277,20 @@ describe('slimOpenAPIPageProps', () => {
       openapi: '3.1.0',
       info: document.info,
       paths: {
-        '/alpha': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/hash1/components/schemas/Alpha' } } } } } } },
-        '/beta': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/hash2/components/schemas/Beta' } } } } } } }
+        '/alpha': {
+          get: {
+            responses: {
+              '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/hash1/components/schemas/Alpha' } } } }
+            }
+          }
+        },
+        '/beta': {
+          get: {
+            responses: {
+              '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/hash2/components/schemas/Beta' } } } }
+            }
+          }
+        }
       },
       'x-ext': {
         hash1: {
@@ -258,7 +318,9 @@ describe('slimOpenAPIPageProps', () => {
     it('keeps the embedded node a reference addresses, at the same pointer', () => {
       const external = slimAlpha()['x-ext'];
 
-      expect(external.hash1.components.schemas.Alpha).to.deep.equal(bundledExternal['x-ext'].hash1.components.schemas.Alpha);
+      expect(external.hash1.components.schemas.Alpha).to.deep.equal(
+        bundledExternal['x-ext'].hash1.components.schemas.Alpha
+      );
     });
 
     it('follows references between embedded documents', () => {
@@ -279,7 +341,9 @@ describe('slimOpenAPIPageProps', () => {
         paths: {
           '/x': {
             get: {
-              responses: { '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/h/components/schemas/Node' } } } } }
+              responses: {
+                '200': { content: { 'application/json': { schema: { $ref: '#/x-ext/h/components/schemas/Node' } } } }
+              }
             }
           }
         },
@@ -342,7 +406,13 @@ describe('slimOpenAPIPageProps', () => {
     const recursive = {
       openapi: '3.1.0',
       info: document.info,
-      paths: { '/x': { get: { responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Node' } } } } } } } },
+      paths: {
+        '/x': {
+          get: {
+            responses: { '200': { content: { 'application/json': { schema: { $ref: '#/components/schemas/Node' } } } } }
+          }
+        }
+      },
       components: {
         schemas: {
           Node: { properties: { self: { $ref: '#/components/schemas/Node' }, a: { $ref: '#/components/schemas/A' } } },
@@ -353,7 +423,11 @@ describe('slimOpenAPIPageProps', () => {
     };
 
     const slim = bundledOf(
-      slimOpenAPIPageProps({ document: 'rec', payload: { bundled: recursive as never }, operations: [{ path: '/x', method: 'get' }] } as Props)
+      slimOpenAPIPageProps({
+        document: 'rec',
+        payload: { bundled: recursive as never },
+        operations: [{ path: '/x', method: 'get' }]
+      } as Props)
     );
 
     expect(Object.keys(slim.components.schemas).sort()).to.deep.equal(['A', 'B', 'Node']);
