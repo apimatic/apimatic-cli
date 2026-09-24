@@ -15,6 +15,7 @@ import { FileService } from './file-service.js';
 // single link also lets Vite write its scratch files into the CLI's own install directory.
 export const TEMPLATE_DEPENDENCIES = [
   '@fumadocs/api-docs',
+  '@scalar/json-magic',
   '@tailwindcss/vite',
   '@tanstack/react-router',
   '@tanstack/react-start',

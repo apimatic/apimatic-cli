@@ -6,5 +6,6 @@ import { renderUsageTabs } from './usage-tabs';
 export const OpenAPIPage = createOpenAPIPage({
   // Without a registry of its own, Fumadocs registers and bundles every request generator it has.
   codeUsages: createCodeUsageGeneratorRegistry(),
+  generateTypeScriptDefinitions: false,
   content: { renderAPIExampleLayout: renderExampleLayout, renderAPIExampleUsageTabs: renderUsageTabs }
 });
