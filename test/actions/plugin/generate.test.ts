@@ -89,7 +89,7 @@ describe('PluginGenerateAction', () => {
     // about either says nothing about them.
     selectLanguages = sinon
       .stub(PluginGeneratePrompts.prototype, 'selectLanguages')
-      .callsFake(async (_offered, _published, initial) => [...initial]);
+      .callsFake(async (config) => [...config.initialLanguages()]);
     getPublishingProfiles = sinon.stub(PublishingApiService.prototype, 'getPublishingProfiles').resolves(ok([]));
 
     action = new PluginGenerateAction(new DirectoryPath(tmpDirResult.path), COMMAND_METADATA, 'auth-key');
@@ -304,64 +304,30 @@ describe('PluginGenerateAction', () => {
     });
 
     describe('language selection', () => {
-      it('offers every plugin language, pre-checked from what the config already names', async () => {
+      // Which languages come up checked is the config's own rule — `initialLanguages`, covered in
+      // plugin-config-context.test.ts. What this command owes the prompt is the config it read.
+      it('hands the prompt the config it read', async () => {
         await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
         generated();
 
         await execute();
 
-        const [offered, published, initial] = selectLanguages.firstCall.args;
-        expect(offered).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
-        expect(published).to.deep.equal([Language.CSHARP]);
-        expect(initial).to.deep.equal([Language.CSHARP]);
+        const [config] = selectLanguages.firstCall.args;
+        expect(config.publishedLanguages()).to.deep.equal([Language.CSHARP]);
+        expect(config.initialLanguages()).to.deep.equal([Language.CSHARP]);
       });
 
-      // A project that has never named a language has not chosen against any of them, and the
-      // plugin covering everything is the answer a single Enter should give.
-      it('pre-checks every language when the config names none', async () => {
-        await writeConfig({ plugin: METADATA, languages: {} });
-        generated();
-
-        await execute();
-
-        const [, , initial] = selectLanguages.firstCall.args;
-        expect(initial).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
-      });
-
-      it('pre-checks every language when the config names only ones a plugin cannot carry', async () => {
-        const java = { publishing: { source: { repositoryUrl: 'https://github.com/acme/acme-java' } } };
-        await writeConfig({ plugin: METADATA, languages: { java } });
-        sinon.stub(PluginGeneratePrompts.prototype, 'languagesNotIncluded');
-        generated();
-
-        await execute();
-
-        const [, , initial] = selectLanguages.firstCall.args;
-        expect(initial).to.deep.equal([Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON]);
-      });
-
-      // The published entry is the record of where the SDK went. Clearing its checkbox cannot take
-      // it out of the plugin, so the language is put back and the user is told.
-      it('keeps a published language that was cleared, and says so', async () => {
+      // The entry is the record of where the SDK went, so a selection cannot take it out of the
+      // file. The prompt puts a cleared published language back and says so; this is the other
+      // half of that promise — even a selection that arrives without it leaves the entry alone.
+      it('never drops a language the config already names', async () => {
         await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
         selectLanguages.resolves([Language.TYPESCRIPT]);
-        const kept = sinon.stub(PluginGeneratePrompts.prototype, 'publishedLanguagesKept');
         generated();
 
         await execute();
 
-        expect(kept.calledOnceWith([Language.CSHARP])).to.be.true;
         expect(writtenConfig().languages).to.deep.equal({ csharp: CSHARP, typescript: {} });
-      });
-
-      it('says nothing about published languages when none were cleared', async () => {
-        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
-        const kept = sinon.stub(PluginGeneratePrompts.prototype, 'publishedLanguagesKept');
-        generated();
-
-        await execute();
-
-        expect(kept.called).to.be.false;
       });
 
       // The one way this command ends with no plugin, and the exit code is the point: `success()`

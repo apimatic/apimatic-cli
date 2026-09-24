@@ -7,7 +7,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PluginConfig, PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
-import { Language, PLUGIN_LANGUAGES } from '../../types/sdk/generate.js';
+import { Language } from '../../types/sdk/generate.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { PluginRecordMetadataAction } from './record-metadata.js';
@@ -75,8 +75,8 @@ export class PluginGenerateAction {
     }
 
     const published = config.publishedLanguages();
-    const selection = await this.selectLanguages(config);
-    if (selection === undefined) {
+    const selection = await this.prompts.selectLanguages(config);
+    if (!selection?.length) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
     }
@@ -116,7 +116,15 @@ export class PluginGenerateAction {
    * adds nothing local is describing packages that already exist.
    */
   private readonly confirmBundledSdks = async (bundled: readonly Language[]): Promise<boolean | undefined> => {
-    if (bundled.length === 0 || !(await this.hasPublishingProfile())) {
+    if (bundled.length === 0) {
+      return false;
+    }
+
+    // The profile lookup is advisory only, so one that cannot answer is read as "no profile": a
+    // recommendation is not worth failing a generation the user asked for, and `--auth-key` does
+    // not reach this call.
+    const profiles = await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
+    if (profiles.isErr() || profiles.value.length === 0) {
       return false;
     }
 
@@ -155,46 +163,5 @@ export class PluginGenerateAction {
 
       return ActionResult.success();
     });
-  };
-
-  /**
-   * The languages the plugin should include. Published ones are offered checked and are put back
-   * if they are cleared, because their entry records where the SDK actually went — see
-   * `selectLanguages` in the prompts. `undefined` means the user chose nothing at all, which is
-   * the one way this command ends with no plugin.
-   */
-  private readonly selectLanguages = async (config: PluginConfig): Promise<Language[] | undefined> => {
-    const published = config.publishedLanguages();
-    const requested = config.requestedLanguages();
-
-    // A config that names languages has already made the choice, so it is what comes up checked.
-    // One that names none has not chosen yet — a first run, or a project that has only ever had a
-    // spec — and for it the plugin covering everything is both the common answer and the one that
-    // makes the command useful with a single Enter. Nothing is checked only if there is nothing
-    // to check.
-    const initial = requested.length > 0 ? requested : PLUGIN_LANGUAGES;
-
-    const chosen = await this.prompts.selectLanguages(PLUGIN_LANGUAGES, published, initial);
-    if (chosen === undefined) {
-      return undefined;
-    }
-
-    const cleared = published.filter((language) => !chosen.includes(language));
-    if (cleared.length > 0) {
-      this.prompts.publishedLanguagesKept(cleared);
-    }
-
-    const selection = [...new Set([...chosen, ...published])];
-    return selection.length > 0 ? selection : undefined;
-  };
-
-  /**
-   * Advisory only, so a lookup that cannot answer is read as "no profile": a recommendation is not
-   * worth failing a generation the user asked for, and `--auth-key` does not reach this call.
-   */
-  private readonly hasPublishingProfile = async (): Promise<boolean> => {
-    const profiles = await this.publishingApiService.getPublishingProfiles(this.configDir, this.commandMetadata.shell);
-
-    return profiles.isOk() && profiles.value.length > 0;
   };
 }

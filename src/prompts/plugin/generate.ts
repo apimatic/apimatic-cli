@@ -6,8 +6,8 @@ import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
-import { PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
-import { Language, LANGUAGE_CHOICES } from '../../types/sdk/generate.js';
+import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
+import { Language, LANGUAGE_CHOICES, PLUGIN_LANGUAGES } from '../../types/sdk/generate.js';
 
 /** The names the SDK flows already show, so one language reads the same everywhere. */
 const labelOf = (language: string): string =>
@@ -85,19 +85,17 @@ export class PluginGeneratePrompts {
    * something the plugin does not mention or delete it outright; the label says so rather than
    * leaving a checkbox that does nothing when it is cleared.
    */
-  public async selectLanguages(
-    offered: readonly Language[],
-    published: readonly Language[],
-    initial: readonly Language[]
-  ): Promise<Language[] | undefined> {
+  public async selectLanguages(config: PluginConfig): Promise<Language[] | undefined> {
+    const published = config.publishedLanguages();
+
     const selected = await multiselect<Language>({
       message: 'Which languages should your plugin include?',
-      options: offered.map((language) => ({
+      options: PLUGIN_LANGUAGES.map((language) => ({
         value: language,
         label: labelOf(language),
         hint: published.includes(language) ? 'published — always included' : undefined
       })),
-      initialValues: [...initial],
+      initialValues: [...config.initialLanguages()],
       required: false
     });
 
@@ -105,15 +103,21 @@ export class PluginGeneratePrompts {
       return undefined;
     }
 
-    return selected;
+    const cleared = published.filter((language) => !selected.includes(language));
+    if (cleared.length > 0) {
+      log.info(this.publishedLanguagesKeptNote(cleared));
+    }
+
+    return [...new Set([...selected, ...published])];
   }
 
   /** Says what was added back, so a cleared checkbox never passes without a word. */
-  public publishedLanguagesKept(languages: readonly Language[]) {
+  private publishedLanguagesKeptNote(languages: readonly Language[]): string {
     const names = languages.map((language) => labelOf(language)).join(', ');
-    log.info(
+
+    return (
       `${names} stays in the plugin: ${f.var(APIMATIC_CONFIG_FILE_NAME)} records where its SDK is ` +
-        `published, and the plugin describes what that file names.`
+      `published, and the plugin describes what that file names.`
     );
   }
 

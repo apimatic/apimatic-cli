@@ -724,5 +724,33 @@ describe('PluginConfigContext', () => {
 
       expect((await present()).unsupportedLanguages()).to.deep.equal([]);
     });
+
+    it('offers the languages the config names as the ones already chosen', async () => {
+      withConfig({ languages: { csharp: CSHARP_ENTRY, python: UNPUBLISHED_ENTRY } });
+
+      expect((await present()).initialLanguages()).to.deep.equal([Language.CSHARP, Language.PYTHON]);
+    });
+
+    // A project that has never named a language has not chosen against any of them, and the plugin
+    // covering everything is the answer a single Enter should give.
+    it('offers every language a plugin can carry when the config names none', async () => {
+      withConfig({ languages: {} });
+
+      expect((await present()).initialLanguages()).to.deep.equal([
+        Language.CSHARP,
+        Language.TYPESCRIPT,
+        Language.PYTHON
+      ]);
+    });
+
+    it('offers every language when the config names only ones a plugin cannot carry', async () => {
+      withConfig({ languages: { java: CSHARP_ENTRY } });
+
+      expect((await present()).initialLanguages()).to.deep.equal([
+        Language.CSHARP,
+        Language.TYPESCRIPT,
+        Language.PYTHON
+      ]);
+    });
   });
 });
