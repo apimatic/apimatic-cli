@@ -14,8 +14,13 @@ const labelOf = (language: string): string =>
   LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
 
 export class PluginGeneratePrompts {
-  public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>) {
-    return withSpinner('Generating Context Plugin', 'Plugin generated successfully.', 'Plugin Generation failed.', fn);
+  public generatePlugin(fn: Promise<Result<NodeJS.ReadableStream, ServiceError>>, plugin: DirectoryPath) {
+    return withSpinner(
+      'Generating Context Plugin',
+      `Plugin generated successfully${f.muted(` — ${f.relativePath(plugin)}`)}`,
+      'Plugin Generation failed.',
+      fn
+    );
   }
 
   public async overwritePlugin(directory: DirectoryPath): Promise<boolean> {
@@ -164,10 +169,6 @@ export class PluginGeneratePrompts {
     log.warn('Context plugin is preview only.\nFor production, publish your SDK and plugin.');
   }
 
-  public pluginGenerated(plugin: DirectoryPath) {
-    log.info(`Plugin artifacts can be found at ${f.path(plugin)}.`);
-  }
-
   /**
    * One command rather than a page of per-assistant instructions: the installer knows how each
    * editor loads an unpublished folder, so naming it is both shorter and the only line that stays
@@ -178,6 +179,8 @@ export class PluginGeneratePrompts {
    * user pastes.
    */
   public installPluginLocally(plugin: DirectoryPath) {
-    log.info(`Run '${f.cmdAlt('npx', 'context-plugins', 'install', `"${plugin}"`)}' to install your plugin.`);
+    log.info(
+      `Run '${f.cmdAlt('npx', 'context-plugins', 'install', `"${f.relativePath(plugin)}"`)}' to install your plugin.`
+    );
   }
 }

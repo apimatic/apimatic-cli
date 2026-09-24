@@ -1,3 +1,4 @@
+import nodePath from 'path';
 import pc from 'picocolors';
 import { intro as i, outro as o } from '@clack/prompts';
 import { ActionResult } from '../actions/action-result.js';
@@ -8,6 +9,19 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
+  /**
+   * A location as a reader would type it from where they are: `./plugin` for something beside
+   * them, the full path for anything else. `DirectoryPath` resolves on construction, so without
+   * this even the directory the command was run in prints as an absolute path.
+   */
+  relativePath: (target: DirectoryPath | FilePath) => {
+    const here = nodePath.relative(process.cwd(), String(target));
+    return here === '' || here.startsWith('..') || nodePath.isAbsolute(here)
+      ? String(target)
+      : `./${here.split(nodePath.sep).join('/')}`;
+  },
+  /** For the half of a line that is context rather than the message itself. */
+  muted: (text: string) => pc.dim(text),
   cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map((arg) => pc.dim(arg)).join(' ')}`,
   cmdAlt: (cmd: string, ...args: string[]) =>
     `${pc.dim(pc.blueBright(cmd))} ${args.map((arg) => pc.blueBright(arg)).join(' ')}`,

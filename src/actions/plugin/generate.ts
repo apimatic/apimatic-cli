@@ -117,7 +117,8 @@ export class PluginGenerateAction {
       const buildZipPath = await tempContext.zip(buildDirectory);
 
       const response = await this.prompts.generatePlugin(
-        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey)
+        this.pluginService.generatePlugin(buildZipPath, this.configDir, this.commandMetadata, this.authKey),
+        pluginDirectory
       );
 
       if (response.isErr()) {
@@ -128,7 +129,6 @@ export class PluginGenerateAction {
       const tempPluginZipPath = await tempContext.save(response.value);
       await pluginContext.save(tempPluginZipPath);
 
-      this.prompts.pluginGenerated(pluginDirectory);
       this.prompts.installPluginLocally(pluginDirectory);
       if (preview) {
         this.prompts.previewOnly();
