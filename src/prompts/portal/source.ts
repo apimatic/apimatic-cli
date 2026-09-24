@@ -8,21 +8,29 @@ import { format as f } from '../format.js';
 
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
- * a broken one has to be explained the same way in both.
+ * a broken one has to be explained the same way in both. `offerQuickstart` is false once a
+ * preview of the directory is running: quickstart refuses a directory that is not empty.
  */
-export function reportSourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath): void {
+export function reportSourceProblem(
+  problem: PortalSourceProblem,
+  sourceDirectory: DirectoryPath,
+  { offerQuickstart = true }: { offerQuickstart?: boolean } = {}
+): void {
+  const quickstart = `Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`;
   switch (problem.kind) {
     case 'missingConfig': {
       log.error(`No ${f.var(APIMATIC_CONFIG_FILE_NAME)} found in ${f.path(sourceDirectory)}.`);
-      log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
+      if (offerQuickstart) {
+        log.message(quickstart);
+      }
       return;
     }
     case 'invalidConfig': {
       log.error(`The ${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} is not valid:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
       // A file without the block is no worse off than no file: the same command sets it up.
-      if (problem.missingPortal) {
-        log.message(`Run ${f.cmdAlt('apimatic', 'quickstart')} to set up a portal.`);
+      if (problem.missingPortal && offerQuickstart) {
+        log.message(quickstart);
       }
       return;
     }
@@ -50,11 +58,32 @@ export function reportSourceProblem(problem: PortalSourceProblem, sourceDirector
       log.error(message);
       return;
     }
-    case 'missingLogo': {
-      const message =
-        `The logo ${f.var(problem.logoPath)} named in ${f.var(APIMATIC_CONFIG_FILE_NAME)} is not in ` +
-        `${f.path(sourceDirectory)}. Add the image there, or remove ${f.var('portal.logo')}.`;
-      log.error(message);
+    case 'missingStaticFiles': {
+      const one = problem.files.length === 1;
+      const [subject, verb] = one ? ['A file', 'is'] : ['Files', 'are'];
+      const heading = `${subject} named in ${f.var(APIMATIC_CONFIG_FILE_NAME)} ${verb} not in ${f.path(
+        sourceDirectory
+      )}:`;
+      const relative = (file: FilePath) => f.var(file.relativeTo(sourceDirectory));
+      const lines = problem.files.map(
+        ({ setting, file, foundAs }) =>
+          `  • ${relative(file)}, named by ${f.var(setting)}` +
+          (foundAs === null ? '' : `, which is spelt ${relative(foundAs)} on disk`)
+      );
+      log.error(heading);
+      log.message(lines.join('\n'));
+      log.message(
+        one
+          ? 'Add the file there, or remove the setting that names it.'
+          : 'Add each file there, or remove the setting that names it.'
+      );
+      // Found by this machine's file system, which ignores case, and lost by the host.
+      if (problem.files.some(({ foundAs }) => foundAs !== null)) {
+        log.message(
+          'Names are matched exactly, as the servers a portal is published to match them, ' +
+            'so spell the setting as the file is spelt.'
+        );
+      }
       return;
     }
     case 'noSpecs': {

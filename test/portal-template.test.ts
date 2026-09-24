@@ -4,7 +4,11 @@ import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
 import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
-import { PortalConfig } from '../src/types/portal/portal-config';
+import { PortalIdentity } from '../src/types/portal/portal-config';
+import type { Portal } from '../portal-template/src/lib/portal-types';
+
+/** True only when the two types are identical, every nested field and union member included. */
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 const repositoryRoot = process.cwd();
 const templateRoot = path.join(repositoryRoot, 'portal-template');
@@ -91,15 +95,30 @@ describe('portal template packaging', () => {
     expect(source).to.contain("'__APIMATIC_CONTENT_DIR__'");
   });
 
-  // The two sides are compiled apart, so nothing else holds the browser's `Portal` interface to
-  // the object the CLI substitutes into it.
-  it('declares exactly the identity fields the CLI writes', () => {
-    const source = fs.readFileSync(path.join(templateRoot, 'src/lib/portal.ts'), 'utf8');
-    const block = /export interface Portal \{([\s\S]*?)\n\}/.exec(source);
-    const declared = [...(block?.[1] ?? '').matchAll(/^\s*(\w+):/gm)].map((match) => match[1]).sort();
+  // The generated primary has the theme's own specificity, so it wins only by coming after it.
+  it('imports the neutral theme, and the stylesheet the CLI generates after everything else', () => {
+    const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
+    const imports = [...stylesheet.matchAll(/@import\s+'([^']+)'/g)].map((match) => match[1]);
 
-    expect(declared).to.not.be.empty;
-    expect(declared).to.deep.equal(Object.keys(PortalConfig.create('Acme').identity()).sort());
+    expect(imports).to.include('fumadocs-ui/css/neutral.css');
+    expect(imports[imports.length - 1]).to.equal('./theme.css');
+  });
+
+  // The two sides are compiled apart and the template casts the files it reads, so nothing else
+  // holds them together: a field or a value only one side knows builds a portal that is quietly
+  // missing it. The compiler checks this when `pretest` runs; the assertion only reports it.
+  it('declares exactly what the CLI writes for it', () => {
+    const identity: Equal<Portal, PortalIdentity> = true;
+
+    expect(identity).to.equal(true);
+  });
+
+  // The CLI writes these into the prepared project; a copy in the template would be a second
+  // set of defaults that nothing but a stray local build ever read, and it would ship.
+  it('ships none of the files the CLI generates', () => {
+    const generated = ['portal.config.json', 'portal.identity.json', 'src/styles/theme.css'];
+
+    expect(templateFiles().filter((file) => generated.includes(file))).to.be.empty;
   });
 
   it('carries no nested .gitignore, which would drop files from the package', () => {

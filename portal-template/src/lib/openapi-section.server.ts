@@ -1,5 +1,6 @@
 import { createOpenAPI } from 'fumadocs-openapi/server';
 import { bundleSpecification } from './openapi-bundle.server';
+import { withoutInternalOperations } from './openapi-filter';
 import { apiBaseDir } from './shared';
 
 /**
@@ -8,10 +9,37 @@ import { apiBaseDir } from './shared';
  * One server per document, because `staticSource()` emits pages for every schema its server
  * knows about, so sharing a server across sections duplicates pages.
  */
-export function openApiSection(slug: string, file: string) {
-  return createOpenAPI({ input: { [slug]: () => bundleSpecification(file) } }).staticSource({
+export async function openApiSection(slug: string, file: string) {
+  const section = await createOpenAPI({
+    input: { [slug]: async () => withoutInternalOperations(await bundleSpecification(file)) }
+  }).staticSource({
     baseDir: `${apiBaseDir}/${slug}`,
     groupBy: 'tag',
     meta: true
   });
+  refuseSharedPages(section.files, slug);
+  return { files: section.files };
+}
+
+type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSource']>>['files'][number];
+
+/**
+ * Fumadocs writes a page per tag an operation lists, named after the tag and the operationId, so
+ * two operations sharing an operationId, or one listing a tag twice, would put two pages at one
+ * path, and one would be left out without a word.
+ */
+function refuseSharedPages(files: SectionFile[], slug: string): void {
+  const pages = new Set<string>();
+  for (const file of files) {
+    if (file.type === 'meta') {
+      continue;
+    }
+    if (pages.has(file.path)) {
+      throw new Error(
+        `[OpenAPI] '${slug}' would put two pages at ${file.path.replaceAll('\\', '/')}, so one would be left out. ` +
+          `Give each operation an operationId of its own, and list each of its tags once.`
+      );
+    }
+    pages.add(file.path);
+  }
 }

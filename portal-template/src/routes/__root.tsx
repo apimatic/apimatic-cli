@@ -13,18 +13,39 @@ const loadPageTree = createServerFn({ method: 'GET' })
   .middleware([staticFunctionMiddleware])
   .handler(async () => ({ pageTree: await source.serializePageTree(source.getPageTree()) }));
 
+// Linked from the page rather than imported by `app.css`, so the browser fetches it alongside the
+// stylesheet instead of after it.
+const fontLinks = [
+  { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+  { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' as const },
+  {
+    rel: 'stylesheet',
+    href: 'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap'
+  }
+];
+
+// Without one the browser tab shows the blank-document icon on every page.
+const iconLinks = portal.favicon
+  ? [{ rel: 'icon', href: portal.favicon.url, ...(portal.favicon.type ? { type: portal.favicon.type } : {}) }]
+  : [];
+
+// A portal fixed to one mode keeps to it whatever the visitor's system prefers, and offers no
+// way out: the layout hides the switch, and the `D` hotkey is turned off here.
+const theme =
+  portal.colorMode === 'both'
+    ? undefined
+    : { forcedTheme: portal.colorMode, defaultTheme: portal.colorMode, enableSystem: false, hotKey: false as const };
+
 export const Route = createRootRoute({
   loader: () => loadPageTree(),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: portal.title },
+      { title: portal.name },
       ...(portal.description ? [{ name: 'description', content: portal.description }] : [])
     ],
-    // The portal already supplies a logo for the navigation bar; without this the browser
-    // tab showed the blank-document icon on every page.
-    links: [{ rel: 'stylesheet', href: appCss }, ...(portal.logoUrl ? [{ rel: 'icon', href: portal.logoUrl }] : [])]
+    links: [...fontLinks, { rel: 'stylesheet', href: appCss }, ...iconLinks]
   }),
   component: RootComponent
 });
@@ -36,7 +57,7 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body className="flex flex-col min-h-screen">
-        <RootProvider search={{ SearchDialog }}>
+        <RootProvider search={{ SearchDialog }} theme={theme}>
           <Outlet />
         </RootProvider>
         <Scripts />

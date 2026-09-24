@@ -1,6 +1,7 @@
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
+import { SuggestedSite } from './config/site-config.js';
 import { PortalConfig } from './portal-config.js';
 
 /** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
@@ -12,6 +13,11 @@ export interface PortalSpec {
 /** A validated portal source directory, ready to be built. */
 export interface PortalSource {
   config: PortalConfig;
+  /**
+   * What the only specification says about itself, or null with several. Kept so `portal serve`
+   * can judge an edited config without reading the specifications again.
+   */
+  suggestedSite: SuggestedSite | null;
   specs: PortalSpec[];
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
@@ -35,6 +41,16 @@ export type PortalScaffoldProblem =
   // `reason` is the message of whatever the file service raised, which nothing here can narrow.
   | { kind: 'sourceUnwritable'; reason: string };
 
+export interface MissingStaticFile {
+  setting: string;
+  file: FilePath;
+  /**
+   * The same file in another case, when there is one. Found here because Windows and macOS
+   * ignore case, but a link in it 404s on the hosts portals are published to, which do not.
+   */
+  foundAs: FilePath | null;
+}
+
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
@@ -45,4 +61,4 @@ export type PortalSourceProblem =
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
   | { kind: 'noSpecs' }
-  | { kind: 'missingLogo'; logoPath: string };
+  | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };

@@ -23,5 +23,5 @@ export async function renderFull(): Promise<string> {
 }
 
 export function renderHome(): string {
-  return `# ${portal.title}\n\n${portal.description ?? ''}`.trimEnd() + '\n';
+  return `# ${portal.name}\n\n${portal.description ?? ''}`.trimEnd() + '\n';
 }

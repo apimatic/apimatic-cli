@@ -1,9 +1,16 @@
 {
   "schemaVersion": 1,
   "portal": {
-    "title": "Calculator API",
-    "description": "A tiny calculator, documented.",
-    "logo": "static/images/logo.png",
-    "siteUrl": "https://docs.test"
+    "site": {
+      "name": "Calculator API",
+      "url": "https://docs.test",
+      "description": "A tiny calculator, documented."
+    },
+    "brand": {
+      "logo": "static/images/logo.png"
+    }
+  },
+  "languages": {
+    "typescript": {}
   }
 }
