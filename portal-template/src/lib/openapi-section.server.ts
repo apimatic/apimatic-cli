@@ -24,8 +24,9 @@ export async function openApiSection(slug: string, file: string) {
 type SectionFile = Awaited<ReturnType<ReturnType<typeof createOpenAPI>['staticSource']>>['files'][number];
 
 /**
- * Fumadocs names a page after its tag and operationId, so two operations sharing an operationId
- * would share a page, and one would be left out without a word.
+ * Fumadocs writes a page per tag an operation lists, named after the tag and the operationId, so
+ * two operations sharing an operationId, or one listing a tag twice, would put two pages at one
+ * path, and one would be left out without a word.
  */
 function refuseSharedPages(files: SectionFile[], slug: string): void {
   const pages = new Set<string>();
@@ -35,8 +36,8 @@ function refuseSharedPages(files: SectionFile[], slug: string): void {
     }
     if (pages.has(file.path)) {
       throw new Error(
-        `[OpenAPI] Two operations of '${slug}' would share the page ${file.path.replaceAll('\\', '/')}, so one would be left ` +
-          `out. Give each operation an operationId of its own.`
+        `[OpenAPI] '${slug}' would put two pages at ${file.path.replaceAll('\\', '/')}, so one would be left out. ` +
+          `Give each operation an operationId of its own, and list each of its tags once.`
       );
     }
     pages.add(file.path);

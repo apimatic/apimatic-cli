@@ -339,29 +339,37 @@ describe('openApiSection', () => {
     expect(target).to.deep.equal({ type: 'object', properties: { name: { type: 'string' } } });
   });
 
-  it('refuses two operations that one operationId would give one page', async () => {
+  /** The message a section fails with for these paths, or undefined when it builds. */
+  const failureFor = async (paths: Record<string, unknown>) => {
     fs.writeFileSync(
       path.join(directory, 'api.json'),
-      JSON.stringify({
-        openapi: '3.1.0',
-        info: { title: 'Pets', version: '1' },
-        paths: {
-          '/pets': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } },
-          '/cats': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } }
-        }
-      })
+      JSON.stringify({ openapi: '3.1.0', info: { title: 'Pets', version: '1' }, paths })
     );
-
-    let failure: unknown;
     try {
       await section();
+      return undefined;
     } catch (error) {
-      failure = error;
+      return (error as Error).message;
     }
+  };
 
-    expect((failure as Error | undefined)?.message).to.equal(
-      "[OpenAPI] Two operations of 'pets' would share the page api/pets/pets/createPet.mdx, so one would be left " +
-        'out. Give each operation an operationId of its own.'
-    );
+  const SHARED_PAGE =
+    "[OpenAPI] 'pets' would put two pages at api/pets/pets/createPet.mdx, so one would be left out. " +
+    'Give each operation an operationId of its own, and list each of its tags once.';
+
+  it('refuses two operations that one operationId would give one page', async () => {
+    expect(
+      await failureFor({
+        '/pets': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } },
+        '/cats': { post: { operationId: 'createPet', tags: ['pets'], responses: ok } }
+      })
+    ).to.equal(SHARED_PAGE);
+  });
+
+  // Fumadocs writes a page for each tag an operation lists, the same one twice included.
+  it('refuses an operation that lists one tag twice', async () => {
+    expect(
+      await failureFor({ '/pets': { post: { operationId: 'createPet', tags: ['pets', 'pets'], responses: ok } } })
+    ).to.equal(SHARED_PAGE);
   });
 });

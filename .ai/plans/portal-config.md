@@ -429,8 +429,10 @@ follow.
 formed a folder named `''` whose `meta.json` hid the section's own, and a path
 and a webhook of one name shared a page. One check stays: grouped by tag,
 Fumadocs names a page after its tag and operationId, so two operations sharing
-an operationId would share a page and one would be dropped without a word.
-`openApiSection` refuses that, asking for an operationId of each one's own.
+an operationId would share a page and one would be dropped without a word, as
+would one operation listing a tag twice, which Fumadocs writes a page for each
+time. `openApiSection` refuses both, asking for an operationId of each one's
+own and each tag listed once.
 
 ## 8. CLI changes
 
