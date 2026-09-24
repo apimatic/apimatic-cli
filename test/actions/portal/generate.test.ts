@@ -98,8 +98,9 @@ describe('GenerateAction', () => {
       built = fs.readFileSync(source.specs[0].file.toString(), 'utf8');
       return ok({ projectDirectory, viteBinary: new FilePath(projectDirectory, new FileName('vite.js')) });
     });
+    process.env.APIMATIC_CODE_SAMPLES_PATH = 'test/resources/code-samples.json';
 
-    const result = await execute(CODE_SAMPLES_FIXTURE);
+    const result = await execute(CODE_SAMPLES_FIXTURE).finally(() => delete process.env.APIMATIC_CODE_SAMPLES_PATH);
 
     expect(result.isSuccess()).to.be.true;
     expect(prepare.firstCall.args[1].specs[0].file.toString()).to.not.contain(CODE_SAMPLES_FIXTURE.toString());
