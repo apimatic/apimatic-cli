@@ -43,7 +43,7 @@ export function mapLanguages(languageFlag: number): Language[] {
  * are selectable.
  */
 export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
-  { label: 'Typescript', value: Language.TYPESCRIPT },
+  { label: 'TypeScript', value: Language.TYPESCRIPT },
   { label: 'Ruby', value: Language.RUBY },
   { label: 'Python', value: Language.PYTHON },
   { label: 'Java', value: Language.JAVA },
@@ -54,6 +54,13 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
 
 // java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the config says.
 export const PLUGIN_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
+
+// The four a plugin cannot carry, named so a user whose language is missing sees it rather than wonders.
+export const UPCOMING_LANGUAGES: readonly Language[] = [Language.JAVA, Language.RUBY, Language.GO, Language.PHP];
+
+/** The name a language is shown under everywhere, so one reads the same in every message. */
+export const languageLabel = (language: string): string =>
+  LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
 
 export function isPluginLanguage(language: string): language is Language {
   return PLUGIN_LANGUAGES.includes(language as Language);

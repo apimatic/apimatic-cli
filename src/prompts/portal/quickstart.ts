@@ -1,5 +1,5 @@
 import { Result } from 'neverthrow';
-import { isCancel, log, select, text } from '@clack/prompts';
+import { isCancel, log, multiselect, select, text } from '@clack/prompts';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { format as f, getTree } from '../format.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -13,6 +13,7 @@ import { PortalAuthorizationFailure } from '../../infrastructure/services/portal
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { LANGUAGES_EXAMPLE } from '../../types/portal/portal-languages.js';
 import { PortalScaffoldProblem } from '../../types/portal/portal-source.js';
+import { Language, languageLabel, PLUGIN_LANGUAGES, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 
@@ -218,5 +219,28 @@ export class PortalQuickstartPrompts {
     const heading = `${f.var('src')} directory containing source files created at ${f.path(inputDirectory)}\n`;
     const message = getTree(directory.toTreeNode());
     log.info(heading + message);
+  }
+
+  // Everything is checked: a first portal covering every language it can is the answer one Enter
+  // should give, and the four it cannot are named rather than left out silently.
+  public async selectLanguages(): Promise<Language[] | undefined> {
+    const comingSoon = UPCOMING_LANGUAGES.map(languageLabel).join(', ');
+    const selected = await multiselect<Language>({
+      message: `Which languages should your portal include?
+${f.description(`${comingSoon} are coming soon`)}`,
+      options: PLUGIN_LANGUAGES.map((language) => ({ value: language, label: languageLabel(language) })),
+      initialValues: [...PLUGIN_LANGUAGES],
+      required: false
+    });
+
+    return isCancel(selected) ? undefined : selected;
+  }
+
+  public noLanguagesSelected() {
+    log.warn('No languages selected. Exiting without building a portal.');
+  }
+
+  public languagesNotRecorded() {
+    log.error(`The languages could not be written to ${f.var(APIMATIC_CONFIG_FILE_NAME)}.`);
   }
 }

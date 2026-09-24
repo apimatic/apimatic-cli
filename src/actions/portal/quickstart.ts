@@ -17,6 +17,7 @@ import { FileDownloadService } from '../../infrastructure/services/file-download
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
 import { envInfo } from '../../infrastructure/env-info.js';
 import { schemaUrlFor } from '../../types/apimatic-config/document.js';
+import { PluginConfigContext } from '../../types/plugin-config-context.js';
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -160,6 +161,20 @@ export class PortalQuickstartAction {
       );
       if (scaffolded.isErr()) {
         this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
+        return ActionResult.failed();
+      }
+
+      const selection = await this.prompts.selectLanguages();
+      if (!selection?.length) {
+        this.prompts.noLanguagesSelected();
+        return ActionResult.cancelled();
+      }
+
+      // Recorded before anything is built: `apimatic.json` is what says which SDKs the portal
+      // documents, and every command after this one reads it rather than the answer.
+      const recorded = await new PluginConfigContext(sourceDirectory).recordLanguages(selection);
+      if (recorded.isErr()) {
+        this.prompts.languagesNotRecorded();
         return ActionResult.failed();
       }
 
