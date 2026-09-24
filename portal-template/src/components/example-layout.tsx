@@ -10,6 +10,12 @@ interface ExampleSelection {
   select: (id: string) => void;
 }
 
+interface LayoutSlots {
+  selector: ReactNode;
+  usageTabs: ReactNode;
+  responseTabs: ReactNode;
+}
+
 const SelectionContext = createContext<ExampleSelection | undefined>(undefined);
 
 export function useExampleSelection(): ExampleSelection {
@@ -19,20 +25,21 @@ export function useExampleSelection(): ExampleSelection {
 }
 
 // Fumadocs' own selector lists request body examples only, and ignores an id outside that list.
-export function renderExampleLayout(slots: Readonly<{ usageTabs: ReactNode; responseTabs: ReactNode }>): ReactNode {
-  return <ExampleLayout usageTabs={slots.usageTabs} responseTabs={slots.responseTabs} />;
+export function renderExampleLayout(slots: Readonly<LayoutSlots>): ReactNode {
+  return <ExampleLayout selector={slots.selector} usageTabs={slots.usageTabs} responseTabs={slots.responseTabs} />;
 }
 
-function ExampleLayout({ usageTabs, responseTabs }: Readonly<{ usageTabs: ReactNode; responseTabs: ReactNode }>) {
+// Fumadocs passes a null selector for an operation with `x-exclusiveCodeSample`.
+function ExampleLayout({ selector, usageTabs, responseTabs }: Readonly<LayoutSlots>) {
   const { schema } = useRenderContext();
-  const { route, examples: bodyExamples, setExample } = useOperationContext();
+  const { route, examples: bodyExamples, example: defaultId, setExample } = useOperationContext();
   const pathItem = schema.resolve(schema.dereferenced.paths?.[route]);
   const operation = pathItem?.[bodyExamples[0].data.method];
   const examples = useMemo(
     () => requestExamples(bodyExamples, Parameter.listIn(operation, pathItem, schema.resolve)),
     [bodyExamples, operation, pathItem, schema]
   );
-  const [selectedId, setSelectedId] = useState(examples[0].id);
+  const [selectedId, setSelectedId] = useState(defaultId);
 
   const selection = useMemo<ExampleSelection>(
     () => ({
@@ -49,7 +56,7 @@ function ExampleLayout({ usageTabs, responseTabs }: Readonly<{ usageTabs: ReactN
   return (
     <SelectionContext.Provider value={selection}>
       <div className="prose-no-margin">
-        <ExampleSelector />
+        {selector === null ? null : <ExampleSelector />}
         {usageTabs}
         {responseTabs}
       </div>
