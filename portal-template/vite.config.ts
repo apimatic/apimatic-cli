@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { readPortalConfig } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
+import { specReload } from './spec-reload.ts';
 
 export default defineConfig(async () => {
   const portalConfig = await readPortalConfig();
@@ -16,6 +17,7 @@ export default defineConfig(async () => {
     publicDir,
     plugins: [
       fumadocsMdx(),
+      specReload(portalConfig.specs),
       tailwindcss(),
       tanstackStart({
         // Without a mask path the shell is rendered at "/" and no index.html is written;

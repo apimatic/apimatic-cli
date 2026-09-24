@@ -83,7 +83,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D9 | **The CLI synthesizes the zip**, with the language request carried by a config file inside it, mirroring how `plugin-config.json` drives the plugin flow. |
 | D11 | **Key a sample on `path` + `method`.** That is the document's own addressing and is guaranteed to be present and to match; `operationId` is optional in OpenAPI and codegen-v2 synthesizes one when it is absent. |
 | D12 | **Carry every declared example** on the wire, keyed by its OpenAPI `examples:` map key, and **special-case no key**: `"Example"` is only the placeholder for an operation's one snippet, so a spec's own `Example` beside other examples is kept like any other. |
-| D13 | **The portal template places the samples, on each spec as it bundles it**, reading `src/spec/` where it is. Every `$ref` resolves as it would without samples, and path items behind a `$ref` are reached like inline ones. |
+| D13 | **The portal template places the samples, on each spec as it bundles it**, reading `src/spec/` where it is. Every `$ref` resolves as it would without samples, path items behind a `$ref` are reached like inline ones, and `portal serve` shows spec edits live. |
 | D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. |
 | D17 | The Func wiring is the critical path and is what this document specifies. |
 | D18 | **One `x-apimatic-codeSamples` entry per language, its `sources` keyed by example id**, and the tab follows the portal's example selector, which lists the ids codegen-v2 keys snippets by. `x-codeSamples` is ignored, hand-written or not: each entry is a fixed tab the selector cannot switch, and fumadocs-openapi 11.4.1 renders it empty. |
@@ -399,7 +399,9 @@ Placement runs after `bundleSpecification` has inlined path items, so an operati
 `$ref`, into the document or another file, is annotated like an inline one. Paths that
 reference one path item share its operation objects, so each path item is rebuilt, never
 edited. The walk skips a path item's non-method keys (`summary`, `description`, `servers`,
-`parameters`) and keeps declaration order.
+`parameters`) and keeps declaration order. Nothing imports a spec, so Vite would never
+reload for one; under `portal serve`, `spec-reload.ts` reloads the server and the browser
+when a file in a spec's directory changes, and the specs are bundled again.
 
 The unplaced-sample warning runs in the CLI over each spec's endpoints: inline operations,
 path items behind a `#/` reference, and path items in another local file, which
