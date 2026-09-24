@@ -59,6 +59,48 @@ describe('FileService', () => {
     });
   });
 
+  describe('replaceContentsIfChanged', () => {
+    const fileService = new FileService();
+    let root: string;
+    let target: FilePath;
+
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), 'file-service-'));
+      target = new FilePath(new DirectoryPath(root), new FileName('theme.css'));
+    });
+
+    afterEach(() => {
+      sinon.restore();
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it('replaces a file that holds something else, and says so', async () => {
+      fs.writeFileSync(target.toString(), 'old');
+      const replace = sinon.spy(FileService.prototype, 'replaceContents');
+
+      expect(await fileService.replaceContentsIfChanged(target, 'new')).to.be.true;
+
+      expect(fs.readFileSync(target.toString(), 'utf-8')).to.equal('new');
+      expect(replace.calledOnce).to.be.true;
+    });
+
+    it('creates a file that is not there, and says so', async () => {
+      expect(await fileService.replaceContentsIfChanged(target, 'new')).to.be.true;
+
+      expect(fs.readFileSync(target.toString(), 'utf-8')).to.equal('new');
+    });
+
+    // An empty file is still a file: only a missing one is written for empty contents.
+    it('leaves a file holding the same contents untouched, and says so', async () => {
+      fs.writeFileSync(target.toString(), '');
+      const replace = sinon.spy(FileService.prototype, 'replaceContents');
+
+      expect(await fileService.replaceContentsIfChanged(target, '')).to.be.false;
+
+      expect(replace.called).to.be.false;
+    });
+  });
+
   describe('spelledOnDisk', () => {
     const fileService = new FileService();
     let root: DirectoryPath;

@@ -301,6 +301,16 @@ export class FileService {
     }
   }
 
+  /** Renamed over, so a watcher never reads it half-written, and skipped when unchanged, so nothing reloads. */
+  public async replaceContentsIfChanged(filePath: FilePath, contents: string): Promise<boolean> {
+    const current = (await this.fileExists(filePath)) ? await this.getContents(filePath) : null;
+    if (current === contents) {
+      return false;
+    }
+    await this.replaceContents(filePath, contents);
+    return true;
+  }
+
   public async copy(source: FilePath, destination: FilePath) {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }

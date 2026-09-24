@@ -36,10 +36,7 @@ export class PortalPagesService {
     try {
       let changed = false;
       for (const { file, contents } of files.value) {
-        const current = (await this.fileService.fileExists(file)) ? await this.fileService.getContents(file) : null;
-        if (current !== contents) {
-          // Renamed over rather than written in place, which the watching dev server could read half-written.
-          await this.fileService.replaceContents(file, contents);
+        if (await this.fileService.replaceContentsIfChanged(file, contents)) {
           changed = true;
         }
       }
