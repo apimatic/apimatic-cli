@@ -64,7 +64,7 @@ gains no key; and quickstart, which writes nothing new.
 | Reserved addresses | `/sdks` and `/context-plugin`, each with everything below it, are the CLI's. A content page whose slugs begin with either name is refused by `PortalSourceContext.resolve()` naming each file: `content/sdks.md`, `content/sdks.mdx`, anything under `content/sdks/`, the same for `context-plugin`, and the same behind a `(group)` folder, which the content source drops from the address (`getSlugs('(intro)/sdks.mdx')` is `['sdks']`). Without the refusal, two pages at one address would fail the build with Fumadocs' opaque `Duplicated slugs` error, or, when one of them is an index page, move it to `…/index` without a word (the slugs plugin of `fumadocs-core@16.15.8`, read on 2026-09-24). `/context-plugin` is reserved with or without a `plugin` block, so adding the block never starts refusing a page that built the day before. A root `nav.json` entry `sdks` or `context-plugin` is refused as today, with a hint naming the token, and so is `plugin` when no page of that name exists, since the token invites the guess. |
 | Templates | Three `.mdx` files in a new top-level `portal-pages/` directory, shipped in the npm package beside `portal-template/`. Dynamic text is `{{key}}`. A renderer of a few lines substitutes flat string keys and refuses an unknown or unfilled key, so a template and its data cannot drift silently. No dependency today; mustache, whose `{{key}}` is the same, is adopted when the real templates need sections (section 10). Rendering happens before MDX compilation, so the braces never reach MDX. |
 | Data today | `sdks.mdx` and `context-plugin.mdx` take `{}`. `sdk.mdx` takes `{ language, name }`, the enum value and a display name, so the per-language pages have distinct titles and sidebar rows. Everything else waits for the backend data. |
-| Display names | A `Record<Language, string>` beside `GeneratedPages`: `csharp` C#, `go` Go, `java` Java, `php` PHP, `python` Python, `ruby` Ruby, `typescript` TypeScript. `LANGUAGE_CHOICES` in `src/types/sdk/generate.ts` spells "Typescript" for the quickstart prompt and is left alone. |
+| Display names | One `Record<Language, string>`, `LANGUAGE_NAMES` in `src/types/sdk/generate.ts`: `csharp` C#, `go` Go, `java` Java, `php` PHP, `python` Python, `ruby` Ruby, `typescript` TypeScript. First written beside `GeneratedPages`, with `LANGUAGE_CHOICES` left spelling "Typescript" for the quickstart prompt; the review of PR #360 had the two tables made one, so the prompt's labels are read from it and say "TypeScript" too. |
 | `portal serve` | The watcher that re-applies the `portal` block also regenerates the pages: a language added or removed, or the `plugin` block added or removed, rewrites `generated/` (changed files written, stale files and emptied directories deleted) and Vite reloads, so the Context Plugin tab appears and disappears with the block. Step 1 found that an edited generated file reaches the preview on its own but an added or removed one does not, and that a removed one fails every request until a restart (section 16). A serve-only Vite plugin in the template makes adds and removes reach it as edits do (section 4), so no case needs a restart. |
 | Prerender | `prerender-pages.ts` enumerates the generated directory as it enumerates the content directory. `portal.config.json` gains `generatedDir`, absolute and server-only, as `contentDir` is. |
 | Backend data | Not in this PR. `portal generate` will call the backend, which validates `apimatic.json` and answers with what the pages show; `GeneratedPages.of(...)` is where that answer lands (section 10). |
@@ -404,11 +404,12 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   template it uses and its data; and each section's `nav.json` text. Exports
   the sections, each with its name, its token and the words a message uses
   for it (`sdks`, `apimatic:sdks`, "the SDK pages"; `context-plugin`,
-  `apimatic:plugin`, "the context plugin page"), the template names
-  and the display-name table. The sections are the one list the reserved
-  addresses, the tokens and the hints are read from, so a third section, such
-  as the AI one portal-config expects, is one entry. The languages come from
-  `PortalLanguages.all()`, which keeps the block's key order.
+  `apimatic:plugin`, "the context plugin page") and the template names; the
+  display names are `LANGUAGE_NAMES` in `src/types/sdk/generate.ts`. The
+  sections are the one list the reserved addresses, the tokens and the hints
+  are read from, so a third section, such as the AI one portal-config
+  expects, is one entry. The languages come from `PortalLanguages.all()`,
+  which keeps the block's key order.
 - **`PortalSource`** gains `generatedPages: GeneratedPages`, computed in
   `PortalSourceContext.parseSettings` (formerly `parseConfig`) from the
   `PortalLanguages` it already builds and discards, and from

@@ -1,7 +1,7 @@
 import { expect } from 'chai';
-import { GeneratedPages, LANGUAGE_NAMES, PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
+import { GeneratedPages, PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
-import { Language } from '../../../src/types/sdk/generate';
+import { Language, LANGUAGE_NAMES } from '../../../src/types/sdk/generate';
 
 describe('GeneratedPages', () => {
   const pagesFor = (languages: Record<string, object>, plugin = false) =>

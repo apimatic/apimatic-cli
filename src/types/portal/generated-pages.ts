@@ -1,5 +1,5 @@
 import { FileName } from '../file/fileName.js';
-import { Language } from '../sdk/generate.js';
+import { Language, LANGUAGE_NAMES } from '../sdk/generate.js';
 import { PortalLanguages } from './portal-languages.js';
 
 /** A set of pages the CLI writes into the portal, which the portal shows as a tab of its own. */
@@ -34,16 +34,6 @@ export const GENERATED_SECTIONS: readonly GeneratedSection[] = [SDK_SECTION, PLU
 export const PAGE_TEMPLATES = ['sdks', 'sdk', 'context-plugin'] as const;
 
 export type PageTemplateName = (typeof PAGE_TEMPLATES)[number];
-
-export const LANGUAGE_NAMES: Record<Language, string> = {
-  [Language.CSHARP]: 'C#',
-  [Language.GO]: 'Go',
-  [Language.JAVA]: 'Java',
-  [Language.PHP]: 'PHP',
-  [Language.PYTHON]: 'Python',
-  [Language.RUBY]: 'Ruby',
-  [Language.TYPESCRIPT]: 'TypeScript'
-};
 
 const INDEX_PAGE = new FileName('index.mdx');
 
