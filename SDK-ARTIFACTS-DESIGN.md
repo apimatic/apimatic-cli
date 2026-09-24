@@ -86,7 +86,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D13 | **Copy the spec tree into the temp project and annotate the copy.** Relative `$ref`s then keep resolving. See D20 for refs that escape `src/spec/`. |
 | D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. |
 | D17 | The Func wiring is the critical path and is what this document specifies. |
-| D18 | **One `x-apimatic-codeSamples` entry per language, its `sources` keyed by example id**, and the tab follows fumadocs' example selector. `x-codeSamples` is ignored, hand-written or not: each entry is a fixed tab the selector cannot switch, and fumadocs-openapi 11.4.1 renders it empty. |
+| D18 | **One `x-apimatic-codeSamples` entry per language, its `sources` keyed by example id**, and the tab follows the portal's example selector, which lists the ids codegen-v2 keys snippets by. `x-codeSamples` is ignored, hand-written or not: each entry is a fixed tab the selector cannot switch, and fumadocs-openapi 11.4.1 renders it empty. |
 | D19 | **Tab order: curl first, then one tab per language in configured order**: `curl, TypeScript, C#, …`. |
 | D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
@@ -254,8 +254,10 @@ Rules, all of which the consumer depends on:
 
 - **Path is the template verbatim, with its leading slash**, exactly as the document writes
   it. **Method is uppercase.**
-- **The example id is the OpenAPI `examples:` map key** — the same key fumadocs' example
-  selector switches on, so a snippet lines up with the example it was rendered from.
+- **The example id is an OpenAPI `examples:` map key** — the request body's, or, when the
+  body names none, that of the first query, header or path parameter that does, the order
+  codegen-v2 takes them in. The portal's example selector lists the same ids, so a snippet
+  lines up with the example it was rendered from.
 - **`"Example"` is a placeholder only when it is the one key**: an operation that declares
   no example gets its single snippet under `"Example"`. Beside other keys it is an ordinary
   example id a spec may declare, so neither the CLI nor the portal filters or renames it
@@ -417,11 +419,18 @@ test containment in `src/spec/`.
 - `lang` is the `Language` enum value verbatim. It is simultaneously the catalog filename,
   the tab id and the Shiki grammar key — one token, three uses, no mapping table.
 - `label` is the bare language name from `LANGUAGE_CHOICES`; the example is chosen by
-  fumadocs' example selector, never by the label.
+  the example selector, never by the label.
 - Order: curl, then languages in configured order ([D19](#wire-format)).
 
-`api-page.tsx` registers curl alone and replaces fumadocs' usage tabs with
-`usage-tabs.tsx`, which reads the selected example id from the operation context. A
+`api-page.tsx` registers curl alone and replaces two fumadocs slots. Fumadocs' selector
+lists request body examples only and gives every parameter its first example, so
+`example-layout.tsx` replaces it with one over `request-examples.ts`: the body's examples,
+or, when the body names none — no `examples`, or a lone placeholder key, `Example` or the
+`default` fumadocs' 3.0 → 3.1 upgrade gives a singular `example` — the ids of the first
+parameter that names any, in codegen-v2's order. Each example then gives every parameter its
+own example of that id, keeping fumadocs' value otherwise. `usage-tabs.tsx` replaces the
+usage tabs and reads the selected example from the layout: curl encodes its request with
+fumadocs' `encodeRequestData`, and each language shows its snippet for that id. A
 language without a snippet for that example shows a note, never another example's code;
 an empty snippet is still a snippet. With one example, the language's only snippet shows
 whatever its key. A malformed entry is skipped rather than failing the page.
@@ -463,6 +472,7 @@ Read from source on 2026-09-22, codegen-v2 re-read on 2026-09-23. CLI facts are 
 | `LANGUAGE_CHOICES` is read in exactly one file, as prompt text only | `src/types/sdk/generate.ts:45-53`, used at `src/prompts/sdk/quickstart.ts:12,159-160,163,168` |
 | `shiki-bundle.ts` bundles grammars for **all seven** languages, keyed by the enum values | `portal-template/src/lib/shiki-bundle.ts` |
 | fumadocs-openapi 11.4.1 renders an `x-codeSamples` entry as an empty tab: it registers the entry per operation, but the tab body reads only the page registry | `fumadocs-openapi/dist/ui/operation/usage-tabs.js:51,108` |
+| fumadocs-openapi 11.4.1 takes example ids from the preferred media type's request body `examples` only, else one `_default`; gives each parameter its `example` or first `examples` entry whatever the id; ignores `setExample` for an id outside that list; and exports neither `getExampleRequests` nor `encodeRequestData` | `dist/utils/get-example-requests.js`, `dist/ui/operation/context.js:14-15`, `package.json` `exports` |
 | A per-language `plugin-config.json` entry requires `codegenVersion` — so `{}` is not valid *today* | `src/types/plugin/plugin-config.ts:48-66` |
 | **`apimatic.json` does not exist anywhere in the repo** | repo-wide grep |
 
@@ -512,6 +522,7 @@ The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged ren
 | R3 | **Retry-safety is a prerequisite, not a follow-up.** Retries are limited to transient storage failures, but a retried activity that does not clean up stale state still produces a run that never finishes — a worse failure than the transient one being papered over. |
 | R4 | **`apimatic.json` is owned elsewhere.** This document treats it as fixed input; if its shape moves, [§4.2](#42-request-the-build-zip) moves with it. The portal's `PortalConfig.parse` and the signup page's *Download build* must change together, or the first command on a downloaded build hard-stops. |
 | R5 | **`--verbose` does not exist.** [D20](#wire-format) names affected spec files rather than individual `$ref`s because there is no verbose mode to put the detail behind. **TODO:** enumerate the exact refs once a `--verbose` flag exists. |
+| R6 | **The curl tab imports a fumadocs internal.** `vite.config.ts` aliases `fumadocs-openapi/encode` to `dist/requests/media/encode.js`; an upgrade that moves it fails the build rather than the page. The API playground still follows fumadocs' own list, so a parameter-derived id does not reach it. |
 
 ---
 
@@ -521,8 +532,9 @@ The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged ren
 
 - A catalog entry keyed by a path/method the document does not contain → warn, do not fail.
 - An operation's only snippet shows for its only example whatever its key; `"Example"`
-  beside other keys is kept as an ordinary id; a language without a snippet for the
-  selected example shows a note.
+  beside other keys is kept as an ordinary id; a body that names no id selects among its
+  parameters' ids; curl carries each parameter's value for the selected id; a language
+  without a snippet for the selected example shows a note.
 - Tab order: curl first, then languages in configured order.
 - A path item that is itself a `$ref` → skipped without throwing.
 - Non-method keys on a path item (`summary`, `parameters`, `servers`) → not treated as
