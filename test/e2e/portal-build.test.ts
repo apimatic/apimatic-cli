@@ -42,7 +42,7 @@ const CODE_SAMPLES = new CodeSamples([
     project = new DirectoryPath(root).join('build');
     fs.mkdirSync(project.toString(), { recursive: true });
     const projectService = new PortalProjectService();
-    const sampled = await projectService.addCodeSamples(project, source, CODE_SAMPLES);
+    const sampled = (await projectService.addCodeSamples(project, source, CODE_SAMPLES))._unsafeUnwrap();
     const prepared = (await projectService.prepare(project, sampled.source))._unsafeUnwrap();
 
     const build = await new PortalBuildService().build(prepared);

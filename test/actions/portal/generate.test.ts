@@ -71,7 +71,7 @@ describe('GenerateAction', () => {
       );
     addCodeSamples = sinon
       .stub(PortalProjectService.prototype, 'addCodeSamples')
-      .callsFake(async (_projectDirectory, source) => ({ source, unsampledSpecs: [] }));
+      .callsFake(async (_projectDirectory, source) => ok({ source, unsampledSpecs: [] }));
     authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
     build = sinon.stub(PortalBuildService.prototype, 'build').resolves(ok({ output: builtSite, pageCount: 3 }));
   });
@@ -89,6 +89,16 @@ describe('GenerateAction', () => {
     expect(result.isFailed()).to.be.true;
     expect(build.called).to.be.false;
     expect(fs.existsSync(portalDirectory.toString())).to.be.false;
+  });
+
+  it('fails without building when the code samples cannot be added to the spec', async () => {
+    addCodeSamples.resolves(err('EBUSY: resource busy or locked'));
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(prompts.codeSamplesNotAdded.calledOnceWith('EBUSY: resource busy or locked')).to.be.true;
+    expect(build.called).to.be.false;
   });
 
   it('builds from a copy of each spec carrying its code samples', async () => {

@@ -45,6 +45,10 @@ export class PortalServePrompts {
     reportUnsampledSpecs(fileNames);
   }
 
+  public codeSamplesNotAdded(reason: string) {
+    log.error(reason);
+  }
+
   public authorizationFailed(failure: PortalAuthorizationFailure) {
     reportAuthorizationFailure(failure);
   }

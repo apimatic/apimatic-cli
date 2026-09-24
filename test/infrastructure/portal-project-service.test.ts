@@ -199,7 +199,9 @@ describe('PortalProjectService', () => {
     it('points the spec at a copy in the project carrying its samples, leaving the original alone', async () => {
       const spec = writeSpec('pets.json', petsSpec());
 
-      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+      const sampled = (
+        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples)
+      )._unsafeUnwrap();
 
       const [copy] = sampled.source.specs;
       expect(copy.file.toString()).to.equal(path.join(project.toString(), 'spec', 'pets.json'));
@@ -214,18 +216,29 @@ describe('PortalProjectService', () => {
     it('leaves every spec on its original file, unnamed, when there are no samples', async () => {
       const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: '../shared/responses.json' } }));
 
-      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), new CodeSamples([]));
+      const sampled = (
+        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), new CodeSamples([]))
+      )._unsafeUnwrap();
 
       expect(sampled.source.specs[0].file).to.equal(spec.file);
       expect(sampled.unsampledSpecs).to.be.empty;
       expect(fs.existsSync(path.join(project.toString(), 'spec'))).to.be.false;
     });
 
+    it('reports a spec directory it cannot copy rather than throwing', async () => {
+      const spec = writeSpec('pets.json', petsSpec());
+      const specDirectory = new DirectoryPath(root).join('missing');
+
+      const result = await service.addCodeSamples(project, sourceFor({ specs: [spec], specDirectory }), codeSamples);
+
+      expect(result._unsafeUnwrapErr()).to.contain("The code samples could not be added to 'spec'");
+    });
+
     it('copies the files a spec refers to, so its relative references still resolve', async () => {
       const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: './responses.json' } }));
       fs.writeFileSync(path.join(root, 'spec', 'responses.json'), '{}');
 
-      await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+      (await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples))._unsafeUnwrap();
 
       expect(fs.existsSync(path.join(project.toString(), 'spec', 'responses.json'))).to.be.true;
     });
@@ -233,7 +246,9 @@ describe('PortalProjectService', () => {
     it('keeps a spec whose references leave spec/ on its original file, and names it', async () => {
       const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: '../shared/responses.json' } }));
 
-      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+      const sampled = (
+        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples)
+      )._unsafeUnwrap();
 
       expect(sampled.source.specs[0].file).to.equal(spec.file);
       expect(sampled.unsampledSpecs.map(String)).to.deep.equal(['pets.json']);
@@ -244,7 +259,9 @@ describe('PortalProjectService', () => {
       fs.mkdirSync(path.join(root, 'spec', 'schemas'));
       fs.writeFileSync(path.join(root, 'spec', 'schemas', 'responses.json'), '{ "$ref": "../../shared/ok.json" }');
 
-      const sampled = await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples);
+      const sampled = (
+        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples)
+      )._unsafeUnwrap();
 
       expect(sampled.source.specs[0].file).to.equal(spec.file);
       expect(sampled.unsampledSpecs.map(String)).to.deep.equal(['pets.json']);

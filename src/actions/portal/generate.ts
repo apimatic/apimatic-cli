@@ -84,9 +84,13 @@ export class GenerateAction {
 
     return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
       const sampled = await this.projectService.addCodeSamples(tempDirectory, source.value, codeSamples.value);
-      this.prompts.unsampledSpecs(sampled.unsampledSpecs);
+      if (sampled.isErr()) {
+        this.prompts.codeSamplesNotAdded(sampled.error);
+        return ActionResult.failed();
+      }
+      this.prompts.unsampledSpecs(sampled.value.unsampledSpecs);
 
-      const project = await this.projectService.prepare(tempDirectory, sampled.source);
+      const project = await this.projectService.prepare(tempDirectory, sampled.value.source);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);
         return ActionResult.failed();

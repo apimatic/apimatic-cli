@@ -9,6 +9,7 @@ import { FilePath } from '../types/file/filePath.js';
 import { CodeSamples } from '../types/portal/code-samples.js';
 import { OpenApiDocument } from '../types/portal/openapi-document.js';
 import { PortalSource, PortalSpec } from '../types/portal/portal-source.js';
+import { errorMessage } from '../utils/error-utils.js';
 import { FileService } from './file-service.js';
 
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
@@ -93,21 +94,30 @@ export class PortalProjectService {
     });
   }
 
-  // A spec whose `$ref`s leave `spec/` keeps its original file: they would not resolve from the copy.
   public async addCodeSamples(
     projectDirectory: DirectoryPath,
     source: PortalSource,
     codeSamples: CodeSamples
-  ): Promise<SampledSource> {
+  ): Promise<Result<SampledSource, string>> {
     if (codeSamples.isEmpty()) {
-      return { source, unsampledSpecs: [] };
+      return ok({ source, unsampledSpecs: [] });
     }
-    const specDirectory = projectDirectory.join('spec');
+    try {
+      return ok(await this.copyWithCodeSamples(projectDirectory.join('spec'), source, codeSamples));
+    } catch (error) {
+      return err(`The code samples could not be added to 'spec': ${errorMessage(error)}`);
+    }
+  }
+
+  // A spec whose `$ref`s leave `spec/` keeps its original file: they would not resolve from the copy.
+  private async copyWithCodeSamples(
+    specDirectory: DirectoryPath,
+    source: PortalSource,
+    codeSamples: CodeSamples
+  ): Promise<SampledSource> {
     await this.fileService.copyDirectoryContents(source.specDirectory, specDirectory);
 
-    const refersOutside = await Promise.all(
-      source.specs.map((spec) => this.refersOutside(spec, source.specDirectory))
-    );
+    const refersOutside = await Promise.all(source.specs.map((spec) => this.refersOutside(spec, source.specDirectory)));
     const unsampled = source.specs.filter((_, index) => refersOutside[index]);
     const specs = await Promise.all(
       source.specs.map(async (spec) =>
