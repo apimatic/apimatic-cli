@@ -36,6 +36,12 @@ describe('bundleSpecification', () => {
     return (await server.getSchemas()).api.bundled;
   };
 
+  const rejection = (promise: Promise<unknown>): Promise<unknown> =>
+    promise.then(
+      () => undefined,
+      (reason: unknown) => reason
+    );
+
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'openapi-bundle-'));
   });
@@ -220,6 +226,24 @@ describe('bundleSpecification', () => {
     expect(document.components.schemas.Tag).to.deep.equal({ type: 'string' });
   });
 
+  it('reads a key in a components map of another file as a name, not a keyword', async () => {
+    write('Thing.yaml', { type: 'string' });
+    write('common.yaml', {
+      components: { schemas: { default: { type: 'object', properties: { thing: { $ref: './Thing.yaml' } } } } }
+    });
+    const file = write('openapi.yaml', {
+      openapi: '3.1.0',
+      info,
+      paths: { '/settings': { get: operation({ $ref: './common.yaml#/components/schemas/default' }) } }
+    });
+
+    const document: any = await bundleSpecification(file);
+
+    expect(document.components.schemas.default.properties.thing).to.deep.equal({
+      $ref: '#/components/schemas/Thing'
+    });
+  });
+
   it('puts the file in place of a component that only referenced it', async () => {
     write('order-schema.yaml', { type: 'object', properties: { id: { type: 'integer' } } });
     const file = write('openapi.yaml', {
@@ -273,6 +297,38 @@ describe('bundleSpecification', () => {
 
     expect(document.components.schemas.TreeNode.properties.children.items).to.deep.equal({
       $ref: '#/components/schemas/TreeNode'
+    });
+  });
+
+  it('points a reference in example data into a filed schema at its new place', async () => {
+    write('Pet.yaml', { type: 'object', example: { name: 'Rex' } });
+    const file = write('openapi.yaml', {
+      openapi: '3.1.0',
+      info,
+      paths: {
+        '/pets': {
+          get: {
+            tags: ['pets'],
+            responses: {
+              '200': {
+                description: 'ok',
+                content: {
+                  'application/json': {
+                    schema: { $ref: './Pet.yaml' },
+                    examples: { rex: { value: { $ref: './Pet.yaml#/example' } } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const document: any = await bundleSpecification(file);
+
+    expect(document.paths['/pets'].get.responses['200'].content['application/json'].examples.rex.value).to.deep.equal({
+      $ref: '#/components/schemas/Pet/example'
     });
   });
 
@@ -357,10 +413,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { get: operation({ $ref: './Missing.yaml' }) } }
     });
 
-    const error = await bundleSpecification(file).then(
-      () => undefined,
-      (reason: unknown) => reason
-    );
+    const error = await rejection(bundleSpecification(file));
 
     expect(error).to.be.instanceOf(Error);
     expect((error as Error).message).to.include('./Missing.yaml');
@@ -370,10 +423,7 @@ describe('bundleSpecification', () => {
   it('names the specification it cannot read', async () => {
     const file = path.join(root, 'missing.yaml');
 
-    const error = await bundleSpecification(file).then(
-      () => undefined,
-      (reason: unknown) => reason
-    );
+    const error = await rejection(bundleSpecification(file));
 
     expect(error).to.be.instanceOf(Error);
     expect((error as Error).message).to.include(file);
