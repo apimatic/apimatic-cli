@@ -253,7 +253,8 @@ function baseName(location: string): string {
 
 function uniqueName(schemas: Node, name: string): string {
   let candidate = name;
-  for (let suffix = 2; Object.hasOwn(schemas, candidate); suffix++) candidate = `${name}-${suffix}`;
+  let suffix = 1;
+  while (Object.hasOwn(schemas, candidate)) candidate = `${name}-${++suffix}`;
   return candidate;
 }
 
