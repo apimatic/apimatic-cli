@@ -272,6 +272,29 @@ describe('PortalSourceContext', () => {
       expect(new Set(slugs).size).to.equal(2);
       expect(slugs).to.include('my-api');
     });
+
+    it('lists the operations of a path item kept in another file under the path that mounts it', async () => {
+      writeConfig({ title: 'Calc' });
+      write('spec/paths/pets.yaml', JSON.stringify({ get: {}, post: {} }));
+      write('spec/shared.json', JSON.stringify({ items: { owners: { delete: {} } } }));
+      write(
+        'spec/api.json',
+        JSON.stringify({
+          openapi: '3.1.0',
+          info: { title: 'Calc', version: '1' },
+          paths: {
+            '/health': { get: {} },
+            '/pets': { $ref: './paths/pets.yaml' },
+            '/owners': { $ref: 'shared.json#/items/owners' },
+            '/missing': { $ref: './nowhere.yaml' }
+          }
+        })
+      );
+
+      const [spec] = (await resolve())._unsafeUnwrap().specs;
+
+      expect(spec.endpoints.map(String)).to.deep.equal(['GET /health', 'GET /pets', 'POST /pets', 'DELETE /owners']);
+    });
   });
 
   describe('optional directories', () => {

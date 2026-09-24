@@ -7,10 +7,7 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSamples } from '../types/portal/code-samples.js';
-import { OpenApiDocument } from '../types/portal/openapi-document.js';
-import { PortalSource, PortalSpec } from '../types/portal/portal-source.js';
-import { SpecCopy } from '../types/portal/spec-copy.js';
-import { errorMessage } from '../utils/error-utils.js';
+import { PortalSource } from '../types/portal/portal-source.js';
 import { FileService } from './file-service.js';
 
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
@@ -46,12 +43,6 @@ export interface PortalProjectPaths {
   viteBinary: FilePath;
 }
 
-export interface SampledSource {
-  source: PortalSource;
-  unsampledSpecs: FileName[];
-  specCopy: SpecCopy;
-}
-
 /**
  * Prepares the throwaway Vite project that both `portal generate` and `portal serve` run.
  * The user's `src/` is never copied: the project points at it by absolute path.
@@ -72,7 +63,8 @@ export class PortalProjectService {
 
   public async prepare(
     projectDirectory: DirectoryPath,
-    source: PortalSource
+    source: PortalSource,
+    codeSamples: CodeSamples
   ): Promise<Result<PortalProjectPaths, string>> {
     const template = this.templateDirectory();
     if (template === undefined) {
@@ -88,49 +80,12 @@ export class PortalProjectService {
 
     await this.fileService.copyDirectoryContents(template, projectDirectory);
     await this.linkDependencies(projectDirectory);
-    await this.writeConfiguration(projectDirectory, source);
+    await this.writeConfiguration(projectDirectory, source, await this.writeCodeSamples(projectDirectory, codeSamples));
 
     return ok({
       projectDirectory,
       viteBinary: new FilePath(viteDirectory.join('bin'), new FileName('vite.js'))
     });
-  }
-
-  public async addCodeSamples(
-    projectDirectory: DirectoryPath,
-    source: PortalSource,
-    codeSamples: CodeSamples
-  ): Promise<Result<SampledSource, string>> {
-    if (codeSamples.isEmpty()) {
-      return ok({ source, unsampledSpecs: [], specCopy: SpecCopy.none() });
-    }
-    try {
-      return ok(await this.copyWithCodeSamples(projectDirectory.join('spec'), source, codeSamples));
-    } catch (error) {
-      return err(`The code samples could not be added to 'spec': ${errorMessage(error)}`);
-    }
-  }
-
-  // A spec whose `$ref`s leave `spec/` keeps its original file: they would not resolve from the copy.
-  private async copyWithCodeSamples(
-    specDirectory: DirectoryPath,
-    source: PortalSource,
-    codeSamples: CodeSamples
-  ): Promise<SampledSource> {
-    await this.fileService.copyDirectoryContents(source.specDirectory, specDirectory);
-
-    const refersOutside = await Promise.all(source.specs.map((spec) => this.refersOutside(spec, source.specDirectory)));
-    const unsampled = source.specs.filter((_, index) => refersOutside[index]);
-    const specs = await Promise.all(
-      source.specs.map(async (spec) =>
-        unsampled.includes(spec) ? spec : this.writeWithCodeSamples(spec, specDirectory, codeSamples)
-      )
-    );
-    return {
-      source: { ...source, specs },
-      unsampledSpecs: unsampled.map((spec) => spec.file.name()),
-      specCopy: SpecCopy.of(source.specDirectory, specDirectory)
-    };
   }
 
   /**
@@ -170,33 +125,14 @@ export class PortalProjectService {
     return environment;
   }
 
-  // A `../` in a file the spec refers to breaks the copy as surely as one in the spec itself.
-  private async refersOutside(spec: PortalSpec, specDirectory: DirectoryPath): Promise<boolean> {
-    const visited = new Set([spec.file.toString()]);
-    const pending = spec.document.referencedFiles(spec.file.directory());
-    for (let file = pending.pop(); file !== undefined; file = pending.pop()) {
-      if (!specDirectory.contains(file.directory())) {
-        return true;
-      }
-      if (visited.has(file.toString()) || !(await this.fileService.fileExists(file))) {
-        continue;
-      }
-      visited.add(file.toString());
-      const document = OpenApiDocument.parse(file.name(), await this.fileService.getContents(file));
-      pending.push(...(document?.referencedFiles(file.directory()) ?? []));
+  // The template places the samples on the specs as it bundles them, so the specs are read where they are.
+  private async writeCodeSamples(projectDirectory: DirectoryPath, codeSamples: CodeSamples): Promise<FilePath | null> {
+    if (codeSamples.isEmpty()) {
+      return null;
     }
-    return false;
-  }
-
-  private async writeWithCodeSamples(
-    spec: PortalSpec,
-    directory: DirectoryPath,
-    codeSamples: CodeSamples
-  ): Promise<PortalSpec> {
-    const file = spec.file.replaceDirectory(directory);
-    const document = spec.document.withCodeSamples(codeSamples);
-    await this.fileService.writeContents(file, document.serialize(file.name()));
-    return { ...spec, file, document };
+    const file = new FilePath(projectDirectory, new FileName('code-samples.json'));
+    await this.fileService.writeContents(file, JSON.stringify(codeSamples.toJson()));
+    return file;
   }
 
   private async linkDependencies(projectDirectory: DirectoryPath): Promise<void> {
@@ -217,7 +153,11 @@ export class PortalProjectService {
     }
   }
 
-  private async writeConfiguration(projectDirectory: DirectoryPath, source: PortalSource): Promise<void> {
+  private async writeConfiguration(
+    projectDirectory: DirectoryPath,
+    source: PortalSource,
+    codeSamples: FilePath | null
+  ): Promise<void> {
     const contentDirectory = source.contentDirectory ?? projectDirectory.join('content');
     if (source.contentDirectory === null) {
       await this.fileService.createDirectoryIfNotExists(contentDirectory);
@@ -236,6 +176,7 @@ export class PortalProjectService {
     const configuration = {
       ...identity,
       specs,
+      codeSamples: codeSamples === null ? null : this.toPosix(codeSamples.toString()),
       contentDir: this.toPosix(contentDirectory.toString()),
       staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
     };

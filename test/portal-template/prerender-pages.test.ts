@@ -23,6 +23,7 @@ describe('prerenderPages', () => {
       siteUrl,
       aiPageActions: true,
       specs: {},
+      codeSamples: null,
       contentDir,
       staticDir: null
     });

@@ -42,8 +42,7 @@ const CODE_SAMPLES = new CodeSamples([
     project = new DirectoryPath(root).join('build');
     fs.mkdirSync(project.toString(), { recursive: true });
     const projectService = new PortalProjectService();
-    const sampled = (await projectService.addCodeSamples(project, source, CODE_SAMPLES))._unsafeUnwrap();
-    const prepared = (await projectService.prepare(project, sampled.source))._unsafeUnwrap();
+    const prepared = (await projectService.prepare(project, source, CODE_SAMPLES))._unsafeUnwrap();
 
     const build = await new PortalBuildService().build(prepared);
     if (build.isErr()) {
@@ -210,7 +209,7 @@ const CODE_SAMPLES = new CodeSamples([
     expect(assets.length, 'asset count').to.be.below(150);
   });
 
-  it('carries the code samples the CLI merged into the spec into the operation page data', () => {
+  it('carries the code samples placed on the operation into its page data', () => {
     const page = read('api/apimatic-calculator/simple-calculator/Calculate/index.html');
 
     expect(page).to.contain('x-apimatic-codeSamples');

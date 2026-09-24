@@ -5,6 +5,8 @@ import type { Portal } from './src/lib/portal.ts';
 export interface PortalConfig extends Portal {
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
+  /** Absolute path of the code samples, keyed by path then method; null when there are none. */
+  codeSamples: string | null;
   /** Absolute. Always exists, and may be empty. */
   contentDir: string;
   staticDir: string | null;

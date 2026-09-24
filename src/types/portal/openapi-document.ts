@@ -1,11 +1,10 @@
 import { basename, dirname } from 'node:path';
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { parse as parseYaml } from 'yaml';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { isJsonObject, JsonObject } from '../common/json-object.js';
-import { CodeSample, CodeSamples } from './code-samples.js';
 import { Endpoint } from './endpoint.js';
 import { PortalConfig } from './portal-config.js';
 
@@ -16,14 +15,18 @@ import { PortalConfig } from './portal-config.js';
  */
 export type SpecFormat = { supported: true } | { supported: false; format: string | null };
 
+/** A path item kept in another file, where `pointer` locates it; empty for the whole file. */
+export interface PathItemReference {
+  path: string;
+  file: FilePath;
+  pointer: string;
+}
+
 const DESCRIPTION_LIMIT = 300;
 
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 const URL_SCHEME = /^[a-z][a-z\d+.-]+:/i;
-
-// Not `x-codeSamples`: fumadocs makes each of those a fixed tab that the example selector cannot switch.
-const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
 
 // The options @scalar/json-magic bundles with, so a spec reads here as it does in the portal.
 const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
@@ -48,38 +51,26 @@ export class OpenApiDocument {
     }
   }
 
-  public serialize(fileName: FileName): string {
-    return fileName.hasExtension('.json') ? JSON.stringify(this.document, null, 2) : stringifyYaml(this.document);
-  }
-
+  /** Every operation declared inline or behind a `$ref` into this document; see `pathItemReferences` for the rest. */
   public endpoints(): Endpoint[] {
-    return Object.entries(this.paths()).flatMap(([path, pathItem]) =>
-      isInlinePathItem(pathItem)
-        ? Object.entries(pathItem)
-            .filter(([key, value]) => isOperation(key, value))
-            .map(([method]) => new Endpoint(method, path))
-        : []
-    );
+    return Object.entries(this.paths()).flatMap(([path, pathItem]) => this.endpointsOf(path, pathItem));
   }
 
-  public withCodeSamples(codeSamples: CodeSamples): OpenApiDocument {
-    if (!isJsonObject(this.document.paths)) {
-      return this;
-    }
-    const paths = Object.fromEntries(
-      Object.entries(this.paths()).map(([path, pathItem]) => [
-        path,
-        isInlinePathItem(pathItem) ? pathItemWithSamples(path, pathItem, codeSamples) : pathItem
-      ])
-    );
-    return new OpenApiDocument({ ...this.document, paths });
+  /** The path items kept in other local files, resolved against the `directory` this document sits in. */
+  public pathItemReferences(directory: DirectoryPath): PathItemReference[] {
+    return Object.entries(this.paths()).flatMap(([path, pathItem]) => {
+      const reference = isJsonObject(pathItem) && typeof pathItem.$ref === 'string' ? pathItem.$ref : '';
+      const [file, pointer = ''] = reference.split('#');
+      if (file === '' || URL_SCHEME.test(file)) {
+        return [];
+      }
+      return [{ path, file: new FilePath(directory.resolve(dirname(file)), new FileName(basename(file))), pointer }];
+    });
   }
 
-  /** The local files this document's `$ref`s name, resolved against the `directory` it sits in. */
-  public referencedFiles(directory: DirectoryPath): FilePath[] {
-    return [...references(this.document)]
-      .flatMap((reference) => referencedFile(reference) ?? [])
-      .map((file) => new FilePath(directory.resolve(dirname(file)), new FileName(basename(file))));
+  /** The operations of the path item `pointer` locates in this document, as they are mounted at `path`. */
+  public endpointsAt(path: string, pointer: string): Endpoint[] {
+    return this.endpointsOf(path, valueAt(this.document, pointer));
   }
 
   public format(): SpecFormat {
@@ -112,49 +103,40 @@ export class OpenApiDocument {
   private paths(): JsonObject {
     return isJsonObject(this.document.paths) ? this.document.paths : {};
   }
-}
 
-function isInlinePathItem(value: unknown): value is JsonObject {
-  return isJsonObject(value) && !('$ref' in value);
-}
+  private endpointsOf(path: string, pathItem: unknown): Endpoint[] {
+    return Object.entries(this.followLocal(pathItem, new Set()))
+      .filter(([key, value]) => HTTP_METHODS.has(key.toLowerCase()) && isJsonObject(value))
+      .map(([method]) => new Endpoint(method, path));
+  }
 
-function isOperation(key: string, value: unknown): value is JsonObject {
-  return HTTP_METHODS.has(key.toLowerCase()) && isJsonObject(value);
-}
-
-function pathItemWithSamples(path: string, pathItem: JsonObject, codeSamples: CodeSamples): JsonObject {
-  return Object.fromEntries(
-    Object.entries(pathItem).map(([key, value]) => [
-      key,
-      isOperation(key, value) ? withSamples(value, codeSamples.samplesFor(new Endpoint(key, path))) : value
-    ])
-  );
-}
-
-function withSamples(operation: JsonObject, samples: CodeSample[]): JsonObject {
-  const rest = Object.fromEntries(Object.entries(operation).filter(([key]) => key !== CODE_SAMPLES_EXTENSION));
-  return samples.length === 0 ? rest : { ...rest, [CODE_SAMPLES_EXTENSION]: samples };
-}
-
-function* references(node: unknown): Generator<string> {
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      yield* references(item);
+  // Siblings of a `$ref` override what it points to, as the portal bundles a path item.
+  private followLocal(pathItem: unknown, seen: Set<string>): JsonObject {
+    if (!isJsonObject(pathItem)) {
+      return {};
     }
-  } else if (isJsonObject(node)) {
-    for (const [key, value] of Object.entries(node)) {
-      if (key === '$ref' && typeof value === 'string') {
-        yield value;
-      } else {
-        yield* references(value);
-      }
+    const { $ref, ...siblings } = pathItem;
+    if (typeof $ref !== 'string' || !$ref.startsWith('#') || seen.has($ref)) {
+      return siblings;
     }
+    seen.add($ref);
+    return { ...this.followLocal(valueAt(this.document, $ref.slice(1)), seen), ...siblings };
   }
 }
 
-function referencedFile(reference: string): string | undefined {
-  const [file] = reference.split('#');
-  return file === '' || URL_SCHEME.test(file) ? undefined : file;
+function valueAt(document: JsonObject, pointer: string): unknown {
+  try {
+    const segments = pointer
+      .split('/')
+      .slice(1)
+      .map((segment) => decodeURIComponent(segment));
+    return segments.reduce<unknown>(
+      (node, segment) => (isJsonObject(node) ? node[segment.replace(/~1/g, '/').replace(/~0/g, '~')] : undefined),
+      document
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 // Version keys are strings in well-formed documents; anything else is named rather than

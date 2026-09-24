@@ -13,7 +13,7 @@ import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
-import { generateCodeSamples, reportUnplacedSamples, reportUnsampledSpecs } from './code-samples.js';
+import { generateCodeSamples, reportUnplacedSamples } from './code-samples.js';
 
 function describeSaveProblem(problem: PortalSaveProblem): string {
   switch (problem.kind) {
@@ -83,14 +83,6 @@ export class PortalGeneratePrompts {
 
   public unplacedSamples(endpoints: string[]) {
     reportUnplacedSamples(endpoints);
-  }
-
-  public unsampledSpecs(fileNames: FileName[]) {
-    reportUnsampledSpecs(fileNames);
-  }
-
-  public codeSamplesNotAdded(reason: string) {
-    log.error(reason);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {

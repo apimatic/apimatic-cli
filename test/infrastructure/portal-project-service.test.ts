@@ -8,11 +8,12 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
-import { OpenApiDocument } from '../../src/types/portal/openapi-document';
 import { PortalConfig } from '../../src/types/portal/portal-config';
 import { PortalSource } from '../../src/types/portal/portal-source';
 import { UrlPath } from '../../src/types/file/urlPath';
 import { Language } from '../../src/types/sdk/generate';
+
+const NO_SAMPLES = new CodeSamples([]);
 
 describe('PortalProjectService', () => {
   const service = new PortalProjectService();
@@ -25,10 +26,9 @@ describe('PortalProjectService', () => {
       {
         slug: 'calculator',
         file: new FilePath(new DirectoryPath(root).join('spec'), new FileName('api.json')),
-        document: OpenApiDocument.parse(new FileName('api.json'), '{}') as OpenApiDocument
+        endpoints: []
       }
     ],
-    specDirectory: new DirectoryPath(root).join('spec'),
     contentDirectory: null,
     staticDirectory: null,
     shadowedFiles: [],
@@ -72,7 +72,7 @@ describe('PortalProjectService', () => {
 
   describe('prepare', () => {
     it('links every dependency the template imports, resolved to a real package', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       const modules = path.join(project.toString(), 'node_modules');
       const linked = fs
@@ -92,7 +92,7 @@ describe('PortalProjectService', () => {
     });
 
     it('copies the template rather than moving it', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       expect(fs.existsSync(path.join(process.cwd(), 'portal-template', 'vite.config.ts'))).to.be.true;
       expect(fs.existsSync(path.join(project.toString(), 'vite.config.ts'))).to.be.true;
@@ -101,7 +101,7 @@ describe('PortalProjectService', () => {
     it('writes the spec, title and description into the generated config', async () => {
       const source = sourceFor({ config: PortalConfig.create('My API', 'Docs for it') });
 
-      (await service.prepare(project, source))._unsafeUnwrap();
+      (await service.prepare(project, source, NO_SAMPLES))._unsafeUnwrap();
 
       const config = readConfig();
       expect(config.title).to.equal('My API');
@@ -118,14 +118,14 @@ describe('PortalProjectService', () => {
         new UrlPath('https://docs.example.com')
       );
 
-      (await service.prepare(project, sourceFor({ config })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ config }), NO_SAMPLES))._unsafeUnwrap();
 
       expect(readConfig().logoUrl).to.equal('/images/logo.png');
       expect(readConfig().siteUrl).to.equal('https://docs.example.com');
     });
 
     it('reports no static directory when the project has none', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       expect(readConfig().staticDir).to.be.null;
     });
@@ -134,7 +134,7 @@ describe('PortalProjectService', () => {
       const contentDirectory = new DirectoryPath(root).join('content');
       fs.mkdirSync(contentDirectory.toString(), { recursive: true });
 
-      (await service.prepare(project, sourceFor({ contentDirectory })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ contentDirectory }), NO_SAMPLES))._unsafeUnwrap();
 
       const module = fs.readFileSync(path.join(project.toString(), 'src/lib/source.ts'), 'utf8');
       expect(module).to.not.contain('__APIMATIC_CONTENT_DIR__');
@@ -145,7 +145,7 @@ describe('PortalProjectService', () => {
       const contentDirectory = new DirectoryPath(root).join('content');
       fs.mkdirSync(contentDirectory.toString(), { recursive: true });
 
-      (await service.prepare(project, sourceFor({ contentDirectory })))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor({ contentDirectory }), NO_SAMPLES))._unsafeUnwrap();
 
       const stylesheet = fs.readFileSync(path.join(project.toString(), 'src/styles/app.css'), 'utf8');
       expect(stylesheet).to.not.contain('__APIMATIC_CONTENT_DIR__');
@@ -153,7 +153,7 @@ describe('PortalProjectService', () => {
     });
 
     it('substitutes the portal identity into the module the browser receives', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       const module = fs.readFileSync(path.join(project.toString(), 'src/lib/portal.ts'), 'utf8');
       expect(module).to.not.contain('__APIMATIC_PORTAL_IDENTITY__');
@@ -163,7 +163,7 @@ describe('PortalProjectService', () => {
     });
 
     it('creates an empty content directory when the project has none, so the build has one to read', async () => {
-      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
       const config = readConfig();
       expect(fs.existsSync(config.contentDir)).to.be.true;
@@ -171,7 +171,7 @@ describe('PortalProjectService', () => {
     });
   });
 
-  describe('addCodeSamples', () => {
+  describe('code samples', () => {
     const codeSamples = new CodeSamples([
       CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
         paths: { '/pets': { GET: { Example: 'await client.pets.list();' } } },
@@ -179,93 +179,31 @@ describe('PortalProjectService', () => {
       }) as CodeSampleCatalog
     ]);
 
-    const writeSpec = (fileName: string, document: unknown) => {
-      const specDirectory = path.join(root, 'spec');
-      fs.mkdirSync(specDirectory, { recursive: true });
-      fs.writeFileSync(path.join(specDirectory, fileName), JSON.stringify(document));
-      const name = new FileName(fileName);
-      return {
-        slug: name.withoutExtension().toString(),
-        file: new FilePath(new DirectoryPath(specDirectory), name),
-        document: OpenApiDocument.parse(name, JSON.stringify(document)) as OpenApiDocument
-      };
-    };
+    it('writes the samples beside the configuration, keyed by path and method, and names them in it', async () => {
+      (await service.prepare(project, sourceFor(), codeSamples))._unsafeUnwrap();
 
-    const petsSpec = (extra: Record<string, unknown> = {}) => ({
-      openapi: '3.0.0',
-      paths: { '/pets': { get: { responses: {}, ...extra } } }
+      const config = readConfig();
+      expect(config.codeSamples).to.equal(path.join(project.toString(), 'code-samples.json').split(path.sep).join('/'));
+      expect(JSON.parse(fs.readFileSync(config.codeSamples, 'utf8'))).to.deep.equal({
+        '/pets': {
+          GET: [{ lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }]
+        }
+      });
     });
 
-    it('points the spec at a copy in the project carrying its samples, leaving the original alone', async () => {
-      const spec = writeSpec('pets.json', petsSpec());
+    it('points each spec at its own file, samples or not', async () => {
+      const source = sourceFor();
 
-      const sampled = (
-        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples)
-      )._unsafeUnwrap();
+      (await service.prepare(project, source, codeSamples))._unsafeUnwrap();
 
-      const [copy] = sampled.source.specs;
-      expect(copy.file.toString()).to.equal(path.join(project.toString(), 'spec', 'pets.json'));
-      const written = JSON.parse(fs.readFileSync(copy.file.toString(), 'utf8'));
-      expect(written.paths['/pets'].get['x-apimatic-codeSamples']).to.deep.equal([
-        { lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }
-      ]);
-      expect(JSON.parse(fs.readFileSync(spec.file.toString(), 'utf8'))).to.deep.equal(petsSpec());
-      expect(sampled.unsampledSpecs).to.be.empty;
-      expect(sampled.specCopy.restorePaths(copy.file.toString())).to.equal(spec.file.toString());
+      expect(readConfig().specs.calculator).to.equal(source.specs[0].file.toString().split(path.sep).join('/'));
     });
 
-    it('leaves every spec on its original file, unnamed, when there are no samples', async () => {
-      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: '../shared/responses.json' } }));
+    it('names no samples when there are none', async () => {
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 
-      const sampled = (
-        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), new CodeSamples([]))
-      )._unsafeUnwrap();
-
-      expect(sampled.source.specs[0].file).to.equal(spec.file);
-      expect(sampled.unsampledSpecs).to.be.empty;
-      expect(fs.existsSync(path.join(project.toString(), 'spec'))).to.be.false;
-    });
-
-    it('reports a spec directory it cannot copy rather than throwing', async () => {
-      const spec = writeSpec('pets.json', petsSpec());
-      const specDirectory = new DirectoryPath(root).join('missing');
-
-      const result = await service.addCodeSamples(project, sourceFor({ specs: [spec], specDirectory }), codeSamples);
-
-      expect(result._unsafeUnwrapErr()).to.contain("The code samples could not be added to 'spec'");
-    });
-
-    it('copies the files a spec refers to, so its relative references still resolve', async () => {
-      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: './responses.json' } }));
-      fs.writeFileSync(path.join(root, 'spec', 'responses.json'), '{}');
-
-      (await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples))._unsafeUnwrap();
-
-      expect(fs.existsSync(path.join(project.toString(), 'spec', 'responses.json'))).to.be.true;
-    });
-
-    it('keeps a spec whose references leave spec/ on its original file, and names it', async () => {
-      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: '../shared/responses.json' } }));
-
-      const sampled = (
-        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples)
-      )._unsafeUnwrap();
-
-      expect(sampled.source.specs[0].file).to.equal(spec.file);
-      expect(sampled.unsampledSpecs.map(String)).to.deep.equal(['pets.json']);
-    });
-
-    it('also keeps a spec on its original file when a file it refers to leaves spec/', async () => {
-      const spec = writeSpec('pets.json', petsSpec({ responses: { $ref: './schemas/responses.json' } }));
-      fs.mkdirSync(path.join(root, 'spec', 'schemas'));
-      fs.writeFileSync(path.join(root, 'spec', 'schemas', 'responses.json'), '{ "$ref": "../../shared/ok.json" }');
-
-      const sampled = (
-        await service.addCodeSamples(project, sourceFor({ specs: [spec] }), codeSamples)
-      )._unsafeUnwrap();
-
-      expect(sampled.source.specs[0].file).to.equal(spec.file);
-      expect(sampled.unsampledSpecs.map(String)).to.deep.equal(['pets.json']);
+      expect(readConfig().codeSamples).to.be.null;
+      expect(fs.existsSync(path.join(project.toString(), 'code-samples.json'))).to.be.false;
     });
   });
 

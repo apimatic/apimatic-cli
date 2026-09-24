@@ -39,7 +39,3 @@ _Avoid_: Example name, variant
 **Unplaced sample**:
 A code sample whose endpoint no spec in the build directory declares.
 _Avoid_: Orphan sample, missing operation
-
-**Unsampled spec**:
-A spec whose references reach files outside `spec/`, so its reference pages are built without code samples.
-_Avoid_: Skipped spec, external spec

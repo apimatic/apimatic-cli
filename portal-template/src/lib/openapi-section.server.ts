@@ -1,5 +1,6 @@
 import { createOpenAPI } from 'fumadocs-openapi/server';
 import { bundleSpecification } from './openapi-bundle.server';
+import { placeCodeSamples, readCodeSamples } from './code-samples.server';
 import { apiBaseDir } from './shared';
 
 /**
@@ -8,8 +9,9 @@ import { apiBaseDir } from './shared';
  * One server per document, because `staticSource()` emits pages for every schema its server
  * knows about, so sharing a server across sections duplicates pages.
  */
-export function openApiSection(slug: string, file: string) {
-  return createOpenAPI({ input: { [slug]: () => bundleSpecification(file) } }).staticSource({
+export function openApiSection(slug: string, file: string, codeSamplesFile: string | null) {
+  const load = async () => placeCodeSamples(await bundleSpecification(file), await readCodeSamples(codeSamplesFile));
+  return createOpenAPI({ input: { [slug]: load } }).staticSource({
     baseDir: `${apiBaseDir}/${slug}`,
     groupBy: 'tag',
     meta: true

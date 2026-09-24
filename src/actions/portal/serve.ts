@@ -69,7 +69,7 @@ export class PortalServeAction {
     if (codeSamples.isErr()) {
       return ActionResult.failed();
     }
-    this.prompts.unplacedSamples(codeSamples.value.unplacedIn(source.value.specs.map((spec) => spec.document)));
+    this.prompts.unplacedSamples(codeSamples.value.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {
@@ -77,14 +77,7 @@ export class PortalServeAction {
     }
 
     return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const sampled = await this.projectService.addCodeSamples(tempDirectory, source.value, codeSamples.value);
-      if (sampled.isErr()) {
-        this.prompts.codeSamplesNotAdded(sampled.error);
-        return ActionResult.failed();
-      }
-      this.prompts.unsampledSpecs(sampled.value.unsampledSpecs);
-
-      const project = await this.projectService.prepare(tempDirectory, sampled.value.source);
+      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples.value);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);
         return ActionResult.failed();
@@ -93,7 +86,7 @@ export class PortalServeAction {
       const server = await this.prompts.startPreview(this.devServerService.start(project.value, servePort));
 
       if (server.isErr()) {
-        this.prompts.startFailed(sampled.value.specCopy.restorePaths(server.error.log));
+        this.prompts.startFailed(server.error.log);
         return ActionResult.failed();
       }
 
@@ -114,7 +107,7 @@ export class PortalServeAction {
       const outcome = await Promise.race([interrupted, stopped]);
 
       if (outcome.kind === 'exited') {
-        this.prompts.previewStopped(sampled.value.specCopy.restorePaths(outcome.output));
+        this.prompts.previewStopped(outcome.output);
         return ActionResult.failed();
       }
 

@@ -52,9 +52,9 @@ apimatic {quickstart | portal generate | portal serve}
   │  poll ◀────── status ──────────────────────────────────┤
   │  download ◀── portal-artifacts.zip ────────────────────┘
   │
-  ├─ merge code-samples/<lang>.json into a COPY of the spec tree as x-apimatic-codeSamples
+  ├─ write code-samples/<lang>.json into the temp project as one code-samples.json
   ├─ place sdk/<lang>.zip under the portal output's static assets
-  └─ vite build (or vite dev) over the annotated copy ──▶ portal
+  └─ vite build (or vite dev) over src/spec/, placing x-apimatic-codeSamples as it bundles ──▶ portal
 ```
 
 **The portal build runs on the user's machine.** APIMatic's backend estate is .NET end to
@@ -83,12 +83,11 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D9 | **The CLI synthesizes the zip**, with the language request carried by a config file inside it, mirroring how `plugin-config.json` drives the plugin flow. |
 | D11 | **Key a sample on `path` + `method`.** That is the document's own addressing and is guaranteed to be present and to match; `operationId` is optional in OpenAPI and codegen-v2 synthesizes one when it is absent. |
 | D12 | **Carry every declared example** on the wire, keyed by its OpenAPI `examples:` map key, and **special-case no key**: `"Example"` is only the placeholder for an operation's one snippet, so a spec's own `Example` beside other examples is kept like any other. |
-| D13 | **Copy the spec tree into the temp project and annotate the copy.** Relative `$ref`s then keep resolving. See D20 for refs that escape `src/spec/`. |
+| D13 | **The portal template places the samples, on each spec as it bundles it**, reading `src/spec/` where it is. Every `$ref` resolves as it would without samples, and path items behind a `$ref` are reached like inline ones. |
 | D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. |
 | D17 | The Func wiring is the critical path and is what this document specifies. |
 | D18 | **One `x-apimatic-codeSamples` entry per language, its `sources` keyed by example id**, and the tab follows the portal's example selector, which lists the ids codegen-v2 keys snippets by. `x-codeSamples` is ignored, hand-written or not: each entry is a fixed tab the selector cannot switch, and fumadocs-openapi 11.4.1 renders it empty. |
-| D19 | **One tab per language, in configured order**: `TypeScript, C#, …`. There is no cURL tab: fumadocs renders it from the example on its own terms, so it cannot agree with the SDK samples. |
-| D20 | **A spec with an escaping `$ref` falls back to its original file** and loses only its samples. Name the affected files in the warning; do not enumerate individual refs. |
+| D19 | **One tab per language, in configured order**: `TypeScript, C#, …`. There is no cURL tab beside them: fumadocs renders it from the example on its own terms, so it cannot agree with the SDK samples. An operation without SDK samples shows fumadocs' cURL tab alone. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
 | D22 | **Reuse codegen-v2's status vocabulary verbatim**, `SubscriptionError` included. The CLI's poller already handles all of it; the `SubscriptionError` callback status is new, so apimatic-io's callback handler must accept it. |
 | D24 | **Webhooks carry no request samples.** The catalog carries `paths` only. |
@@ -373,39 +372,38 @@ Following the 5-layer stack in `.ai/instructions.md`:
 | Call the endpoint, poll, download | Infrastructure service | `PortalArtifactsService` (`services/portal-artifacts-service.ts`), axios-auth variant |
 | Parse `code-samples/<lang>.json` | Types (value object) | `CodeSampleCatalog` |
 | The downloaded zip as a thing | Types (value object) | `PortalArtifacts` — `catalogs()`, `sdkZips()`, ignores unknown folders |
-| Inject `x-apimatic-codeSamples` | Types (value object) | `OpenApiDocument.withCodeSamples(codeSamples) -> OpenApiDocument` |
-| Detect escaping `$ref`s | Types (value object) + Infrastructure | `OpenApiDocument.referencedFiles(directory) -> FilePath[]`, followed file to file by `PortalProjectService` |
-| Copy + annotate the spec tree, repoint slugs | Infrastructure | `PortalProjectService` |
+| Write the samples for the template | Types (value object) + Infrastructure | `CodeSamples.toJson()`, written by `PortalProjectService.prepare()` as `code-samples.json` |
+| Inject `x-apimatic-codeSamples` | Portal template | `placeCodeSamples(document, samples)` in `code-samples.server.ts`, run on each bundled spec |
+| List each spec's endpoints for the unplaced warning | Types (value object) + context | `OpenApiDocument.endpoints()`, plus `pathItemReferences()` / `endpointsAt()` for path items in other files, read by `PortalSourceContext` |
 | Place `sdk/<lang>.zip` in the built site | Infrastructure | `PortalContext` — it already owns the output directory ([D35](#d35)) |
 | Poll loop | — | **reuse** `pollUntilCompleted`; [D22](#wire-format) makes it a no-change |
 
-Injection is a method on the document it rewrites: it has the most edge cases and most
-needs tests that touch neither network nor filesystem, and a value object gives both
-without reviving `src/application/`.
+Injection is a pure function over the bundled document: it has the most edge cases and
+most needs tests that touch neither network nor filesystem, and only once bundled is every
+operation an inline object, however the spec is split.
 
 ### 7.2 Merging the catalog into the spec
 
 `PortalProjectService.prepare()` already writes `portal.config.json` with a `specs` map of
-slug → **absolute path**, and each slug is independent. That is the whole seam:
+slug → **absolute path** into `src/spec/`. That is the whole seam ([D13](#wire-format)):
 
-1. Copy `src/spec/` into the temp project ([D13](#wire-format)).
-2. For each spec, walk `paths` and inject `x-apimatic-codeSamples` from each language's
-   catalog, replacing any the operation already carries.
-3. Point that slug at the annotated copy.
-4. For a spec with a `$ref` escaping `src/spec/`, **skip steps 1–3 and point the slug at
-   the original file** ([D20](#wire-format)). It then builds exactly as it does today and
-   loses only its samples.
+1. Write every language's catalog into the temp project as one `code-samples.json`, keyed
+   by path, then upper-case method, then a list of `{ lang, label, sources }` in configured
+   order, and name it in `portal.config.json` as `codeSamples` (`null` when there are none).
+2. The template's `openApiSection` bundles each spec as before, then `placeCodeSamples`
+   walks `paths` and gives each operation its endpoint's list as `x-apimatic-codeSamples`,
+   replacing any the operation already carries. With `codeSamples: null` the spec is left
+   as written.
 
-The walk needs no library. `document.paths` is a flat map; the traps are that a path item
-carries non-method keys (`summary`, `description`, `servers`, `parameters`) and that a
-whole path item can itself be a `$ref`, in which case there is no inline operation to
-annotate. Every library that does this walk also *normalizes* the document — upgrades
-3.0 → 3.1, rewrites refs, drops unrecognised keys — which for a docs portal is actively
-harmful: the customer's document is what must render.
+Placement runs after `bundleSpecification` has inlined path items, so an operation behind a
+`$ref`, into the document or another file, is annotated like an inline one. Paths that
+reference one path item share its operation objects, so each path item is rebuilt, never
+edited. The walk skips a path item's non-method keys (`summary`, `description`, `servers`,
+`parameters`) and keeps declaration order.
 
-Escaping-ref detection is a scan of `$ref` string values: skip `#/...` (internal) and URLs
-(which resolve identically from anywhere), resolve the rest against the file's directory,
-test containment in `src/spec/`, and repeat in every file reached, since a nested file's `../` breaks the copy too.
+The unplaced-sample warning runs in the CLI over each spec's endpoints: inline operations,
+path items behind a `#/` reference, and path items in another local file, which
+`PortalSourceContext` reads once. A file that refers on to a third is not followed.
 
 ### 7.3 Rendering the tabs
 
@@ -428,7 +426,10 @@ with one over `request-examples.ts`: the body's examples, or, when the body name
 `examples`, or a lone placeholder key, `Example` or the `default` fumadocs' 3.0 → 3.1
 upgrade gives a singular `example` — the ids of the first parameter that names any, in
 codegen-v2's order. `usage-tabs.tsx` replaces the usage tabs with one per language, each
-showing its snippet for the example the layout selects. A
+showing its snippet for the example the layout selects, or a lone cURL tab for an operation
+without SDK samples ([D19](#wire-format)). The layout opens on the example fumadocs picks from
+`x-exclusiveCodeSample` or `x-selectedCodeSample`, and leaves the selector out when fumadocs
+does. Parameters and examples given as `$ref`s are followed with fumadocs' own resolver. A
 language without a snippet for that example shows a note, never another example's code;
 an empty snippet is still a snippet. With one example, the language's only snippet shows
 whatever its key. A malformed entry is skipped rather than failing the page.
@@ -519,28 +520,27 @@ The catalog shape in [§4.5](#45-the-code-sample-catalog) matches the merged ren
 | R2 | **`portal serve` now costs a full orchestration at startup** — serially, given the pinned concurrency, against a 25-minute budget. Accepted under [D27](#d27), but it is the single biggest change to the feel of the command. |
 | R3 | **Retry-safety is a prerequisite, not a follow-up.** Retries are limited to transient storage failures, but a retried activity that does not clean up stale state still produces a run that never finishes — a worse failure than the transient one being papered over. |
 | R4 | **`apimatic.json` is owned elsewhere.** This document treats it as fixed input; if its shape moves, [§4.2](#42-request-the-build-zip) moves with it. The portal's `PortalConfig.parse` and the signup page's *Download build* must change together, or the first command on a downloaded build hard-stops. |
-| R5 | **`--verbose` does not exist.** [D20](#wire-format) names affected spec files rather than individual `$ref`s because there is no verbose mode to put the detail behind. **TODO:** enumerate the exact refs once a `--verbose` flag exists. |
 | R6 | **The API playground follows fumadocs' own example list**, so a parameter-derived id does not reach it. |
 
 ---
 
 ## 10. Test plan
 
-**CLI, unit.** Injection is a pure function, so most of this needs no filesystem:
+**CLI and template, unit.** Injection is a pure function, so most of this needs no filesystem:
 
 - A catalog entry keyed by a path/method the document does not contain → warn, do not fail.
 - An operation's only snippet shows for its only example whatever its key; `"Example"`
   beside other keys is kept as an ordinary id; a body that names no id selects among its
   parameters' ids; a language without a snippet for the selected example shows a note.
 - Tab order: languages in configured order.
-- A path item that is itself a `$ref` → skipped without throwing.
+- A path item that is itself a `$ref`, into the document or another file → its operations
+  get their samples, and do not count as unplaced.
 - Non-method keys on a path item (`summary`, `parameters`, `servers`) → not treated as
   operations.
 - Declaration order preserved, not sorted.
 - A language present in `languages` but absent from the zip → its tabs are simply absent.
 - An unknown top-level folder in the artifact zip → ignored, not an error.
-- Escaping-`$ref` detection: internal `#/...` and URL refs do not count; a `../` ref does, in the spec or in any file it reaches.
-- A spec with an escaping ref keeps its slug pointed at the **original** file.
+- Every slug points at the user's own file in `src/spec/`, samples or not.
 
 **CLI, integration** (nock): 202 → poll → 302 → download; `Failed` with errors; a status
 token outside the closed set (asserts the timeout, documenting the hang); the 30-minute
@@ -553,4 +553,4 @@ first-attempt one.
 
 **Manual** (`APIMATIC_BASE_URL` → `api.dev.apimatic.io`): a three-language portal switches
 every language's snippet with the example selector; a spec with a sibling `$ref` still builds;
-`portal serve` starts after a full generation; Ctrl+C mid-generation leaves nothing behind.
+`portal serve` starts after a full generation and shows a spec edit on refresh; Ctrl+C mid-generation leaves nothing behind.

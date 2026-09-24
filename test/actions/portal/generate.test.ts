@@ -9,7 +9,6 @@ import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
-import { SpecCopy } from '../../../src/types/portal/spec-copy';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
 import { ServiceError } from '../../../src/infrastructure/service-error';
 import { FileService } from '../../../src/infrastructure/file-service';
@@ -30,7 +29,6 @@ describe('GenerateAction', () => {
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
   let prepare: sinon.SinonStub;
-  let addCodeSamples: sinon.SinonStub;
 
   const execute = (source = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
@@ -70,9 +68,6 @@ describe('GenerateAction', () => {
       .callsFake(async (projectDirectory) =>
         ok({ projectDirectory, viteBinary: new FilePath(projectDirectory, new FileName('vite.js')) })
       );
-    addCodeSamples = sinon
-      .stub(PortalProjectService.prototype, 'addCodeSamples')
-      .callsFake(async (_projectDirectory, source) => ok({ source, unsampledSpecs: [], specCopy: SpecCopy.none() }));
     authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
     build = sinon.stub(PortalBuildService.prototype, 'build').resolves(ok({ output: builtSite, pageCount: 3 }));
   });
@@ -92,30 +87,15 @@ describe('GenerateAction', () => {
     expect(fs.existsSync(portalDirectory.toString())).to.be.false;
   });
 
-  it('fails without building when the code samples cannot be added to the spec', async () => {
-    addCodeSamples.resolves(err('EBUSY: resource busy or locked'));
-
-    const result = await execute();
-
-    expect(result.isFailed()).to.be.true;
-    expect(prompts.codeSamplesNotAdded.calledOnceWith('EBUSY: resource busy or locked')).to.be.true;
-    expect(build.called).to.be.false;
-  });
-
-  it('builds from a copy of each spec carrying its code samples', async () => {
-    addCodeSamples.restore();
-    let built = '';
-    prepare.callsFake(async (projectDirectory, source) => {
-      built = fs.readFileSync(source.specs[0].file.toString(), 'utf8');
-      return ok({ projectDirectory, viteBinary: new FilePath(projectDirectory, new FileName('vite.js')) });
-    });
+  it("builds from the user's own specs, handing the project their code samples", async () => {
     process.env.APIMATIC_CODE_SAMPLES_PATH = 'test/resources/code-samples.json';
 
     const result = await execute(CODE_SAMPLES_FIXTURE).finally(() => delete process.env.APIMATIC_CODE_SAMPLES_PATH);
 
     expect(result.isSuccess()).to.be.true;
-    expect(prepare.firstCall.args[1].specs[0].file.toString()).to.not.contain(CODE_SAMPLES_FIXTURE.toString());
-    expect(built).to.contain('x-apimatic-codeSamples');
+    const [, source, codeSamples] = prepare.firstCall.args;
+    expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
+    expect(codeSamples.isEmpty()).to.be.false;
     expect(prompts.unplacedSamples.calledOnceWith([])).to.be.true;
   });
 

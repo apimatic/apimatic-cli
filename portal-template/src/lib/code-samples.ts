@@ -1,6 +1,6 @@
 import { isJsonObject } from './json-object';
 
-const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
+export const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
 
 export class CodeSample {
   private constructor(

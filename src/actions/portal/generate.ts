@@ -80,17 +80,10 @@ export class GenerateAction {
     if (codeSamples.isErr()) {
       return ActionResult.failed();
     }
-    this.prompts.unplacedSamples(codeSamples.value.unplacedIn(source.value.specs.map((spec) => spec.document)));
+    this.prompts.unplacedSamples(codeSamples.value.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
 
     return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const sampled = await this.projectService.addCodeSamples(tempDirectory, source.value, codeSamples.value);
-      if (sampled.isErr()) {
-        this.prompts.codeSamplesNotAdded(sampled.error);
-        return ActionResult.failed();
-      }
-      this.prompts.unsampledSpecs(sampled.value.unsampledSpecs);
-
-      const project = await this.projectService.prepare(tempDirectory, sampled.value.source);
+      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples.value);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);
         return ActionResult.failed();
@@ -100,9 +93,8 @@ export class GenerateAction {
 
       if (build.isErr()) {
         // Written before the temp directory is removed, so the log outlives the build.
-        const log = sampled.value.specCopy.restorePaths(build.error.log);
-        const logPath = await portalContext.saveBuildLog(log);
-        this.prompts.buildFailed(log, logPath);
+        const logPath = await portalContext.saveBuildLog(build.error.log);
+        this.prompts.buildFailed(build.error.log, logPath);
         return ActionResult.failed();
       }
 

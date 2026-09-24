@@ -1,8 +1,6 @@
 import { expect } from 'chai';
 import { CodeSampleCatalog, CodeSamples } from '../../../src/types/portal/code-samples';
 import { Endpoint } from '../../../src/types/portal/endpoint';
-import { OpenApiDocument } from '../../../src/types/portal/openapi-document';
-import { FileName } from '../../../src/types/file/fileName';
 import { Language } from '../../../src/types/sdk/generate';
 
 const catalog = (language: Language, paths: unknown): CodeSampleCatalog => {
@@ -79,11 +77,24 @@ describe('CodeSamples', () => {
       catalog(Language.TYPESCRIPT, { '/pets': { GET: { Example: 'a' } }, '/owners': { GET: { Example: 'b' } } }),
       catalog(Language.CSHARP, { '/owners': { GET: { Example: 'c' } } })
     ]);
-    const document = OpenApiDocument.parse(
-      new FileName('spec.json'),
-      JSON.stringify({ openapi: '3.0.0', paths: { '/pets': { get: {} } } })
-    ) as OpenApiDocument;
 
-    expect(codeSamples.unplacedIn([document])).to.deep.equal(['GET /owners']);
+    expect(codeSamples.unplacedIn([new Endpoint('get', '/pets')])).to.deep.equal(['GET /owners']);
+  });
+
+  it("writes each endpoint's samples keyed by path and upper-case method, languages in catalog order", () => {
+    const codeSamples = new CodeSamples([
+      catalog(Language.TYPESCRIPT, { '/pets': { get: { Example: 'a' }, POST: { Example: 'b' } } }),
+      catalog(Language.CSHARP, { '/pets': { GET: { Example: 'c' } } })
+    ]);
+
+    expect(codeSamples.toJson()).to.deep.equal({
+      '/pets': {
+        GET: [
+          { lang: 'typescript', label: 'TypeScript', sources: { Example: 'a' } },
+          { lang: 'csharp', label: 'C#', sources: { Example: 'c' } }
+        ],
+        POST: [{ lang: 'typescript', label: 'TypeScript', sources: { Example: 'b' } }]
+      }
+    });
   });
 });
