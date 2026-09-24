@@ -294,9 +294,14 @@ function isSpecSection(context: NavigationContext, child: Node): child is Folder
 /** The first page beneath a folder, at any depth; a section's pages sit under its tag folders. */
 function firstPageIn(folder: Folder): Node | undefined {
   for (const child of folder.children) {
-    const page = child.type === 'page' ? child : child.type === 'folder' ? firstPageIn(child) : undefined;
-    if (page !== undefined) {
-      return page;
+    if (child.type === 'page') {
+      return child;
+    }
+    if (child.type === 'folder') {
+      const page = firstPageIn(child);
+      if (page !== undefined) {
+        return page;
+      }
     }
   }
   return undefined;

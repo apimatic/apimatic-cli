@@ -25,13 +25,11 @@ export function portalTabs(tree: PageTree.Root): LayoutTab[] {
 function firstPageUrl(folder: PageTree.Folder): string | undefined {
   if (folder.index !== undefined) return folder.index.url;
   for (const child of folder.children) {
-    const url =
-      child.type === 'page' && !child.external
-        ? child.url
-        : child.type === 'folder'
-          ? firstPageUrl(child)
-          : undefined;
-    if (url !== undefined) return url;
+    if (child.type === 'page' && !child.external) return child.url;
+    if (child.type === 'folder') {
+      const url = firstPageUrl(child);
+      if (url !== undefined) return url;
+    }
   }
   return undefined;
 }
