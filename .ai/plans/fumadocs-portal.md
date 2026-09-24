@@ -145,10 +145,10 @@ from Google Fonts at runtime, Fumadocs page actions) except where noted.
   reach. Without this every page carried the whole specification twice (inlined
   router state plus the server-function cache file), so output grew with
   pages x document size: 150 Stripe operations produced 812 MB.
-- Request samples: only curl is generated (`createOpenAPIPage({ codeUsages })` with a
-  registry holding the curl generator alone, `src/components/api-page.tsx`). Other
-  languages come from `x-apimatic-codeSamples` on each operation, which the CLI adds to a
-  copy of the spec; `src/components/usage-tabs.tsx` renders them beside the generated one.
+- Request samples: none are generated (`createOpenAPIPage({ codeUsages })` with an empty
+  registry, `src/components/api-page.tsx`), so there is no curl tab. Every language comes
+  from `x-apimatic-codeSamples` on each operation, which the CLI adds to a copy of the spec;
+  `src/components/usage-tabs.tsx` renders one tab per language, following the example selector.
 - Per-route `head()` with title, meta description (frontmatter or operation summary) and canonical URL.
 - Static Orama search index (`server.staticGET()`), `llms.txt` with a cheap per-page renderer (never serialize the spec per page).
 - Reads `portal.config.json` written by the CLI into the build directory (title, description, logo URL, absolute spec paths, absolute static dir); the content dir is the generated literal described above.
