@@ -50,9 +50,9 @@ const SCHEMA_LISTS = new Set(['allOf', 'anyOf', 'oneOf', 'prefixItems']);
 // Hold values, or examples of them, and never a schema.
 const DATA_KEYS = new Set(['example', 'examples', 'default', 'enum', 'const']);
 
-// The segments by which the OpenAPI 3.0 upgrader decides a node is a schema: its
-// `isSchemaPath`, which fumadocs-openapi bundles rather than depends on, so it cannot be
-// imported. A schema anywhere this misses is upgraded as some other object.
+// The segments by which the OpenAPI 3.0 upgrader decides a node is a schema: `isSchemaPath`
+// in @scalar/openapi-upgrader 0.2.15, which fumadocs-openapi bundles rather than depends on,
+// so it cannot be imported. A schema anywhere this misses is upgraded as some other object.
 const UPGRADER_SCHEMA_SEGMENTS = new Set([
   'properties',
   'items',
