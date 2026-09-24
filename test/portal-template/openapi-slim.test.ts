@@ -226,6 +226,49 @@ describe('slimOpenAPIPageProps', () => {
       expect(Object.keys(schemas)).to.deep.equal(['DeleteBody']);
     });
 
+    describe('the operations OpenAPI 3.2 adds', () => {
+      const body = (schema: string) => ({
+        responses: {
+          '200': { content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } } }
+        }
+      });
+      const newer = {
+        openapi: '3.2.0',
+        info: document.info,
+        paths: {
+          '/pets': {
+            get: body('Listed'),
+            query: body('Found'),
+            additionalOperations: { COPY: body('Copied'), LINK: body('Linked') }
+          }
+        },
+        components: { schemas: { Listed: {}, Found: {}, Copied: {}, Linked: {} } }
+      };
+      const slimNewer = (method: string) =>
+        bundledOf(
+          slimOpenAPIPageProps({
+            document: 'newer',
+            payload: { bundled: newer as never },
+            operations: [{ path: '/pets', method }]
+          } as unknown as Props)
+        );
+
+      it('drops a query operation and the additional ones beside the rendered method', () => {
+        const slim = slimNewer('get');
+
+        expect(Object.keys(slim.paths['/pets'])).to.deep.equal(['get']);
+        expect(Object.keys(slim.components.schemas)).to.deep.equal(['Listed']);
+      });
+
+      it('keeps the one additional operation a page renders', () => {
+        const slim = slimNewer('copy');
+
+        expect(Object.keys(slim.paths['/pets'])).to.deep.equal(['additionalOperations']);
+        expect(Object.keys(slim.paths['/pets'].additionalOperations)).to.deep.equal(['COPY']);
+        expect(Object.keys(slim.components.schemas)).to.deep.equal(['Copied']);
+      });
+    });
+
     it('passes a path item that is itself a reference through untouched', () => {
       const referenced = {
         openapi: '3.1.0',

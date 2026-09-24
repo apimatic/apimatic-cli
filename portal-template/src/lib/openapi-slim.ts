@@ -1,4 +1,6 @@
 import type { OpenAPIPageProps_Spec } from 'fumadocs-openapi/ui';
+import { isJsonObject } from './json';
+import { OPERATION_METHODS } from './openapi-methods';
 
 type Document = OpenAPIPageProps_Spec['payload']['bundled'];
 type Components = Record<string, Record<string, unknown>>;
@@ -12,7 +14,7 @@ const COMPONENT_REF = /^#\/components\/([^/]+)\/([^/]+)/;
 // references to point inside it. These never take the `#/components/` shape above.
 const EXTERNAL_REF = /^#\/x-ext\/(.+)$/;
 
-const METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
+const METHODS = new Set(OPERATION_METHODS);
 
 /**
  * Cuts the bundled document down to what this page can reach: the operations it renders, the
@@ -79,20 +81,26 @@ function pick(
 }
 
 /**
- * Drops the operations the page does not render. Fumadocs reads only `pathItem[method]`, so
- * without this a page carries every sibling method and the schema closure each one reaches.
- * Non-method fields stay: the renderer reads path-level `parameters` and `servers` here too.
+ * Drops the operations the page does not render, those under OpenAPI 3.2's
+ * `additionalOperations` included. Fumadocs reads only `pathItem[method]`, so without this a
+ * page carries every sibling method and the schema closure each one reaches. Non-method fields
+ * stay: the renderer reads path-level `parameters` and `servers` here too.
  */
 function narrowToMethods(item: unknown, methods: Set<string>): unknown {
-  if (methods.size === 0 || item === null || typeof item !== 'object' || Array.isArray(item)) return item;
+  if (methods.size === 0 || !isJsonObject(item)) return item;
 
-  const entries = Object.entries(item as Record<string, unknown>);
+  const entries = Object.entries(item);
   // An item that is itself a reference carries no operations to narrow.
   if (entries.some(([key]) => key === '$ref')) return item;
 
   const out: Record<string, unknown> = {};
   for (const [key, value] of entries) {
-    if (!METHODS.has(key.toLowerCase()) || methods.has(key.toLowerCase())) out[key] = value;
+    if (key === 'additionalOperations' && isJsonObject(value)) {
+      const kept = Object.entries(value).filter(([method]) => methods.has(method.toLowerCase()));
+      if (kept.length > 0) out[key] = Object.fromEntries(kept);
+    } else if (!METHODS.has(key.toLowerCase()) || methods.has(key.toLowerCase())) {
+      out[key] = value;
+    }
   }
   return out;
 }

@@ -1,10 +1,6 @@
 import type { Document } from 'fumadocs-openapi';
-
-/**
- * The fixed fields of a path item that hold an operation, OpenAPI 3.2's `query` included.
- * Fumadocs builds pages for fewer of them, but any it keeps rides along in every page's payload.
- */
-const METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace', 'query'];
+import { isJsonObject } from './json';
+import { OPERATION_METHODS } from './openapi-methods';
 
 type Json = Record<string, unknown>;
 
@@ -30,7 +26,7 @@ export function withoutInternalOperations(document: Document): Document {
 
 /** The map as given when nothing in it is hidden, else a copy without what is. */
 function pathItemsShown(root: Json, items: unknown): unknown {
-  if (!isObject(items)) {
+  if (!isJsonObject(items)) {
     return items;
   }
   let changed = false;
@@ -65,12 +61,12 @@ function pathItemShown(root: Json, item: unknown): unknown {
 }
 
 function withoutInternal(item: Json): Json {
-  const isShown = (operation: unknown) => !isObject(operation) || !isInternal(operation);
+  const isShown = (operation: unknown) => !isJsonObject(operation) || !isInternal(operation);
   const copy: Json = { ...item };
-  for (const method of METHODS) {
+  for (const method of OPERATION_METHODS) {
     if (!isShown(copy[method])) delete copy[method];
   }
-  if (isObject(item.additionalOperations)) {
+  if (isJsonObject(item.additionalOperations)) {
     const additional = Object.fromEntries(
       Object.entries(item.additionalOperations).filter(([, operation]) => isShown(operation))
     );
@@ -81,12 +77,12 @@ function withoutInternal(item: Json): Json {
 }
 
 function holdsOperation(item: Json): boolean {
-  return METHODS.some((method) => isObject(item[method])) || isObject(item.additionalOperations);
+  return OPERATION_METHODS.some((method) => isJsonObject(item[method])) || isJsonObject(item.additionalOperations);
 }
 
 function operationsOf(item: Json): Json[] {
-  const additional = isObject(item.additionalOperations) ? Object.values(item.additionalOperations) : [];
-  return [...METHODS.map((method) => item[method]), ...additional].filter(isObject);
+  const additional = isJsonObject(item.additionalOperations) ? Object.values(item.additionalOperations) : [];
+  return [...OPERATION_METHODS.map((method) => item[method]), ...additional].filter(isJsonObject);
 }
 
 /**
@@ -97,7 +93,7 @@ function operationsOf(item: Json): Json[] {
  * followed is left in place, with what was found on the way.
  */
 function resolvePathItem(root: Json, item: unknown, seen = new Set<string>()): Json | undefined {
-  if (!isObject(item)) {
+  if (!isJsonObject(item)) {
     return undefined;
   }
   const { $ref, ...siblings } = item;
@@ -132,7 +128,7 @@ function withoutEmptiedTags(root: Json, shown: Json): void {
   // Here a tag stands for the operations it carries, so one kept in `tags` only as a group goes.
   if (Array.isArray(shown['x-tagGroups'])) {
     shown['x-tagGroups'] = (shown['x-tagGroups'] as unknown[]).flatMap((group) => {
-      if (!isObject(group) || !Array.isArray(group.tags)) return [group];
+      if (!isJsonObject(group) || !Array.isArray(group.tags)) return [group];
       const tags = group.tags.filter((name) => typeof name !== 'string' || !(emptied.has(name) || gone.has(name)));
       return tags.length > 0 ? [{ ...group, tags }] : [];
     });
@@ -159,7 +155,7 @@ function tagsThatGo(tags: unknown[], emptied: Set<string>, kept: Set<string>): S
 }
 
 function nameOf(tag: unknown): string | undefined {
-  return isObject(tag) && typeof tag.name === 'string' ? tag.name : undefined;
+  return isJsonObject(tag) && typeof tag.name === 'string' ? tag.name : undefined;
 }
 
 function isNamedIn(tag: unknown, names: Set<string>): boolean {
@@ -168,12 +164,12 @@ function isNamedIn(tag: unknown, names: Set<string>): boolean {
 }
 
 function parentOf(tag: unknown): string[] {
-  return isObject(tag) && typeof tag.parent === 'string' ? [tag.parent] : [];
+  return isJsonObject(tag) && typeof tag.parent === 'string' ? [tag.parent] : [];
 }
 
 function tagsUsed(document: Json): Set<string> {
   const tags = [document.paths, document.webhooks]
-    .flatMap((items) => (isObject(items) ? Object.values(items) : []))
+    .flatMap((items) => (isJsonObject(items) ? Object.values(items) : []))
     .flatMap((item) => operationsOf(resolvePathItem(document, item) ?? {}))
     .flatMap((operation): unknown[] => (Array.isArray(operation.tags) ? operation.tags : []));
   return new Set(tags.filter((tag): tag is string => typeof tag === 'string'));
@@ -186,7 +182,7 @@ function resolveLocal(root: Json, ref: string): unknown {
   }
   let node: unknown = root;
   for (const token of ref.slice(2).split('/')) {
-    if (!isObject(node)) return undefined;
+    if (!isJsonObject(node)) return undefined;
     let key: string;
     try {
       key = decodeURIComponent(token);
@@ -197,8 +193,4 @@ function resolveLocal(root: Json, ref: string): unknown {
     node = node[key.replaceAll('~1', '/').replaceAll('~0', '~')];
   }
   return node;
-}
-
-function isObject(value: unknown): value is Json {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
