@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
@@ -32,8 +33,14 @@ describe('FileWatchService', () => {
     await settled();
   };
 
-  const watchFile = (onChange: () => Promise<void>, onFailed: (reason: string) => void = () => undefined) => {
-    watch = service.watch(new DirectoryPath(root), new FileName('apimatic.json'), onChange, onFailed)._unsafeUnwrap();
+  const watchFile = (
+    onChange: () => Promise<void>,
+    onFailed: (reason: string) => void = () => undefined,
+    directory = root
+  ) => {
+    watch = service
+      .watch(new DirectoryPath(directory), new FileName('apimatic.json'), onChange, onFailed)
+      ._unsafeUnwrap();
   };
 
   beforeEach(async () => {
@@ -217,6 +224,31 @@ describe('FileWatchService', () => {
 
     expect(started).to.be.true;
     expect(finished).to.be.true;
+  });
+
+  // Without the real path this aborts the whole run rather than failing the test.
+  it('watches a directory named by its 8.3 short name', async function () {
+    // Windows gives the short name only where the volume keeps them, and the long one otherwise.
+    const short =
+      process.platform === 'win32'
+        ? execSync(`for %I in ("${root}") do @echo %~sI`, { encoding: 'utf8' }).trim()
+        : root;
+    if (short.toLowerCase() === root.toLowerCase()) {
+      this.skip();
+    }
+    let calls = 0;
+    watchFile(
+      async () => {
+        calls += 1;
+      },
+      undefined,
+      short
+    );
+
+    fs.writeFileSync(file(), '{"a":1}');
+    await until(() => calls >= 1);
+
+    expect(calls).to.equal(1);
   });
 
   it('says so when the directory cannot be watched', () => {

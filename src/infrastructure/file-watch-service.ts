@@ -61,8 +61,11 @@ export class FileWatchService {
     };
 
     try {
+      // On Windows, libuv aborts the whole process at the first event under a directory named by
+      // its 8.3 short name, as a TEMP of C:\Users\RUNNER~1\... is, so the real path is watched.
+      const watched = fs.realpathSync.native(directory.toString());
       // Some platforms leave the name out of an event; one without it may be this file.
-      watcher = fs.watch(directory.toString(), (_event, changed) => {
+      watcher = fs.watch(watched, (_event, changed) => {
         if (closed || (changed !== null && !fileName.is(changed.toString()))) {
           return;
         }
