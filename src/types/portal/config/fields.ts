@@ -91,7 +91,11 @@ export function oneOf<T extends string>(value: unknown, path: string, allowed: r
   if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) {
     return ok(value as T);
   }
-  return err([`'${path}' must be one of ${allowed.map((entry) => `'${entry}'`).join(', ')}.`]);
+  return err([`'${path}' must be one of ${quotedList(allowed)}.`]);
+}
+
+export function quotedList(values: readonly string[]): string {
+  return values.map((value) => `'${value}'`).join(', ');
 }
 
 export function nonEmptyString(value: unknown, path: string): Parsed<string> {

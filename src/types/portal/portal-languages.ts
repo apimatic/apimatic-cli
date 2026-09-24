@@ -1,7 +1,7 @@
 import { err, ok, Result } from 'neverthrow';
 import { ConfigFinding, findingSentences } from '../apimatic-config/document.js';
 import { Language } from '../sdk/generate.js';
-import { isJsonObject } from './config/fields.js';
+import { isJsonObject, quotedList } from './config/fields.js';
 
 const KNOWN_LANGUAGES: readonly string[] = Object.values(Language);
 
@@ -37,11 +37,7 @@ export class PortalLanguages {
       errors.push(REQUIRED);
     }
     for (const key of keys.filter((key) => !KNOWN_LANGUAGES.includes(key))) {
-      errors.push(
-        `'languages.${key}' is not an SDK language; name one of ${KNOWN_LANGUAGES.map((known) => `'${known}'`).join(
-          ', '
-        )}.`
-      );
+      errors.push(`'languages.${key}' is not an SDK language; name one of ${quotedList(KNOWN_LANGUAGES)}.`);
     }
     if (errors.length > 0) {
       return err(errors);

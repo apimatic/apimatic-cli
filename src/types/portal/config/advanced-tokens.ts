@@ -1,5 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
-import { allOf, namespace, nonEmptyString, Parsed, unknownKeys } from './fields.js';
+import { allOf, namespace, nonEmptyString, Parsed, quotedList, unknownKeys } from './fields.js';
 
 /**
  * The tokens every Fumadocs preset sets once per colour mode. The status and diff colours are
@@ -78,9 +78,7 @@ export class AdvancedTokens {
       for (const [name, token] of Object.entries(data)) {
         if (!(MODE_TOKENS as readonly string[]).includes(name)) {
           errors.push(
-            `'${path}.${name}' is not a token the preset sets per colour mode; name one of ${MODE_TOKENS.map(
-              (known) => `'${known}'`
-            ).join(', ')}.`
+            `'${path}.${name}' is not a token the preset sets per colour mode; name one of ${quotedList(MODE_TOKENS)}.`
           );
           continue;
         }
