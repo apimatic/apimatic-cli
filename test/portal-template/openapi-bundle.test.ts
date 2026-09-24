@@ -147,9 +147,10 @@ describe('bundleSpecification', () => {
     expect(document.components.schemas.Pet).to.deep.equal({ type: 'object', examples: [{ id: 1 }] });
   });
 
-  it('files the schema a schema file only passes on', async () => {
+  it('files the schemas a chain of schema files only passes on', async () => {
     write('Pet.yaml', { $ref: './Animal.yaml' });
-    write('Animal.yaml', { type: 'object' });
+    write('Animal.yaml', { $ref: './Being.yaml' });
+    write('Being.yaml', { type: 'object' });
     const file = write('openapi.yaml', {
       openapi: '3.1.0',
       info,
@@ -160,7 +161,8 @@ describe('bundleSpecification', () => {
 
     expect(document.components.schemas).to.deep.equal({
       Pet: { $ref: '#/components/schemas/Animal' },
-      Animal: { type: 'object' }
+      Animal: { $ref: '#/components/schemas/Being' },
+      Being: { type: 'object' }
     });
   });
 

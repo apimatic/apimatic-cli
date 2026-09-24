@@ -204,14 +204,21 @@ function isNamedMap(path: string[]): boolean {
 }
 
 // A schema file that is nothing but a reference makes what it names a schema too, though
-// nothing may reference that from a schema position itself. Entries added here are visited by
-// this same loop.
+// nothing may reference that from a schema position itself.
 function addPassedOnSchemas(document: Node, targets: Map<string, string[]>): void {
-  for (const segments of targets.values()) {
-    const node = resolve(document, segments);
-    const next = isNode(node) && typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
-    if (next && isHoistable(document, next) && !targets.has(key(next))) targets.set(key(next), next);
+  for (const segments of [...targets.values()]) {
+    let next = passedOn(document, segments);
+    while (next && !targets.has(key(next))) {
+      targets.set(key(next), next);
+      next = passedOn(document, next);
+    }
   }
+}
+
+function passedOn(document: Node, segments: string[]): string[] | undefined {
+  const node = resolve(document, segments);
+  const next = isNode(node) && typeof node.$ref === 'string' ? pointerSegments(node.$ref) : undefined;
+  return next && isHoistable(document, next) ? next : undefined;
 }
 
 /** Files each target under `components/schemas`, and returns the pointer to where each one went. */
