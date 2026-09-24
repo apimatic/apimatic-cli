@@ -61,11 +61,14 @@ export class Link {
   }
 
   // Resolved as a browser resolves it, against an origin no link can name: `//host`, `/\host`
-  // and a slash followed by a tab all start with '/' and still lead to another site.
+  // and a slash followed by a tab all start with '/' and still lead to another site. So does
+  // `/.//host`: it stays on the portal, but its dot segment drops away and leaves `//host` as
+  // the path the header writes out.
   private static pageOfThePortal(text: string): string | undefined {
     try {
       const resolved = new URL(text, PORTAL_ORIGIN);
-      return resolved.origin === PORTAL_ORIGIN ? `${resolved.pathname}${resolved.search}${resolved.hash}` : undefined;
+      const onThePortal = resolved.origin === PORTAL_ORIGIN && !resolved.pathname.startsWith('//');
+      return onThePortal ? `${resolved.pathname}${resolved.search}${resolved.hash}` : undefined;
     } catch {
       return undefined;
     }

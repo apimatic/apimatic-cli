@@ -54,7 +54,7 @@
         "url": {
           "type": "string",
           "description": "A page of the portal starting with '/', or an address starting with 'https://' or 'http://'.",
-          "pattern": "^\\s*(?:/(?![\\t\\n\\r]*[/\\\\])[\\s\\S]*|[hH][tT][tT][pP][sS]?://[^\\s/?#]+(?:[/?#][\\s\\S]*)?\\s*)$"
+          "pattern": "^\\s*(?:/(?![\\t\\n\\r]*[/\\\\])(?:(?![/\\\\][\\t\\n\\r]*[/\\\\])[^?#])*(?:[?#][\\s\\S]*)?|[hH][tT][tT][pP][sS]?://[^\\s/?#]+(?:[/?#][\\s\\S]*)?\\s*)$"
         }
       }
     },

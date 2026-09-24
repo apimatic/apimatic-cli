@@ -352,6 +352,21 @@ describe('PortalConfig', () => {
       }
     });
 
+    // Each stays on the portal as written, but resolves to the path `//example.com`, which the
+    // header would write out as a link to another site.
+    it('refuses a page whose dot segments leave two slashes at the front of its path', () => {
+      for (const url of [
+        '/.//example.com',
+        '/..//example.com',
+        '/%2e//example.com',
+        '/docs/..//example.com',
+        '/././/example.com',
+        '/.\t//example.com'
+      ]) {
+        expect(errorsOf({ navigation: { links: [{ label: 'x', url }] } }), JSON.stringify(url)).to.have.lengthOf(1);
+      }
+    });
+
     it('writes a page of the portal as the browser resolves it', () => {
       const [link] = config({ navigation: { links: [{ label: 'x', url: '/guides/../start here?tab=1#top' }] } })
         .navigationSettings()

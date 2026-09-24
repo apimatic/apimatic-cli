@@ -107,7 +107,9 @@ describe('apimatic.schema.json', () => {
       ['a logo path with its dots inside a name', { brand: { logo: 'static/..hidden/logo.png' } }],
       ['a three-digit hex primary', { brand: { colors: { primary: ' #FFF ' } } }],
       ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }],
-      ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }]
+      ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }],
+      ['a link through a parent segment', { navigation: { links: [{ label: 'Start', url: '/guides/../start' }] } }],
+      ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }]
     ];
 
     const invalid: [string, object][] = [
@@ -160,6 +162,26 @@ describe('apimatic.schema.json', () => {
         { navigation: { links: [{ label: 'x', url: '/\\example.com' }] } }
       ],
       ['a link to another host through a tab', { navigation: { links: [{ label: 'x', url: '/\t/example.com' }] } }],
+      [
+        'a link to another host past a dot segment',
+        { navigation: { links: [{ label: 'x', url: '/.//example.com' }] } }
+      ],
+      [
+        'a link to another host past a parent segment',
+        { navigation: { links: [{ label: 'x', url: '/..//example.com' }] } }
+      ],
+      [
+        'a link to another host past an encoded dot segment',
+        { navigation: { links: [{ label: 'x', url: '/%2e//example.com' }] } }
+      ],
+      [
+        'a link to another host past a page it leaves',
+        { navigation: { links: [{ label: 'x', url: '/docs/..//example.com' }] } }
+      ],
+      [
+        'a link to another host past a dot segment and a tab',
+        { navigation: { links: [{ label: 'x', url: '/.\t//example.com' }] } }
+      ],
       [
         'a link without the slashes of its scheme',
         { navigation: { links: [{ label: 'x', url: 'https:example.com' }] } }
