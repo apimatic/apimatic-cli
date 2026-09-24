@@ -4,6 +4,7 @@ import { DirectoryPath } from '../file/directoryPath.js';
 import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
+import { isJsonObject, JsonObject } from '../common/json-object.js';
 import { CodeSample, CodeSamples } from './code-samples.js';
 import { Endpoint } from './endpoint.js';
 import { PortalConfig } from './portal-config.js';
@@ -27,8 +28,6 @@ const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
 // The options @scalar/json-magic bundles with, so a spec reads here as it does in the portal.
 const YAML_OPTIONS = { merge: true, maxAliasCount: 10000 };
 
-type JsonObject = Record<string, unknown>;
-
 /** A specification as written to disk, read the one way the wizard and the build agree on. */
 export class OpenApiDocument {
   private constructor(private readonly document: JsonObject) {}
@@ -43,9 +42,7 @@ export class OpenApiDocument {
       // so each extension gets the parser built for it.
       const text = stripByteOrderMark(contents);
       const document: unknown = fileName.hasExtension('.json') ? JSON.parse(text) : parseYaml(text, YAML_OPTIONS);
-      return new OpenApiDocument(
-        typeof document === 'object' && document !== null && !Array.isArray(document) ? (document as JsonObject) : {}
-      );
+      return new OpenApiDocument(isJsonObject(document) ? document : {});
     } catch {
       return undefined;
     }
@@ -66,7 +63,7 @@ export class OpenApiDocument {
   }
 
   public withCodeSamples(codeSamples: CodeSamples): OpenApiDocument {
-    if (!isObject(this.document.paths)) {
+    if (!isJsonObject(this.document.paths)) {
       return this;
     }
     const paths = Object.fromEntries(
@@ -106,23 +103,23 @@ export class OpenApiDocument {
    */
   public suggestedConfig(): PortalConfig {
     const info = this.document.info;
-    const fields = typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {};
+    const fields = isJsonObject(info) ? info : {};
     const title = oneLine(fields.title) ?? PortalConfig.placeholder.siteTitle();
     const description = oneLine(fields.description);
     return PortalConfig.create(title, description === null ? null : cap(description, DESCRIPTION_LIMIT));
   }
 
   private paths(): JsonObject {
-    return isObject(this.document.paths) ? this.document.paths : {};
+    return isJsonObject(this.document.paths) ? this.document.paths : {};
   }
 }
 
 function isInlinePathItem(value: unknown): value is JsonObject {
-  return isObject(value) && !('$ref' in value);
+  return isJsonObject(value) && !('$ref' in value);
 }
 
 function isOperation(key: string, value: unknown): value is JsonObject {
-  return HTTP_METHODS.has(key.toLowerCase()) && isObject(value);
+  return HTTP_METHODS.has(key.toLowerCase()) && isJsonObject(value);
 }
 
 function pathItemWithSamples(path: string, pathItem: JsonObject, codeSamples: CodeSamples): JsonObject {
@@ -144,7 +141,7 @@ function* references(node: unknown): Generator<string> {
     for (const item of node) {
       yield* references(item);
     }
-  } else if (isObject(node)) {
+  } else if (isJsonObject(node)) {
     for (const [key, value] of Object.entries(node)) {
       if (key === '$ref' && typeof value === 'string') {
         yield value;
@@ -158,10 +155,6 @@ function* references(node: unknown): Generator<string> {
 function referencedFile(reference: string): string | undefined {
   const [file] = reference.split('#');
   return file === '' || URL_SCHEME.test(file) ? undefined : file;
-}
-
-function isObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // Version keys are strings in well-formed documents; anything else is named rather than

@@ -4,8 +4,7 @@ import { fetchUrls, parseJson, parseYaml, readFiles } from '@scalar/json-magic/b
 import { escapeJsonPointer } from '@scalar/json-magic/helpers/escape-json-pointer';
 import { getSegmentsFromPath } from '@scalar/json-magic/helpers/get-segments-from-path';
 import { getValueByPath } from '@scalar/json-magic/helpers/get-value-by-path';
-
-type JsonObject = Record<string, unknown>;
+import { isJsonObject, JsonObject } from './json-object';
 
 interface Reference {
   /** As written, so a rewrite keeps whatever escaping the rest of the pointer had. */
@@ -341,6 +340,3 @@ function key(segments: string[]): string {
   return JSON.stringify(segments);
 }
 
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}

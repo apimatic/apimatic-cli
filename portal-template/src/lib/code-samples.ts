@@ -1,3 +1,5 @@
+import { isJsonObject } from './json-object';
+
 const CODE_SAMPLES_EXTENSION = 'x-apimatic-codeSamples';
 
 export class CodeSample {
@@ -8,13 +10,13 @@ export class CodeSample {
   ) {}
 
   public static listIn(operation: unknown): CodeSample[] {
-    const entries = isRecord(operation) ? operation[CODE_SAMPLES_EXTENSION] : undefined;
+    const entries = isJsonObject(operation) ? operation[CODE_SAMPLES_EXTENSION] : undefined;
     return Array.isArray(entries) ? entries.flatMap((entry) => CodeSample.from(entry) ?? []) : [];
   }
 
   private static from(entry: unknown): CodeSample | undefined {
     if (
-      !isRecord(entry) ||
+      !isJsonObject(entry) ||
       typeof entry.lang !== 'string' ||
       typeof entry.label !== 'string' ||
       !isSources(entry.sources)
@@ -36,10 +38,6 @@ export class CodeSample {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function isSources(value: unknown): value is Record<string, string> {
-  return isRecord(value) && Object.values(value).every((source) => typeof source === 'string');
+  return isJsonObject(value) && Object.values(value).every((source) => typeof source === 'string');
 }

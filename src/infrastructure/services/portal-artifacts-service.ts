@@ -3,6 +3,7 @@ import { err, ok, Result } from 'neverthrow';
 import { CodeSampleCatalog, CodeSamples } from '../../types/portal/code-samples.js';
 import { Language } from '../../types/sdk/generate.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { isJsonObject } from '../../types/common/json-object.js';
 import { format as f } from '../../prompts/format.js';
 import { FileService } from '../file-service.js';
 import { ServiceError } from '../service-error.js';
@@ -31,7 +32,7 @@ export class PortalArtifactsService {
     } catch {
       return err(ServiceError.invalidResponse(`${describe(resolved)} is not valid JSON.`));
     }
-    if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+    if (!isJsonObject(json)) {
       return err(ServiceError.invalidResponse(`${describe(resolved)} must hold an object keyed by language.`));
     }
 

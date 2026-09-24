@@ -1,4 +1,5 @@
 import { Language, LANGUAGE_CHOICES } from '../sdk/generate.js';
+import { isJsonObject } from '../common/json-object.js';
 import { Endpoint } from './endpoint.js';
 import type { OpenApiDocument } from './openapi-document.js';
 
@@ -14,13 +15,13 @@ export class CodeSampleCatalog {
   private constructor(private readonly samplesByEndpoint: Map<string, CodeSample>) {}
 
   public static fromJson(language: Language, json: unknown): CodeSampleCatalog | undefined {
-    if (!isRecord(json) || !isRecord(json.paths)) {
+    if (!isJsonObject(json) || !isJsonObject(json.paths)) {
       return undefined;
     }
 
     const samplesByEndpoint = new Map<string, CodeSample>();
     for (const [path, methods] of Object.entries(json.paths)) {
-      if (!isRecord(methods)) {
+      if (!isJsonObject(methods)) {
         return undefined;
       }
       for (const [method, sources] of Object.entries(methods)) {
@@ -68,10 +69,6 @@ function languageLabel(language: Language): string {
   return LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function isSources(value: unknown): value is Sources {
-  return isRecord(value) && Object.values(value).every((source) => typeof source === 'string');
+  return isJsonObject(value) && Object.values(value).every((source) => typeof source === 'string');
 }

@@ -1,4 +1,5 @@
 import type { useOperationContext } from 'fumadocs-openapi/ui';
+import { isJsonObject } from './json-object';
 
 export type RequestExample = Pick<
   ReturnType<typeof useOperationContext>['examples'][number],
@@ -28,10 +29,10 @@ export class Parameter {
   }
 
   private static from(entry: unknown): Parameter | undefined {
-    if (!isRecord(entry) || !isLocation(entry.in) || typeof entry.name !== 'string') {
+    if (!isJsonObject(entry) || !isLocation(entry.in) || typeof entry.name !== 'string') {
       return undefined;
     }
-    const examples = isRecord(entry.examples) ? Object.entries(entry.examples).filter(isExampleEntry) : [];
+    const examples = isJsonObject(entry.examples) ? Object.entries(entry.examples).filter(isExampleEntry) : [];
     return new Parameter(entry.in, new Map(examples));
   }
 
@@ -51,7 +52,7 @@ export function requestExamples(bodyExamples: RequestExample[], parameters: Para
 }
 
 function parametersOf(node: unknown): unknown[] {
-  return isRecord(node) && Array.isArray(node.parameters) ? node.parameters : [];
+  return isJsonObject(node) && Array.isArray(node.parameters) ? node.parameters : [];
 }
 
 function isLocation(value: unknown): value is Location {
@@ -59,9 +60,6 @@ function isLocation(value: unknown): value is Location {
 }
 
 function isExampleEntry(entry: [string, unknown]): entry is [string, Example] {
-  return isRecord(entry[1]) && 'value' in entry[1];
+  return isJsonObject(entry[1]) && 'value' in entry[1];
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
