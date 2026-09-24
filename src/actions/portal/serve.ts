@@ -6,6 +6,7 @@ import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
+import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { withBuildDirectory } from '../../infrastructure/tmp-extensions.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
@@ -137,28 +138,22 @@ export class PortalServeAction {
     projectDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
-    const running = source.config.apiSettings();
-    // The dev server serves `static/` only if it was there at startup, and a block that names
-    // a file in it was refused unless it was.
-    const servesStatic = source.staticDirectory !== null;
-    let lastAccepted = source.config;
-    let rejected = false;
+    const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const reapply = async () => {
       const reloaded = await sourceContext.resolveConfig(source.suggestedSite);
       if (reloaded.isErr()) {
-        rejected = true;
+        preview.refuse();
         this.prompts.configRejected(reloaded.error, sourceDirectory);
         return;
       }
       const config = reloaded.value;
 
-      // Each said once, on the save that brings it about, rather than on every save after it.
-      const api = config.apiSettings();
-      if (!api.isEqual(lastAccepted.apiSettings()) && !api.isEqual(running)) {
+      const notices = preview.noticesFor(config);
+      if (notices.restartNeeded) {
         this.prompts.restartNeeded();
       }
-      if (!servesStatic && config.staticFiles().length > 0 && lastAccepted.staticFiles().length === 0) {
+      if (notices.staticDirectoryNotServed) {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
@@ -167,13 +162,9 @@ export class PortalServeAction {
         this.prompts.configNotApplied(applied.error);
         return;
       }
-      // A file fixed back to what the preview already shows writes nothing, but the user
-      // was just told it was refused, so hears that it is accepted again.
-      if (applied.value || rejected) {
+      if (preview.show(config, applied.value)) {
         this.prompts.configApplied();
       }
-      rejected = false;
-      lastAccepted = config;
     };
 
     const watch = this.fileWatchService.watch(
