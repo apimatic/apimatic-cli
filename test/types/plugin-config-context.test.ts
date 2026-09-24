@@ -7,10 +7,13 @@ import { DirectoryPath } from '../../src/types/file/directoryPath';
 import {
   LanguagePublishingEntry,
   PluginIdentityData,
-  PluginLanguageEntry,
   PluginLanguages
 } from '../../src/types/plugin/plugin-config';
-import { CodeGenerationVersion, Language } from '../../src/types/sdk/generate';
+import {
+  CSharpPackageConfiguration,
+  TypeScriptPackageConfiguration
+} from '../../src/types/publish/package-settings-configuration';
+import { Language } from '../../src/types/sdk/generate';
 
 /** The file as written back, read whole: the plugin blocks and whatever sits around them. */
 interface WrittenDocument {
@@ -26,24 +29,27 @@ describe('PluginConfigContext', () => {
   let buildDirectory: DirectoryPath;
   let context: PluginConfigContext;
 
+  // The package's name lives in the configuration now; a release records the version alone.
+  const CSHARP_CONFIGURATION = { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration;
+
   const CSHARP_PUBLISHING = {
     source: { repositoryUrl: 'https://github.com/acme/acme-payments-csharp', branch: 'main' },
-    package: { packageId: 'Acme.Payments.Sdk', version: '1.2.3' },
-    codegenVersion: CodeGenerationVersion.V3
+    package: { version: '1.2.3' },
+    packageConfiguration: CSHARP_CONFIGURATION
   } satisfies LanguagePublishingEntry<Language.CSHARP>;
 
   const CSHARP_ENTRY = { publishing: CSHARP_PUBLISHING } satisfies NonNullable<PluginLanguages['csharp']>;
 
   const SOURCE_ONLY_ENTRY = {
-    publishing: { source: CSHARP_PUBLISHING.source, codegenVersion: CSHARP_PUBLISHING.codegenVersion }
+    publishing: { source: CSHARP_PUBLISHING.source, packageConfiguration: CSHARP_CONFIGURATION }
   } satisfies NonNullable<PluginLanguages['csharp']>;
 
   const PACKAGE_ONLY_ENTRY = {
-    publishing: { package: CSHARP_PUBLISHING.package, codegenVersion: CSHARP_PUBLISHING.codegenVersion }
+    publishing: { package: CSHARP_PUBLISHING.package, packageConfiguration: CSHARP_CONFIGURATION }
   } satisfies NonNullable<PluginLanguages['csharp']>;
 
   const UNPUBLISHED_ENTRY = {
-    publishing: { codegenVersion: CSHARP_PUBLISHING.codegenVersion }
+    publishing: { packageConfiguration: CSHARP_CONFIGURATION }
   } satisfies NonNullable<PluginLanguages['csharp']>;
 
   const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
@@ -293,78 +299,6 @@ describe('PluginConfigContext', () => {
     });
   });
 
-  describe('assertNoCodegenVersionMismatch', () => {
-    const PUBLISHED_SOURCE = {
-      publishing: { source: CSHARP_PUBLISHING.source, codegenVersion: CodeGenerationVersion.V3 }
-    } satisfies PluginLanguageEntry<Language.CSHARP>;
-
-    const PUBLISHED_PACKAGE = {
-      publishing: { package: CSHARP_PUBLISHING.package, codegenVersion: CodeGenerationVersion.V3 }
-    } satisfies PluginLanguageEntry<Language.CSHARP>;
-
-    const assertFor = async (
-      languages: object,
-      published: PluginLanguageEntry<Language.CSHARP>,
-      codegenVersion = CodeGenerationVersion.V3
-    ) => {
-      withConfig({ languages });
-      const state = await context.getPluginConfigState();
-      if (state.state !== 'present') {
-        expect.fail(`expected a present config, got ${state.state}`);
-      }
-      return state.assertNoCodegenVersionMismatch(codegenVersion, Language.CSHARP, published);
-    };
-
-    it('passes when the run republishes both halves, whatever the config records', async () => {
-      const result = await assertFor({ csharp: CSHARP_ENTRY }, CSHARP_ENTRY, CodeGenerationVersion.V4);
-
-      expect(result.isOk()).to.be.true;
-    });
-
-    it('reports the recorded version alongside the published one when a package-only run leaves a source behind', async () => {
-      const recorded = { publishing: { source: CSHARP_PUBLISHING.source, codegenVersion: CodeGenerationVersion.V3 } };
-
-      const result = await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4);
-
-      expect(result.isErr()).to.be.true;
-      expect(result._unsafeUnwrapErr()).to.deep.equal({
-        expected: CodeGenerationVersion.V4,
-        actual: CodeGenerationVersion.V3
-      });
-    });
-
-    it('reports the mismatch when a source-only run leaves a package behind', async () => {
-      const recorded = { publishing: { package: CSHARP_PUBLISHING.package, codegenVersion: CodeGenerationVersion.V3 } };
-
-      const result = await assertFor({ csharp: recorded }, PUBLISHED_SOURCE, CodeGenerationVersion.V4);
-
-      expect(result.isErr()).to.be.true;
-    });
-
-    it('passes when the recorded version is the one being published', async () => {
-      const recorded = { publishing: { source: CSHARP_PUBLISHING.source, codegenVersion: CodeGenerationVersion.V3 } };
-
-      expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE)).isOk()).to.be.true;
-    });
-
-    it('passes for a language the config does not carry', async () => {
-      const result = await assertFor({ java: CSHARP_ENTRY }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4);
-
-      expect(result.isOk()).to.be.true;
-    });
-
-    it('passes when the recorded entry has no half to carry over', async () => {
-      const recorded = { publishing: { codegenVersion: CodeGenerationVersion.V3 } };
-
-      expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
-    });
-
-    it('passes when the recorded entry records no version', async () => {
-      const recorded = { publishing: { source: { repositoryUrl: 'https://github.com/acme/sdk' } } };
-
-      expect((await assertFor({ csharp: recorded }, PUBLISHED_PACKAGE, CodeGenerationVersion.V4)).isOk()).to.be.true;
-    });
-  });
 
   describe('upsertMetadata', () => {
     it('creates the file with the plugin block, the metadata and a default licence', async () => {
@@ -501,8 +435,7 @@ describe('PluginConfigContext', () => {
       const typescriptEntry = {
         publishing: {
           source: { repositoryUrl: 'https://github.com/acme/acme-payments-typescript' },
-          package: { name: '@acme/payments-sdk', version: '1.2.3' },
-          codegenVersion: CodeGenerationVersion.V3
+          package: { version: '1.2.3' }, packageConfiguration: { name: '@acme/payments-sdk' } as TypeScriptPackageConfiguration
         }
       } satisfies NonNullable<PluginLanguages['typescript']>;
       await context.upsertLanguage(Language.TYPESCRIPT, typescriptEntry);
@@ -524,8 +457,7 @@ describe('PluginConfigContext', () => {
 
         await context.upsertLanguage(Language.CSHARP, {
           publishing: {
-            source: { repositoryUrl: 'https://github.com/acme/renamed' },
-            codegenVersion: CodeGenerationVersion.V3
+            source: { repositoryUrl: 'https://github.com/acme/renamed' }
           }
         });
 
@@ -533,7 +465,7 @@ describe('PluginConfigContext', () => {
           publishing: {
             source: { repositoryUrl: 'https://github.com/acme/renamed' },
             package: CSHARP_PUBLISHING.package,
-            codegenVersion: 'v3'
+            packageConfiguration: CSHARP_CONFIGURATION
           }
         });
       });
@@ -543,16 +475,14 @@ describe('PluginConfigContext', () => {
 
         await context.upsertLanguage(Language.CSHARP, {
           publishing: {
-            package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
-            codegenVersion: CodeGenerationVersion.V3
+            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
           }
         });
 
         expect(writtenDocument().languages?.csharp).to.deep.equal({
           publishing: {
             source: CSHARP_PUBLISHING.source,
-            package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
-            codegenVersion: 'v3'
+            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
           }
         });
       });
@@ -562,15 +492,13 @@ describe('PluginConfigContext', () => {
 
         await context.upsertLanguage(Language.CSHARP, {
           publishing: {
-            package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
-            codegenVersion: CodeGenerationVersion.V3
+            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
           }
         });
 
         expect(writtenDocument().languages?.csharp).to.deep.equal({
           publishing: {
-            package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
-            codegenVersion: 'v3'
+            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
           }
         });
       });
@@ -580,12 +508,11 @@ describe('PluginConfigContext', () => {
 
         await context.upsertLanguage(Language.CSHARP, {
           publishing: {
-            package: { packageId: 'Acme.Payments.Sdk', version: '2.0.0' },
-            codegenVersion: CodeGenerationVersion.V4
+            package: { version: '2.0.0' }, packageConfiguration: { packageId: 'Acme.Payments.Sdk' } as CSharpPackageConfiguration
           }
         });
 
-        expect(writtenDocument().languages?.csharp?.publishing?.codegenVersion).to.equal('v4');
+        expect(writtenDocument().languages?.csharp?.publishing?.package).to.deep.equal({ version: '2.0.0' });
       });
     });
 

@@ -5,7 +5,7 @@ import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { SemVersion } from '../../types/publish/version.js';
-import { CodeGenerationVersion, Language } from '../../types/sdk/generate.js';
+import { Language } from '../../types/sdk/generate.js';
 import { ActionResult } from '../action-result.js';
 
 /**
@@ -20,23 +20,19 @@ export class PluginRecordSdkAction {
     language: Language,
     publishingProfile: PublishingProfile,
     publishTypes: PublishType[],
-    packageVersion: SemVersion,
-    codegenVersion: CodeGenerationVersion,
-    isInteractive: boolean
+    packageVersion: SemVersion
   ): Promise<ActionResult> => {
-    // The entry has to describe what this run published, not what the profile happens to enable.
-    // A package-only run must not claim a repository it never pushed to, nor a source-only run a
-    // package that was never released.
+    // The entry describes what this run published, not what the profile enables: a package-only
+    // run claims no repository, and a source-only run records no released version. The package
+    // configuration is written either way — it says how the package is set up, not that one
+    // exists, and the service reads the package's name out of it.
     const entry = buildLanguageEntry(
       language,
       publishTypes.includes(PublishType.SourceCodePublishing)
         ? publishingProfile.getGitConfigurationForLanguage(language)
         : undefined,
-      publishTypes.includes(PublishType.PackagePublishing)
-        ? publishingProfile.getPackageConfigurationDataForLanguage(language)
-        : undefined,
-      packageVersion,
-      codegenVersion
+      publishingProfile.getPackageConfigurationDataForLanguage(language),
+      publishTypes.includes(PublishType.PackagePublishing) ? packageVersion : undefined
     );
 
     const pluginConfigContext = new PluginConfigContext(buildDirectory);
@@ -47,16 +43,6 @@ export class PluginRecordSdkAction {
     }
 
     const configExisted = configState.state === 'present';
-
-    if (configExisted) {
-      const result = configState.assertNoCodegenVersionMismatch(codegenVersion, language, entry);
-      if (result.isErr()) {
-        this.prompts.codegenVersionMismatch(language, result.error.actual, result.error.expected);
-        if (isInteractive && !(await this.prompts.confirmCodegenVersionOverwrite())) {
-          return ActionResult.cancelled();
-        }
-      }
-    }
 
     if (!entry.publishing?.source && (!configExisted || configState.hasNoSourceRepository(language))) {
       this.prompts.noSourceRepository(language);

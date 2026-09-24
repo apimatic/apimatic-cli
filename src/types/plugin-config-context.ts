@@ -1,4 +1,4 @@
-import { err, ok, Result, ResultAsync } from 'neverthrow';
+import { Result, ResultAsync } from 'neverthrow';
 import { FileService } from '../infrastructure/file-service.js';
 import { ApimaticConfigContext, ApimaticConfigWriteFailure } from './apimatic-config-context.js';
 import { ApimaticConfigDocument, ConfigBlockName, findingClause } from './apimatic-config/document.js';
@@ -14,7 +14,7 @@ import {
   PluginMetadata
 } from './plugin/plugin-config.js';
 import { SemVersion } from './publish/version.js';
-import { CodeGenerationVersion, isPluginLanguage, Language, PLUGIN_LANGUAGES } from './sdk/generate.js';
+import { isPluginLanguage, Language, PLUGIN_LANGUAGES } from './sdk/generate.js';
 
 export type PluginReleaseData = { pluginId: string; version: SemVersion };
 
@@ -89,37 +89,6 @@ export class PluginConfig {
 
   public hasNoSourceRepository(language: Language): boolean {
     return !this.config.languages?.[language]?.publishing?.source;
-  }
-
-  public assertNoCodegenVersionMismatch(
-    codegenVersion: CodeGenerationVersion,
-    language: Language,
-    entry: PluginLanguageEntry<Language>
-  ): Result<void, { expected: CodeGenerationVersion; actual: CodeGenerationVersion }> {
-    const publishing = entry.publishing;
-    if (publishing?.package && publishing.source) {
-      return ok();
-    }
-
-    const existingPublishing = this.config.languages?.[language]?.publishing;
-    if (!existingPublishing) {
-      return ok();
-    }
-
-    if (!existingPublishing.package && !existingPublishing.source) {
-      return ok();
-    }
-
-    const extractedVersion = existingPublishing.codegenVersion;
-    if (!extractedVersion) {
-      return ok();
-    }
-
-    if (extractedVersion === codegenVersion) {
-      return ok();
-    }
-
-    return err({ expected: codegenVersion, actual: extractedVersion });
   }
 }
 

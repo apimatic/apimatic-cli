@@ -1,5 +1,6 @@
+import { PackageConfigurationForLanguage } from '../publish/package-settings-configuration.js';
 import { SemVersionString } from '../publish/version.js';
-import { CodeGenerationVersion, Language } from '../sdk/generate.js';
+import { Language } from '../sdk/generate.js';
 
 /** Written unprompted: the backend consumes it, and nothing in the CLI asks for it. */
 export const DEFAULT_PLUGIN_LICENSE = 'MIT';
@@ -17,55 +18,27 @@ export interface LanguageSource {
   branch?: string;
 }
 
-interface CSharpPackageConfig {
-  packageId: string;
+/** What a release recorded about itself. The package's name is in `packageConfiguration`. */
+interface PackageRelease {
   version: SemVersionString;
 }
 
-interface JavaPackageConfig {
-  groupId: string;
-  artifactId: string;
-  version: SemVersionString;
-}
-
-interface PhpPackageConfig {
-  vendorName: string;
-  projectName: string;
-  version: SemVersionString;
-}
-
-interface NamedPackageConfig {
-  name: string;
-  version: SemVersionString;
-}
-
-type PythonPackageConfig = NamedPackageConfig;
-type RubyPackageConfig = NamedPackageConfig;
-type TypeScriptPackageConfig = NamedPackageConfig;
-
-interface GoPackageConfig {
-  packageName: string;
-  version: SemVersionString;
-}
-
-/** Where one language's SDK is published, and which generator produced what was published. */
-interface LanguagePublishing<TPackage> {
+/**
+ * Where one language's SDK went and how its package is configured.
+ *
+ * `packageConfiguration` is the profile's own settings, written through: the service reads the
+ * package's name out of it, so it is what a published entry is identified by. The service
+ * requires it beside any `publishing` block; it is optional here only because a profile can
+ * configure a repository and no package, and losing the repository would be worse than writing
+ * an entry the service then refuses.
+ */
+interface LanguagePublishing<TConfiguration> {
   source?: LanguageSource;
-  package?: TPackage;
-  codegenVersion: CodeGenerationVersion;
+  package?: PackageRelease;
+  packageConfiguration?: TConfiguration;
 }
 
-interface PublishingForLanguage {
-  [Language.CSHARP]: LanguagePublishing<CSharpPackageConfig>;
-  [Language.JAVA]: LanguagePublishing<JavaPackageConfig>;
-  [Language.PHP]: LanguagePublishing<PhpPackageConfig>;
-  [Language.PYTHON]: LanguagePublishing<PythonPackageConfig>;
-  [Language.RUBY]: LanguagePublishing<RubyPackageConfig>;
-  [Language.TYPESCRIPT]: LanguagePublishing<TypeScriptPackageConfig>;
-  [Language.GO]: LanguagePublishing<GoPackageConfig>;
-}
-
-export type LanguagePublishingEntry<L extends Language> = PublishingForLanguage[L];
+export type LanguagePublishingEntry<L extends Language> = LanguagePublishing<PackageConfigurationForLanguage[L]>;
 
 /**
  * One language's entry. The publishing record nests under `publishing` because the entry is
@@ -75,7 +48,7 @@ export type LanguagePublishingEntry<L extends Language> = PublishingForLanguage[
  * nothing has been published yet" is expressed.
  */
 export interface PluginLanguageEntry<L extends Language> {
-  publishing?: PublishingForLanguage[L];
+  publishing?: LanguagePublishingEntry<L>;
 }
 
 export type PluginLanguages = Partial<{ [L in Language]: PluginLanguageEntry<L> }>;

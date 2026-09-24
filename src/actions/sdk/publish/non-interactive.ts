@@ -147,9 +147,7 @@ export class SdkPublishNonInteractiveAction {
           language,
           publishingProfile,
           publishTypes,
-          semVersion,
-          codegenOption.codeGenerationVersion(),
-          false
+          semVersion
         );
       }
     }
