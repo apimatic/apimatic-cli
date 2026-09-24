@@ -87,7 +87,7 @@ Numbers are stable identifiers, so gaps are decisions that a later one replaced.
 | D16 | **One `<language>.json` per language in the artifact zip**; a language that yields nothing is omitted entirely. |
 | D17 | The Func wiring is the critical path and is what this document specifies. |
 | D18 | **One `x-apimatic-codeSamples` entry per language, its `sources` keyed by example id**, and the tab follows the portal's example selector, which lists the ids codegen-v2 keys snippets by. `x-codeSamples` is ignored, hand-written or not: each entry is a fixed tab the selector cannot switch, and fumadocs-openapi 11.4.1 renders it empty. |
-| D19 | **One tab per language, in configured order**: `TypeScript, C#, …`. There is no cURL tab beside them: fumadocs renders it from the example on its own terms, so it cannot agree with the SDK samples. An operation without SDK samples shows fumadocs' cURL tab alone. |
+| D19 | **fumadocs' cURL tab, then one tab per language, in configured order**: `cURL, TypeScript, C#, …`. fumadocs renders cURL from the example on its own terms, so it may disagree with the SDK samples, and it stays on the last body example when the selector picks a parameter example. |
 | D21 | **One display map, nothing else, is per-language knowledge in the CLI.** `LANGUAGE_CHOICES` already is that map. No title-casing logic. |
 | D22 | **Reuse codegen-v2's status vocabulary verbatim**, `SubscriptionError` included. The CLI's poller already handles all of it; the `SubscriptionError` callback status is new, so apimatic-io's callback handler must accept it. |
 | D24 | **Webhooks carry no request samples.** The catalog carries `paths` only. |
@@ -427,9 +427,9 @@ Fumadocs' selector lists request body examples only, so `example-layout.tsx` rep
 with one over `request-examples.ts`: the body's examples, or, when the body names none — no
 `examples`, or a lone placeholder key, `Example` or the `default` fumadocs' 3.0 → 3.1
 upgrade gives a singular `example` — the ids of the first parameter that names any, in
-codegen-v2's order. `usage-tabs.tsx` replaces the usage tabs with one per language, each
-showing its snippet for the example the layout selects, or a lone cURL tab for an operation
-without SDK samples ([D19](#wire-format)). The layout opens on the example fumadocs picks from
+codegen-v2's order. `usage-tabs.tsx` replaces the usage tabs with fumadocs' cURL tab and one
+per language, each showing its snippet for the example the layout selects
+([D19](#wire-format)). The layout opens on the example fumadocs picks from
 `x-exclusiveCodeSample` or `x-selectedCodeSample`, and leaves the selector out when fumadocs
 does. Parameters and examples given as `$ref`s are followed with fumadocs' own resolver. A
 language without a snippet for that example shows a note, never another example's code;

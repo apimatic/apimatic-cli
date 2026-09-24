@@ -19,13 +19,15 @@ export function renderUsageTabs(): ReactNode {
   return <UsageTabs />;
 }
 
-// cURL only stands in for SDK samples: beside them it would sample a request they disagree with.
 function UsageTabs() {
-  const samples = CodeSample.listIn(useExampleSelection().operation);
-  const tabs: UsageTab[] =
-    samples.length === 0
-      ? [{ id: 'curl', label: curl.label ?? curl.lang, body: <CurlCode /> }]
-      : samples.map((sample) => ({ id: sample.lang, label: sample.label, body: <SampleCode sample={sample} /> }));
+  const tabs: UsageTab[] = [
+    { id: 'curl', label: curl.label ?? curl.lang, body: <CurlCode /> },
+    ...CodeSample.listIn(useExampleSelection().operation).map((sample) => ({
+      id: sample.lang,
+      label: sample.label,
+      body: <SampleCode sample={sample} />
+    }))
+  ];
 
   return (
     <CodeBlockTabs groupId="fumadocs_openapi_requests" defaultValue={tabs[0].id}>
