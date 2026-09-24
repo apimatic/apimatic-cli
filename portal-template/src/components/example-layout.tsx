@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fumadocs/api-docs/components/select';
 import { useOperationContext, useRenderContext } from 'fumadocs-openapi/ui';
+import { CodeSample } from '@/lib/code-samples';
 import { Parameter, requestExamples, type RequestExample } from '@/lib/request-examples';
 
 interface ExampleSelection {
@@ -35,8 +36,12 @@ function ExampleLayout({ selector, usageTabs, responseTabs }: Readonly<LayoutSlo
   const { route, examples: bodyExamples, example: defaultId, setExample } = useOperationContext();
   const pathItem = schema.resolve(schema.dereferenced.paths?.[route]);
   const operation = pathItem?.[bodyExamples[0].data.method];
+  // Only SDK samples follow a parameter's example ids; fumadocs' cURL and playground ignore them.
   const examples = useMemo(
-    () => requestExamples(bodyExamples, Parameter.listIn(operation, pathItem, schema.resolve)),
+    () =>
+      CodeSample.listIn(operation).length === 0
+        ? bodyExamples
+        : requestExamples(bodyExamples, Parameter.listIn(operation, pathItem, schema.resolve)),
     [bodyExamples, operation, pathItem, schema]
   );
   const [selectedId, setSelectedId] = useState(defaultId);
