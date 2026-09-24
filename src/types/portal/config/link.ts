@@ -53,7 +53,7 @@ export class Link {
     if (page !== undefined) {
       return ok({ url: page, external: false });
     }
-    if (!text.startsWith('/') && isWebAddress(text)) {
+    if (isWebAddress(text)) {
       return ok({ url: text, external: true });
     }
     return err([
