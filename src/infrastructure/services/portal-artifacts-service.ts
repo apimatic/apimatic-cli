@@ -9,7 +9,7 @@ import { ServiceError } from '../service-error.js';
 export class PortalArtifactsService {
   private readonly fileService = new FileService();
 
-  // TODO: Replace the file read with a call to `/api/portal-artifacts` once it exists.
+  // Stands in for a call to `/api/portal-artifacts` until that endpoint exists.
   public async generate(): Promise<Result<CodeSamples, ServiceError>> {
     const samplesPath = process.env.APIMATIC_CODE_SAMPLES_PATH;
     if (!samplesPath) {
