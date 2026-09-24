@@ -114,7 +114,7 @@ describe('PortalSourceContext', () => {
       const { config } = (await resolve())._unsafeUnwrap();
 
       expect(config.siteTitle()).to.equal('Calc');
-      expect(config.siteDescription()).to.equal('Adds.');
+      expect(config.identity().description).to.equal('Adds.');
     });
 
     it('lets the block describe the portal instead, or not at all', async () => {
@@ -124,9 +124,9 @@ describe('PortalSourceContext', () => {
       );
 
       writeConfig({ site: { description: 'Our docs.' } });
-      expect((await resolve())._unsafeUnwrap().config.siteDescription()).to.equal('Our docs.');
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.equal('Our docs.');
       writeConfig({ site: { description: '' } });
-      expect((await resolve())._unsafeUnwrap().config.siteDescription()).to.be.null;
+      expect((await resolve())._unsafeUnwrap().config.identity().description).to.be.null;
     });
 
     // No one of several specifications speaks for the whole portal.

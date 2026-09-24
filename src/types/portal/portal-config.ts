@@ -1,6 +1,5 @@
 import { err, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
-import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
 import { allOf, unknownKeys } from './config/fields.js';
@@ -88,24 +87,8 @@ export class PortalConfig {
     return this.site.siteName();
   }
 
-  public siteDescription(): string | null {
-    return this.site.siteDescription();
-  }
-
-  public siteOrigin(): UrlPath | null {
-    return this.site.origin();
-  }
-
   public brandSettings(): BrandConfig {
     return this.brand;
-  }
-
-  public navigationSettings(): NavigationConfig {
-    return this.navigation;
-  }
-
-  public aiSettings(): AiConfig {
-    return this.ai;
   }
 
   public staticFiles(): StaticAsset[] {

@@ -28,16 +28,17 @@ describe('PortalConfig', () => {
 
     it('builds a portal from an empty block, with every default', () => {
       const portal = config({});
+      const identity = portal.identity();
 
       expect(portal.siteTitle()).to.equal('Spec Title');
-      expect(portal.siteDescription()).to.equal('What the spec says.');
-      expect(portal.siteOrigin()).to.be.null;
+      expect(identity.description).to.equal('What the spec says.');
+      expect(identity.siteUrl).to.be.null;
       expect(portal.brandSettings().logoImages()).to.be.null;
       expect(portal.brandSettings().faviconImage()).to.be.null;
       expect(portal.brandSettings().brandColors().primaryColors()).to.be.null;
       expect(portal.brandSettings().mode()).to.equal('both');
-      expect(portal.navigationSettings().headerLinks()).to.be.empty;
-      expect(portal.aiSettings().offersPageActions()).to.be.true;
+      expect(identity.links).to.be.empty;
+      expect(identity.pageActions).to.be.true;
       expect(portal.staticFiles()).to.be.empty;
     });
 
@@ -119,17 +120,17 @@ describe('PortalConfig', () => {
     });
 
     it('has no description with several specifications unless the block gives one', () => {
-      expect(config({ site: { name: 'Calc' } }, null).siteDescription()).to.be.null;
+      expect(config({ site: { name: 'Calc' } }, null).identity().description).to.be.null;
     });
 
     it('trims the description', () => {
-      expect(config({ site: { description: '  Docs  ' } }).siteDescription()).to.equal('Docs');
+      expect(config({ site: { description: '  Docs  ' } }).identity().description).to.equal('Docs');
     });
 
     // Blank is how the block turns the specification's description off.
     it('treats a blank description as none, not as absent', () => {
       for (const description of ['', '   ', '\n\t']) {
-        expect(config({ site: { description } }).siteDescription(), JSON.stringify(description)).to.be.null;
+        expect(config({ site: { description } }).identity().description, JSON.stringify(description)).to.be.null;
       }
     });
 
@@ -138,16 +139,12 @@ describe('PortalConfig', () => {
     });
 
     it('keeps only the origin of the address, dropping a trailing slash and keeping a port', () => {
-      expect(
-        config({ site: { url: 'https://docs.example.com/' } })
-          .siteOrigin()
-          ?.toString()
-      ).to.equal('https://docs.example.com');
-      expect(
-        config({ site: { url: 'https://docs.example.com:8443' } })
-          .siteOrigin()
-          ?.toString()
-      ).to.equal('https://docs.example.com:8443');
+      expect(config({ site: { url: 'https://docs.example.com/' } }).identity().siteUrl).to.equal(
+        'https://docs.example.com'
+      );
+      expect(config({ site: { url: 'https://docs.example.com:8443' } }).identity().siteUrl).to.equal(
+        'https://docs.example.com:8443'
+      );
     });
 
     it('refuses an address carrying a path, query or fragment, or one that is not http', () => {
@@ -313,20 +310,18 @@ describe('PortalConfig', () => {
 
   describe('navigation', () => {
     it('marks a link to another site external and a page of the portal not', () => {
-      const links = config({
+      const { links } = config({
         navigation: {
           links: [
             { label: 'Status', url: 'https://status.example.com' },
             { label: 'Auth', url: '/authentication' }
           ]
         }
-      })
-        .navigationSettings()
-        .headerLinks();
+      }).identity();
 
-      expect(links.map((link) => [link.text(), link.href(), link.isExternal()])).to.deep.equal([
-        ['Status', 'https://status.example.com', true],
-        ['Auth', '/authentication', false]
+      expect(links).to.deep.equal([
+        { label: 'Status', url: 'https://status.example.com', external: true },
+        { label: 'Auth', url: '/authentication', external: false }
       ]);
     });
 
@@ -368,11 +363,11 @@ describe('PortalConfig', () => {
     });
 
     it('writes a page of the portal as the browser resolves it', () => {
-      const [link] = config({ navigation: { links: [{ label: 'x', url: '/guides/../start here?tab=1#top' }] } })
-        .navigationSettings()
-        .headerLinks();
+      const [link] = config({
+        navigation: { links: [{ label: 'x', url: '/guides/../start here?tab=1#top' }] }
+      }).identity().links;
 
-      expect(link.href()).to.equal('/start%20here?tab=1#top');
+      expect(link.url).to.equal('/start%20here?tab=1#top');
     });
 
     it('names each broken link by its position', () => {
@@ -393,11 +388,7 @@ describe('PortalConfig', () => {
     // Each page offers to open itself in ChatGPT, Claude, Cursor or Scira. A portal
     // published under someone else's brand carries that endorsement, so it can be refused.
     it('offers the page actions unless the block turns them off', () => {
-      expect(
-        config({ ai: { pageActions: false } })
-          .aiSettings()
-          .offersPageActions()
-      ).to.be.false;
+      expect(config({ ai: { pageActions: false } }).identity().pageActions).to.be.false;
       expect(errorsOf({ ai: { pageActions: 'no' } })).to.deep.equal(["'portal.ai.pageActions' must be true or false."]);
     });
   });

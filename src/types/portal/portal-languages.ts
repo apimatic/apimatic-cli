@@ -1,6 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
 import { ConfigFinding, findingSentences } from '../apimatic-config/document.js';
-import { isJsonObject } from '../../utils/json-utils.js';
 import { Language } from '../sdk/generate.js';
 import { quotedList } from './config/fields.js';
 
@@ -20,10 +19,7 @@ const REQUIRED =
  * `publishing` record counts: it is a language the project wants and has not published yet.
  */
 export class PortalLanguages {
-  private constructor(
-    private readonly languages: readonly Language[],
-    private readonly published: ReadonlySet<Language>
-  ) {}
+  private constructor(private readonly languages: readonly Language[]) {}
 
   /** `findings` already covers a block or an entry of the wrong shape, so neither is checked here. */
   public static fromBlock(
@@ -41,24 +37,10 @@ export class PortalLanguages {
     if (errors.length > 0) {
       return err(errors);
     }
-
-    const languages = keys as Language[];
-    const published = languages.filter((language) => PortalLanguages.isPublished(block?.[language]));
-    return ok(new PortalLanguages(languages, new Set(published)));
+    return ok(new PortalLanguages(keys as Language[]));
   }
 
   public all(): Language[] {
     return [...this.languages];
-  }
-
-  public isPublished(language: Language): boolean {
-    return this.published.has(language);
-  }
-
-  // The same test `PluginConfigPresent.hasPublishedSdks` applies: a record naming neither where
-  // the source lives nor which package carries it has published nothing a reader could use.
-  private static isPublished(entry: unknown): boolean {
-    const publishing = isJsonObject(entry) ? entry.publishing : undefined;
-    return isJsonObject(publishing) && (Boolean(publishing.source) || Boolean(publishing.package));
   }
 }

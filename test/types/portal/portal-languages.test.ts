@@ -28,10 +28,9 @@ describe('PortalLanguages', () => {
     const languages = read({ languages: { typescript: {} } })._unsafeUnwrap();
 
     expect(languages.all()).to.deep.equal([Language.TYPESCRIPT]);
-    expect(languages.isPublished(Language.TYPESCRIPT)).to.be.false;
   });
 
-  it('tells a published language apart by its publishing record', () => {
+  it('counts published and unpublished languages alike, in the order written', () => {
     const languages = read({
       languages: {
         python: { publishing: { package: { name: 'calc', version: '1.0.0' }, codegenVersion: 'v4' } },
@@ -40,8 +39,6 @@ describe('PortalLanguages', () => {
     })._unsafeUnwrap();
 
     expect(languages.all()).to.deep.equal([Language.PYTHON, Language.JAVA]);
-    expect(languages.isPublished(Language.PYTHON)).to.be.true;
-    expect(languages.isPublished(Language.JAVA)).to.be.false;
   });
 
   it('refuses a key that is no SDK language', () => {

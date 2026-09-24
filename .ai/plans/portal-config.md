@@ -450,8 +450,11 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   `ApimaticConfigDocument.languages()` plus that block's findings. Refuses an
   absent or empty block and an unknown language key; an entry that is not an
   object, or whose `publishing` is not one, arrives as a document finding.
-  Holds the language list, and whether each is published, for the SDK page to
-  read later.
+  Holds the language list, in the block's order, for the SDK pages to read.
+  *As reviewed:* whether each language is published went, since nothing reads
+  it yet; so did `PortalConfig`'s `siteDescription`, `siteOrigin`,
+  `navigationSettings` and `aiSettings`, whose values reach the portal through
+  `identity()` alone.
 - **Finding partition.** `PortalSourceContext.readConfig` reads
   `findingsFor('root', 'languages')` instead of `'root'` alone, and adds the
   `portal` and `PortalLanguages` errors to the same `invalidConfig` report. This
