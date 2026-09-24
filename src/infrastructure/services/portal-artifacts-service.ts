@@ -9,7 +9,6 @@ import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { CodeSampleCatalog, CodeSamples } from '../../types/portal/code-samples.js';
 import {
-  PortalArtifactsGenerationStatus,
   PortalArtifactsInitiatedResponse,
   PortalArtifactsStatusResponse
 } from '../../types/portal/generation-status.js';
@@ -311,5 +310,3 @@ const formatPortalArtifactsError: ValidationErrorFormatter = (errors) => {
   const lines = entries.flatMap(([subject, messages]) => messages.map((message) => `${subject}: ${message}`));
   return 'Portal artifacts could not be generated.\n- ' + lines.join('\n- ');
 };
-
-export { PortalArtifactsGenerationStatus };
