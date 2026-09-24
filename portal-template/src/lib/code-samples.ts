@@ -29,7 +29,7 @@ export class CodeSample {
     return source ?? (exampleCount === 1 ? this.onlySource() : undefined);
   }
 
-  // The CLI names an unnamed example `Example` where Fumadocs names it `_default`.
+  // The catalog keys a lone snippet `Example` where Fumadocs names the lone example `_default`.
   private onlySource(): string | undefined {
     const sources = [...this.sources.values()];
     return sources.length === 1 ? sources[0] : undefined;

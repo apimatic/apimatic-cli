@@ -2,8 +2,6 @@ import { Language, LANGUAGE_CHOICES } from '../sdk/generate.js';
 import { Endpoint } from './endpoint.js';
 import type { OpenApiDocument } from './openapi-document.js';
 
-const UNNAMED_EXAMPLE_ID = 'Example';
-
 type Sources = Record<string, string>;
 
 export interface CodeSample {
@@ -61,12 +59,7 @@ export class CodeSamples {
 }
 
 function toCodeSample(language: Language, sources: Sources): CodeSample {
-  const named = Object.entries(sources).filter(([exampleId]) => exampleId !== UNNAMED_EXAMPLE_ID);
-  return {
-    lang: language,
-    label: languageLabel(language),
-    sources: named.length > 0 ? Object.fromEntries(named) : sources
-  };
+  return { lang: language, label: languageLabel(language), sources };
 }
 
 function languageLabel(language: Language): string {

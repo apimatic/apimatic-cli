@@ -44,13 +44,13 @@ describe('CodeSampleCatalog', () => {
     expect(Object.keys(sample.sources)).to.deep.equal(['minimal', 'full', 'basic']);
   });
 
-  it('drops the unnamed example beside named ones', () => {
+  it('keeps an example named Example beside other examples', () => {
     const codeSamples = new CodeSamples([
       catalog(Language.PYTHON, { '/pets': { POST: { Example: 'x', minimal: 'a', full: 'b' } } })
     ]);
 
     expect(samples(codeSamples, new Endpoint('POST', '/pets'))).to.deep.equal([
-      { label: 'Python', sources: { minimal: 'a', full: 'b' } }
+      { label: 'Python', sources: { Example: 'x', minimal: 'a', full: 'b' } }
     ]);
   });
 });
