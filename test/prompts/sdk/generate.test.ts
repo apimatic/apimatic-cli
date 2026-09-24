@@ -38,7 +38,7 @@ describe('SdkGeneratePrompts.languageNotAvailable', () => {
   it('lists the four that are on their way', () => {
     const message = messageFor(Language.GO);
 
-    expect(message).to.contain('Coming soon: Java, Ruby, Go, PHP');
+    expect(message).to.contain('Coming soon: Ruby, Java, PHP, Go');
   });
 
   // There is no version to fall back to any more, so nothing may suggest one.

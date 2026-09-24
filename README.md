@@ -46,21 +46,11 @@ Documentation portals are now built on your machine from a `src/` directory, and
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
 
-Version 3 of the code generator is retired, and the CLI generates with version 4 only:
+# SDK languages
 
-- `--codegen-version` now takes `v4` and nothing else, and defaults to it. The flag stays so
-  that moving to a later generator is something you ask for rather than something a release
-  changes underneath you. `--stability` stays too: version 4 renders each language at beta
-  first and stable later.
-- C#, TypeScript and Python are the languages that can be generated. Java, Ruby, Go and PHP
-  come back as each reaches version 4; until then both commands refuse them and say so.
-- `apimatic sdk save-changes` is gone, with `--track-changes` and `--skip-changes` on
-  `sdk generate`. Version 4 never supported customizations, so there is nothing left to save
-  or re-apply. Run `apimatic autocomplete --refresh-cache` to drop the command from shell
-  completion.
-- `sdk publish` records what it published in `src/apimatic.json` every time. The
-  `--update-plugin-config` flag and the question interactive runs asked are both gone:
-  recording a publish is bookkeeping, not a decision.
+SDKs are generated with version 4 of the code generator, which renders C#, TypeScript and
+Python. `--language` still accepts Java, Ruby, Go and PHP; each is refused by name until it
+reaches version 4.
 
 # Usage
 <!-- usage -->

@@ -61,10 +61,16 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
 export const AVAILABLE_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
 
 /**
- * The four that leave with v3. They are named in the refusal rather than left out of it: a user
- * whose language is coming back reads something different from one who mistyped.
+ * Everything v4 does not render yet, which is the rest of the enum. Derived rather than listed,
+ * so a language cannot end up named by both or by neither when one of them changes -- adding a
+ * renderer is then one edit, to the list above.
+ *
+ * They are named in the refusal rather than left out of it: a user whose language is coming back
+ * reads something different from one who mistyped. The order is the one every other list shows.
  */
-export const UPCOMING_LANGUAGES: readonly Language[] = [Language.JAVA, Language.RUBY, Language.GO, Language.PHP];
+export const UPCOMING_LANGUAGES: readonly Language[] = LANGUAGE_CHOICES.map((choice) => choice.value).filter(
+  (language) => !AVAILABLE_LANGUAGES.includes(language)
+);
 
 /** Takes a string because config files name their languages, and a file may name anything. */
 export function isAvailableLanguage(language: string): language is Language {
