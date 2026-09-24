@@ -4,10 +4,13 @@ import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
 import { TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
-import { GROUP_BY } from '../src/types/portal/config/api-config';
-import { COLOR_MODES } from '../src/types/portal/config/brand-config';
-import { LAYOUTS } from '../src/types/portal/config/navigation-config';
-import { PortalConfig } from '../src/types/portal/portal-config';
+import { ApiConfig } from '../src/types/portal/config/api-config';
+import { PortalIdentity } from '../src/types/portal/portal-config';
+import type { ApiOptions } from '../portal-template/portal-config';
+import type { Portal } from '../portal-template/src/lib/portal-types';
+
+/** True only when the two types are identical, every nested field and union member included. */
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 const repositoryRoot = process.cwd();
 const templateRoot = path.join(repositoryRoot, 'portal-template');
@@ -94,34 +97,14 @@ describe('portal template packaging', () => {
     expect(source).to.contain("'__APIMATIC_CONTENT_DIR__'");
   });
 
-  // The two sides are compiled apart, so nothing else holds the browser's `Portal` interface to
-  // the file the CLI writes for it.
-  it('declares exactly the identity fields the CLI writes', () => {
-    const source = fs.readFileSync(path.join(templateRoot, 'src/lib/portal.ts'), 'utf8');
-    const block = /export interface Portal \{([\s\S]*?)\n\}/.exec(source);
-    const declared = [...(block?.[1] ?? '').matchAll(/^\s*(\w+):/gm)].map((match) => match[1]).sort();
+  // The two sides are compiled apart and the template casts the files it reads, so nothing else
+  // holds them together: a field or a value only one side knows builds a portal that is quietly
+  // missing it. The compiler checks this when `pretest` runs; the assertion only reports it.
+  it('declares exactly what the CLI writes for it', () => {
+    const identity: Equal<Portal, PortalIdentity> = true;
+    const api: Equal<ApiOptions, ReturnType<ApiConfig['toJSON']>> = true;
 
-    expect(declared).to.not.be.empty;
-    expect(declared).to.deep.equal(
-      Object.keys(PortalConfig.scaffolded({ name: 'Acme', description: null }).identity()).sort()
-    );
-  });
-
-  /** The members of a string-literal union the template declares, in the order written. */
-  const unionMembers = (file: string, pattern: RegExp): string[] => {
-    const declaration = pattern.exec(fs.readFileSync(path.join(templateRoot, file), 'utf8'));
-    return [...(declaration?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1]);
-  };
-
-  // A value the CLI accepts and the template does not handle builds a portal that is quietly
-  // missing its layout or its theme props.
-  it('handles exactly the layouts and colour modes the CLI accepts', () => {
-    expect(unionMembers('src/lib/portal.ts', /export type PortalLayout = ([^;]+);/)).to.deep.equal([...LAYOUTS]);
-    expect(unionMembers('src/lib/portal.ts', /export type PortalColorMode = ([^;]+);/)).to.deep.equal([...COLOR_MODES]);
-  });
-
-  it('groups the reference pages in exactly the ways the CLI accepts', () => {
-    expect(unionMembers('portal-config.ts', /groupBy: ([^;]+);/)).to.deep.equal([...GROUP_BY]);
+    expect([identity, api]).to.deep.equal([true, true]);
   });
 
   // The CLI writes these into the prepared project; a copy in the template would be a second

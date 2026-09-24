@@ -21,8 +21,8 @@ export interface PortalLink {
 
 /**
  * What the browser bundle is told about the portal, written to `portal.identity.json`. Nothing
- * here may address the machine the portal was built on; `portal-template/src/lib/portal.ts`
- * declares the same fields.
+ * here may address the machine the portal was built on. `portal-template/src/lib/portal-types.ts`
+ * declares the same type, and test/portal-template.test.ts holds the two equal.
  */
 export interface PortalIdentity {
   name: string;

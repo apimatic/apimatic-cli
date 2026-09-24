@@ -8,7 +8,8 @@ import * as glassPage from 'fumadocs-ui/layouts/glass/page';
 import { DocsLayout as NotebookLayout } from 'fumadocs-ui/layouts/notebook';
 import * as notebookPage from 'fumadocs-ui/layouts/notebook/page';
 import { baseOptions } from './layout.shared';
-import { portal, type PortalLayout } from './portal';
+import { portal } from './portal';
+import type { PortalLayout } from './portal-types';
 import { portalTabs } from './tabs';
 
 /**
