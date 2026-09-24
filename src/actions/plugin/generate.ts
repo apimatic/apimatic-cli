@@ -1,4 +1,3 @@
-import { err, ok, Result } from 'neverthrow';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
 import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
@@ -32,20 +31,51 @@ export class PluginGenerateAction {
     pluginDirectory: DirectoryPath,
     force: boolean
   ): Promise<ActionResult> => {
+    if (buildDirectory.isEqual(pluginDirectory)) {
+      this.prompts.directoryCannotBeSame(pluginDirectory);
+      return ActionResult.failed();
+    }
+
+    if (!(await new BuildContext(buildDirectory).exists())) {
+      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
+      return ActionResult.failed();
+    }
+
     const pluginContext = new PluginContext(pluginDirectory);
-    const unusable = await this.checkDirectories(buildDirectory, pluginDirectory, pluginContext, force);
-    if (unusable !== undefined) {
-      return unusable;
+    if (!force && (await pluginContext.exists()) && !(await this.prompts.overwritePlugin(pluginDirectory))) {
+      this.prompts.pluginDirectoryNotEmpty();
+      return ActionResult.cancelled();
     }
 
     const configContext = new PluginConfigContext(buildDirectory);
-    const opened = await this.openConfig(configContext, buildDirectory);
-    if (opened.isErr()) {
-      return opened.error;
+    const configState = await configContext.getPluginConfigState();
+    if (configState.state === 'unreadable') {
+      this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
+      return ActionResult.failed();
     }
 
-    const published = opened.value.publishedLanguages();
-    const selection = await this.selectLanguages(opened.value);
+    let config: PluginConfigPresent;
+    if (configState.state === 'present' && configState.hasMetadata()) {
+      config = configState;
+    } else {
+      const metadataResult = await new PluginRecordMetadataAction(
+        this.configDir,
+        this.commandMetadata,
+        this.authKey
+      ).execute(buildDirectory);
+      if (metadataResult.isCancelled()) {
+        this.prompts.metadataCancelled(metadataResult.getMessage());
+        return ActionResult.cancelled();
+      }
+      if (!metadataResult.isSuccess()) {
+        return metadataResult.discardValue();
+      }
+
+      config = metadataResult.getValue();
+    }
+
+    const published = config.publishedLanguages();
+    const selection = await this.selectLanguages(config);
     if (selection === undefined) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
@@ -78,69 +108,6 @@ export class PluginGenerateAction {
     }
 
     return await this.buildPlugin(buildDirectory, pluginContext, pluginDirectory, preview);
-  };
-
-  /**
-   * The reasons this command can end before it reads anything. `undefined` means the directories
-   * are usable and the run goes on; anything else is the result to end on.
-   */
-  private readonly checkDirectories = async (
-    buildDirectory: DirectoryPath,
-    pluginDirectory: DirectoryPath,
-    pluginContext: PluginContext,
-    force: boolean
-  ): Promise<ActionResult | undefined> => {
-    if (buildDirectory.isEqual(pluginDirectory)) {
-      this.prompts.directoryCannotBeSame(pluginDirectory);
-      return ActionResult.failed();
-    }
-
-    if (!(await new BuildContext(buildDirectory).exists())) {
-      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
-      return ActionResult.failed();
-    }
-
-    if (!force && (await pluginContext.exists()) && !(await this.prompts.overwritePlugin(pluginDirectory))) {
-      this.prompts.pluginDirectoryNotEmpty();
-      return ActionResult.cancelled();
-    }
-
-    return undefined;
-  };
-
-  /**
-   * The config every later step reads from, recording the plugin identity first if the file is
-   * missing it. The error side carries the result to end on, so a config that cannot be opened
-   * ends the command the same way whether it was unreadable or the user stopped at the prompts.
-   */
-  private readonly openConfig = async (
-    configContext: PluginConfigContext,
-    buildDirectory: DirectoryPath
-  ): Promise<Result<PluginConfigPresent, ActionResult>> => {
-    const configState = await configContext.getPluginConfigState();
-    if (configState.state === 'unreadable') {
-      this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
-      return err(ActionResult.failed());
-    }
-
-    if (configState.state === 'present' && configState.hasMetadata()) {
-      return ok(configState);
-    }
-
-    const metadataResult = await new PluginRecordMetadataAction(
-      this.configDir,
-      this.commandMetadata,
-      this.authKey
-    ).execute(buildDirectory);
-    if (metadataResult.isCancelled()) {
-      this.prompts.metadataCancelled(metadataResult.getMessage());
-      return err(ActionResult.cancelled());
-    }
-    if (!metadataResult.isSuccess()) {
-      return err(metadataResult.discardValue());
-    }
-
-    return ok(metadataResult.getValue());
   };
 
   /**
