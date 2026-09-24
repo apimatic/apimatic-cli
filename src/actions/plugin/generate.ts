@@ -5,7 +5,7 @@ import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { BuildContext } from '../../types/build-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext, PluginConfigPresent } from '../../types/plugin-config-context.js';
+import { PluginConfig, PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { Language, PLUGIN_LANGUAGES } from '../../types/sdk/generate.js';
 import { TempContext } from '../../types/temp-context.js';
@@ -54,7 +54,7 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    let config: PluginConfigPresent;
+    let config: PluginConfig;
     if (configState.state === 'present' && configState.hasMetadata()) {
       config = configState;
     } else {
@@ -163,7 +163,7 @@ export class PluginGenerateAction {
    * `selectLanguages` in the prompts. `undefined` means the user chose nothing at all, which is
    * the one way this command ends with no plugin.
    */
-  private readonly selectLanguages = async (config: PluginConfigPresent): Promise<Language[] | undefined> => {
+  private readonly selectLanguages = async (config: PluginConfig): Promise<Language[] | undefined> => {
     const published = config.publishedLanguages();
     const requested = config.requestedLanguages();
 

@@ -25,15 +25,21 @@ export type PluginReleaseData = { pluginId: string; version: SemVersion };
 export type PluginConfigState =
   | { state: 'missing' }
   | { state: 'unreadable'; reason: string; path: FilePath }
-  | PluginConfigPresent;
+  | PluginConfig;
 
-export class PluginConfigPresent {
+/**
+ * The `plugin` and `languages` blocks of `src/apimatic.json`, read. It is the third state a
+ * config can be in, which is why it carries `state` — `present` means the document parsed with
+ * nothing wrong in these two blocks, never that either block is there: a file holding only
+ * languages is a present config with no identity, and `hasMetadata()` is what answers that.
+ */
+export class PluginConfig {
   public readonly state = 'present' as const;
 
   private constructor(private readonly config: PluginConfigData) {}
 
-  public static create(config: PluginConfigData): PluginConfigPresent {
-    return new PluginConfigPresent(config);
+  public static create(config: PluginConfigData): PluginConfig {
+    return new PluginConfig(config);
   }
 
   public hasPublishedSdks(): boolean {
@@ -174,7 +180,7 @@ export class PluginConfigContext {
     if (findings.length > 0) {
       return { state: 'unreadable', reason: findingClause(findings), path: state.path };
     }
-    return PluginConfigPresent.create(PluginConfigContext.configOf(state.document));
+    return PluginConfig.create(PluginConfigContext.configOf(state.document));
   }
 
   /** Settles the byte-order mark before `plugin generate` zips `src/` and sends the file on. */
@@ -185,7 +191,7 @@ export class PluginConfigContext {
   public async upsertMetadata(
     metadata: PluginMetadata,
     author?: PluginAuthor
-  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
+  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
     return await this.merge((document) => {
       const plugin = (document.plugin() ?? {}) as PluginIdentityData;
       return document.with('plugin', {
@@ -210,7 +216,7 @@ export class PluginConfigContext {
    */
   public async requestLanguages(
     languages: readonly Language[]
-  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
+  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
     const state = await this.getPluginConfigState();
     if (state.state === 'present' && languages.every((language) => state.requestedLanguages().includes(language))) {
       return ok(state);
@@ -228,7 +234,7 @@ export class PluginConfigContext {
   public async upsertLanguage<L extends Language>(
     language: L,
     entry: PluginLanguageEntry<L>
-  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
+  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
     return await this.merge((document) => {
       const languages: PluginLanguages = { ...(document.languages() as PluginLanguages | undefined) };
       const existingEntry = languages[language];
@@ -257,9 +263,9 @@ export class PluginConfigContext {
    */
   private async merge(
     apply: (document: ApimaticConfigDocument) => ApimaticConfigDocument
-  ): Promise<Result<PluginConfigPresent, PluginConfigWriteFailure>> {
+  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
     const merged = await this.configContext.merge(OWNED_BLOCKS, apply);
-    return merged.map((document) => PluginConfigPresent.create(PluginConfigContext.configOf(document)));
+    return merged.map((document) => PluginConfig.create(PluginConfigContext.configOf(document)));
   }
 
   private static configOf(document: ApimaticConfigDocument): PluginConfigData {
