@@ -226,7 +226,7 @@ describe('slimOpenAPIPageProps', () => {
       expect(Object.keys(schemas)).to.deep.equal(['DeleteBody']);
     });
 
-    describe('the operations OpenAPI 3.2 adds', () => {
+    it('drops the operations OpenAPI 3.2 adds beside the rendered method: query and additionalOperations', () => {
       const body = (schema: string) => ({
         responses: {
           '200': { content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } } }
@@ -236,37 +236,20 @@ describe('slimOpenAPIPageProps', () => {
         openapi: '3.2.0',
         info: document.info,
         paths: {
-          '/pets': {
-            get: body('Listed'),
-            query: body('Found'),
-            additionalOperations: { COPY: body('Copied'), LINK: body('Linked') }
-          }
+          '/pets': { get: body('Listed'), query: body('Found'), additionalOperations: { COPY: body('Copied') } }
         },
-        components: { schemas: { Listed: {}, Found: {}, Copied: {}, Linked: {} } }
+        components: { schemas: { Listed: {}, Found: {}, Copied: {} } }
       };
-      const slimNewer = (method: string) =>
-        bundledOf(
-          slimOpenAPIPageProps({
-            document: 'newer',
-            payload: { bundled: newer as never },
-            operations: [{ path: '/pets', method }]
-          } as unknown as Props)
-        );
+      const slim = bundledOf(
+        slimOpenAPIPageProps({
+          document: 'newer',
+          payload: { bundled: newer as never },
+          operations: [{ path: '/pets', method: 'get' }]
+        } as unknown as Props)
+      );
 
-      it('drops a query operation and the additional ones beside the rendered method', () => {
-        const slim = slimNewer('get');
-
-        expect(Object.keys(slim.paths['/pets'])).to.deep.equal(['get']);
-        expect(Object.keys(slim.components.schemas)).to.deep.equal(['Listed']);
-      });
-
-      it('keeps the one additional operation a page renders', () => {
-        const slim = slimNewer('copy');
-
-        expect(Object.keys(slim.paths['/pets'])).to.deep.equal(['additionalOperations']);
-        expect(Object.keys(slim.paths['/pets'].additionalOperations)).to.deep.equal(['COPY']);
-        expect(Object.keys(slim.components.schemas)).to.deep.equal(['Copied']);
-      });
+      expect(Object.keys(slim.paths['/pets'])).to.deep.equal(['get']);
+      expect(Object.keys(slim.components.schemas)).to.deep.equal(['Listed']);
     });
 
     it('passes a path item that is itself a reference through untouched', () => {

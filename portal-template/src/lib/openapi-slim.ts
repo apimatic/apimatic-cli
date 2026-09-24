@@ -81,10 +81,9 @@ function pick(
 }
 
 /**
- * Drops the operations the page does not render, those under OpenAPI 3.2's
- * `additionalOperations` included. Fumadocs reads only `pathItem[method]`, so without this a
- * page carries every sibling method and the schema closure each one reaches. Non-method fields
- * stay: the renderer reads path-level `parameters` and `servers` here too.
+ * Drops the operations the page does not render. Fumadocs reads only `pathItem[method]`, so
+ * without this a page carries every sibling method and the schema closure each one reaches.
+ * Non-method fields stay: the renderer reads path-level `parameters` and `servers` here too.
  */
 function narrowToMethods(item: unknown, methods: Set<string>): unknown {
   if (methods.size === 0 || !isJsonObject(item)) return item;
@@ -95,12 +94,9 @@ function narrowToMethods(item: unknown, methods: Set<string>): unknown {
 
   const out: Record<string, unknown> = {};
   for (const [key, value] of entries) {
-    if (key === 'additionalOperations' && isJsonObject(value)) {
-      const kept = Object.entries(value).filter(([method]) => methods.has(method.toLowerCase()));
-      if (kept.length > 0) out[key] = Object.fromEntries(kept);
-    } else if (!METHODS.has(key.toLowerCase()) || methods.has(key.toLowerCase())) {
-      out[key] = value;
-    }
+    // Fumadocs builds no page for an operation under `additionalOperations`, so a page never renders one.
+    const isOperation = METHODS.has(key.toLowerCase()) || key === 'additionalOperations';
+    if (!isOperation || methods.has(key.toLowerCase())) out[key] = value;
   }
   return out;
 }
