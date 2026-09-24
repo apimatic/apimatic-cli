@@ -3,7 +3,6 @@ import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
-import { ServiceErrorCode } from '../../../src/infrastructure/service-error';
 import { Endpoint } from '../../../src/types/portal/endpoint';
 
 describe('PortalArtifactsService', () => {
@@ -33,7 +32,7 @@ describe('PortalArtifactsService', () => {
   it('returns no samples when no file is configured', async () => {
     const result = await new PortalArtifactsService().generate();
 
-    expect(result._unsafeUnwrap().samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
+    expect(result._unsafeUnwrap().samples.samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
   });
 
   it('loads a catalog per language from the configured file', async () => {
@@ -41,42 +40,44 @@ describe('PortalArtifactsService', () => {
 
     const result = await new PortalArtifactsService().generate();
 
-    const samples = result._unsafeUnwrap().samplesFor(new Endpoint('GET', '/payments'));
+    const samples = result._unsafeUnwrap().samples.samplesFor(new Endpoint('GET', '/payments'));
     expect(samples.map((sample) => sample.lang)).to.deep.equal(['typescript', 'csharp', 'python']);
   });
 
-  it('names the variable and the file when the file does not exist', async () => {
+  it('names the file when it does not exist', async () => {
     const missing = path.join(root, 'missing.json');
     process.env.APIMATIC_CODE_SAMPLES_PATH = missing;
 
-    const error = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
+    const failure = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
 
-    expect(error.code).to.equal(ServiceErrorCode.NotFound);
-    expect(error.errorMessage).to.contain('APIMATIC_CODE_SAMPLES_PATH').and.contain(missing);
+    expect(failure).to.deep.equal({ file: missing, problem: { kind: 'missing' } });
   });
 
-  it('names the variable and the file when the file is not JSON', async () => {
+  it('reports a file that is not JSON', async () => {
     withSamples('{ not json');
 
-    const error = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
+    const failure = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
 
-    expect(error.errorMessage).to.contain('APIMATIC_CODE_SAMPLES_PATH').and.contain('code-samples.json');
+    expect(failure.file).to.equal(path.join(root, 'code-samples.json'));
+    expect(failure.problem).to.deep.equal({ kind: 'invalidJson' });
   });
 
   it('names the language whose catalog is malformed', async () => {
     withSamples(JSON.stringify({ python: { paths: [] } }));
 
-    const error = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
+    const failure = (await new PortalArtifactsService().generate())._unsafeUnwrapErr();
 
-    expect(error.errorMessage).to.contain('python');
+    expect(failure.problem).to.deep.equal({ kind: 'malformedCatalogs', languages: ['python'] });
   });
 
-  it('skips a key that is not a language', async () => {
-    withSamples(JSON.stringify({ version: 1, typescript: { paths: { '/payments': { GET: { Example: 'list()' } } } } }));
+  it('skips and reports a key that is not a language', async () => {
+    withSamples(JSON.stringify({ typescipt: {}, typescript: { paths: { '/payments': { GET: { Example: 'list()' } } } } }));
 
-    const result = await new PortalArtifactsService().generate();
+    const { samples, ignoredKeys } = (await new PortalArtifactsService().generate())._unsafeUnwrap();
 
-    const samples = result._unsafeUnwrap().samplesFor(new Endpoint('GET', '/payments'));
-    expect(samples.map((sample) => sample.lang)).to.deep.equal(['typescript']);
+    expect(samples.samplesFor(new Endpoint('GET', '/payments')).map((sample) => sample.lang)).to.deep.equal([
+      'typescript'
+    ]);
+    expect(ignoredKeys).to.deep.equal(['typescipt']);
   });
 });

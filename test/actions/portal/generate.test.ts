@@ -10,7 +10,6 @@ import { PortalAuthorizationService } from '../../../src/infrastructure/services
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
 import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
-import { ServiceError } from '../../../src/infrastructure/service-error';
 import { FileService } from '../../../src/infrastructure/file-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
@@ -78,7 +77,7 @@ describe('GenerateAction', () => {
   });
 
   it('fails without building when the code samples cannot be generated', async () => {
-    sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(err(ServiceError.ServerError));
+    sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(err({ file: 'code-samples.json', problem: { kind: 'missing' as const } }));
 
     const result = await execute();
 

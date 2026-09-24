@@ -65,11 +65,13 @@ export class PortalServeAction {
     this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
     this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
 
-    const codeSamples = await this.prompts.generateCodeSamples(this.artifactsService.generate());
-    if (codeSamples.isErr()) {
+    const generated = await this.prompts.generateCodeSamples(this.artifactsService.generate());
+    if (generated.isErr()) {
       return ActionResult.failed();
     }
-    this.prompts.unplacedSamples(codeSamples.value.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
+    const codeSamples = generated.value.samples;
+    this.prompts.ignoredSampleKeys(generated.value.ignoredKeys);
+    this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
 
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {
@@ -77,7 +79,7 @@ export class PortalServeAction {
     }
 
     return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples.value);
+      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);
         return ActionResult.failed();
