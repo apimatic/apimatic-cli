@@ -95,7 +95,10 @@ Supporting: **Types** (`src/types/`) for value objects, context objects, and dom
 - **Commands use `export default class`** — oclif requires default export; actions, prompts, and services use named exports (`export class`)
 - **Static fields use `readonly`** — `static readonly summary`, `static readonly description`, `static readonly cmdTxt` on every Command
 - **Topic separator is space** — `apimatic portal generate`, not `apimatic portal:generate`
-- **No AI-generated comments** — comment only to explain non-obvious *why*: a constraint, a workaround, a subtle invariant. Never restate what the code already says, narrate a change, or leave notes addressed to a future agent. Default to no comment; existing comment density in nearby code is never a reason to add more.
+- **Comments are a design smell** — improve the design until they are unnecessary; if one is unavoidable, keep it to one line explaining *why*. Never restate the code, narrate a change, or address a future agent; nearby comment density is never a reason to add more.
+- **Reuse infra** — network, file I/O, OS calls, sleep, time: use existing services, Node.js standard libraries and built-in JS APIs.
+- **Readability is king** — simple names, simple domain models, composed with simple functions that turn one type into another instead of passing primitives around.
+- **Validate once, up front** — no repeated runtime type checks; later code works with guaranteed types.
 - **Telemetry** — After `outro(result)`, commands optionally track failures via `result.mapAll(() => {}, async () => { await new TelemetryService(configDir).trackEvent(new SomeFailedEvent(...), shell) }, () => {})`. Event classes extend `DomainEvent` (`src/types/events/`). Only the failure callback is populated; success/cancel are no-ops.
 
 ## Branching
