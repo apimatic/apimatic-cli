@@ -6,7 +6,7 @@ for (const spec of ['external', 'internal', 'opref']) {
   check(
     `${route}: the inline operation beside the $ref gets its sample`,
     [await labels(page), await panel(page, 'typescript')],
-    [['cURL', 'TypeScript'], 'TS-INLINE']
+    [['TypeScript'], 'TS-INLINE']
   );
   await finish(page, route);
 }
@@ -31,7 +31,7 @@ for (const spec of ['external', 'internal']) {
   check(
     `${route}: the sample the CLI set beside the operation $ref still renders`,
     [await labels(page), await panel(page, 'typescript')],
-    [['cURL', 'TypeScript'], 'TS-PETS-LIST']
+    [['TypeScript'], 'TS-PETS-LIST']
   );
   check(
     `${route}: KNOWN FUMADOCS BUG - the page shows none of the operation's details, not even its summary`,

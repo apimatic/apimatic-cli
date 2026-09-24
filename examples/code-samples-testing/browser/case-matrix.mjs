@@ -1,14 +1,22 @@
-import { check, choose, done, finish, hasSelector, labels, note, open, options, origin, panel } from './lib.mjs';
+import {
+  check,
+  choose,
+  done,
+  finish,
+  hasSelector,
+  labels,
+  note,
+  open,
+  options,
+  origin,
+  panel,
+  usageTabList
+} from './lib.mjs';
 
 {
   const route = 'store/orders/CreateOrder';
   const page = await open(route);
-  check(`${route}: tabs are curl then catalog languages in order`, await labels(page), [
-    'cURL',
-    'TypeScript',
-    'C#',
-    'Python'
-  ]);
+  check(`${route}: tabs are the catalog languages in order`, await labels(page), ['TypeScript', 'C#', 'Python']);
   check(`${route}: selector lists every request example`, await options(page), [
     'Minimal order',
     'Full order',
@@ -29,11 +37,6 @@ import { check, choose, done, finish, hasSelector, labels, note, open, options, 
       py
     );
   }
-  check(
-    `${route} [Bulk order]: curl follows the example body`,
-    (await panel(page, 'curl')).includes('"quantity": 500'),
-    true
-  );
   await choose(page, 'Minimal order');
   check(`${route}: returning to an example restores its snippet`, await panel(page, 'typescript'), 'TS-CREATE-MINIMAL');
   await finish(page, route);
@@ -41,7 +44,7 @@ import { check, choose, done, finish, hasSelector, labels, note, open, options, 
 {
   const route = 'store/orders/TagOrder';
   const page = await open(route);
-  check(`${route}: tabs`, await labels(page), ['cURL', 'TypeScript', 'C#']);
+  check(`${route}: tabs`, await labels(page), ['TypeScript', 'C#']);
   await choose(page, 'Same body, second');
   check(
     `${route} [second]: identical bodies still resolve to the chosen example`,
@@ -58,7 +61,7 @@ import { check, choose, done, finish, hasSelector, labels, note, open, options, 
   const route = 'store/orders/ListOrders';
   const page = await open(route);
   check(`${route}: no request body means no selector`, await hasSelector(page), false);
-  check(`${route}: tabs`, await labels(page), ['cURL', 'TypeScript', 'C#', 'Python']);
+  check(`${route}: tabs`, await labels(page), ['TypeScript', 'C#', 'Python']);
   check(`${route}: the only snippet (keyed Example) shows for _default`, await panel(page, 'typescript'), 'TS-LIST');
   check(
     `${route}: C# keeps Example beside other, so two snippets leave nothing to choose`,
@@ -66,21 +69,20 @@ import { check, choose, done, finish, hasSelector, labels, note, open, options, 
     note('C#')
   );
   check(`${route}: two snippets for one example leave nothing to choose`, await panel(page, 'python'), note('Python'));
-  check(`${route}: curl carries the query example`, (await panel(page, 'curl')).includes('limit=10'), true);
   await finish(page, route);
 }
 {
   const route = 'store/orders/ReplaceOrder';
   const page = await open(route);
   check(`${route}: a single named example shows no selector`, await hasSelector(page), false);
-  check(`${route}: tabs`, await labels(page), ['cURL', 'TypeScript']);
+  check(`${route}: tabs`, await labels(page), ['TypeScript']);
   check(`${route}: snippet keyed by the example name`, await panel(page, 'typescript'), 'TS-REPLACE');
   await finish(page, route);
 }
 {
   const route = 'store/orders/DeleteOrder';
   const page = await open(route);
-  check(`${route}: hand-written x-codeSamples adds no tab`, await labels(page), ['cURL']);
+  check(`${route}: hand-written x-codeSamples adds no tab`, await labels(page), []);
   check(
     `${route}: hand-written x-codeSamples text appears nowhere`,
     (await page.content()).includes('HANDWRITTEN-XCODESAMPLES</'),
@@ -91,7 +93,7 @@ import { check, choose, done, finish, hasSelector, labels, note, open, options, 
 {
   const route = 'store/orders/PatchOrder';
   const page = await open(route);
-  check(`${route}: catalog tab, not the x-codeSamples one`, await labels(page), ['cURL', 'TypeScript']);
+  check(`${route}: catalog tab, not the x-codeSamples one`, await labels(page), ['TypeScript']);
   check(`${route}: catalog snippet`, await panel(page, 'typescript'), 'TS-PATCH');
   await finish(page, route);
 }
@@ -126,7 +128,6 @@ import { check, choose, done, finish, hasSelector, labels, note, open, options, 
   const route = 'store/legacy/GetLegacy';
   const page = await open(route);
   check(`${route}: hand-written x-apimatic-codeSamples renders; malformed entries are skipped`, await labels(page), [
-    'cURL',
     'Ruby'
   ]);
   check(`${route}: Ruby`, await panel(page, 'ruby'), 'client.legacy.get # HANDWRITTEN-APIMATIC');
@@ -134,14 +135,14 @@ import { check, choose, done, finish, hasSelector, labels, note, open, options, 
 }
 for (const route of ['store/health/StoreHealth', 'inventory/health/InventoryHealth']) {
   const page = await open(route);
-  check(`${route}: an endpoint in two specs gets the sample in both`, await labels(page), ['cURL', 'TypeScript']);
+  check(`${route}: an endpoint in two specs gets the sample in both`, await labels(page), ['TypeScript']);
   check(`${route}: TypeScript`, await panel(page, 'typescript'), 'TS-HEALTH');
   await finish(page, route);
 }
 {
   const route = 'inventory/items/CreateItem';
   const page = await open(route);
-  check(`${route}: YAML 3.1 spec with an in-spec $ref is sampled`, await labels(page), ['cURL', 'TypeScript']);
+  check(`${route}: YAML 3.1 spec with an in-spec $ref is sampled`, await labels(page), ['TypeScript']);
   await choose(page, 'Gadget');
   check(`${route} [Gadget]: TypeScript`, await panel(page, 'typescript'), 'TS-ITEM-GADGET');
   await finish(page, route);
@@ -149,15 +150,14 @@ for (const route of ['store/health/StoreHealth', 'inventory/health/InventoryHeal
 {
   const route = 'outside/things/CreateThing';
   const page = await open(route);
-  check(`${route}: a spec whose $ref leaves spec/ keeps curl only`, await labels(page), ['cURL']);
+  check(`${route}: a spec whose $ref leaves spec/ has no sample tabs`, await labels(page), []);
   await finish(page, route);
 }
 {
   const page = await open('store/orders/CreateOrder');
   await panel(page, 'csharp');
   await page.goto(`${origin}/api/store/orders/TagOrder/`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('[role=tab][id$="-trigger-curl"]');
-  const selected = await page.locator('[role=tablist]:has([id$="-trigger-curl"]) > [aria-selected=true]').innerText();
+  const selected = await page.locator(`${usageTabList} > [aria-selected=true]`).innerText();
   check('the chosen language carries over to the next operation page', selected.trim(), 'C#');
   await page.close();
 }

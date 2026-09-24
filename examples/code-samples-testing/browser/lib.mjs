@@ -27,11 +27,12 @@ export async function open(route) {
   );
   const response = await page.goto(`${origin}/api/${route}/`, { waitUntil: 'networkidle', timeout: 120_000 });
   page.status = response.status();
-  if (page.status === 200) await page.waitForSelector('[role=tab][id$="-trigger-curl"]', { timeout: 60_000 });
   return page;
 }
 
-const usageTabList = '[role=tablist]:has([id$="-trigger-curl"])';
+const languages = ['csharp', 'java', 'php', 'python', 'ruby', 'typescript', 'go'];
+const languageTab = `[role=tab]:is(${languages.map((id) => `[id$="-trigger-${id}"]`).join(', ')})`;
+export const usageTabList = `[role=tablist]:has(${languageTab})`;
 export const labels = async (page) =>
   (await page.locator(`${usageTabList} > [role=tab]`).allInnerTexts()).map((text) => text.trim());
 export async function panel(page, id) {
@@ -42,8 +43,7 @@ export async function panel(page, id) {
 export const panelElement = async (page, id) =>
   page.locator(`#${await page.locator(`${usageTabList} > [id$="-trigger-${id}"]`).getAttribute('aria-controls')}`);
 
-const exampleSelector = (page) =>
-  page.locator('div:has(> [role=combobox]):has([id$="-trigger-curl"]) > [role=combobox]');
+const exampleSelector = (page) => page.locator(`div:has(> [role=combobox]):has(${languageTab}) > [role=combobox]`);
 export const hasSelector = async (page) => (await exampleSelector(page).count()) > 0;
 export async function choose(page, name) {
   await exampleSelector(page).click();

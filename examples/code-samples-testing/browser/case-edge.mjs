@@ -14,18 +14,13 @@ const languages = [
   const route = 'edge/languages/ListLanguages';
   const page = await open(route);
   check(
-    `${route}: all seven languages, in catalog order, after curl; the empty Java catalog adds nothing`,
+    `${route}: all seven languages, in catalog order; the empty Java catalog adds nothing`,
     await labels(page),
-    ['cURL', ...languages.map(([, label]) => label)]
+    languages.map(([, label]) => label)
   );
   for (const [id, label] of languages) {
     check(`${route}: ${label} snippet`, await panel(page, id), `${id.toUpperCase()}-LANGUAGES`);
   }
-  check(
-    `${route}: curl resolves the server variables`,
-    (await panel(page, 'curl')).includes('https://eu.api.edge.test/v2/languages'),
-    true
-  );
   await finish(page, route);
 }
 {
@@ -76,7 +71,7 @@ const languages = [
   check(
     `${route}: an untagged operation still gets its sample`,
     [await labels(page), await panel(page, 'typescript')],
-    [['cURL', 'TypeScript'], 'TS-UNTAGGED']
+    [['TypeScript'], 'TS-UNTAGGED']
   );
   await finish(page, route);
 }

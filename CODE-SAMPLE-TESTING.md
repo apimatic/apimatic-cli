@@ -67,7 +67,7 @@ node case-matrix.mjs http://127.0.0.1:4203
 
 Each check prints `PASS` or `FAIL` with the expected and actual values, and the run ends
 with `N passed, M failed` and a non-zero exit on any failure. Every page also fails if it
-threw or any request answered 4xx/5xx. The matrix is 60 checks.
+threw or any request answered 4xx/5xx. The matrix is 58 checks.
 
 ## 4. The matrix case
 
@@ -76,18 +76,18 @@ one rule. Snippets are marker strings such as `TS-CREATE-FULL`, so a wrong one i
 
 | Page (`api/…`) | What the spec and catalog set up | What it must show |
 |---|---|---|
-| `store/orders/CreateOrder` | Three body examples `minimal`, `full`, `bulk`. TypeScript has `minimal` and `full`; C# has all three; Python has only `Example` | Tabs `cURL, TypeScript, C#, Python`; each tab follows the selector; TypeScript on `bulk` and Python on every example show `No <Language> sample for this example.`; curl follows the body |
+| `store/orders/CreateOrder` | Three body examples `minimal`, `full`, `bulk`. TypeScript has `minimal` and `full`; C# has all three; Python has only `Example` | Tabs `TypeScript, C#, Python`; each tab follows the selector; TypeScript on `bulk` and Python on every example show `No <Language> sample for this example.` |
 | `store/orders/TagOrder` | Examples `first` and `second` with identical bodies; C# has only `first` | `second` shows `TS-TAG-SECOND`, not the first example's code; C# on `second` shows the note |
 | `store/orders/ListOrders` | No request body, so one example, `_default`. TypeScript has `Example`; C# has `Example` and `other`; Python has `a` and `b` | No selector; TypeScript shows its only snippet whatever the key; C# and Python have two snippets for one example and show the note, since `Example` beside another key is an ordinary id |
 | `store/orders/ReplaceOrder` | One named example `replace` | No selector; the `replace` snippet |
-| `store/orders/DeleteOrder` | Hand-written `x-codeSamples` only, no catalog entry | Only `cURL`; the hand-written text appears nowhere |
-| `store/orders/PatchOrder` | Hand-written `x-codeSamples` and a catalog entry | `cURL, TypeScript` with the catalog snippet |
+| `store/orders/DeleteOrder` | Hand-written `x-codeSamples` only, no catalog entry | No sample tabs; the hand-written text appears nowhere |
+| `store/orders/PatchOrder` | Hand-written `x-codeSamples` and a catalog entry | `TypeScript` with the catalog snippet |
 | `store/refunds/CreateRefund` | TypeScript snippet for `blank` is `""` | An empty code block, not the note |
 | `store/imports/CreateImport` | Two media types; the JSON one's examples are `$ref`s to `components/examples` | Selector lists the JSON examples; each shows its snippet |
-| `store/legacy/GetLegacy` | Hand-written `x-apimatic-codeSamples`: a valid Ruby entry, one using the old `sourceByExample` key, one with no label | Only `cURL, Ruby`; the malformed entries are skipped, not fatal |
+| `store/legacy/GetLegacy` | Hand-written `x-apimatic-codeSamples`: a valid Ruby entry, one using the old `sourceByExample` key, one with no label | Only `Ruby`; the malformed entries are skipped, not fatal |
 | `store/health/StoreHealth`, `inventory/health/InventoryHealth` | The same `GET /health` in two specs | The sample on both pages |
 | `inventory/items/CreateItem` | OpenAPI 3.1 YAML with a `$ref` to `spec/schemas/item.yaml` | Samples placed; the selector switches them |
-| `outside/things/CreateThing` | A `$ref` to `../shared/thing.yaml`, outside `spec/` | Only `cURL`: the spec keeps its original file and loses its samples |
+| `outside/things/CreateThing` | A `$ref` to `../shared/thing.yaml`, outside `spec/` | No sample tabs: the spec keeps its original file and loses its samples |
 | — | `/pets` is a path item `$ref`; `GET /ghost` exists in no spec | Both reported `unplaced`; `/pets` gets no page (see [§5](#5-other-cases)) |
 
 The last check picks C# on one page and opens another: the chosen language must stay
@@ -98,9 +98,9 @@ selected.
 | Case | Build and serve | Checks | What it covers |
 |---|---|---|---|
 | `pathref` | as §2 | `case-pathref.mjs`, 14 | Path items and operations written as `$ref`s, in the same file and another. Records a fumadocs-openapi bug (still in 12.0.2): its page listing reads a `$ref`'d path item without resolving it, so such operations get **no page**, and an operation `$ref` gets a page under `unknown/…/get` with none of its details. The checks marked `KNOWN FUMADOCS BUG` will fail once that is fixed; update them then |
-| `edge` | as §2 | `case-edge.mjs`, 25 | All seven languages in catalog order and an empty catalog adding nothing; curl resolving server variables; example ids with a space, a slash and non-ASCII; `<script>` in a snippet shown as text and never run; a 400-line snippet, highlighted; an untagged operation; a webhook page with no SDK tabs |
-| `combine` | as §2 | `case-combine.mjs`, 108 | Body and parameter `examples` with overlapping and disjoint ids, against the real codegen-v2 catalog (`GA-dev-branch` 7b8e0e30). The selector lists the body's ids, or, when the body names none (no `examples`, a singular `example`, a lone `Example` key), the first query, header or path parameter's; cURL and the TypeScript tab bind each parameter's value for the selected id. What still differs: `Example` beside a named body id shows the note, since codegen never emits it; values fumadocs samples (`"string"`) and codegen invents (`"some example string"`, or an optional body left out); and a two-media-type body, where codegen's one snippet sends no body |
-| payments | the real CLI, below | `case-payments.mjs`, 28 | The shipped commands end to end, with the mock catalog |
+| `edge` | as §2 | `case-edge.mjs`, 24 | All seven languages in catalog order and an empty catalog adding nothing; example ids with a space, a slash and non-ASCII; `<script>` in a snippet shown as text and never run; a 400-line snippet, highlighted; an untagged operation; a webhook page with no SDK tabs |
+| `combine` | as §2 | `case-combine.mjs`, 82 | Body and parameter `examples` with overlapping and disjoint ids, against the real codegen-v2 catalog (`GA-dev-branch` 7b8e0e30). The selector lists the body's ids, or, when the body names none (no `examples`, a singular `example`, a lone `Example` key), the first query, header or path parameter's, and the TypeScript tab shows codegen's snippet for each. `Example` beside a named body id still shows the note, since codegen never emits it |
+| payments | the real CLI, below | `case-payments.mjs`, 26 | The shipped commands end to end, with the mock catalog |
 
 The payments case runs the commands a user runs, so it needs `pnpm build` and a login
 (`pnpm apimatic auth status`). `--input` is the directory **containing** `src/`:
@@ -145,9 +145,9 @@ rerun writes the same file.
 - **Windows paths.** Pass `cygpath -m` (forward-slash) paths. A backslash path breaks in
   `read` without `-r`, and `"$DIR\\$name"` escapes the `$` and writes every build to one
   literal directory.
-- **Selectors.** Response tabs are also `role=tab`, so scope to the tab list holding the
-  `-trigger-curl` tab. A spec with two media types also has a media-type combobox, so the
-  example selector is the combobox beside that tab list. `lib.mjs` does both.
+- **Selectors.** Response tabs are also `role=tab`, so scope to the tab list holding a
+  `-trigger-<language>` tab. A spec with two media types also has a media-type combobox, so
+  the example selector is the combobox beside that tab list. `lib.mjs` does both.
 - **The selector popup** renders after its trigger is clicked; wait for `[role=option]`
   before reading it, and for it to close before the next click.
 - **Code in `page.evaluate`** runs in the browser but is linted as Node; pass it as a

@@ -6,12 +6,7 @@ const has = (text, part) => text.includes(part);
 {
   const route = `${base}/createPayment`;
   const page = await open(route);
-  check(`${route}: tabs are curl then the catalog languages`, await labels(page), [
-    'cURL',
-    'TypeScript',
-    'C#',
-    'Python'
-  ]);
+  check(`${route}: tabs are the catalog languages`, await labels(page), ['TypeScript', 'C#', 'Python']);
   check(`${route}: selector lists both examples`, await options(page), ['Only the required fields', 'Every field']);
 
   await choose(page, 'Only the required fields');
@@ -31,7 +26,6 @@ const has = (text, part) => text.includes(part);
     has(await panel(page, 'python'), "description='Order 42'"),
     false
   );
-  check(`${route} [minimal]: curl carries the minimal body`, has(await panel(page, 'curl'), 'Order 42'), false);
 
   await choose(page, 'Every field');
   check(
@@ -43,11 +37,6 @@ const has = (text, part) => text.includes(part);
   check(
     `${route} [full]: Python is the full snippet`,
     has(await panel(page, 'python'), "description='Order 42'"),
-    true
-  );
-  check(
-    `${route} [full]: curl carries the full body`,
-    has(await panel(page, 'curl'), '"description": "Order 42"'),
     true
   );
   await finish(page, route);
@@ -70,7 +59,7 @@ for (const [operation, [ts, cs, py]] of Object.entries(single)) {
   const route = `${base}/${operation}`;
   const page = await open(route);
   check(`${route}: no selector for an operation without body examples`, await hasSelector(page), false);
-  check(`${route}: tabs`, await labels(page), ['cURL', 'TypeScript', 'C#', 'Python']);
+  check(`${route}: tabs`, await labels(page), ['TypeScript', 'C#', 'Python']);
   check(`${route}: TypeScript shows its only snippet`, has(await panel(page, 'typescript'), ts), true);
   if (cs) check(`${route}: C# shows its only snippet`, has(await panel(page, 'csharp'), cs), true);
   check(`${route}: Python shows its only snippet`, has(await panel(page, 'python'), py), true);
