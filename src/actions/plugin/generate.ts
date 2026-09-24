@@ -1,3 +1,4 @@
+import { err, ok, Result } from 'neverthrow';
 import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
 import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
@@ -31,49 +32,20 @@ export class PluginGenerateAction {
     pluginDirectory: DirectoryPath,
     force: boolean
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(pluginDirectory)) {
-      this.prompts.directoryCannotBeSame(pluginDirectory);
-      return ActionResult.failed();
-    }
-
-    const buildContext = new BuildContext(buildDirectory);
-    if (!(await buildContext.exists())) {
-      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
-      return ActionResult.failed();
-    }
-
     const pluginContext = new PluginContext(pluginDirectory);
-    if (!force && (await pluginContext.exists()) && !(await this.prompts.overwritePlugin(pluginDirectory))) {
-      this.prompts.pluginDirectoryNotEmpty();
-      return ActionResult.cancelled();
+    const unusable = await this.checkDirectories(buildDirectory, pluginDirectory, pluginContext, force);
+    if (unusable !== undefined) {
+      return unusable;
     }
 
-    let preview = false;
     const configContext = new PluginConfigContext(buildDirectory);
-    let configState = await configContext.getPluginConfigState();
-    if (configState.state === 'unreadable') {
-      this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
-      return ActionResult.failed();
+    const opened = await this.openConfig(configContext, buildDirectory);
+    if (opened.isErr()) {
+      return opened.error;
     }
 
-    if (configState.state === 'missing' || !configState.hasMetadata()) {
-      const metadataResult = await new PluginRecordMetadataAction(
-        this.configDir,
-        this.commandMetadata,
-        this.authKey
-      ).execute(buildDirectory);
-      if (metadataResult.isCancelled()) {
-        this.prompts.metadataCancelled(metadataResult.getMessage());
-        return ActionResult.cancelled();
-      }
-      if (!metadataResult.isSuccess()) {
-        return metadataResult.discardValue();
-      }
-      configState = metadataResult.getValue();
-    }
-
-    const published = configState.publishedLanguages();
-    const selection = await this.selectLanguages(configState);
+    const published = opened.value.publishedLanguages();
+    const selection = await this.selectLanguages(opened.value);
     if (selection === undefined) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
@@ -84,23 +56,16 @@ export class PluginGenerateAction {
       this.prompts.configNotPrepared(recorded.error, buildDirectory);
       return ActionResult.failed();
     }
-    configState = recorded.value;
 
-    const unsupported = configState.unsupportedLanguages();
+    const unsupported = recorded.value.unsupportedLanguages();
     if (unsupported.length > 0) {
       this.prompts.languagesNotIncluded(unsupported);
     }
 
-    // Only a language the plugin has to carry itself is worth a word about publishing; a run that
-    // adds nothing local is describing packages that already exist.
-    const bundled = selection.filter((language) => !published.includes(language));
-    if (bundled.length > 0 && (await this.hasPublishingProfile())) {
-      this.prompts.recommendPublishingFirst();
-      if (!(await this.prompts.confirmLocalPlugin())) {
-        this.prompts.localPluginCancelled();
-        return ActionResult.cancelled();
-      }
-      preview = true;
+    const preview = await this.confirmBundledSdks(selection.filter((language) => !published.includes(language)));
+    if (preview === undefined) {
+      this.prompts.localPluginCancelled();
+      return ActionResult.cancelled();
     }
 
     // `src/` is zipped as it sits on disk, so a byte-order mark the reader above looked past
@@ -112,6 +77,93 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
+    return await this.buildPlugin(buildDirectory, pluginContext, pluginDirectory, preview);
+  };
+
+  /**
+   * The reasons this command can end before it reads anything. `undefined` means the directories
+   * are usable and the run goes on; anything else is the result to end on.
+   */
+  private readonly checkDirectories = async (
+    buildDirectory: DirectoryPath,
+    pluginDirectory: DirectoryPath,
+    pluginContext: PluginContext,
+    force: boolean
+  ): Promise<ActionResult | undefined> => {
+    if (buildDirectory.isEqual(pluginDirectory)) {
+      this.prompts.directoryCannotBeSame(pluginDirectory);
+      return ActionResult.failed();
+    }
+
+    if (!(await new BuildContext(buildDirectory).exists())) {
+      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
+      return ActionResult.failed();
+    }
+
+    if (!force && (await pluginContext.exists()) && !(await this.prompts.overwritePlugin(pluginDirectory))) {
+      this.prompts.pluginDirectoryNotEmpty();
+      return ActionResult.cancelled();
+    }
+
+    return undefined;
+  };
+
+  /**
+   * The config every later step reads from, recording the plugin identity first if the file is
+   * missing it. The error side carries the result to end on, so a config that cannot be opened
+   * ends the command the same way whether it was unreadable or the user stopped at the prompts.
+   */
+  private readonly openConfig = async (
+    configContext: PluginConfigContext,
+    buildDirectory: DirectoryPath
+  ): Promise<Result<PluginConfigPresent, ActionResult>> => {
+    const configState = await configContext.getPluginConfigState();
+    if (configState.state === 'unreadable') {
+      this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
+      return err(ActionResult.failed());
+    }
+
+    if (configState.state === 'present' && configState.hasMetadata()) {
+      return ok(configState);
+    }
+
+    const metadataResult = await new PluginRecordMetadataAction(
+      this.configDir,
+      this.commandMetadata,
+      this.authKey
+    ).execute(buildDirectory);
+    if (metadataResult.isCancelled()) {
+      this.prompts.metadataCancelled(metadataResult.getMessage());
+      return err(ActionResult.cancelled());
+    }
+    if (!metadataResult.isSuccess()) {
+      return err(metadataResult.discardValue());
+    }
+
+    return ok(metadataResult.getValue());
+  };
+
+  /**
+   * Whether the plugin is a preview, or `undefined` if the user stopped rather than build one.
+   * Only a language the plugin has to carry itself is worth a word about publishing; a run that
+   * adds nothing local is describing packages that already exist.
+   */
+  private readonly confirmBundledSdks = async (bundled: readonly Language[]): Promise<boolean | undefined> => {
+    if (bundled.length === 0 || !(await this.hasPublishingProfile())) {
+      return false;
+    }
+
+    this.prompts.recommendPublishingFirst();
+
+    return (await this.prompts.confirmLocalPlugin()) ? true : undefined;
+  };
+
+  private readonly buildPlugin = async (
+    buildDirectory: DirectoryPath,
+    pluginContext: PluginContext,
+    pluginDirectory: DirectoryPath,
+    preview: boolean
+  ): Promise<ActionResult> => {
     return await withDirPath(async (tempDirectory) => {
       const tempContext = new TempContext(tempDirectory);
       const buildZipPath = await tempContext.zip(buildDirectory);
