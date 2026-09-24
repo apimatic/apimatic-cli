@@ -181,8 +181,9 @@ export class PluginGeneratePrompts {
    * user pastes.
    */
   public installPluginLocally(plugin: DirectoryPath) {
-    log.info(
-      `Run '${f.cmdAlt('npx', 'context-plugins', 'install', `"${f.relativePath(plugin)}"`)}' to install your plugin.`
-    );
+    const quotedPath = `"${f.relativePath(plugin)}"`;
+    const command = f.cmdAlt('npx', 'context-plugins', 'install', quotedPath);
+
+    log.info(`Run '${command}' to install your plugin.`);
   }
 }
