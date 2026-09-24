@@ -1,4 +1,5 @@
 import { err, ok, Result } from 'neverthrow';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { unknownFieldErrors } from './unknown-fields.js';
 
 const BYTE_ORDER_MARK = 0xfeff;
@@ -212,10 +213,10 @@ export class PortalNavigation {
     } catch {
       return err([`${context.label} is not valid JSON.`]);
     }
-    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    if (!isJsonObject(data)) {
       return err([`${context.label} must contain a JSON object.`]);
     }
-    return ok(data as Record<string, unknown>);
+    return ok(data);
   }
 
   /** Whether a page and a folder in this directory both answer to the name. */

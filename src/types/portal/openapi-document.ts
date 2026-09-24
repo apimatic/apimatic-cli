@@ -54,7 +54,7 @@ export class OpenApiDocument {
    */
   public suggestedSite(): SuggestedSite {
     const info = this.document.info;
-    const fields = typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {};
+    const fields = isJsonObject(info) ? info : {};
     const name = oneLine(fields.title) ?? PLACEHOLDER_SITE.name;
     const description = oneLine(firstParagraph(fields.description));
     return { name, description: description === null ? null : cap(description, DESCRIPTION_LIMIT) };
