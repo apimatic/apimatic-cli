@@ -173,8 +173,13 @@ describe('tabsTransformer', () => {
   });
 
   it('makes no tab for a section that is not generated', () => {
-    expect(tabNames({ docs: CONTENT, openapi: API })).to.not.include.members(['SDKs', 'Context Plugin']);
-    expect(tabNames({ docs: CONTENT, generated: SDKS, openapi: API })).to.not.include('Context Plugin');
+    expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal(['Home', 'Guides', 'API Reference']);
+    expect(tabNames({ docs: CONTENT, generated: SDKS, openapi: API })).to.deep.equal([
+      'Home',
+      'Guides',
+      'SDKs',
+      'API Reference'
+    ]);
   });
 
   // Matching tabs to folders goes by id on the client, after the tree has been serialised.
