@@ -18,6 +18,7 @@ import { PortalProjectService } from '../../infrastructure/portal-project-servic
 import { envInfo } from '../../infrastructure/env-info.js';
 import { schemaUrlFor } from '../../types/apimatic-config/document.js';
 import { PluginConfigContext } from '../../types/plugin-config-context.js';
+import { deriveMetadata } from '../../types/plugin/plugin-config.js';
 
 export class PortalQuickstartAction {
   private readonly prompts: PortalQuickstartPrompts = new PortalQuickstartPrompts();
@@ -171,10 +172,17 @@ export class PortalQuickstartAction {
       }
 
       // Recorded before anything is built: `apimatic.json` is what says which SDKs the portal
-      // documents, and every command after this one reads it rather than the answer.
-      const recorded = await new PluginConfigContext(sourceDirectory).recordLanguages(selection);
+      // documents and what names its plugin, and every command after this one reads it rather
+      // than the answers. The identity is derived, never asked: quickstart has two questions and
+      // neither of them is about plugins.
+      const configContext = new PluginConfigContext(sourceDirectory);
+      const recorded = await configContext
+        .recordLanguages(selection)
+        .then(async (languages) =>
+          languages.isErr() ? languages : await configContext.upsertMetadata(deriveMetadata(inputDirectory.leafName()))
+        );
       if (recorded.isErr()) {
-        this.prompts.languagesNotRecorded();
+        this.prompts.configNotWritten();
         return ActionResult.failed();
       }
 

@@ -81,3 +81,28 @@ export interface PluginMetadata {
   pluginName: string;
   pluginVersion: string;
 }
+
+const FIRST_VERSION = '0.1.0';
+const FALLBACK_ID = 'api-plugin';
+
+/**
+ * A plugin identity taken from the directory the user is working in, for the flow that may not
+ * ask: quickstart has two questions and neither of them is about plugins.
+ *
+ * `pluginId` has to match `PLUGIN_ID_PATTERN`, which a directory name need not — `Acme Payments`
+ * and `acme_payments!` are both ordinary folder names and neither is kebab-case. A name that
+ * survives none of that leaves nothing to publish under, so it falls back rather than writing an
+ * id the config would then refuse.
+ */
+export function deriveMetadata(directoryName: string): PluginMetadata {
+  const pluginId = directoryName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return {
+    pluginId: PLUGIN_ID_PATTERN.test(pluginId) ? pluginId : FALLBACK_ID,
+    pluginName: directoryName.trim() === '' ? FALLBACK_ID : directoryName.trim(),
+    pluginVersion: FIRST_VERSION
+  };
+}

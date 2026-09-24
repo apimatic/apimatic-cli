@@ -240,7 +240,7 @@ ${f.description(`${comingSoon} are coming soon`)}`,
     log.warn('No languages selected. Exiting without building a portal.');
   }
 
-  public languagesNotRecorded() {
-    log.error(`The languages could not be written to ${f.var(APIMATIC_CONFIG_FILE_NAME)}.`);
+  public configNotWritten() {
+    log.error(`${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written. Check that it can be written and try again.`);
   }
 }
