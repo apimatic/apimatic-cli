@@ -21,6 +21,7 @@
         "./bin",
         "./lib",
         "./portal-template",
+        "./portal-pages",
         "/oclif.manifest.json",
         "/apimatic.schema.json"
     ],

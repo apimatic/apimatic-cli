@@ -7,6 +7,8 @@ export interface PortalConfig {
   specs: Record<string, string>;
   /** Absolute. Always exists, and may be empty. */
   contentDir: string;
+  /** Absolute, inside this project: the pages the CLI generates, which `src/lib/source.ts` compiles. */
+  generatedDir: string;
   staticDir: string | null;
 }
 

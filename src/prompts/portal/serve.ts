@@ -69,15 +69,20 @@ export class PortalServePrompts {
         `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
           `folder titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
             'apimatic.json'
-          )} appear in the browser automatically. A mistake in ${f.var(
+          )} appear in the browser automatically, and so does a language added to or removed from its ${f.var(
+            'languages'
+          )} block, which updates the SDK pages, or its ${f.var(
+            'plugin'
+          )} block added or removed, which adds or removes the Context Plugin tab. A mistake in ${f.var(
             'apimatic.json'
           )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a ${f.var(
             'nav.json'
           )} is only reported when the preview starts; until then an entry or a title that the build would ` +
           `refuse is ignored here.`,
         '',
-        `Adding or removing a page, creating ${f.path(sourceDirectory.join('static'))}, or changing which ` +
-          `documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        `Adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
+          sourceDirectory.join('static')
+        )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),

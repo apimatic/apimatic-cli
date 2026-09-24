@@ -9,7 +9,7 @@ import { parse as parseYaml } from 'yaml';
 import { FileService } from '../../src/infrastructure/file-service';
 import { APIMATIC_SCHEMA_URL } from '../../src/types/apimatic-config/document';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
-import { PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
+import { PortalSettings, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
@@ -310,7 +310,7 @@ describe('PortalSourceContext', () => {
   });
 
   // What `portal serve` runs on each save of `apimatic.json`.
-  describe('resolveConfig', () => {
+  describe('resolveSettings', () => {
     const context = () => new PortalSourceContext(new DirectoryPath(root));
 
     beforeEach(() => write('spec/api.json', OPENAPI));
@@ -319,17 +319,17 @@ describe('PortalSourceContext', () => {
       writeConfig({ brand: { colors: { primary: '#1d4ed8' } } });
       const resolved = (await resolve())._unsafeUnwrap();
 
-      const reloaded = (await context().resolveConfig(resolved.suggestedSite))._unsafeUnwrap();
+      const reloaded = (await context().resolveSettings(resolved.suggestedSite))._unsafeUnwrap();
 
-      expect(reloaded.toJSON()).to.deep.equal(resolved.config.toJSON());
-      expect(reloaded.siteTitle()).to.equal(resolved.config.siteTitle());
+      expect(reloaded.config.toJSON()).to.deep.equal(resolved.config.toJSON());
+      expect(reloaded.config.siteTitle()).to.equal(resolved.config.siteTitle());
     });
 
     // The specifications are not read again, so with several the name is still required.
     it('holds the file to the rules resolve holds it to', async () => {
       writeConfig({});
 
-      const errors = (await context().resolveConfig(null))._unsafeUnwrapErr();
+      const errors = (await context().resolveSettings(null))._unsafeUnwrapErr();
 
       expect(errors).to.deep.equal({
         kind: 'invalidConfig',
@@ -341,13 +341,13 @@ describe('PortalSourceContext', () => {
     it('reports a file the block names that is not on disk', async () => {
       writeConfig({ site: { name: 'Calc' }, brand: { favicon: 'static/favicon.ico' } });
 
-      expect(missingFiles(await context().resolveConfig(null))).to.deep.equal([
+      expect(missingFiles(await context().resolveSettings(null))).to.deep.equal([
         ['portal.brand.favicon', 'static/favicon.ico', null]
       ]);
     });
 
     it('reports a file removed while the preview runs', async () => {
-      expect((await context().resolveConfig(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
+      expect((await context().resolveSettings(null))._unsafeUnwrapErr()).to.deep.equal({ kind: 'missingConfig' });
     });
   });
 
@@ -584,6 +584,127 @@ describe('PortalSourceContext', () => {
 
       expect(source.contentDirectory).to.not.be.null;
       expect(source.staticDirectory).to.not.be.null;
+    });
+  });
+
+  describe('the generated pages', () => {
+    beforeEach(() => write('spec/api.json', OPENAPI));
+
+    const writeFile = (file: object) => write('apimatic.json', JSON.stringify(file));
+
+    /** Each generated page as its folder and file. */
+    const generated = (settings: PortalSettings) =>
+      settings.generatedPages.pages().map((page) => `${page.section.folder}/${page.fileName}`);
+
+    it('carries a page per language, in the order the block lists them', async () => {
+      writeFile({ portal: {}, languages: { python: {}, typescript: {} } });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.deep.equal([
+        'sdks/index.mdx',
+        'sdks/python.mdx',
+        'sdks/typescript.mdx'
+      ]);
+    });
+
+    it('carries the context plugin page only when there is a plugin block', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: {} });
+      expect(generated((await resolve())._unsafeUnwrap())).to.include('context-plugin/index.mdx');
+
+      writeFile({ portal: {}, languages: LANGUAGES });
+      expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
+    });
+
+    // The plugin commands judge the block; a build does not fail over it, and gets no page.
+    it('treats a plugin block that is not an object as no block', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: 'yes' });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
+    });
+
+    // Nothing in the block is read, so an identity the plugin commands would refuse still gets the page.
+    it('carries the context plugin page for a block whose identity is malformed', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: { pluginId: 'Bad Id!', pluginVersion: 'one' } });
+
+      expect(generated((await resolve())._unsafeUnwrap())).to.include('context-plugin/index.mdx');
+    });
+
+    it('reads them again for portal serve', async () => {
+      // Named, because nothing suggests a site when the specifications are not read again.
+      writeFile({ portal: { site: { name: 'Calc' } }, languages: { go: {} }, plugin: {} });
+
+      const reloaded = (await new PortalSourceContext(new DirectoryPath(root)).resolveSettings(null))._unsafeUnwrap();
+
+      expect(generated(reloaded)).to.deep.equal(['sdks/index.mdx', 'sdks/go.mdx', 'context-plugin/index.mdx']);
+    });
+  });
+
+  describe('the addresses the generated pages are served at', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', '# Home');
+    });
+
+    /** Each refused page as the file, where it would be served, and the section it collides with. */
+    const reserved = (problem: PortalSourceProblem): string[] => {
+      if (problem.kind !== 'reservedAddresses') {
+        throw new Error(`expected a 'reservedAddresses' problem, got '${problem.kind}'`);
+      }
+      return problem.pages
+        .map(({ file, address, section }) => `${file.relativeTo(new DirectoryPath(root))} ${address} ${section.folder}`)
+        .sort();
+    };
+
+    it('refuses every page the SDK pages would share an address with, naming each', async () => {
+      write('content/sdks.md', '# Mine');
+      write('content/sdks/setup.mdx', '# Setup');
+      write('content/(intro)/sdks.md', '# Grouped');
+      write('content/sdks/index.md', '# Index');
+
+      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'content/(intro)/sdks.md /sdks sdks',
+        'content/sdks.md /sdks sdks',
+        'content/sdks/index.md /sdks sdks',
+        'content/sdks/setup.mdx /sdks/setup sdks'
+      ]);
+    });
+
+    // Reserved with or without a plugin block, so adding one never refuses a page that built.
+    it('refuses a page at the context plugin address although there is no plugin block', async () => {
+      write('content/context-plugin.md', '# Mine');
+      write('content/context-plugin/faq.md', '# FAQ');
+
+      expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
+        'content/context-plugin.md /context-plugin context-plugin',
+        'content/context-plugin/faq.md /context-plugin/faq context-plugin'
+      ]);
+    });
+
+    // A group folder's name is not part of the address; only the folder it groups is.
+    it('accepts pages whose address only starts with the same letters, or sits deeper', async () => {
+      write('content/sdks-overview.md', '# Overview');
+      write('content/guides/sdks.md', '# Nested');
+      write('content/(sdks)/intro.md', '# Grouped');
+      write('content/plugin.md', '# Plugin');
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('leaves a nav.json alone in a directory of that name, which is no page', async () => {
+      write('content/sdks/nav.json', JSON.stringify({ pages: [] }));
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('answers an entry that names a generated section with its token', async () => {
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'sdks', 'context-plugin'] }));
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind === 'invalidNavigation' && problem.errors).to.deep.equal([
+        "content/nav.json: 'sdks' is not a page or folder in this directory. 'apimatic:sdks' positions the SDK pages.",
+        "content/nav.json: 'context-plugin' is not a page or folder in this directory. 'apimatic:plugin' positions the context plugin page."
+      ]);
     });
   });
 

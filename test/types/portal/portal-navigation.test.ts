@@ -19,23 +19,25 @@ describe('PortalNavigation', () => {
     validate(pages, overrides)._unsafeUnwrapErr();
 
   describe('entries it accepts', () => {
-    it('accepts pages, both tokens and the rest entry together', () => {
-      expect(validate(['index', 'apimatic:sdks', 'authentication', '...', 'apimatic:api']).isOk()).to.be.true;
+    it('accepts pages, every token and the rest entry together', () => {
+      expect(validate(['index', 'apimatic:sdks', 'authentication', 'apimatic:plugin', '...', 'apimatic:api']).isOk()).to
+        .be.true;
     });
 
     it('accepts a subfolder by name', () => {
       expect(validate(['guides']).isOk()).to.be.true;
     });
 
-    // The SDK page ships in a later change; a nav.json written today has to keep working.
-    it('accepts the SDKs token while it resolves to nothing', () => {
-      expect(validate(['apimatic:sdks']).isOk()).to.be.true;
+    // Accepted whether or not apimatic.json has a plugin block: removing the block must not also
+    // force an edit here, and under `portal serve` this file is not checked again when it goes.
+    it('accepts the context plugin token, which resolves to nothing without a plugin block', () => {
+      expect(validate(['apimatic:plugin']).isOk()).to.be.true;
     });
 
     // Renamed before any release, so the old name gets no hint: it is an unknown token.
     it('refuses the earlier name of the SDKs token like any unknown token', () => {
       expect(errorsFor(['apimatic:pages'])).to.deep.equal([
-        "content/nav.json: 'apimatic:pages' is not a nav.json token. The tokens are 'apimatic:sdks' and 'apimatic:api'."
+        "content/nav.json: 'apimatic:pages' is not a nav.json token. The tokens are 'apimatic:sdks', 'apimatic:plugin' and 'apimatic:api'."
       ]);
     });
 
@@ -98,6 +100,24 @@ describe('PortalNavigation', () => {
       expect(errorsFor(['api'])).to.deep.equal([
         "content/nav.json: 'api' is not a page or folder in this directory. The API reference is positioned with 'apimatic:api'."
       ]);
+    });
+
+    it('points a generated section named by its address or its word at its token', () => {
+      expect(errorsFor(['sdks'])).to.deep.equal([
+        "content/nav.json: 'sdks' is not a page or folder in this directory. 'apimatic:sdks' positions the SDK pages."
+      ]);
+      for (const entry of ['context-plugin', 'plugin', 'Plugin.md']) {
+        expect(errorsFor([entry])[0], entry).to.contain("'apimatic:plugin' positions the context plugin page.");
+      }
+    });
+
+    // `/plugin` is not reserved, so a page of that name is the user's to position.
+    it('positions a page called plugin like any other page', () => {
+      expect(validate(['plugin'], { childNames: ['index', 'plugin'] }).isOk()).to.be.true;
+    });
+
+    it('gives no section hint below the root', () => {
+      expect(errorsFor(['sdks'], { isContentRoot: false })[0]).to.not.contain('apimatic:');
     });
 
     // `content/api` is the reference's mount point, and a directory the user keeps there
@@ -163,8 +183,8 @@ describe('PortalNavigation', () => {
   describe('tokens outside the content root', () => {
     const nested = { label: 'content/guides/nav.json', isContentRoot: false, childNames: ['index'] };
 
-    it('refuses both tokens, because the nodes they position live at the root', () => {
-      for (const token of ['apimatic:api', 'apimatic:sdks']) {
+    it('refuses every token, because the nodes they position live at the root', () => {
+      for (const token of ['apimatic:api', 'apimatic:sdks', 'apimatic:plugin']) {
         const errors = errorsFor([token], nested);
 
         expect(errors).to.have.lengthOf(1);

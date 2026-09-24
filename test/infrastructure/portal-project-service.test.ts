@@ -5,11 +5,17 @@ import { expect } from 'chai';
 import semver from 'semver';
 import sinon from 'sinon';
 import { FileService } from '../../src/infrastructure/file-service';
-import { PortalProjectService, TEMPLATE_DEPENDENCIES } from '../../src/infrastructure/portal-project-service';
+import {
+  GENERATED_DIRECTORY_NAME,
+  PortalProjectService,
+  TEMPLATE_DEPENDENCIES
+} from '../../src/infrastructure/portal-project-service';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
+import { GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
+import { PortalLanguages } from '../../src/types/portal/portal-languages';
 import { PortalSource } from '../../src/types/portal/portal-source';
 import { PortalStylesheet } from '../../src/types/portal/portal-stylesheet';
 
@@ -20,8 +26,25 @@ describe('PortalProjectService', () => {
 
   const configFor = (block: object) => PortalConfig.fromBlock(block, null)._unsafeUnwrap();
 
+  const pagesFor = (languages: Record<string, object> = { typescript: {} }, plugin = false) =>
+    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin);
+
+  /** What `portal serve` passes on an edit: the block, and the pages the default source generates. */
+  const settingsFor = (config: PortalConfig, generatedPages = pagesFor()) => ({ config, generatedPages });
+
+  /** Every file in the generated directory, relative to it. */
+  const generatedFiles = () => {
+    const directory = path.join(project.toString(), GENERATED_DIRECTORY_NAME);
+    return fs
+      .readdirSync(directory, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => path.relative(directory, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
+      .sort();
+  };
+
   const sourceFor = (overrides: Partial<PortalSource> = {}): PortalSource => ({
     config: configFor({ site: { name: 'My API' } }),
+    generatedPages: pagesFor(),
     suggestedSite: null,
     specs: [
       {
@@ -105,9 +128,26 @@ describe('PortalProjectService', () => {
       (await service.prepare(project, sourceFor()))._unsafeUnwrap();
 
       const config = readConfig();
-      expect(Object.keys(config).sort()).to.deep.equal(['contentDir', 'specs', 'staticDir']);
+      expect(Object.keys(config).sort()).to.deep.equal(['contentDir', 'generatedDir', 'specs', 'staticDir']);
       expect(Object.keys(config.specs)).to.deep.equal(['calculator']);
       expect(config.specs.calculator).to.contain('api.json');
+    });
+
+    it('writes the generated pages into the project, and names their directory in the build-only config', async () => {
+      (
+        await service.prepare(project, sourceFor({ generatedPages: pagesFor({ typescript: {} }, true) }))
+      )._unsafeUnwrap();
+
+      expect(generatedFiles()).to.deep.equal([
+        'context-plugin/index.mdx',
+        'context-plugin/nav.json',
+        'sdks/index.mdx',
+        'sdks/nav.json',
+        'sdks/typescript.mdx'
+      ]);
+      expect(readConfig().generatedDir).to.equal(
+        path.join(project.toString(), GENERATED_DIRECTORY_NAME).split(path.sep).join('/')
+      );
     });
 
     it('writes what the browser is told into a file of its own', async () => {
@@ -211,7 +251,7 @@ describe('PortalProjectService', () => {
         brand: { colors: { primary: '#1d4ed8' } },
         ai: { pageActions: true }
       });
-      const applied = await service.applyConfig(project, same);
+      const applied = await service.applyConfig(project, settingsFor(same));
 
       expect(applied._unsafeUnwrap()).to.be.false;
       expect([fs.statSync(themeFile()).mtimeMs, fs.statSync(identityFile()).mtimeMs]).to.deep.equal(before);
@@ -224,7 +264,7 @@ describe('PortalProjectService', () => {
         brand: { colors: { primary: '#1d4ed8' }, colorMode: 'dark' }
       });
 
-      expect((await service.applyConfig(project, config))._unsafeUnwrap()).to.be.true;
+      expect((await service.applyConfig(project, settingsFor(config)))._unsafeUnwrap()).to.be.true;
 
       expect(fs.readFileSync(themeFile(), 'utf8')).to.equal(PortalStylesheet.of(config).toString());
       expect(readIdentity()).to.deep.equal(config.identity());
@@ -235,7 +275,7 @@ describe('PortalProjectService', () => {
       const before = fs.statSync(themeFile()).mtimeMs;
 
       const renamed = configFor({ site: { name: 'Renamed API' } });
-      expect((await service.applyConfig(project, renamed))._unsafeUnwrap()).to.be.true;
+      expect((await service.applyConfig(project, settingsFor(renamed)))._unsafeUnwrap()).to.be.true;
 
       expect(readIdentity().name).to.equal('Renamed API');
       expect(fs.statSync(themeFile()).mtimeMs).to.equal(before);
@@ -248,7 +288,7 @@ describe('PortalProjectService', () => {
       const write = sinon.spy(FileService.prototype, 'writeContents');
 
       const config = configFor({ site: { name: 'Renamed API' }, brand: { colors: { primary: '#1d4ed8' } } });
-      expect((await service.applyConfig(project, config))._unsafeUnwrap()).to.be.true;
+      expect((await service.applyConfig(project, settingsFor(config)))._unsafeUnwrap()).to.be.true;
 
       expect(replace.args.map(([file]) => file.toString())).to.deep.equal([identityFile(), themeFile()]);
       expect(write.called).to.be.false;
@@ -259,9 +299,32 @@ describe('PortalProjectService', () => {
       const blocked = new DirectoryPath(root).join('blocked');
       fs.writeFileSync(blocked.toString(), '');
 
-      const applied = await service.applyConfig(blocked, configFor({ site: { name: 'My API' } }));
+      const applied = await service.applyConfig(blocked, settingsFor(configFor({ site: { name: 'My API' } })));
 
       expect(applied.isErr()).to.be.true;
+    });
+
+    it('writes the page for a language added, and says so', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      const config = sourceFor().config;
+
+      const applied = await service.applyConfig(project, settingsFor(config, pagesFor({ typescript: {}, go: {} })));
+
+      expect(applied._unsafeUnwrap()).to.be.true;
+      expect(generatedFiles()).to.include('sdks/go.mdx');
+    });
+
+    it('writes the context plugin folder for a plugin block added, and removes it with the block', async () => {
+      (await service.prepare(project, sourceFor()))._unsafeUnwrap();
+      const config = sourceFor().config;
+
+      expect(
+        (await service.applyConfig(project, settingsFor(config, pagesFor({ typescript: {} }, true))))._unsafeUnwrap()
+      ).to.be.true;
+      expect(generatedFiles()).to.include.members(['context-plugin/index.mdx', 'context-plugin/nav.json']);
+
+      expect((await service.applyConfig(project, settingsFor(config)))._unsafeUnwrap()).to.be.true;
+      expect(fs.existsSync(path.join(project.toString(), GENERATED_DIRECTORY_NAME, 'context-plugin'))).to.be.false;
     });
   });
 

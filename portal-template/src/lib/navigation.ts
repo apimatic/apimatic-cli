@@ -23,10 +23,18 @@ interface NavigationContext {
 
 /** Everything in this directory that no other entry names. */
 const REST_TOKEN = '...';
-/** The pages the CLI generates for the project's SDKs, which make the SDKs tab. */
-const INJECTED_PAGES_TOKEN = 'apimatic:sdks';
 /** The API reference, positioned as one node. */
 const API_REFERENCE_TOKEN = 'apimatic:api';
+
+/**
+ * The folders the CLI generates, each a tab of its own, by the token that positions it and in
+ * the order they take when the root `nav.json` names none of them. The CLI's
+ * `GENERATED_SECTIONS` lists the same, and a test holds the two together.
+ */
+export const GENERATED_SECTIONS = [
+  { token: 'apimatic:sdks', folder: 'sdks' },
+  { token: 'apimatic:plugin', folder: 'context-plugin' }
+] as const;
 
 const NAVIGATION_FILE_STEM = 'nav';
 
@@ -46,8 +54,7 @@ const HOME_URL = docsRoute;
  */
 const SYNTHETIC_TABS = {
   home: { $id: '/tab/home', name: 'Home' },
-  guides: { $id: '/tab/guides', name: 'Guides' },
-  sdks: { $id: '/tab/sdks', name: 'SDKs' }
+  guides: { $id: '/tab/guides', name: 'Guides' }
 } as const;
 
 /** The node the fallback home page gets when there is no index page; see `groupIntoTabs`. */
@@ -86,9 +93,9 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       node.children = node.children.filter((child) => !isEmptyFolder(child));
 
       // The root is ordered even with no file of its own: naming nothing still puts the
-      // injected pages and the API reference at their defaults, and Fumadocs' own order would
-      // not. It sorts folders by path, so `api` lands above a user folder called anything
-      // later in the alphabet, and a generated page lands in the middle of the user's pages.
+      // generated sections and the API reference at their defaults, and Fumadocs' own order
+      // would not. It sorts folders by path, so `api` lands above a user folder called anything
+      // later in the alphabet, and a generated folder lands in the middle of the user's pages.
       // Below the root those defaults do not apply, so a folder with no file keeps Fumadocs'
       // order untouched, which is every tag folder of every specification.
       const settings = readSettings(this, folderPath);
@@ -114,10 +121,11 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
 
 /**
  * A tab is a root folder, which is how Fumadocs builds a tab bar: a top-level folder whose
- * `nav.json` sets `"root": true` becomes one, as does the API reference, and the loose nodes
- * are gathered into Home (the index page), SDKs (the generated pages) and Guides (everything
- * else). The tabs are ordered by where each one's first node sat, except that Home leads when
- * the file does not place the index page itself. Tabs change no address: URLs come from slugs.
+ * `nav.json` sets `"root": true` becomes one, as do the API reference and each folder the CLI
+ * generates, and the loose nodes are gathered into Home (the index page) and Guides
+ * (everything else). The tabs are ordered by where each one's first node sat, except that Home
+ * leads when the file does not place the index page itself. Tabs change no address: URLs come
+ * from slugs.
  *
  * Fumadocs never reads `root` itself: it takes a folder's metadata from `meta.json`, which the
  * content collection does not load. So only this decides which folders become tabs, which is
@@ -182,12 +190,13 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   };
 
   for (const child of children) {
-    if (child.type === 'folder' && (isApiReference(child) || isTabFolder(context, child))) {
+    if (
+      child.type === 'folder' &&
+      (isApiReference(child) || isTabFolder(context, child) || isInjected(context, child))
+    ) {
       tabs.push(asTab(child));
     } else if (child.type === 'page' && child.url === HOME_URL) {
       gather('home', child);
-    } else if (isInjected(context, child)) {
-      gather('sdks', child);
     } else {
       gather('guides', child);
     }
@@ -318,37 +327,37 @@ function reorder(context: NavigationContext, node: Folder, folderPath: string, o
     }
   };
 
-  // Both tokens name nodes that live at the content root, and the CLI refuses either one
+  // Every token names a node that lives at the content root, and the CLI refuses each one
   // anywhere else. Honouring them in a nested directory would let the two halves of the
   // format disagree about a file only one of them had rejected.
   const isContentRoot = folderPath === '';
 
   for (const raw of order) {
     const entry = raw.trim();
+    const section = GENERATED_SECTIONS.find((candidate) => candidate.token === entry);
     if (entry === REST_TOKEN) {
       restIndex = named.length;
     } else if (entry === API_REFERENCE_TOKEN) {
       if (isContentRoot) {
         claim([...remaining].find((child) => isApiReference(child)));
       }
-    } else if (entry === INJECTED_PAGES_TOKEN) {
+    } else if (section !== undefined) {
       if (isContentRoot) {
-        for (const page of [...remaining].filter(isInjectedChild)) {
-          claim(page);
-        }
+        claim([...remaining].find((child) => isInjectedChild(child) && isSectionFolder(child, section)));
       }
     } else {
       claim(matching(context, [...remaining], folderPath, entry));
     }
   }
 
-  // What is left keeps its default order, in three bands. The injected pages and the API
+  // What is left keeps its default order, in three bands. The generated sections and the API
   // reference have defaults of their own rather than travelling with the content, so that
-  // a later release adding a generated page never splits the band or reorders a sidebar
-  // nobody touched.
+  // a later release adding a section never splits the band or reorders a sidebar nobody
+  // touched. The sections keep the CLI's order: Fumadocs' own is by path, which would put
+  // `context-plugin` above `sdks`.
   const rest = [...remaining];
   const api = rest.filter((child) => isApiReference(child));
-  const injected = rest.filter(isInjectedChild);
+  const injected = rest.filter(isInjectedChild).sort((left, right) => sectionRank(left) - sectionRank(right));
   const content = rest.filter((child) => !isApiReference(child) && !isInjectedChild(child));
 
   // With no rest token, unnamed content joins the user's own pages: after the last one the
@@ -404,9 +413,30 @@ function isEmptyFolder(child: Node): boolean {
   return child.type === 'folder' && child.children.length === 0 && child.index === undefined;
 }
 
-/** Whether a page came from the generated source rather than the user's content directory. */
+/**
+ * Whether a node came from the generated source rather than the user's content directory. A
+ * folder is judged by its index page first: the context plugin's holds nothing else, and
+ * `firstPageIn` walks only a folder's children.
+ */
 function isInjected(context: NavigationContext, child: Node): boolean {
+  if (child.type === 'folder') {
+    const page = child.index ?? firstPageIn(child);
+    return page !== undefined && isFromSource(context, page, GENERATED_SOURCE);
+  }
   return isFromSource(context, child, GENERATED_SOURCE);
+}
+
+/**
+ * Where a generated folder comes in `GENERATED_SECTIONS`. Anything else sorts after them, which
+ * only a loose generated page could be, and the CLI writes none.
+ */
+function sectionRank(child: Node): number {
+  const rank = GENERATED_SECTIONS.findIndex((section) => isSectionFolder(child, section));
+  return rank === -1 ? GENERATED_SECTIONS.length : rank;
+}
+
+function isSectionFolder(child: Node, section: (typeof GENERATED_SECTIONS)[number]): boolean {
+  return child.type === 'folder' && child.$ref?.folder === section.folder;
 }
 
 /** Whether a page was passed to `loader()` under this key, which the storage stamps on it. */

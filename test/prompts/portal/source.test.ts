@@ -7,6 +7,7 @@ import { reportSourceProblem } from '../../../src/prompts/portal/source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
+import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages.js';
 
 describe('reportSourceProblem', () => {
   const source = new DirectoryPath('project').join('src');
@@ -85,5 +86,63 @@ describe('reportSourceProblem', () => {
 
     expect(printed()).to.contain("'static/favicon.ico'");
     expect(printed()).to.not.contain('spelt');
+  });
+
+  describe('a page at an address kept for the generated pages', () => {
+    const content = source.join('content');
+
+    it('names the page, where it would be served, and what the address is kept for', () => {
+      reportSourceProblem(
+        {
+          kind: 'reservedAddresses',
+          pages: [
+            {
+              file: new FilePath(content.join('(intro)'), new FileName('sdks.md')),
+              address: '/sdks',
+              section: SDK_SECTION
+            }
+          ]
+        },
+        source
+      );
+
+      const [heading, ...rest] = printed().split('\n');
+
+      expect(heading).to.match(/^A page in .+ would be served where the portal puts the pages it generates:$/);
+      expect(rest).to.deep.equal([
+        "  • 'content/(intro)/sdks.md', at '/sdks', which is kept for the SDK pages",
+        'Rename or move the page.'
+      ]);
+    });
+
+    it('says which section a deeper page falls under, for every page and section', () => {
+      reportSourceProblem(
+        {
+          kind: 'reservedAddresses',
+          pages: [
+            {
+              file: new FilePath(content.join('sdks'), new FileName('setup.md')),
+              address: '/sdks/setup',
+              section: SDK_SECTION
+            },
+            {
+              file: new FilePath(content, new FileName('context-plugin.mdx')),
+              address: '/context-plugin',
+              section: PLUGIN_SECTION
+            }
+          ]
+        },
+        source
+      );
+
+      expect(printed()).to.contain('Pages in ');
+      expect(printed()).to.contain(
+        "  • 'content/sdks/setup.md', at '/sdks/setup', under '/sdks', which is kept for the SDK pages"
+      );
+      expect(printed()).to.contain(
+        "  • 'content/context-plugin.mdx', at '/context-plugin', which is kept for the context plugin page"
+      );
+      expect(printed()).to.contain('Rename or move each page.');
+    });
   });
 });

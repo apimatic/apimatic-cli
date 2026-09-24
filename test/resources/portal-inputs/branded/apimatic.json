@@ -13,5 +13,6 @@
       "links": [{ "label": "Status", "url": "https://status.example.com" }]
     }
   },
-  "languages": { "typescript": {} }
+  "languages": { "typescript": {} },
+  "plugin": { "pluginId": "branded-pets", "pluginName": "Branded Pets", "pluginVersion": "0.1.0" }
 }

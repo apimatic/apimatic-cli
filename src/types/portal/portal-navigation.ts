@@ -1,17 +1,20 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
+import { quotedList } from './config/fields.js';
+import { GENERATED_SECTIONS, GeneratedSection } from './generated-pages.js';
 import { unknownFieldErrors } from './unknown-fields.js';
 
 const BYTE_ORDER_MARK = 0xfeff;
 
 /** Everything in this directory that no other entry names. */
 const REST_TOKEN = '...';
-/** The pages the CLI generates for the project's SDKs, positioned as the SDKs tab. */
-const INJECTED_PAGES_TOKEN = 'apimatic:sdks';
 /** The API reference, positioned as one node. */
 const API_REFERENCE_TOKEN = 'apimatic:api';
 
 const APIMATIC_PREFIX = 'apimatic:';
+
+/** Each generated section's tab, and the API reference. */
+const TOKENS = [...GENERATED_SECTIONS.map((section) => section.token), API_REFERENCE_TOKEN];
 
 /** The directory the reference is mounted at, which `content/api/` shares, and so the name someone guesses for it. */
 export const API_REFERENCE_NAME = 'api';
@@ -31,7 +34,7 @@ const KNOWN_FIELDS = new Set(['pages', 'title', 'root']);
 export interface NavigationContext {
   /** The file's path relative to `src/`, as messages name it. */
   label: string;
-  /** Both `apimatic:` tokens resolve to nodes that live at the content root. */
+  /** Every `apimatic:` token resolves to a node that lives at the content root. */
   isContentRoot: boolean;
   /** Directly under the content root: the only place a folder can be a tab of its own. */
   isTopLevel: boolean;
@@ -179,10 +182,10 @@ export class PortalNavigation {
   }
 
   private static checkToken(entry: string, context: NavigationContext): Result<void, string> {
-    if (entry !== INJECTED_PAGES_TOKEN && entry !== API_REFERENCE_TOKEN) {
+    if (!TOKENS.includes(entry)) {
       return err(
         `${context.label}: '${entry}' is not a ${NAVIGATION_FILE_NAME} token. ` +
-          `The tokens are '${INJECTED_PAGES_TOKEN}' and '${API_REFERENCE_TOKEN}'.`
+          `The tokens are ${quotedList(TOKENS.slice(0, -1))} and '${TOKENS[TOKENS.length - 1]}'.`
       );
     }
 
@@ -318,9 +321,23 @@ export class PortalNavigation {
     if (withoutExtension === API_REFERENCE_NAME && context.isContentRoot) {
       return ` The API reference is positioned with '${API_REFERENCE_TOKEN}'.`;
     }
+    const section = context.isContentRoot ? PortalNavigation.sectionGuessed(withoutExtension) : undefined;
+    if (section !== undefined) {
+      return ` '${section.token}' positions ${section.description}.`;
+    }
     const candidate = context.childNames.find(
       (name) => name.toLowerCase() === lowered || name.toLowerCase() === withoutExtension
     );
     return candidate === undefined ? '' : ` Did you mean '${candidate}'?`;
+  }
+
+  /**
+   * The section an entry was most likely meant to position: one named after its address, or
+   * after the word its token ends in, which for the context plugin is not the same word.
+   */
+  private static sectionGuessed(name: string): GeneratedSection | undefined {
+    return GENERATED_SECTIONS.find(
+      (section) => name === section.folder || name === section.token.slice(APIMATIC_PREFIX.length)
+    );
   }
 }
