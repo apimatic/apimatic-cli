@@ -1,0 +1,21 @@
+[
+  ["typescript", { "paths": {
+    "/orders": { "GET": { "Example": "TS-LIST" }, "POST": { "minimal": "TS-CREATE-MINIMAL", "full": "TS-CREATE-FULL" } },
+    "/orders/{id}": { "PUT": { "replace": "TS-REPLACE" }, "PATCH": { "note": "TS-PATCH" } },
+    "/orders/{id}/tags": { "POST": { "first": "TS-TAG-FIRST", "second": "TS-TAG-SECOND" } },
+    "/refunds": { "POST": { "blank": "", "filled": "TS-REFUND-FILLED" } },
+    "/imports": { "POST": { "csv": "TS-IMPORT-CSV", "json": "TS-IMPORT-JSON", "xmlOnly": "TS-IMPORT-XML" } },
+    "/items": { "POST": { "widget": "TS-ITEM-WIDGET", "gadget": "TS-ITEM-GADGET" } },
+    "/health": { "GET": { "Example": "TS-HEALTH" } },
+    "/pets": { "GET": { "Example": "TS-PETS" } },
+    "/things": { "POST": { "one": "TS-THING" } },
+    "/ghost": { "GET": { "Example": "TS-GHOST" } }
+  }, "webhooks": {} }],
+  ["csharp", { "paths": {
+    "/orders": { "GET": { "Example": "CS-LIST-EXAMPLE", "other": "CS-LIST-OTHER" }, "POST": { "minimal": "CS-CREATE-MINIMAL", "full": "CS-CREATE-FULL", "bulk": "CS-CREATE-BULK" } },
+    "/orders/{id}/tags": { "POST": { "first": "CS-TAG-FIRST" } }
+  }, "webhooks": {} }],
+  ["python", { "paths": {
+    "/orders": { "get": { "a": "PY-LIST-A", "b": "PY-LIST-B" }, "post": { "Example": "PY-CREATE-UNNAMED" } }
+  } }]
+]

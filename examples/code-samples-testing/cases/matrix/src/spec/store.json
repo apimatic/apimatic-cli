@@ -1,0 +1,111 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Store", "version": "1.0.0" },
+  "servers": [{ "url": "https://api.store.test" }],
+  "paths": {
+    "/orders": {
+      "get": {
+        "tags": ["Orders"], "operationId": "ListOrders", "summary": "List orders",
+        "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer" }, "example": 10 }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Orders"], "operationId": "CreateOrder", "summary": "Create order",
+        "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer" }, "examples": {
+          "minimal": 10,
+          "other": 984709872435
+        } }],
+        "requestBody": { "content": { "application/json": {
+          "schema": { "$ref": "#/components/schemas/Order" },
+          "examples": {
+            "minimal": { "summary": "Minimal order", "value": { "sku": "A1" } },
+            "full": { "summary": "Full order", "value": { "sku": "A1", "quantity": 2, "note": "gift" } },
+            "bulk": { "summary": "Bulk order", "value": { "sku": "A1", "quantity": 500 } }
+          } } } },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/orders/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "ord_1" }],
+      "put": {
+        "tags": ["Orders"], "operationId": "ReplaceOrder", "summary": "Replace order",
+        "requestBody": { "content": { "application/json": {
+          "schema": { "$ref": "#/components/schemas/Order" },
+          "examples": { "replace": { "summary": "Replace", "value": { "sku": "B2" } } } } } },
+        "responses": { "200": { "description": "OK" } }
+      },
+      "delete": {
+        "tags": ["Orders"], "operationId": "DeleteOrder", "summary": "Delete order",
+        "x-codeSamples": [{ "lang": "go", "label": "Hand-written Go", "source": "client.DeleteOrder(\"ord_1\") // HANDWRITTEN-XCODESAMPLES" }],
+        "responses": { "204": { "description": "Deleted" } }
+      },
+      "patch": {
+        "tags": ["Orders"], "operationId": "PatchOrder", "summary": "Patch order",
+        "x-codeSamples": [{ "lang": "typescript", "label": "Hand-written TS", "source": "HANDWRITTEN-XCODESAMPLES" }],
+        "requestBody": { "content": { "application/json": {
+          "schema": { "$ref": "#/components/schemas/Order" },
+          "examples": { "note": { "summary": "Change note", "value": { "note": "x" } } } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/orders/{id}/tags": {
+      "post": {
+        "tags": ["Orders"], "operationId": "TagOrder", "summary": "Tag order",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "ord_1" }],
+        "requestBody": { "content": { "application/json": {
+          "schema": { "type": "object" },
+          "examples": {
+            "first": { "summary": "Same body, first", "value": { "tag": "vip" } },
+            "second": { "summary": "Same body, second", "value": { "tag": "vip" } }
+          } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/refunds": {
+      "post": {
+        "tags": ["Refunds"], "operationId": "CreateRefund", "summary": "Create refund",
+        "requestBody": { "content": { "application/json": {
+          "schema": { "type": "object" },
+          "examples": {
+            "blank": { "summary": "Blank snippet", "value": { "amount": 1 } },
+            "filled": { "summary": "Filled snippet", "value": { "amount": 2 } }
+          } } } },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/imports": {
+      "post": {
+        "tags": ["Imports"], "operationId": "CreateImport", "summary": "Create import",
+        "requestBody": { "content": {
+          "application/json": { "schema": { "type": "object" }, "examples": {
+            "csv": { "$ref": "#/components/examples/CsvImport" },
+            "json": { "$ref": "#/components/examples/JsonImport" } } },
+          "application/xml": { "schema": { "type": "object" }, "examples": {
+            "xmlOnly": { "summary": "XML only", "value": { "format": "xml" } } } } } },
+        "responses": { "202": { "description": "Accepted" } }
+      }
+    },
+    "/legacy": {
+      "get": {
+        "tags": ["Legacy"], "operationId": "GetLegacy", "summary": "Get legacy",
+        "x-apimatic-codeSamples": [
+          { "lang": "ruby", "label": "Ruby", "sources": { "Example": "client.legacy.get # HANDWRITTEN-APIMATIC" } },
+          { "lang": "php", "label": "PHP", "sourceByExample": { "Example": "OLD-KEY-MUST-NOT-RENDER" } },
+          { "lang": "java", "sources": { "Example": "NO-LABEL-MUST-NOT-RENDER" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/health": {
+      "get": { "tags": ["Health"], "operationId": "StoreHealth", "summary": "Store health", "responses": { "200": { "description": "OK" } } }
+    },
+    "/pets": { "$ref": "./schemas/pets-path.json" }
+  },
+  "components": {
+    "schemas": { "Order": { "type": "object", "properties": { "sku": { "type": "string" }, "quantity": { "type": "integer" }, "note": { "type": "string" } } } },
+    "examples": {
+      "CsvImport": { "summary": "CSV import", "value": { "format": "csv" } },
+      "JsonImport": { "summary": "JSON import", "value": { "format": "json" } }
+    }
+  }
+}

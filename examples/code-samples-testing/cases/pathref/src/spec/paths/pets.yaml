@@ -1,0 +1,2 @@
+get: { tags: [Pets], operationId: ListPets, summary: List pets, responses: { '200': { description: OK } } }
+post: { tags: [Pets], operationId: CreatePet, summary: Create pet, responses: { '201': { description: Created } } }

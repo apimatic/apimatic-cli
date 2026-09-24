@@ -1,0 +1,4 @@
+[["typescript", { "paths": {
+  "/inline": { "GET": { "Example": "TS-INLINE" } },
+  "/pets": { "GET": { "Example": "TS-PETS-LIST" }, "POST": { "Example": "TS-PETS-CREATE" } }
+}, "webhooks": {} }]]

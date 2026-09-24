@@ -1,0 +1,9 @@
+openapi: 3.1.0
+info: { title: Internal, version: 1.0.0 }
+paths:
+  /inline: { get: { tags: [Pets], operationId: Inline, responses: { '200': { description: OK } } } }
+  /pets: { $ref: '#/components/pathItems/Pets' }
+components:
+  pathItems:
+    Pets:
+      get: { tags: [Pets], operationId: ListPets, summary: List pets, responses: { '200': { description: OK } } }

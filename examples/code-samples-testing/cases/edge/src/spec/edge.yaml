@@ -1,0 +1,51 @@
+openapi: 3.1.0
+info: { title: Edge, version: 1.0.0 }
+servers:
+  - url: https://{region}.api.edge.test/{version}
+    variables:
+      region: { default: eu }
+      version: { default: v2 }
+paths:
+  /messages:
+    post:
+      tags: [Messages]
+      operationId: SendMessage
+      summary: Send message
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+            examples:
+              with space: { summary: Id with a space, value: { text: a } }
+              slash/id: { summary: Id with a slash, value: { text: b } }
+              ünïcode: { summary: Unicode id, value: { text: c } }
+              html: { summary: HTML in the snippet, value: { text: d } }
+      responses: { '202': { description: Accepted } }
+  /languages:
+    get:
+      tags: [Languages]
+      operationId: ListLanguages
+      summary: Every SDK language
+      responses: { '200': { description: OK } }
+  /big:
+    get:
+      tags: [Languages]
+      operationId: BigSnippet
+      summary: A 400-line snippet
+      responses: { '200': { description: OK } }
+  /untagged:
+    get:
+      operationId: Untagged
+      summary: No tags
+      responses: { '200': { description: OK } }
+webhooks:
+  orderPaid:
+    post:
+      tags: [Webhooks]
+      operationId: OrderPaid
+      summary: Order paid
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses: { '200': { description: OK } }

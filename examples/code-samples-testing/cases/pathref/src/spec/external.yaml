@@ -1,0 +1,5 @@
+openapi: 3.1.0
+info: { title: External, version: 1.0.0 }
+paths:
+  /inline: { get: { tags: [Pets], operationId: Inline, responses: { '200': { description: OK } } } }
+  /pets: { $ref: './paths/pets.yaml' }

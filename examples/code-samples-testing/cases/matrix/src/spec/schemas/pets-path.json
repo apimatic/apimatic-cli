@@ -1,0 +1,1 @@
+{ "get": { "tags": ["Pets"], "operationId": "ListPets", "summary": "List pets", "responses": { "200": { "description": "OK" } } } }
