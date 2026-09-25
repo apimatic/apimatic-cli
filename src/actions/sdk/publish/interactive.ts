@@ -8,7 +8,7 @@ import { PublishingProfiles } from '../../../types/publish/publishing-profiles.j
 import { AVAILABLE_LANGUAGES, stabilityLevelsFor } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
-import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
+import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
@@ -145,7 +145,7 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    await new PluginRecordSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, version);
+    await new RecordPublishedSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, version);
 
     return ActionResult.success();
   };

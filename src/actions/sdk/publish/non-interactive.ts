@@ -12,7 +12,7 @@ import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js'
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { BuildContext } from '../../../types/build-context.js';
-import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
+import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { FileService } from '../../../infrastructure/file-service.js';
 
@@ -142,7 +142,7 @@ export class SdkPublishNonInteractiveAction {
     if (dryRun) {
       this.prompts.dryRunPluginConfigNotice();
     } else {
-      await new PluginRecordSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, semVersion);
+      await new RecordPublishedSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, semVersion);
     }
 
     return ActionResult.success();

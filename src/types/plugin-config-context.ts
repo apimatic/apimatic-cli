@@ -190,27 +190,6 @@ export class PluginConfigContext {
     return await covered.asyncAndThen(() => new ResultAsync(config.removeByteOrderMark())).map(() => staged);
   }
 
-  public async upsertLanguage<L extends Language>(
-    language: L,
-    entry: PluginLanguageEntry<L>
-  ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
-    return await this.merge((document) => {
-      const languages: PluginLanguages = { ...(document.languages() as PluginLanguages | undefined) };
-      const existingEntry = languages[language];
-      const existingPublishing = existingEntry?.publishing;
-      const publishing = entry.publishing
-        ? {
-            ...existingPublishing,
-            ...entry.publishing,
-            source: entry.publishing.source ?? existingPublishing?.source,
-            package: entry.publishing.package ?? existingPublishing?.package
-          }
-        : existingPublishing;
-      languages[language] = { ...existingEntry, ...entry, ...(publishing ? { publishing } : {}) };
-      return document.with('languages', languages);
-    });
-  }
-
   private async merge(
     apply: (document: ApimaticConfigDocument) => ApimaticConfigDocument
   ): Promise<Result<PluginConfig, PluginConfigWriteFailure>> {
