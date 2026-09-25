@@ -69,4 +69,19 @@ describe('ProjectContext.upsertGitignore', () => {
 
     expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/plugin/', '/sdk/', '/portal/']);
   });
+
+  // The caller is a wizard that has already written a portal, so a `.gitignore` it cannot write
+  // has to come back as an answer it can report rather than as a throw through the whole run.
+  it('reports a path it cannot write rather than throwing', async () => {
+    fs.mkdirSync(gitignorePath());
+
+    const result = await ignore();
+
+    expect(result.isErr()).to.be.true;
+    expect(result._unsafeUnwrapErr()).to.equal('unwritable');
+  });
+
+  it('answers with the entries it wrote', async () => {
+    expect((await ignore()).isOk()).to.be.true;
+  });
 });
