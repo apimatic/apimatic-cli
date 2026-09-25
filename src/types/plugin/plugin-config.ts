@@ -81,3 +81,9 @@ export interface PluginMetadata {
   pluginName: string;
   pluginVersion: string;
 }
+
+export const PLACEHOLDER_METADATA: Readonly<PluginMetadata> = Object.freeze({
+  pluginId: 'my-api-plugin',
+  pluginName: 'My API Plugin',
+  pluginVersion: '0.1.0'
+});

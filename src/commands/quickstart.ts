@@ -8,9 +8,10 @@ import { QuickstartAction } from '../actions/quickstart.js';
 import { QuickstartCompletedEvent } from '../types/events/quickstart-completed.js';
 
 export default class Quickstart extends Command {
-  static readonly description = 'Get started with your first SDK or API Portal in a few easy steps.';
+  static readonly description =
+    'Point the CLI at your API specification and it builds a documentation portal, SDKs, and a context plugin that teaches an AI coding assistant to use them.';
 
-  static readonly summary = 'Create your first API Documentation Portal, or your first SDK, using APIMatic.';
+  static readonly summary = 'Create your first API Documentation Portal, SDKs and Context Plugins.';
 
   static readonly cmdTxt = format.cmd('apimatic', 'quickstart');
 
@@ -27,7 +28,7 @@ export default class Quickstart extends Command {
 
     intro('Quickstart');
     const action = new QuickstartAction(this.getConfigDir(), commandMetadata);
-    const result = await action.execute();
+    const result = await action.execute(DirectoryPath.default);
     outro(result);
 
     // TODO: Remove this, find a solution for tracking.
