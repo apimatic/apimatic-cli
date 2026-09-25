@@ -7,7 +7,7 @@ import { Directory } from "../../types/file/directory.js";
 
 export class SaveChangesPrompts {
   
-  public srcDirectoryEmpty(directory: DirectoryPath) {
+  public sourceDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var("src")} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }

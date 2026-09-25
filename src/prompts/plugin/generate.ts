@@ -50,7 +50,7 @@ export class PluginGeneratePrompts {
     log.error(message);
   }
 
-  public srcDirectoryDoesNotExist(directory: DirectoryPath) {
+  public sourceDirectoryDoesNotExist(directory: DirectoryPath) {
     const message = `The ${f.var('src')} directory does not exist at the provided location: ${f.path(directory)}`;
     log.error(message);
   }
@@ -63,12 +63,12 @@ export class PluginGeneratePrompts {
     log.error(error);
   }
 
-  public configNotPrepared(failure: PluginConfigWriteFailure, buildDirectory: DirectoryPath) {
+  public configNotPrepared(failure: PluginConfigWriteFailure, sourceDirectory: DirectoryPath) {
     const message =
       failure === 'unreadable'
-        ? `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(buildDirectory)} could not be read. ` +
+        ? `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} could not be read. ` +
           `Check that it can be read and try again.`
-        : `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(buildDirectory)} starts with a byte-order mark, ` +
+        : `${f.var(APIMATIC_CONFIG_FILE_NAME)} in ${f.path(sourceDirectory)} starts with a byte-order mark, ` +
           `which the plugin cannot be generated from, and it could not be rewritten without one. ` +
           `Save the file as UTF-8 without a BOM and try again.`;
     log.error(message);

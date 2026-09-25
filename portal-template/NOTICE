@@ -29,5 +29,9 @@ src/components/logos.tsx:
   Each mark remains the trademark of its owner, and is shown to name the
   language or tool it stands for.
 
-The generated portal additionally loads the Geist typeface from Google Fonts at
-runtime.
+The generated portal also bundles the Geist and Geist Mono typefaces, from the
+Fontsource packages @fontsource-variable/geist and @fontsource-variable/geist-mono.
+They are licensed under the SIL Open Font License 1.1, not MIT:
+
+  Geist and Geist Mono
+    Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)

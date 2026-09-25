@@ -407,11 +407,17 @@ const stylesheetOf = (output: DirectoryPath) => {
     ).to.deep.equal([]);
   });
 
-  it('loads Geist and the neutral theme', () => {
+  it('bundles Geist and loads the neutral theme', () => {
     const css = stylesheetOf(output);
 
-    expect(read('index.html')).to.contain('https://fonts.googleapis.com/css2?family=Geist:wght@100..900');
-    expect(css).to.contain('--default-font-family:"Geist"');
+    expect(read('index.html')).not.to.contain('fonts.googleapis.com');
+    // Fumadocs' type tables and playground output use the `font-mono` class, which reads `--font-mono`.
+    expect(css).to.contain('--font-sans:"Geist Variable"');
+    expect(css).to.contain('--font-mono:"Geist Mono Variable"');
+    expect(css).to.contain('--default-font-family:var(--font-sans)');
+    expect(css).to.contain('--default-mono-font-family:var(--font-mono)');
+    expect(css).to.match(/url\(\/assets\/geist-latin-wght-normal-[\w-]+\.woff2\)/);
+    expect(css).to.match(/url\(\/assets\/geist-mono-latin-wght-normal-[\w-]+\.woff2\)/);
     // The theme's light primary, which nothing in the fixture overrides.
     expect(css).to.match(/--color-fd-primary:#171717/);
   });

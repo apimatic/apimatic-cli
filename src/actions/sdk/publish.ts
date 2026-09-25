@@ -25,7 +25,7 @@ export class SdkPublishAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     outputDirectory: DirectoryPath,
     language: Language,
     publishType: PublishType[],
@@ -51,7 +51,7 @@ export class SdkPublishAction {
 
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
-        buildDirectory,
+        sourceDirectory,
         outputDirectory,
         language,
         force,

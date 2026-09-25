@@ -126,8 +126,8 @@ export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
   private readonly fileService = new FileService();
 
-  constructor(private readonly buildDirectory: DirectoryPath) {
-    this.configContext = new ApimaticConfigContext(this.buildDirectory);
+  constructor(private readonly sourceDirectory: DirectoryPath) {
+    this.configContext = new ApimaticConfigContext(this.sourceDirectory);
   }
 
   public async getPluginConfigState(): Promise<PluginConfigState> {
@@ -179,7 +179,7 @@ export class PluginConfigContext {
     languages: readonly Language[]
   ): Promise<Result<DirectoryPath, PluginConfigWriteFailure>> {
     const staged = into.join('build');
-    await this.fileService.copyDirectoryContents(this.buildDirectory, staged);
+    await this.fileService.copyDirectoryContents(this.sourceDirectory, staged);
 
     const config = new ApimaticConfigContext(staged);
     const covered = await config.merge(OWNED_BLOCKS, (document) =>

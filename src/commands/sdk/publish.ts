@@ -118,7 +118,7 @@ export default class SdkPublish extends Command {
     };
 
     const workingDirectory = DirectoryPath.createInput(input);
-    const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
+    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
 
     const configDir = this.getConfigDir();
@@ -147,7 +147,7 @@ export default class SdkPublish extends Command {
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(workingDirectory, onPublishSdkError)
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
-          buildDirectory,
+          sourceDirectory,
           sdkDirectory,
           language as Language,
           publishTypes,

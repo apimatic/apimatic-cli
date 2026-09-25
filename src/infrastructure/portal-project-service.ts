@@ -17,10 +17,13 @@ import { envInfo } from './env-info.js';
 import { FileService } from './file-service.js';
 import { PortalPagesService } from './portal-pages-service.js';
 
+// Copied, not linked: Tailwind rebases their `url()`s onto the project, and no relative path crosses drives.
+export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'];
+
 // Linked one by one rather than through a single link to the CLI's `node_modules`: under a
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
-export const TEMPLATE_DEPENDENCIES = [
+export const LINKED_DEPENDENCIES = [
   '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',
@@ -41,6 +44,8 @@ export const TEMPLATE_DEPENDENCIES = [
   'tslib',
   'vite'
 ];
+
+export const TEMPLATE_DEPENDENCIES = [...COPIED_DEPENDENCIES, ...LINKED_DEPENDENCIES];
 
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
 
@@ -110,6 +115,7 @@ export class PortalProjectService {
 
     await this.fileService.copyDirectoryContents(template, projectDirectory);
     await this.linkDependencies(projectDirectory);
+    await this.copyDependencies(projectDirectory);
     await this.writeConfiguration(
       projectDirectory,
       source,
@@ -215,7 +221,7 @@ export class PortalProjectService {
     const modules = projectDirectory.join('node_modules');
     await this.fileService.createDirectoryIfNotExists(modules);
 
-    for (const dependency of TEMPLATE_DEPENDENCIES) {
+    for (const dependency of LINKED_DEPENDENCIES) {
       const target = this.packageDirectory(dependency);
       if (target === undefined) {
         continue;
@@ -226,6 +232,15 @@ export class PortalProjectService {
       }
       // A junction is the only link type Windows grants without elevation.
       await fsExtra.symlink(target.toString(), link.toString(), process.platform === 'win32' ? 'junction' : 'dir');
+    }
+  }
+
+  private async copyDependencies(projectDirectory: DirectoryPath): Promise<void> {
+    for (const dependency of COPIED_DEPENDENCIES) {
+      const target = this.packageDirectory(dependency);
+      if (target !== undefined) {
+        await this.fileService.copyDirectoryContents(target, projectDirectory.join('node_modules', dependency));
+      }
     }
   }
 
