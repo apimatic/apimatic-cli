@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { CodeBlockTab, CodeBlockTabs, CodeBlockTabsList, CodeBlockTabsTrigger } from 'fumadocs-ui/components/codeblock';
-import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock.core';
 import { useOperationContext, useRenderContext, useServerContext } from 'fumadocs-openapi/ui';
 import { pathnameFromRequest } from 'fumadocs-openapi/requests/generators';
 import { curl } from 'fumadocs-openapi/requests/generators/curl';
 import { joinURL, resolveServerUrl } from '@fumadocs/api-docs/utils/url';
 import { CodeSample } from '@/lib/code-samples';
+import { CodeBlock } from './code-block';
 import { useExampleSelection } from './example-layout';
 
 interface UsageTab {
@@ -66,11 +66,6 @@ function CurlCode() {
   if (request === undefined) return null;
   const url = joinURL(serverUrl, pathnameFromRequest(route, request));
   return <CodeBlock lang={curl.lang} code={curl.generate({ ...request, url }, { mediaAdapters, custom: null })} />;
-}
-
-function CodeBlock({ lang, code }: Readonly<{ lang: string; code: string }>) {
-  const { shiki, shikiOptions } = useRenderContext();
-  return <DynamicCodeBlock lang={lang} code={code} highlighter={() => shiki.getOrInit()} options={shikiOptions} />;
 }
 
 // Fumadocs reports the playground's edits to the selected example through its listeners.
