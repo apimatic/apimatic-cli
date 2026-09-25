@@ -143,7 +143,8 @@ describe('GenerateAction', () => {
     expect(build.called).to.be.false;
   });
 
-  it('reports a source directory it cannot build from', async () => {
+  // A source the build would refuse should not cost the artifacts run, which can take minutes.
+  it('reports a source directory it cannot build from, without asking for the artifacts', async () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
@@ -152,6 +153,7 @@ describe('GenerateAction', () => {
     expect(result.isFailed()).to.be.true;
     expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
     expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.artifacts.called).to.be.false;
     expect(build.called).to.be.false;
   });
 
@@ -175,8 +177,18 @@ describe('GenerateAction', () => {
 
     expect(result.isCancelled()).to.be.true;
     expect(prompts.overwritePortal.calledOnceWith(portalDirectory)).to.be.true;
+    expect(shared.artifacts.called).to.be.false;
     expect(build.called).to.be.false;
     expect(inPortal('old.html')).to.be.true;
+  });
+
+  it('asks before the artifacts run rather than after it', async () => {
+    writeOldPortal();
+
+    const result = await execute();
+
+    expect(result.isSuccess()).to.be.true;
+    expect(prompts.overwritePortal.calledBefore(shared.artifacts)).to.be.true;
   });
 
   it('counts a staging folder left by an unfinished save as a portal to overwrite', async () => {

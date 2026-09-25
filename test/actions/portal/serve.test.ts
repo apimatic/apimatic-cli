@@ -100,7 +100,7 @@ describe('PortalServeAction', () => {
     expect(start.called).to.be.false;
   });
 
-  it('reports a source directory it cannot serve', async () => {
+  it('reports a source directory it cannot serve, without asking for the artifacts', async () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
@@ -108,6 +108,7 @@ describe('PortalServeAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.artifacts.called).to.be.false;
     expect(start.called).to.be.false;
   });
 

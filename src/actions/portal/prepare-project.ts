@@ -9,9 +9,9 @@ import { PortalSource } from '../../types/portal/portal-source.js';
 import { ActionResult } from '../action-result.js';
 
 /**
- * The run `portal generate` and `portal serve` share: fetch what `/portal-artifacts` built, read
- * the source, and prepare the Vite project both of them then run. Only what happens to
- * that project differs — one builds it to disk, the other serves it.
+ * The run `portal generate` and `portal serve` share: read the source, fetch what
+ * `/portal-artifacts` builds from it, and prepare the Vite project both of them then run. Only
+ * what happens to that project differs — one builds it to disk, the other serves it.
  */
 export class PreparePortalProjectAction {
   private readonly prompts: PreparePortalProjectPrompts = new PreparePortalProjectPrompts();
@@ -31,8 +31,25 @@ export class PreparePortalProjectAction {
    */
   public readonly execute = async (
     sourceDirectory: DirectoryPath,
-    onPrepared: (project: PortalProjectPaths, source: PortalSource) => Promise<ActionResult>
+    onPrepared: (project: PortalProjectPaths, source: PortalSource) => Promise<ActionResult>,
+    confirm: () => Promise<boolean> = async () => true
   ): Promise<ActionResult> => {
+    // Ahead of the server run, which can take minutes: a mistake or a question should not wait on it.
+    const source = await new PortalSourceContext(sourceDirectory).resolve();
+    if (source.isErr()) {
+      this.prompts.sourceProblem(source.error, sourceDirectory);
+      return ActionResult.failed();
+    }
+    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
+    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
+    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
+    this.prompts.folderTabs(source.value.folderTabs);
+    this.prompts.sharedTabNames(source.value.sharedTabNames, sourceDirectory);
+
+    if (!(await confirm())) {
+      return ActionResult.cancelled();
+    }
+
     // The artifacts live in this directory for as long as the caller needs them, so it wraps
     // everything that reads them rather than being opened and closed around the call.
     return await withDirPath(async (artifactsDirectory) => {
@@ -48,17 +65,6 @@ export class PreparePortalProjectAction {
       if (artifacts.isErr()) {
         return ActionResult.failed();
       }
-
-      const source = await new PortalSourceContext(sourceDirectory).resolve();
-      if (source.isErr()) {
-        this.prompts.sourceProblem(source.error, sourceDirectory);
-        return ActionResult.failed();
-      }
-      this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-      this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-      this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-      this.prompts.folderTabs(source.value.folderTabs);
-      this.prompts.sharedTabNames(source.value.sharedTabNames, sourceDirectory);
 
       this.prompts.unplacedSamples(
         artifacts.value.codeSampleCatalogs.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))
