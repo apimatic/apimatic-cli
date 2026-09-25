@@ -5,8 +5,9 @@ Status: designed 2026-09-25 on `saeedjamshaid/sdk-plugin-pages` (worktree
 `0e823f3d` once PR #361 ("fetch the artifacts from /portal-artifacts") was
 squash-merged the same day, so it builds directly on #361's
 `PortalArtifactsService` and `/__downloads/`. Section 2 records the decisions
-of that day. Step 1 (section 9) is done; section 10 records what it found and
-the two questions it raised.
+of that day. **Implemented 2026-09-25**: every step of section 9 is done, each
+committed on its own. Section 10 records what the step 1 spike found and the
+two questions it raised.
 
 Follows on from `.ai/plans/generated-pages.md` (PR #360), which shipped the flow
 (three templates in `portal-pages/`, a second Fumadocs collection over
@@ -512,7 +513,14 @@ committed without asking.
    package line truncates, with the whole of it in a tooltip, so the buttons
    keep their row. The serve test that took a publishing record for an edit no
    page shows now finds it applied, since the cards show it.
-6. **Surfacing.** e2e: cards and buttons on `/sdks`; a language page carrying a
+6. **Surfacing.** *Done 2026-09-25.* The e2e builds now take artifacts: an SDK zip
+   and docs for each fixture's language, and the plugin for the branded one. The
+   branded spec's description gains an H1 section, below the paragraph its
+   suggested site reads. All 38 cases pass. A hosted `pluginUrl` is left to the
+   unit, service and serve tests rather than a third full build. The command
+   descriptions and the README were edited by hand, keeping its CRLF endings and
+   oclif's wrapping (see the repository memory on `oclif readme`).
+   What the step called for: e2e: cards and buttons on `/sdks`; a language page carrying a
    fixture's SDK docs with its headings in the TOC; the SDKs page's
    description split around the cards with its H1 shifted; the plugin page
    with a relative and an absolute address; no project path published. Also:

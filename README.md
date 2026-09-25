@@ -31,11 +31,11 @@ Documentation portals are now built on your machine from a `src/` directory, and
   (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
   with every default spelled out, and the file's `$schema` lets your editor complete and check it.
 - A portal also needs the project's SDK languages, at least one, in the same file's
-  `languages` block, for example `"languages": { "typescript": {} }`. `plugin generate` and
-  `sdk publish` both write to it, and the context plugin reads it too, so name only the languages
-  you ship. The same file carries the plugin's identity in `plugin`; `src/plugin-config.json` is
-  no longer read, so run `plugin generate` and `sdk publish` again after upgrading and delete the
-  old file.
+  `languages` block, for example `"languages": { "typescript": {} }`; `csharp`, `python` and
+  `typescript` are available for now. `plugin generate` and `sdk publish` both write to it, and
+  the context plugin reads it too, so name only the languages you ship. The same file carries
+  the plugin's identity in `plugin`; `src/plugin-config.json` is no longer read, so run
+  `plugin generate` and `sdk publish` again after upgrading and delete the old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
@@ -43,9 +43,12 @@ Documentation portals are now built on your machine from a `src/` directory, and
   Home, Guides, SDKs, Context Plugin, the API reference, and any folder directly under
   `src/content/` whose own `nav.json` sets `"root": true`. The root `nav.json` places the
   tabs the CLI makes with `apimatic:sdks`, `apimatic:plugin` and `apimatic:api`.
-- The SDKs tab has a page per language in the `languages` block, and the Context Plugin tab
-  appears when there is a `plugin` block. Their addresses, `/sdks` and `/context-plugin`, are
-  kept for them, so a page in `src/content/` that would be served there is refused.
+- The SDKs tab lists a card per language in the `languages` block, offering its download, and
+  its source repository and package once `sdk publish` records them, and gives each language a
+  page carrying its SDK's getting-started docs. The Context Plugin tab, with the plugin's install
+  command, appears when there is a `plugin` block, or a `pluginUrl` in the `portal` block for a
+  plugin hosted elsewhere. Their addresses, `/sdks` and `/context-plugin`, are kept for them, so
+  a page in `src/content/` that would be served there is refused.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
@@ -334,7 +337,7 @@ DESCRIPTION
 
   The portal is built on your machine and written as static files you can host anywhere. Configure it with
   'src/apimatic.json', whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block,
-  when there is one, a page for the context plugin.
+  or a 'pluginUrl' in its 'portal' block for a plugin hosted elsewhere, a page for the context plugin.
 
 EXAMPLES
   apimatic portal generate
@@ -368,8 +371,8 @@ DESCRIPTION
   pages in 'src/content', reorder them in a 'nav.json', or change the 'portal', 'languages' or 'plugin' block of
   'apimatic.json'.
 
-  Adding or removing a page in 'src/content', creating 'src/static', or changing which documents are in 'src/spec',
-  needs the preview restarted.
+  Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', or changing
+  which documents are in 'src/spec', needs the preview restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 
