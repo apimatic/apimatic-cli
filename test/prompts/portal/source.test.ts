@@ -88,6 +88,12 @@ describe('reportSourceProblem', () => {
     expect(printed()).to.not.contain('spelt');
   });
 
+  it('points at api transform when src/spec holds no OpenAPI 3.x document', () => {
+    reportSourceProblem({ kind: 'noOpenApiSpec' }, source);
+
+    expect(printed()).to.contain('apimatic api transform --format=openapi3yaml');
+  });
+
   describe('a page at an address kept for the generated pages', () => {
     const content = source.join('content');
 

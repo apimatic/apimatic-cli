@@ -3,7 +3,12 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
-import { GENERATED_DIRECTORY_NAME, TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
+import {
+  COPIED_DEPENDENCIES,
+  GENERATED_DIRECTORY_NAME,
+  LINKED_DEPENDENCIES,
+  TEMPLATE_DEPENDENCIES
+} from '../src/infrastructure/portal-project-service';
 import { PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
 import { PortalIdentity } from '../src/types/portal/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
@@ -46,14 +51,20 @@ function templateFiles(): string[] {
     .map((entry) => path.relative(templateRoot, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'));
 }
 
-/**
- * The template is built inside a temp project whose node_modules holds one link per entry in
- * TEMPLATE_DEPENDENCIES, not one per dependency the CLI declares. Anything unlinked still
- * resolves here, where every package is installed, and fails only on a user's machine.
- */
+// Data URIs, absolute URLs and root-relative paths are left as written, so they resolve anywhere.
+const RELATIVE_URL = /url\(\s*['"]?(?![\s'")]|[a-z][\w+.-]*:|\/|#)/i;
+
+function usesRelativeUrl(packageName: string): boolean {
+  return fs
+    .readdirSync(path.join(repositoryRoot, 'node_modules', packageName), { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.css'))
+    .some((entry) => RELATIVE_URL.test(fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8')));
+}
+
+// The temp project installs only TEMPLATE_DEPENDENCIES; anything else resolves here but fails on a user's machine.
 describe('portal template packaging', () => {
-  it('imports only packages the temp project links', () => {
-    const linked = new Set(TEMPLATE_DEPENDENCIES);
+  it('imports only packages the temp project installs', () => {
+    const installed = new Set(TEMPLATE_DEPENDENCIES);
     const offenders = new Set<string>();
 
     for (const specifier of templateImports()) {
@@ -61,15 +72,35 @@ describe('portal template packaging', () => {
       const packageName = specifier.startsWith('@')
         ? specifier.split('/').slice(0, 2).join('/')
         : specifier.split('/')[0];
-      if (!linked.has(packageName)) offenders.add(packageName);
+      if (!installed.has(packageName)) offenders.add(packageName);
     }
 
-    expect([...offenders], 'template imports packages the temp project does not link').to.be.empty;
+    expect([...offenders], 'template imports packages the temp project does not install').to.be.empty;
   });
 
-  // The converse: a linked package that the CLI stops depending on would be missing at build
-  // time for everyone, with nothing here to notice.
-  it('links only packages the CLI declares as dependencies', () => {
+  // CI keeps the CLI and the build on one drive, where a linked `url()` still resolves, so only this catches it.
+  it('links no package whose stylesheets use a relative url()', () => {
+    expect(
+      LINKED_DEPENDENCIES.filter(usesRelativeUrl),
+      'copy these into the project (COPIED_DEPENDENCIES) instead of linking them'
+    ).to.be.empty;
+  });
+
+  // pnpm keeps a package's dependencies beside it, not inside it, so a copy would leave them behind.
+  it('copies only packages that need it and have no dependencies of their own', () => {
+    for (const name of COPIED_DEPENDENCIES) {
+      const packageManifest = JSON.parse(
+        fs.readFileSync(path.join(repositoryRoot, 'node_modules', name, 'package.json'), 'utf8')
+      );
+
+      expect(usesRelativeUrl(name), `${name} has no relative url() to need copying`).to.be.true;
+      const { dependencies, peerDependencies, optionalDependencies } = packageManifest;
+      expect({ ...dependencies, ...peerDependencies, ...optionalDependencies }, name).to.be.empty;
+    }
+  });
+
+  // The converse: a package the CLI stops depending on would be missing at build time for everyone.
+  it('installs only packages the CLI declares as dependencies', () => {
     const declared = new Set(Object.keys(manifest.dependencies));
 
     expect(TEMPLATE_DEPENDENCIES.filter((name) => !declared.has(name))).to.be.empty;

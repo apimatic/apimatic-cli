@@ -133,6 +133,10 @@ release cuts the preset, the fonts and the layout. `app.css` imports
 links their Google Fonts stylesheet, the generated `theme.css` holds only the
 primary colour's two rules, and `layout.tsx` renders the notebook layout alone.
 
+*Amended 2026-09-25* (PR #366): the Google Fonts link is gone. `app.css`
+imports `@fontsource-variable/geist` and `geist-mono`, which the CLI copies into
+the build project, and sets `--font-sans` / `--font-mono` in `@theme`.
+
 *Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 4 and 6):
 `src/lib/source.ts` declares a second collection over the relative literal
 `'generated'`, where the CLI writes the SDK and context plugin pages from the
@@ -311,7 +315,7 @@ Follow the five-layer conventions in `.ai/instructions.md` and the skills in
 - Large, densely connected APIs still yield large output folders (section 5:
   a Stripe-shaped spec approaches 1 GB at full size). The remaining lever is the
   second copy of each page's payload; see section 12.
-- Generated site is not self-contained: Geist fonts load from Google Fonts at runtime and Fumadocs' page actions link to ChatGPT/Claude/Cursor (decided to keep as-is for v1). *Amended 2026-09-23:* the fonts are now a shortlist in `portal.brand.fonts`, each still from Google Fonts, and `system` for both makes no font request at all; `portal.ai.pageActions: false` removes the external links. *Amended 2026-09-24:* the shortlist is cut for the first release, so Geist and Geist Mono are fixed and load from Google Fonts again, as in v1; `portal.ai.pageActions: false` still removes the external links.
+- Generated site is not self-contained: Geist fonts load from Google Fonts at runtime and Fumadocs' page actions link to ChatGPT/Claude/Cursor (decided to keep as-is for v1). *Amended 2026-09-23:* the fonts are now a shortlist in `portal.brand.fonts`, each still from Google Fonts, and `system` for both makes no font request at all; `portal.ai.pageActions: false` removes the external links. *Amended 2026-09-24:* the shortlist is cut for the first release, so Geist and Geist Mono are fixed and load from Google Fonts again, as in v1; `portal.ai.pageActions: false` still removes the external links. *Amended 2026-09-25:* the fonts are bundled with the site from `@fontsource-variable` (PR #366), because the Google stylesheet held up first paint and hydration by 1–3 s on a first visit; only the page actions still reach another origin.
 - Verified on Windows only; macOS/Linux via the new CI matrix.
 - Try-it playground requires CORS on the customer's API (Fumadocs' proxy needs a server). Out of scope.
 - Fumadocs UI is mid-transition to `@fumadocs/base-ui`; fumadocs-openapi has had three majors in about a year; several single-maintainer and 0.x packages in the tree (`lucide-react`, `yuku-analyzer` with native binaries, `zbsearch`, `h3` RC). Mitigated by pinning and the e2e test.
@@ -377,6 +381,7 @@ the new-layout branch in the sample repository.
    `--destination` and `--no-reload`. Release notes also mention
    `apimatic autocomplete --refresh-cache`, the deferred `$ref` file-read risk
    (section 9) and that generated sites load Geist from Google Fonts.
+   *Amended 2026-09-25:* drop the Google Fonts line; the fonts are bundled with the site (PR #366).
 3. **Sample repository** `sample-docs-as-code-portal`: done 2026-09-17. `v2` is a
    permanent branch for the CLI 2 layout (`54d2cb3`: spec renamed
    `spec/petstore.json`, deploy workflow pinned to `@apimatic/cli@2`, artifact
@@ -435,3 +440,4 @@ the new-layout branch in the sample repository.
   `discriminator.mapping` and JSON-pointer-escaped names.
 - Section 9 items stand: `$ref` file-read/SSRF deferred, Google Fonts at
   runtime, try-it playground needs CORS on the customer's API.
+  *Amended 2026-09-25:* the Google Fonts item is closed; the fonts are bundled (PR #366).

@@ -8,11 +8,7 @@ import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
-import { AVAILABLE_LANGUAGES, Language, LANGUAGE_CHOICES } from '../../types/sdk/generate.js';
-
-/** The names the SDK flows already show, so one language reads the same everywhere. */
-const labelOf = (language: string): string =>
-  LANGUAGE_CHOICES.find((choice) => choice.value === language)?.label ?? language;
+import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
 
 export class PluginGeneratePrompts {
   // The spinner covers the service call only; until the save has run there is no path to name.
@@ -87,7 +83,7 @@ export class PluginGeneratePrompts {
       message: 'Which languages should your plugin include?',
       options: AVAILABLE_LANGUAGES.map((language) => ({
         value: language,
-        label: labelOf(language),
+        label: languageLabel(language),
         hint: published.includes(language) ? 'published' : undefined
       })),
       initialValues: [...config.initialLanguages()],
@@ -108,7 +104,7 @@ export class PluginGeneratePrompts {
     }
 
     const [verb, entries] = languages.length === 1 ? ['is', 'its entry'] : ['are', 'their entries'];
-    const names = languages.map((language) => labelOf(language)).join(', ');
+    const names = languages.map((language) => languageLabel(language)).join(', ');
 
     log.warn(
       `${names} cannot be included in a context plugin and ${verb} left out of this one. ` +

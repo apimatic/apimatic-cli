@@ -124,7 +124,10 @@ export function defaultStability(language: Language): Stability {
   return stabilityLevelsFor(language)[0] ?? Stability.STABLE;
 }
 
-/** The name a language is shown under everywhere, so one reads the same in every message. */
-export function languageLabel(language: Language): string {
-  return LANGUAGE_NAMES[language];
+/**
+ * The name a language is shown under everywhere, so one reads the same in every message.
+ * Takes a string because a config file names its own languages, and may name anything.
+ */
+export function languageLabel(language: string): string {
+  return LANGUAGE_NAMES[language as Language] ?? language;
 }
