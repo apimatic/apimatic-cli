@@ -38,9 +38,13 @@ Documentation portals are now built on your machine from a `src/` directory, and
   `plugin generate` and `sdk publish` again after upgrading and delete the old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
-- Every page starts with front matter giving its `title`, which names it in the sidebar:
-  `---`, then `title: Getting started`, then `---`, each on its own line. Pages written for 1.x
-  had none; the CLI lists each page that needs one before it builds.
+- Every page starts with front matter giving its `title`, which names it in the sidebar.
+  Pages written for 1.x had none; the CLI lists each page that needs one before it builds.
+  ```md
+  ---
+  title: Getting started
+  ---
+  ```
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
   `title` there names the folder it sits in. A folder links to its `index.md`; without one it
   is only a heading.
