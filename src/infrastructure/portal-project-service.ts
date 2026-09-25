@@ -18,6 +18,8 @@ import { PortalPagesService } from './portal-pages-service.js';
 // pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
 // single link also lets Vite write its scratch files into the CLI's own install directory.
 export const TEMPLATE_DEPENDENCIES = [
+  '@fontsource-variable/geist',
+  '@fontsource-variable/geist-mono',
   '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',

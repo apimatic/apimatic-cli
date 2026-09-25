@@ -13,17 +13,6 @@ const loadPageTree = createServerFn({ method: 'GET' })
   .middleware([staticFunctionMiddleware])
   .handler(async () => ({ pageTree: await source.serializePageTree(source.getPageTree()) }));
 
-// Linked from the page rather than imported by `app.css`, so the browser fetches it alongside the
-// stylesheet instead of after it.
-const fontLinks = [
-  { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-  { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' as const },
-  {
-    rel: 'stylesheet',
-    href: 'https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap'
-  }
-];
-
 // Without one the browser tab shows the blank-document icon on every page.
 const iconLinks = portal.favicon
   ? [{ rel: 'icon', href: portal.favicon.url, ...(portal.favicon.type ? { type: portal.favicon.type } : {}) }]
@@ -45,7 +34,7 @@ export const Route = createRootRoute({
       { title: portal.name },
       ...(portal.description ? [{ name: 'description', content: portal.description }] : [])
     ],
-    links: [...fontLinks, { rel: 'stylesheet', href: appCss }, ...iconLinks]
+    links: [{ rel: 'stylesheet', href: appCss }, ...iconLinks]
   }),
   component: RootComponent
 });

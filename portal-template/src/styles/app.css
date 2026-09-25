@@ -2,15 +2,19 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
+/* Bundled rather than linked from Google Fonts: a stylesheet on another origin holds up the
+   first paint, and every React commit after hydration, until it arrives. */
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 /* Written by the CLI from the 'portal' block of apimatic.json: the colour overrides. Imported
    last, so what it sets outranks the theme and presets above. */
 @import './theme.css';
 
 @theme {
-  --default-font-family: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-    'Segoe UI Symbol', 'Noto Color Emoji';
-  --default-mono-font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  --default-font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --default-mono-font-family: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
 }
 
 @source not '../../dist';
