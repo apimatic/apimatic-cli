@@ -82,7 +82,7 @@ Delivered as **one PR** (section 11).
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
 | Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. Fumadocs' neutral theme supplies every other token (section 15). |
-| Fonts | Geist and Geist Mono from Google Fonts, fixed in the template (section 15). |
+| Fonts | Geist and Geist Mono from Google Fonts, fixed in the template (section 15). *Amended 2026-09-25:* bundled with the portal instead (section 15). |
 | Favicon default | The light logo; none when there is no logo. The APIMatic mark is never shipped onto a customer's domain. |
 | Site name default | Derived from `info.title` when the project has exactly one spec. With two or more, `site.name` is required. |
 | Unknown keys | Reported by dotted path, `'portal.brand.colour' is not a 'portal' setting.` No near-miss hints, including for today's flat keys: `title` is reported as unknown like any other key. The live `url`/`site` → `siteUrl` hints are deleted. |
@@ -743,6 +743,7 @@ did not change the pins. Re-check each entry if a pin moves.
   `getOpenAPIPageProps().payload.bundled` carries.
 - **Fonts.** `app.css` loads Geist and Geist Mono from Google Fonts and sets
   `--default-font-family` / `--default-mono-font-family` in `@theme`.
+  *Amended 2026-09-25:* see the note at the end of section 15.
 
 ## 11. Delivery
 
@@ -970,6 +971,13 @@ and `ai.pageActions`.
   setting seldom delivered one, and each family's weight axis had to be checked
   by hand against Google, where one wrong entry fails the whole font request.
   The identity loses `fontsUrl`, and `theme.css` its `@theme` block.
+  *Amended 2026-09-25 (PR #366):* the fonts are bundled, not linked from Google:
+  the stylesheet held up first paint and hydration by 1–3 s on a first visit.
+  `app.css` imports `@fontsource-variable/geist` and `geist-mono`, which the CLI
+  copies into the build project (`COPIED_DEPENDENCIES`) so their `url()`s
+  resolve on the project's drive, and sets `--font-sans` / `--font-mono` so the
+  `font-sans` and `font-mono` classes get Geist too. The link in `__root.tsx`
+  is gone.
 - **`home.cta`** is gone, and the `home` namespace with it; no home page has a
   button under its title, which was the default. A portal that wants a landing
   page writes `content/index.md`, which can link wherever it likes. The

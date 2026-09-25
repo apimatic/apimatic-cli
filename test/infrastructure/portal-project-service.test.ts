@@ -6,6 +6,7 @@ import semver from 'semver';
 import sinon from 'sinon';
 import { FileService } from '../../src/infrastructure/file-service';
 import {
+  COPIED_DEPENDENCIES,
   GENERATED_DIRECTORY_NAME,
   PortalProjectService,
   TEMPLATE_DEPENDENCIES
@@ -105,11 +106,11 @@ describe('PortalProjectService', () => {
   });
 
   describe('prepare', () => {
-    it('links every dependency the template imports, resolved to a real package', async () => {
+    it('installs every dependency the template imports, resolved to a real package', async () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
 
       const modules = path.join(project.toString(), 'node_modules');
-      const linked = fs
+      const installed = fs
         .readdirSync(modules, { withFileTypes: true })
         .flatMap((entry) =>
           entry.name.startsWith('@')
@@ -117,11 +118,22 @@ describe('PortalProjectService', () => {
             : [entry.name]
         );
 
-      expect(linked).to.include.members(['react', 'vite', 'fumadocs-ui', '@tanstack/react-start']);
-      for (const name of linked) {
-        // Each link must reach that package's own manifest, not merely exist.
+      expect(installed).to.include.members(['react', 'vite', 'fumadocs-ui', '@tanstack/react-start']);
+      for (const name of installed) {
+        // Each entry must reach that package's own manifest, not merely exist.
         const manifest = JSON.parse(fs.readFileSync(path.join(modules, name, 'package.json'), 'utf8'));
         expect(manifest.name, `${name} resolves to the wrong package`).to.equal(name);
+      }
+    });
+
+    // Linked, their `url()`s would resolve from the CLI's install, which may be on another drive.
+    it('copies the font packages into the project instead of linking them', async () => {
+      (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
+
+      for (const name of COPIED_DEPENDENCIES) {
+        const directory = path.join(project.toString(), 'node_modules', name);
+        expect(fs.lstatSync(directory).isSymbolicLink(), `${name} is linked`).to.be.false;
+        expect(fs.readdirSync(path.join(directory, 'files')).some((file) => file.endsWith('.woff2'))).to.be.true;
       }
     });
 

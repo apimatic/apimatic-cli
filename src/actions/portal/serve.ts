@@ -39,7 +39,8 @@ export class PortalServeAction {
   public readonly execute = async (
     sourceDirectory: DirectoryPath,
     port: number,
-    openInBrowser: boolean
+    openInBrowser: boolean,
+    onServing?: () => void
   ): Promise<ActionResult> => {
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
@@ -77,6 +78,9 @@ export class PortalServeAction {
         this.prompts.portalServed(server.value.url, sourceDirectory);
         if (openInBrowser) {
           await this.launcherService.openUrlInBrowser(server.value.url);
+        }
+        if (onServing) {
+          onServing();
         }
 
         const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);

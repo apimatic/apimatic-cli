@@ -326,23 +326,42 @@ export class PortalSourceContext {
    */
   public async scaffold(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
     try {
+      await new SpecContext(this.specDirectory).install(specPath);
+    } catch (error) {
+      return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
+    }
+    return await this.adopt(specPath, schemaUrl);
+  }
+
+  /** The same tree around a specification the project already carries, which is left where it is. */
+  public async adopt(specPath: FilePath, schemaUrl: string): Promise<Result<FilePath, PortalScaffoldProblem>> {
+    try {
       return await this.writeSourceTree(specPath, schemaUrl);
     } catch (error) {
       return err({ kind: 'sourceUnwritable', reason: errorMessage(error) });
     }
   }
 
+  /**
+   * The document the portal speaks for, and the one quickstart validates when it adopts a
+   * project someone downloaded rather than asking for a specification the project has.
+   */
+  public async primarySpec(): Promise<FilePath | null> {
+    const fileName = (await this.specDirectoryFileNames()).find((name) =>
+      SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension))
+    );
+    return fileName === undefined ? null : new FilePath(this.specDirectory, fileName);
+  }
+
   private async writeSourceTree(
     specPath: FilePath,
     schemaUrl: string
   ): Promise<Result<FilePath, PortalScaffoldProblem>> {
-    await new SpecContext(this.specDirectory).install(specPath);
-
     const site = await this.suggestedSite(specPath);
     const config = PortalConfig.scaffolded(site);
-    // The directory is empty when quickstart runs this, so the merge always creates the file.
-    // Every default is spelled out, so the block shows what can be set, and the schema lets an
-    // editor complete and check the rest.
+    // A downloaded build carries `spec/` and no config, so the merge creates the file on both
+    // paths. Every default is spelled out, so the block shows what can be set, and the schema
+    // lets an editor complete and check the rest.
     const written = await this.configContext.merge(['portal'], (document) =>
       document.referencingSchema(schemaUrl).with('portal', config.toJSON())
     );

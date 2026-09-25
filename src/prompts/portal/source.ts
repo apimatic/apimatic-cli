@@ -10,6 +10,11 @@ import { format as f } from '../format.js';
 
 const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
+// Quickstart refuses a spec for the same reason, and has to point at the same fix.
+export const convertToOpenApi3 = (): string =>
+  `Try ${f.cmdAlt('apimatic', 'api', 'transform')} ${f.flag('format', 'openapi3yaml')} to convert your spec ` +
+  `to OpenAPI 3.x first.`;
+
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
  * a broken one has to be explained the same way in both. `offerQuickstart` is false once a
@@ -114,8 +119,7 @@ export function reportSourceProblem(
     }
     case 'noOpenApiSpec': {
       const message =
-        `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join('spec'))}. ` +
-        `Try ${f.cmdAlt('apimatic', 'api', 'transform')} to convert your spec to OpenAPI 3.x first.`;
+        `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join('spec'))}. ` + convertToOpenApi3();
       log.error(message);
       return;
     }
