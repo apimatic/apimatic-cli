@@ -10,9 +10,8 @@ import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
-import { BuildContext } from '../../../types/build-context.js';
+import { ProjectContext } from '../../../types/project-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
-import { removeQuotes } from '../../../utils/string-utils.js';
 
 export class SdkPublishInteractiveAction {
   private readonly prompts: SdkPublishInteractivePrompts = new SdkPublishInteractivePrompts();
@@ -32,12 +31,11 @@ export class SdkPublishInteractiveAction {
       await this.prompts.noInputDirectoryProvided();
       return ActionResult.cancelled();
     }
-    const sourceDirectory = workingDirectory.join('src');
+    const project = ProjectContext.in(workingDirectory);
 
-    const defaultSdkDirectory = workingDirectory.join('sdk');
     const sdkDirectory = await this.prompts.inputSdkDirectory(
-      defaultSdkDirectory,
-      SdkPublishInteractiveAction.sdkDirectoryValidator(sourceDirectory)
+      project.sdkDirectory(),
+      SdkPublishInteractiveAction.sdkDirectoryValidator(project)
     );
     if (!sdkDirectory) {
       await this.prompts.noSdkDirectoryProvided();
@@ -125,7 +123,7 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfileItem);
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
-      sourceDirectory,
+      project,
       sdkDirectory,
       language,
       publishTypes,
@@ -145,7 +143,7 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    await new RecordPublishedSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, version);
+    await new RecordPublishedSdkAction().execute(project, language, publishingProfile, publishTypes, version);
 
     return ActionResult.success();
   };
@@ -154,22 +152,16 @@ export class SdkPublishInteractiveAction {
     defaultProjectDirectory: DirectoryPath
   ): (value: string | undefined) => string | undefined {
     return (value) => {
-      if (!value) {
-        if (!new BuildContext(defaultProjectDirectory.join('src')).existsSync())
-          return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
-        return;
-      }
-      if (!new BuildContext(new DirectoryPath(removeQuotes(value.trim())).join('src')).existsSync())
+      const projectDirectory = value ? DirectoryPath.fromUserInput(value) : defaultProjectDirectory;
+      if (!ProjectContext.in(projectDirectory).sourceExistsSync())
         return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
     };
   }
 
-  public static sdkDirectoryValidator(
-    sourceDirectory: DirectoryPath
-  ): (value: string | undefined) => string | undefined {
+  public static sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
-      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(sourceDirectory))
+      if (project.isSourceDirectory(DirectoryPath.fromUserInput(value)))
         return 'SDK directory must be different from the src directory.';
     };
   }

@@ -45,12 +45,7 @@ export const LANGUAGE_NAMES: Readonly<Record<Language, string>> = {
   [Language.TYPESCRIPT]: 'TypeScript'
 };
 
-/**
- * The languages offered in the quickstart prompts, in display order.
- * Shared by the portal (multi-select) and SDK (single-select) flows so both
- * present the same list; the subscription's allowed languages decide which
- * are selectable.
- */
+/** In display order, which `UPCOMING_LANGUAGES` inherits. */
 export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
   Language.TYPESCRIPT,
   Language.RUBY,

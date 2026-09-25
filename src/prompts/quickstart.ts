@@ -4,7 +4,6 @@ import { UrlPath } from '../types/file/urlPath.js';
 import { format as f, getTree } from './format.js';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FilePath } from '../types/file/filePath.js';
-import { removeQuotes } from '../utils/string-utils.js';
 import { ServiceError } from '../infrastructure/service-error.js';
 import { Directory } from '../types/file/directory.js';
 import { createResourceInputFromInput, ResourceInput } from '../types/file/resource-input.js';
@@ -136,8 +135,7 @@ Let's get started!`);
       return undefined;
     }
 
-    const cleanedPath = removeQuotes((projectDirectory as string)?.trim() ?? '');
-    return new DirectoryPath(cleanedPath);
+    return DirectoryPath.fromUserInput(projectDirectory);
   }
 
   public projectDirectoryDoesNotExist(projectDirectory: DirectoryPath) {

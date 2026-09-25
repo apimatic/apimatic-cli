@@ -8,7 +8,9 @@ import { RecordPublishedSdkAction } from '../../../src/actions/sdk/record-publis
 import { RecordPublishedSdkPrompts } from '../../../src/prompts/sdk/record-published-sdk.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { ApimaticConfigContext } from '../../../src/types/apimatic-config-context.js';
-import { PluginIdentityData, PluginLanguages } from '../../../src/types/plugin/plugin-config.js';
+import { PluginLanguages } from '../../../src/types/apimatic-config/languages-block.js';
+import { PluginIdentityData } from '../../../src/types/plugin/plugin-config.js';
+import { ProjectContext } from '../../../src/types/project-context.js';
 import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
 import { SemVersion } from '../../../src/types/publish/version.js';
@@ -53,7 +55,13 @@ describe('RecordPublishedSdkAction', () => {
   const writtenPublishing = () => writtenConfig().languages.csharp?.publishing;
 
   const execute = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
-    action.execute(new DirectoryPath(sourceDirectory), Language.CSHARP, profile, publishTypes, VERSION);
+    action.execute(
+      ProjectContext.in(new DirectoryPath(path.dirname(sourceDirectory))),
+      Language.CSHARP,
+      profile,
+      publishTypes,
+      VERSION
+    );
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });

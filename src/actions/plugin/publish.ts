@@ -1,17 +1,14 @@
 import { PluginPublishPrompts } from '../../prompts/plugin/publish.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 
 export class PluginPublishAction {
   private readonly prompts: PluginPublishPrompts = new PluginPublishPrompts();
 
-  public readonly execute = async (
-    sourceDirectory: DirectoryPath,
-    pluginDirectory: DirectoryPath
-  ): Promise<ActionResult> => {
-    if (sourceDirectory.isEqual(pluginDirectory)) {
+  public readonly execute = async (project: ProjectContext, pluginDirectory: DirectoryPath): Promise<ActionResult> => {
+    if (project.isSourceDirectory(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
       return ActionResult.failed();
     }
@@ -22,14 +19,14 @@ export class PluginPublishAction {
       return ActionResult.failed();
     }
 
-    const configState = await new PluginConfigContext(sourceDirectory).getPluginConfigState();
+    const configState = await project.pluginConfig().getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     }
 
     if (configState.state === 'missing') {
-      this.prompts.pluginConfigMissing(sourceDirectory);
+      this.prompts.pluginConfigMissing(project.sourceDirectory());
       return ActionResult.failed();
     }
 

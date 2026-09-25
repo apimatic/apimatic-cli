@@ -1,17 +1,15 @@
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
-import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
-import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalProjectPaths } from '../../infrastructure/portal-project-service.js';
 import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalContext } from '../../types/portal-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 import { PreparePortalProjectAction } from './prepare-project.js';
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
-  private readonly authorizationService = new PortalAuthorizationService();
-  private readonly projectService = new PortalProjectService();
   private readonly buildService = new PortalBuildService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -24,47 +22,28 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     portalDirectory: DirectoryPath,
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
-    if (sourceDirectory.isEqual(portalDirectory)) {
+    if (project.isSourceDirectory(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
       return ActionResult.failed();
     }
 
     // The destination is emptied before the site is written, so a destination that holds
     // the source would delete the very files being built from.
-    if (portalDirectory.contains(sourceDirectory)) {
-      this.prompts.destinationContainsSource(sourceDirectory, portalDirectory);
-      return ActionResult.failed();
-    }
-
-    const runtimeProblem = this.projectService.runtimeProblem();
-    if (runtimeProblem !== null) {
-      this.prompts.runtimeUnsupported(runtimeProblem);
-      return ActionResult.failed();
-    }
-
-    const authorization = await this.authorizationService.authorize(
-      this.configDir,
-      this.commandMetadata.shell,
-      this.authKey
-    );
-    if (authorization.isErr()) {
-      this.prompts.authorizationFailed(authorization.error);
+    if (project.isSourceWithin(portalDirectory)) {
+      this.prompts.destinationContainsSource(project.sourceDirectory(), portalDirectory);
       return ActionResult.failed();
     }
 
     const portalContext = new PortalContext(portalDirectory);
-    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      sourceDirectory,
-      {
-        confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
-        onPrepared: (project) => this.build(project, portalContext, portalDirectory, zipPortal)
-      }
-    );
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+      confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
+      onPrepared: (portalProject) => this.build(portalProject, portalContext, portalDirectory, zipPortal)
+    });
   };
 
   private async confirmOverwrite(
@@ -80,12 +59,12 @@ export class GenerateAction {
   }
 
   private async build(
-    project: PortalProjectPaths,
+    portalProject: PortalProjectPaths,
     portalContext: PortalContext,
     portalDirectory: DirectoryPath,
     zipPortal: boolean
   ): Promise<ActionResult> {
-    const build = await this.prompts.buildPortal(this.buildService.build(project));
+    const build = await this.prompts.buildPortal(this.buildService.build(portalProject));
 
     if (build.isErr()) {
       // Written before the temp directory is removed, so the log outlives the build.

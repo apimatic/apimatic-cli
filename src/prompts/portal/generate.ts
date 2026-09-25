@@ -1,13 +1,11 @@
 import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
-import { PortalSaveProblem } from '../../types/portal-context.js';
+import { NOT_FOUND_FILE_NAME, PortalSaveProblem, ZIP_FILE_NAME } from '../../types/portal-context.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
-import { reportAuthorizationFailure } from './authorization.js';
 
 function describeSaveProblem(problem: PortalSaveProblem): string {
   switch (problem.kind) {
@@ -55,14 +53,6 @@ export class PortalGeneratePrompts {
     log.error(message);
   }
 
-  public authorizationFailed(failure: PortalAuthorizationFailure) {
-    reportAuthorizationFailure(failure);
-  }
-
-  public runtimeUnsupported(reason: string) {
-    log.error(reason);
-  }
-
   /**
    * A portal build runs for tens of seconds with no output of its own, so the spinner
    * carries an elapsed timer rather than a static message.
@@ -99,10 +89,10 @@ export class PortalGeneratePrompts {
 
   public nextSteps(portal: DirectoryPath, zipped: boolean) {
     const message = zipped
-      ? `Unpack ${f.var('portal.zip')} in ${f.path(portal)} onto any static host.\n` +
-        `Configure ${f.var('404.html')} as the error document so deep links resolve.`
+      ? `Unpack ${f.var(ZIP_FILE_NAME)} in ${f.path(portal)} onto any static host.\n` +
+        `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`
       : `Upload the contents of ${f.path(portal)} to any static host.\n` +
-        `Configure ${f.var('404.html')} as the error document so deep links resolve.`;
+        `Configure ${f.var(NOT_FOUND_FILE_NAME)} as the error document so deep links resolve.`;
     noteWrapped(message, 'Next steps');
   }
 }

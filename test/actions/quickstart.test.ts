@@ -20,7 +20,7 @@ import { completeArtifacts } from './portal/prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
 const SPEC = new FilePath(
-  new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/spec'),
+  new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src/spec'),
   new FileName('Apimatic-Calculator.json')
 );
 
@@ -51,7 +51,7 @@ describe('QuickstartAction', () => {
     sinon.stub(ApiValidatePrompts.prototype, 'validateApi').callsFake((fn) => fn);
     sinon
       .stub(ValidationService.prototype, 'validateViaFile')
-      .resolves(ok({ result: { validation: PASSED, linting: PASSED }, unallowedFeatures: null } as never));
+      .resolves(ok({ validation: PASSED, linting: PASSED } as never));
     runtimeProblem = sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null);
     authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
   });
@@ -156,7 +156,7 @@ describe('QuickstartAction', () => {
     it('does not offer the sample when the specification it found fails validation', async () => {
       const failed = { isSuccess: false, blocking: [], errors: ['bad'], warnings: [], information: [] };
       (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
-        ok({ result: { validation: failed, linting: PASSED }, unallowedFeatures: null } as never)
+        ok({ validation: failed, linting: PASSED } as never)
       );
 
       expect((await execute(downloaded)).isCancelled()).to.be.true;

@@ -1,4 +1,4 @@
-import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
+import { recordedPublishing } from '../apimatic-config/languages-block.js';
 import { UrlPath } from '../file/urlPath.js';
 import { Language } from '../sdk/generate.js';
 import { PublishedPackage, publishedPackage } from './published-package.js';
@@ -18,16 +18,14 @@ export class PortalSdk {
 
   /** The document checked the shapes down to `publishing`; a wrongly shaped field below it reads as not recorded. */
   public static fromEntry(language: Language, entry: unknown): PortalSdk {
-    const publishing = objectAt(entry, 'publishing');
-    const repositoryUrl = objectAt(publishing, 'source').repositoryUrl;
-    const version = objectAt(publishing, 'package').version;
-    const released = typeof version === 'string' && version.trim().length > 0;
-    const listed = released ? publishedPackage(language, objectAt(publishing, 'packageConfiguration')) : null;
+    const { repositoryUrl, version, packageConfiguration } = recordedPublishing(entry);
+    const releasedVersion = version?.trim() ?? '';
+    const listed = releasedVersion.length > 0 ? publishedPackage(language, packageConfiguration) : null;
 
     return new PortalSdk(
       language,
-      typeof repositoryUrl === 'string' ? UrlPath.create(repositoryUrl) ?? null : null,
-      released && listed !== null ? { version: version.trim(), package: listed } : null
+      repositoryUrl === null ? null : UrlPath.create(repositoryUrl) ?? null,
+      listed === null ? null : { version: releasedVersion, package: listed }
     );
   }
 
@@ -39,9 +37,4 @@ export class PortalSdk {
   public release(): SdkRelease | null {
     return this.published;
   }
-}
-
-function objectAt(value: unknown, key: string): JsonObject {
-  const found = isJsonObject(value) ? value[key] : undefined;
-  return isJsonObject(found) ? found : {};
 }

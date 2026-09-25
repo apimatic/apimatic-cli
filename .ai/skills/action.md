@@ -102,7 +102,7 @@ Use when creating a new Action class. Choose the variant that matches the action
 5. **Needs auth** — whether the action receives `authKey: string | null = null`
 6. **Needs services** — which infrastructure services are used (e.g., `PortalService`, `ValidationService`)
 7. **Needs temp directory** — whether to wrap logic in `withDirPath()`
-8. **Needs Context objects** — which contexts are used (e.g., `BuildContext`, `TempContext`, `ResourceContext`)
+8. **Needs Context objects** — which contexts are used (e.g., `ProjectContext`, `TempContext`, `ResourceContext`)
 9. **Prompts class** — the paired Prompts class name and import path
 10. **Execute parameters** — typed parameters the execute method receives from the Command layer
 
@@ -124,7 +124,7 @@ import { withDirPath } from "../../infrastructure/tmp-extensions.js";
 // If context objects needed:
 // import { ResourceContext } from "../../types/resource-context.js";
 // import { TempContext } from "../../types/temp-context.js";
-// import { BuildContext } from "../../types/build-context.js";
+// import { ProjectContext } from "../../types/project-context.js";
 // If services needed:
 // import { {ServiceName} } from "../../infrastructure/services/{service-file}.js";
 // If ResourceInput parameter:
@@ -157,9 +157,8 @@ export class {PascalName}Action {
     */
   ): Promise<ActionResult> => {
     // 1. Input validation via Context objects
-    //    const buildContext = new BuildContext(sourceDirectory);
-    //    if (!(await buildContext.validate())) {
-    //      this.prompts.invalidSourceDirectory(sourceDirectory);
+    //    if (!(await project.sourceExists())) {
+    //      this.prompts.invalidSourceDirectory(project.sourceDirectory());
     //      return ActionResult.failed();
     //    }
 

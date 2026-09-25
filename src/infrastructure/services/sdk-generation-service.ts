@@ -16,19 +16,9 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { err, ok, Result } from 'neverthrow';
 import { Language, Stability } from '../../types/sdk/generate.js';
 import { handleServiceError, ServiceError } from '../service-error.js';
-import { GENERATION_TIMEOUT_MS, pollUntilCompleted, STATUS_POLL_INTERVAL_MS } from '../generation-status-poller.js';
+import { GenerationTimings, pollUntilCompleted, TIMING_DEFAULTS } from '../generation-status-poller.js';
 import { envInfo } from '../env-info.js';
-import { REQUEST_TIMEOUT_MS } from '../../config/axios-config.js';
 import { GenerationStatusResponse } from '../../types/api/generation-status.js';
-
-const TIMING_DEFAULTS = {
-  pollIntervalMs: STATUS_POLL_INTERVAL_MS,
-  generationTimeoutMs: GENERATION_TIMEOUT_MS,
-  requestTimeoutMs: REQUEST_TIMEOUT_MS
-};
-
-/** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
-export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
 export class SdkGenerationService {
   private readonly CONTENT_TYPE = ContentType.EnumMultipartformdata;

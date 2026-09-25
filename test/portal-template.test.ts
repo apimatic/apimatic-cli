@@ -6,10 +6,12 @@ import { expect } from 'chai';
 import {
   COPIED_DEPENDENCIES,
   LINKED_DEPENDENCIES,
+  PortalBuildPaths,
   TEMPLATE_DEPENDENCIES
 } from '../src/infrastructure/portal-project-service';
 import { GENERATED_DIRECTORY_NAME, PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
 import { PortalIdentity } from '../src/types/portal/portal-config';
+import type { BuildPaths } from '../portal-template/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
 
 /** True only when the two types are identical, every nested field and union member included. */
@@ -167,8 +169,10 @@ describe('portal template packaging', () => {
   // missing it. The compiler checks this when `pretest` runs; the assertion only reports it.
   it('declares exactly what the CLI writes for it', () => {
     const identity: Equal<Portal, PortalIdentity> = true;
+    const paths: Equal<BuildPaths, PortalBuildPaths> = true;
 
     expect(identity).to.equal(true);
+    expect(paths).to.equal(true);
   });
 
   // The CLI writes these into the prepared project; a copy in the template would be a second

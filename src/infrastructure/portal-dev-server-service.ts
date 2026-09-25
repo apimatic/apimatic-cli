@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { stripVTControlCharacters } from 'node:util';
 import { sleep } from './timer-extensions.js';
 import { execa, ResultPromise } from 'execa';
 import { err, ok, Result } from 'neverthrow';
@@ -18,14 +19,8 @@ const OUTPUT_TAIL_BYTES = 64 * 1024;
 /** How long the last of a dead server's output is waited for before reporting what arrived. */
 const DRAIN_TIMEOUT_MS = 2000;
 
-// Vite bolds the port inside the URL, so colour codes have to come out before this reads as
-// one address. The trailing newline proves the line is whole, not a half-delivered chunk.
+// Read after Vite's colour codes are stripped but not the line end, which proves the URL arrived whole.
 const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)\/?[ \t]*[\r\n]/i;
-
-// Colour sequences only: `stripAnsi` in utils also drops the newline that marks the end of
-// the line the URL is printed on. Built from a code point to keep the escape character from
-// appearing literally in this source.
-const COLOUR_SEQUENCE_PATTERN = new RegExp(String.raw`${String.fromCodePoint(27)}\[[0-9;]*[a-zA-Z]`, 'g');
 
 export interface PortalDevServer {
   url: UrlPath;
@@ -92,7 +87,7 @@ export class PortalDevServerService {
     let kept = 0;
     const output = subprocess.all;
     output?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString().replace(COLOUR_SEQUENCE_PATTERN, '');
+      const text = stripVTControlCharacters(chunk.toString());
       tail.push(text);
       kept += text.length;
       // The last chunk always survives, however big: it most likely holds the exit message.
@@ -134,7 +129,7 @@ export class PortalDevServerService {
       let settled = false;
 
       const onData = (chunk: Buffer) => {
-        log += chunk.toString().replace(COLOUR_SEQUENCE_PATTERN, '');
+        log += stripVTControlCharacters(chunk.toString());
         const match = LOCAL_URL_PATTERN.exec(log);
         if (match) {
           settle(ok(new UrlPath(match[1])));

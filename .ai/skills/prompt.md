@@ -16,7 +16,7 @@ Prompts live at `src/prompts/` and are the sole terminal UI layer for each comma
 - **DO** return `undefined` from `select`, `text`, and `multiselect` methods on cancel.
 - **DO** use `confirm({ message: "...", initialValue: false })` for overwrite/destructive confirmations.
 - **DO** use format helpers for all dynamic content: `f.var("name")` for variables, `f.path(dir)` for paths, `f.link(url)` for URLs.
-- **DO** use `log.error()` for errors, `log.info()` for success/info, `log.warning()` for warnings, `log.message()` for multi-line output, `log.step()` for step markers.
+- **DO** use `log.error()` for errors, `log.info()` for success/info, `log.warn()` for warnings, `log.message()` for multi-line output, `log.step()` for step markers.
 - **DO** use `noteWrapped(message, title)` from `../prompt.js` for multi-line notes (e.g., next steps).
 - **DO** use `getTree()` from `../format.js` when displaying directory structures.
 - **DO** name spinner methods after their operation, matching the paired service call (e.g., `generatePortal(fn)`, `validateApi(fn)`).

@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { buildLanguageEntry } from '../../../src/types/plugin/language-entry';
+import { buildLanguageEntry } from '../../../src/types/apimatic-config/languages-block';
 import {
   CSharpPackageConfiguration,
   GitConfiguration,

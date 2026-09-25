@@ -2,7 +2,6 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { err, ok, Result } from 'neverthrow';
 import { AuthInfo, getAuthInfo } from '../../client-utils/auth-manager.js';
-import { REQUEST_TIMEOUT_MS } from '../../config/axios-config.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -14,22 +13,13 @@ import {
 import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import {
-  GENERATION_TIMEOUT_MS,
+  GenerationTimings,
   pollUntilCompleted,
-  STATUS_POLL_INTERVAL_MS,
+  TIMING_DEFAULTS,
   ValidationErrorFormatter
 } from '../generation-status-poller.js';
 import { FileService } from '../file-service.js';
 import { mapRequestError, mapTransportError, ServiceError } from '../service-error.js';
-
-const TIMING_DEFAULTS = {
-  pollIntervalMs: STATUS_POLL_INTERVAL_MS,
-  generationTimeoutMs: GENERATION_TIMEOUT_MS,
-  requestTimeoutMs: REQUEST_TIMEOUT_MS
-};
-
-/** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
-export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
 export class PluginService {
   private readonly apiBaseUrl = 'https://api.apimatic.io' as const;

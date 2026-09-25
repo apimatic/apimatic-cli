@@ -20,6 +20,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 ### Encapsulation — DON'T
 
 - **DON'T** expose internal paths as public getters — no `public get outputDirectory()` or `public get filePath()`. If a caller needs a path, it should come as a return value from an operation.
+  - The one exception: a context whose domain *is* a layout may answer with a directory it **derives**, for a prompt that names it or a service that works on it. Checks against that directory stay in the context (`isSourceDirectory()`, `isSourceWithin()`). `ProjectContext` answers `sourceDirectory()` and its output directories, never the project directory it was made from.
 - **DON'T** return raw config objects — don't return parsed JSON/YAML for callers to manipulate directly. Wrap reads/writes in domain methods (e.g., `getCopilotConfig()` instead of `getBuildFileContents()`).
 - **DON'T** expose derived file names — methods like `getScriptFileName()` leak internal naming logic.
 - **DON'T** add public properties for internal state — constructor parameters are `private readonly`, not exposed.
@@ -82,7 +83,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 | Input context (validate + file ops) | `src/types/spec-context.ts` | Good — zip detection internal |
 | Temp context (zip + save stream) | `src/types/temp-context.ts` | Good — UUID naming internal |
 | Temp context (download + resolve) | `src/types/resource-context.ts` | Good — URL/file decision internal |
-| Composite (delegates to other contexts) | `src/types/build-context.ts` | Good — hands back a SpecContext, not a path |
+| Composite (delegates to other contexts) | `src/types/project-context.ts` | Good — hands back `PortalSourceContext`, `PluginConfigContext` and `SdkContext`; knows the layout so no caller joins `src` |
 | Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory`, has methods that only use infrastructure services without touching domain state |
 | Input context (validate + typed result) | `src/types/portal-source-context.ts` | Good — reports problems, exposes no paths |
 

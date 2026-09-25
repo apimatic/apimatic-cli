@@ -7,6 +7,8 @@ import { Directory } from './file/directory.js';
 import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
+import { NOT_FOUND_FILE_NAME, SHELL_FILE_NAME } from './portal-context.js';
+import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from './project-layout.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
 import { AcceptedContent, ContentFile, ContentTree } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
@@ -42,14 +44,10 @@ const GENERATED_ROOT_FILES = [
   'llms.txt',
   'llms-full.txt',
   'index.html',
-  '404.html',
-  '_shell.html'
+  NOT_FOUND_FILE_NAME,
+  SHELL_FILE_NAME
 ];
 
-/**
- * The `src/` directory of a portal project: the `portal` block of `apimatic.json`, the OpenAPI
- * documents in `spec/`, and the optional `content/` and `static/` directories.
- */
 export class PortalSourceContext {
   private readonly fileService = new FileService();
   private readonly configContext: ApimaticConfigContext;
@@ -59,15 +57,15 @@ export class PortalSourceContext {
   }
 
   private get specDirectory(): DirectoryPath {
-    return this.sourceDirectory.join('spec');
+    return this.sourceDirectory.join(SPEC_DIRECTORY_NAME);
   }
 
   private get contentDirectory(): DirectoryPath {
-    return this.sourceDirectory.join('content');
+    return this.sourceDirectory.join(CONTENT_DIRECTORY_NAME);
   }
 
   private get staticDirectory(): DirectoryPath {
-    return this.sourceDirectory.join('static');
+    return this.sourceDirectory.join(STATIC_DIRECTORY_NAME);
   }
 
   /** Reads and validates the whole source directory, or reports the first problem found. */

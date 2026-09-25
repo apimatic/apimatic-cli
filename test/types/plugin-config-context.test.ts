@@ -4,7 +4,8 @@ import path from 'path';
 import { expect } from 'chai';
 import { PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { LanguagePublishingEntry, PluginIdentityData, PluginLanguages } from '../../src/types/plugin/plugin-config';
+import { LanguagePublishingEntry, PluginLanguages } from '../../src/types/apimatic-config/languages-block';
+import { PluginIdentityData } from '../../src/types/plugin/plugin-config';
 import { CSharpPackageConfiguration } from '../../src/types/publish/package-settings-configuration';
 import { Language } from '../../src/types/sdk/generate';
 

@@ -3,6 +3,7 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
+import { SHELL_FILE_NAME } from '../types/portal-context.js';
 import { FileService } from './file-service.js';
 import { PortalProjectPaths, PortalProjectService } from './portal-project-service.js';
 
@@ -17,9 +18,6 @@ export interface PortalBuildResult {
   output: DirectoryPath;
   pageCount: number;
 }
-
-/** The SPA shell is emitted even when nothing else is; on its own it means a failed build. */
-const SHELL_FILE = '_shell.html';
 
 export class PortalBuildService {
   private readonly fileService = new FileService();
@@ -62,7 +60,7 @@ export class PortalBuildService {
   private async countPages(output: DirectoryPath): Promise<number | null> {
     try {
       const directory = await this.fileService.getDirectory(output);
-      const isPage = (file: FilePath) => file.name().hasExtension('.html') && !file.name().is(SHELL_FILE);
+      const isPage = (file: FilePath) => file.name().hasExtension('.html') && !file.name().is(SHELL_FILE_NAME);
       return directory.getAllFiles().filter(isPage).length;
     } catch {
       return null;

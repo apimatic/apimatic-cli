@@ -3,27 +3,25 @@ import { once } from 'node:events';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
-import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
+import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
 import { ContentProblem, PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
-import { reportAuthorizationFailure } from './authorization.js';
 import { describeMissingArtifacts } from './artifacts.js';
-import { reportContentNotices, reportContentProblems, reportSourceProblem } from './source.js';
+import {
+  contentPath,
+  reportContentNotices,
+  reportContentProblems,
+  reportSourceProblem,
+  specPath,
+  staticPath
+} from './source.js';
 
 export class PortalServePrompts {
-  public authorizationFailed(failure: PortalAuthorizationFailure) {
-    reportAuthorizationFailure(failure);
-  }
-
-  public runtimeUnsupported(reason: string) {
-    log.error(reason);
-  }
-
   public usingFallbackPort(requestedPort: number, availablePort: number) {
     const message =
       `Port ${f.var(requestedPort.toString())} is already in use. ` +
@@ -49,22 +47,18 @@ export class PortalServePrompts {
     log.message(`The portal is running at ${f.link(url.toString())}`);
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order, tabs and ` +
-          `titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
-            'apimatic.json'
-          )} appear in the browser automatically, and so does a language removed from its ${f.var(
-            'languages'
-          )} block, which updates the SDK pages, or its ${f.var(
-            'plugin'
-          )} block removed, which removes the Context Plugin tab. A mistake in ${f.var(
-            'apimatic.json'
-          )}, a page or a ${f.var('nav.json')} is reported when you save it, and the preview keeps what it ` +
+        `Edits to the Markdown pages in ${contentPath(sourceDirectory)}, to the order, tabs and titles in a ` +
+          `${f.var(NAVIGATION_FILE_NAME)}, and to the ${f.var('portal')} block of ` +
+          `${f.var(APIMATIC_CONFIG_FILE_NAME)} appear in the browser automatically, and so does a language ` +
+          `removed from its ${f.var('languages')} block, which updates the SDK pages, or its ${f.var('plugin')} ` +
+          `block removed, which removes the Context Plugin tab. A mistake in ${f.var(APIMATIC_CONFIG_FILE_NAME)}, ` +
+          `a page or a ${f.var(NAVIGATION_FILE_NAME)} is reported when you save it, and the preview keeps what it ` +
           `last accepted.`,
         '',
         `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
-          `starts, adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
-            sourceDirectory.join('static')
-          )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+          `starts, adding or removing a page in ${contentPath(sourceDirectory)}, creating ` +
+          `${staticPath(sourceDirectory)}, or changing which documents are in ${specPath(sourceDirectory)} ` +
+          `needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
@@ -98,7 +92,7 @@ export class PortalServePrompts {
   /** Vite reads its public directory once, and a missing one is served as none. */
   public staticDirectoryNotServed(sourceDirectory: DirectoryPath) {
     const message =
-      `${f.path(sourceDirectory.join('static'))} did not exist when the preview started, so the files ` +
+      `${staticPath(sourceDirectory)} did not exist when the preview started, so the files ` +
       `in it are not served. Restart the preview to show them.`;
     log.warn(message);
   }
@@ -120,23 +114,21 @@ export class PortalServePrompts {
   public contentRejected(problems: ContentProblem[], sourceDirectory: DirectoryPath) {
     reportContentProblems(problems, sourceDirectory);
     log.message(
-      `The preview keeps showing what it last accepted until ${f.path(sourceDirectory.join('content'))} is ` +
+      `The preview keeps showing what it last accepted until ${contentPath(sourceDirectory)} is ` +
         `fixed; a build would stop here.`
     );
   }
 
   public contentNotApplied(reason: string, sourceDirectory: DirectoryPath) {
-    log.warn(
-      `The changes to ${f.path(sourceDirectory.join('content'))} could not be applied to the preview: ${reason}`
-    );
+    log.warn(`The changes to ${contentPath(sourceDirectory)} could not be applied to the preview: ${reason}`);
   }
 
   public contentNotChecked(reason: string, sourceDirectory: DirectoryPath) {
-    log.warn(`The changes to ${f.path(sourceDirectory.join('content'))} could not be checked: ${reason}`);
+    log.warn(`The changes to ${contentPath(sourceDirectory)} could not be checked: ${reason}`);
   }
 
   public contentAccepted(sourceDirectory: DirectoryPath) {
-    log.success(`${f.path(sourceDirectory.join('content'))} is fixed; a build would accept it again.`);
+    log.success(`${contentPath(sourceDirectory)} is fixed; a build would accept it again.`);
   }
 
   public contentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath) {
@@ -145,15 +137,15 @@ export class PortalServePrompts {
 
   public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {
     log.warn(
-      `${f.path(sourceDirectory.join('content'))} cannot be watched (${reason}), so a mistake in a page or a ` +
-        `${f.var('nav.json')} is only reported when the preview is restarted.`
+      `${contentPath(sourceDirectory)} cannot be watched (${reason}), so a mistake in a page or a ` +
+        `${f.var(NAVIGATION_FILE_NAME)} is only reported when the preview is restarted.`
     );
   }
 
   public contentWatchFailed(reason: string, sourceDirectory: DirectoryPath) {
     log.warn(
-      `${f.path(sourceDirectory.join('content'))} is no longer watched (${reason}), so a mistake in a page or ` +
-        `a ${f.var('nav.json')} is only reported when the preview is restarted.`
+      `${contentPath(sourceDirectory)} is no longer watched (${reason}), so a mistake in a page or ` +
+        `a ${f.var(NAVIGATION_FILE_NAME)} is only reported when the preview is restarted.`
     );
   }
 

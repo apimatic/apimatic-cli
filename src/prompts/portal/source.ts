@@ -3,6 +3,7 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
+import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
   PortalSourceProblem,
@@ -12,9 +13,20 @@ import {
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from '../../types/project-layout.js';
 import { format as f } from '../format.js';
 
 const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
+
+const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
+
+export const specPath = (sourceDirectory: DirectoryPath): string => f.path(sourceDirectory.join(SPEC_DIRECTORY_NAME));
+
+export const contentPath = (sourceDirectory: DirectoryPath): string =>
+  f.path(sourceDirectory.join(CONTENT_DIRECTORY_NAME));
+
+export const staticPath = (sourceDirectory: DirectoryPath): string =>
+  f.path(sourceDirectory.join(STATIC_DIRECTORY_NAME));
 
 // Quickstart refuses a spec for the same reason, and has to point at the same fix.
 export const convertToOpenApi3 = (): string =>
@@ -87,14 +99,13 @@ export function reportSourceProblem(
     }
     case 'emptySpecDirectory': {
       const message =
-        `${f.path(sourceDirectory.join('spec'))} has no files. Add your OpenAPI 3.x document to it as a ` +
+        `${specPath(sourceDirectory)} has no files. Add your OpenAPI 3.x document to it as a ` +
         `${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
       log.error(message);
       return;
     }
     case 'noOpenApiSpec': {
-      const message =
-        `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join('spec'))}. ` + convertToOpenApi3();
+      const message = `No OpenAPI 3.x document found in ${specPath(sourceDirectory)}. ` + convertToOpenApi3();
       log.error(message);
       return;
     }
@@ -112,7 +123,7 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
   switch (problem.kind) {
     case 'unreadableContent': {
       log.error(
-        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
+        `${contentPath(sourceDirectory)} could not be read. Check that it and every ` +
           `directory beneath it can be listed.`
       );
       return;
@@ -201,7 +212,9 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   const verb = files.length === 1 ? 'is' : 'are';
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
-  log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
+  log.warn(
+    `${names} ${verb} not read. Only a file named ${f.var(NAVIGATION_FILE_NAME)}, in lower case, orders the pages.`
+  );
 }
 
 export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
@@ -216,7 +229,7 @@ export function reportFolderTabs(folders: DirectoryPath[]): void {
     return;
   }
   const names = listedInProse(folders.map((folder) => f.var(folder.leafName())));
-  log.info(`${f.var('content/nav.json')} makes a tab of each folder it lists: ${names}.`);
+  log.info(`${f.var(ROOT_NAVIGATION_FILE)} makes a tab of each folder it lists: ${names}.`);
 }
 
 export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath): void {
@@ -244,9 +257,9 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   log.warn('More than one tab has the same name, or one that differs only in case, so readers cannot tell them apart:');
   log.message(shared.map(({ tabs }) => `  • ${spellings(tabs)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
   log.message(
-    `Rename all but one tab of each name with a ${f.var('title')} in its folder's ${f.var('nav.json')}, or in ` +
-      `${f.var('content/nav.json')} for the Home tab; the tabs of the SDK pages and the context plugin keep ` +
-      `their names.`
+    `Rename all but one tab of each name with a ${f.var('title')} in its folder's ` +
+      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the tabs of the ` +
+      `SDK pages and the context plugin keep their names.`
   );
 }
 

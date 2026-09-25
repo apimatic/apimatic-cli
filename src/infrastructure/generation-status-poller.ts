@@ -1,16 +1,17 @@
 import { Status } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
+import { REQUEST_TIMEOUT_MS } from '../config/axios-config.js';
 import { ServiceError } from './service-error.js';
 import { sleep } from './timer-extensions.js';
 
-export const STATUS_POLL_INTERVAL_MS = 3000;
+export const TIMING_DEFAULTS = {
+  pollIntervalMs: 3000,
+  // Past `/portal-artifacts`' own 25-minute limit, so the user reads the server's overrun message.
+  generationTimeoutMs: 30 * 60 * 1000,
+  requestTimeoutMs: REQUEST_TIMEOUT_MS
+};
 
-/**
- * Set well clear of any plausible run: it exists to end a generation that is stuck, not to
- * cap a slow one. No duration data exists for real runs, so this is the number to revisit
- * if a legitimate generation ever reports a timeout.
- */
-export const GENERATION_TIMEOUT_MS = 30 * 60 * 1000;
+export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
 export interface GenerationStatus {
   status: string;

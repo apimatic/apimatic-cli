@@ -1,4 +1,5 @@
 import { UrlPath } from '../file/urlPath.js';
+import { PackageConfigurationForLanguage } from '../publish/package-settings-configuration.js';
 import { Language } from '../sdk/generate.js';
 
 /** A released SDK package, as its public registry lists it. */
@@ -8,15 +9,14 @@ export interface PublishedPackage {
   url: UrlPath;
 }
 
-interface PackageRegistry {
+interface PackageRegistry<L extends Language> {
   name: string;
-  /** The `packageConfiguration` field that holds the package's name. */
-  nameField: string;
+  nameField: keyof PackageConfigurationForLanguage[L] & string;
   address: (packageName: string) => string;
 }
 
 // The public registry of each language the portal supports; a private one is not told apart.
-const REGISTRIES: Partial<Record<Language, PackageRegistry>> = {
+const REGISTRIES: { [L in Language]?: PackageRegistry<L> } = {
   [Language.TYPESCRIPT]: {
     name: 'npm',
     nameField: 'name',

@@ -11,7 +11,7 @@ import { ActionResult } from '../../action-result.js';
 import { getDownloadsDirectory } from '../../../infrastructure/os-extensions.js';
 import { SemVersion } from '../../../types/publish/version.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
-import { BuildContext } from '../../../types/build-context.js';
+import { ProjectContext } from '../../../types/project-context.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { FileService } from '../../../infrastructure/file-service.js';
@@ -24,7 +24,7 @@ export class SdkPublishNonInteractiveAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     sdkDirectory: DirectoryPath,
     language: Language,
     publishTypes: PublishType[],
@@ -35,14 +35,13 @@ export class SdkPublishNonInteractiveAction {
     profileId?: string,
     version?: string
   ): Promise<ActionResult> => {
-    if (sourceDirectory.isEqual(sdkDirectory)) {
+    if (project.isSourceDirectory(sdkDirectory)) {
       this.prompts.directoryCannotBeSame(sdkDirectory);
       return ActionResult.failed();
     }
 
-    const buildContext = new BuildContext(sourceDirectory);
-    if (!(await buildContext.exists())) {
-      this.prompts.sourceDirectoryDoesNotExist(sourceDirectory);
+    if (!(await project.sourceExists())) {
+      this.prompts.sourceDirectoryDoesNotExist(project.sourceDirectory());
       return ActionResult.failed();
     }
 
@@ -118,7 +117,7 @@ export class SdkPublishNonInteractiveAction {
       ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))
       : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
-      sourceDirectory,
+      project,
       outputDir,
       language,
       publishTypes,
@@ -142,13 +141,7 @@ export class SdkPublishNonInteractiveAction {
     if (dryRun) {
       this.prompts.dryRunPluginConfigNotice();
     } else {
-      await new RecordPublishedSdkAction().execute(
-        sourceDirectory,
-        language,
-        publishingProfile,
-        publishTypes,
-        semVersion
-      );
+      await new RecordPublishedSdkAction().execute(project, language, publishingProfile, publishTypes, semVersion);
     }
 
     return ActionResult.success();

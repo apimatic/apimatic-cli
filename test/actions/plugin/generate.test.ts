@@ -21,6 +21,7 @@ import { ZipService } from '../../../src/infrastructure/zip-service.js';
 import { FileService } from '../../../src/infrastructure/file-service.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 import { PublishingApiService } from '../../../src/infrastructure/services/publishing-api-service.js';
+import { ProjectContext } from '../../../src/types/project-context.js';
 import { Language } from '../../../src/types/sdk/generate.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -50,8 +51,9 @@ describe('PluginGenerateAction', () => {
   /** The config the service actually reads: the copy, not the user's file. */
   const uploadedConfig = () => JSON.parse(uploaded['apimatic.json']);
 
-  const execute = (force = false) =>
-    action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(pluginDirectory), force);
+  const project = () => ProjectContext.in(new DirectoryPath(path.dirname(sourceDirectory)));
+
+  const execute = (force = false) => action.execute(project(), new DirectoryPath(pluginDirectory), force);
 
   // The action expands what the service returns, so the stubbed payload has to be a genuine zip.
   // The upload is read while the stub runs: the temporary directory it sits in is gone once the
@@ -107,7 +109,7 @@ describe('PluginGenerateAction', () => {
     it('fails when the build and plugin directories are the same', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
-      const result = await action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(sourceDirectory), false);
+      const result = await action.execute(project(), new DirectoryPath(sourceDirectory), false);
 
       expect(result.isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;

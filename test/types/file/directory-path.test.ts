@@ -29,3 +29,16 @@ describe('DirectoryPath.relativeTo', () => {
     expect(base.relativeTo(base)).to.equal(base.toString());
   });
 });
+
+describe('DirectoryPath.fromUserInput', () => {
+  const typed = path.join('/', 'projects', 'petstore api');
+
+  it('reads the path out of the quotes and spaces around it', () => {
+    expect(DirectoryPath.fromUserInput(`  "${typed}" `).toString()).to.equal(path.resolve(typed));
+    expect(DirectoryPath.fromUserInput(`'${typed}'`).toString()).to.equal(path.resolve(typed));
+  });
+
+  it('reads an unquoted path as it is', () => {
+    expect(DirectoryPath.fromUserInput(typed).toString()).to.equal(path.resolve(typed));
+  });
+});

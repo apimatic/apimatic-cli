@@ -72,6 +72,16 @@ export interface PortalProjectPaths {
   viteBinary: FilePath;
 }
 
+/** `portal.config.json`, which the template reads as `BuildPaths`; a test holds the two to one shape. */
+export interface PortalBuildPaths {
+  specs: Record<string, string>;
+  codeSamples: string | null;
+  contentDir: string;
+  generatedDir: string;
+  staticDir: string | null;
+  downloadsDir: string | null;
+}
+
 /**
  * Prepares the throwaway Vite project that both `portal generate` and `portal serve` run.
  * The project points at the user's `src/` by absolute path, but for a copy of `content/` that
@@ -274,7 +284,7 @@ export class PortalProjectService {
 
     // Everything here addresses this machine, so it stays behind `portal.server.ts` and the
     // build's own config files.
-    const configuration = {
+    const configuration: PortalBuildPaths = {
       specs,
       codeSamples: codeSamples === null ? null : this.toPosix(codeSamples.toString()),
       contentDir: this.toPosix(contentDirectory.toString()),

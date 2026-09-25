@@ -6,10 +6,13 @@ import { FileName } from './file/fileName.js';
 import { ZipService } from '../infrastructure/zip-service.js';
 import { errorMessage } from '../utils/error-utils.js';
 
-/** Emitted by the SPA build; also serves as the not-found page on static hosts. */
-const SHELL_FILE = new FileName('_shell.html');
-const NOT_FOUND_FILE = new FileName('404.html');
-const ZIP_FILE = new FileName('portal.zip');
+/** Emitted even by a failed build, so it never counts as a page. */
+export const SHELL_FILE_NAME = '_shell.html';
+
+export const NOT_FOUND_FILE_NAME = '404.html';
+
+export const ZIP_FILE_NAME = 'portal.zip';
+
 const STAGING_DIRECTORY = '.apimatic-staging';
 
 /**
@@ -56,7 +59,7 @@ export class PortalContext {
       await this.addNotFoundPage(builtDirectory);
       await this.fileService.cleanDirectory(this.stagingDirectory);
       if (asZip) {
-        await this.zipService.archive(builtDirectory, new FilePath(this.stagingDirectory, ZIP_FILE));
+        await this.zipService.archive(builtDirectory, new FilePath(this.stagingDirectory, new FileName(ZIP_FILE_NAME)));
       } else {
         await this.fileService.copyDirectoryContents(builtDirectory, this.stagingDirectory);
       }
@@ -91,11 +94,10 @@ export class PortalContext {
     }
   }
 
-  // Static hosts serve this for any unknown path; the SPA shell then routes it client-side.
   private async addNotFoundPage(builtDirectory: DirectoryPath) {
-    const shell = new FilePath(builtDirectory, SHELL_FILE);
+    const shell = new FilePath(builtDirectory, new FileName(SHELL_FILE_NAME));
     if (await this.fileService.fileExists(shell)) {
-      await this.fileService.copy(shell, new FilePath(builtDirectory, NOT_FOUND_FILE));
+      await this.fileService.copy(shell, new FilePath(builtDirectory, new FileName(NOT_FOUND_FILE_NAME)));
     }
   }
 }
