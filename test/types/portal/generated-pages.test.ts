@@ -1,10 +1,19 @@
+import { posix } from 'node:path';
 import { expect } from 'chai';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
 import { CodeSampleCatalogs } from '../../../src/types/portal/code-samples';
-import { GeneratedPages, PLUGIN_SECTION, PluginSource, SDK_SECTION } from '../../../src/types/portal/generated-pages';
+import {
+  GENERATED_DIRECTORY_NAME,
+  GeneratedPages,
+  PLUGIN_SECTION,
+  PluginSource,
+  SDK_SECTION
+} from '../../../src/types/portal/generated-pages';
+import { sdkDocsPath } from '../../../src/types/portal/page-fragments';
+import { PageRecord } from '../../../src/types/portal/page-template';
 import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { Language, LANGUAGE_NAMES } from '../../../src/types/sdk/generate';
@@ -60,7 +69,8 @@ describe('GeneratedPages', () => {
         version: '1.2.0',
         packageName: '@acme/calc',
         packageUrl: 'https://www.npmjs.com/package/@acme/calc',
-        registry: 'npm'
+        registry: 'npm',
+        docs: '../../generated-includes/sdk-docs/typescript.md'
       });
     });
 
@@ -77,23 +87,37 @@ describe('GeneratedPages', () => {
         version: '',
         packageName: '',
         packageUrl: '',
-        registry: ''
+        registry: '',
+        docs: '../../generated-includes/sdk-docs/csharp.md'
       });
     });
 
     it('is on the SDKs page for every language, in order', () => {
       const [index, typescript, python] = pagesFor({ typescript: PUBLISHED_TYPESCRIPT, python: {} }).pages();
+      const cards = index.data.sdks as readonly PageRecord[];
 
-      expect(index.data).to.deep.equal({ sdks: [typescript.data, python.data] });
+      expect(cards.map((card) => card.language)).to.deep.equal(['typescript', 'python']);
+      expect(typescript.data).to.deep.include(cards[0]);
+      expect(python.data).to.deep.include(cards[1]);
     });
 
-    // Each value lands in a double-quoted JSX attribute.
-    it('writes a double quote from the configuration so it cannot end the attribute', () => {
+    // Worked out from where the page and the docs are written, rather than written into the template.
+    it('includes its SDK docs from where they are written, relative to the page', () => {
+      const [, page] = pagesFor({ python: {} }).pages();
+
+      expect(posix.join(GENERATED_DIRECTORY_NAME, SDK_SECTION.folder, `${page.data.docs}`)).to.equal(
+        sdkDocsPath('python')
+      );
+    });
+
+    // Each value lands in a double-quoted JSX attribute, whose entities MDX decodes.
+    it('writes a double quote and an ampersand from the configuration so each reads back as written', () => {
       const [, page] = pagesFor({
-        python: { publishing: { package: { version: '1.0"' }, packageConfiguration: { name: 'calc' } } }
+        python: { publishing: { package: { version: '1.0"' }, packageConfiguration: { name: 'calc&amp;co' } } }
       }).pages();
 
       expect(page.data.version).to.equal('1.0&quot;');
+      expect(page.data.packageName).to.equal('calc&amp;amp;co');
     });
   });
 
@@ -162,11 +186,13 @@ describe('GeneratedPages', () => {
       expect(pages.missingFrom(artifactsWith(['typescript', 'python'], ['typescript', 'python'], true))).to.be.null;
     });
 
-    it('names each language whose SDK or SDK docs are missing, in order', () => {
+    // Apart, so the message points at the file that is missing rather than at the SDK for both.
+    it('names the languages missing their SDK, and those missing their SDK docs, each in order', () => {
       const pages = pagesFor({ csharp: {}, typescript: {}, python: {} });
 
       expect(pages.missingFrom(artifactsWith(['csharp', 'python'], ['csharp', 'typescript'], false))).to.deep.equal({
-        sdks: ['typescript', 'python'],
+        sdks: ['typescript'],
+        sdkDocs: ['python'],
         plugin: false
       });
     });
@@ -177,6 +203,7 @@ describe('GeneratedPages', () => {
 
       expect(pagesFor({ typescript: {} }, { kind: 'bundled' }).missingFrom(artifacts)).to.deep.equal({
         sdks: [],
+        sdkDocs: [],
         plugin: true
       });
       expect(pagesFor({ typescript: {} }, hosted).missingFrom(artifacts)).to.be.null;

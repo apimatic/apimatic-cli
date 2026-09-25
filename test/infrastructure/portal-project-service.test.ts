@@ -7,16 +7,15 @@ import sinon from 'sinon';
 import { FileService } from '../../src/infrastructure/file-service';
 import {
   COPIED_DEPENDENCIES,
-  GENERATED_DIRECTORY_NAME,
-  GENERATED_INCLUDES_DIRECTORY_NAME,
   PortalProjectService,
   TEMPLATE_DEPENDENCIES
 } from '../../src/infrastructure/portal-project-service';
+import { GENERATED_INCLUDES_DIRECTORY_NAME } from '../../src/types/portal/page-fragments';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
-import { GeneratedPages } from '../../src/types/portal/generated-pages';
+import { GENERATED_DIRECTORY_NAME, GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { PortalLanguages } from '../../src/types/portal/portal-languages';

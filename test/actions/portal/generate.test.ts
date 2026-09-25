@@ -95,9 +95,9 @@ describe('GenerateAction', () => {
     const result = await execute(CODE_SAMPLES_FIXTURE);
 
     expect(result.isFailed()).to.be.true;
-    expect(
-      shared.prompts.artifactsIncomplete.calledOnceWith({ sdks: [Language.TYPESCRIPT, Language.PYTHON], plugin: false })
-    ).to.be.true;
+    const missing = [Language.TYPESCRIPT, Language.PYTHON];
+    expect(shared.prompts.artifactsIncomplete.calledOnceWith({ sdks: missing, sdkDocs: missing, plugin: false })).to.be
+      .true;
     expect(shared.prepare.called).to.be.false;
     expect(build.called).to.be.false;
   });

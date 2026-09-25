@@ -46,10 +46,10 @@ describe('PortalServePrompts', () => {
   });
 
   describe('an edit that needs artifacts the preview was started without', () => {
-    const warned = (sdks: Language[], plugin: boolean) => {
+    const warned = (sdks: Language[], sdkDocs: Language[], plugin: boolean) => {
       const warn = sinon.stub(log, 'warn');
       try {
-        new PortalServePrompts().editNeedsRestart({ sdks, plugin });
+        new PortalServePrompts().editNeedsRestart({ sdks, sdkDocs, plugin });
         return stripVTControlCharacters(String(warn.firstCall.args[0]));
       } finally {
         warn.restore();
@@ -57,16 +57,22 @@ describe('PortalServePrompts', () => {
     };
 
     it('names what the edit needs, and that a restart fetches it', () => {
-      expect(warned([Language.PYTHON, Language.CSHARP], true)).to.equal(
-        "This edit to 'apimatic.json' needs the SDK for 'python', 'csharp' and the context plugin, which the " +
-          'preview was started without. Restart the preview to fetch them; until then it keeps showing what it ' +
-          'last accepted.'
+      const added = [Language.PYTHON, Language.CSHARP];
+
+      expect(warned(added, added, true)).to.equal(
+        "This edit to 'apimatic.json' needs the SDK and SDK docs for 'python', 'csharp' and the context plugin, " +
+          'which the preview was started without. Restart the preview to fetch them; until then it keeps showing ' +
+          'what it last accepted.'
       );
     });
 
-    it('names a language alone, or the plugin alone', () => {
-      expect(warned([Language.PYTHON], false)).to.contain("needs the SDK for 'python', which");
-      expect(warned([], true)).to.contain('needs the context plugin, which');
+    it('names an SDK, its docs or the plugin each on its own', () => {
+      expect(warned([Language.PYTHON], [], false)).to.contain("needs the SDK for 'python', which");
+      expect(warned([], [Language.CSHARP], false)).to.contain("needs the SDK docs for 'csharp', which");
+      expect(warned([], [], true)).to.contain('needs the context plugin, which');
+      expect(warned([Language.PYTHON], [Language.CSHARP], true)).to.contain(
+        "needs the SDK for 'python', the SDK docs for 'csharp' and the context plugin, which"
+      );
     });
   });
 });

@@ -9,7 +9,7 @@ import { PortalPagesService } from '../../src/infrastructure/portal-pages-servic
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalLanguages } from '../../src/types/portal/portal-languages';
-import { PLUGIN_LANGUAGES } from '../../src/types/sdk/generate';
+import { PORTAL_LANGUAGES } from '../../src/types/sdk/generate';
 
 describe('PortalPagesService', () => {
   const service = new PortalPagesService();
@@ -56,7 +56,7 @@ describe('PortalPagesService', () => {
 
   // The one run that holds the shipped templates and the data the generator gives them together.
   it('renders every page from the shipped templates, leaving no placeholder behind', async () => {
-    const everyLanguage = Object.fromEntries(PLUGIN_LANGUAGES.map((language) => [language, {}]));
+    const everyLanguage = Object.fromEntries(PORTAL_LANGUAGES.map((language) => [language, {}]));
 
     (await service.write(generated, pagesFor(everyLanguage, true)))._unsafeUnwrap();
 
@@ -65,7 +65,7 @@ describe('PortalPagesService', () => {
     }
     expect(read('sdks/csharp.mdx')).to.contain('title: "C# SDK"');
     expect(read('sdks/csharp.mdx')).to.contain('<include>../../generated-includes/sdk-docs/csharp.md</include>');
-    for (const language of PLUGIN_LANGUAGES) {
+    for (const language of PORTAL_LANGUAGES) {
       expect(read('sdks/index.mdx')).to.contain(`<SdkCard language="${language}"`);
       expect(read('context-plugin/index.mdx')).to.contain(`<PluginLanguage language="${language}"`);
     }

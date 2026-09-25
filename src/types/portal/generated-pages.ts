@@ -1,11 +1,16 @@
+import { posix } from 'node:path';
 import { FileName } from '../file/fileName.js';
 import { UrlPath } from '../file/urlPath.js';
 import { Language, LANGUAGE_NAMES } from '../sdk/generate.js';
+import { sdkDocsPath } from './page-fragments.js';
 import { PageRecord, PageValues } from './page-template.js';
 import { PortalArtifacts } from './portal-artifacts.js';
 import { PLUGIN_DOWNLOAD_ADDRESS, sdkDownloadAddress } from './portal-downloads.js';
 import { PortalLanguages } from './portal-languages.js';
 import { PortalSdk } from './portal-sdk.js';
+
+// `src/lib/source.ts` names it as a relative literal, so the browser bundle never carries the project's location.
+export const GENERATED_DIRECTORY_NAME = 'generated';
 
 /** A set of pages the CLI writes into the portal, which the portal shows as a tab of its own. */
 export interface GeneratedSection {
@@ -24,6 +29,8 @@ export const SDK_SECTION: GeneratedSection = {
   title: 'SDKs',
   description: 'the SDK pages'
 };
+
+const SDK_PAGES_DIRECTORY = posix.join(GENERATED_DIRECTORY_NAME, SDK_SECTION.folder);
 
 export const PLUGIN_SECTION: GeneratedSection = {
   folder: 'context-plugin',
@@ -50,17 +57,13 @@ export interface GeneratedPage {
   data: PageValues;
 }
 
-/**
- * Where the context plugin page tells readers to install the plugin from: the copy the portal
- * artifacts bundle into the portal, or the address `portal.pluginUrl` gives, in which case the
- * artifacts carry no plugin.
- */
+/** A hosted plugin is installed from `portal.pluginUrl`, and the portal artifacts carry none. */
 export type PluginSource = { kind: 'bundled' } | { kind: 'hosted'; url: UrlPath };
 
 /** What the pages link to or include that the portal artifacts did not deliver. */
 export interface MissingArtifacts {
-  /** The languages whose SDK, or whose SDK docs, are not among them. */
   sdks: Language[];
+  sdkDocs: Language[];
   /** Whether the plugin the page installs from the portal is not among them. */
   plugin: boolean;
 }
@@ -92,7 +95,7 @@ export class GeneratedPages {
         section: SDK_SECTION,
         fileName: new FileName(`${sdk.language}.mdx`),
         template: 'sdk',
-        data: card(sdk)
+        data: { ...card(sdk), docs: posix.relative(SDK_PAGES_DIRECTORY, sdkDocsPath(sdk.language)) }
       })
     );
     return [
@@ -116,17 +119,13 @@ export class GeneratedPages {
     }));
   }
 
-  /**
-   * Null when the artifacts back every page: each language's page includes its SDK docs and
-   * offers its SDK, and a bundled plugin is offered from the portal. A page backed by nothing
-   * would fail the build, or link to a download the portal does not have.
-   */
+  /** Null when the artifacts back every page; a page backed by nothing fails the build or links nowhere. */
   public missingFrom(artifacts: PortalArtifacts): MissingArtifacts | null {
-    const sdks = this.sdks
-      .map((sdk) => sdk.language)
-      .filter((language) => !artifacts.sdks.has(language) || !artifacts.sdkDocs.has(language));
+    const languages = this.sdks.map((sdk) => sdk.language);
+    const sdks = languages.filter((language) => !artifacts.sdks.has(language));
+    const sdkDocs = languages.filter((language) => !artifacts.sdkDocs.has(language));
     const plugin = this.plugin?.kind === 'bundled' && artifacts.plugin === undefined;
-    return sdks.length > 0 || plugin ? { sdks, plugin } : null;
+    return sdks.length > 0 || sdkDocs.length > 0 || plugin ? { sdks, sdkDocs, plugin } : null;
   }
 
   // Every language the portal supports can be carried by a plugin, so the page lists them all.
@@ -143,10 +142,7 @@ export class GeneratedPages {
   }
 }
 
-/**
- * What a card and a language page show about one SDK. Every field is present, empty when
- * nothing is recorded, so a template's attribute list is fixed and a component hides the empty.
- */
+/** Every field is present, empty when nothing is recorded, so a template's attribute list is fixed. */
 function card(sdk: PortalSdk): PageRecord {
   const release = sdk.release();
   const source = sdk.sourceRepository();
@@ -163,7 +159,7 @@ function card(sdk: PortalSdk): PageRecord {
   };
 }
 
-/** The templates write values into double-quoted JSX attributes, which a `"` would end. */
+// A double-quoted JSX attribute, whose entities MDX decodes: `&` first, so an `&amp;` in a value survives.
 function attribute(value: string | UrlPath): string {
-  return `${value}`.replaceAll('"', '&quot;');
+  return `${value}`.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }

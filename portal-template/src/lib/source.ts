@@ -23,16 +23,14 @@ export const docs = defineDocs({
 // The pages the CLI writes into this project, resolved against the Vite root. Relative, unlike
 // the content directory's: the literal is embedded in the browser bundle, and an absolute one
 // would publish the build machine's directory with every portal.
-//
-// They include Markdown they do not hold, each language's SDK docs. MDX drops the HTML of a
-// whole `.md` page, but keeps an included file's as raw nodes it cannot compile, so `rehype-raw`
-// renders it. Options given here replace Fumadocs' defaults, hence the preset.
 export const generated = defineDocs({
   dir: 'generated',
   docs: {
     async: true,
     postprocess: { includeProcessedMarkdown: true },
+    // Options given here replace Fumadocs' defaults, hence the preset.
     mdxOptions: applyMdxPreset({
+      // The SDK docs' HTML fails the build unrendered; not sanitized, as it comes from the owner's own spec.
       rehypePlugins: (defaults) => [[rehypeRaw, { passThrough: MDX_NODE_TYPES }], ...defaults]
     })
   },

@@ -20,6 +20,7 @@ export function SdkCards({ children }: Readonly<{ children?: ReactNode }>) {
 
 // Not a Fumadocs `Card`, which is one link as a whole: the buttons inside would be links in a link.
 export function SdkCard({ language, name, page, packageName, version, ...actions }: Readonly<SdkCardProps>) {
+  const release = version ? `${packageName} · v${version.replace(/^v/i, '')}` : null;
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-fd-card p-4 text-fd-card-foreground shadow-sm sm:flex-row sm:items-center sm:justify-between">
       {/* The buttons keep their row beside it; a long package name is cut short instead. */}
@@ -27,9 +28,9 @@ export function SdkCard({ language, name, page, packageName, version, ...actions
         <LanguageLogo language={language} className="size-10 shrink-0" />
         <span className="flex min-w-0 flex-col">
           <span className="font-medium group-hover:underline">{name}</span>
-          {version ? (
-            <span className="truncate text-sm text-fd-muted-foreground" title={`${packageName} v${version}`}>
-              {packageName} · v{version}
+          {release ? (
+            <span className="truncate text-sm text-fd-muted-foreground" title={release}>
+              {release}
             </span>
           ) : null}
         </span>

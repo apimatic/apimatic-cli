@@ -509,7 +509,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   // the origin it loaded the page from.
   it('installs the bundled plugin from where the site serves it', () => {
     expect(read('context-plugin/index.html')).to.match(
-      /npx context-plugins install (<!-- -->)?\/__downloads\/plugin\.zip/
+      /npx context-plugins install (&quot;|")\/__downloads\/plugin\.zip(&quot;|")/
     );
     expect(read('__downloads/plugin.zip')).to.equal('PK plugin');
   });

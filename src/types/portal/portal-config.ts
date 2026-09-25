@@ -139,12 +139,18 @@ function portalLink(link: Link): PortalLink {
   return { label: link.text(), url: link.href(), external: link.isExternal() };
 }
 
-// https only: the address is handed to `npx context-plugins install`, which fetches and runs it.
+const HTTPS_ADDRESS = /^https:\/\/\S+$/i;
+
+const PLUGIN_URL_EXAMPLE = 'https://example.com/acme-plugin.zip';
+
+// Parsed, so the quoted install command it goes into can hold no space or quote; https, as npx runs what it fetches.
 function secureAddress(value: unknown, path: string): Parsed<UrlPath> {
-  const url = typeof value === 'string' && /^https:\/\//i.test(value) ? UrlPath.create(value) : undefined;
+  const url = typeof value === 'string' && HTTPS_ADDRESS.test(value) ? UrlPath.create(value) : undefined;
   return url === undefined
-    ? err([`'${path}' must be an address starting with 'https://', for example 'https://example.com/acme-plugin.zip'.`])
-    : ok(url);
+    ? err([
+        `'${path}' must be an address starting with 'https://', with no spaces, for example '${PLUGIN_URL_EXAMPLE}'.`
+      ])
+    : ok(new UrlPath(new URL(`${url}`).href));
 }
 
 export interface PortalBlock {

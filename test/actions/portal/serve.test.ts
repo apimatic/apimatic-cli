@@ -342,7 +342,13 @@ describe('PortalServeAction', () => {
 
           await save(config);
 
-          expect(prompts.editNeedsRestart.calledOnceWith({ sdks: [Language.PYTHON], plugin: false })).to.be.true;
+          expect(
+            prompts.editNeedsRestart.calledOnceWith({
+              sdks: [Language.PYTHON],
+              sdkDocs: [Language.PYTHON],
+              plugin: false
+            })
+          ).to.be.true;
           expect(projectHas('generated/sdks/python.mdx')).to.be.false;
           expect(prompts.configApplied.called).to.be.false;
 
@@ -356,7 +362,7 @@ describe('PortalServeAction', () => {
         await whileServing(async () => {
           await save({ ...originalConfig(), plugin: { pluginId: 'calc', pluginVersion: '0.1.0' } });
 
-          expect(prompts.editNeedsRestart.calledOnceWith({ sdks: [], plugin: true })).to.be.true;
+          expect(prompts.editNeedsRestart.calledOnceWith({ sdks: [], sdkDocs: [], plugin: true })).to.be.true;
           expect(projectHas('generated/context-plugin/index.mdx')).to.be.false;
         });
       });

@@ -395,7 +395,8 @@ describe('PortalConfig', () => {
 
   describe('pluginUrl', () => {
     const REFUSED =
-      "'portal.pluginUrl' must be an address starting with 'https://', for example 'https://example.com/acme-plugin.zip'.";
+      "'portal.pluginUrl' must be an address starting with 'https://', with no spaces, for example " +
+      "'https://example.com/acme-plugin.zip'.";
 
     it('is absent unless the block gives one, so the plugin is bundled', () => {
       expect(config({}).pluginUrl()).to.be.null;
@@ -419,6 +420,27 @@ describe('PortalConfig', () => {
       ]) {
         expect(errorsOf({ pluginUrl }), JSON.stringify(pluginUrl)).to.deep.equal([REFUSED]);
       }
+    });
+
+    // A space would split the address in the install command a reader pastes into a shell.
+    it('refuses an address with whitespace anywhere in it', () => {
+      for (const pluginUrl of [
+        'https://plugins.acme.test/my plugin.zip',
+        'https://plugins.acme.test/calc.zip ',
+        ' https://plugins.acme.test/calc.zip',
+        'https://plugins.acme.test/calc.zip\n'
+      ]) {
+        expect(errorsOf({ pluginUrl }), JSON.stringify(pluginUrl)).to.deep.equal([REFUSED]);
+      }
+    });
+
+    it('keeps the address as it parses: a query of several parameters whole, and a quote encoded', () => {
+      const presigned = 'https://bucket.s3.amazonaws.com/calc.zip?X-Amz-Credential=a%2Fb&X-Amz-Signature=c';
+
+      expect(`${config({ pluginUrl: presigned }).pluginUrl()}`).to.equal(presigned);
+      expect(`${config({ pluginUrl: 'https://Plugins.Acme.test/"calc".zip' }).pluginUrl()}`).to.equal(
+        'https://plugins.acme.test/%22calc%22.zip'
+      );
     });
 
     it('is kept out of what the browser is told', () => {

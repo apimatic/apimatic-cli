@@ -237,10 +237,7 @@ export class PortalArtifactsService {
     );
   }
 
-  /**
-   * Keyed by the file's stem, as the SDKs are. A file this CLI cannot read is an error, as an
-   * unreadable catalog is: the page it belongs to would otherwise be published without its docs.
-   */
+  /** An unreadable file fails the run, as an unreadable catalog does, rather than publish a page without its docs. */
   private async readSdkDocs(directory: DirectoryPath): Promise<Result<ReadonlyMap<string, string>, ServiceError>> {
     const docs = new Map<string, string>();
     if (!(await this.fileService.directoryExists(directory))) {

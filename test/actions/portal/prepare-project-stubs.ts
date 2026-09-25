@@ -8,7 +8,7 @@ import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { CodeSampleCatalogs } from '../../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
-import { PLUGIN_LANGUAGES } from '../../../src/types/sdk/generate';
+import { PORTAL_LANGUAGES } from '../../../src/types/sdk/generate';
 
 export interface PreparePortalProjectStubs {
   prompts: sinon.SinonStubbedInstance<PreparePortalProjectPrompts>;
@@ -22,7 +22,7 @@ export interface PreparePortalProjectStubs {
  * pages of any fixture. The files are never read: the project service is stubbed wherever these are.
  */
 export function completeArtifacts(
-  languages: readonly string[] = PLUGIN_LANGUAGES,
+  languages: readonly string[] = PORTAL_LANGUAGES,
   { plugin = true, codeSampleCatalogs = new CodeSampleCatalogs([]) } = {}
 ): PortalArtifacts {
   const delivered = new DirectoryPath('artifacts');

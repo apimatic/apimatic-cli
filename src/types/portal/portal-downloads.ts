@@ -1,10 +1,6 @@
 import { FileName } from '../file/fileName.js';
 
-/**
- * Where the portal offers what the portal artifacts delivered. The portal project lays the files
- * out under these names, and `portal-template/downloads.ts` serves that directory at this address,
- * so the pages that link to a download and the directory that holds it agree by construction.
- */
+// One place for the names both the pages' links and the laid-out downloads use, so the two agree.
 export const DOWNLOADS_ADDRESS = '__downloads';
 
 export const SDK_DOWNLOADS_FOLDER = 'sdk';

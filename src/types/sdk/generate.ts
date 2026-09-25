@@ -69,6 +69,9 @@ export function isPluginLanguage(language: string): language is Language {
   return PLUGIN_LANGUAGES.includes(language as Language);
 }
 
+// The portal artifacts can be generated for these today; the rest of `Language` comes later.
+export const PORTAL_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
+
 export class CodegenOption {
   public static readonly v3 = new CodegenOption(CodeGenerationVersion.V3, Stability.STABLE);
 

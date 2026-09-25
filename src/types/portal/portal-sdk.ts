@@ -16,10 +16,7 @@ export class PortalSdk {
     private readonly published: SdkRelease | null
   ) {}
 
-  /**
-   * `entry` has passed the document's shape checks, so it and any `publishing` in it are objects.
-   * Nothing below that is checked: a field of the wrong shape reads as not recorded.
-   */
+  /** The document checked the shapes down to `publishing`; a wrongly shaped field below it reads as not recorded. */
   public static fromEntry(language: Language, entry: unknown): PortalSdk {
     const publishing = objectAt(entry, 'publishing');
     const repositoryUrl = objectAt(publishing, 'source').repositoryUrl;

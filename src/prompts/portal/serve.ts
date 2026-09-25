@@ -11,7 +11,7 @@ import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { describeMissingArtifacts } from './code-samples.js';
+import { describeMissingArtifacts } from './artifacts.js';
 import { reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {

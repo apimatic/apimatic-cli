@@ -27,7 +27,7 @@ describe('PortalLanguages', () => {
   it('counts a language that is wanted but not yet published', () => {
     const languages = read({ languages: { typescript: {} } })._unsafeUnwrap();
 
-    expect(languages.all()).to.deep.equal([Language.TYPESCRIPT]);
+    expect(languages.listed().map((sdk) => sdk.language)).to.deep.equal([Language.TYPESCRIPT]);
   });
 
   it('counts published and unpublished languages alike, in the order written', () => {
@@ -39,8 +39,11 @@ describe('PortalLanguages', () => {
       }
     })._unsafeUnwrap();
 
-    expect(languages.all()).to.deep.equal([Language.PYTHON, Language.CSHARP, Language.TYPESCRIPT]);
-    expect(languages.listed().map((sdk) => sdk.language)).to.deep.equal(languages.all());
+    expect(languages.listed().map((sdk) => sdk.language)).to.deep.equal([
+      Language.PYTHON,
+      Language.CSHARP,
+      Language.TYPESCRIPT
+    ]);
   });
 
   it("keeps what each language's publishing record says", () => {

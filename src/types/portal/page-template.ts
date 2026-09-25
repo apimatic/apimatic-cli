@@ -16,12 +16,7 @@ const TAG_TYPES = ['name', '#', '^'];
 // The values are MDX source, which reads its own braces and tags, so nothing is escaped.
 const RENDER_OPTIONS = { escape: (value: unknown) => String(value) };
 
-/**
- * One of the pages in `portal-pages/`, filled before MDX sees the text. Every tag is judged
- * against the values first: a key the page is not given, or anything but a plain placeholder or
- * section, is refused rather than written through, because MDX would read it as an expression and
- * the page would fail to build, or render as text, far from the template that caused it.
- */
+/** Refuses a tag MDX would misread; inside a section, tags are checked per item, so an empty list checks none. */
 export class PageTemplate {
   constructor(private readonly fileName: FileName, private readonly text: string) {}
 
@@ -54,8 +49,7 @@ export class PageTemplate {
     }
     const tag = this.text.slice(start, end);
     if (!TAG_TYPES.includes(type) || !KEY.test(key)) {
-      // JSX writes an object inside an expression as `{{ ... }}`, which is the likeliest way to
-      // meet this, and a space between the braces keeps it out of the tags.
+      // Most likely a JSX object, `{{ ... }}`, which a space between the braces keeps out of the tags.
       return (
         `${this.fileName}: '${tag}' is not a placeholder. A placeholder is {{key}} and a section ` +
         `{{#key}}...{{/key}}; write a JSX object as '{ { ... } }'.`

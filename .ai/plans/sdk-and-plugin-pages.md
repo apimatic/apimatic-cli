@@ -15,6 +15,13 @@ description, only its title, subtitle and cards. `SpecDescription`, the
 `<ShiftHeadings>` step are removed with it; the sections that describe them are
 marked. The step records of section 9 are left as they were.
 
+**Amended 2026-09-25, after code review on #369:** the install command quotes
+its address; `pluginUrl` refuses whitespace and is kept as parsed; the language
+page includes its SDK docs from a `{{docs}}` path the CLI works out; missing SDK
+docs are reported apart from missing SDKs; attribute values escape `&` as well
+as `"`; the portal's languages are `PORTAL_LANGUAGES`; `rehype-raw` stays
+unsanitized (section 4 says why). Sections 4, 5 and 7 are updated to match.
+
 Follows on from `.ai/plans/generated-pages.md` (PR #360), which shipped the flow
 (three templates in `portal-pages/`, a second Fumadocs collection over
 `generated/`, the SDKs and Context Plugin tabs) with **placeholder** templates,
@@ -74,12 +81,12 @@ primitives.
 | Logos | Brand logos as inline SVG, for the three languages and the three platforms, vendored from an MIT or CC0 icon set into small components, with no new dependency. Attribution goes in `portal-template/NOTICE`. |
 | SDKs page text | *Removed 2026-09-25, after review: the page shows no spec description.* Was: the spec's full `info.description`, when the source directory has exactly one spec and it has one; otherwise a fixed sentence that names no portal. This matches the rule `suggestedSite` already follows ("with several specifications … no one of them speaks for the portal"). Its first paragraph goes above the cards and the rest below them. |
 | SDKs page headings | *Removed 2026-09-25, with the description.* Was: shifted so the description's top heading is H2, since spec authors write `# Authentication` and no backend controls it. Done by a remark step in the template, scoped by a `<ShiftHeadings>` wrapper in `sdks.mdx` (section 4). |
-| Raw HTML in fragments | Rendered, through `rehype-raw` on the generated collection (section 4). Without it, any HTML in an included fragment fails the build (step 1). |
+| Raw HTML in fragments | Rendered, through `rehype-raw` on the generated collection (section 4). Without it, any HTML in an included fragment fails the build (step 1). Not sanitized: the docs come from the owner's own spec (section 4; decided after review). |
 | Template data | Components take plain string attributes, which print cleanly in the `.md` twin and `llms-full.txt`. Lists (the SDK cards, the plugin's languages) are mustache sections, so `PageTemplate` moves onto `mustache` with escaping off (section 4). Decided after step 1 showed JSON props printing as entity-escaped blobs. |
 | Fragments | Written once, when the portal project is prepared, from the artifacts' SDK docs; `applyConfig` leaves them alone. They could only change on a restart anyway: the artifacts are read once, and a language added under `portal serve` is refused (decided after step 2; the spec description's fragments were removed 2026-09-25). |
 | A language added under `portal serve` | Refused like any edit a build would refuse, with a message to restart `portal serve`, since the artifacts (its SDK docs and zip) are fetched once when the preview starts. The preview keeps what it last accepted. Removing a language still applies live. |
 | Language page | Title "<Language> SDK" (so its sidebar row reads the same), the buttons right under the title, then the SDK docs. |
-| `pluginUrl` | `portal.pluginUrl`, exactly as asked: the first top-level key of `portal` outside its four namespaces (`site`, `brand`, `navigation`, `ai`). Optional, absolute, `https://` only. |
+| `pluginUrl` | `portal.pluginUrl`, exactly as asked: the first top-level key of `portal` outside its four namespaces (`site`, `brand`, `navigation`, `ai`). Optional, absolute, `https://` only, with no whitespace (added after review). |
 | Plugin page condition | A `plugin` block **or** `portal.pluginUrl`. Either one creates the page (today only the block does). |
 | Plugin install address | `pluginUrl` when set; otherwise the fixed relative `/__downloads/plugin.zip`, where #361 places the bundled plugin. The backend skips generating and bundling the plugin when `pluginUrl` is set. |
 | Relative address | Resolved in the browser against `window.location.origin`, so it is right on any host (staging, previews, `portal serve`). The prerendered HTML uses `siteUrl` when configured, else the relative path. The `.md` twin prints the component's attribute as written, the relative path, since an absolute one there would also be what the browser installs from. *(Corrected 2026-09-25: this row first said the twin used `siteUrl` too.)* |
@@ -195,9 +202,12 @@ for `.md` (`remark-include-*.js`: `_getProcessor(ext === ".mdx" ? "mdx" : "md")`
 and runs first among the remark plugins. So:
 
 ```mdx
-<include>../../generated-includes/sdk-docs/{{language}}.md</include>
+<include>{{docs}}</include>
 ```
 
+where the CLI fills `{{docs}}` with
+`../../generated-includes/sdk-docs/<language>.md`, worked out from where the
+page and the docs are written, so the template repeats no directory name. This
 inlines the SDK docs parsed as CommonMark, where `{` is text, into the page's
 tree before headings, the TOC, structured search data and processed Markdown
 are computed. The spike (section 9, step 1) confirms each of those, that a path
@@ -243,6 +253,13 @@ dependency of `fumadocs-ui`, whose search dialog bundles it, so it adds no
 browser weight. It becomes a direct dependency of the CLI and joins
 `TEMPLATE_DEPENDENCIES`.
 
+It is not followed by a sanitizer (decided after review). The SDK docs come
+from the portal owner's own spec through our backend, and the owner's content
+pages are MDX that can already run any JSX, so a sanitizer here guards against
+no one. `rehype-sanitize` would also drop every node type it does not know,
+which includes the page's own components (`hast-util-sanitize` 5.0.2 returns
+nothing for them).
+
 ### The relative install address
 
 `<PluginInstall path="{{installPath}}" />`. If the path is absolute it is shown
@@ -250,8 +267,10 @@ as written. If it is relative, the component reads `window.location.origin`
 through `useSyncExternalStore`, whose server snapshot is `portal.siteUrl ?? null`.
 So the prerendered HTML carries the `siteUrl` form (or the bare path), and the
 browser swaps in its own origin after hydration with no mismatch warning. The
-join is one pure function, `installAddress(path, origin)`, unit-tested in the
-template tests. The copy button copies what is displayed.
+command is one pure function, `installCommand(path, origin)`, unit-tested in
+the template tests. It puts the address in double quotes, so a `&` or a space
+stays one argument in any shell; single quotes would not work in `cmd`. The
+copy button copies what is displayed.
 
 ## 5. Data
 
@@ -260,11 +279,13 @@ template tests. The copy button copies what is displayed.
 `PortalLanguages.fromBlock` accepts `csharp`, `python` and `typescript`. It
 refuses the other four `Language` values separately from unknown keys:
 "'languages.java' is not available yet; the portal supports 'csharp', 'python'
-and 'typescript' today." The list is `PLUGIN_LANGUAGES` from
-`src/types/sdk/generate.ts`. PR #359 (open) renames it `AVAILABLE_LANGUAGES`
-and adds `UPCOMING_LANGUAGES`; whichever of the two PRs merges second adopts
-the other's names. `apimatic.schema.json` keeps its seven-language enum, which
-is #359's to narrow.
+and 'typescript' today." The list is `PORTAL_LANGUAGES` in
+`src/types/sdk/generate.ts`, its own constant rather than the plugin's, since
+the two change for different reasons (after review). PR #359 (open) replaces
+`PLUGIN_LANGUAGES` with an `AVAILABLE_LANGUAGES` derived from the code
+generators, so the portal's list keeps a name of its own.
+`apimatic.schema.json` keeps its seven-language enum, which is #359's to
+narrow.
 
 `PortalLanguages` also keeps each language's `publishing` record beside its key
 (today it keeps the keys alone).
@@ -297,16 +318,19 @@ Every value is a string, and an absent field is `''`.
 | Template | Data |
 |---|---|
 | `sdks.mdx` | `sdks`: a list of cards, each `{ language, name, page, download, source, packageName, packageUrl, registry, version }`, in the block's order |
-| `sdk.mdx` | the one language's card fields at the top level |
+| `sdk.mdx` | the one language's card fields at the top level, and `docs`: the path from the page to its SDK docs, worked out from where each is written |
 | `context-plugin.mdx` | `installPath`; `languages`: a list of `{ language, name }` |
 
 ### `portal.pluginUrl`
 
 `PortalConfig.fromBlock` accepts `pluginUrl` beside the four namespaces
 (`unknownKeys(block, [...NAMESPACES, 'pluginUrl'], BLOCK)`), and `PortalConfig`
-carries it as `string | null`. It is validated with the existing `isWebAddress`
-plus an `https://` requirement: "'portal.pluginUrl' must be an address starting
-with 'https://', for example 'https://example.com/acme-plugin.zip'." It is not
+carries it as `string | null`. It must start with `https://` and hold no
+whitespace, and is kept as `new URL(...).href`, so no quote or space reaches
+the quoted install command: "'portal.pluginUrl' must be an address starting
+with 'https://', with no spaces, for example
+'https://example.com/acme-plugin.zip'." (Whitespace and the parsed form were
+added after review.) It is not
 part of `PortalIdentity`, because only the plugin page's data needs it. It goes
 into `apimatic.schema.json`, which #360 left untouched, and is not written by
 quickstart's scaffold (`toJSON` leaves it out when null).
@@ -376,7 +400,7 @@ description: "Install and start using the {{name}} SDK."
 
 <SdkActions download="{{download}}" source="{{source}}" packageUrl="{{packageUrl}}" registry="{{registry}}" />
 
-<include>../../generated-includes/sdk-docs/{{language}}.md</include>
+<include>{{docs}}</include>
 ```
 
 `context-plugin.mdx`:

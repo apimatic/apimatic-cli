@@ -14,11 +14,22 @@ describe('PreparePortalProjectPrompts', () => {
   it('names what the artifacts left out, and says to try again', () => {
     const error = sinon.stub(log, 'error');
 
-    new PreparePortalProjectPrompts().artifactsIncomplete({ sdks: [Language.TYPESCRIPT], plugin: true });
+    new PreparePortalProjectPrompts().artifactsIncomplete({ sdks: [Language.TYPESCRIPT], sdkDocs: [], plugin: true });
 
     expect(stripVTControlCharacters(String(error.firstCall.args[0]))).to.equal(
       "The portal artifacts did not include the SDK for 'typescript' and the context plugin, which the portal's " +
         "pages need. Try again, and if it keeps happening, reach out to our team at 'support@apimatic.io'."
+    );
+  });
+
+  // Only the docs were missing, so the message must not send the reader looking for the SDK.
+  it('names missing SDK docs as the docs', () => {
+    const error = sinon.stub(log, 'error');
+
+    new PreparePortalProjectPrompts().artifactsIncomplete({ sdks: [], sdkDocs: [Language.PYTHON], plugin: false });
+
+    expect(stripVTControlCharacters(String(error.firstCall.args[0]))).to.contain(
+      "did not include the SDK docs for 'python', which"
     );
   });
 });

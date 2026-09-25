@@ -111,8 +111,7 @@ export class PortalServeAction {
 
   /**
    * Held to the rules a build applies: an edit a build would refuse is reported as `portal
-   * generate` would report it, and the preview keeps what it last accepted. So is an edit that
-   * needs artifacts the preview was not started with, which only a restart fetches.
+   * generate` would report it, and the preview keeps what it last accepted.
    */
   private watchConfig(
     source: PortalSource,

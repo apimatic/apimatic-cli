@@ -1,13 +1,12 @@
 import { err, ok, Result } from 'neverthrow';
 import { ConfigFinding, findingSentences } from '../apimatic-config/document.js';
-import { Language, PLUGIN_LANGUAGES } from '../sdk/generate.js';
+import { Language, PORTAL_LANGUAGES } from '../sdk/generate.js';
 import { quotedList } from './config/fields.js';
 import { PortalSdk } from './portal-sdk.js';
 
 const KNOWN_LANGUAGES: readonly string[] = Object.values(Language);
 
-// The languages the portal artifacts can be generated for today; the rest of `Language` comes later.
-const AVAILABLE_LANGUAGES: readonly string[] = PLUGIN_LANGUAGES;
+const SUPPORTED_LANGUAGES: readonly string[] = PORTAL_LANGUAGES;
 
 export const LANGUAGES_EXAMPLE = '"languages": { "typescript": {} }';
 
@@ -35,21 +34,17 @@ export class PortalLanguages {
     if (entries.length === 0 && findings.length === 0) {
       errors.push(REQUIRED);
     }
-    for (const [key] of entries.filter(([key]) => !AVAILABLE_LANGUAGES.includes(key))) {
+    for (const [key] of entries.filter(([key]) => !SUPPORTED_LANGUAGES.includes(key))) {
       errors.push(
         KNOWN_LANGUAGES.includes(key)
-          ? `'languages.${key}' is not available yet; the portal supports ${quotedList(AVAILABLE_LANGUAGES)} today.`
-          : `'languages.${key}' is not an SDK language; name one of ${quotedList(AVAILABLE_LANGUAGES)}.`
+          ? `'languages.${key}' is not available yet; the portal supports ${quotedList(SUPPORTED_LANGUAGES)} today.`
+          : `'languages.${key}' is not an SDK language; name one of ${quotedList(SUPPORTED_LANGUAGES)}.`
       );
     }
     if (errors.length > 0) {
       return err(errors);
     }
     return ok(new PortalLanguages(entries.map(([key, entry]) => PortalSdk.fromEntry(key as Language, entry))));
-  }
-
-  public all(): Language[] {
-    return this.sdks.map((sdk) => sdk.language);
   }
 
   /** In the order the block lists them. */

@@ -110,7 +110,8 @@ describe('apimatic.schema.json', () => {
       ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }],
       ['a link through a parent segment', { navigation: { links: [{ label: 'Start', url: '/guides/../start' }] } }],
       ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }],
-      ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }]
+      ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }],
+      ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }]
     ];
 
     const invalid: [string, object][] = [
@@ -196,7 +197,9 @@ describe('apimatic.schema.json', () => {
       ['a plugin address over http', { pluginUrl: 'http://plugins.acme.test/calc.zip' }],
       ['a plugin address on the portal itself', { pluginUrl: '/__downloads/plugin.zip' }],
       ['a plugin address without a host', { pluginUrl: 'https://' }],
-      ['a plugin address that is not a string', { pluginUrl: 7 }]
+      ['a plugin address that is not a string', { pluginUrl: 7 }],
+      ['a plugin address with a space', { pluginUrl: 'https://plugins.acme.test/my plugin.zip' }],
+      ['a plugin address with trailing whitespace', { pluginUrl: 'https://plugins.acme.test/calc.zip ' }]
     ];
 
     for (const [label, block] of valid) {

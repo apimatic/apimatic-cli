@@ -6,7 +6,8 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
-import { PageFragment, pageFragments } from '../types/portal/page-fragments.js';
+import { GENERATED_DIRECTORY_NAME } from '../types/portal/generated-pages.js';
+import { GENERATED_INCLUDES_DIRECTORY_NAME, PageFragment, pageFragments } from '../types/portal/page-fragments.js';
 import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
 import { PLUGIN_DOWNLOAD, SDK_DOWNLOADS_FOLDER, sdkDownload } from '../types/portal/portal-downloads.js';
@@ -54,19 +55,6 @@ const IDENTITY_FILE_NAME = 'portal.identity.json';
 
 /** In `src/styles/`, beside `app.css`, which imports it. */
 const STYLESHEET_FILE_NAME = 'theme.css';
-
-/**
- * Where the generated pages are written, inside the project: `src/lib/source.ts` names it as a
- * relative literal, which the browser bundle carries, so the portal project's location is never published.
- */
-export const GENERATED_DIRECTORY_NAME = 'generated';
-
-/**
- * Where the Markdown the generated pages include is written, inside the portal project and beside
- * the generated directory rather than in it, where the collection and the prerender pass would
- * each take a fragment for a page of its own.
- */
-export const GENERATED_INCLUDES_DIRECTORY_NAME = 'generated-includes';
 
 /** Where the SDKs and the context plugin are laid out as the site serves them, inside the project. */
 export const DOWNLOADS_DIRECTORY_NAME = 'downloads';

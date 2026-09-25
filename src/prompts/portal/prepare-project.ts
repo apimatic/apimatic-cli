@@ -8,7 +8,8 @@ import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { format as f } from '../format.js';
-import { describeMissingArtifacts, generateArtifacts, reportUnplacedSamples } from './code-samples.js';
+import { describeMissingArtifacts, generateArtifacts } from './artifacts.js';
+import { reportUnplacedSamples } from './code-samples.js';
 import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
 
 /** What both `portal generate` and `portal serve` say while the project they share is prepared. */
