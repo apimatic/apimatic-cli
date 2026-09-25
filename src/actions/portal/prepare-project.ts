@@ -9,6 +9,13 @@ import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { ActionResult } from '../action-result.js';
 
+/** What the caller does within the shared run, in the order the run does it. */
+export interface PreparationSteps {
+  /** Asked once the source is read, before the artifacts are fetched; false cancels the run. */
+  confirm?: () => Promise<boolean>;
+  onPrepared: (project: PortalProjectPaths, source: PortalSource, artifacts: PortalArtifacts) => Promise<ActionResult>;
+}
+
 /**
  * The run `portal generate` and `portal serve` share: read the source, fetch what
  * `/portal-artifacts` builds from it, and prepare the Vite project both of them then run. Only
@@ -32,12 +39,7 @@ export class PreparePortalProjectAction {
    */
   public readonly execute = async (
     sourceDirectory: DirectoryPath,
-    onPrepared: (
-      project: PortalProjectPaths,
-      source: PortalSource,
-      artifacts: PortalArtifacts
-    ) => Promise<ActionResult>,
-    confirm: () => Promise<boolean> = async () => true
+    { confirm = async () => true, onPrepared }: PreparationSteps
   ): Promise<ActionResult> => {
     // Ahead of the server run, which can take minutes: a mistake or a question should not wait on it.
     const source = await new PortalSourceContext(sourceDirectory).resolve();

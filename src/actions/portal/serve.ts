@@ -70,65 +70,67 @@ export class PortalServeAction {
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
-      async (project, source, artifacts) => {
-        const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
+      {
+        onPrepared: async (project, source, artifacts) => {
+          const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
-        if (server.isErr()) {
-          this.prompts.startFailed(server.error.log);
-          return ActionResult.failed();
-        }
-
-        this.prompts.portalServed(server.value.url, sourceDirectory);
-        if (openInBrowser) {
-          await this.launcherService.openUrlInBrowser(server.value.url);
-        }
-        if (onServing) {
-          onServing();
-        }
-
-        // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
-        let generatedPages = source.generatedPages;
-        const contentWatch = this.watchContent(source, () => generatedPages, sourceDirectory);
-        const configWatch = this.watchConfig(
-          source,
-          artifacts,
-          project.projectDirectory,
-          sourceDirectory,
-          (settings) => {
-            const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
-            generatedPages = settings.generatedPages;
-            if (tabsChanged) {
-              contentWatch?.recheck();
-            }
-          }
-        );
-        const closeWatches = async () => {
-          await configWatch?.close();
-          await contentWatch?.close();
-        };
-
-        this.clearStandardInput();
-
-        try {
-          // Whichever comes first: the user stopping the preview, or the preview stopping on its
-          // own. Waiting only on the signal left a crashed server advertised as running.
-          const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
-          const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
-          const outcome = await Promise.race([interrupted, stopped]);
-          // First, so a save still being handled is not reported after the preview says it stops.
-          await closeWatches();
-
-          if (outcome.kind === 'exited') {
-            this.prompts.previewStopped(outcome.output);
+          if (server.isErr()) {
+            this.prompts.startFailed(server.error.log);
             return ActionResult.failed();
           }
 
-          this.prompts.stopping();
-          await server.value.stop();
-          return ActionResult.stopped();
-        } finally {
-          // Before the portal project goes: a save being handled writes into it.
-          await closeWatches();
+          this.prompts.portalServed(server.value.url, sourceDirectory);
+          if (openInBrowser) {
+            await this.launcherService.openUrlInBrowser(server.value.url);
+          }
+          if (onServing) {
+            onServing();
+          }
+
+          // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
+          let generatedPages = source.generatedPages;
+          const contentWatch = this.watchContent(source, () => generatedPages, sourceDirectory);
+          const configWatch = this.watchConfig(
+            source,
+            artifacts,
+            project.projectDirectory,
+            sourceDirectory,
+            (settings) => {
+              const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
+              generatedPages = settings.generatedPages;
+              if (tabsChanged) {
+                contentWatch?.recheck();
+              }
+            }
+          );
+          const closeWatches = async () => {
+            await configWatch?.close();
+            await contentWatch?.close();
+          };
+
+          this.clearStandardInput();
+
+          try {
+            // Whichever comes first: the user stopping the preview, or the preview stopping on its
+            // own. Waiting only on the signal left a crashed server advertised as running.
+            const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
+            const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
+            const outcome = await Promise.race([interrupted, stopped]);
+            // First, so a save still being handled is not reported after the preview says it stops.
+            await closeWatches();
+
+            if (outcome.kind === 'exited') {
+              this.prompts.previewStopped(outcome.output);
+              return ActionResult.failed();
+            }
+
+            this.prompts.stopping();
+            await server.value.stop();
+            return ActionResult.stopped();
+          } finally {
+            // Before the portal project goes: a save being handled writes into it.
+            await closeWatches();
+          }
         }
       }
     );
