@@ -410,6 +410,7 @@ export class PortalSourceContext {
       const childErrors: string[] = [];
       const subfolders = new Map<string, { directory: DirectoryPath; scan: DirectoryScan }>();
       const homePageFolders: string[] = [];
+      const emptyFolders: string[] = [];
       let holdsPage = false;
       let navigationFile: FileName | undefined;
       let indexPage: FilePath | undefined;
@@ -434,6 +435,8 @@ export class PortalSourceContext {
               childNames.push(name);
               subfolders.set(name, { directory: item.directoryPath, scan: child });
             }
+          } else if (!isApiChild) {
+            emptyFolders.push(name);
           }
           continue;
         }
@@ -507,6 +510,7 @@ export class PortalSourceContext {
             isApiDirectory,
             becomesFolder,
             childNames,
+            emptyFolders,
             homePageFolders: isContentRoot ? homePageFolders : []
           });
           if (checked.isErr()) {

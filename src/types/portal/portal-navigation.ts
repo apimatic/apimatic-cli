@@ -49,6 +49,8 @@ export interface NavigationContext {
   becomesFolder: boolean;
   /** Pages and subfolders in the same directory; page names carry no extension. */
   childNames: string[];
+  /** Subdirectories with no page in them or below them, which are no folder in the sidebar. */
+  emptyFolders: string[];
   /** Subfolders that serve the home page, as a `(group)` folder's index page can at the content root. */
   homePageFolders: string[];
 }
@@ -142,6 +144,14 @@ export class PortalNavigation {
       return err(
         `${context.label}: '${entry}' addresses another directory. An entry names a page or ` +
           `folder in this directory; order a subfolder's pages with its own ${NAVIGATION_FILE_NAME}.`
+      );
+    }
+
+    // A page of the same name is what the entry names, since the template drops the empty folder.
+    if (!context.childNames.includes(entry) && context.emptyFolders.includes(entry)) {
+      return err(
+        `${context.label}: '${entry}' is a folder with no page in it or below it, so it is not in the ` +
+          `sidebar. Add a page to it, or remove the entry.`
       );
     }
 

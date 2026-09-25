@@ -533,6 +533,7 @@ describe('navigationTransformer', () => {
         isApiDirectory: false,
         becomesFolder: true,
         childNames: ['index', 'authentication'],
+        emptyFolders: [],
         homePageFolders: []
       }).isOk();
 

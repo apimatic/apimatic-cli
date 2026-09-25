@@ -1061,7 +1061,7 @@ describe('PortalSourceContext', () => {
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
-      expect(errors[0]).to.contain("'assets' is not a page or folder in this directory");
+      expect(errors[0]).to.contain("'assets' is a folder with no page in it or below it");
     });
 
     // The template drops the empty folder Fumadocs would otherwise build for it.
@@ -1071,7 +1071,10 @@ describe('PortalSourceContext', () => {
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
-      expect(errors).to.deep.equal(["content/nav.json: 'guides' is not a page or folder in this directory."]);
+      expect(errors).to.deep.equal([
+        "content/nav.json: 'guides' is a folder with no page in it or below it, so it is not in the sidebar. " +
+          'Add a page to it, or remove the entry.'
+      ]);
     });
 
     it('refuses to make a tab of a (group) folder that serves the home page, however deep', async () => {

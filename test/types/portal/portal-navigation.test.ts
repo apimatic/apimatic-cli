@@ -8,6 +8,7 @@ describe('PortalNavigation', () => {
     isApiDirectory: false,
     becomesFolder: true,
     childNames: ['index', 'authentication', 'guides'],
+    emptyFolders: [],
     homePageFolders: [],
     ...overrides
   });
@@ -55,6 +56,18 @@ describe('PortalNavigation', () => {
       expect(errorsFor(['nonsense'])).to.deep.equal([
         "content/nav.json: 'nonsense' is not a page or folder in this directory."
       ]);
+    });
+
+    // The folder is there to see, so "not a page or folder" would send the user looking for it.
+    it('says a folder with no page in it is no folder in the sidebar', () => {
+      expect(errorsFor(['drafts'], { emptyFolders: ['drafts'] })).to.deep.equal([
+        "content/nav.json: 'drafts' is a folder with no page in it or below it, so it is not in the sidebar. " +
+          'Add a page to it, or remove the entry.'
+      ]);
+    });
+
+    it('accepts the name of a page beside an empty folder of the same name', () => {
+      expect(validate(['drafts'], { childNames: ['drafts'], emptyFolders: ['drafts'] }).isOk()).to.be.true;
     });
 
     it('suggests the intended page when the entry is a near miss', () => {
