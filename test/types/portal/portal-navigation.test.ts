@@ -246,14 +246,21 @@ describe('PortalNavigation', () => {
       });
     }
 
-    // The root is no folder in the sidebar, so a name given here would set nothing, which is
-    // the silent wrongness this file exists to refuse.
-    it('refuses a name at the content root, naming where the portal is titled instead', () => {
-      const errors = PortalNavigation.validate('{"title":"My API","pages":["index"]}', contextFor())._unsafeUnwrapErr();
+    it('accepts a name at the content root, which names the Home tab', () => {
+      expect(PortalNavigation.validate('{"title":"Overview","pages":["index"]}', contextFor()).isOk()).to.be.true;
+    });
 
-      expect(errors).to.have.lengthOf(1);
-      expect(errors[0]).to.contain('orders the content root, which is not one');
-      expect(errors[0]).to.contain("'portal.site.name' in apimatic.json");
+    // The Home tab gets a fallback home page, so it has something to name without any page.
+    it('accepts a name at the content root even with no page in the content directory', () => {
+      const context = contextFor({ becomesFolder: false, childNames: ['api'] });
+
+      expect(PortalNavigation.validate('{"title":"Overview"}', context).isOk()).to.be.true;
+    });
+
+    it('refuses an empty name at the content root, as anywhere else', () => {
+      expect(PortalNavigation.validate('{"title":""}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
+        "content/nav.json: 'title' must be a non-empty string."
+      ]);
     });
 
     // The template drops a folder with no page beneath it, so the name would reach nothing --

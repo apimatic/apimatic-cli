@@ -229,23 +229,16 @@ export class PortalNavigation {
 
   /**
    * A folder is named after its directory, or after the title of its index page; `title`
-   * outranks both. The content root is no folder in the sidebar, so a name given there would
-   * set nothing, and the portal's own name is `apimatic.json`'s `portal.site.name`.
+   * outranks both. At the content root it names the Home tab, which holds the index page and
+   * every page and folder that is not a tab of its own.
    */
   private static titleErrors(title: unknown, context: NavigationContext): string[] {
     if (title === undefined) {
       return [];
     }
-    if (context.isContentRoot) {
-      return [
-        `${context.label}: 'title' names a folder, and this file orders the content root, ` +
-          `which is not one. Set the portal's own name with 'portal.site.name' in apimatic.json.`
-      ];
-    }
-    // A directory with no page beneath it becomes no folder, so the name would reach nothing
-    // -- the same silent setting the content root is refused for. The parent's file is
-    // already refused for naming such a directory, for the same reason.
-    if (!context.becomesFolder) {
+    // Below the content root, a directory with no page beneath it becomes no folder, so the
+    // name would reach nothing. At the root it names the Home tab, which exists without one.
+    if (!context.isContentRoot && !context.becomesFolder) {
       return [
         `${context.label}: 'title' names this folder, but a directory with no page in it or ` +
           `below it is no folder in the sidebar. Add a page, or remove the setting.`

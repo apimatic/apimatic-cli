@@ -39,10 +39,14 @@ Documentation portals are now built on your machine from a `src/` directory, and
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Page order comes from a `nav.json` beside your pages, listing them by file name, and a
-  `title` there names the folder it sits in. The top level of the portal is shown as tabs:
-  Home, Guides, SDKs, Context Plugin, the API reference, and any folder directly under
-  `src/content/` whose own `nav.json` sets `"root": true`. The root `nav.json` places the
-  tabs the CLI makes with `apimatic:sdks`, `apimatic:plugin` and `apimatic:api`.
+  `title` there names the folder it sits in. A folder links to its `index.md`; without one it
+  is only a heading.
+- The top level of the portal is shown as tabs: SDKs, Context Plugin, the API reference, each
+  folder directly under `src/content/` whose own `nav.json` sets `"root": true`, and Home,
+  which holds your `index.md` and every other page and folder at the top level. Home opens on
+  `index.md`, and the `title` in `src/content/nav.json` names it. That file places the tabs the
+  CLI makes with `apimatic:sdks`, `apimatic:plugin` and `apimatic:api`, and Home comes first
+  unless it lists `index`.
 - The SDKs tab has a page per language in the `languages` block, and the Context Plugin tab
   appears when there is a `plugin` block. Their addresses, `/sdks` and `/context-plugin`, are
   kept for them, so a page in `src/content/` that would be served there is refused.

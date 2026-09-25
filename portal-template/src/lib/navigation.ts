@@ -46,21 +46,18 @@ const API_REFERENCE_TITLE = 'API Reference';
 const HOME_URL = docsRoute;
 
 /**
- * The tabs no folder backs, which the transformer assembles from loose nodes. Their names are
- * fixed, and so are their ids: React keys and the tree context's tab matching both go by id,
- * and the tree is serialised and rebuilt on its way to the browser. Fumadocs ids a node by its
- * path relative to the content directory, which never starts with a slash, so these cannot be
- * taken by a directory of the same name.
+ * The id of the one tab no folder backs, which the transformer assembles from the loose nodes.
+ * It is fixed: React keys and the tree context's tab matching both go by id, and the tree is
+ * serialised and rebuilt on its way to the browser. Fumadocs ids a node by its path relative to
+ * the content directory, which never starts with a slash, so no directory can take it.
  */
-const SYNTHETIC_TABS = {
-  home: { $id: '/tab/home', name: 'Home' },
-  guides: { $id: '/tab/guides', name: 'Guides' }
-} as const;
+const HOME_TAB_ID = '/tab/home';
 
-/** The node the fallback home page gets when there is no index page; see `groupIntoTabs`. */
+/** The Home tab's name when the root `nav.json` gives none, and the fallback home page's. */
+const HOME_NAME = 'Home';
+
+/** The node the fallback home page gets when there is no index page; see `withHomePageFirst`. */
 const SYNTHETIC_HOME_ID = '/page/home';
-
-type SyntheticTab = keyof typeof SYNTHETIC_TABS;
 
 /**
  * The key the generated pages are passed to `loader()` under, which the storage stamps onto
@@ -108,9 +105,7 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
       }
       // Last, so a name the user wrote outranks both the title Fumadocs takes from an index
       // page and the default the API wrapper is given just above. Never at the content root,
-      // which is no folder in the sidebar: Fumadocs names the tree itself from this node, and
-      // the CLI refuses a title there, so honouring one would rename the preview and then
-      // fail the build -- the disagreement the token checks in `reorder` exist to avoid.
+      // which is no folder in the sidebar: its title names the Home tab instead.
       if (folderPath !== '' && settings?.title !== undefined) {
         node.name = settings.title;
       }
@@ -122,10 +117,10 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
 /**
  * A tab is a root folder, which is how Fumadocs builds a tab bar: a top-level folder whose
  * `nav.json` sets `"root": true` becomes one, as do the API reference and each folder the CLI
- * generates, and the loose nodes are gathered into Home (the index page) and Guides
- * (everything else). The tabs are ordered by where each one's first node sat, except that Home
- * leads when the file does not place the index page itself. Tabs change no address: URLs come
- * from slugs.
+ * generates, and the index page and every other loose node are gathered into Home, which the
+ * root `nav.json`'s `title` names. The tabs keep the root's order, except that Home leads
+ * unless the file places the index page, which puts it there. Tabs change no address: URLs
+ * come from slugs.
  *
  * Fumadocs never reads `root` itself: it takes a folder's metadata from `meta.json`, which the
  * content collection does not load. So only this decides which folders become tabs, which is
@@ -178,16 +173,8 @@ function isTabFolder(context: NavigationContext, folder: Folder): boolean {
 
 function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   const tabs: Folder[] = [];
-  const synthetic = new Map<SyntheticTab, Folder>();
-  const gather = (kind: SyntheticTab, child: Node): void => {
-    let tab = synthetic.get(kind);
-    if (tab === undefined) {
-      tab = { type: 'folder', ...SYNTHETIC_TABS[kind], root: true, children: [] };
-      synthetic.set(kind, tab);
-      tabs.push(tab);
-    }
-    tab.children.push(child);
-  };
+  const loose: Node[] = [];
+  let tabsBeforeIndex: number | undefined;
 
   for (const child of children) {
     if (
@@ -195,20 +182,12 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
       (isApiReference(child) || isTabFolder(context, child) || isInjected(context, child))
     ) {
       tabs.push(asTab(child));
-    } else if (child.type === 'page' && child.url === HOME_URL) {
-      gather('home', child);
     } else {
-      gather('guides', child);
+      if (child.type === 'page' && child.url === HOME_URL) {
+        tabsBeforeIndex = tabs.length;
+      }
+      loose.push(child);
     }
-  }
-
-  // A project without an index page still gets a home page, rendered by the route, but no
-  // node reaches it: it would sit outside every tab and show no tab bar at all. It gets one
-  // here -- unless the address is taken deeper down, as by an index page in a `(group)`
-  // folder, since the same URL may appear only once in the tree.
-  const hasIndexPage = synthetic.has('home');
-  if (!hasIndexPage && !containsUrl(children, HOME_URL)) {
-    gather('home', { type: 'page', $id: SYNTHETIC_HOME_ID, name: SYNTHETIC_TABS.home.name, url: HOME_URL });
   }
 
   // Fumadocs points a tab at the page with the same path inside the tab being left, when
@@ -219,14 +198,41 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     delete tab.$ref;
   }
 
+  const homeChildren = withHomePageFirst(loose, children);
+  if (homeChildren.length === 0) {
+    return tabs;
+  }
+
+  const settings = readSettings(context, '');
+  const home: Folder = {
+    type: 'folder',
+    $id: HOME_TAB_ID,
+    name: settings?.title ?? HOME_NAME,
+    root: true,
+    children: homeChildren
+  };
   // The home page opens the site, so its tab leads unless the file placed the page itself --
   // which it can only do when there is an index page: without one, an `index` entry names a
   // folder of that name.
-  const home = synthetic.get('home');
-  if (home !== undefined && !(hasIndexPage && namesIndex(context))) {
-    return [home, ...tabs.filter((tab) => tab !== home)];
+  const at = tabsBeforeIndex !== undefined && namesIndex(settings) ? tabsBeforeIndex : 0;
+  return [...tabs.slice(0, at), home, ...tabs.slice(at)];
+}
+
+/**
+ * The loose nodes with the one that serves the home page first, so the tab opens on it. A
+ * project without an index page still gets a home page, rendered by the route, and a node here
+ * to reach it -- unless a tab of its own serves the address, since the same URL may appear only
+ * once in the tree.
+ */
+function withHomePageFirst(loose: Node[], children: Node[]): Node[] {
+  const holder = loose.find((node) => containsUrl([node], HOME_URL));
+  if (holder !== undefined) {
+    return [holder, ...loose.filter((node) => node !== holder)];
   }
-  return tabs;
+  if (containsUrl(children, HOME_URL)) {
+    return loose;
+  }
+  return [{ type: 'page', $id: SYNTHETIC_HOME_ID, name: HOME_NAME, url: HOME_URL }, ...loose];
 }
 
 /**
@@ -243,8 +249,8 @@ function asTab(folder: Folder): Folder {
   return folder;
 }
 
-function namesIndex(context: NavigationContext): boolean {
-  return readSettings(context, '')?.pages?.some((entry) => entry.trim() === INDEX_STEM) ?? false;
+function namesIndex(settings: NavigationSettings | undefined): boolean {
+  return settings?.pages?.some((entry) => entry.trim() === INDEX_STEM) ?? false;
 }
 
 function containsUrl(nodes: Node[], url: string): boolean {

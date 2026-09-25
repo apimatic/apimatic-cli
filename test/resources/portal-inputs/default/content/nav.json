@@ -1,3 +1,4 @@
 {
-  "pages": ["index", "apimatic:sdks", "apimatic:api", "authentication"]
+  "title": "Overview",
+  "pages": ["index", "guides", "apimatic:api", "apimatic:sdks", "authentication"]
 }

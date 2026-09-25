@@ -67,10 +67,10 @@ Delivered as **one PR** (section 11).
 |---|---|
 | Where navigation lives | The root `src/content/nav.json`. Its entries, in order, decide the tabs and their order (section 5). `apimatic.json` carries no tab order and no section list. |
 | Tabs | Always on. Each top-level node belongs to exactly one tab; there is no flat-sidebar mode. |
-| Content tabs | A folder directly under `content/` becomes its own tab when its own `nav.json` sets `"root": true` — Fumadocs' own key for the same thing. Otherwise it stays a group in the Guides sidebar. |
-| Tab labels | Fixed for the three tabs no folder backs: "Home", "Guides", "SDKs". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. Only root-level tabs are affected; nothing nested changes. *(Amended 2026-09-24: SDKs is now a generated folder rather than a tab no folder backs, and "Context Plugin" joins it; both labels stay fixed, set by the generated folders' `nav.json` titles. `.ai/plans/generated-pages.md`.)* |
+| Content tabs | A folder directly under `content/` becomes its own tab when its own `nav.json` sets `"root": true` — Fumadocs' own key for the same thing. Otherwise it stays a group in the Guides sidebar. *(Amended 2026-09-25: in the Home tab's sidebar, section 5.)* |
+| Tab labels | Fixed for the three tabs no folder backs: "Home", "Guides", "SDKs". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. Only root-level tabs are affected; nothing nested changes. *(Amended 2026-09-24: SDKs is now a generated folder rather than a tab no folder backs, and "Context Plugin" joins it; both labels stay fixed, set by the generated folders' `nav.json` titles. `.ai/plans/generated-pages.md`.)* *(Amended 2026-09-25: there is no Guides tab, and the root `nav.json` `title` renames Home, section 5.)* |
 | Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. *(Amended 2026-09-24: `apimatic:plugin` places the Context Plugin tab, a generated section given its own token by this rule; the AI section is still to come.)* |
-| Home | `content/index.md` rendered in the docs layout, in its own Home tab. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. |
+| Home | `content/index.md` rendered in the docs layout, in its own Home tab. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. *(Amended 2026-09-25: Home also holds every page and folder that is no tab of its own, the index page first.)* |
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
 | Primary colour | Overrides `--color-fd-primary`, a contrast-picked `--color-fd-primary-foreground`, and `--color-fd-ring`. Fumadocs' neutral theme supplies every other token (section 15). |
@@ -103,6 +103,8 @@ Rejected, with reasons:
 - **Configurable labels for Home, Guides and SDKs.** No place for them in
   `nav.json` (see above), and a second place to name tabs in `apimatic.json` for
   three words nobody has asked to change. Additive later if asked for.
+  *(Amended 2026-09-25: asked for after QA. Guides is gone, and the root
+  `nav.json` `title` names Home, section 5.)*
 - **Near-miss hints for the flat `dev` keys.** The flat block never shipped, and
   the project carries no migration messaging.
 - **Home as a plain tab, not a root folder.** Fumadocs builds tab groups from
@@ -272,6 +274,18 @@ synthetic `/tab/sdks` is gone, so the fixed ids below are `/tab/home` and
 `/tab/guides`. No `nav.json` at all gives Home, Guides, SDKs, Context Plugin,
 API, and the unnamed sections keep that order before the API.
 
+*Amended 2026-09-25* (QA of the tabs): Home and Guides are one tab. A user
+folder called `guides/` sat inside the Guides tab as Guides › Guides, giving it
+`"root": true` made two tabs named Guides, the Guides tab opened on whichever
+loose page came first, and Home held a single page. Now the index page and
+every other loose node make up Home, which lists the node serving `/` first --
+the index page, a `(group)` folder holding one, or the fallback node -- so the
+tab opens on the home page. The root `nav.json`'s `title`, refused until now,
+names the tab, and "Home" does otherwise; the tree itself is still not renamed.
+Home keeps its placement rule, the other rows of the table are unchanged, and
+`/tab/home` is the only fixed id left. No `nav.json` at all gives Home, SDKs,
+Context Plugin, API.
+
 ### Mechanism
 
 A second transformer, `tabsTransformer`, registered after `navigationTransformer`,
@@ -346,7 +360,8 @@ under `portal serve` as they do today, tabs included, with no config watcher.
   groups; in `content/api/` it is redundant because the API is always a tab.
   Each case is reported with its own sentence.
 - The root-`title` refusal message names `portal.site.name` instead of
-  `portal.title`.
+  `portal.title`. *(Amended 2026-09-25: the root `title` is accepted and names
+  the Home tab, section 5.)*
 - `PortalSourceContext.navigation`'s `visit` gains a flag for "directly under
   the content root", beside the `isContentRoot` and `isApiDirectory` it already
   passes, and `PortalNavigation.validate`'s context gains the same field. Today
@@ -810,7 +825,9 @@ verified to build 22 pages with this branch's CLI.
   restart. An already-open tab relies on Vite's own module and CSS updates for
   the same files, and was not checked separately.
 - Whether the one-entry sidebar on the Home tab grates enough to hide it. Docs
-  has `sidebar.enabled`; notebook and glass do not. Deferred.
+  has `sidebar.enabled`; notebook and glass do not. Deferred. *(2026-09-25: since
+  Home holds the loose pages too, only a project whose content is its index page
+  alone still has it.)*
 
 ## 13. Changes to the other plans
 

@@ -239,10 +239,13 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   // The only end-to-end proof that `nav.json` reaches the build: the Vite glob, the macro's
-  // `meta.files` restriction and the transformer over real on-disk storage.
+  // `meta.files` restriction and the transformer over real on-disk storage. Fumadocs' own
+  // order would put the page above the folder, and the defaults the SDKs above the reference.
   it('orders the sidebar by nav.json, with the SDKs and the API reference where their tokens name them', () => {
     const tree = read(treeCacheFiles()[0]);
-    const order = ['Welcome', 'SDKs', 'API Reference', 'Authentication'].map((name) => tree.indexOf(`"${name}"`));
+    const order = ['Welcome', 'Developer Guides', 'Authentication', 'API Reference', 'SDKs'].map((name) =>
+      tree.indexOf(`"${name}"`)
+    );
 
     expect(
       order.every((at) => at !== -1),
@@ -264,12 +267,11 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   // The fixture's `content/guides/` is named by its `nav.json` rather than by its directory,
   // which is the only proof the title reaches a real build rather than the in-memory loader.
-  // The Guides tab holding it is called "Guides" too, so that name is counted, not looked for.
   it('names a folder from its nav.json instead of its directory', () => {
     const tree = read(treeCacheFiles()[0]);
 
     expect(tree).to.contain('"Developer Guides"');
-    expect(tree.split('"Guides"').length - 1, 'nodes named "Guides"').to.equal(1);
+    expect(tree).to.not.contain('"Guides"');
   });
 
   it('ships only the syntax grammars a portal can contain', () => {
@@ -302,15 +304,14 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   // The layout puts the tab bar in the header, and the prerendered page carries it,
   // so the tabs are there before any script runs.
-  it('renders the top level as tabs in the header, in the order nav.json gives', () => {
+  it('renders the top level as tabs in the header, in the order nav.json gives, Home named by it', () => {
     const page = read('index.html');
     const tab = (href: string, name: string) =>
       page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
     const positions = [
-      tab('/', 'Home'),
-      tab('/sdks', 'SDKs'),
+      tab('/', 'Overview'),
       tab('/api/apimatic-calculator/simple-calculator/Calculate', 'API Reference'),
-      tab('/authentication', 'Guides')
+      tab('/sdks', 'SDKs')
     ];
 
     expect(
