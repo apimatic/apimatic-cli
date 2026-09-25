@@ -296,8 +296,9 @@ describe('GenerateAction', () => {
   it('says which folders the root nav.json makes tabs of, and which tab names are shared', async () => {
     const result = await execute();
 
+    const [notices] = shared.prompts.contentNotices.firstCall.args;
     expect(result.isSuccess()).to.be.true;
-    expect(shared.prompts.folderTabs.firstCall.args[0].map((folder) => folder.leafName())).to.deep.equal(['guides']);
-    expect(shared.prompts.sharedTabNames.firstCall.args[0]).to.deep.equal([]);
+    expect(notices.folderTabs.map((folder) => folder.leafName())).to.deep.equal(['guides']);
+    expect(notices.sharedTabNames).to.deep.equal([]);
   });
 });

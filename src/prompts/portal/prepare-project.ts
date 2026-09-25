@@ -3,19 +3,11 @@ import { Result } from 'neverthrow';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
-import { FilePath } from '../../types/file/filePath.js';
+import { ContentNotices } from '../../types/portal/content-notices.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
-import { SharedTabName } from '../../types/portal/portal-tabs.js';
 import { generateArtifacts, reportUnplacedSamples } from './code-samples.js';
-import {
-  reportFolderTabs,
-  reportHiddenPages,
-  reportIgnoredNavigationFiles,
-  reportShadowedFiles,
-  reportSharedTabNames,
-  reportSourceProblem
-} from './source.js';
+import { reportContentNotices, reportShadowedFiles, reportSourceProblem } from './source.js';
 
 /** What both `portal generate` and `portal serve` say while the project they share is prepared. */
 export class PreparePortalProjectPrompts {
@@ -31,20 +23,8 @@ export class PreparePortalProjectPrompts {
     reportShadowedFiles(shadowed);
   }
 
-  public pagesHiddenBySpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportHiddenPages(files, sourceDirectory);
-  }
-
-  public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportIgnoredNavigationFiles(files, sourceDirectory);
-  }
-
-  public folderTabs(folders: DirectoryPath[]) {
-    reportFolderTabs(folders);
-  }
-
-  public sharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath) {
-    reportSharedTabNames(shared, sourceDirectory);
+  public contentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath) {
+    reportContentNotices(notices, sourceDirectory);
   }
 
   public unplacedSamples(endpoints: string[]) {

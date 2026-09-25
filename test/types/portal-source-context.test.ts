@@ -9,7 +9,13 @@ import { parse as parseYaml } from 'yaml';
 import { FileService } from '../../src/infrastructure/file-service';
 import { APIMATIC_SCHEMA_URL } from '../../src/types/apimatic-config/document';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
-import { PortalSettings, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
+import { GeneratedPages } from '../../src/types/portal/generated-pages';
+import {
+  ContentProblem,
+  PortalSettings,
+  PortalSource,
+  PortalSourceProblem
+} from '../../src/types/portal/portal-source';
 import { PortalTab } from '../../src/types/portal/portal-tabs';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
@@ -42,11 +48,26 @@ describe('PortalSourceContext', () => {
 
   /** The ignored navigation files as the warning names them, relative to the source directory. */
   const ignored = (source: PortalSource): string[] =>
-    source.ignoredNavigationFiles.map((file) => file.relativeTo(new DirectoryPath(root)));
+    source.contentNotices.ignoredNavigationFiles.map((file) => file.relativeTo(new DirectoryPath(root)));
 
   /** The hidden pages as the warning names them, relative to the source directory. */
   const hidden = (source: PortalSource): string[] =>
-    source.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
+    source.contentNotices.hiddenPages.map((file) => file.relativeTo(new DirectoryPath(root))).sort();
+
+  /** Every problem found in `content/`, when that is what refused the source. */
+  const contentProblems = (problem: PortalSourceProblem): ContentProblem[] => {
+    if (problem.kind !== 'invalidContent') {
+      throw new Error(`expected problems in content/, got '${problem.kind}'`);
+    }
+    return problem.problems;
+  };
+
+  /** The one problem found in `content/`. */
+  const contentProblem = (problem: PortalSourceProblem): ContentProblem => {
+    const problems = contentProblems(problem);
+    expect(problems.map(({ kind }) => kind)).to.have.lengthOf(1);
+    return problems[0];
+  };
 
   /** Each file the block names that is not on disk: its setting, its path, and its spelling on disk in another case. */
   const missingFiles = (result: Result<unknown, PortalSourceProblem>): [string, string, string | null][] => {
@@ -474,7 +495,10 @@ describe('PortalSourceContext', () => {
         });
 
       try {
-        expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'unreadableContent' });
+        expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+          kind: 'invalidContent',
+          problems: [{ kind: 'unreadableContent' }]
+        });
       } finally {
         getDirectory.restore();
       }
@@ -673,7 +697,8 @@ describe('PortalSourceContext', () => {
     });
 
     /** Each refused page as the file, where it would be served, and the section it collides with. */
-    const reserved = (problem: PortalSourceProblem): string[] => {
+    const reserved = (refused: PortalSourceProblem): string[] => {
+      const problem = contentProblem(refused);
       if (problem.kind !== 'reservedAddresses') {
         throw new Error(`expected a 'reservedAddresses' problem, got '${problem.kind}'`);
       }
@@ -682,6 +707,7 @@ describe('PortalSourceContext', () => {
         .sort();
     };
 
+    // Three of them share /sdks as well, which is not said again.
     it('refuses every page the SDK pages would share an address with, naming each', async () => {
       write('content/sdks.md', page('Mine'));
       write('content/sdks/setup.mdx', page('Setup'));
@@ -726,7 +752,7 @@ describe('PortalSourceContext', () => {
     it('answers an entry that names a generated section with its token', async () => {
       write('content/nav.json', JSON.stringify({ pages: ['index', 'sdks', 'context-plugin'] }));
 
-      const problem = (await resolve())._unsafeUnwrapErr();
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
 
       expect(problem.kind === 'invalidNavigation' && problem.errors).to.deep.equal([
         "content/nav.json: 'sdks' is not a page or folder in this directory. 'apimatic:sdks' positions the SDK pages.",
@@ -743,7 +769,8 @@ describe('PortalSourceContext', () => {
     });
 
     /** Each shared address with the pages that would be served there. */
-    const shared = (problem: PortalSourceProblem): string[] => {
+    const shared = (refused: PortalSourceProblem): string[] => {
+      const problem = contentProblem(refused);
       if (problem.kind !== 'sharedAddresses') {
         throw new Error(`expected a 'sharedAddresses' problem, got '${problem.kind}'`);
       }
@@ -757,10 +784,18 @@ describe('PortalSourceContext', () => {
     it('refuses a page named like a (group) folder, which Fumadocs throws on', async () => {
       write('content/(intro).md', page('Intro'));
 
-      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({
+      expect(contentProblem((await resolve())._unsafeUnwrapErr())).to.deep.equal({
         kind: 'groupNamedPages',
         pages: [new FilePath(new DirectoryPath(root).join('content'), new FileName('(intro).md'))]
       });
+    });
+
+    // It has no address, so it cannot share one with the page it looks like it would.
+    it('refuses such a page only for its name', async () => {
+      write('content/(intro).md', page('Intro'));
+      write('content/(start)/(intro).md', page('Intro again'));
+
+      expect(contentProblem((await resolve())._unsafeUnwrapErr()).kind).to.equal('groupNamedPages');
     });
 
     // Vite's glob, which the build reads the content through, never loads them.
@@ -773,14 +808,14 @@ describe('PortalSourceContext', () => {
 
       const source = (await resolve())._unsafeUnwrap();
 
-      expect(source.hiddenPages).to.deep.equal([]);
+      expect(source.contentNotices.hiddenPages).to.deep.equal([]);
     });
 
     it('does not count a dot folder as one a nav.json entry can name', async () => {
       write('content/.drafts/notes.md', page('Notes'));
       write('content/nav.json', JSON.stringify({ pages: ['index', '.drafts'] }));
 
-      const problem = (await resolve())._unsafeUnwrapErr();
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
 
       expect(problem.kind === 'invalidNavigation' && problem.errors).to.deep.equal([
         "content/nav.json: '.drafts' is not a page or folder in this directory."
@@ -828,24 +863,102 @@ describe('PortalSourceContext', () => {
     });
 
     it('refuses what resolve refuses about the content, and accepts it once fixed', async () => {
-      const { specs } = (await resolve())._unsafeUnwrap();
+      const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
       const context = new PortalSourceContext(new DirectoryPath(root));
 
       write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
-      const refused = (await context.resolveContent(specs))._unsafeUnwrapErr();
+      const refused = (await context.resolveContent(specs, generatedPages))._unsafeUnwrapErr();
       write('content/nav.json', JSON.stringify({ pages: ['index'] }));
 
-      expect(refused.kind).to.equal('invalidNavigation');
-      expect((await context.resolveContent(specs)).isOk()).to.be.true;
+      expect(refused.map(({ kind }) => kind)).to.deep.equal(['invalidNavigation']);
+      expect((await context.resolveContent(specs, generatedPages)).isOk()).to.be.true;
     });
 
     // The reference's folders are the specifications' own, which it takes as they were at startup.
     it('lets content/api/nav.json name a specification without reading it again', async () => {
-      const { specs } = (await resolve())._unsafeUnwrap();
+      const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
       write('content/api/nav.json', JSON.stringify({ pages: [specs[0].slug] }));
       fs.rmSync(path.join(root, 'spec/api.json'));
 
-      expect((await new PortalSourceContext(new DirectoryPath(root)).resolveContent(specs)).isOk()).to.be.true;
+      const content = await new PortalSourceContext(new DirectoryPath(root)).resolveContent(specs, generatedPages);
+
+      expect(content.isOk()).to.be.true;
+    });
+
+    it('gives the notices resolve gives about the content', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/api/api/notes.md', page('Notes'));
+      write('content/guides/Nav.json', JSON.stringify({ pages: ['intro'] }));
+      const source = (await resolve())._unsafeUnwrap();
+
+      const notices = await new PortalSourceContext(new DirectoryPath(root)).resolveContent(
+        source.specs,
+        source.generatedPages
+      );
+
+      expect(notices._unsafeUnwrap()).to.deep.equal(source.contentNotices);
+      expect(hidden(source)).to.deep.equal(['content/api/api/notes.md']);
+      expect(ignored(source)).to.deep.equal(['content/guides/Nav.json']);
+      expect(source.contentNotices.folderTabs.map((folder) => folder.leafName())).to.deep.equal(['guides']);
+    });
+
+    // `portal serve` passes the generated pages the preview shows, which an edit to apimatic.json changes.
+    it('names the tabs against the generated pages it is given', async () => {
+      write('content/extensions/first.md', page('First'));
+      write('content/extensions/nav.json', JSON.stringify({ title: 'Context Plugin' }));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'extensions'] }));
+      const { specs, generatedPages: withoutPlugin } = (await resolve())._unsafeUnwrap();
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
+      const { generatedPages: withPlugin } = (await resolve())._unsafeUnwrap();
+      const context = new PortalSourceContext(new DirectoryPath(root));
+
+      const names = async (generatedPages: GeneratedPages) =>
+        (await context.resolveContent(specs, generatedPages))._unsafeUnwrap().sharedTabNames.map(({ name }) => name);
+
+      expect(await names(withoutPlugin)).to.deep.equal([]);
+      expect(await names(withPlugin)).to.deep.equal(['Context Plugin']);
+    });
+  });
+
+  // One run lists all of it, so a project upgraded from 1.x is not fixed one kind of mistake at a time.
+  describe('every problem in the content', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    const kinds = async () => contentProblems((await resolve())._unsafeUnwrapErr()).map(({ kind }) => kind);
+
+    it('reports the front matter and the nav.json files together', async () => {
+      write('content/notes.md', '# Notes');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'missing'] }));
+
+      expect(await kinds()).to.deep.equal(['invalidFrontMatter', 'invalidNavigation']);
+    });
+
+    it('reports every kind of page at the wrong address together, with the front matter', async () => {
+      write('content/(intro).md', page('Intro'));
+      write('content/sdks.md', page('Mine'));
+      write('content/faq.md', page('FAQ'));
+      write('content/faq.mdx', '# FAQ again');
+
+      expect(await kinds()).to.deep.equal([
+        'groupNamedPages',
+        'reservedAddresses',
+        'sharedAddresses',
+        'invalidFrontMatter'
+      ]);
+    });
+
+    // An entry naming such a page would be answered as if the page were served where it sits.
+    it('leaves the nav.json files until every page has an address of its own', async () => {
+      write('content/guides.md', page('Guides page'));
+      write('content/guides/index.md', page('Guides'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides', 'missing'] }));
+
+      expect(await kinds()).to.deep.equal(['sharedAddresses']);
     });
   });
 
@@ -861,7 +974,7 @@ describe('PortalSourceContext', () => {
       write('content/notes.md', 'Just a body, no front matter.');
       write('content/guides/intro.mdx', '---\ntitle: 2024\n---\n');
 
-      const problem = (await resolve())._unsafeUnwrapErr();
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
 
       expect(problem.kind === 'invalidFrontMatter' && [...problem.errors].sort()).to.deep.equal([
         "content/guides/intro.mdx: 'title' must be text. Put it in quotes if it looks like a number or true or false.",
@@ -879,7 +992,7 @@ describe('PortalSourceContext', () => {
         });
 
       try {
-        const problem = (await resolve())._unsafeUnwrapErr();
+        const problem = contentProblem((await resolve())._unsafeUnwrapErr());
 
         expect(problem.kind === 'invalidFrontMatter' && problem.errors).to.deep.equal([
           'content/notes.md could not be read.'
@@ -892,7 +1005,7 @@ describe('PortalSourceContext', () => {
     it('checks the pages below content/api too, which the build compiles as well', async () => {
       write('content/api/overview.md', '# Overview');
 
-      const problem = (await resolve())._unsafeUnwrapErr();
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
 
       expect(problem.kind === 'invalidFrontMatter' && problem.errors).to.deep.equal([
         'content/api/overview.md has no front matter, which is where its title goes.'
@@ -909,7 +1022,8 @@ describe('PortalSourceContext', () => {
     });
 
     /** The errors behind an `invalidNavigation` problem, as their own type. */
-    const navigationErrors = (problem: PortalSourceProblem): string[] => {
+    const navigationErrors = (refused: PortalSourceProblem): string[] => {
+      const problem = contentProblem(refused);
       if (problem.kind !== 'invalidNavigation') {
         throw new Error(`expected an 'invalidNavigation' problem, got '${problem.kind}'`);
       }
@@ -975,7 +1089,7 @@ describe('PortalSourceContext', () => {
       write('content/concepts/pets.md', page('Pets'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'tutorials', 'guides', '...'] }));
 
-      const folders = (await resolve())._unsafeUnwrap().folderTabs.map((folder) => folder.leafName());
+      const folders = (await resolve())._unsafeUnwrap().contentNotices.folderTabs.map((folder) => folder.leafName());
 
       expect(folders).to.deep.equal(['tutorials', 'guides']);
     });
@@ -1147,9 +1261,9 @@ describe('PortalSourceContext', () => {
       write('content/(start)/intro/index.md', page('Intro'));
       write('content/nav.json', JSON.stringify({ pages: ['index', '(start)'] }));
 
-      expect((await resolve())._unsafeUnwrap().folderTabs.map((folder) => folder.leafName())).to.deep.equal([
-        '(start)'
-      ]);
+      const { folderTabs } = (await resolve())._unsafeUnwrap().contentNotices;
+
+      expect(folderTabs.map((folder) => folder.leafName())).to.deep.equal(['(start)']);
     });
 
     it('accepts a directory whose pages are nested below it', async () => {
@@ -1173,7 +1287,7 @@ describe('PortalSourceContext', () => {
       write('content/Nav.json', JSON.stringify({ pages: ['index'] }));
 
       const first = (await resolve())._unsafeUnwrap();
-      first.ignoredNavigationFiles.length = 0;
+      first.contentNotices.ignoredNavigationFiles.length = 0;
 
       expect(ignored((await resolve())._unsafeUnwrap())).to.deep.equal(['content/Nav.json']);
     });
@@ -1221,7 +1335,7 @@ describe('PortalSourceContext', () => {
     /** Each name more than one tab shares, with its tabs described and sorted. */
     const shared = async (): Promise<[string, string[]][]> => {
       const source = (await resolve())._unsafeUnwrap();
-      return source.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(described).sort()]);
+      return source.contentNotices.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(described).sort()]);
     };
 
     /** A folder directly under `content/`, which `listFolders` makes a tab. */
@@ -1430,7 +1544,7 @@ describe('PortalSourceContext', () => {
       const scaffolded = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
 
       expect(contentFiles).to.deep.equal(['index.md', 'nav.json']);
-      expect(scaffolded.ignoredNavigationFiles).to.deep.equal([]);
+      expect(scaffolded.contentNotices.ignoredNavigationFiles).to.deep.equal([]);
     });
 
     it('falls back to a placeholder title for a specification it cannot read', async () => {

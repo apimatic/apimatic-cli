@@ -2,7 +2,13 @@ import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { listedInProse } from '../../utils/string-utils.js';
-import { PortalSourceProblem, ReservedAddressPage, SharedAddress } from '../../types/portal/portal-source.js';
+import { ContentNotices } from '../../types/portal/content-notices.js';
+import {
+  ContentProblem,
+  PortalSourceProblem,
+  ReservedAddressPage,
+  SharedAddress
+} from '../../types/portal/portal-source.js';
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -43,39 +49,8 @@ export function reportSourceProblem(
       }
       return;
     }
-    case 'invalidNavigation': {
-      log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
-      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
-      return;
-    }
-    case 'invalidFrontMatter': {
-      log.error(`The front matter of pages in ${f.path(sourceDirectory)} would fail the build:`);
-      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
-      log.message(`Start each page with front matter that gives its title, for example:\n${TITLE_EXAMPLE}`);
-      return;
-    }
-    case 'groupNamedPages': {
-      const names = listedInProse(problem.pages.map((page) => f.var(page.relativeTo(sourceDirectory))));
-      const one = problem.pages.length === 1;
-      log.error(
-        `${names} ${one ? 'is' : 'are'} named like a ${f.var('(group)')} folder, which is left out of every ` +
-          `address, so the build cannot serve ${one ? 'it' : 'them'}. Rename ${one ? 'the file' : 'each file'}.`
-      );
-      return;
-    }
-    case 'reservedAddresses': {
-      reportReservedAddresses(problem.pages, sourceDirectory);
-      return;
-    }
-    case 'sharedAddresses': {
-      reportSharedAddresses(problem.addresses, sourceDirectory);
-      return;
-    }
-    case 'unreadableContent': {
-      log.error(
-        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
-          `directory beneath it can be listed.`
-      );
+    case 'invalidContent': {
+      reportContentProblems(problem.problems, sourceDirectory);
       return;
     }
     case 'unreadableSpec': {
@@ -121,6 +96,53 @@ export function reportSourceProblem(
       const message =
         `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join('spec'))}. ` + convertToOpenApi3();
       log.error(message);
+      return;
+    }
+  }
+}
+
+/** Each problem in turn, so one run lists everything a build would refuse in `content/`. */
+export function reportContentProblems(problems: ContentProblem[], sourceDirectory: DirectoryPath): void {
+  for (const problem of problems) {
+    reportContentProblem(problem, sourceDirectory);
+  }
+}
+
+function reportContentProblem(problem: ContentProblem, sourceDirectory: DirectoryPath): void {
+  switch (problem.kind) {
+    case 'unreadableContent': {
+      log.error(
+        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
+          `directory beneath it can be listed.`
+      );
+      return;
+    }
+    case 'groupNamedPages': {
+      const names = listedInProse(problem.pages.map((page) => f.var(page.relativeTo(sourceDirectory))));
+      const one = problem.pages.length === 1;
+      log.error(
+        `${names} ${one ? 'is' : 'are'} named like a ${f.var('(group)')} folder, which is left out of every ` +
+          `address, so the build cannot serve ${one ? 'it' : 'them'}. Rename ${one ? 'the file' : 'each file'}.`
+      );
+      return;
+    }
+    case 'reservedAddresses': {
+      reportReservedAddresses(problem.pages, sourceDirectory);
+      return;
+    }
+    case 'sharedAddresses': {
+      reportSharedAddresses(problem.addresses, sourceDirectory);
+      return;
+    }
+    case 'invalidFrontMatter': {
+      log.error(`The front matter of pages in ${f.path(sourceDirectory)} would fail the build:`);
+      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      log.message(`Start each page with front matter that gives its title, for example:\n${TITLE_EXAMPLE}`);
+      return;
+    }
+    case 'invalidNavigation': {
+      log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
+      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
       return;
     }
   }
@@ -179,6 +201,13 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
   log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
+}
+
+export function reportContentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath): void {
+  reportHiddenPages(notices.hiddenPages, sourceDirectory);
+  reportIgnoredNavigationFiles(notices.ignoredNavigationFiles, sourceDirectory);
+  reportFolderTabs(notices.folderTabs);
+  reportSharedTabNames(notices.sharedTabNames, sourceDirectory);
 }
 
 export function reportFolderTabs(folders: DirectoryPath[]): void {

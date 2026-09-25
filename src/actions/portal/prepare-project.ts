@@ -41,10 +41,7 @@ export class PreparePortalProjectAction {
       return ActionResult.failed();
     }
     this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-    this.prompts.folderTabs(source.value.folderTabs);
-    this.prompts.sharedTabNames(source.value.sharedTabNames, sourceDirectory);
+    this.prompts.contentNotices(source.value.contentNotices, sourceDirectory);
 
     if (!(await confirm())) {
       return ActionResult.cancelled();

@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
 import { reportFolderTabs, reportSharedTabNames, reportSourceProblem } from '../../../src/prompts/portal/source.js';
+import { ContentProblem } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
@@ -19,6 +20,10 @@ describe('reportSourceProblem', () => {
     [...error.getCalls(), ...message.getCalls()]
       .map((call) => stripVTControlCharacters(String(call.args[0])))
       .join('\n');
+
+  /** A source refused for these problems in `content/`. */
+  const reportContent = (...problems: ContentProblem[]) =>
+    reportSourceProblem({ kind: 'invalidContent', problems }, source);
 
   beforeEach(() => {
     error = sinon.stub(log, 'error');
@@ -98,19 +103,16 @@ describe('reportSourceProblem', () => {
     const content = source.join('content');
 
     it('names the page, where it would be served, and what the address is kept for', () => {
-      reportSourceProblem(
-        {
-          kind: 'reservedAddresses',
-          pages: [
-            {
-              file: new FilePath(content.join('(intro)'), new FileName('sdks.md')),
-              address: '/sdks',
-              section: SDK_SECTION
-            }
-          ]
-        },
-        source
-      );
+      reportContent({
+        kind: 'reservedAddresses',
+        pages: [
+          {
+            file: new FilePath(content.join('(intro)'), new FileName('sdks.md')),
+            address: '/sdks',
+            section: SDK_SECTION
+          }
+        ]
+      });
 
       const [heading, ...rest] = printed().split('\n');
 
@@ -122,24 +124,21 @@ describe('reportSourceProblem', () => {
     });
 
     it('says which section a deeper page falls under, for every page and section', () => {
-      reportSourceProblem(
-        {
-          kind: 'reservedAddresses',
-          pages: [
-            {
-              file: new FilePath(content.join('sdks'), new FileName('setup.md')),
-              address: '/sdks/setup',
-              section: SDK_SECTION
-            },
-            {
-              file: new FilePath(content, new FileName('context-plugin.mdx')),
-              address: '/context-plugin',
-              section: PLUGIN_SECTION
-            }
-          ]
-        },
-        source
-      );
+      reportContent({
+        kind: 'reservedAddresses',
+        pages: [
+          {
+            file: new FilePath(content.join('sdks'), new FileName('setup.md')),
+            address: '/sdks/setup',
+            section: SDK_SECTION
+          },
+          {
+            file: new FilePath(content, new FileName('context-plugin.mdx')),
+            address: '/context-plugin',
+            section: PLUGIN_SECTION
+          }
+        ]
+      });
 
       expect(printed()).to.contain('Pages in ');
       expect(printed()).to.contain(
@@ -153,16 +152,13 @@ describe('reportSourceProblem', () => {
   });
 
   it('lists each page whose front matter the build would refuse, and shows front matter that works', () => {
-    reportSourceProblem(
-      {
-        kind: 'invalidFrontMatter',
-        errors: [
-          'content/notes.md has no front matter, which is where its title goes.',
-          "content/faq.md: 'title' must not be empty."
-        ]
-      },
-      source
-    );
+    reportContent({
+      kind: 'invalidFrontMatter',
+      errors: [
+        'content/notes.md has no front matter, which is where its title goes.',
+        "content/faq.md: 'title' must not be empty."
+      ]
+    });
 
     const [heading, ...rest] = printed().split('\n');
 
@@ -178,13 +174,10 @@ describe('reportSourceProblem', () => {
   });
 
   it('names a page named like a (group) folder, and why it cannot be served', () => {
-    reportSourceProblem(
-      {
-        kind: 'groupNamedPages',
-        pages: [new FilePath(source.join('content'), new FileName('(intro).md'))]
-      },
-      source
-    );
+    reportContent({
+      kind: 'groupNamedPages',
+      pages: [new FilePath(source.join('content'), new FileName('(intro).md'))]
+    });
 
     expect(printed()).to.equal(
       "'content/(intro).md' is named like a '(group)' folder, which is left out of every address, so the " +
@@ -197,16 +190,13 @@ describe('reportSourceProblem', () => {
     const page = (directory: DirectoryPath, name: string) => new FilePath(directory, new FileName(name));
 
     it('names each address and its pages, and why a (group) or index page lands there', () => {
-      reportSourceProblem(
-        {
-          kind: 'sharedAddresses',
-          addresses: [
-            { address: '/guides', pages: [page(content, 'guides.md'), page(content.join('guides'), 'index.md')] },
-            { address: '/', pages: [page(content, 'index.md'), page(content.join('(start)'), 'index.md')] }
-          ]
-        },
-        source
-      );
+      reportContent({
+        kind: 'sharedAddresses',
+        addresses: [
+          { address: '/guides', pages: [page(content, 'guides.md'), page(content.join('guides'), 'index.md')] },
+          { address: '/', pages: [page(content, 'index.md'), page(content.join('(start)'), 'index.md')] }
+        ]
+      });
 
       const [heading, ...rest] = printed().split('\n');
 
@@ -220,17 +210,27 @@ describe('reportSourceProblem', () => {
     });
 
     it('speaks of one address when there is one', () => {
-      reportSourceProblem(
-        {
-          kind: 'sharedAddresses',
-          addresses: [{ address: '/faq', pages: [page(content, 'faq.md'), page(content, 'faq.mdx')] }]
-        },
-        source
-      );
+      reportContent({
+        kind: 'sharedAddresses',
+        addresses: [{ address: '/faq', pages: [page(content, 'faq.md'), page(content, 'faq.mdx')] }]
+      });
 
       expect(printed()).to.contain('would share an address, but only one page can be served at each:');
       expect(printed()).to.contain('Rename or move all but one of them.');
     });
+  });
+
+  it('reports every problem in the content, one after another', () => {
+    reportContent(
+      { kind: 'invalidFrontMatter', errors: ['content/notes.md has no front matter, which is where its title goes.'] },
+      { kind: 'invalidNavigation', errors: ["content/nav.json: 'missing' is not a page or folder in this directory."] }
+    );
+
+    const headings = error.getCalls().map((call) => stripVTControlCharacters(String(call.args[0])));
+    expect(headings).to.have.lengthOf(2);
+    expect(headings[0]).to.match(/^The front matter of pages in .+ would fail the build:$/);
+    expect(headings[1]).to.match(/^The page order in .+ could not be applied:$/);
+    expect(printed()).to.contain("  • content/nav.json: 'missing' is not a page or folder in this directory.");
   });
 });
 

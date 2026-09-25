@@ -4,13 +4,14 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
-import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { ContentNotices } from '../../types/portal/content-notices.js';
+import { ContentProblem, PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportSourceProblem } from './source.js';
+import { reportContentNotices, reportContentProblems, reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
   public authorizationFailed(failure: PortalAuthorizationFailure) {
@@ -104,8 +105,8 @@ export class PortalServePrompts {
   }
 
   /** Explained as `portal generate` would explain it, since the same rules refused it. */
-  public contentRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
+  public contentRejected(problems: ContentProblem[], sourceDirectory: DirectoryPath) {
+    reportContentProblems(problems, sourceDirectory);
     log.message(
       `The preview may show the pages wrongly, or not at all, until ${f.path(sourceDirectory.join('content'))} ` +
         `is fixed; a build would stop here.`
@@ -118,6 +119,10 @@ export class PortalServePrompts {
 
   public contentAccepted(sourceDirectory: DirectoryPath) {
     log.success(`${f.path(sourceDirectory.join('content'))} is fixed; a build would accept it again.`);
+  }
+
+  public contentNotices(notices: ContentNotices, sourceDirectory: DirectoryPath) {
+    reportContentNotices(notices, sourceDirectory);
   }
 
   public contentNotWatched(reason: string, sourceDirectory: DirectoryPath) {

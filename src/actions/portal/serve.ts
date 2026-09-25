@@ -5,7 +5,9 @@ import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { PortalSource } from '../../types/portal/portal-source.js';
+import { noticesSince } from '../../types/portal/content-notices.js';
+import { GeneratedPages } from '../../types/portal/generated-pages.js';
+import { PortalSettings, PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
@@ -83,8 +85,16 @@ export class PortalServeAction {
           onServing();
         }
 
-        const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);
-        const contentWatch = this.watchContent(source, sourceDirectory);
+        // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
+        let generatedPages = source.generatedPages;
+        const contentWatch = this.watchContent(source, () => generatedPages, sourceDirectory);
+        const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory, (settings) => {
+          const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
+          generatedPages = settings.generatedPages;
+          if (tabsChanged) {
+            contentWatch?.recheck();
+          }
+        });
         const closeWatches = async () => {
           await configWatch?.close();
           await contentWatch?.close();
@@ -124,7 +134,8 @@ export class PortalServeAction {
   private watchConfig(
     source: PortalSource,
     projectDirectory: DirectoryPath,
-    sourceDirectory: DirectoryPath
+    sourceDirectory: DirectoryPath,
+    onApplied: (settings: PortalSettings) => void
   ): FileWatch | undefined {
     const sourceContext = new PortalSourceContext(sourceDirectory);
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
@@ -151,6 +162,7 @@ export class PortalServeAction {
       if (preview.show(config, applied.value)) {
         this.prompts.configApplied();
       }
+      onApplied(settings);
     };
 
     // The watch drops whatever its handler throws, so a fault no Result carries, such as the
@@ -180,23 +192,35 @@ export class PortalServeAction {
     return watch.value;
   }
 
-  /** The preview drops what a build would refuse without a word, so each save is checked as a build would. */
-  private watchContent(source: PortalSource, sourceDirectory: DirectoryPath): FileWatch | undefined {
+  /**
+   * The preview drops what a build would refuse without a word, so each save is checked as a
+   * build would check it, and what a build would warn of is said on the save that brings it about.
+   */
+  private watchContent(
+    source: PortalSource,
+    generatedPages: () => GeneratedPages,
+    sourceDirectory: DirectoryPath
+  ): FileWatch | undefined {
     if (source.contentDirectory === null) {
       return undefined;
     }
     const sourceContext = new PortalSourceContext(sourceDirectory);
     let rejected = false;
+    let reported = source.contentNotices;
 
     const check = async () => {
-      const checked = await sourceContext.resolveContent(source.specs);
+      const checked = await sourceContext.resolveContent(source.specs, generatedPages());
       if (checked.isErr()) {
         rejected = true;
         this.prompts.contentRejected(checked.error, sourceDirectory);
-      } else if (rejected) {
+        return;
+      }
+      if (rejected) {
         rejected = false;
         this.prompts.contentAccepted(sourceDirectory);
       }
+      this.prompts.contentNotices(noticesSince(checked.value, reported), sourceDirectory);
+      reported = checked.value;
     };
     // As for `apimatic.json`: the watch drops whatever its handler throws.
     const onSave = async () => {

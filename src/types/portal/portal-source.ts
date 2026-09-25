@@ -3,9 +3,9 @@ import { FileName } from '../file/fileName.js';
 import { FilePath } from '../file/filePath.js';
 import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
+import { ContentNotices } from './content-notices.js';
 import { GeneratedPages, GeneratedSection } from './generated-pages.js';
 import { PortalConfig } from './portal-config.js';
-import { SharedTabName } from './portal-tabs.js';
 
 /** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
 export interface PortalSpec {
@@ -32,20 +32,7 @@ export interface PortalSource extends PortalSettings {
   contentDirectory: DirectoryPath | null;
   staticDirectory: DirectoryPath | null;
   shadowedFiles: FileName[];
-  /**
-   * Pages below `content/api/<slug>/` for a specification `<slug>`. The section's generated
-   * metadata lists only the reference pages, so these never appear in the sidebar.
-   */
-  hiddenPages: FilePath[];
-  /**
-   * A `nav.json` written in a case the build's glob does not match, such as `Nav.json`, and
-   * so read by nothing. Reported rather than left to sit there doing nothing.
-   */
-  ignoredNavigationFiles: FilePath[];
-  /** The folders `content/nav.json` makes tabs of, in its order; listing one is all it takes. */
-  folderTabs: DirectoryPath[];
-  /** Names more than one tab would show, which the build accepts and a reader cannot tell apart. */
-  sharedTabNames: SharedTabName[];
+  contentNotices: ContentNotices;
 }
 
 /** Why a source directory could not be written; each variant maps to its own message. */
@@ -79,17 +66,22 @@ export interface SharedAddress {
   pages: FilePath[];
 }
 
+/** Why `content/` cannot be built; each variant maps to its own message. */
+export type ContentProblem =
+  | { kind: 'unreadableContent' }
+  | { kind: 'groupNamedPages'; pages: FilePath[] }
+  | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
+  | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
+  | { kind: 'invalidFrontMatter'; errors: string[] }
+  | { kind: 'invalidNavigation'; errors: string[] };
+
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
   | { kind: 'missingConfig' }
   // `missingPortal`: the block itself is absent, which is what quickstart sets up.
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
-  | { kind: 'invalidNavigation'; errors: string[] }
-  | { kind: 'invalidFrontMatter'; errors: string[] }
-  | { kind: 'groupNamedPages'; pages: FilePath[] }
-  | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
-  | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
-  | { kind: 'unreadableContent' }
+  // Every problem found in `content/`, so that one run lists all that a build would refuse.
+  | { kind: 'invalidContent'; problems: ContentProblem[] }
   | { kind: 'unreadableSpec'; fileName: FileName }
   | { kind: 'emptySpecDirectory' }
   | { kind: 'noOpenApiSpec' }

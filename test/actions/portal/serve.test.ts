@@ -231,11 +231,10 @@ describe('PortalServeAction', () => {
       await whileServing(async (save) => {
         await save('{ "pages": ["intro", ');
 
-        const [problem] = prompts.contentRejected.firstCall.args;
-        expect(problem).to.deep.equal({
-          kind: 'invalidNavigation',
-          errors: ['content/guides/nav.json is not valid JSON.']
-        });
+        const [problems] = prompts.contentRejected.firstCall.args;
+        expect(problems).to.deep.equal([
+          { kind: 'invalidNavigation', errors: ['content/guides/nav.json is not valid JSON.'] }
+        ]);
       });
     });
 
@@ -243,7 +242,7 @@ describe('PortalServeAction', () => {
       await whileServing(async (save) => {
         await save(JSON.stringify({ pages: ['intro', 'does-not-exist'] }));
 
-        const [problem] = prompts.contentRejected.firstCall.args;
+        const [[problem]] = prompts.contentRejected.firstCall.args;
         expect(problem.kind === 'invalidNavigation' && problem.errors[0]).to.contain(
           "'does-not-exist' is not a page or folder in this directory."
         );
@@ -261,6 +260,51 @@ describe('PortalServeAction', () => {
 
         expect(prompts.contentRejected.calledOnce).to.be.true;
         expect(prompts.contentAccepted.calledOnce).to.be.true;
+      });
+    });
+
+    // The fixture's root nav.json names the Home tab 'Overview'.
+    it('gives a notice on the save that brings it about, and not on the saves after it', async () => {
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
+        await save(JSON.stringify({ title: 'Overview', pages: ['intro', '...'] }));
+
+        const names = prompts.contentNotices
+          .getCalls()
+          .map(({ args: [notices] }) => notices.sharedTabNames.map(({ name }) => name));
+        expect(names).to.deep.equal([['Overview'], []]);
+      });
+    });
+
+    it('checks the content again when an edit to apimatic.json adds or removes a generated tab', async () => {
+      const configFile = path.join(source.toString(), 'apimatic.json');
+      const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+      let saveConfig: (edited: object) => Promise<void> = async () => undefined;
+      watch.callsFake((_directory: DirectoryPath, _fileName: FileName, onChange: () => Promise<void>) => {
+        saveConfig = async (edited) => {
+          fs.writeFileSync(configFile, JSON.stringify(edited));
+          await onChange();
+        };
+        return ok({ close: sinon.stub().resolves(), recheck: sinon.stub() });
+      });
+      sinon.stub(PortalProjectService.prototype, 'applyConfig').resolves(ok(true));
+      writeNavigation(JSON.stringify({ title: 'Context Plugin', pages: ['intro'] }));
+
+      await whileServing(async () => {
+        recheck.resetHistory();
+        await saveConfig({ ...config, portal: { ...config.portal, site: { ...config.portal.site, name: 'Renamed' } } });
+        expect(recheck.called).to.be.false;
+
+        await saveConfig({ ...config, plugin: {} });
+        expect(recheck.calledOnce).to.be.true;
+        // What the watch does on a recheck: check the content as though it had just been saved.
+        await (await watched).onChange();
+
+        const [notices] = prompts.contentNotices.lastCall.args;
+        expect(notices.sharedTabNames.map(({ name }) => name)).to.deep.equal(['Context Plugin']);
+
+        await saveConfig(config);
+        expect(recheck.calledTwice).to.be.true;
       });
     });
 

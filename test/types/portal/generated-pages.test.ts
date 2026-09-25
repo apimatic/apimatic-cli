@@ -73,6 +73,15 @@ describe('GeneratedPages', () => {
     });
   });
 
+  // `portal serve` checks the content's tab names again only when the generated tabs change.
+  it('makes the same tabs whatever the languages, and another tab with a plugin block', () => {
+    const typescript = pagesFor({ typescript: {} });
+
+    expect(typescript.makesSameTabsAs(pagesFor({ python: {}, go: {} }))).to.be.true;
+    expect(typescript.makesSameTabsAs(pagesFor({ typescript: {} }, true))).to.be.false;
+    expect(pagesFor({ typescript: {} }, true).makesSameTabsAs(typescript)).to.be.false;
+  });
+
   it('writes each nav.json as the build reads it, ending in a newline', () => {
     const [file] = pagesFor({ typescript: {} }).navigationFiles();
 

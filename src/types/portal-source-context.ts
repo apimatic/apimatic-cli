@@ -8,6 +8,7 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
+import { ContentNotices } from './portal/content-notices.js';
 import { Endpoint } from './portal/endpoint.js';
 import { GENERATED_SECTIONS, GeneratedPages } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
@@ -23,6 +24,7 @@ import {
   PortalNavigation
 } from './portal/portal-navigation.js';
 import {
+  ContentProblem,
   MissingStaticFile,
   PortalScaffoldProblem,
   PortalSettings,
@@ -153,11 +155,10 @@ export class PortalSourceContext {
       : null;
     const contentDirectory = await this.existingContentDirectory();
 
-    const content = await this.content(contentDirectory, specs);
+    const content = await this.content(contentDirectory, specs, settings.value.generatedPages);
     if (content.isErr()) {
-      return err(content.error);
+      return err({ kind: 'invalidContent', problems: content.error });
     }
-    const { pages: contentPages, navigation } = content.value;
 
     return ok({
       ...settings.value,
@@ -166,17 +167,19 @@ export class PortalSourceContext {
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
-      hiddenPages: PortalSourceContext.hiddenPages(contentPages, specs),
-      ignoredNavigationFiles: navigation.ignoredFiles,
-      folderTabs: navigation.tabs.flatMap(({ owner }) => (owner.kind === 'folder' ? [owner.directory] : [])),
-      sharedTabNames: sharedTabNames(PortalSourceContext.allTabs(navigation.tabs, settings.value.generatedPages))
+      contentNotices: content.value
     });
   }
 
-  /** The `content/` half of `resolve`, for `portal serve` to run on each save, against the `specs` it found. */
-  public async resolveContent(specs: PortalSpec[]): Promise<Result<void, PortalSourceProblem>> {
-    const content = await this.content(await this.existingContentDirectory(), specs);
-    return content.map(() => undefined);
+  /**
+   * The `content/` half of `resolve`, for `portal serve` to run on each save, against the `specs`
+   * it found and the generated pages the preview shows.
+   */
+  public async resolveContent(
+    specs: PortalSpec[],
+    generatedPages: GeneratedPages
+  ): Promise<Result<ContentNotices, ContentProblem[]>> {
+    return await this.content(await this.existingContentDirectory(), specs, generatedPages);
   }
 
   private async existingContentDirectory(): Promise<DirectoryPath | null> {
@@ -186,8 +189,9 @@ export class PortalSourceContext {
   /** The content tree's pages and `nav.json` files, held to the rules the build reads them by. */
   private async content(
     contentDirectory: DirectoryPath | null,
-    specs: PortalSpec[]
-  ): Promise<Result<{ pages: ContentPage[]; navigation: NavigationScan }, PortalSourceProblem>> {
+    specs: PortalSpec[],
+    generatedPages: GeneratedPages
+  ): Promise<Result<ContentNotices, ContentProblem[]>> {
     // Walked once and shared: both the navigation scan and the hidden-page check read the
     // whole content tree, and `getDirectory` stats every entry in it.
     // Not swallowed: a tree that cannot be walked would otherwise pass as one with no files,
@@ -197,45 +201,72 @@ export class PortalSourceContext {
       try {
         contentTree = await this.fileService.getDirectory(contentDirectory);
       } catch {
-        return err({ kind: 'unreadableContent' });
+        return err([{ kind: 'unreadableContent' }]);
       }
     }
 
     const pages = contentTree === null ? [] : PortalSourceContext.contentPages(contentTree);
-
-    // Fumadocs throws on one: a `(group)` name is left out of every address, so it has none.
-    const groupNamed = pages.filter(({ file }) => GROUP_FOLDER.test(PortalSourceContext.pageName(file.name()) ?? ''));
-    if (groupNamed.length > 0) {
-      return err({ kind: 'groupNamedPages', pages: groupNamed.map(({ file }) => file) });
-    }
-
-    // Refused before the navigation scan, which would otherwise answer an entry naming such a
-    // page as if it were an ordinary one. In the build, the user's page and the generated one
-    // would compete for the address.
-    const reserved = PortalSourceContext.reservedAddressPages(pages);
-    if (reserved.length > 0) {
-      return err({ kind: 'reservedAddresses', pages: reserved });
-    }
-
-    // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
-    const shared = PortalSourceContext.sharedAddresses(pages);
-    if (shared.length > 0) {
-      return err({ kind: 'sharedAddresses', addresses: shared });
-    }
+    const addressProblems = PortalSourceContext.addressProblems(pages);
 
     // The build fails as a whole, with a stack trace, over one page whose front matter it refuses.
     const titledPages = await this.titledPages(pages);
-    if (titledPages.isErr()) {
-      return err({ kind: 'invalidFrontMatter', errors: titledPages.error });
+    const problems: ContentProblem[] = titledPages.isErr()
+      ? [{ kind: 'invalidFrontMatter', errors: titledPages.error }]
+      : [];
+
+    // The scan takes each page to be served where it sits, so it would misjudge an entry naming one of these.
+    if (addressProblems.length > 0) {
+      return err([...addressProblems, ...problems]);
     }
 
     // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
     // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
-    const navigation = await this.navigation(contentTree, specs, titledPages.value);
+    // A page refused for its front matter has no title here, which only names tabs never reported.
+    const navigation = await this.navigation(contentTree, specs, titledPages.unwrapOr([]));
     if (navigation.errors.length > 0) {
-      return err({ kind: 'invalidNavigation', errors: navigation.errors });
+      problems.push({ kind: 'invalidNavigation', errors: navigation.errors });
     }
-    return ok({ pages, navigation });
+    if (problems.length > 0) {
+      return err(problems);
+    }
+
+    return ok({
+      hiddenPages: PortalSourceContext.hiddenPages(pages, specs),
+      ignoredNavigationFiles: navigation.ignoredFiles,
+      folderTabs: navigation.tabs.flatMap(({ owner }) => (owner.kind === 'folder' ? [owner.directory] : [])),
+      sharedTabNames: sharedTabNames(PortalSourceContext.allTabs(navigation.tabs, generatedPages))
+    });
+  }
+
+  /**
+   * Pages the build cannot serve where they are, each refused for one reason: a page with no
+   * address is not judged by one, and one at an address kept for the generated pages is not
+   * said to share it as well.
+   */
+  private static addressProblems(pages: ContentPage[]): ContentProblem[] {
+    const problems: ContentProblem[] = [];
+
+    // Fumadocs throws on one: a `(group)` name is left out of every address, so it has none.
+    const groupNamed = pages.filter(({ file }) => GROUP_FOLDER.test(PortalSourceContext.pageName(file.name()) ?? ''));
+    if (groupNamed.length > 0) {
+      problems.push({ kind: 'groupNamedPages', pages: groupNamed.map(({ file }) => file) });
+    }
+    const addressed = pages.filter((page) => !groupNamed.includes(page));
+
+    // In the build, the user's page and the generated one would compete for the address.
+    const reserved = PortalSourceContext.reservedAddressPages(addressed);
+    if (reserved.length > 0) {
+      problems.push({ kind: 'reservedAddresses', pages: reserved });
+    }
+
+    // The build fails on two pages at one address, or moves an index page to `<folder>/index`.
+    const shared = PortalSourceContext.sharedAddresses(
+      addressed.filter(({ file }) => !reserved.some((page) => page.file.isEqual(file)))
+    );
+    if (shared.length > 0) {
+      problems.push({ kind: 'sharedAddresses', addresses: shared });
+    }
+    return problems;
   }
 
   /**
