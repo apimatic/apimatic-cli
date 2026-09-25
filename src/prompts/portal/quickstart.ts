@@ -15,6 +15,7 @@ import { PortalScaffoldProblem } from '../../types/portal/portal-source.js';
 import { Language, languageLabel, PLUGIN_LANGUAGES, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
+import { convertToOpenApi3 } from './source.js';
 
 const vscodeExtensionUrl =
   'https://marketplace.visualstudio.com/items?itemName=apimatic-developers.apimatic-for-vscode';
@@ -50,18 +51,14 @@ export class PortalQuickstartPrompts {
   }
 
   public specFormatUnsupported(specPath: FilePath, format: string) {
-    log.error(
-      `${f.path(specPath)} is ${format}. Portals are generated from OpenAPI 3.x documents; ` +
-        `convert it with ${f.cmdAlt('apimatic', 'api', 'transform')} first.`
-    );
+    const message = `${f.path(specPath)} is ${format}, not OpenAPI 3.x. ` + convertToOpenApi3();
+    log.error(message);
   }
 
-  /** For a document that names no format at all: a Postman collection, an arbitrary JSON file. */
+  /** For a document that names no format at all: a Postman collection, a RAML file, arbitrary JSON. */
   public specNotRecognised(specPath: FilePath) {
-    log.error(
-      `${f.path(specPath)} is not an OpenAPI document: it names no ${f.var('openapi')} version. ` +
-        `Portals are generated from OpenAPI 3.x documents.`
-    );
+    const message = `${f.path(specPath)} is not an OpenAPI 3.x document. ` + convertToOpenApi3();
+    log.error(message);
   }
 
   public runtimeUnsupported(reason: string) {
