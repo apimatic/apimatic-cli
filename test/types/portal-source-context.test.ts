@@ -27,6 +27,9 @@ describe('PortalSourceContext', () => {
     fs.writeFileSync(target, contents);
   };
 
+  /** The smallest page the build accepts: front matter giving its title. */
+  const page = (title: string) => `---\ntitle: ${title}\n---\n`;
+
   /** The smallest `languages` block the portal accepts. */
   const LANGUAGES = { typescript: {} };
 
@@ -460,7 +463,7 @@ describe('PortalSourceContext', () => {
     // Swallowing the failure would pass the tree off as empty, and a nav.json in it would go
     // unvalidated to a build that drops bad entries without a word.
     it('reports a content tree that cannot be walked instead of treating it as empty', async () => {
-      write('content/index.md', '# Home');
+      write('content/index.md', page('Home'));
       // Only the content tree fails; the spec directory is walked the same way and must not.
       const content = new DirectoryPath(root).join('content');
       const original = FileService.prototype.getDirectory;
@@ -480,7 +483,7 @@ describe('PortalSourceContext', () => {
     // A glob over the tree would skip such an entry; failing the whole build for one is worse
     // than describing the pages that are there.
     it('walks past an entry that cannot be examined, such as a link to nothing', async function () {
-      write('content/index.md', '# Home');
+      write('content/index.md', page('Home'));
       write('content/nav.json', JSON.stringify({ pages: ['index'] }));
       const target = path.join(root, 'content', 'gone');
       try {
@@ -508,14 +511,14 @@ describe('PortalSourceContext', () => {
     // The section's generated metadata lists only the reference pages, and metadata hides
     // whatever it does not name, so the page never reaches the sidebar.
     it('reports a page inside a specification’s section as hidden', async () => {
-      write('content/api/api/authentication.md', '# Authentication');
+      write('content/api/api/authentication.md', page('Authentication'));
 
       expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal(['content/api/api/authentication.md']);
     });
 
     it('reports a page hidden however deep it sits in the section', async () => {
-      write('content/api/api/pets/guide.mdx', '# Guide');
-      write('content/api/api/pets/(drafts)/notes.md', '# Notes');
+      write('content/api/api/pets/guide.mdx', page('Guide'));
+      write('content/api/api/pets/(drafts)/notes.md', page('Notes'));
 
       expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([
         'content/api/api/pets/(drafts)/notes.md',
@@ -527,7 +530,7 @@ describe('PortalSourceContext', () => {
     // and shown: as the section's landing page, or beside it.
     for (const landing of ['content/api/api.md', 'content/api/api/index.md']) {
       it(`does not report ${landing}, at the section’s own address`, async () => {
-        write(landing, '# Landing');
+        write(landing, page('Landing'));
 
         expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
       });
@@ -536,8 +539,8 @@ describe('PortalSourceContext', () => {
     // An index page is a folder's own link, and the folders directly below a section are the
     // tag folders, which the CLI cannot tell from the user's without reading the specification.
     it('does not report an index page one folder below the section, where the tag folders sit', async () => {
-      write('content/api/api/pets/index.md', '# Pets');
-      write('content/api/api/pets/deeper/index.md', '# Deeper');
+      write('content/api/api/pets/index.md', page('Pets'));
+      write('content/api/api/pets/deeper/index.md', page('Deeper'));
 
       expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal(['content/api/api/pets/deeper/index.md']);
     });
@@ -545,17 +548,17 @@ describe('PortalSourceContext', () => {
     // The page tree is keyed on the path as written: a differently cased directory, or a
     // route group on the way, is another folder, and no metadata hides what is in it.
     it('does not report pages whose directories only resolve to the section’s address', async () => {
-      write('content/API/api/guide.md', '# Guide');
-      write('content/api/API/guide.md', '# Guide');
-      write('content/api/(guides)/api/notes.md', '# Notes');
+      write('content/API/api/guide.md', page('Guide'));
+      write('content/api/API/guide.md', page('Guide'));
+      write('content/api/(guides)/api/notes.md', page('Notes'));
 
       expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
     });
 
     it('does not report pages under content/api in a folder that is no specification', async () => {
-      write('content/api/guides/intro.md', '# Intro');
-      write('content/api/overview.md', '# Overview');
-      write('content/api/index.md', '# API reference');
+      write('content/api/guides/intro.md', page('Intro'));
+      write('content/api/overview.md', page('Overview'));
+      write('content/api/index.md', page('API reference'));
 
       expect(hidden((await resolve())._unsafeUnwrap())).to.deep.equal([]);
     });
@@ -601,7 +604,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('reports them once they exist', async () => {
-      write('content/index.md', '# hi');
+      write('content/index.md', page('hi'));
       write('static/logo.png', 'x');
 
       const source = (await resolve())._unsafeUnwrap();
@@ -666,7 +669,7 @@ describe('PortalSourceContext', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });
       write('spec/api.json', OPENAPI);
-      write('content/index.md', '# Home');
+      write('content/index.md', page('Home'));
     });
 
     /** Each refused page as the file, where it would be served, and the section it collides with. */
@@ -680,10 +683,10 @@ describe('PortalSourceContext', () => {
     };
 
     it('refuses every page the SDK pages would share an address with, naming each', async () => {
-      write('content/sdks.md', '# Mine');
-      write('content/sdks/setup.mdx', '# Setup');
-      write('content/(intro)/sdks.md', '# Grouped');
-      write('content/sdks/index.md', '# Index');
+      write('content/sdks.md', page('Mine'));
+      write('content/sdks/setup.mdx', page('Setup'));
+      write('content/(intro)/sdks.md', page('Grouped'));
+      write('content/sdks/index.md', page('Index'));
 
       expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
         'content/(intro)/sdks.md /sdks sdks',
@@ -695,8 +698,8 @@ describe('PortalSourceContext', () => {
 
     // Reserved with or without a plugin block, so adding one never refuses a page that built.
     it('refuses a page at the context plugin address although there is no plugin block', async () => {
-      write('content/context-plugin.md', '# Mine');
-      write('content/context-plugin/faq.md', '# FAQ');
+      write('content/context-plugin.md', page('Mine'));
+      write('content/context-plugin/faq.md', page('FAQ'));
 
       expect(reserved((await resolve())._unsafeUnwrapErr())).to.deep.equal([
         'content/context-plugin.md /context-plugin context-plugin',
@@ -706,10 +709,10 @@ describe('PortalSourceContext', () => {
 
     // A group folder's name is not part of the address; only the folder it groups is.
     it('accepts pages whose address only starts with the same letters, or sits deeper', async () => {
-      write('content/sdks-overview.md', '# Overview');
-      write('content/guides/sdks.md', '# Nested');
-      write('content/(sdks)/intro.md', '# Grouped');
-      write('content/plugin.md', '# Plugin');
+      write('content/sdks-overview.md', page('Overview'));
+      write('content/guides/sdks.md', page('Nested'));
+      write('content/(sdks)/intro.md', page('Grouped'));
+      write('content/plugin.md', page('Plugin'));
 
       expect((await resolve()).isOk()).to.be.true;
     });
@@ -736,7 +739,7 @@ describe('PortalSourceContext', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });
       write('spec/api.json', OPENAPI);
-      write('content/index.md', '# Home');
+      write('content/index.md', page('Home'));
     });
 
     /** Each shared address with the pages that would be served there. */
@@ -753,8 +756,8 @@ describe('PortalSourceContext', () => {
 
     // The build would serve the page there and move the folder's own to /guides/index.
     it('refuses a page beside a folder whose index page has the same address', async () => {
-      write('content/guides.md', '# Guides page');
-      write('content/guides/index.md', '# Guides');
+      write('content/guides.md', page('Guides page'));
+      write('content/guides/index.md', page('Guides'));
 
       expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
         '/guides content/guides.md,content/guides/index.md'
@@ -762,11 +765,11 @@ describe('PortalSourceContext', () => {
     });
 
     it('refuses every address two pages share, through a (group) folder or two extensions', async () => {
-      write('content/(start)/index.md', '# Start');
-      write('content/intro.md', '# Intro');
-      write('content/(learn)/intro.mdx', '# Grouped intro');
-      write('content/faq.md', '# FAQ');
-      write('content/faq.mdx', '# FAQ again');
+      write('content/(start)/index.md', page('Start'));
+      write('content/intro.md', page('Intro'));
+      write('content/(learn)/intro.mdx', page('Grouped intro'));
+      write('content/faq.md', page('FAQ'));
+      write('content/faq.mdx', page('FAQ again'));
 
       expect(shared((await resolve())._unsafeUnwrapErr())).to.deep.equal([
         '/ content/(start)/index.md,content/index.md',
@@ -776,10 +779,41 @@ describe('PortalSourceContext', () => {
     });
 
     it('accepts a page beside a folder of the same name that has no index page', async () => {
-      write('content/guides.md', '# Guides page');
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides.md', page('Guides page'));
+      write('content/guides/intro.md', page('Intro'));
 
       expect((await resolve()).isOk()).to.be.true;
+    });
+  });
+
+  // The build fails as a whole over one page its schema refuses, with a stack trace for a message.
+  describe('the front matter of the pages', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', page('Home'));
+    });
+
+    it('refuses every page whose front matter the build would refuse, naming each', async () => {
+      write('content/notes.md', 'Just a body, no front matter.');
+      write('content/guides/intro.mdx', '---\ntitle: 2024\n---\n');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind === 'invalidFrontMatter' && [...problem.errors].sort()).to.deep.equal([
+        "content/guides/intro.mdx: 'title' must be text. Put it in quotes if it looks like a number or true or false.",
+        'content/notes.md has no front matter, which is where its title goes.'
+      ]);
+    });
+
+    it('checks the pages below content/api too, which the build compiles as well', async () => {
+      write('content/api/overview.md', '# Overview');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind === 'invalidFrontMatter' && problem.errors).to.deep.equal([
+        'content/api/overview.md has no front matter, which is where its title goes.'
+      ]);
     });
   });
 
@@ -787,8 +821,8 @@ describe('PortalSourceContext', () => {
     beforeEach(() => {
       writeConfig({ site: { name: 'Calc' } });
       write('spec/api.json', OPENAPI);
-      write('content/index.md', '# Home');
-      write('content/authentication.md', '# Auth');
+      write('content/index.md', page('Home'));
+      write('content/authentication.md', page('Auth'));
     });
 
     /** The errors behind an `invalidNavigation` problem, as their own type. */
@@ -834,7 +868,7 @@ describe('PortalSourceContext', () => {
     // there positions those folders as it does the user's own pages.
     it('lets the nav.json in content/api name the specifications beside its pages', async () => {
       write('spec/billing.json', OPENAPI);
-      write('content/api/overview.md', '# Overview');
+      write('content/api/overview.md', page('Overview'));
       write('content/api/nav.json', JSON.stringify({ pages: ['overview', 'api', 'billing'] }));
 
       expect((await resolve()).isOk()).to.be.true;
@@ -842,7 +876,7 @@ describe('PortalSourceContext', () => {
 
     // Listing a folder in the content root's file is what makes it a tab.
     it('refuses the root setting that used to make a tab, wherever it is written', async () => {
-      write('content/tutorials/first-call.md', '# First call');
+      write('content/tutorials/first-call.md', page('First call'));
       write('content/tutorials/nav.json', JSON.stringify({ root: true }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -853,9 +887,9 @@ describe('PortalSourceContext', () => {
     });
 
     it('makes a tab of each folder the root nav.json lists, in its order, and of no other', async () => {
-      write('content/tutorials/first-call.md', '# First call');
-      write('content/guides/intro.md', '# Intro');
-      write('content/concepts/pets.md', '# Pets');
+      write('content/tutorials/first-call.md', page('First call'));
+      write('content/guides/intro.md', page('Intro'));
+      write('content/concepts/pets.md', page('Pets'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'tutorials', 'guides', '...'] }));
 
       const folders = (await resolve())._unsafeUnwrap().folderTabs.map((folder) => folder.leafName());
@@ -864,8 +898,8 @@ describe('PortalSourceContext', () => {
     });
 
     it('refuses a name shared by a page and a folder, since only the folder could be positioned', async () => {
-      write('content/guides.md', '# Guides');
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides.md', page('Guides'));
+      write('content/guides/intro.md', page('Intro'));
       write('content/nav.json', JSON.stringify({ pages: ['guides', 'index'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -877,7 +911,7 @@ describe('PortalSourceContext', () => {
     // the tree makes `api` look like two children. Listing it is what turns the entry the
     // template would honour as the reference into an error rather than a silent reordering.
     it('refuses api at the root when a page carries the name the reference is mounted at', async () => {
-      write('content/api.md', '# My API notes');
+      write('content/api.md', page('My API notes'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -895,7 +929,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('accepts api at the root when a directory of that name holds the user’s own pages', async () => {
-      write('content/api/overview.md', '# Overview');
+      write('content/api/overview.md', page('Overview'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'api'] }));
 
       expect((await resolve()).isOk()).to.be.true;
@@ -903,7 +937,7 @@ describe('PortalSourceContext', () => {
 
     // One node, so the two spellings name it twice wherever the directory came from.
     it('refuses api together with the token, with or without a directory of that name', async () => {
-      write('content/api/overview.md', '# Overview');
+      write('content/api/overview.md', page('Overview'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'api', 'apimatic:api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -913,7 +947,7 @@ describe('PortalSourceContext', () => {
 
     // The specification's folder is one child; a page of the same name beside it is another.
     it('refuses a specification’s name when a page under content/api carries it too', async () => {
-      write('content/api/api.md', '# Landing');
+      write('content/api/api.md', page('Landing'));
       write('content/api/nav.json', JSON.stringify({ pages: ['api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -922,7 +956,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('refuses a specification named anywhere but in content/api', async () => {
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides/intro.md', page('Intro'));
       write('content/guides/nav.json', JSON.stringify({ pages: ['intro', 'api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -931,7 +965,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('validates a nested file against its own directory', async () => {
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides/intro.md', page('Intro'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
       write('content/guides/nav.json', JSON.stringify({ pages: ['intro'] }));
 
@@ -940,8 +974,8 @@ describe('PortalSourceContext', () => {
 
     // A folder's index page is what the folder itself links to, not one of its children.
     it('refuses index in a nested file while keeping it at the content root', async () => {
-      write('content/guides/index.md', '# Guides');
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides/index.md', page('Guides'));
+      write('content/guides/intro.md', page('Intro'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
       write('content/guides/nav.json', JSON.stringify({ pages: ['index', 'intro'] }));
 
@@ -952,7 +986,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('refuses a page named in the wrong directory', async () => {
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides/intro.md', page('Intro'));
       // 'authentication' is a sibling of the content root's nav.json, not of this one.
       write('content/guides/nav.json', JSON.stringify({ pages: ['authentication'] }));
 
@@ -962,7 +996,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('refuses an apimatic token outside the content root', async () => {
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides/intro.md', page('Intro'));
       write('content/guides/nav.json', JSON.stringify({ pages: ['intro', 'apimatic:api'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -971,7 +1005,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('collects the errors of every file in the tree', async () => {
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides/intro.md', page('Intro'));
       write('content/nav.json', JSON.stringify({ pages: ['nope'] }));
       write('content/guides/nav.json', JSON.stringify({ pages: ['also-nope'] }));
 
@@ -983,7 +1017,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('addresses a page by its name without the extension, for both md and mdx', async () => {
-      write('content/tour.mdx', '# Tour');
+      write('content/tour.mdx', page('Tour'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'tour', 'authentication'] }));
 
       expect((await resolve()).isOk()).to.be.true;
@@ -1012,7 +1046,7 @@ describe('PortalSourceContext', () => {
 
     it('refuses to make a tab of a (group) folder that serves the home page, however deep', async () => {
       fs.rmSync(path.join(root, 'content/index.md'));
-      write('content/(start)/(welcome)/index.md', '# Welcome');
+      write('content/(start)/(welcome)/index.md', page('Welcome'));
       write('content/nav.json', JSON.stringify({ pages: ['(start)', 'authentication'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
@@ -1024,7 +1058,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('makes a tab of a (group) folder that does not serve the home page', async () => {
-      write('content/(start)/intro/index.md', '# Intro');
+      write('content/(start)/intro/index.md', page('Intro'));
       write('content/nav.json', JSON.stringify({ pages: ['index', '(start)'] }));
 
       expect((await resolve())._unsafeUnwrap().folderTabs.map((folder) => folder.leafName())).to.deep.equal([
@@ -1033,7 +1067,7 @@ describe('PortalSourceContext', () => {
     });
 
     it('accepts a directory whose pages are nested below it', async () => {
-      write('content/guides/deep/intro.md', '# Intro');
+      write('content/guides/deep/intro.md', page('Intro'));
       write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
 
       expect((await resolve()).isOk()).to.be.true;
@@ -1078,7 +1112,7 @@ describe('PortalSourceContext', () => {
     // is neither read nor remarked upon, whatever it contains.
     it('says nothing about other JSON and YAML files in the content directory', async () => {
       write('content/meta.json', JSON.stringify({ pages: ['nonsense'] }));
-      write('content/guides/intro.md', '# Intro');
+      write('content/guides/intro.md', page('Intro'));
       write('content/guides/nav.yaml', 'pages: [nonsense]');
 
       const source = (await resolve())._unsafeUnwrap();

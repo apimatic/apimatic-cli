@@ -11,6 +11,7 @@ import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js'
 import { Endpoint } from './portal/endpoint.js';
 import { GENERATED_SECTIONS, GeneratedPages } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
+import { PageFrontMatter } from './portal/page-front-matter.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
 import {
@@ -31,7 +32,7 @@ import {
   ReservedAddressPage,
   SharedAddress
 } from './portal/portal-source.js';
-import { frontMatterTitle, PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal/portal-tabs.js';
+import { PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal/portal-tabs.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -80,6 +81,12 @@ interface CheckedNavigation {
 interface ContentPage {
   file: FilePath;
   segments: string[];
+}
+
+/** A page whose front matter the build accepts, with the title it names the page by. */
+interface TitledPage {
+  file: FilePath;
+  title: string;
 }
 
 /** What the walk found in one directory and everything beneath it. */
@@ -174,9 +181,15 @@ export class PortalSourceContext {
       return err({ kind: 'sharedAddresses', addresses: shared });
     }
 
+    // The build fails as a whole, with a stack trace, over one page whose front matter it refuses.
+    const titledPages = await this.titledPages(contentPages);
+    if (titledPages.isErr()) {
+      return err({ kind: 'invalidFrontMatter', errors: titledPages.error });
+    }
+
     // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
     // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
-    const navigation = await this.navigation(contentTree, specs);
+    const navigation = await this.navigation(contentTree, specs, titledPages.value);
     if (navigation.errors.length > 0) {
       return err({ kind: 'invalidNavigation', errors: navigation.errors });
     }
@@ -347,7 +360,11 @@ export class PortalSourceContext {
    * any `nav.json` in a case the build does not match. One walk, because both come from the
    * same tree, and a directory has to be seen before its file can be checked against it.
    */
-  private async navigation(contentTree: Directory | null, specs: PortalSpec[]): Promise<NavigationScan> {
+  private async navigation(
+    contentTree: Directory | null,
+    specs: PortalSpec[],
+    pages: TitledPage[]
+  ): Promise<NavigationScan> {
     if (contentTree === null) {
       return { errors: [], ignoredFiles: [], tabs: [] };
     }
@@ -477,16 +494,17 @@ export class PortalSourceContext {
 
       if (isContentRoot) {
         // The home page is the content root's index page, which names no tab.
-        tabs.push(await this.namedTab({ kind: 'home' }, navigation, undefined));
+        tabs.push(PortalSourceContext.namedTab({ kind: 'home' }, navigation, undefined, pages));
         for (const entry of navigation?.settings.pages ?? []) {
           const subfolder = subfolders.get(entry);
           if (subfolder !== undefined) {
             const { navigation: own, indexPage: index } = subfolder.scan;
-            tabs.push(await this.namedTab({ kind: 'folder', directory: subfolder.directory }, own, index));
+            const owner: TabOwner = { kind: 'folder', directory: subfolder.directory };
+            tabs.push(PortalSourceContext.namedTab(owner, own, index, pages));
           }
         }
       } else if (isApiDirectory) {
-        tabs.push(await this.namedTab({ kind: 'apiReference' }, navigation, indexPage));
+        tabs.push(PortalSourceContext.namedTab({ kind: 'apiReference' }, navigation, indexPage, pages));
       }
 
       const servesOwnAddress = indexPage !== undefined || homePageFolders.length > 0;
@@ -498,19 +516,18 @@ export class PortalSourceContext {
   }
 
   /** A tab by the name the template gives it: its `nav.json` title, else its index page's. */
-  private async namedTab(
+  private static namedTab(
     owner: TabOwner,
     navigation: CheckedNavigation | undefined,
-    indexPage: FilePath | undefined
-  ): Promise<PortalTab> {
+    indexPage: FilePath | undefined,
+    pages: TitledPage[]
+  ): PortalTab {
     if (navigation?.settings.title !== undefined) {
       return { owner, name: navigation.settings.title, namedBy: navigation.file };
     }
-    if (indexPage !== undefined) {
-      const pageTitle = await this.pageTitle(indexPage);
-      if (pageTitle !== undefined) {
-        return { owner, name: pageTitle, namedBy: indexPage };
-      }
+    const index = indexPage === undefined ? undefined : pages.find((page) => page.file.isEqual(indexPage));
+    if (index !== undefined) {
+      return { owner, name: index.title, namedBy: index.file };
     }
     return { owner, name: untitledTabName(owner), namedBy: null };
   }
@@ -528,13 +545,18 @@ export class PortalSourceContext {
     );
   }
 
-  // A page that cannot be read or parsed fails the build on its own, with the build's message.
-  private async pageTitle(file: FilePath): Promise<string | undefined> {
-    try {
-      return frontMatterTitle(await this.fileService.getContents(file));
-    } catch {
-      return undefined;
-    }
+  /** Every page with its title, or all that the build would refuse in their front matter. */
+  private async titledPages(pages: ContentPage[]): Promise<Result<TitledPage[], string[]>> {
+    const titled = await Promise.all(
+      pages.map(async ({ file }) => {
+        const label = file.relativeTo(this.sourceDirectory);
+        const markdown = await this.fileService.getContents(file).catch(() => undefined);
+        const title =
+          markdown === undefined ? err([`${label} could not be read.`]) : PageFrontMatter.title(markdown, label);
+        return title.map((name): TitledPage => ({ file, title: name }));
+      })
+    );
+    return Result.combineWithAllErrors(titled).mapErr((errors) => errors.flat());
   }
 
   /**

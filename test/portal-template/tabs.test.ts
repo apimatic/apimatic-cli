@@ -12,7 +12,8 @@ import {
 import { portalTabs } from '../../portal-template/src/lib/tabs';
 import { frontmatter } from 'fumadocs-core/content/md/frontmatter';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { frontMatterTitle, untitledTabName } from '../../src/types/portal/portal-tabs';
+import { PageFrontMatter } from '../../src/types/portal/page-front-matter';
+import { untitledTabName } from '../../src/types/portal/portal-tabs';
 
 /**
  * The tabs the transformers make of a real `loader()`'s tree, and the list the layouts are
@@ -465,7 +466,7 @@ describe('tabsTransformer', () => {
         listing('index', 'tutorials')
       ];
 
-      expect(tabNames({ docs })).to.include(frontMatterTitle(markdown));
+      expect(tabNames({ docs })).to.include(PageFrontMatter.title(markdown, 'tutorials/index.mdx')._unsafeUnwrap());
     });
   });
 });

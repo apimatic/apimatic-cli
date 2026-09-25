@@ -146,6 +146,31 @@ describe('reportSourceProblem', () => {
     });
   });
 
+  it('lists each page whose front matter the build would refuse, and shows front matter that works', () => {
+    reportSourceProblem(
+      {
+        kind: 'invalidFrontMatter',
+        errors: [
+          'content/notes.md has no front matter, which is where its title goes.',
+          "content/faq.md: 'title' must not be empty."
+        ]
+      },
+      source
+    );
+
+    const [heading, ...rest] = printed().split('\n');
+
+    expect(heading).to.match(/^The front matter of pages in .+ would fail the build:$/);
+    expect(rest).to.deep.equal([
+      '  • content/notes.md has no front matter, which is where its title goes.',
+      "  • content/faq.md: 'title' must not be empty.",
+      'Every page starts with front matter that gives its title, for example:',
+      '---',
+      'title: Getting started',
+      '---'
+    ]);
+  });
+
   describe('pages at the same address', () => {
     const content = source.join('content');
     const page = (directory: DirectoryPath, name: string) => new FilePath(directory, new FileName(name));

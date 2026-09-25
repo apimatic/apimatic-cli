@@ -5,7 +5,6 @@ import { FilePath } from '../../../src/types/file/filePath';
 import { PLUGIN_SECTION, SDK_SECTION } from '../../../src/types/portal/generated-pages';
 import {
   directoryTabName,
-  frontMatterTitle,
   PortalTab,
   sharedTabNames,
   TabOwner,
@@ -68,33 +67,6 @@ describe('portal tabs', () => {
     ]) {
       it(`names '${directory}' '${name}', as Fumadocs does`, () => {
         expect(directoryTabName(directory)).to.equal(name);
-      });
-    }
-  });
-
-  describe('frontMatterTitle', () => {
-    it('reads the title from the front matter', () => {
-      expect(frontMatterTitle('---\ntitle: Learn the API\ndescription: More\n---\n\n# Body')).to.equal('Learn the API');
-    });
-
-    it('reads front matter written with Windows line endings', () => {
-      expect(frontMatterTitle('---\r\ntitle: Learn\r\n---\r\nBody')).to.equal('Learn');
-    });
-
-    // The build's own parser, which does not need a line break after the closing marker.
-    it('reads front matter whose closing marker the body follows on the same line', () => {
-      expect(frontMatterTitle('---\ntitle: Learn\n--- \nBody')).to.equal('Learn');
-    });
-
-    for (const [description, markdown] of [
-      ['no front matter', '# Learn the API'],
-      ['front matter that is not at the top', '\n---\ntitle: Learn\n---\n'],
-      ['front matter with no title', '---\ndescription: More\n---\n'],
-      ['a title that is not a string', '---\ntitle: [1, 2]\n---\n'],
-      ['front matter that is not YAML', '---\ntitle: "unclosed\n---\n']
-    ]) {
-      it(`gives nothing for ${description}`, () => {
-        expect(frontMatterTitle(markdown)).to.be.undefined;
       });
     }
   });

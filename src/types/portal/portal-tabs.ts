@@ -1,5 +1,3 @@
-import { frontmatter } from 'fumadocs-core/content/md/frontmatter';
-import { isJsonObject } from '../../utils/json-utils.js';
 import { DirectoryPath } from '../file/directoryPath.js';
 import { FilePath } from '../file/filePath.js';
 import { GeneratedSection } from './generated-pages.js';
@@ -60,15 +58,4 @@ export function directoryTabName(directoryName: string): string {
       return character === '-' ? ' ' : character;
     })
     .join('');
-}
-
-/** The `title` in a page's front matter, read by the parser the build reads it with. */
-export function frontMatterTitle(markdown: string): string | undefined {
-  let data: unknown;
-  try {
-    data = frontmatter(markdown).data;
-  } catch {
-    return undefined;
-  }
-  return isJsonObject(data) && typeof data.title === 'string' ? data.title : undefined;
 }

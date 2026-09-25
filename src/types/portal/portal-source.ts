@@ -85,6 +85,7 @@ export type PortalSourceProblem =
   // `missingPortal`: the block itself is absent, which is what quickstart sets up.
   | { kind: 'invalidConfig'; errors: string[]; missingPortal: boolean }
   | { kind: 'invalidNavigation'; errors: string[] }
+  | { kind: 'invalidFrontMatter'; errors: string[] }
   | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
   | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
   | { kind: 'unreadableContent' }

@@ -8,6 +8,8 @@ import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
 
+const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
+
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
  * a broken one has to be explained the same way in both. `offerQuickstart` is false once a
@@ -39,6 +41,12 @@ export function reportSourceProblem(
     case 'invalidNavigation': {
       log.error(`The page order in ${f.path(sourceDirectory)} could not be applied:`);
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      return;
+    }
+    case 'invalidFrontMatter': {
+      log.error(`The front matter of pages in ${f.path(sourceDirectory)} would fail the build:`);
+      log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
+      log.message(`Every page starts with front matter that gives its title, for example:\n${TITLE_EXAMPLE}`);
       return;
     }
     case 'reservedAddresses': {
