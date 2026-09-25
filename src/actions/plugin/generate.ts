@@ -29,17 +29,17 @@ export class PluginGenerateAction {
   }
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     pluginDirectory: DirectoryPath,
     force: boolean
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(pluginDirectory)) {
+    if (sourceDirectory.isEqual(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
       return ActionResult.failed();
     }
 
-    if (!(await new BuildContext(buildDirectory).exists())) {
-      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
+    if (!(await new BuildContext(sourceDirectory).exists())) {
+      this.prompts.sourceDirectoryDoesNotExist(sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -49,7 +49,7 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    const configContext = new PluginConfigContext(buildDirectory);
+    const configContext = new PluginConfigContext(sourceDirectory);
     const configState = await configContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
@@ -60,7 +60,7 @@ export class PluginGenerateAction {
       configState.state === 'present' && configState.hasMetadata()
         ? ActionResult.success(configState)
         : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(
-            buildDirectory
+            sourceDirectory
           );
     if (!identified.isSuccess()) {
       return identified.discardValue();
@@ -93,7 +93,7 @@ export class PluginGenerateAction {
 
     const recorded = await configContext.recordLanguages(selection);
     if (recorded.isErr()) {
-      this.prompts.configNotPrepared(recorded.error, buildDirectory);
+      this.prompts.configNotPrepared(recorded.error, sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -116,7 +116,7 @@ export class PluginGenerateAction {
       return await response.asyncMap(async (stream) => pluginContext.save(await tempContext.save(stream)));
     });
     if (generated.isErr()) {
-      this.reportGenerationProblem(generated.error, buildDirectory);
+      this.reportGenerationProblem(generated.error, sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -131,9 +131,9 @@ export class PluginGenerateAction {
   /** A staging fault and a generation fault land here alike; only the wording differs. */
   private readonly reportGenerationProblem = (
     problem: ServiceError | PluginConfigWriteFailure,
-    buildDirectory: DirectoryPath
+    sourceDirectory: DirectoryPath
   ) =>
     typeof problem === 'string'
-      ? this.prompts.configNotPrepared(problem, buildDirectory)
+      ? this.prompts.configNotPrepared(problem, sourceDirectory)
       : this.prompts.pluginGenerationError(problem.errorMessage);
 }

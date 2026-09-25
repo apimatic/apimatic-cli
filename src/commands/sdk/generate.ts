@@ -84,7 +84,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     } = await this.parse(SdkGenerate);
 
     const workingDirectory = DirectoryPath.createInput(input);
-    const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
+    const sourceDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("sdk");
 
     const commandMetadata: CommandMetadata = {
@@ -96,7 +96,7 @@ Supports multiple programming languages including Java, C#, Python, JavaScript, 
     intro("Generate SDK");
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
-      buildDirectory,
+      sourceDirectory,
       sdkDirectory,
       language as Language,
       force,

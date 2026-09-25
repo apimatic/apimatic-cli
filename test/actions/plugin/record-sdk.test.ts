@@ -44,21 +44,21 @@ interface WrittenDocument {
 
 describe('PluginRecordSdkAction', () => {
   let tmpDirResult: DirectoryResult;
-  let buildDirectory: string;
+  let sourceDirectory: string;
   let action: PluginRecordSdkAction;
   let noSourceRepository: sinon.SinonStub;
 
-  const configPath = () => path.join(buildDirectory, 'apimatic.json');
+  const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   const writtenConfig = (): WrittenDocument => fsExtra.readJsonSync(configPath());
   const writtenPublishing = () => writtenConfig().languages.csharp?.publishing;
 
   const execute = (profile: PublishingProfile, publishTypes: PublishType[] = BOTH) =>
-    action.execute(new DirectoryPath(buildDirectory), Language.CSHARP, profile, publishTypes, VERSION);
+    action.execute(new DirectoryPath(sourceDirectory), Language.CSHARP, profile, publishTypes, VERSION);
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
-    buildDirectory = path.join(tmpDirResult.path, 'acme-payments', 'src');
-    await fsExtra.ensureDir(buildDirectory);
+    sourceDirectory = path.join(tmpDirResult.path, 'acme-payments', 'src');
+    await fsExtra.ensureDir(sourceDirectory);
     sinon.stub(PluginRecordSdkPrompts.prototype, 'sdkRecorded');
     noSourceRepository = sinon.stub(PluginRecordSdkPrompts.prototype, 'noSourceRepository');
     action = new PluginRecordSdkAction();
