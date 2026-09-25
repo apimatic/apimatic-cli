@@ -26,7 +26,7 @@ interface WrittenDocument {
 
 describe('PluginConfigContext', () => {
   let root: string;
-  let buildDirectory: DirectoryPath;
+  let sourceDirectory: DirectoryPath;
   let context: PluginConfigContext;
 
   // The package's name lives in the configuration now; a release records the version alone.
@@ -54,7 +54,7 @@ describe('PluginConfigContext', () => {
 
   const METADATA = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
 
-  const configPath = () => path.join(buildDirectory.toString(), 'apimatic.json');
+  const configPath = () => path.join(sourceDirectory.toString(), 'apimatic.json');
   const written = () => fs.readFileSync(configPath(), 'utf-8');
   const writtenDocument = (): WrittenDocument => JSON.parse(written());
 
@@ -63,9 +63,9 @@ describe('PluginConfigContext', () => {
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-config-context-'));
-    buildDirectory = new DirectoryPath(path.join(root, 'src'));
-    fs.mkdirSync(buildDirectory.toString(), { recursive: true });
-    context = new PluginConfigContext(buildDirectory);
+    sourceDirectory = new DirectoryPath(path.join(root, 'src'));
+    fs.mkdirSync(sourceDirectory.toString(), { recursive: true });
+    context = new PluginConfigContext(sourceDirectory);
   });
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));

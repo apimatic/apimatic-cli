@@ -11,7 +11,7 @@ export interface CodeSample {
 }
 
 /** Each endpoint's samples, keyed by path and then by upper-case method: what the portal template reads. */
-export type CodeSamplesJson = Record<string, Record<string, CodeSample[]>>;
+export type CodeSamplesByEndpoint = Record<string, Record<string, CodeSample[]>>;
 
 interface CatalogEntry {
   endpoint: Endpoint;
@@ -51,7 +51,7 @@ export class CodeSampleCatalog {
   }
 }
 
-export class CodeSamples {
+export class CodeSampleCatalogs {
   constructor(private readonly catalogs: CodeSampleCatalog[]) {}
 
   public isEmpty(): boolean {
@@ -67,8 +67,8 @@ export class CodeSamples {
     return [...new Set(this.endpoints().map(String))].filter((endpoint) => !names.has(endpoint));
   }
 
-  public toJson(): CodeSamplesJson {
-    const json: CodeSamplesJson = {};
+  public toJson(): CodeSamplesByEndpoint {
+    const json: CodeSamplesByEndpoint = {};
     for (const endpoint of this.endpoints()) {
       json[endpoint.path] = { ...json[endpoint.path], [endpoint.method]: this.samplesFor(endpoint) };
     }

@@ -523,21 +523,20 @@ export class PortalSourceContext {
     let first: OpenApiDocument | undefined;
     const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
 
-    for (const fileName of await this.specFileNames()) {
+    const fileNames = await this.specDirectoryFileNames();
+    if (fileNames.length === 0) {
+      return err({ kind: 'emptySpecDirectory' });
+    }
+
+    const documentNames = fileNames.filter((name) => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension)));
+    for (const fileName of documentNames) {
       const file = new FilePath(this.specDirectory, fileName);
       const document = await this.readDocument(file);
       if (document === undefined) {
         return err({ kind: 'unreadableSpec', fileName });
       }
-
-      // A document without a version key is not a spec at all (APIMATIC-META.json, a `$ref`
-      // target); those are skipped silently. A recognisable but unsupported format is named.
-      const format = document.format();
-      if (!format.supported) {
-        if (format.format === null) {
-          continue;
-        }
-        return err({ kind: 'unsupportedSpec', fileName, format: format.format });
+      if (!document.format().supported) {
+        continue;
       }
 
       specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file, endpoints: await this.endpoints(document, file) });
@@ -545,12 +544,12 @@ export class PortalSourceContext {
     }
 
     if (first === undefined) {
-      return err({ kind: 'noSpecs' });
+      return err({ kind: 'noOpenApiSpec' });
     }
     return ok({ specs, suggested: specs.length === 1 ? first.suggestedSite() : null });
   }
 
-  private async specFileNames(): Promise<FileName[]> {
+  private async specDirectoryFileNames(): Promise<FileName[]> {
     if (!(await this.fileService.directoryExists(this.specDirectory))) {
       return [];
     }
@@ -559,7 +558,6 @@ export class PortalSourceContext {
     // keeps it, and which document becomes the default server.
     return directory.items
       .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
-      .filter((fileName) => SPEC_EXTENSIONS.some((extension) => fileName.hasExtension(extension)))
       .sort((left, right) => left.compare(right));
   }
 

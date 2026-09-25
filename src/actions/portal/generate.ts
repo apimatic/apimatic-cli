@@ -1,20 +1,17 @@
-import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
-import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { ActionResult } from '../action-result.js';
-import { PortalContext } from '../../types/portal-context.js';
-import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { withBuildDirectory } from '../../infrastructure/tmp-extensions.js';
-import { CommandMetadata } from '../../types/common/command-metadata.js';
-import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
-import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
+import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
+import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { PortalContext } from '../../types/portal-context.js';
+import { ActionResult } from '../action-result.js';
+import { PreparePortalProjectAction } from './prepare-project.js';
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
-  private readonly artifactsService = new PortalArtifactsService();
   private readonly buildService = new PortalBuildService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -60,55 +57,35 @@ export class GenerateAction {
       return ActionResult.failed();
     }
 
-    const sourceContext = new PortalSourceContext(sourceDirectory);
-    const source = await sourceContext.resolve();
-    if (source.isErr()) {
-      this.prompts.sourceProblem(source.error, sourceDirectory);
-      return ActionResult.failed();
-    }
-    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-
     const portalContext = new PortalContext(portalDirectory);
-    if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
-      this.prompts.portalDirectoryNotEmpty();
-      return ActionResult.cancelled();
-    }
 
-    const generated = await this.prompts.generateCodeSamples(this.artifactsService.generate());
-    if (generated.isErr()) {
-      return ActionResult.failed();
-    }
-    const codeSamples = generated.value.samples;
-    this.prompts.ignoredSampleKeys(generated.value.ignoredKeys);
-    this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
+      sourceDirectory,
+      async (project) => {
+        if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
+          this.prompts.portalDirectoryNotEmpty();
+          return ActionResult.cancelled();
+        }
 
-    return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
-      if (project.isErr()) {
-        this.prompts.runtimeUnsupported(project.error);
-        return ActionResult.failed();
+        const build = await this.prompts.buildPortal(this.buildService.build(project));
+
+        if (build.isErr()) {
+          // Written before the temp directory is removed, so the log outlives the build.
+          const logPath = await portalContext.saveBuildLog(build.error.log);
+          this.prompts.buildFailed(build.error.log, logPath);
+          return ActionResult.failed();
+        }
+
+        const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
+        if (saved.isErr()) {
+          return ActionResult.failed();
+        }
+
+        this.prompts.portalGenerated(portalDirectory);
+        this.prompts.nextSteps(portalDirectory, zipPortal);
+
+        return ActionResult.success();
       }
-
-      const build = await this.prompts.buildPortal(this.buildService.build(project.value));
-
-      if (build.isErr()) {
-        // Written before the temp directory is removed, so the log outlives the build.
-        const logPath = await portalContext.saveBuildLog(build.error.log);
-        this.prompts.buildFailed(build.error.log, logPath);
-        return ActionResult.failed();
-      }
-
-      const saved = await this.prompts.savePortal(portalContext.save(build.value.output, zipPortal));
-      if (saved.isErr()) {
-        return ActionResult.failed();
-      }
-
-      this.prompts.portalGenerated(portalDirectory);
-      this.prompts.nextSteps(portalDirectory, zipPortal);
-
-      return ActionResult.success();
-    });
+    );
   };
 }

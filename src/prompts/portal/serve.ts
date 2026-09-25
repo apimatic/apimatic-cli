@@ -2,52 +2,17 @@ import { log } from '@clack/prompts';
 import { once } from 'node:events';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { FileName } from '../../types/file/fileName.js';
-import { FilePath } from '../../types/file/filePath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
-import {
-  CodeSamplesFileFailure,
-  GeneratedCodeSamples
-} from '../../infrastructure/services/portal-artifacts-service.js';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
-import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
-import { generateCodeSamples, reportIgnoredSampleKeys, reportUnplacedSamples } from './code-samples.js';
+import { reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
-  public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
-    reportSourceProblem(problem, sourceDirectory);
-  }
-
-  public filesShadowedByStatic(shadowed: FileName[]) {
-    reportShadowedFiles(shadowed);
-  }
-
-  public pagesHiddenBySpecs(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportHiddenPages(files, sourceDirectory);
-  }
-
-  public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
-    reportIgnoredNavigationFiles(files, sourceDirectory);
-  }
-
-  public generateCodeSamples(fn: Promise<Result<GeneratedCodeSamples, CodeSamplesFileFailure>>) {
-    return generateCodeSamples(fn);
-  }
-
-  public ignoredSampleKeys(keys: string[]) {
-    reportIgnoredSampleKeys(keys);
-  }
-
-  public unplacedSamples(endpoints: string[]) {
-    reportUnplacedSamples(endpoints);
-  }
-
   public authorizationFailed(failure: PortalAuthorizationFailure) {
     reportAuthorizationFailure(failure);
   }

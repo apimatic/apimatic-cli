@@ -37,13 +37,13 @@ export class SdkGeneratePrompts {
     return overwrite;
   }
 
-  public sameBuildAndSdkDir(directory: DirectoryPath) {
+  public sameSourceAndSdkDir(directory: DirectoryPath) {
     const message =
       `The ${f.var('src')} and ${f.var('sdk')} directories must be different. ` + `Current value: ${f.path(directory)}`;
     log.error(message);
   }
 
-  public srcDirectoryEmpty(directory: DirectoryPath) {
+  public sourceDirectoryEmpty(directory: DirectoryPath) {
     const message = `The ${f.var('src')} directory is either empty or invalid: ${f.path(directory)}`;
     log.error(message);
   }

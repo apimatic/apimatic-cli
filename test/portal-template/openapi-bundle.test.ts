@@ -5,7 +5,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { stringify as toYaml } from 'yaml';
 import { createOpenAPI } from 'fumadocs-openapi/server';
-import { bundleSpecification } from '../../portal-template/src/lib/openapi-bundle.server';
+import { bundleSpec } from '../../portal-template/src/lib/openapi-bundle.server';
 import { openApiSection } from '../../portal-template/src/lib/openapi-section.server';
 
 const info = { title: 'Pets', version: '1' };
@@ -20,7 +20,7 @@ const responseSchema = (document: any, route: string) =>
 
 // A specification split across files, as `redocly split` and hand-organised projects lay one
 // out. Fumadocs bundles these itself, but misreads what its bundler produces.
-describe('bundleSpecification', () => {
+describe('bundleSpec', () => {
   let root: string;
 
   const write = (relative: string, value: unknown) => {
@@ -32,7 +32,7 @@ describe('bundleSpecification', () => {
 
   // The document as fumadocs holds it once it has loaded and upgraded it.
   const loaded = async (file: string): Promise<any> => {
-    const server = createOpenAPI({ input: { api: () => bundleSpecification(file) } });
+    const server = createOpenAPI({ input: { api: () => bundleSpec(file) } });
     return (await server.getSchemas()).api.bundled;
   };
 
@@ -86,7 +86,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { $ref: './paths/pets.yaml', summary: 'Beside the reference' } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.paths['/pets'].summary).to.equal('Beside the reference');
     expect(document.paths['/pets'].get).to.exist;
@@ -101,7 +101,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { get: operation({ $ref: './schemas/Pet.yaml' }) } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(responseSchema(document, '/pets')).to.deep.equal({ $ref: '#/components/schemas/Pet' });
     expect(document.components.schemas.Pet.properties.category).to.deep.equal({
@@ -163,7 +163,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { get: operation({ $ref: './Pet.yaml' }) } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.components.schemas).to.deep.equal({
       Pet: { $ref: '#/components/schemas/Animal' },
@@ -182,7 +182,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { get: operation({ $ref: './Pet.yaml' }) } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.components.schemas).to.deep.equal({
       Pet: { $ref: '#/components/schemas/Animal' },
@@ -199,7 +199,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { get: operation({ $ref: './宠物.yaml' }) } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(responseSchema(document, '/pets')).to.deep.equal({ $ref: '#/components/schemas/宠物' });
     expect(document.components.schemas['宠物']).to.deep.equal({ type: 'object' });
@@ -222,7 +222,7 @@ describe('bundleSpecification', () => {
       }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.paths['/events'].get.responses['200'].content['application/jsonl'].itemSchema).to.deep.equal({
       $ref: '#/components/schemas/Event'
@@ -239,7 +239,7 @@ describe('bundleSpecification', () => {
       }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(responseSchema(document, '/tags').items).to.deep.equal({ $ref: '#/components/schemas/Tag' });
     expect(document.components.schemas.Tag).to.deep.equal({ type: 'string' });
@@ -256,7 +256,7 @@ describe('bundleSpecification', () => {
       paths: { '/settings': { get: operation({ $ref: './common.yaml#/components/schemas/default' }) } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.components.schemas.default.properties.thing).to.deep.equal({
       $ref: '#/components/schemas/Thing'
@@ -275,7 +275,7 @@ describe('bundleSpecification', () => {
       components: { schemas: { Order: { $ref: './order-schema.yaml' } } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.components.schemas).to.deep.equal({
       Order: { type: 'object', properties: { id: { type: 'integer' } } }
@@ -295,7 +295,7 @@ describe('bundleSpecification', () => {
       components: { schemas: { Thing: { type: 'integer' } } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.components.schemas).to.deep.equal({ Thing: { type: 'integer' }, 'Thing-2': { type: 'string' } });
     expect(responseSchema(document, '/external')).to.deep.equal({ $ref: '#/components/schemas/Thing-2' });
@@ -312,7 +312,7 @@ describe('bundleSpecification', () => {
       paths: { '/tree': { get: operation({ $ref: './TreeNode.yaml' }) } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.components.schemas.TreeNode.properties.children.items).to.deep.equal({
       $ref: '#/components/schemas/TreeNode'
@@ -344,7 +344,7 @@ describe('bundleSpecification', () => {
       }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document.paths['/pets'].get.responses['200'].content['application/json'].examples.rex.value).to.deep.equal({
       $ref: '#/components/schemas/Pet/example'
@@ -374,7 +374,7 @@ describe('bundleSpecification', () => {
       }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
     const { parameters, responses } = document.paths['/pets'].get;
 
     expect(document.components).to.be.undefined;
@@ -418,7 +418,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { get: operation({ $ref: './Pet.yaml' }) } }
     });
 
-    const document: any = await bundleSpecification(file);
+    const document: any = await bundleSpec(file);
 
     expect(document).to.not.have.property('x-ext-urls');
   });
@@ -432,7 +432,7 @@ describe('bundleSpecification', () => {
       paths: { '/pets': { get: operation({ $ref: './Missing.yaml' }) } }
     });
 
-    const error = await rejection(bundleSpecification(file));
+    const error = await rejection(bundleSpec(file));
 
     expect(error).to.be.instanceOf(Error);
     expect((error as Error).message).to.include('./Missing.yaml');
@@ -442,7 +442,7 @@ describe('bundleSpecification', () => {
   it('names the specification it cannot read', async () => {
     const file = path.join(root, 'missing.yaml');
 
-    const error = await rejection(bundleSpecification(file));
+    const error = await rejection(bundleSpec(file));
 
     expect(error).to.be.instanceOf(Error);
     expect((error as Error).message).to.include(file);
@@ -457,6 +457,6 @@ describe('bundleSpecification', () => {
     };
     const file = write('openapi.json', specification);
 
-    expect(await bundleSpecification(file)).to.deep.equal(specification);
+    expect(await bundleSpec(file)).to.deep.equal(specification);
   });
 });

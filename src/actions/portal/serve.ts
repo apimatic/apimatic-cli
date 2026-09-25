@@ -8,14 +8,13 @@ import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
-import { withBuildDirectory } from '../../infrastructure/tmp-extensions.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
-import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { errorMessage } from '../../utils/error-utils.js';
+import { PreparePortalProjectAction } from './prepare-project.js';
 
 export const DEFAULT_PORTAL_PORT = 23513;
 
@@ -25,7 +24,6 @@ export class PortalServeAction {
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
-  private readonly artifactsService = new PortalArtifactsService();
   private readonly devServerService = new PortalDevServerService();
   private readonly fileWatchService = new FileWatchService();
   private readonly configDir: DirectoryPath;
@@ -61,79 +59,53 @@ export class PortalServeAction {
       return ActionResult.failed();
     }
 
-    const sourceContext = new PortalSourceContext(sourceDirectory);
-    const source = await sourceContext.resolve();
-    if (source.isErr()) {
-      this.prompts.sourceProblem(source.error, sourceDirectory);
-      return ActionResult.failed();
-    }
-    this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
-    this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
-    this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
-
-    const generated = await this.prompts.generateCodeSamples(this.artifactsService.generate());
-    if (generated.isErr()) {
-      return ActionResult.failed();
-    }
-    const codeSamples = generated.value.samples;
-    this.prompts.ignoredSampleKeys(generated.value.ignoredKeys);
-    this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
-
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
-    return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
-      if (project.isErr()) {
-        this.prompts.runtimeUnsupported(project.error);
-        return ActionResult.failed();
-      }
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
+      sourceDirectory,
+      async (project, source) => {
+        const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
-      const server = await this.prompts.startPreview(this.devServerService.start(project.value, servePort));
-
-      if (server.isErr()) {
-        this.prompts.startFailed(server.error.log);
-        return ActionResult.failed();
-      }
-
-      this.prompts.portalServed(server.value.url, sourceDirectory);
-      if (openInBrowser) {
-        await this.launcherService.openUrlInBrowser(server.value.url);
-      }
-
-      const configWatch = this.watchConfig(
-        sourceContext,
-        source.value,
-        project.value.projectDirectory,
-        sourceDirectory
-      );
-
-      this.clearStandardInput();
-
-      try {
-        // Whichever comes first: the user stopping the preview, or the preview stopping on its
-        // own. Waiting only on the signal left a crashed server advertised as running.
-        const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
-        const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
-        const outcome = await Promise.race([interrupted, stopped]);
-
-        if (outcome.kind === 'exited') {
-          this.prompts.previewStopped(outcome.output);
+        if (server.isErr()) {
+          this.prompts.startFailed(server.error.log);
           return ActionResult.failed();
         }
 
-        // First, so a save still being handled is not reported after the preview says it stops.
-        await configWatch?.close();
-        this.prompts.stopping();
-        await server.value.stop();
-        return ActionResult.stopped();
-      } finally {
-        // Before the build directory goes: a save being handled writes into it.
-        await configWatch?.close();
+        this.prompts.portalServed(server.value.url, sourceDirectory);
+        if (openInBrowser) {
+          await this.launcherService.openUrlInBrowser(server.value.url);
+        }
+
+        const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);
+
+        this.clearStandardInput();
+
+        try {
+          // Whichever comes first: the user stopping the preview, or the preview stopping on its
+          // own. Waiting only on the signal left a crashed server advertised as running.
+          const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
+          const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
+          const outcome = await Promise.race([interrupted, stopped]);
+
+          if (outcome.kind === 'exited') {
+            this.prompts.previewStopped(outcome.output);
+            return ActionResult.failed();
+          }
+
+          // First, so a save still being handled is not reported after the preview says it stops.
+          await configWatch?.close();
+          this.prompts.stopping();
+          await server.value.stop();
+          return ActionResult.stopped();
+        } finally {
+          // Before the portal project goes: a save being handled writes into it.
+          await configWatch?.close();
+        }
       }
-    });
+    );
   };
 
   /**
@@ -141,11 +113,11 @@ export class PortalServeAction {
    * generate` would report it, and the preview keeps what it last accepted.
    */
   private watchConfig(
-    sourceContext: PortalSourceContext,
     source: PortalSource,
     projectDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
+    const sourceContext = new PortalSourceContext(sourceDirectory);
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const applyEdit = async () => {

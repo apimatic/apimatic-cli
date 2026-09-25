@@ -23,7 +23,7 @@ export class SdkPublishNonInteractiveAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath,
     language: Language,
     publishTypes: PublishType[],
@@ -35,14 +35,14 @@ export class SdkPublishNonInteractiveAction {
     profileId?: string,
     version?: string
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(sdkDirectory)) {
+    if (sourceDirectory.isEqual(sdkDirectory)) {
       this.prompts.directoryCannotBeSame(sdkDirectory);
       return ActionResult.failed();
     }
 
-    const buildContext = new BuildContext(buildDirectory);
+    const buildContext = new BuildContext(sourceDirectory);
     if (!(await buildContext.exists())) {
-      this.prompts.srcDirectoryDoesNotExist(buildDirectory);
+      this.prompts.sourceDirectoryDoesNotExist(sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -118,7 +118,7 @@ export class SdkPublishNonInteractiveAction {
       ? await this.fileService.getAvailableDirectoryPath(getDownloadsDirectory('apimatic-sdk'))
       : sdkDirectory;
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
-      buildDirectory,
+      sourceDirectory,
       outputDir,
       language,
       publishTypes,
@@ -142,7 +142,7 @@ export class SdkPublishNonInteractiveAction {
     if (dryRun) {
       this.prompts.dryRunPluginConfigNotice();
     } else {
-      await new PluginRecordSdkAction().execute(buildDirectory, language, publishingProfile, publishTypes, semVersion);
+      await new PluginRecordSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, semVersion);
     }
 
     return ActionResult.success();

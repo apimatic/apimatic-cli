@@ -84,7 +84,7 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
         : (stability as Stability);
 
     const workingDirectory = DirectoryPath.createInput(input);
-    const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
+    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
     const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
 
     const commandMetadata: CommandMetadata = {
@@ -95,7 +95,7 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
     intro('Generate SDK');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
-      buildDirectory,
+      sourceDirectory,
       sdkDirectory,
       language as Language,
       level,

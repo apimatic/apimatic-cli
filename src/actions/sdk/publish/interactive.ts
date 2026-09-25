@@ -21,23 +21,23 @@ export class SdkPublishInteractiveAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    defaultBuildDirectory: DirectoryPath,
+    defaultProjectDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const workingDirectory = await this.prompts.inputWorkingDirectory(
-      defaultBuildDirectory,
-      SdkPublishInteractiveAction.workingDirectoryValidator(defaultBuildDirectory)
+      defaultProjectDirectory,
+      SdkPublishInteractiveAction.workingDirectoryValidator(defaultProjectDirectory)
     );
     if (!workingDirectory) {
       await this.prompts.noInputDirectoryProvided();
       return ActionResult.cancelled();
     }
-    const buildDirectory = workingDirectory.join('src');
+    const sourceDirectory = workingDirectory.join('src');
 
     const defaultSdkDirectory = workingDirectory.join('sdk');
     const sdkDirectory = await this.prompts.inputSdkDirectory(
       defaultSdkDirectory,
-      SdkPublishInteractiveAction.sdkDirectoryValidator(buildDirectory)
+      SdkPublishInteractiveAction.sdkDirectoryValidator(sourceDirectory)
     );
     if (!sdkDirectory) {
       await this.prompts.noSdkDirectoryProvided();
@@ -127,7 +127,7 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfileItem);
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
-      buildDirectory,
+      sourceDirectory,
       sdkDirectory,
       language,
       publishTypes,
@@ -149,17 +149,17 @@ export class SdkPublishInteractiveAction {
 
     // Bookkeeping, not a decision: nobody publishes an SDK and then wants their plugin to keep
     // describing a local copy. It happens, and says so.
-    await new PluginRecordSdkAction().execute(buildDirectory, language, publishingProfile, publishTypes, version);
+    await new PluginRecordSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, version);
 
     return ActionResult.success();
   };
 
   public static workingDirectoryValidator(
-    defaultBuildDirectory: DirectoryPath
+    defaultProjectDirectory: DirectoryPath
   ): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) {
-        if (!new BuildContext(defaultBuildDirectory.join('src')).existsSync())
+        if (!new BuildContext(defaultProjectDirectory.join('src')).existsSync())
           return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
         return;
       }
@@ -169,11 +169,11 @@ export class SdkPublishInteractiveAction {
   }
 
   public static sdkDirectoryValidator(
-    buildDirectory: DirectoryPath
+    sourceDirectory: DirectoryPath
   ): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
-      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(buildDirectory))
+      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(sourceDirectory))
         return 'SDK directory must be different from the src directory.';
     };
   }

@@ -11,14 +11,14 @@ import { PluginReleaseData } from '../../../src/types/plugin-config-context.js';
 
 describe('PluginPublishAction', () => {
   let tmpDirResult: DirectoryResult;
-  let buildDirectory: string;
+  let sourceDirectory: string;
   let pluginDirectory: string;
   let action: PluginPublishAction;
 
   const execute = (plugin = pluginDirectory) =>
-    action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(plugin));
+    action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(plugin));
 
-  const configPath = () => path.join(buildDirectory, 'apimatic.json');
+  const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   const writeConfig = (config: unknown) => fsExtra.writeJson(configPath(), config);
 
   const IDENTITY = { pluginId: 'hamza', pluginName: 'Hamza Plugin', pluginVersion: '0.1.67' };
@@ -30,10 +30,10 @@ describe('PluginPublishAction', () => {
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     const workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
-    buildDirectory = path.join(workingDirectory, 'src');
+    sourceDirectory = path.join(workingDirectory, 'src');
     pluginDirectory = path.join(workingDirectory, 'plugin');
 
-    await fsExtra.ensureDir(buildDirectory);
+    await fsExtra.ensureDir(sourceDirectory);
     await writeConfig(validConfig);
 
     await fsExtra.ensureDir(path.join(pluginDirectory, 'skills', 'auth'));
@@ -50,10 +50,10 @@ describe('PluginPublishAction', () => {
   });
 
   describe('input validation', () => {
-    it('refuses to publish the build directory itself', async () => {
+    it('refuses to publish the source directory itself', async () => {
       const prompt = spy('directoryCannotBeSame');
 
-      const result = await execute(buildDirectory);
+      const result = await execute(sourceDirectory);
 
       expect(result.isFailed()).to.be.true;
       expect(prompt.calledOnce).to.be.true;

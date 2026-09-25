@@ -28,19 +28,19 @@ const ACCOUNT = {
 
 describe('PluginRecordMetadataAction', () => {
   let tmpDirResult: DirectoryResult;
-  let buildDirectory: string;
+  let sourceDirectory: string;
   let action: PluginRecordMetadataAction;
 
-  const execute = () => action.execute(new DirectoryPath(buildDirectory));
+  const execute = () => action.execute(new DirectoryPath(sourceDirectory));
 
-  const configPath = () => path.join(buildDirectory, 'apimatic.json');
+  const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   /** The plugin block as written: what this action owns in the file. */
   const writtenPlugin = (): PluginIdentityData => fsExtra.readJsonSync(configPath()).plugin;
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
-    buildDirectory = path.join(tmpDirResult.path, 'some-project-folder', 'src');
-    await fsExtra.ensureDir(buildDirectory);
+    sourceDirectory = path.join(tmpDirResult.path, 'some-project-folder', 'src');
+    await fsExtra.ensureDir(sourceDirectory);
 
     // The spinner would render to stdout; pass the underlying promise straight through.
     sinon.stub(PluginRecordMetadataPrompts.prototype, 'spinnerAccountInfo').callsFake((fn) => fn);
