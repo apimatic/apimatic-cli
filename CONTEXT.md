@@ -21,8 +21,12 @@ _Avoid_: Operation ID, route
 ### Code samples
 
 **Portal artifacts**:
-Everything the APIMatic platform generates for one portal build — SDKs and code-sample catalogs — delivered together as one zip.
+Everything the APIMatic platform generates for one portal build — SDKs, SDK docs, code-sample catalogs and the context plugin — delivered together as one zip.
 _Avoid_: Generation output, SDK bundle
+
+**SDK docs**:
+One language's documentation pages, such as "Getting Started", written for that language's SDK.
+_Avoid_: Language guide, language docs, docs
 
 **Code-sample catalog**:
 One language's code samples for every endpoint of the build directory, keyed by endpoint then by example id.

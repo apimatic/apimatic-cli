@@ -18,7 +18,8 @@
           "Example": "const client = new Client({ accessToken: 'ACCESS_TOKEN' });\n\nawait client.payments.cancelPayment('pay_123');"
         }
       }
-    }
+    },
+    "webhooks": {}
   },
   "csharp": {
     "paths": {
