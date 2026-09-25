@@ -1,8 +1,9 @@
-import { err, Result } from 'neverthrow';
+import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
+import { UrlPath } from '../file/urlPath.js';
 import { AiConfig } from './config/ai-config.js';
 import { BrandConfig, ColorMode } from './config/brand-config.js';
-import { allOf, unknownKeys } from './config/fields.js';
+import { allOf, optional, Parsed, unknownKeys } from './config/fields.js';
 import { Link } from './config/link.js';
 import { NavigationConfig } from './config/navigation-config.js';
 import { SiteConfig, SuggestedSite } from './config/site-config.js';
@@ -39,12 +40,16 @@ const BLOCK = 'portal';
 
 const NAMESPACES = ['site', 'brand', 'navigation', 'ai'];
 
+/** The one setting outside the namespaces, named as the portal artifacts endpoint reads it. */
+const PLUGIN_URL = 'pluginUrl';
+
 export class PortalConfig {
   private constructor(
     private readonly site: SiteConfig,
     private readonly brand: BrandConfig,
     private readonly navigation: NavigationConfig,
-    private readonly ai: AiConfig
+    private readonly ai: AiConfig,
+    private readonly pluginAddress: UrlPath | null
   ) {}
 
   /** The block quickstart writes: the specification's own name and description, and every default spelled out. */
@@ -53,7 +58,8 @@ export class PortalConfig {
       SiteConfig.suggested(site),
       BrandConfig.defaults,
       NavigationConfig.defaults,
-      AiConfig.defaults
+      AiConfig.defaults,
+      null
     );
   }
 
@@ -73,18 +79,24 @@ export class PortalConfig {
     // Each parser hands back the value it accepted, so the constructor is fed only what
     // validation proved.
     return allOf(
-      unknownKeys(block, NAMESPACES, BLOCK),
+      unknownKeys(block, [...NAMESPACES, PLUGIN_URL], BLOCK),
       Result.combineWithAllErrors([
         SiteConfig.parse(block.site, `${BLOCK}.site`, suggested),
         BrandConfig.parse(block.brand, `${BLOCK}.brand`),
         NavigationConfig.parse(block.navigation, `${BLOCK}.navigation`),
-        AiConfig.parse(block.ai, `${BLOCK}.ai`)
+        AiConfig.parse(block.ai, `${BLOCK}.ai`),
+        optional(block.pluginUrl, (value) => secureAddress(value, `${BLOCK}.${PLUGIN_URL}`))
       ])
-    ).map((namespaces) => new PortalConfig(...namespaces));
+    ).map((settings) => new PortalConfig(...settings));
   }
 
   public siteTitle(): string {
     return this.site.siteName();
+  }
+
+  /** Where the context plugin is hosted when it is not bundled into the portal, or null when it is. */
+  public pluginUrl(): UrlPath | null {
+    return this.pluginAddress;
   }
 
   public brandSettings(): BrandConfig {
@@ -117,7 +129,8 @@ export class PortalConfig {
       site: this.site.toJSON(),
       brand: this.brand.toJSON(),
       navigation: this.navigation.toJSON(),
-      ai: this.ai.toJSON()
+      ai: this.ai.toJSON(),
+      ...(this.pluginAddress === null ? {} : { pluginUrl: this.pluginAddress.toString() })
     };
   }
 }
@@ -126,9 +139,18 @@ function portalLink(link: Link): PortalLink {
   return { label: link.text(), url: link.href(), external: link.isExternal() };
 }
 
+// https only: the address is handed to `npx context-plugins install`, which fetches and runs it.
+function secureAddress(value: unknown, path: string): Parsed<UrlPath> {
+  const url = typeof value === 'string' && /^https:\/\//i.test(value) ? UrlPath.create(value) : undefined;
+  return url === undefined
+    ? err([`'${path}' must be an address starting with 'https://', for example 'https://example.com/acme-plugin.zip'.`])
+    : ok(url);
+}
+
 export interface PortalBlock {
   site: ReturnType<SiteConfig['toJSON']>;
   brand: ReturnType<BrandConfig['toJSON']>;
   navigation: ReturnType<NavigationConfig['toJSON']>;
   ai: ReturnType<AiConfig['toJSON']>;
+  pluginUrl?: string;
 }

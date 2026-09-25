@@ -7,6 +7,7 @@ import { isJsonObject, JsonObject } from '../../utils/json-utils.js';
 import { stripByteOrderMark } from '../../utils/string-utils.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './config/site-config.js';
 import { Endpoint } from './endpoint.js';
+import { SpecDescription } from './spec-description.js';
 
 /**
  * Whether a parsed document is one a portal can be built from. `format` names what it is
@@ -98,6 +99,12 @@ export class OpenApiDocument {
     const name = oneLine(fields.title) ?? PLACEHOLDER_SITE.name;
     const description = oneLine(firstParagraph(fields.description));
     return { name, description: description === null ? null : cap(description, DESCRIPTION_LIMIT) };
+  }
+
+  /** The whole of `info.description`, which the SDKs page shows; null when it has none. */
+  public description(): SpecDescription | null {
+    const info = this.document.info;
+    return SpecDescription.create(isJsonObject(info) ? info.description : undefined);
   }
 
   private paths(): JsonObject {

@@ -176,6 +176,11 @@
               "description": "Whether each page offers to open itself in an external AI assistant."
             }
           }
+        },
+        "pluginUrl": {
+          "type": "string",
+          "description": "Where the context plugin is hosted, starting with 'https://'. The Context Plugin page installs it from here, and the portal carries no copy of its own.",
+          "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/?#]+(?:[/?#][\\s\\S]*)?\\s*$"
         }
       }
     },

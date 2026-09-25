@@ -8,6 +8,7 @@ import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
 import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
+import { PLUGIN_DOWNLOAD, SDK_DOWNLOADS_FOLDER, sdkDownload } from '../types/portal/portal-downloads.js';
 import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
 import { errorMessage } from '../utils/error-utils.js';
@@ -178,12 +179,12 @@ export class PortalProjectService {
     const downloads = projectDirectory.join(DOWNLOADS_DIRECTORY_NAME);
     await this.fileService.createDirectoryIfNotExists(downloads);
     for (const [language, archive] of artifacts.sdks) {
-      const sdks = downloads.join('sdk');
+      const sdks = downloads.join(SDK_DOWNLOADS_FOLDER);
       await this.fileService.createDirectoryIfNotExists(sdks);
-      await this.fileService.copy(archive, new FilePath(sdks, new FileName(`${language}.zip`)));
+      await this.fileService.copy(archive, new FilePath(sdks, sdkDownload(language)));
     }
     if (artifacts.plugin !== undefined) {
-      await this.fileService.copy(artifacts.plugin, new FilePath(downloads, new FileName('plugin.zip')));
+      await this.fileService.copy(artifacts.plugin, new FilePath(downloads, PLUGIN_DOWNLOAD));
     }
     return downloads;
   }

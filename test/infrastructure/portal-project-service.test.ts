@@ -32,7 +32,7 @@ describe('PortalProjectService', () => {
   const configFor = (block: object) => PortalConfig.fromBlock(block, null)._unsafeUnwrap();
 
   const pagesFor = (languages: Record<string, object> = { typescript: {} }, plugin = false) =>
-    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin);
+    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin ? { kind: 'bundled' } : null);
 
   /** What `portal serve` passes on an edit: the block, and the pages the default source generates. */
   const settingsFor = (config: PortalConfig, generatedPages = pagesFor()) => ({ config, generatedPages });
@@ -51,6 +51,7 @@ describe('PortalProjectService', () => {
     config: configFor({ site: { name: 'My API' } }),
     generatedPages: pagesFor(),
     suggestedSite: null,
+    specDescription: null,
     specs: [
       {
         slug: 'calculator',
@@ -404,10 +405,10 @@ describe('PortalProjectService', () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
       const config = sourceFor().config;
 
-      const applied = await service.applyConfig(project, settingsFor(config, pagesFor({ typescript: {}, go: {} })));
+      const applied = await service.applyConfig(project, settingsFor(config, pagesFor({ typescript: {}, python: {} })));
 
       expect(applied._unsafeUnwrap()).to.be.true;
-      expect(generatedFiles()).to.include('sdks/go.mdx');
+      expect(generatedFiles()).to.include('sdks/python.mdx');
     });
 
     it('writes the context plugin folder for a plugin block added, and removes it with the block', async () => {

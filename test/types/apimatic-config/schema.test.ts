@@ -109,7 +109,8 @@ describe('apimatic.schema.json', () => {
       ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }],
       ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }],
       ['a link through a parent segment', { navigation: { links: [{ label: 'Start', url: '/guides/../start' }] } }],
-      ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }]
+      ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }],
+      ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }]
     ];
 
     const invalid: [string, object][] = [
@@ -191,7 +192,11 @@ describe('apimatic.schema.json', () => {
       ['an empty link', { navigation: { links: [{ label: 'x', url: '' }] } }],
       ['a blank link label', { navigation: { links: [{ label: ' ', url: '/' }] } }],
       ['a link with an unknown key', { navigation: { links: [{ label: 'x', url: '/', icon: 'x' }] } }],
-      ['page actions that are not a boolean', { ai: { pageActions: 'no' } }]
+      ['page actions that are not a boolean', { ai: { pageActions: 'no' } }],
+      ['a plugin address over http', { pluginUrl: 'http://plugins.acme.test/calc.zip' }],
+      ['a plugin address on the portal itself', { pluginUrl: '/__downloads/plugin.zip' }],
+      ['a plugin address without a host', { pluginUrl: 'https://' }],
+      ['a plugin address that is not a string', { pluginUrl: 7 }]
     ];
 
     for (const [label, block] of valid) {
@@ -272,15 +277,15 @@ describe('apimatic.schema.json', () => {
       ],
       [
         'keys this CLI does not model, beside and inside the record',
-        { java: { publishing: { future: 1 }, notes: 'x' } }
+        { csharp: { publishing: { future: 1 }, notes: 'x' } }
       ]
     ];
 
     const invalid: [string, unknown][] = [
       ['a block that is not an object', 'typescript'],
       ['a key that is no SDK language', { typescipt: {} }],
-      ['an entry that is not an object', { go: 'yes' }],
-      ['a publishing record that is not an object', { ruby: { publishing: 1 } }]
+      ['an entry that is not an object', { csharp: 'yes' }],
+      ['a publishing record that is not an object', { python: { publishing: 1 } }]
     ];
 
     for (const [label, languages] of valid) {
@@ -304,8 +309,18 @@ describe('apimatic.schema.json', () => {
       expect(languagesAccepted({})).to.be.false;
     });
 
-    // The portal reads only which languages there are; the record is typed for the editor.
-    it('types the publishing record, which the portal does not read', () => {
+    // The block is shared with the SDK and plugin commands, whose schema entry still lists every
+    // language; the portal refuses those it cannot be generated for yet.
+    it('leaves a language that is not available yet to the portal command', () => {
+      const languages = { java: {} };
+
+      expect(schemaVerdict({ languages }).valid).to.be.true;
+      expect(languagesAccepted(languages)).to.be.false;
+    });
+
+    // The portal reads the record leniently, as not recorded where it has the wrong shape; the
+    // schema types it for the editor.
+    it('types the publishing record, which the portal reads leniently', () => {
       const languages = { csharp: { publishing: { codegenVersion: 'v9' } } };
 
       expect(languagesAccepted(languages)).to.be.true;

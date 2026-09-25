@@ -410,6 +410,34 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrapErr().kind).to.equal('emptySpecDirectory');
     });
 
+    it("carries the only spec's whole description, for the SDKs page", async () => {
+      write(
+        'spec/api.json',
+        JSON.stringify({
+          openapi: '3.0.0',
+          info: { title: 'Calc', version: '1', description: 'Adds.\n\n# Auth\n\nA key.' },
+          paths: {}
+        })
+      );
+
+      const description = (await resolve())._unsafeUnwrap().specDescription;
+
+      expect(description?.lead()).to.equal('Adds.');
+      expect(description?.rest()).to.equal('# Auth\n\nA key.');
+    });
+
+    // As with the suggested site, no one of several specifications speaks for the portal.
+    it('carries no description with several specs, or when the only one has none', async () => {
+      write('spec/api.json', OPENAPI);
+      expect((await resolve())._unsafeUnwrap().specDescription).to.be.null;
+
+      write(
+        'spec/more.json',
+        JSON.stringify({ openapi: '3.0.0', info: { title: 'More', version: '1', description: 'More.' }, paths: {} })
+      );
+      expect((await resolve())._unsafeUnwrap().specDescription).to.be.null;
+    });
+
     it('leaves a spec named after the search route with its own name', async () => {
       write('spec/search.json', OPENAPI);
 
@@ -636,6 +664,25 @@ describe('PortalSourceContext', () => {
       expect(generated((await resolve())._unsafeUnwrap())).to.not.include('context-plugin/index.mdx');
     });
 
+    /** What the context plugin page tells readers to install from. */
+    const installPath = (settings: PortalSettings) =>
+      settings.generatedPages.pages().find((page) => page.template === 'context-plugin')?.data.installPath;
+
+    it('installs the plugin block from the copy bundled into the portal', async () => {
+      writeFile({ portal: {}, languages: LANGUAGES, plugin: {} });
+
+      expect(installPath((await resolve())._unsafeUnwrap())).to.equal('/__downloads/plugin.zip');
+    });
+
+    // The portal artifacts carry no plugin when it is hosted elsewhere.
+    it('carries the page for a pluginUrl, with or without a plugin block, installing from it', async () => {
+      writeFile({ portal: { pluginUrl: 'https://plugins.acme.test/calc.zip' }, languages: LANGUAGES });
+      expect(installPath((await resolve())._unsafeUnwrap())).to.equal('https://plugins.acme.test/calc.zip');
+
+      writeFile({ portal: { pluginUrl: 'https://plugins.acme.test/calc.zip' }, languages: LANGUAGES, plugin: {} });
+      expect(installPath((await resolve())._unsafeUnwrap())).to.equal('https://plugins.acme.test/calc.zip');
+    });
+
     // The plugin commands judge the block; a build does not fail over it, and gets no page.
     it('treats a plugin block that is not an object as no block', async () => {
       writeFile({ portal: {}, languages: LANGUAGES, plugin: 'yes' });
@@ -652,11 +699,11 @@ describe('PortalSourceContext', () => {
 
     it('reads them again for portal serve', async () => {
       // Named, because nothing suggests a site when the specifications are not read again.
-      writeFile({ portal: { site: { name: 'Calc' } }, languages: { go: {} }, plugin: {} });
+      writeFile({ portal: { site: { name: 'Calc' } }, languages: { csharp: {} }, plugin: {} });
 
       const reloaded = (await new PortalSourceContext(new DirectoryPath(root)).resolveSettings(null))._unsafeUnwrap();
 
-      expect(generated(reloaded)).to.deep.equal(['sdks/index.mdx', 'sdks/go.mdx', 'context-plugin/index.mdx']);
+      expect(generated(reloaded)).to.deep.equal(['sdks/index.mdx', 'sdks/csharp.mdx', 'context-plugin/index.mdx']);
     });
   });
 

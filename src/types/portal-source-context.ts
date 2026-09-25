@@ -9,11 +9,12 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
 import { Endpoint } from './portal/endpoint.js';
-import { GENERATED_SECTIONS, GeneratedPages } from './portal/generated-pages.js';
+import { GENERATED_SECTIONS, GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
 import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
+import { SpecDescription } from './portal/spec-description.js';
 import {
   MissingStaticFile,
   PortalScaffoldProblem,
@@ -109,7 +110,7 @@ export class PortalSourceContext {
     if (discovered.isErr()) {
       return err(discovered.error);
     }
-    const { specs, suggested } = discovered.value;
+    const { specs, suggested, description } = discovered.value;
 
     const settings = await this.settingsFrom(document.value, suggested);
     if (settings.isErr()) {
@@ -156,6 +157,7 @@ export class PortalSourceContext {
     return ok({
       ...settings.value,
       suggestedSite: suggested,
+      specDescription: description,
       specs,
       contentDirectory,
       staticDirectory,
@@ -210,7 +212,8 @@ export class PortalSourceContext {
    * The root and the `languages` block are this command's to judge as well, since the portal
    * documents the project's SDK languages. The `plugin` block is the plugin commands' to judge,
    * so it never fails a build and nothing in it is read: an object gets the context plugin page
-   * whatever it holds, and anything else counts as no block.
+   * whatever it holds, and anything else counts as no block. `portal.pluginUrl` gets the page
+   * too, with or without the block, and is where the page says to install from.
    */
   private static parseSettings(
     document: ApimaticConfigDocument,
@@ -229,8 +232,17 @@ export class PortalSourceContext {
     }
     return ok({
       config: config.value,
-      generatedPages: GeneratedPages.of(languages.value, document.plugin() !== undefined)
+      generatedPages: GeneratedPages.of(languages.value, PortalSourceContext.pluginSource(config.value, document))
     });
+  }
+
+  /** A hosted plugin is installed from its address, whatever the block says; otherwise the block's is bundled. */
+  private static pluginSource(config: PortalConfig, document: ApimaticConfigDocument): PluginSource | null {
+    const url = config.pluginUrl();
+    if (url !== null) {
+      return { kind: 'hosted', url };
+    }
+    return document.plugin() === undefined ? null : { kind: 'bundled' };
   }
 
   private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {
@@ -513,9 +525,13 @@ export class PortalSourceContext {
       .map((file) => ({ file, segments: file.relativeTo(contentTree.directoryPath).split('/') }));
   }
 
-  // With several specifications there is no suggested site: no one of them speaks for the portal.
+  // With several specifications there is no suggested site and no description: no one of them
+  // speaks for the portal.
   private async specs(): Promise<
-    Result<{ specs: PortalSpec[]; suggested: SuggestedSite | null }, PortalSourceProblem>
+    Result<
+      { specs: PortalSpec[]; suggested: SuggestedSite | null; description: SpecDescription | null },
+      PortalSourceProblem
+    >
   > {
     const specs: PortalSpec[] = [];
     // Only the first is kept: it is the one that speaks for the portal when it is alone, and
@@ -546,7 +562,12 @@ export class PortalSourceContext {
     if (first === undefined) {
       return err({ kind: 'noOpenApiSpec' });
     }
-    return ok({ specs, suggested: specs.length === 1 ? first.suggestedSite() : null });
+    const alone = specs.length === 1;
+    return ok({
+      specs,
+      suggested: alone ? first.suggestedSite() : null,
+      description: alone ? first.description() : null
+    });
   }
 
   private async specDirectoryFileNames(): Promise<FileName[]> {

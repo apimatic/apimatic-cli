@@ -123,6 +123,25 @@ describe('OpenApiDocument', () => {
     });
   });
 
+  describe('description', () => {
+    // Unlike the site description, which stops at the first paragraph and is capped.
+    it('is the whole of info.description, past its first paragraph', () => {
+      const description = withInfo({
+        title: 'API',
+        version: '1',
+        description: 'Adds.\n\n## Auth\n\nA key.'
+      }).description();
+
+      expect(description?.lead()).to.equal('Adds.');
+      expect(description?.rest()).to.equal('## Auth\n\nA key.');
+    });
+
+    it('is null without one', () => {
+      expect(withInfo({ title: 'API', version: '1' }).description()).to.be.null;
+      expect(readJson({ openapi: '3.0.0' }).description()).to.be.null;
+    });
+  });
+
   describe('endpoints', () => {
     it('reads YAML as the portal bundler does, merging keys and allowing many aliases', () => {
       const aliases = Array.from({ length: 150 }, (_, index) => `  a${index}: *ops`);
