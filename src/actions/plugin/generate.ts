@@ -6,7 +6,7 @@ import { PublishingApiService } from '../../infrastructure/services/publishing-a
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigWriteFailure, setUpConfig } from '../../types/plugin-config-context.js';
+import { PluginConfigWriteFailure, unattendedLanguages } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
@@ -57,7 +57,7 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const recorded = setUpConfig(configState)?.recordedLanguages() ?? [];
+    const recorded = unattendedLanguages(configState);
     if (recorded.length === 0 && !this.prompts.canAsk()) {
       this.prompts.setupNeedsTerminal(sourceDirectory);
       return ActionResult.failed();

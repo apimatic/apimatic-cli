@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { expect } from 'chai';
-import { PluginConfigContext, PluginConfigState } from '../../src/types/plugin-config-context';
+import { PluginConfigContext, PluginConfigState, unattendedLanguages } from '../../src/types/plugin-config-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { LanguagePublishingEntry, PluginLanguages } from '../../src/types/apimatic-config/languages-block';
 import { PluginIdentityData } from '../../src/types/plugin/plugin-config';
@@ -550,6 +550,20 @@ describe('PluginConfigContext', () => {
 
       withConfig({ languages: {} });
       expect((await present()).recordedLanguages()).to.deep.equal([]);
+    });
+
+    // What `plugin generate` takes without a question, and nothing until the project is set up.
+    it('is generated unattended from its recorded languages only once the plugin block is there', async () => {
+      const plugin = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
+
+      withConfig({ plugin, languages: { python: {} } });
+      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([Language.PYTHON]);
+
+      withConfig({ languages: { python: {} } });
+      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([]);
+
+      withConfig({ plugin, languages: {} });
+      expect(unattendedLanguages(await context.getPluginConfigState())).to.deep.equal([]);
     });
   });
 });

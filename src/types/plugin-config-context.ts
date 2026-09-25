@@ -26,6 +26,10 @@ export type PluginConfigState =
 export const setUpConfig = (state: PluginConfigState): PluginConfig | null =>
   state.state === 'present' && state.hasMetadata() ? state : null;
 
+/** The languages a set-up project is generated from without a question; none while any is still to be recorded. */
+export const unattendedLanguages = (state: PluginConfigState): readonly Language[] =>
+  setUpConfig(state)?.recordedLanguages() ?? [];
+
 export class PluginConfig {
   public readonly state = 'present' as const;
 
