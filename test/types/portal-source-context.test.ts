@@ -381,21 +381,20 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().specs).to.have.lengthOf(1);
     });
 
-    it('names a Swagger document rather than ignoring it', async () => {
+    it('skips a document in another format when an OpenAPI 3.x document is beside it', async () => {
+      write('spec/api.json', OPENAPI);
       write('spec/old.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
 
-      const problem = (await resolve())._unsafeUnwrapErr();
-
-      expect(problem).to.deep.include({ kind: 'unsupportedSpec', format: 'Swagger 2.0' });
+      expect((await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug)).to.deep.equal(['api']);
     });
 
-    it('names an OpenAPI version it cannot build', async () => {
-      write('spec/old.json', JSON.stringify({ openapi: '2.0.0', info: {}, paths: {} }));
+    it('reports no OpenAPI 3.x document whatever format the others are in', async () => {
+      write('spec/swagger.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
+      write('spec/openapi2.json', JSON.stringify({ openapi: '2.0.0', info: {}, paths: {} }));
+      write('spec/postman.json', JSON.stringify({ info: { schema: 'postman' }, item: [] }));
+      write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
 
-      expect((await resolve())._unsafeUnwrapErr()).to.deep.include({
-        kind: 'unsupportedSpec',
-        format: 'OpenAPI 2.0.0'
-      });
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'noOpenApiSpec' });
     });
 
     it('reports a document it cannot parse', async () => {
@@ -405,10 +404,10 @@ describe('PortalSourceContext', () => {
     });
 
     it('reports an empty or absent spec directory', async () => {
-      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('noSpecs');
+      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('emptySpecDirectory');
 
       fs.mkdirSync(path.join(root, 'spec'));
-      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('noSpecs');
+      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('emptySpecDirectory');
     });
 
     it('leaves a spec named after the search route with its own name', async () => {
