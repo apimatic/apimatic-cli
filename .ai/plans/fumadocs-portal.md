@@ -133,6 +133,10 @@ release cuts the preset, the fonts and the layout. `app.css` imports
 links their Google Fonts stylesheet, the generated `theme.css` holds only the
 primary colour's two rules, and `layout.tsx` renders the notebook layout alone.
 
+*Amended 2026-09-25* (PR #366): the Google Fonts link is gone. `app.css`
+imports `@fontsource-variable/geist` and `geist-mono`, which the CLI copies into
+the build project, and sets `--font-sans` / `--font-mono` in `@theme`.
+
 *Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 4 and 6):
 `src/lib/source.ts` declares a second collection over the relative literal
 `'generated'`, where the CLI writes the SDK and context plugin pages from the

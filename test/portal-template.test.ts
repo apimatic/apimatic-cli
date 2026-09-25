@@ -61,11 +61,7 @@ function usesRelativeUrl(packageName: string): boolean {
     .some((entry) => RELATIVE_URL.test(fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8')));
 }
 
-/**
- * The template is built inside a temp project whose node_modules holds one package per entry in
- * TEMPLATE_DEPENDENCIES, not one per dependency the CLI declares. Anything missing still
- * resolves here, where every package is installed, and fails only on a user's machine.
- */
+// The temp project installs only TEMPLATE_DEPENDENCIES; anything else resolves here but fails on a user's machine.
 describe('portal template packaging', () => {
   it('imports only packages the temp project installs', () => {
     const installed = new Set(TEMPLATE_DEPENDENCIES);
@@ -98,12 +94,12 @@ describe('portal template packaging', () => {
       );
 
       expect(usesRelativeUrl(name), `${name} has no relative url() to need copying`).to.be.true;
-      expect({ ...packageManifest.dependencies, ...packageManifest.peerDependencies }, name).to.be.empty;
+      const { dependencies, peerDependencies, optionalDependencies } = packageManifest;
+      expect({ ...dependencies, ...peerDependencies, ...optionalDependencies }, name).to.be.empty;
     }
   });
 
-  // The converse: a package the CLI stops depending on would be missing at build time for
-  // everyone, with nothing here to notice.
+  // The converse: a package the CLI stops depending on would be missing at build time for everyone.
   it('installs only packages the CLI declares as dependencies', () => {
     const declared = new Set(Object.keys(manifest.dependencies));
 
