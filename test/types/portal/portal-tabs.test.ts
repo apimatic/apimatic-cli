@@ -40,8 +40,11 @@ describe('portal tabs', () => {
     });
 
     // The tab bar shows each name as written, so these two can be told apart.
-    it('tells names apart by case', () => {
-      expect(sharedTabNames([home, folder('home')])).to.deep.equal([]);
+    // Guides and guides read as one name in a tab bar.
+    it('counts names that differ only in case as the same, under the first one’s spelling', () => {
+      const lower = folder('home');
+
+      expect(sharedTabNames([home, lower])).to.deep.equal([{ name: 'Home', tabs: [home, lower] }]);
     });
   });
 

@@ -289,6 +289,25 @@ describe('reportSharedTabNames', () => {
     expect(printed()).to.equal('');
   });
 
+  it('gives each spelling of a name that differs only in case', () => {
+    reportSharedTabNames(
+      [
+        {
+          name: 'guides',
+          tabs: [
+            { owner: { kind: 'home' }, name: 'guides', namedBy: new FilePath(content, new FileName('nav.json')) },
+            { owner: { kind: 'folder', directory: content.join('guides') }, name: 'Guides', namedBy: guidesNavigation }
+          ]
+        }
+      ],
+      source
+    );
+
+    expect(printed()).to.contain(
+      "  • 'guides' and 'Guides': the Home tab (titled in 'content/nav.json') and the tab of the 'guides' folder"
+    );
+  });
+
   it('names each tab by what gives it the name, and says how to rename it', () => {
     reportSharedTabNames(
       [
@@ -331,7 +350,7 @@ describe('reportSharedTabNames', () => {
     );
 
     expect(printed().split('\n')).to.deep.equal([
-      'More than one tab has the same name, so readers cannot tell them apart:',
+      'More than one tab has the same name, or one that differs only in case, so readers cannot tell them apart:',
       "  • 'Guides': the Home tab (titled in 'content/nav.json'), the tab of the 'guides' folder (titled in " +
         "'content/guides/nav.json') and the API reference (titled in 'content/api/index.md')",
       "  • 'SDKs': the tab of the 'sdk-docs' folder (titled in 'content/sdk-docs/index.md') and the tab of the " +

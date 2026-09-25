@@ -238,8 +238,10 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
       }
     }
   };
-  log.warn('More than one tab has the same name, so readers cannot tell them apart:');
-  log.message(shared.map(({ name, tabs }) => `  • ${f.var(name)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
+  const spellings = (tabs: PortalTab[]) =>
+    listedInProse([...new Set(tabs.map(({ name }) => name))].map((name) => f.var(name)));
+  log.warn('More than one tab has the same name, or one that differs only in case, so readers cannot tell them apart:');
+  log.message(shared.map(({ tabs }) => `  • ${spellings(tabs)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
   log.message(
     `Rename all but one tab of each name with a ${f.var('title')} in its folder's ${f.var('nav.json')}, or in ` +
       `${f.var('content/nav.json')} for the Home tab; the tabs of the SDK pages and the context plugin keep ` +

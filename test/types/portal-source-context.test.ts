@@ -1416,6 +1416,13 @@ describe('PortalSourceContext', () => {
       expect(await shared()).to.deep.equal([['Home', ['folder content/start/nav.json', 'home']]]);
     });
 
+    it('finds the Home tab titled like a folder tab in another case', async () => {
+      folder('guides', 'Guides');
+      listFolders(['guides'], 'guides');
+
+      expect(await shared()).to.deep.equal([['guides', ['folder content/guides/nav.json', 'home content/nav.json']]]);
+    });
+
     it('finds the Home tab titled like a folder tab its index page names', async () => {
       folder('guides', undefined, 'Guides');
       listFolders(['guides'], 'Guides');

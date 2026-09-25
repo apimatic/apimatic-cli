@@ -21,16 +21,21 @@ export interface PortalTab {
 
 /** A name the tab bar would show for more than one tab, which leaves them indistinguishable. */
 export interface SharedTabName {
+  /** As the first of the tabs spells it; the others may differ from it in case. */
   name: string;
   tabs: PortalTab[];
 }
 
+// A reader cannot tell Guides from guides in a tab bar any more than Guides from Guides.
 export function sharedTabNames(tabs: PortalTab[]): SharedTabName[] {
   const byName = new Map<string, PortalTab[]>();
   for (const tab of tabs) {
-    byName.set(tab.name, [...(byName.get(tab.name) ?? []), tab]);
+    const key = tab.name.toLowerCase();
+    byName.set(key, [...(byName.get(key) ?? []), tab]);
   }
-  return [...byName].filter(([, named]) => named.length > 1).map(([name, named]) => ({ name, tabs: named }));
+  return [...byName.values()]
+    .filter((named) => named.length > 1)
+    .map((named) => ({ name: named[0].name, tabs: named }));
 }
 
 /** The name the template gives a tab that no title names. */
