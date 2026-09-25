@@ -77,9 +77,9 @@ describe('PortalQuickstartAction', () => {
   });
 
   // The wizard ends in a preview now, so this covers what it writes on the way there: the
-  // languages it was told, the plugin identity it derived, and the entries none of it belongs
+  // languages it was told, the placeholder plugin identity, and the entries none of it belongs
   // in a repository under. `prepare` is stopped so the test is about the writing, not the build.
-  it('records the languages and the derived plugin identity, then hands off to the preview', async () => {
+  it('records the languages and the placeholder plugin identity, then hands off to the preview', async () => {
     prompts.selectLanguages.resolves([Language.TYPESCRIPT, Language.PYTHON]);
     // The preview asks the service for artifacts before it prepares anything; a portal declaring
     // three languages would otherwise reach the network from a unit test.
@@ -93,8 +93,8 @@ describe('PortalQuickstartAction', () => {
     const written = JSON.parse(fs.readFileSync(path.join(project.toString(), 'src', 'apimatic.json'), 'utf8'));
     expect(written.languages).to.deep.equal({ typescript: {}, python: {} });
     expect(written.plugin).to.deep.equal({
-      pluginId: 'project',
-      pluginName: 'project',
+      pluginId: 'my-api-plugin',
+      pluginName: 'My API Plugin',
       pluginVersion: '0.1.0',
       license: 'MIT'
     });

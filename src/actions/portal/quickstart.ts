@@ -18,7 +18,7 @@ import { PortalProjectService } from '../../infrastructure/portal-project-servic
 import { envInfo } from '../../infrastructure/env-info.js';
 import { schemaUrlFor } from '../../types/apimatic-config/document.js';
 import { PluginConfigContext } from '../../types/plugin-config-context.js';
-import { deriveMetadata } from '../../types/plugin/plugin-config.js';
+import { PLACEHOLDER_METADATA } from '../../types/plugin/plugin-config.js';
 import { ProjectContext } from '../../types/project-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './serve.js';
 
@@ -177,7 +177,7 @@ export class PortalQuickstartAction {
       const languagesRecorded = await pluginConfig.recordLanguages(selection);
       const pluginConfigRecorded = languagesRecorded.isErr()
         ? languagesRecorded
-        : await pluginConfig.upsertMetadata(deriveMetadata(inputDirectory.leafName()));
+        : await pluginConfig.upsertMetadata(PLACEHOLDER_METADATA);
       if (pluginConfigRecorded.isErr()) {
         this.prompts.configNotWritten();
         return ActionResult.failed();
