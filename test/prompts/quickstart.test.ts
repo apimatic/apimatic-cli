@@ -2,14 +2,14 @@ import { stripVTControlCharacters } from 'node:util';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
-import { PortalQuickstartPrompts } from '../../../src/prompts/portal/quickstart.js';
-import { convertToOpenApi3 } from '../../../src/prompts/portal/source.js';
-import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { FileName } from '../../../src/types/file/fileName.js';
-import { FilePath } from '../../../src/types/file/filePath.js';
+import { QuickstartPrompts } from '../../src/prompts/quickstart.js';
+import { convertToOpenApi3 } from '../../src/prompts/portal/source.js';
+import { DirectoryPath } from '../../src/types/file/directoryPath.js';
+import { FileName } from '../../src/types/file/fileName.js';
+import { FilePath } from '../../src/types/file/filePath.js';
 
-describe('PortalQuickstartPrompts', () => {
-  const prompts = new PortalQuickstartPrompts();
+describe('QuickstartPrompts', () => {
+  const prompts = new QuickstartPrompts();
   const specs = new DirectoryPath('specs');
   const fix = stripVTControlCharacters(convertToOpenApi3());
   let error: sinon.SinonStub;

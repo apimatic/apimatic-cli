@@ -5,7 +5,6 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
 import { QuickstartAction } from '../../src/actions/quickstart';
-import { PortalQuickstartPrompts } from '../../src/prompts/portal/quickstart';
 import { QuickstartPrompts } from '../../src/prompts/quickstart';
 import { ApiValidatePrompts } from '../../src/prompts/api/validate';
 import { PortalAuthorizationService } from '../../src/infrastructure/services/portal-authorization-service';
@@ -30,11 +29,13 @@ const PASSED = { isSuccess: true, blocking: [], errors: [], warnings: [], inform
 describe('QuickstartAction', () => {
   let root: string;
   let project: DirectoryPath;
-  let prompts: sinon.SinonStubbedInstance<PortalQuickstartPrompts>;
+  let prompts: sinon.SinonStubbedInstance<QuickstartPrompts>;
   let runtimeProblem: sinon.SinonStub;
   let authorize: sinon.SinonStub;
 
-  const execute = () => new QuickstartAction(new DirectoryPath(root), COMMAND_METADATA).execute();
+  // `root` holds no `src/`, so every test but the adopting ones takes the importing path.
+  const execute = (workingDirectory: DirectoryPath = new DirectoryPath(root)) =>
+    new QuickstartAction(new DirectoryPath(root), COMMAND_METADATA).execute(workingDirectory);
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-quickstart-'));
@@ -43,8 +44,7 @@ describe('QuickstartAction', () => {
     project = new DirectoryPath(root).join('project');
     fs.mkdirSync(project.toString());
 
-    prompts = sinon.stub(PortalQuickstartPrompts.prototype);
-    sinon.stub(QuickstartPrompts.prototype, 'welcomeMessage');
+    prompts = sinon.stub(QuickstartPrompts.prototype);
     prompts.specPathPrompt.resolves(SPEC);
     prompts.inputDirectoryPathPrompt.resolves(project);
 
@@ -118,4 +118,49 @@ describe('QuickstartAction', () => {
     expect(prompts.noLanguagesSelected.calledOnce).to.be.true;
   });
 
+  // A build downloaded from the platform arrives with `src/spec/` already filled. Asking such a
+  // user for the specification their project carries, and then for where to put it, is the pair
+  // of questions this adoption exists to skip.
+  describe('a project that already carries a source directory', () => {
+    let downloaded: DirectoryPath;
+
+    beforeEach(() => {
+      downloaded = new DirectoryPath(root).join('downloaded');
+      fs.mkdirSync(path.join(downloaded.toString(), 'src', 'spec'), { recursive: true });
+      fs.copyFileSync(SPEC.toString(), path.join(downloaded.toString(), 'src', 'spec', 'Apimatic-Calculator.json'));
+    });
+
+    it('validates the specification it finds instead of asking for one', async () => {
+      prompts.selectLanguages.resolves([Language.TYPESCRIPT]);
+      sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(PortalArtifacts.none()));
+      sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
+
+      await execute(downloaded);
+
+      expect(prompts.specPathPrompt.called, 'asked for a specification the project has').to.be.false;
+      expect(prompts.inputDirectoryPathPrompt.called, 'asked where to put a project that exists').to.be.false;
+
+      const source = path.join(downloaded.toString(), 'src');
+      const written = JSON.parse(fs.readFileSync(path.join(source, 'apimatic.json'), 'utf8'));
+      expect(written.languages).to.deep.equal({ typescript: {} });
+      expect(written.portal, 'the portal block is scaffolded into the project it adopted').to.not.be.undefined;
+
+      // The one that was there, and no copy of it beside itself.
+      expect(fs.readdirSync(path.join(source, 'spec'))).to.deep.equal(['Apimatic-Calculator.json']);
+    });
+
+    // The sample is written where the wizard is told to write, and an adopted `spec/` already
+    // holds the document the portal would be built from. Offering it would promise a swap the
+    // wizard cannot make.
+    it('does not offer the sample when the specification it found fails validation', async () => {
+      const failed = { isSuccess: false, blocking: [], errors: ['bad'], warnings: [], information: [] };
+      (ValidationService.prototype.validateViaFile as sinon.SinonStub).resolves(
+        ok({ result: { validation: failed, linting: PASSED }, unallowedFeatures: null } as never)
+      );
+
+      expect((await execute(downloaded)).isCancelled()).to.be.true;
+      expect(prompts.useDefaultSpecPrompt.called, 'offered to replace a specification it cannot replace').to.be.false;
+      expect(prompts.fixYourSpec.calledOnce).to.be.true;
+    });
+  });
 });
