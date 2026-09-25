@@ -9,7 +9,7 @@ import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
 import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
-import { CodeSampleCatalog, CodeSamples } from '../../../src/types/portal/code-samples';
+import { CodeSampleCatalog, CodeSampleCatalogs } from '../../../src/types/portal/code-samples';
 import { Language } from '../../../src/types/sdk/generate';
 import { FileService } from '../../../src/infrastructure/file-service';
 import { ServiceError } from '../../../src/infrastructure/service-error';
@@ -22,9 +22,9 @@ const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inp
 const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
 
 /** The catalogs the merged fixture expects, read the way the service reads them. */
-const samplesFromFixture = (): CodeSamples => {
+const samplesFromFixture = (): CodeSampleCatalogs => {
   const json = JSON.parse(fs.readFileSync('test/resources/code-samples.json', 'utf8')) as Record<string, unknown>;
-  return new CodeSamples(
+  return new CodeSampleCatalogs(
     Object.entries(json).map(([language, catalog]) => CodeSampleCatalog.fromJson(language as Language, catalog)!)
   );
 };
@@ -97,7 +97,7 @@ describe('GenerateAction', () => {
     expect(result.isSuccess()).to.be.true;
     const [, source, artifacts] = shared.prepare.firstCall.args;
     expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
-    expect(artifacts.codeSamples.isEmpty()).to.be.false;
+    expect(artifacts.codeSampleCatalogs.isEmpty()).to.be.false;
     expect(shared.prompts.unplacedSamples.calledOnceWith([])).to.be.true;
   });
 

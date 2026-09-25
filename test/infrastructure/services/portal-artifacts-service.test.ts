@@ -131,7 +131,7 @@ describe('PortalArtifactsService', () => {
     it('reads a catalog per language into the samples the build merges', async () => {
       const artifacts = (await generate())._unsafeUnwrap();
 
-      const samples = artifacts.codeSamples.samplesFor(new Endpoint('GET', '/payments'));
+      const samples = artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'));
       expect(samples.map((sample) => sample.lang)).to.deep.equal(['csharp']);
     });
 
@@ -165,7 +165,7 @@ describe('PortalArtifactsService', () => {
     it('succeeds with no samples, no SDKs and no plugin', async () => {
       const artifacts = (await generate())._unsafeUnwrap();
 
-      expect(artifacts.codeSamples.samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
+      expect(artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
       expect(artifacts.sdks.size).to.equal(0);
       expect(artifacts.plugin).to.be.undefined;
     });

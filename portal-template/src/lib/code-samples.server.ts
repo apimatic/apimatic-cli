@@ -4,19 +4,19 @@ import { CODE_SAMPLES_EXTENSION } from './code-samples';
 import { isJsonObject, type JsonObject } from './json';
 
 /** Each endpoint's code samples, keyed by path and then by upper-case method, as the CLI writes them. */
-export type SamplesByEndpoint = Record<string, Record<string, unknown[]>>;
+export type CodeSampleCatalogs = Record<string, Record<string, unknown[]>>;
 
 const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
-export async function readCodeSamples(file: string | null): Promise<SamplesByEndpoint> {
-  return file === null ? {} : (JSON.parse(await readFile(file, 'utf8')) as SamplesByEndpoint);
+export async function readCodeSampleCatalogs(file: string | null): Promise<CodeSampleCatalogs> {
+  return file === null ? {} : (JSON.parse(await readFile(file, 'utf8')) as CodeSampleCatalogs);
 }
 
 /**
  * Gives every operation the samples of its endpoint, replacing any it already carries. Placed
  * after bundling, so an operation behind a path-item `$ref` is reached like an inline one.
  */
-export function placeCodeSamples(document: Document, samples: SamplesByEndpoint): Document {
+export function placeCodeSamples(document: Document, samples: CodeSampleCatalogs): Document {
   const paths = (document as JsonObject).paths;
   if (!isJsonObject(paths)) return document;
   for (const [route, item] of Object.entries(paths)) {

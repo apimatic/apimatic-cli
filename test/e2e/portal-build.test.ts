@@ -8,7 +8,7 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
+import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { Language } from '../../src/types/sdk/generate';
 import {
@@ -21,7 +21,7 @@ import {
 const enabled = process.env.APIMATIC_E2E === '1';
 
 const CALCULATE_SAMPLE = 'const result = await calculator.calculate(OperationType.Sum, 4, 5);';
-const CODE_SAMPLES = new CodeSamples([
+const CODE_SAMPLES = new CodeSampleCatalogs([
   CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
     paths: { '/{operation}': { GET: { Example: CALCULATE_SAMPLE } } }
   }) as CodeSampleCatalog
@@ -35,7 +35,7 @@ interface BuiltPortal {
 }
 
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
-async function buildFixture(name: string, codeSamples = new CodeSamples([])): Promise<BuiltPortal> {
+async function buildFixture(name: string, codeSampleCatalogs = new CodeSampleCatalogs([])): Promise<BuiltPortal> {
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name);
   const base = await ensurePortalProjectDirectoryBase(fixture);
   const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
@@ -45,7 +45,11 @@ async function buildFixture(name: string, codeSamples = new CodeSamples([])): Pr
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });
   const prepared = (
-    await new PortalProjectService().prepare(project, source, new PortalArtifacts(codeSamples, new Map(), undefined))
+    await new PortalProjectService().prepare(
+      project,
+      source,
+      new PortalArtifacts(codeSampleCatalogs, new Map(), undefined)
+    )
   )._unsafeUnwrap();
 
   const build = await new PortalBuildService().build(prepared);

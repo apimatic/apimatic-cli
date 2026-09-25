@@ -1,5 +1,5 @@
 import { FilePath } from '../file/filePath.js';
-import { CodeSamples } from './code-samples.js';
+import { CodeSampleCatalogs } from './code-samples.js';
 
 /**
  * What one `/portal-artifacts` run delivered, unpacked and read but not yet placed. The samples
@@ -11,7 +11,7 @@ import { CodeSamples } from './code-samples.js';
  */
 export class PortalArtifacts {
   public constructor(
-    public readonly codeSamples: CodeSamples,
+    public readonly codeSampleCatalogs: CodeSampleCatalogs,
     /** Keyed by the language name the server delivered, which is what it is placed under. */
     public readonly sdks: ReadonlyMap<string, FilePath>,
     public readonly plugin: FilePath | undefined
@@ -19,6 +19,6 @@ export class PortalArtifacts {
 
   /** A run that was never made: a portal declaring no languages and no plugin has nothing to ask for. */
   public static none(): PortalArtifacts {
-    return new PortalArtifacts(new CodeSamples([]), new Map(), undefined);
+    return new PortalArtifacts(new CodeSampleCatalogs([]), new Map(), undefined);
   }
 }

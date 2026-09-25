@@ -7,7 +7,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { CodeSampleCatalog, CodeSamples } from '../../types/portal/code-samples.js';
+import { CodeSampleCatalog, CodeSampleCatalogs } from '../../types/portal/code-samples.js';
 import {
   PortalArtifactsGenerationStatus,
   PortalArtifactsInitiatedResponse,
@@ -213,16 +213,16 @@ export class PortalArtifactsService {
       return err(ServiceError.InvalidResponse);
     }
 
-    const codeSamples = await this.readCodeSamples(contents.join(BUNDLE.codeSamplesDirectory));
-    if (codeSamples.isErr()) {
-      return err(codeSamples.error);
+    const codeSampleCatalogs = await this.readCodeSampleCatalogs(contents.join(BUNDLE.codeSamplesDirectory));
+    if (codeSampleCatalogs.isErr()) {
+      return err(codeSampleCatalogs.error);
     }
 
     const plugin = new FilePath(contents, new FileName(BUNDLE.plugin));
 
     return ok(
       new PortalArtifacts(
-        codeSamples.value,
+        codeSampleCatalogs.value,
         await this.readSdks(contents.join(BUNDLE.sdkDirectory)),
         (await this.fileService.fileExists(plugin)) ? plugin : undefined
       )
@@ -252,9 +252,9 @@ export class PortalArtifactsService {
    * A catalog this CLI cannot read is an error rather than an omission: silently dropping one
    * would publish a portal missing the samples for a language the user asked for, and say nothing.
    */
-  private async readCodeSamples(directory: DirectoryPath): Promise<Result<CodeSamples, ServiceError>> {
+  private async readCodeSampleCatalogs(directory: DirectoryPath): Promise<Result<CodeSampleCatalogs, ServiceError>> {
     if (!(await this.fileService.directoryExists(directory))) {
-      return ok(new CodeSamples([]));
+      return ok(new CodeSampleCatalogs([]));
     }
 
     const languages = Object.values(Language) as string[];
@@ -285,7 +285,7 @@ export class PortalArtifactsService {
       catalogs.push(catalog);
     }
 
-    return ok(new CodeSamples(catalogs));
+    return ok(new CodeSampleCatalogs(catalogs));
   }
 
   private axiosInstance(shell: string, apiKey: string) {

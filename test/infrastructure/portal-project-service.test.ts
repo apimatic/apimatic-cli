@@ -13,7 +13,7 @@ import {
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
-import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
+import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
@@ -135,7 +135,7 @@ describe('PortalProjectService', () => {
 
       const config = readConfig();
       expect(Object.keys(config).sort()).to.deep.equal([
-        'codeSamples',
+        'codeSampleCatalogs',
         'contentDir',
         'downloadsDir',
         'generatedDir',
@@ -249,8 +249,8 @@ describe('PortalProjectService', () => {
   });
 
   describe('code samples', () => {
-    const codeSamples = new PortalArtifacts(
-      new CodeSamples([
+    const withCatalogs = new PortalArtifacts(
+      new CodeSampleCatalogs([
         CodeSampleCatalog.fromJson(Language.TYPESCRIPT, {
           paths: { '/pets': { GET: { Example: 'await client.pets.list();' } } },
           webhooks: {}
@@ -261,11 +261,13 @@ describe('PortalProjectService', () => {
     );
 
     it('writes the samples beside the configuration, keyed by path and method, and names them in it', async () => {
-      (await service.prepare(project, sourceFor(), codeSamples))._unsafeUnwrap();
+      (await service.prepare(project, sourceFor(), withCatalogs))._unsafeUnwrap();
 
       const config = readConfig();
-      expect(config.codeSamples).to.equal(path.join(project.toString(), 'code-samples.json').split(path.sep).join('/'));
-      expect(JSON.parse(fs.readFileSync(config.codeSamples, 'utf8'))).to.deep.equal({
+      expect(config.codeSampleCatalogs).to.equal(
+        path.join(project.toString(), 'code-sample-catalogs.json').split(path.sep).join('/')
+      );
+      expect(JSON.parse(fs.readFileSync(config.codeSampleCatalogs, 'utf8'))).to.deep.equal({
         '/pets': {
           GET: [{ lang: 'typescript', label: 'TypeScript', sources: { Example: 'await client.pets.list();' } }]
         }
@@ -275,7 +277,7 @@ describe('PortalProjectService', () => {
     it('points each spec at its own file, samples or not', async () => {
       const source = sourceFor();
 
-      (await service.prepare(project, source, codeSamples))._unsafeUnwrap();
+      (await service.prepare(project, source, withCatalogs))._unsafeUnwrap();
 
       expect(readConfig().specs.calculator).to.equal(source.specs[0].file.toString().split(path.sep).join('/'));
     });
@@ -283,8 +285,8 @@ describe('PortalProjectService', () => {
     it('names no samples when there are none', async () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
 
-      expect(readConfig().codeSamples).to.be.null;
-      expect(fs.existsSync(path.join(project.toString(), 'code-samples.json'))).to.be.false;
+      expect(readConfig().codeSampleCatalogs).to.be.null;
+      expect(fs.existsSync(path.join(project.toString(), 'code-sample-catalogs.json'))).to.be.false;
     });
   });
 
@@ -299,7 +301,7 @@ describe('PortalProjectService', () => {
 
     it('lays out one archive per language and the plugin inside the project, and names them in the config', async () => {
       const artifacts = new PortalArtifacts(
-        new CodeSamples([]),
+        new CodeSampleCatalogs([]),
         new Map([
           ['csharp', downloaded('a.zip', 'PK csharp')],
           ['python', downloaded('b.zip', 'PK python')]
@@ -316,7 +318,7 @@ describe('PortalProjectService', () => {
     });
 
     it('offers no SDK directory for a run that carried only the plugin', async () => {
-      const artifacts = new PortalArtifacts(new CodeSamples([]), new Map(), downloaded('c.zip', 'PK plugin'));
+      const artifacts = new PortalArtifacts(new CodeSampleCatalogs([]), new Map(), downloaded('c.zip', 'PK plugin'));
 
       (await service.prepare(project, sourceFor(), artifacts))._unsafeUnwrap();
 

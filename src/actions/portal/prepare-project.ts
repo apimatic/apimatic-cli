@@ -59,7 +59,7 @@ export class PreparePortalProjectAction {
       this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
 
       this.prompts.unplacedSamples(
-        artifacts.value.codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))
+        artifacts.value.codeSampleCatalogs.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))
       );
 
       return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {

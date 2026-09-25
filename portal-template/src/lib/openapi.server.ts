@@ -1,7 +1,7 @@
 import type { MetaData, StaticSource } from 'fumadocs-core/source';
 import type { OpenAPIPageData } from 'fumadocs-openapi/server';
 import { openApiSection } from './openapi-section.server';
-import { codeSamplesFile, specs } from './portal.server';
+import { codeSampleCatalogsFile, specs } from './portal.server';
 
 export type OpenApiSource = StaticSource<{ pageData: OpenAPIPageData; metaData: MetaData }>;
 
@@ -11,6 +11,6 @@ export type OpenApiSource = StaticSource<{ pageData: OpenAPIPageData; metaData: 
  * Markdown page.
  */
 export async function openApiSource(): Promise<OpenApiSource> {
-  const sections = await Promise.all(Object.entries(specs).map(([slug, file]) => openApiSection(slug, file, codeSamplesFile)));
+  const sections = await Promise.all(Object.entries(specs).map(([slug, file]) => openApiSection(slug, file, codeSampleCatalogsFile)));
   return { files: sections.flatMap((section) => section.files) };
 }
