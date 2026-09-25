@@ -135,7 +135,7 @@ function Content({
   const PageBody = page.body;
 
   return (
-    <DocsPage toc={toc}>
+    <DocsPage toc={toc} full={page.full}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">

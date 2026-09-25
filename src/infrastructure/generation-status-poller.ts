@@ -1,6 +1,7 @@
 import { Status } from '@apimatic/sdk';
 import { err, ok, Result } from 'neverthrow';
 import { REQUEST_TIMEOUT_MS } from '../config/axios-config.js';
+import { replaceHTML } from '../utils/utils.js';
 import { ServiceError } from './service-error.js';
 import { sleep } from './timer-extensions.js';
 
@@ -90,5 +91,13 @@ const timedOutMessage = (label: string, budgetMs: number): string => {
   return `${label} timed out after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
 };
 
+// The server writes its messages as HTML; each of their lines goes under the bullet a formatter gives them.
 const asMessages = (errors: Record<string, unknown> | undefined): Record<string, string[]> =>
-  (errors ?? {}) as Record<string, string[]>;
+  Object.fromEntries(
+    Object.entries(errors ?? {}).map(([key, messages]) => [
+      key,
+      (Array.isArray(messages) ? messages : [messages]).map((message) =>
+        replaceHTML(String(message)).replaceAll('\n', '\n  ')
+      )
+    ])
+  );

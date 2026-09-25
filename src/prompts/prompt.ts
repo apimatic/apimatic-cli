@@ -1,4 +1,5 @@
 import type { Writable } from 'node:stream';
+import { stripVTControlCharacters } from 'node:util';
 import pc from 'picocolors';
 import { getColumns } from '@clack/core';
 import { log, note, NoteOptions, S_BAR_H, S_CONNECT_LEFT, spinner } from '@clack/prompts';
@@ -124,11 +125,16 @@ const LOG_TAIL_LINES = 15;
 // dropped first; they also carry the store paths of the CLI's own dependencies.
 const INTERNAL_FRAME = /^\s+at\s.*(?:[\\/]node_modules[\\/]|\(node:)/;
 
+// Vite's report of a failed build opens with this and the error, and ends with the import chain a plain tail shows.
+const BUILD_ERROR = /^error during build:/;
+
 /** The part of a child process's output worth putting in front of the user. */
 export function logTail(output: string): string {
-  const lines = output.trimEnd().split('\n');
+  const lines = stripVTControlCharacters(output).trimEnd().split('\n');
   const meaningful = lines.filter((line) => !INTERNAL_FRAME.test(line));
   // Some failures are nothing but frames; showing them beats showing nothing.
   const source = meaningful.some((line) => line.trim().length > 0) ? meaningful : lines;
-  return source.slice(-LOG_TAIL_LINES).join('\n').trim();
+  const error = source.findIndex((line) => BUILD_ERROR.test(line.trim()));
+  const excerpt = error === -1 ? source.slice(-LOG_TAIL_LINES) : source.slice(error, error + LOG_TAIL_LINES);
+  return excerpt.join('\n').trim();
 }

@@ -34,6 +34,7 @@ describe('PluginGenerateAction', () => {
 
   let pluginArchive: Buffer;
   let selectLanguages: sinon.SinonStub;
+  let canAsk: sinon.SinonStub;
   let getPublishingProfiles: sinon.SinonStub;
   /** Every file in the last zip handed to the service, by entry name. */
   let uploaded: Record<string, string>;
@@ -89,12 +90,13 @@ describe('PluginGenerateAction', () => {
     // The spinner would render to stdout; pass the underlying promise straight through.
     sinon.stub(PluginGeneratePrompts.prototype, 'generatePlugin').callsFake((fn) => fn);
 
-    // The language prompt and the profile lookup sit on every path that generates. Both default
-    // to the quiet case — take what the config already names, no profile — so a test that is not
-    // about either says nothing about them.
+    // The language prompt and the profile lookup sit on the paths that generate. Both default to
+    // the quiet case — take what the config already names, no profile — so a test that is not
+    // about either says nothing about them. Mocha runs without a terminal, which the prompt needs.
     selectLanguages = sinon
       .stub(PluginGeneratePrompts.prototype, 'selectLanguages')
       .callsFake(async (config) => [...config.initialLanguages()]);
+    canAsk = sinon.stub(PluginGeneratePrompts.prototype, 'canAsk').returns(true);
     getPublishingProfiles = sinon.stub(PublishingApiService.prototype, 'getPublishingProfiles').resolves(ok([]));
 
     action = new PluginGenerateAction(new DirectoryPath(tmpDirResult.path), COMMAND_METADATA, 'auth-key');
@@ -290,7 +292,8 @@ describe('PluginGenerateAction', () => {
     // The published entry records where the SDK actually went; a selection may add to the file but
     // never edit what is recorded.
     it('leaves a published entry byte-identical while adding the languages selected beside it', async () => {
-      await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
+      await writeConfig({ languages: { csharp: CSHARP } });
+      answersMetadata();
       selectLanguages.resolves([Language.CSHARP, Language.TYPESCRIPT]);
       generated();
 
@@ -309,11 +312,65 @@ describe('PluginGenerateAction', () => {
       expect(generatePlugin.called).to.be.true;
     });
 
+    // Asked while a project is being set up for a plugin: before its `plugin` block, or any language, is recorded.
     describe('language selection', () => {
+      beforeEach(() => answersMetadata());
+
+      it('generates from the languages a set-up project records, without asking, and says so', async () => {
+        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP, python: {} } });
+        const included = sinon.stub(PluginGeneratePrompts.prototype, 'recordedLanguagesIncluded');
+        generated();
+
+        expect((await execute()).isSuccess()).to.be.true;
+        expect(selectLanguages.called).to.be.false;
+        expect(included.calledOnceWith([Language.CSHARP, Language.PYTHON])).to.be.true;
+        expect(Object.keys(uploadedConfig().languages)).to.deep.equal(['csharp', 'python']);
+      });
+
+      it('asks for the languages of a project without a plugin block', async () => {
+        await writeConfig({ languages: { csharp: CSHARP } });
+        generated();
+
+        await execute();
+
+        expect(selectLanguages.calledOnce).to.be.true;
+      });
+
+      it('asks when the plugin block is there but no language the plugin can carry is recorded', async () => {
+        await writeConfig({ plugin: METADATA, languages: { java: {} } });
+        generated();
+
+        await execute();
+
+        expect(selectLanguages.calledOnce).to.be.true;
+      });
+
+      // Otherwise Node ends the run with a warning about an unsettled await and nothing more.
+      it('fails before asking anything when it has to ask and there is no terminal', async () => {
+        await fsExtra.remove(configPath());
+        canAsk.returns(false);
+        const needsTerminal = sinon.stub(PluginGeneratePrompts.prototype, 'setupNeedsTerminal');
+        const inputPluginMetadata = PluginRecordMetadataPrompts.prototype.inputPluginMetadata as sinon.SinonStub;
+        const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
+
+        expect((await execute()).isFailed()).to.be.true;
+        expect(needsTerminal.calledOnce).to.be.true;
+        expect(inputPluginMetadata.called).to.be.false;
+        expect(selectLanguages.called).to.be.false;
+        expect(generatePlugin.called).to.be.false;
+      });
+
+      it('generates without a terminal for a project set up for a plugin', async () => {
+        canAsk.returns(false);
+        generated();
+
+        expect((await execute()).isSuccess()).to.be.true;
+      });
+
       // Which languages come up checked is the config's own rule — `initialLanguages`, covered in
       // plugin-config-context.test.ts. What this command owes the prompt is the config it read.
       it('hands the prompt the config it read', async () => {
-        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
+        await writeConfig({ languages: { csharp: CSHARP } });
         generated();
 
         await execute();
@@ -326,7 +383,7 @@ describe('PluginGenerateAction', () => {
       // The entry records where the SDK went, and only `sdk publish` can write that again, so
       // clearing the checkbox leaves the file alone.
       it('keeps the record of a published language the user cleared', async () => {
-        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
+        await writeConfig({ languages: { csharp: CSHARP } });
         selectLanguages.resolves([Language.TYPESCRIPT]);
         generated();
 
@@ -338,7 +395,7 @@ describe('PluginGenerateAction', () => {
       // ...and the plugin still does not cover it. The service reads the uploaded copy, which
       // names exactly what was checked.
       it('leaves a cleared published language out of the upload', async () => {
-        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
+        await writeConfig({ languages: { csharp: CSHARP } });
         selectLanguages.resolves([Language.TYPESCRIPT]);
         generated();
 
@@ -349,7 +406,7 @@ describe('PluginGenerateAction', () => {
 
       // Clearing every box is an answer, not an empty one: nothing is generated, published or not.
       it('cancels when every language is cleared, even where one is published', async () => {
-        await writeConfig({ plugin: METADATA, languages: { csharp: CSHARP } });
+        await writeConfig({ languages: { csharp: CSHARP } });
         selectLanguages.resolves([]);
         const generatePlugin = generated();
 
@@ -362,7 +419,7 @@ describe('PluginGenerateAction', () => {
       // The service reads the languages out of the zipped config, so a cleared checkbox that never
       // reaches the file is a checkbox that does nothing.
       it('drops an unpublished language the user cleared', async () => {
-        await writeConfig({ plugin: METADATA, languages: { csharp: {}, typescript: {} } });
+        await writeConfig({ languages: { csharp: {}, typescript: {} } });
         selectLanguages.resolves([Language.TYPESCRIPT]);
         generated();
 
@@ -388,6 +445,7 @@ describe('PluginGenerateAction', () => {
       });
 
       it('cancels with 130 when the prompt is escaped', async () => {
+        await writeConfig({ languages: LANGUAGES });
         selectLanguages.resolves(undefined);
         const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
         sinon.stub(PluginGeneratePrompts.prototype, 'noLanguagesSelected');
@@ -485,6 +543,21 @@ describe('PluginGenerateAction', () => {
         expect((await execute()).isSuccess()).to.be.true;
         expect(prompts.confirm.called).to.be.false;
         expect(prompts.preview.called).to.be.false;
+      });
+
+      // Nothing is asked of a project set up for a plugin, so the recommendation stands on its own.
+      it('recommends publishing first without asking when the languages come from the config', async () => {
+        await writeConfig({ plugin: METADATA, languages: { csharp: {} } });
+        hasProfile();
+        const prompts = stubProfilePrompts();
+        const recommended = sinon.stub(PluginGeneratePrompts.prototype, 'publishFirstRecommended');
+        const generatePlugin = generated();
+
+        expect((await execute()).isSuccess()).to.be.true;
+        expect(prompts.confirm.called).to.be.false;
+        expect(recommended.calledOnce).to.be.true;
+        expect(prompts.preview.called).to.be.true;
+        expect(generatePlugin.called).to.be.true;
       });
 
       // Having a profile is not the trigger; building something local is. Every selected language

@@ -6,10 +6,13 @@ import { ContentNotices } from '../../types/portal/content-notices.js';
 import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
+  MissingImage,
   PortalSourceProblem,
   ReservedAddressPage,
-  SharedAddress
+  SharedAddress,
+  SpecConversion
 } from '../../types/portal/portal-source.js';
+import { TRANSFORMATIONS_DIRECTORY_NAME } from '../../types/transform-context.js';
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -28,10 +31,30 @@ export const contentPath = (sourceDirectory: DirectoryPath): string =>
 export const staticPath = (sourceDirectory: DirectoryPath): string =>
   f.path(sourceDirectory.join(STATIC_DIRECTORY_NAME));
 
+const transformCommand = (flags: string[]): string =>
+  [f.cmdAlt('apimatic', 'api', 'transform'), f.flag('format', 'openapi3yaml'), ...flags].join(' ');
+
 // Quickstart refuses a spec for the same reason, and has to point at the same fix.
 export const convertToOpenApi3 = (): string =>
-  `Try ${f.cmdAlt('apimatic', 'api', 'transform')} ${f.flag('format', 'openapi3yaml')} to convert your spec ` +
-  `to OpenAPI 3.x first.`;
+  `Convert it with ${transformCommand([f.flag('file', '<your spec>')])}, and use the file it writes into a ` +
+  `${f.var(TRANSFORMATIONS_DIRECTORY_NAME)} folder.`;
+
+function reportSpecConversion({ file, format, converted, others }: SpecConversion, sourceDirectory: DirectoryPath) {
+  const name = f.var(file.name().toString());
+  log.error(
+    `No OpenAPI 3.x document found in ${specPath(sourceDirectory)}.` + (format === null ? '' : ` ${name} is ${format}.`)
+  );
+  const command = transformCommand([
+    f.flag('file', f.relative(file)),
+    f.flag('destination', f.relative(file.directory()))
+  ]);
+  log.message(
+    `${format === null ? `If ${name} is an API definition in another format, convert` : 'Convert'} it with:\n` +
+      `  ${command}\n` +
+      `then move ${f.relativePath(converted)} up into ${specPath(sourceDirectory)}, which is the only folder read.` +
+      (others === 0 ? '' : ` Convert the other ${others === 1 ? 'document' : `${others} documents`} the same way.`)
+  );
+}
 
 /**
  * Shared by `portal generate` and `portal serve`: both read the same source directory, so
@@ -102,11 +125,14 @@ export function reportSourceProblem(
         `${specPath(sourceDirectory)} has no files. Add your OpenAPI 3.x document to it as a ` +
         `${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
       log.error(message);
+      if (problem.folders.length > 0) {
+        const folders = listedInProse(problem.folders.map((folder) => f.var(folder.leafName())));
+        log.message(`A document in a folder inside it, such as ${folders}, is not read: move it up.`);
+      }
       return;
     }
     case 'noOpenApiSpec': {
-      const message = `No OpenAPI 3.x document found in ${specPath(sourceDirectory)}. ` + convertToOpenApi3();
-      log.error(message);
+      reportSpecConversion(problem.conversion, sourceDirectory);
       return;
     }
   }
@@ -156,7 +182,34 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
       return;
     }
+    case 'missingImages': {
+      reportMissingImages(problem.images, sourceDirectory);
+      return;
+    }
   }
+}
+
+function reportMissingImages(images: MissingImage[], sourceDirectory: DirectoryPath): void {
+  const relative = (file: FilePath) => f.var(file.relativeTo(sourceDirectory));
+  const lines = images.map(({ page, line, url, file, foundAs }) => {
+    const where = `  • ${relative(page)}, line ${line}: ${f.var(url)}`;
+    if (file === null) {
+      return `${where} points outside ${f.var(CONTENT_DIRECTORY_NAME)}, or into a folder the build skips`;
+    }
+    return foundAs === null
+      ? `${where}, but there is no ${relative(file)}`
+      : `${where}, but the file is spelt ${relative(foundAs)} on disk`;
+  });
+  log.error(
+    images.length === 1
+      ? `A page in ${f.path(sourceDirectory)} shows an image the build cannot find:`
+      : `Pages in ${f.path(sourceDirectory)} show images the build cannot find:`
+  );
+  log.message(lines.join('\n'));
+  log.message(
+    `An image written as ${f.var('/images/logo.png')} is read from ${staticPath(sourceDirectory)}, and any ` +
+      `other from beside its page in ${contentPath(sourceDirectory)}. Names are matched exactly.`
+  );
 }
 
 function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: DirectoryPath): void {

@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { execa } from 'execa';
 import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
@@ -5,7 +6,7 @@ import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { SHELL_FILE_NAME } from '../types/portal-context.js';
 import { FileService } from './file-service.js';
-import { PortalProjectPaths, PortalProjectService } from './portal-project-service.js';
+import { CONTENT_COPY_DIRECTORY_NAME, PortalProjectPaths, PortalProjectService } from './portal-project-service.js';
 
 export interface PortalBuildFailure {
   message: string;
@@ -23,7 +24,10 @@ export class PortalBuildService {
   private readonly fileService = new FileService();
   private readonly projectService = new PortalProjectService();
 
-  public async build(project: PortalProjectPaths): Promise<Result<PortalBuildResult, PortalBuildFailure>> {
+  public async build(
+    project: PortalProjectPaths,
+    contentSource: DirectoryPath | null
+  ): Promise<Result<PortalBuildResult, PortalBuildFailure>> {
     const distDirectory = project.projectDirectory.join('dist');
     await this.fileService.deleteDirectory(distDirectory);
 
@@ -36,7 +40,7 @@ export class PortalBuildService {
       reject: false
     });
 
-    const log = result.all ?? '';
+    const log = contentSource === null ? result.all ?? '' : namingSource(result.all ?? '', project, contentSource);
     if (result.exitCode !== 0) {
       return err({ message: 'The portal build failed.', log });
     }
@@ -66,4 +70,15 @@ export class PortalBuildService {
       return null;
     }
   }
+}
+
+// The build reads a copy of the pages, in a temporary directory; a reader knows each page by its place in the source.
+function namingSource(log: string, project: PortalProjectPaths, contentSource: DirectoryPath): string {
+  const spellings = (directory: DirectoryPath) => [
+    directory.toString(),
+    directory.toString().split(path.sep).join('/')
+  ];
+  const [copy, copyPosix] = spellings(project.projectDirectory.join(CONTENT_COPY_DIRECTORY_NAME));
+  const [source, sourcePosix] = spellings(contentSource);
+  return log.replaceAll(copy, source).replaceAll(copyPosix, sourcePosix);
 }

@@ -66,6 +66,17 @@ export interface SharedAddress {
   pages: FilePath[];
 }
 
+/** A page's Markdown image that the build would import and not find, which fails the whole build. */
+export interface MissingImage {
+  page: FilePath;
+  line: number;
+  url: string;
+  /** Where the build looks; null for an image beside its page that points out of `content/`. */
+  file: FilePath | null;
+  /** The file in another case, as `MissingStaticFile` has it. */
+  foundAs: FilePath | null;
+}
+
 /** Why `content/` cannot be built; each variant maps to its own message. */
 export type ContentProblem =
   | { kind: 'unreadableContent' }
@@ -73,7 +84,19 @@ export type ContentProblem =
   | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
   | { kind: 'sharedAddresses'; addresses: SharedAddress[] }
   | { kind: 'invalidFrontMatter'; errors: string[] }
-  | { kind: 'invalidNavigation'; errors: string[] };
+  | { kind: 'invalidNavigation'; errors: string[] }
+  | { kind: 'missingImages'; images: MissingImage[] };
+
+/** How `api transform` would turn the first document in `spec/` into one the portal reads. */
+export interface SpecConversion {
+  file: FilePath;
+  /** What the document is instead, when it says; null for one that names no format. */
+  format: string | null;
+  /** Where `api transform --destination` of `spec/` writes it, which is one folder too deep. */
+  converted: FilePath;
+  /** How many more documents there are to convert the same way. */
+  others: number;
+}
 
 /** Why a source directory cannot be built; each variant maps to its own message. */
 export type PortalSourceProblem =
@@ -83,6 +106,7 @@ export type PortalSourceProblem =
   // Every problem found in `content/`, so that one run lists all that a build would refuse.
   | { kind: 'invalidContent'; problems: ContentProblem[] }
   | { kind: 'unreadableSpec'; fileName: FileName }
-  | { kind: 'emptySpecDirectory' }
-  | { kind: 'noOpenApiSpec' }
+  // Its `folders` are not read, and `api transform` writes into one of its own.
+  | { kind: 'emptySpecDirectory'; folders: DirectoryPath[] }
+  | { kind: 'noOpenApiSpec'; conversion: SpecConversion }
   | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };

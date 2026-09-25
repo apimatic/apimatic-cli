@@ -98,10 +98,40 @@ describe('reportSourceProblem', () => {
     expect(printed()).to.not.contain('spelt');
   });
 
-  it('points at api transform when src/spec holds no OpenAPI 3.x document', () => {
-    reportSourceProblem({ kind: 'noOpenApiSpec' }, source);
+  describe('a spec directory the portal reads no document from', () => {
+    const spec = source.join('spec');
+    const conversion = (format: string | null, others = 0) => ({
+      file: new FilePath(spec, new FileName('petstore.json')),
+      format,
+      converted: new FilePath(spec.join('transformations'), new FileName('petstore_OpenApi3Yaml.yaml')),
+      others
+    });
 
-    expect(printed()).to.contain('apimatic api transform --format=openapi3yaml');
+    // The command alone wrote into a folder the portal does not read, which left the user stuck.
+    it('gives the whole conversion: the command for the document, and the file to move up', () => {
+      reportSourceProblem({ kind: 'noOpenApiSpec', conversion: conversion('Swagger 2.0') }, source);
+
+      expect(printed()).to.contain("'petstore.json' is Swagger 2.0.");
+      expect(printed()).to.contain(
+        'apimatic api transform --format=openapi3yaml --file=./project/src/spec/petstore.json ' +
+          '--destination=./project/src/spec'
+      );
+      expect(printed()).to.contain("then move './project/src/spec/transformations/petstore_OpenApi3Yaml.yaml' up into");
+      expect(printed()).to.not.contain('the same way');
+    });
+
+    it('hedges for a document that says nothing of its format, and counts the others', () => {
+      reportSourceProblem({ kind: 'noOpenApiSpec', conversion: conversion(null, 2) }, source);
+
+      expect(printed()).to.contain("If 'petstore.json' is an API definition in another format, convert it with:");
+      expect(printed()).to.contain('Convert the other 2 documents the same way.');
+    });
+
+    it('says a document in a folder of it is not read', () => {
+      reportSourceProblem({ kind: 'emptySpecDirectory', folders: [spec.join('transformations')] }, source);
+
+      expect(printed()).to.contain("such as 'transformations', is not read: move it up.");
+    });
   });
 
   describe('a page at an address kept for the generated pages', () => {

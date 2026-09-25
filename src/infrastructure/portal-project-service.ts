@@ -44,12 +44,11 @@ export const LINKED_DEPENDENCIES = [
   'shiki',
   'tailwindcss',
   'tslib',
-  'vite'
+  'vite',
+  'yaml'
 ];
 
 export const TEMPLATE_DEPENDENCIES = [...COPIED_DEPENDENCIES, ...LINKED_DEPENDENCIES];
-
-const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
 
 /** Beside `portal.config.json`; `src/lib/portal.ts` imports it. */
 const IDENTITY_FILE_NAME = 'portal.identity.json';
@@ -61,10 +60,7 @@ const STYLESHEET_FILE_NAME = 'theme.css';
 export const DOWNLOADS_DIRECTORY_NAME = 'downloads';
 
 /** Where the project keeps its copy of `content/`, and an empty one where the source has none. */
-const CONTENT_DIRECTORY_NAME = 'content';
-
-/** What the project reads the pages from: `content/` itself, or a copy the caller keeps up to date. */
-export type ProjectContent = 'source' | 'copy';
+export const CONTENT_COPY_DIRECTORY_NAME = 'content';
 
 export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
@@ -84,8 +80,8 @@ export interface PortalBuildPaths {
 
 /**
  * Prepares the throwaway Vite project that both `portal generate` and `portal serve` run.
- * The project points at the user's `src/` by absolute path, but for a copy of `content/` that
- * a preview keeps to show what it last accepted.
+ * The project points at the user's `src/` by absolute path, but for a copy of `content/`: the
+ * browser bundle names the pages' directory, and a preview keeps the copy at what it last accepted.
  */
 export class PortalProjectService {
   private readonly fileService = new FileService();
@@ -105,8 +101,7 @@ export class PortalProjectService {
   public async prepare(
     projectDirectory: DirectoryPath,
     source: PortalSource,
-    artifacts: PortalArtifacts,
-    content: ProjectContent = 'source'
+    artifacts: PortalArtifacts
   ): Promise<Result<PortalProjectPaths, string>> {
     const template = this.templateDirectory();
     if (template === undefined) {
@@ -126,7 +121,7 @@ export class PortalProjectService {
     await this.writeConfiguration(
       projectDirectory,
       source,
-      await this.contentDirectory(projectDirectory, source, content),
+      await this.contentDirectory(projectDirectory, source),
       await this.writeCodeSamples(projectDirectory, artifacts.codeSampleCatalogs),
       await this.writeDownloads(projectDirectory, artifacts)
     );
@@ -252,16 +247,9 @@ export class PortalProjectService {
     }
   }
 
-  /** The source's own `content/`, or the project's copy of it, which stands empty where the source has none. */
-  private async contentDirectory(
-    projectDirectory: DirectoryPath,
-    source: PortalSource,
-    content: ProjectContent
-  ): Promise<DirectoryPath> {
-    if (content === 'source' && source.contentDirectory !== null) {
-      return source.contentDirectory;
-    }
-    const copy = projectDirectory.join(CONTENT_DIRECTORY_NAME);
+  /** The project's copy of `content/`, which stands empty where the source has none. */
+  private async contentDirectory(projectDirectory: DirectoryPath, source: PortalSource): Promise<DirectoryPath> {
+    const copy = projectDirectory.join(CONTENT_COPY_DIRECTORY_NAME);
     await this.fileService.createDirectoryIfNotExists(copy);
     if (source.contentDirectory !== null) {
       // Before the dev server starts: it lists the pages once, and one missing then stays missing.
@@ -299,16 +287,6 @@ export class PortalProjectService {
     );
 
     await this.writeAppearance(projectDirectory, source.config);
-
-    // A literal because Fumadocs' `defineDocs` macro rejects anything it cannot read at
-    // compile time. Tailwind needs the same path to scan the user's pages: its automatic
-    // detection is rooted at this project, which the content directory sits outside of.
-    const contentLiteral = JSON.stringify(this.toPosix(contentDirectory.toString()));
-    const sourceModule = new FilePath(projectDirectory.join('src').join('lib'), new FileName('source.ts'));
-    await this.substitute(sourceModule, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);
-
-    const stylesheet = new FilePath(projectDirectory.join('src').join('styles'), new FileName('app.css'));
-    await this.substitute(stylesheet, CONTENT_DIRECTORY_PLACEHOLDER, contentLiteral);
   }
 
   /**
@@ -347,7 +325,7 @@ export class PortalProjectService {
     checked: CheckedFile[]
   ): Promise<Result<void, string>> {
     try {
-      await this.syncContent(contentDirectory, projectDirectory.join(CONTENT_DIRECTORY_NAME), checked);
+      await this.syncContent(contentDirectory, projectDirectory.join(CONTENT_COPY_DIRECTORY_NAME), checked);
       return ok(undefined);
     } catch (error) {
       return err(errorMessage(error));
@@ -400,16 +378,6 @@ export class PortalProjectService {
         PortalStylesheet.of(config).toString()
       ]
     ];
-  }
-
-  private async substitute(file: FilePath, placeholder: string, literal: string): Promise<void> {
-    const contents = await this.fileService.getContents(file);
-    // Replacement supplied as a function: a value containing `$&` or `$1` would otherwise be
-    // rewritten by the replacement-pattern syntax.
-    await this.fileService.writeContents(
-      file,
-      contents.replace(placeholder, () => literal)
-    );
   }
 
   private templateDirectory(): DirectoryPath | undefined {

@@ -45,6 +45,28 @@ describe('logTail', () => {
     expect(tail).to.not.contain('line 44');
   });
 
+  // Rolldown ends its report with every module that imported the file, which buried the error itself.
+  it("starts at a failed build's error, in colour or not, rather than at the end of its report", () => {
+    const report = [
+      '\u001b[36mvite v8.2.2\u001b[39m building client environment for production...',
+      '✓ 2974 modules transformed.',
+      '\u001b[31merror during build:',
+      '\u001b[31mBuild failed with 1 error:',
+      '',
+      "\u001b[31m[UNRESOLVED_IMPORT] \u001b[0mCould not resolve '../static/images/logo.png' in content/index.md",
+      '    ╭─[ content/index.md:13:20 ]',
+      ...Array.from({ length: 30 }, (_, i) => `    │         - src/module-${i}.ts`),
+      '────╯'
+    ].join('\n');
+
+    const tail = logTail(report).split('\n');
+
+    expect(tail[0]).to.equal('error during build:');
+    expect(tail).to.include("[UNRESOLVED_IMPORT] Could not resolve '../static/images/logo.png' in content/index.md");
+    expect(tail).to.have.lengthOf(15);
+    expect(tail.join('\n')).to.not.contain('modules transformed');
+  });
+
   it('returns nothing for empty output', () => {
     expect(logTail('')).to.equal('');
     expect(logTail('   \n  \n')).to.equal('');

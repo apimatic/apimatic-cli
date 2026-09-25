@@ -542,5 +542,14 @@ describe('PluginConfigContext', () => {
         Language.PYTHON
       ]);
     });
+
+    // What a set-up project is generated for without a question: no default fills an empty block.
+    it('records only the languages the config names that a plugin can carry', async () => {
+      withConfig({ languages: { python: UNPUBLISHED_ENTRY, java: CSHARP_ENTRY, csharp: {} } });
+      expect((await present()).recordedLanguages()).to.deep.equal([Language.PYTHON, Language.CSHARP]);
+
+      withConfig({ languages: {} });
+      expect((await present()).recordedLanguages()).to.deep.equal([]);
+    });
   });
 });

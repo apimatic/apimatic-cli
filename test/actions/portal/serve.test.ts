@@ -275,15 +275,6 @@ describe('PortalServeAction', () => {
       });
     });
 
-    // The dev server reads the copy, so a save a build would refuse never reaches the browser.
-    it('prepares the preview to read a copy of the content', async () => {
-      interrupt();
-
-      await execute(new DirectoryPath(root));
-
-      expect(shared.prepare.firstCall.args[3]).to.equal('copy');
-    });
-
     it('brings the copy in line with a save a build accepts, as checked, and not with one it refuses', async () => {
       await whileServing(async (save) => {
         await save('{ "pages": [');

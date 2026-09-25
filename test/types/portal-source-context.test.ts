@@ -413,13 +413,42 @@ describe('PortalSourceContext', () => {
       expect((await resolve())._unsafeUnwrap().specs.map((spec) => spec.slug)).to.deep.equal(['api']);
     });
 
-    it('reports no OpenAPI 3.x document whatever format the others are in', async () => {
+    /** How the problem says to convert the directory: the file, its format, where `api transform` writes, and how many more. */
+    const conversion = async () => {
+      const problem = (await resolve())._unsafeUnwrapErr();
+      if (problem.kind !== 'noOpenApiSpec') {
+        throw new Error(`expected no OpenAPI 3.x document, got '${problem.kind}'`);
+      }
+      const { file, format, converted, others } = problem.conversion;
+      const relative = (each: FilePath) => each.relativeTo(new DirectoryPath(root));
+      return [relative(file), format, relative(converted), others];
+    };
+
+    // Named, with where `api transform` writes the result: its own folder, which the portal does not read.
+    it('reports no OpenAPI 3.x document whatever format the others are in, naming one to convert', async () => {
       write('spec/swagger.json', JSON.stringify({ swagger: '2.0', info: {}, paths: {} }));
       write('spec/openapi2.json', JSON.stringify({ openapi: '2.0.0', info: {}, paths: {} }));
       write('spec/postman.json', JSON.stringify({ info: { schema: 'postman' }, item: [] }));
       write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
 
-      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'noOpenApiSpec' });
+      expect(await conversion()).to.deep.equal([
+        'spec/openapi2.json',
+        'OpenAPI 2.0.0',
+        'spec/transformations/openapi2_OpenApi3Yaml.yaml',
+        1
+      ]);
+    });
+
+    it('names the first file when no document says what it is', async () => {
+      write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
+      write('spec/postman.json', JSON.stringify({ info: { schema: 'postman' }, item: [] }));
+
+      expect(await conversion()).to.deep.equal([
+        'spec/api.raml',
+        null,
+        'spec/transformations/api_OpenApi3Yaml.yaml',
+        0
+      ]);
     });
 
     it('reports a document it cannot parse', async () => {
@@ -429,10 +458,21 @@ describe('PortalSourceContext', () => {
     });
 
     it('reports an empty or absent spec directory', async () => {
-      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('emptySpecDirectory');
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
 
       fs.mkdirSync(path.join(root, 'spec'));
-      expect((await resolve())._unsafeUnwrapErr().kind).to.equal('emptySpecDirectory');
+      expect((await resolve())._unsafeUnwrapErr()).to.deep.equal({ kind: 'emptySpecDirectory', folders: [] });
+    });
+
+    // Where `api transform --destination=src/spec` puts its result.
+    it('names the folders of a spec directory that holds nothing else, whose documents are not read', async () => {
+      write('spec/transformations/api_OpenApi3Yaml.yaml', 'openapi: 3.0.0');
+
+      const problem = (await resolve())._unsafeUnwrapErr();
+
+      expect(problem.kind === 'emptySpecDirectory' && problem.folders.map((folder) => folder.leafName())).to.deep.equal(
+        ['transformations']
+      );
     });
 
     it('leaves a spec named after the search route with its own name', async () => {
@@ -1060,6 +1100,107 @@ describe('PortalSourceContext', () => {
       expect(problem.kind === 'invalidFrontMatter' && problem.errors).to.deep.equal([
         'content/api/overview.md has no front matter, which is where its title goes.'
       ]);
+    });
+  });
+
+  // The build imports each Markdown image, and fails as a whole over one it cannot find.
+  describe('the images the pages show', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('static/images/logo.png', 'png');
+      write('content/guides/diagram.png', 'png');
+    });
+
+    /** Each missing image: its page and line, as written, where it was looked for and what is there instead. */
+    const missingImages = async () => {
+      const problem = contentProblem((await resolve())._unsafeUnwrapErr());
+      if (problem.kind !== 'missingImages') {
+        throw new Error(`expected missing images, got '${problem.kind}'`);
+      }
+      const relative = (file: FilePath | null) => (file === null ? null : file.relativeTo(new DirectoryPath(root)));
+      return problem.images.map(({ page, line, url, file, foundAs }) => [
+        `${relative(page)}:${line}`,
+        url,
+        relative(file),
+        relative(foundAs)
+      ]);
+    };
+
+    it('accepts images in the static directory and beside their page, whatever the query or encoding', async () => {
+      write('static/images/team photo.png', 'png');
+      write(
+        'content/guides/index.md',
+        page('Guides') +
+          '![Logo](/images/logo.png)\n\n![Diagram](./diagram.png?v=2)\n\n![Again](diagram.png#top)\n\n' +
+          '![Team](/images/team%20photo.png)\n\n![Remote](https://example.com/x.png)\n\n![Inline](data:image/png;base64,AA)\n'
+      );
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('names each image the build would not find, with its page and line', async () => {
+      write(
+        'content/guides/index.md',
+        page('Guides') + '\n![Logo](/images/missing.png)\n\nText ![Diagram](./missing.png) inline.\n'
+      );
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/guides/index.md:5', '/images/missing.png', 'static/images/missing.png', null],
+        ['content/guides/index.md:7', './missing.png', 'content/guides/missing.png', null]
+      ]);
+    });
+
+    // Found by this machine's file system, and lost by a build on one that matches case.
+    it('names the spelling on disk of an image written in another case', async () => {
+      write('content/index.md', page('Home') + '![Logo](/images/Logo.png)\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.md:4', '/images/Logo.png', 'static/images/Logo.png', 'static/images/logo.png']
+      ]);
+    });
+
+    it('refuses a static image when there is no static directory', async () => {
+      fs.rmSync(path.join(root, 'static'), { recursive: true });
+      write('content/index.md', page('Home') + '![Logo](/images/logo.png)\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.md:4', '/images/logo.png', 'static/images/logo.png', null]
+      ]);
+    });
+
+    // The build reads a copy of content/, which neither of these is in.
+    it('refuses an image beside the page that points out of content/ or into a folder the build skips', async () => {
+      write('content/.drafts/sketch.png', 'png');
+      write('content/index.md', page('Home') + '![Logo](../static/images/logo.png)\n\n![Sketch](.drafts/sketch.png)\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.md:4', '../static/images/logo.png', null, null],
+        ['content/index.md:6', '.drafts/sketch.png', null, null]
+      ]);
+    });
+
+    it('reads an image in a code block or inline code as the text it is', async () => {
+      write('content/index.md', page('Home') + '```md\n![Logo](/images/missing.png)\n```\n\nWrite `![a](/b.png)`.\n');
+
+      expect((await resolve()).isOk()).to.be.true;
+    });
+
+    it('reads an .mdx page as MDX, where an image inside a component is still an image', async () => {
+      write('content/index.mdx', page('Home') + '<Callout>\n\n![Logo](/images/missing.png)\n\n</Callout>\n');
+
+      expect(await missingImages()).to.deep.equal([
+        ['content/index.mdx:6', '/images/missing.png', 'static/images/missing.png', null]
+      ]);
+    });
+
+    it('reports the images with the other problems in the content', async () => {
+      write('content/notes.md', '# Notes');
+      write('content/index.md', page('Home') + '![Logo](/images/missing.png)\n');
+
+      const kinds = contentProblems((await resolve())._unsafeUnwrapErr()).map(({ kind }) => kind);
+
+      expect(kinds).to.deep.equal(['invalidFrontMatter', 'missingImages']);
     });
   });
 

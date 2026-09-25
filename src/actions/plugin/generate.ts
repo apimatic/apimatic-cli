@@ -57,19 +57,30 @@ export class PluginGenerateAction {
       return ActionResult.failed();
     }
 
-    const identified =
-      configState.state === 'present' && configState.hasMetadata()
-        ? ActionResult.success(configState)
-        : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project);
+    // A project set up for a plugin is generated unattended, from the languages it records.
+    const setUp = configState.state === 'present' && configState.hasMetadata();
+    const recordedLanguages = setUp ? configState.recordedLanguages() : [];
+    const asksForLanguages = recordedLanguages.length === 0;
+    if (asksForLanguages && !this.prompts.canAsk()) {
+      this.prompts.setupNeedsTerminal(sourceDirectory);
+      return ActionResult.failed();
+    }
+
+    const identified = setUp
+      ? ActionResult.success(configState)
+      : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project);
     if (!identified.isSuccess()) {
       return identified.discardValue();
     }
 
     const config = identified.getValue();
-    const selection = await this.prompts.selectLanguages(config);
+    const selection = asksForLanguages ? await this.prompts.selectLanguages(config) : recordedLanguages;
     if (!selection?.length) {
       this.prompts.noLanguagesSelected();
       return ActionResult.cancelled();
+    }
+    if (!asksForLanguages) {
+      this.prompts.recordedLanguagesIncluded(recordedLanguages);
     }
 
     this.prompts.languagesNotIncluded(config.unsupportedLanguages());
@@ -85,7 +96,9 @@ export class PluginGenerateAction {
         .andThen(PublishingProfiles.create)
         .map((profiles) => profiles.getActiveProfiles().length > 0)
         .unwrapOr(false);
-    if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin())) {
+    if (couldPublishInstead && !asksForLanguages) {
+      this.prompts.publishFirstRecommended();
+    } else if (couldPublishInstead && !(await this.prompts.confirmLocalPlugin())) {
       this.prompts.localPluginCancelled();
       return ActionResult.cancelled();
     }

@@ -42,7 +42,8 @@ export class GenerateAction {
     const portalContext = new PortalContext(portalDirectory);
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
       confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
-      onPrepared: (portalProject) => this.build(portalProject, portalContext, portalDirectory, zipPortal)
+      onPrepared: (portalProject, source) =>
+        this.build(portalProject, source.contentDirectory, portalContext, portalDirectory, zipPortal)
     });
   };
 
@@ -60,11 +61,12 @@ export class GenerateAction {
 
   private async build(
     portalProject: PortalProjectPaths,
+    contentDirectory: DirectoryPath | null,
     portalContext: PortalContext,
     portalDirectory: DirectoryPath,
     zipPortal: boolean
   ): Promise<ActionResult> {
-    const build = await this.prompts.buildPortal(this.buildService.build(portalProject));
+    const build = await this.prompts.buildPortal(this.buildService.build(portalProject, contentDirectory));
 
     if (build.isErr()) {
       // Written before the temp directory is removed, so the log outlives the build.

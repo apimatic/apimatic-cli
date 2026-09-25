@@ -46,8 +46,6 @@ export class PortalServeAction {
     onServing?: () => void
   ): Promise<ActionResult> => {
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
-      // So the browser keeps showing what a build would accept while an edit is half done.
-      content: 'copy',
       onPrepared: async (portalProject, source, artifacts) => {
         const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
         if (servePort !== port) {

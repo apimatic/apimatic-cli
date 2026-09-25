@@ -222,6 +222,22 @@ describe('PortalArtifactsService', () => {
       expect(error.errorMessage).to.contain('plugin: skills generation failed');
     });
 
+    // As the server words it for its own web page: a link, then details on lines of their own.
+    it("names a problem with the specification as such, in the terminal's plain text", async () => {
+      const message =
+        'Discriminator property is not applicable.  (<a href="https://docs.apimatic.io/rule" target="_blank" ' +
+        'rel="nofollow">View Details</a>)<br/><b>Source</b>: <i><code>API > Filter</code></i>. ';
+      respondToStatus = statusBody({ status: 'ValidationError', errors: { validationSummary: [message] } });
+
+      const error = (await generate())._unsafeUnwrapErr();
+
+      expect(error.errorMessage).to.equal(
+        'Portal artifacts could not be generated.\n' +
+          '- API definition: Discriminator property is not applicable.  (https://docs.apimatic.io/rule)\n' +
+          '  Source: API > Filter.'
+      );
+    });
+
     it('reports a subscription refusal as denied access', async () => {
       respondToStatus = statusBody({
         status: 'SubscriptionError',

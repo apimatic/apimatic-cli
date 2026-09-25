@@ -51,11 +51,16 @@ export class PluginConfig {
     return this.entries.filter(([, entry]) => isPublished(entry)).map(([language]) => language);
   }
 
+  /** What `languages` names that a plugin can carry. */
+  public recordedLanguages(): readonly Language[] {
+    return this.entries.map(([language]) => language);
+  }
+
   // A config naming none has not chosen against any: covering everything is what one Enter gives.
   public initialLanguages(): readonly Language[] {
-    const requested = this.entries.map(([language]) => language);
+    const recorded = this.recordedLanguages();
 
-    return requested.length > 0 ? requested : AVAILABLE_LANGUAGES;
+    return recorded.length > 0 ? recorded : AVAILABLE_LANGUAGES;
   }
 
   public unsupportedLanguages(): readonly string[] {

@@ -80,7 +80,7 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
   expect(source.generatedPages.missingFrom(artifacts), 'the artifacts back every page').to.be.null;
   const prepared = (await new PortalProjectService().prepare(project, source, artifacts))._unsafeUnwrap();
 
-  const build = await new PortalBuildService().build(prepared);
+  const build = await new PortalBuildService().build(prepared, source.contentDirectory);
   if (build.isErr()) {
     throw new Error(`${build.error.message}\n${build.error.log.split('\n').slice(-20).join('\n')}`);
   }
@@ -254,12 +254,10 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(filesNaming(project.toString(), fixture.join('spec').toString())).to.deep.equal([]);
   });
 
-  // Skipped: `defineDocs({ dir })` compiles the content directory's absolute path into the
-  // client bundle as its `base`, and `src/lib/source.ts` cannot move behind `.server` because
-  // the browser imports it to lazy load page bodies. A relative directory is no drop-in: the
-  // same literal is substituted into the stylesheet, which resolves it from elsewhere.
-  it.skip('publishes no absolute path from the build machine at all', () => {
-    expect(filesNaming(fixture.join('content').toString())).to.deep.equal([]);
+  // `defineDocs({ dir })` compiles its directory into the client bundle as the collection's
+  // `base`, which is why the project reads a copy of the content by a relative name.
+  it('publishes no absolute path from the build machine at all', () => {
+    expect(filesNaming(fixture.join('content').toString(), fixture.toString())).to.deep.equal([]);
   });
 
   it('writes the sidebar tree to one cache file instead of into every page payload', () => {
@@ -382,8 +380,21 @@ const stylesheetOf = (output: DirectoryPath) => {
   it("shows the SDK cards under the title, and nothing of the spec's description", () => {
     const twin = read('sdks.md');
 
-    expect(twin).to.contain('<SdkCards>');
+    expect(twin).to.contain('- [TypeScript](/sdks/typescript): [Download SDK](/__downloads/sdk/typescript.zip)');
+    expect(twin).to.not.contain('<Sdk');
     expect(twin).to.not.contain('Simple calculator API hosted on APIMATIC');
+  });
+
+  // What "View as Markdown" and the AI page actions hand over; llms-full.txt names each operation only.
+  it("gives an operation's twin the part of the specification its page renders", () => {
+    const twin = read('api/apimatic-calculator/simple-calculator/Calculate.md');
+    const full = read('llms-full.txt');
+
+    expect(twin).to.contain('`GET /{operation}`');
+    expect(twin).to.match(/```yaml\nopenapi: 3/);
+    expect(twin).to.contain(CALCULATE_SAMPLE);
+    expect(full).to.contain('`GET /{operation}`');
+    expect(full).to.not.contain('```yaml');
   });
 
   it('lists each language in the SDKs tab of the sidebar', () => {
@@ -503,8 +514,13 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   it('writes the context plugin page, and its Markdown twin, for the plugin block', () => {
+    const twin = read('context-plugin.md');
+
     expect(exists('context-plugin/index.html')).to.be.true;
-    expect(read('context-plugin.md')).to.contain('<PluginInstall path="/__downloads/plugin.zip" />');
+    expect(twin).to.contain('```bash\nnpx context-plugins install "/__downloads/plugin.zip"\n```');
+    expect(twin).to.contain('- TypeScript');
+    expect(twin).to.contain('- Claude Code');
+    expect(twin).to.not.contain('<Plugin');
   });
 
   // The fixture names no address, so the prerendered page has only the path; the browser adds

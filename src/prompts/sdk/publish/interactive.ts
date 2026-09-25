@@ -203,7 +203,8 @@ export class SdkPublishInteractivePrompts {
   }
 
   public async confirmPublishing(): Promise<boolean> {
-    const result = await confirm({ message: 'Do you want to proceed?' });
+    // No by default, as the overwrite prompts are: a release cannot be taken back.
+    const result = await confirm({ message: 'Do you want to proceed?', initialValue: false });
     if (isCancel(result)) return false;
     return result;
   }

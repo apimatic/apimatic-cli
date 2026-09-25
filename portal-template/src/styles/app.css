@@ -19,10 +19,9 @@
 
 @source not '../../dist';
 
-/* Tailwind's automatic detection is rooted at this project, and the user's Markdown lives
-   outside it, so a utility class written in a page produced no CSS at all. The CLI
-   substitutes the placeholder with the content directory before the build. */
-@source '__APIMATIC_CONTENT_DIR__';
+/* Named, not detected: the project can sit in a git-ignored folder beside the source, which
+   Tailwind's detection skips, and a utility class in a page would produce no CSS. */
+@source '../../content';
 
 html {
   scrollbar-gutter: stable;
