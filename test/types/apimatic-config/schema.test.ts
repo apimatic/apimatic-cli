@@ -334,6 +334,8 @@ describe('apimatic.schema.json', () => {
       ApimaticConfigDocument.parse(JSON.stringify(file))._unsafeUnwrap().findingsFor('root', 'plugin', 'languages')
         .length === 0;
 
+    const identity = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
+
     const cases: [string, object, boolean][] = [
       [
         'unknown root keys and unknown plugin fields',
@@ -342,7 +344,7 @@ describe('apimatic.schema.json', () => {
           schemaVersion: 1,
           future: { anything: true },
           portal: {},
-          plugin: { pluginId: 'acme-payments', pluginVersion: '0.1.0', notes: 'kept' },
+          plugin: { ...identity, notes: 'kept' },
           languages: { typescript: {} }
         },
         true
@@ -350,8 +352,8 @@ describe('apimatic.schema.json', () => {
       ['a file whose only language entry is empty', { languages: { typescript: {} } }, true],
       ['a file with nothing in it', {}, true],
       ['another schema version', { schemaVersion: 2 }, false],
-      ['a plugin ID with spaces', { plugin: { pluginId: 'Acme Payments' } }, false],
-      ['a plugin version that is not major.minor.patch', { plugin: { pluginVersion: '1.0' } }, false]
+      ['a plugin ID with spaces', { plugin: { ...identity, pluginId: 'Acme Payments' } }, false],
+      ['a plugin version that is not major.minor.patch', { plugin: { ...identity, pluginVersion: '1.0' } }, false]
     ];
 
     for (const [label, file, accepted] of cases) {
@@ -359,6 +361,23 @@ describe('apimatic.schema.json', () => {
         expect(documentAccepts(file), 'document').to.equal(accepted);
         const verdict = schemaVerdict(file);
         expect(verdict.valid, verdict.errors || 'schema').to.equal(accepted);
+      });
+    }
+
+    // The service generates no plugin without its ID, name and version, so the editor asks for
+    // them. The file is still read without them: `plugin generate` asks for a missing ID or name.
+    const incomplete: [string, object][] = [
+      ['an empty plugin block', {}],
+      ['a plugin without an ID', { pluginName: identity.pluginName, pluginVersion: identity.pluginVersion }],
+      ['a plugin without a name', { pluginId: identity.pluginId, pluginVersion: identity.pluginVersion }],
+      ['a plugin with a blank name', { ...identity, pluginName: ' ' }],
+      ['a plugin without a version', { pluginId: identity.pluginId, pluginName: identity.pluginName }]
+    ];
+
+    for (const [label, plugin] of incomplete) {
+      it(`asks for the identity in ${label}, which the file is still read without`, () => {
+        expect(documentAccepts({ plugin }), 'document').to.be.true;
+        expect(schemaVerdict({ plugin }).valid, 'schema').to.be.false;
       });
     }
   });
