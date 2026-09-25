@@ -16,7 +16,7 @@ import { FilePath } from '../../src/types/file/filePath';
 import { CommandMetadata } from '../../src/types/common/command-metadata';
 import { Language } from '../../src/types/sdk/generate';
 import { PortalArtifactsService } from '../../src/infrastructure/services/portal-artifacts-service';
-import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
+import { completeArtifacts } from './portal/prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
 const SPEC = new FilePath(
@@ -84,8 +84,11 @@ describe('QuickstartAction', () => {
   it('records the languages and the placeholder plugin identity, then hands off to the preview', async () => {
     prompts.selectLanguages.resolves([Language.TYPESCRIPT, Language.PYTHON]);
     // The preview asks the service for artifacts before it prepares anything; a portal declaring
-    // three languages would otherwise reach the network from a unit test.
-    const artifacts = sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(PortalArtifacts.none()));
+    // three languages would otherwise reach the network from a unit test. They back every page, as
+    // a real run's do, or the preview would refuse to prepare the project.
+    const artifacts = sinon
+      .stub(PortalArtifactsService.prototype, 'generate')
+      .resolves(ok(completeArtifacts([Language.TYPESCRIPT, Language.PYTHON])));
     const prepare = sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
 
     await execute();
@@ -130,7 +133,7 @@ describe('QuickstartAction', () => {
 
     it('validates the specification it finds instead of asking for one', async () => {
       prompts.selectLanguages.resolves([Language.TYPESCRIPT]);
-      sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(PortalArtifacts.none()));
+      sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(ok(completeArtifacts([Language.TYPESCRIPT])));
       sinon.stub(PortalProjectService.prototype, 'prepare').resolves(err('stopped here'));
 
       await execute(downloaded);

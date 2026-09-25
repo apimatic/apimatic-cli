@@ -5,12 +5,14 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
+import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { ContentProblem, PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
+import { describeMissingArtifacts } from './artifacts.js';
 import { reportContentNotices, reportContentProblems, reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
@@ -50,18 +52,19 @@ export class PortalServePrompts {
         `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order, tabs and ` +
           `titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
             'apimatic.json'
-          )} appear in the browser automatically, and so does a language added to or removed from its ${f.var(
+          )} appear in the browser automatically, and so does a language removed from its ${f.var(
             'languages'
           )} block, which updates the SDK pages, or its ${f.var(
             'plugin'
-          )} block added or removed, which adds or removes the Context Plugin tab. A mistake in ${f.var(
+          )} block removed, which removes the Context Plugin tab. A mistake in ${f.var(
             'apimatic.json'
           )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a page ` +
           `or a ${f.var('nav.json')} is reported when you save it too, while the preview shows what it can.`,
         '',
-        `Adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
-          sourceDirectory.join('static')
-        )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
+          `starts, adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
+            sourceDirectory.join('static')
+          )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
@@ -77,6 +80,15 @@ export class PortalServePrompts {
   public configRejected(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
     reportSourceProblem(problem, sourceDirectory, { offerQuickstart: false });
     log.message('The preview keeps showing what it last accepted until the file is fixed.');
+  }
+
+  // The artifacts are fetched once, before the preview starts.
+  public editNeedsRestart(missing: MissingArtifacts) {
+    log.warn(
+      `This edit to ${f.var(APIMATIC_CONFIG_FILE_NAME)} needs ${describeMissingArtifacts(missing)}, which the ` +
+        `preview was started without. Restart the preview to fetch them; until then it keeps showing what ` +
+        `it last accepted.`
+    );
   }
 
   public configNotApplied(reason: string) {

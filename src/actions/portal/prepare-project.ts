@@ -5,6 +5,7 @@ import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-projec
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { ActionResult } from '../action-result.js';
 
@@ -31,7 +32,11 @@ export class PreparePortalProjectAction {
    */
   public readonly execute = async (
     sourceDirectory: DirectoryPath,
-    onPrepared: (project: PortalProjectPaths, source: PortalSource) => Promise<ActionResult>,
+    onPrepared: (
+      project: PortalProjectPaths,
+      source: PortalSource,
+      artifacts: PortalArtifacts
+    ) => Promise<ActionResult>,
     confirm: () => Promise<boolean> = async () => true
   ): Promise<ActionResult> => {
     // Ahead of the server run, which can take minutes: a mistake or a question should not wait on it.
@@ -67,6 +72,12 @@ export class PreparePortalProjectAction {
         artifacts.value.codeSampleCatalogs.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))
       );
 
+      const missing = source.value.generatedPages.missingFrom(artifacts.value);
+      if (missing !== null) {
+        this.prompts.artifactsIncomplete(missing);
+        return ActionResult.failed();
+      }
+
       return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {
         const project = await this.projectService.prepare(tempDirectory, source.value, artifacts.value);
         if (project.isErr()) {
@@ -74,7 +85,7 @@ export class PreparePortalProjectAction {
           return ActionResult.failed();
         }
 
-        return await onPrepared(project.value, source.value);
+        return await onPrepared(project.value, source.value, artifacts.value);
       });
     });
   };

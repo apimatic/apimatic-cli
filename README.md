@@ -31,11 +31,11 @@ Documentation portals are now built on your machine from a `src/` directory, and
   (header links) and `ai` (the page actions). Running `apimatic quickstart` scaffolds the block
   with every default spelled out, and the file's `$schema` lets your editor complete and check it.
 - A portal also needs the project's SDK languages, at least one, in the same file's
-  `languages` block, for example `"languages": { "typescript": {} }`. `plugin generate` and
-  `sdk publish` both write to it, and the context plugin reads it too, so name only the languages
-  you ship. The same file carries the plugin's identity in `plugin`; `src/plugin-config.json` is
-  no longer read, so run `plugin generate` and `sdk publish` again after upgrading and delete the
-  old file.
+  `languages` block, for example `"languages": { "typescript": {} }`; `csharp`, `python` and
+  `typescript` are available for now. `plugin generate` and `sdk publish` both write to it, and
+  the context plugin reads it too, so name only the languages you ship. The same file carries
+  the plugin's identity in `plugin`; `src/plugin-config.json` is no longer read, so run
+  `plugin generate` and `sdk publish` again after upgrading and delete the old file.
 - Put OpenAPI documents in `src/spec/`, Markdown pages in `src/content/` and images and other
   files in `src/static/`.
 - Every page starts with front matter giving its `title`, which names it in the sidebar:
@@ -50,9 +50,12 @@ Documentation portals are now built on your machine from a `src/` directory, and
   opens on `index.md`. The file places the tabs the CLI makes with `apimatic:sdks`,
   `apimatic:plugin` and `apimatic:api`, and its `title` names Home, which comes first unless
   the file lists `index`.
-- The SDKs tab has a page per language in the `languages` block, and the Context Plugin tab
-  appears when there is a `plugin` block. Their addresses, `/sdks` and `/context-plugin`, are
-  kept for them, so a page in `src/content/` that would be served there is refused.
+- The SDKs tab lists a card per language in the `languages` block, offering its download, and
+  its source repository and package once `sdk publish` records them, and gives each language a
+  page carrying its SDK's getting-started docs. The Context Plugin tab, with the plugin's install
+  command, appears when there is a `plugin` block, or a `pluginUrl` in the `portal` block for a
+  plugin hosted elsewhere. Their addresses, `/sdks` and `/context-plugin`, are kept for them, so
+  a page in `src/content/` that would be served there is refused.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
@@ -89,7 +92,6 @@ USAGE
 * [`apimatic quickstart`](#apimatic-quickstart)
 * [`apimatic sdk generate`](#apimatic-sdk-generate)
 * [`apimatic sdk publish`](#apimatic-sdk-publish)
-* [`apimatic sdk save-changes`](#apimatic-sdk-save-changes)
 
 ## `apimatic api transform`
 
@@ -341,7 +343,7 @@ DESCRIPTION
 
   The portal is built on your machine and written as static files you can host anywhere. Configure it with
   'src/apimatic.json', whose 'languages' block gives the portal a page for each SDK language, and whose 'plugin' block,
-  when there is one, a page for the context plugin.
+  or a 'pluginUrl' in its 'portal' block for a plugin hosted elsewhere, a page for the context plugin.
 
 EXAMPLES
   apimatic portal generate
@@ -375,8 +377,8 @@ DESCRIPTION
   pages in 'src/content', reorder them in a 'nav.json', or change the 'portal', 'languages' or 'plugin' block of
   'apimatic.json'.
 
-  Adding or removing a page in 'src/content', creating 'src/static', or changing which documents are in 'src/spec',
-  needs the preview restarted.
+  Adding a language or a 'plugin' block, adding or removing a page in 'src/content', creating 'src/static', or changing
+  which documents are in 'src/spec', needs the preview restarted.
 
   Nothing is written to disk; run 'apimatic portal generate' to produce the static files.
 
@@ -433,9 +435,8 @@ Generate an SDK for your API
 
 ```
 USAGE
-  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--skip-changes]
-    [--api-version <value>] [--zip] [--track-changes] [--codegen-version v3|v4] [--stability stable|beta] [-i <value>]
-    [-f] [-k <value>]
+  $ apimatic sdk generate -l csharp|java|php|python|ruby|typescript|go [-d <value>] [--api-version <value>]
+    [--zip] [--codegen-version v4] [--stability stable|beta] [-i <value>] [-f] [-k <value>]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk/<language> | <input>/sdk/<api-version>/<language>] path where
@@ -447,22 +448,20 @@ FLAGS
   -l, --language=<option>         (required) Programming language for SDK generation
                                   <options: csharp|java|php|python|ruby|typescript|go>
       --api-version=<value>       Version of the API to use for SDK generation (if multiple versions exist)
-      --codegen-version=<option>  [default: v3] Version of the code generator to use
-                                  <options: v3|v4>
-      --skip-changes              Do not apply the saved changes to the generated SDK
-      --stability=<option>        [default: stable] Stability level of the generated SDK
+      --codegen-version=<option>  [default: v4] Version of the code generator to use
+                                  <options: v4>
+      --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
-      --track-changes             Enable change tracking for SDK generation (only required for initial setup)
       --zip                       Download the generated SDK as a .zip archive
 
 DESCRIPTION
   Generate an SDK for your API
 
-  Generate Software Development Kits (SDKs) from API specifications.
-  Supports multiple programming languages including Java, C#, Python, JavaScript, and more.
+  Generate a Software Development Kit (SDK) from an API specification.
+  C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way.
 
 EXAMPLES
-  apimatic sdk generate --language=java
+  apimatic sdk generate --language=typescript
 
   apimatic sdk generate --language=csharp --input=./
 
@@ -477,9 +476,9 @@ Generate and publish an SDK to a package registry and/or source repository
 
 ```
 USAGE
-  $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript] [-f]
-    [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v3|v4] [--stability stable|beta]
-    [--update-plugin-config]
+  $ apimatic sdk publish [-p <value>] [-v <value>] [-d <value>] [-l csharp|java|php|python|ruby|typescript|go]
+    [-f] [-i <value>] [--publish-type package|sourcecode...] [--dry-run] [--codegen-version v4] [--stability
+    stable|beta]
 
 FLAGS
   -d, --destination=<value>       [default: <input>/sdk] path where the sdk will be generated.
@@ -487,19 +486,17 @@ FLAGS
   -i, --input=<value>             [default: ./] path to the parent directory containing the 'src' directory, which
                                   includes API specifications and configuration files.
   -l, --language=<option>         Language of the SDK to generate and publish.
-                                  <options: csharp|java|php|python|ruby|typescript>
+                                  <options: csharp|java|php|python|ruby|typescript|go>
   -p, --profile-id=<value>        Id of the publishing profile to use.
   -v, --version=<value>           Semantic version of the SDK to publish (e.g. 1.0.0).
-      --codegen-version=<option>  [default: v3] Version of the code generator to use
-                                  <options: v3|v4>
+      --codegen-version=<option>  [default: v4] Version of the code generator to use
+                                  <options: v4>
       --dry-run                   Generate the SDK locally for review without publishing.
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.
                                   <options: package|sourcecode>
-      --stability=<option>        [default: stable] Stability level of the generated SDK
+      --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
-      --update-plugin-config      Record the published SDK in 'src/apimatic.json', creating the file if it does not
-                                  exist. Interactive runs are asked instead.
 
 DESCRIPTION
   Generate and publish an SDK to a package registry and/or source repository
@@ -513,44 +510,10 @@ EXAMPLES
 
   apimatic sdk publish --profile-id=a1b2c3d4e5f6a1b2c3d4e5f6 --language=typescript --version=1.0.0 --publish-type=package --publish-type=sourcecode
 
-  apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=java --version=2.0.0 --publish-type=sourcecode
+  apimatic sdk publish --profile-id=b2c3d4e5f6a1b2c3d4e5f6a1 --language=csharp --version=2.0.0 --publish-type=sourcecode
 
   apimatic sdk publish --profile-id=c3d4e5f6a1b2c3d4e5f6a1b2 --language=python --version=1.0.0 --publish-type=package --dry-run
-
-  apimatic sdk publish --profile-id=d4e5f6a1b2c3d4e5f6a1b2c3 --language=csharp --version=1.0.0 --publish-type=package --codegen-version=v4 --stability=beta
 ```
 
 _See code: [src/commands/sdk/publish.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/sdk/publish.ts)_
-
-## `apimatic sdk save-changes`
-
-Save customizations made to an auto-generated SDK
-
-```
-USAGE
-  $ apimatic sdk save-changes -l csharp|java|php|python|ruby|typescript|go [--sdk <value>] [--api-version <value>] [-i
-    <value>]
-
-FLAGS
-  -i, --input=<value>        [default: ./] path to the parent directory containing the 'src' directory, which includes
-                             API specifications and configuration files.
-  -l, --language=<option>    (required) Programming language of the SDK
-                             <options: csharp|java|php|python|ruby|typescript|go>
-      --api-version=<value>  Version of the API where changes should be saved (if multiple versions exist).
-      --sdk=<value>          [default: ./sdk/<language> | ./sdk/<api-version>/<language>] path to the folder containing
-                             the updated SDK.
-
-DESCRIPTION
-  Save customizations made to an auto-generated SDK
-
-  Requires an input directory with API specifications, a path to the updated SDK directory, and the programming
-  language.
-
-EXAMPLES
-  apimatic sdk save-changes --language=csharp
-
-  apimatic sdk save-changes --language=java --sdk=./sdk
-```
-
-_See code: [src/commands/sdk/save-changes.ts](https://github.com/apimatic/apimatic-cli/blob/v1.3.1/src/commands/sdk/save-changes.ts)_
 <!-- commandsstop -->

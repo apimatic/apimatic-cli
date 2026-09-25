@@ -9,7 +9,7 @@ import { PortalPagesService } from '../../src/infrastructure/portal-pages-servic
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalLanguages } from '../../src/types/portal/portal-languages';
-import { Language } from '../../src/types/sdk/generate';
+import { PORTAL_LANGUAGES } from '../../src/types/sdk/generate';
 
 describe('PortalPagesService', () => {
   const service = new PortalPagesService();
@@ -17,7 +17,7 @@ describe('PortalPagesService', () => {
   let generated: DirectoryPath;
 
   const pagesFor = (languages: Record<string, object> = { typescript: {} }, plugin = false) =>
-    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin);
+    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin ? { kind: 'bundled' } : null);
 
   /** Every file written, relative to the generated directory. */
   const files = () =>
@@ -56,14 +56,43 @@ describe('PortalPagesService', () => {
 
   // The one run that holds the shipped templates and the data the generator gives them together.
   it('renders every page from the shipped templates, leaving no placeholder behind', async () => {
-    const everyLanguage = Object.fromEntries(Object.values(Language).map((language) => [language, {}]));
+    const everyLanguage = Object.fromEntries(PORTAL_LANGUAGES.map((language) => [language, {}]));
 
     (await service.write(generated, pagesFor(everyLanguage, true)))._unsafeUnwrap();
 
     for (const file of files().filter((name) => name.endsWith('.mdx'))) {
       expect(read(file), file).to.not.contain('{{');
     }
-    expect(read('sdks/csharp.mdx')).to.contain('title: "C#"');
+    expect(read('sdks/csharp.mdx')).to.contain('title: "C# SDK"');
+    expect(read('sdks/csharp.mdx')).to.contain('<include>../../generated-includes/sdk-docs/csharp.md</include>');
+    for (const language of PORTAL_LANGUAGES) {
+      expect(read('sdks/index.mdx')).to.contain(`<SdkCard language="${language}"`);
+      expect(read('context-plugin/index.mdx')).to.contain(`<PluginLanguage language="${language}"`);
+    }
+    expect(read('context-plugin/index.mdx')).to.contain('<PluginInstall path="/__downloads/plugin.zip" />');
+  });
+
+  // What the user's `apimatic.json` records reaches the page as it was written, but for a quote.
+  it('writes a published language into its card and its page', async () => {
+    const published = {
+      publishing: {
+        source: { repositoryUrl: 'https://github.com/acme/calc-ts' },
+        package: { version: '1.2.0' },
+        packageConfiguration: { name: '@acme/calc' }
+      }
+    };
+
+    (await service.write(generated, pagesFor({ typescript: published })))._unsafeUnwrap();
+
+    expect(read('sdks/index.mdx')).to.contain(
+      '<SdkCard language="typescript" name="TypeScript" page="/sdks/typescript" ' +
+        'download="/__downloads/sdk/typescript.zip" source="https://github.com/acme/calc-ts" ' +
+        'packageName="@acme/calc" packageUrl="https://www.npmjs.com/package/@acme/calc" registry="npm" version="1.2.0" />'
+    );
+    expect(read('sdks/typescript.mdx')).to.contain(
+      '<SdkActions download="/__downloads/sdk/typescript.zip" source="https://github.com/acme/calc-ts" ' +
+        'packageUrl="https://www.npmjs.com/package/@acme/calc" registry="npm" />'
+    );
   });
 
   // The dev server watches the directory, and could read a page truncated before it is written.
@@ -133,12 +162,12 @@ describe('PortalPagesService', () => {
 
     it('reports a placeholder the pages give no value for, naming the template', async () => {
       fs.writeFileSync(path.join(templates(), 'sdks.mdx'), '# SDKs');
-      fs.writeFileSync(path.join(templates(), 'sdk.mdx'), '# {{name}} {{version}}');
+      fs.writeFileSync(path.join(templates(), 'sdk.mdx'), '# {{name}} {{license}}');
 
       const written = await service.write(generated, pagesFor());
 
       expect(written._unsafeUnwrapErr()).to.equal(
-        "A portal page template could not be filled. sdk.mdx: '{{version}}' names a value the page is not given."
+        "A portal page template could not be filled. sdk.mdx: '{{license}}' names a value the page is not given."
       );
     });
   });

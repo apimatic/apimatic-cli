@@ -8,6 +8,7 @@ import { PortalProjectService } from '../../src/infrastructure/portal-project-se
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { Language } from '../../src/types/sdk/generate';
@@ -27,6 +28,14 @@ const CODE_SAMPLES = new CodeSampleCatalogs([
   }) as CodeSampleCatalog
 ]);
 
+/**
+ * What a run delivers as TypeScript's SDK docs, with a brace and a tag in its prose: MDX would
+ * read either as code, which is why the pages include the docs rather than hold them.
+ */
+const SDK_DOCS =
+  '## Installation\n\nInstall it with npm; its objects look like {id: 1}.<br>Then build it.\n\n' +
+  '```bash\nnpm install calc\n```\n\n## Quick Start\n\nCreate one client and reuse it.\n';
+
 interface BuiltPortal {
   base: string;
   root: string;
@@ -34,8 +43,31 @@ interface BuiltPortal {
   output: DirectoryPath;
 }
 
+interface Delivered {
+  codeSampleCatalogs?: CodeSampleCatalogs;
+  plugin?: boolean;
+}
+
+/** What `/portal-artifacts` would deliver for a fixture whose one language is TypeScript. */
+function deliveredInto(
+  directory: string,
+  { codeSampleCatalogs = new CodeSampleCatalogs([]), plugin = false }: Delivered
+) {
+  fs.mkdirSync(directory, { recursive: true });
+  const file = (name: string, contents: string) => {
+    fs.writeFileSync(path.join(directory, name), contents);
+    return FilePath.create(path.join(directory, name))!;
+  };
+  return new PortalArtifacts(
+    codeSampleCatalogs,
+    new Map([['typescript', file('typescript.zip', 'PK typescript')]]),
+    new Map([['typescript', SDK_DOCS]]),
+    plugin ? file('plugin.zip', 'PK plugin') : undefined
+  );
+}
+
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
-async function buildFixture(name: string, codeSampleCatalogs = new CodeSampleCatalogs([])): Promise<BuiltPortal> {
+async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
   const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name);
   const base = await ensurePortalProjectDirectoryBase(fixture);
   const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
@@ -44,13 +76,9 @@ async function buildFixture(name: string, codeSampleCatalogs = new CodeSampleCat
 
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });
-  const prepared = (
-    await new PortalProjectService().prepare(
-      project,
-      source,
-      new PortalArtifacts(codeSampleCatalogs, new Map(), undefined)
-    )
-  )._unsafeUnwrap();
+  const artifacts = deliveredInto(path.join(root, 'delivered'), delivered);
+  expect(source.generatedPages.missingFrom(artifacts), 'the artifacts back every page').to.be.null;
+  const prepared = (await new PortalProjectService().prepare(project, source, artifacts))._unsafeUnwrap();
 
   const build = await new PortalBuildService().build(prepared);
   if (build.isErr()) {
@@ -123,7 +151,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   let output: DirectoryPath;
 
   before(async () => {
-    built = await buildFixture('default', CODE_SAMPLES);
+    built = await buildFixture('default', { codeSampleCatalogs: CODE_SAMPLES });
     ({ project, output } = built);
   });
 
@@ -327,14 +355,42 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(exists('sdks/index.html')).to.be.true;
     expect(exists('sdks/typescript/index.html')).to.be.true;
     expect(exists('sdks.md')).to.be.true;
-    expect(read('sdks/typescript.md')).to.contain('Installation and usage for the TypeScript SDK');
+    expect(read('sdks/typescript.md')).to.contain('# TypeScript SDK');
+  });
+
+  // Included, so MDX reads them as Markdown: their brace and tag render rather than fail the build.
+  it("carries each language's SDK docs, with their headings in the table of contents", () => {
+    const page = read('sdks/typescript/index.html');
+
+    expect(page).to.contain('its objects look like {id: 1}.<br/>Then build it.');
+    expect(page).to.match(/<h2[^>]*id="installation"/);
+    expect(page).to.contain('href="#quick-start"');
+    expect(read('sdks/typescript.md')).to.contain('## Quick Start');
+  });
+
+  it("offers each language's SDK from its card, its page and the site", () => {
+    const index = read('sdks/index.html');
+
+    expect(index).to.contain('href="/sdks/typescript"');
+    expect(index).to.contain('href="/__downloads/sdk/typescript.zip"');
+    expect(read('sdks/typescript/index.html')).to.contain('href="/__downloads/sdk/typescript.zip"');
+    expect(read('__downloads/sdk/typescript.zip')).to.equal('PK typescript');
+  });
+
+  // Read from the page's twin rather than its HTML, whose head may carry the spec's first
+  // paragraph as the site's description.
+  it("shows the SDK cards under the title, and nothing of the spec's description", () => {
+    const twin = read('sdks.md');
+
+    expect(twin).to.contain('<SdkCards>');
+    expect(twin).to.not.contain('Simple calculator API hosted on APIMATIC');
   });
 
   it('lists each language in the SDKs tab of the sidebar', () => {
     const tree = read(treeCacheFiles()[0]);
 
     expect(tree.indexOf('"SDKs"')).to.not.equal(-1);
-    expect(tree.indexOf('"TypeScript"')).to.be.greaterThan(tree.indexOf('"SDKs"'));
+    expect(tree.indexOf('"TypeScript SDK"')).to.be.greaterThan(tree.indexOf('"SDKs"'));
   });
 
   it('writes no context plugin page for a project without a plugin block', () => {
@@ -388,7 +444,7 @@ const stylesheetOf = (output: DirectoryPath) => {
   let output: DirectoryPath;
 
   before(async () => {
-    built = await buildFixture('branded');
+    built = await buildFixture('branded', { plugin: true });
     ({ output } = built);
   });
 
@@ -448,7 +504,16 @@ const stylesheetOf = (output: DirectoryPath) => {
 
   it('writes the context plugin page, and its Markdown twin, for the plugin block', () => {
     expect(exists('context-plugin/index.html')).to.be.true;
-    expect(read('context-plugin.md')).to.contain('How to install the context plugin');
+    expect(read('context-plugin.md')).to.contain('<PluginInstall path="/__downloads/plugin.zip" />');
+  });
+
+  // The fixture names no address, so the prerendered page has only the path; the browser adds
+  // the origin it loaded the page from.
+  it('installs the bundled plugin from where the site serves it', () => {
+    expect(read('context-plugin/index.html')).to.match(
+      /npx context-plugins install (&quot;|")\/__downloads\/plugin\.zip(&quot;|")/
+    );
+    expect(read('__downloads/plugin.zip')).to.equal('PK plugin');
   });
 
   // No nav.json, so the defaults: the generated tabs before the reference, in the CLI's order,

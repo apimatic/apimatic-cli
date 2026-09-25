@@ -13,8 +13,21 @@ its own copyright:
   @tanstack/start-static-server-functions)
     Copyright (c) 2021-present Tanner Linsley
 
-  Shiki, Tailwind CSS, React and Vite are likewise MIT licensed; see their own
-  packages for the full notices.
+  Shiki, Tailwind CSS, React, Vite and rehype-raw are likewise MIT licensed; see
+  their own packages for the full notices.
+
+The SDK and context plugin pages draw these marks, copied into
+src/components/logos.tsx:
+
+  The C#, Python and TypeScript logos, from Devicon 2.17.0
+    Copyright (c) 2015 konpa, MIT licensed
+    https://github.com/devicons/devicon
+
+  The Claude, Cursor and GitHub Copilot logos, from Simple Icons 16.32.0
+    CC0 1.0 Universal, https://github.com/simple-icons/simple-icons
+
+  Each mark remains the trademark of its owner, and is shown to name the
+  language or tool it stands for.
 
 The generated portal also bundles the Geist and Geist Mono typefaces, from the
 Fontsource packages @fontsource-variable/geist and @fontsource-variable/geist-mono.

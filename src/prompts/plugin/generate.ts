@@ -8,7 +8,7 @@ import { format as f } from '../format.js';
 import { withSpinner } from '../prompt.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { PluginConfig, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
-import { Language, languageLabel, PLUGIN_LANGUAGES } from '../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel } from '../../types/sdk/generate.js';
 
 export class PluginGeneratePrompts {
   // The spinner covers the service call only; until the save has run there is no path to name.
@@ -81,7 +81,7 @@ export class PluginGeneratePrompts {
 
     const selected = await multiselect<Language>({
       message: 'Which languages should your plugin include?',
-      options: PLUGIN_LANGUAGES.map((language) => ({
+      options: AVAILABLE_LANGUAGES.map((language) => ({
         value: language,
         label: languageLabel(language),
         hint: published.includes(language) ? 'published' : undefined

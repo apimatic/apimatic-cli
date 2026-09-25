@@ -8,14 +8,13 @@ import { GenerateAction } from '../../../src/actions/portal/generate';
 import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
-import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../../src/types/portal/code-samples';
 import { Language } from '../../../src/types/sdk/generate';
 import { FileService } from '../../../src/infrastructure/file-service';
 import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
-import { stubPreparePortalProject } from './prepare-project-stubs';
+import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -89,8 +88,22 @@ describe('GenerateAction', () => {
     expect(fs.existsSync(portalDirectory.toString())).to.be.false;
   });
 
+  // A page backed by nothing would fail the build, or link to a download the portal does not have.
+  it('fails without building when the artifacts leave out what the pages need, naming it', async () => {
+    shared.artifacts.resolves(ok(completeArtifacts(['csharp'], { plugin: false })));
+
+    const result = await execute(CODE_SAMPLES_FIXTURE);
+
+    expect(result.isFailed()).to.be.true;
+    const missing = [Language.TYPESCRIPT, Language.PYTHON];
+    expect(shared.prompts.artifactsIncomplete.calledOnceWith({ sdks: missing, sdkDocs: missing, plugin: false })).to.be
+      .true;
+    expect(shared.prepare.called).to.be.false;
+    expect(build.called).to.be.false;
+  });
+
   it("builds from the user's own specs, handing the project their code samples", async () => {
-    shared.artifacts.resolves(ok(new PortalArtifacts(samplesFromFixture(), new Map(), undefined)));
+    shared.artifacts.resolves(ok(completeArtifacts(undefined, { codeSampleCatalogs: samplesFromFixture() })));
 
     const result = await execute(CODE_SAMPLES_FIXTURE);
 

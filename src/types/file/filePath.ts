@@ -1,6 +1,6 @@
 import path from 'path';
 import { FileName } from './fileName.js';
-import { DirectoryPath } from './directoryPath.js';
+import { asTypedFrom, DirectoryPath } from './directoryPath.js';
 
 export class FilePath {
   private readonly fileName: FileName;
@@ -39,6 +39,10 @@ export class FilePath {
    */
   public relativeTo(directory: DirectoryPath): string {
     return path.relative(directory.toString(), this.toString()).split(path.sep).join('/');
+  }
+
+  public asTypedFrom(from: DirectoryPath): string {
+    return asTypedFrom(this.toString(), from);
   }
 
   public static create(filePath: string): FilePath | undefined {

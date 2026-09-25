@@ -7,6 +7,7 @@ import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { noticesSince } from '../../types/portal/content-notices.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
+import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSettings, PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
@@ -69,7 +70,7 @@ export class PortalServeAction {
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
-      async (project, source) => {
+      async (project, source, artifacts) => {
         const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
         if (server.isErr()) {
@@ -88,13 +89,19 @@ export class PortalServeAction {
         // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
         let generatedPages = source.generatedPages;
         const contentWatch = this.watchContent(source, () => generatedPages, sourceDirectory);
-        const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory, (settings) => {
-          const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
-          generatedPages = settings.generatedPages;
-          if (tabsChanged) {
-            contentWatch?.recheck();
+        const configWatch = this.watchConfig(
+          source,
+          artifacts,
+          project.projectDirectory,
+          sourceDirectory,
+          (settings) => {
+            const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
+            generatedPages = settings.generatedPages;
+            if (tabsChanged) {
+              contentWatch?.recheck();
+            }
           }
-        });
+        );
         const closeWatches = async () => {
           await configWatch?.close();
           await contentWatch?.close();
@@ -133,6 +140,7 @@ export class PortalServeAction {
    */
   private watchConfig(
     source: PortalSource,
+    artifacts: PortalArtifacts,
     projectDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath,
     onApplied: (settings: PortalSettings) => void
@@ -149,6 +157,13 @@ export class PortalServeAction {
       }
       const settings = reloaded.value;
       const { config } = settings;
+
+      const missing = settings.generatedPages.missingFrom(artifacts);
+      if (missing !== null) {
+        preview.refuse();
+        this.prompts.editNeedsRestart(missing);
+        return;
+      }
 
       if (preview.staticDirectoryNotServed(config)) {
         this.prompts.staticDirectoryNotServed(sourceDirectory);

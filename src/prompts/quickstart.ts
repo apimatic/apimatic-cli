@@ -14,7 +14,7 @@ import { APIMATIC_CONFIG_FILE_NAME } from '../types/apimatic-config/document.js'
 import { PluginConfigWriteFailure } from '../types/plugin-config-context.js';
 import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
 import { GENERATED, GITIGNORE, GitignoreFailure } from '../types/project-context.js';
-import { Language, languageLabel, PLUGIN_LANGUAGES, UPCOMING_LANGUAGES } from '../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../types/sdk/generate.js';
 import { noteWrapped, withSpinner } from './prompt.js';
 import { reportAuthorizationFailure } from './portal/authorization.js';
 import { convertToOpenApi3 } from './portal/source.js';
@@ -219,8 +219,8 @@ Let's get started!`);
   public async selectLanguages(): Promise<Language[] | undefined> {
     const selected = await multiselect<Language>({
       message: 'Which languages should your portal include?',
-      options: PLUGIN_LANGUAGES.map((language) => ({ value: language, label: languageLabel(language) })),
-      initialValues: [...PLUGIN_LANGUAGES],
+      options: AVAILABLE_LANGUAGES.map((language) => ({ value: language, label: languageLabel(language) })),
+      initialValues: [...AVAILABLE_LANGUAGES],
       required: false
     });
 

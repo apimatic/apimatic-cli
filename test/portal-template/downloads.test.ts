@@ -5,11 +5,21 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { expect } from 'chai';
 import type { ViteDevServer } from 'vite';
-import { downloads } from '../../portal-template/downloads';
+import { DOWNLOADS_ADDRESS as TEMPLATE_ADDRESS, downloads } from '../../portal-template/downloads';
+import {
+  DOWNLOADS_ADDRESS as CLI_ADDRESS,
+  PLUGIN_DOWNLOAD_ADDRESS,
+  sdkDownloadAddress
+} from '../../src/types/portal/portal-downloads';
 
 type Middleware = (request: { url: string }, response: PassThrough, next: () => void) => void;
 
 describe('downloads', () => {
+  // The generated pages link to the addresses the CLI computes; the template serves them.
+  it('is served at the address the generated pages link to', () => {
+    expect(CLI_ADDRESS).to.equal(TEMPLATE_ADDRESS);
+  });
+
   let root: string;
   let directory: string;
 
@@ -49,6 +59,12 @@ describe('downloads', () => {
     it('serves each download under /__downloads/', async () => {
       expect(await request('/__downloads/sdk/python.zip')).to.equal('PK python');
       expect(await request('/__downloads/plugin.zip?v=1')).to.equal('PK plugin');
+    });
+
+    // The directory above is laid out as `PortalProjectService` lays it out.
+    it('serves each at the address a generated page links to', async () => {
+      expect(await request(sdkDownloadAddress('python'))).to.equal('PK python');
+      expect(await request(PLUGIN_DOWNLOAD_ADDRESS)).to.equal('PK plugin');
     });
 
     // The user's static directory answers these, and the pages behind them.

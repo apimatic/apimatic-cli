@@ -607,8 +607,9 @@ Following `.ai/instructions.md` and the skills in `.ai/skills/`.
   `"typescript": {}` section 12 recommends validates. Inside `publishing`,
   `source`, `package` (per language, as `plugin-config.ts` types them) and
   `codegenVersion` (`v3`, `v4`) are typed and none is required, matching the
-  plugin path's leniency: `assertNoCodegenVersionMismatch` already reads a
-  missing `codegenVersion` as no mismatch. `languages` is optional in the schema: the "at least one"
+  plugin path's leniency: the mismatch check then read a missing
+  `codegenVersion` as no mismatch. *(Superseded: `codegenVersion` and its
+  check have both since left; the field is no longer typed in the schema.)* `languages` is optional in the schema: the "at least one"
   rule is the portal command's, and a file `sdk publish` alone created is
   valid. The `$schema` URL
   is `https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json`.
@@ -803,8 +804,8 @@ verified to build 22 pages with this branch's CLI.
   entry (`"typescript": {}`) is enough, since the portal checks only the key.
   Today a `{}` entry is inert for the plugin commands: `hasPublishedSdks` needs
   `publishing.source` or `publishing.package`, so `plugin generate` still
-  reports no published SDKs, and `assertNoCodegenVersionMismatch` skips an
-  entry with no `publishing` record.
+  reports no published SDKs. *(The mismatch check that also skipped such an
+  entry has since been removed with `codegenVersion`.)*
 - **The hand-written entry is not inert for long.** Since #350 an entry with no
   `publishing` block means "this language is wanted, nothing is published
   yet", which is the state the coming bundling change turns into an SDK

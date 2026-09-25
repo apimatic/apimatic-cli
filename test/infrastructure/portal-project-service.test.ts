@@ -7,15 +7,15 @@ import sinon from 'sinon';
 import { FileService } from '../../src/infrastructure/file-service';
 import {
   COPIED_DEPENDENCIES,
-  GENERATED_DIRECTORY_NAME,
   PortalProjectService,
   TEMPLATE_DEPENDENCIES
 } from '../../src/infrastructure/portal-project-service';
+import { GENERATED_INCLUDES_DIRECTORY_NAME } from '../../src/types/portal/page-fragments';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
 import { CodeSampleCatalog, CodeSampleCatalogs } from '../../src/types/portal/code-samples';
-import { GeneratedPages } from '../../src/types/portal/generated-pages';
+import { GENERATED_DIRECTORY_NAME, GeneratedPages } from '../../src/types/portal/generated-pages';
 import { PortalConfig, PortalIdentity } from '../../src/types/portal/portal-config';
 import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { PortalLanguages } from '../../src/types/portal/portal-languages';
@@ -33,7 +33,7 @@ describe('PortalProjectService', () => {
   const configFor = (block: object) => PortalConfig.fromBlock(block, null)._unsafeUnwrap();
 
   const pagesFor = (languages: Record<string, object> = { typescript: {} }, plugin = false) =>
-    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin);
+    GeneratedPages.of(PortalLanguages.fromBlock(languages, [])._unsafeUnwrap(), plugin ? { kind: 'bundled' } : null);
 
   /** What `portal serve` passes on an edit: the block, and the pages the default source generates. */
   const settingsFor = (config: PortalConfig, generatedPages = pagesFor()) => ({ config, generatedPages });
@@ -268,6 +268,7 @@ describe('PortalProjectService', () => {
         }) as CodeSampleCatalog
       ]),
       new Map(),
+      new Map(),
       undefined
     );
 
@@ -315,6 +316,7 @@ describe('PortalProjectService', () => {
           ['csharp', downloaded('a.zip', 'PK csharp')],
           ['python', downloaded('b.zip', 'PK python')]
         ]),
+        new Map(),
         downloaded('c.zip', 'PK plugin')
       );
 
@@ -327,7 +329,12 @@ describe('PortalProjectService', () => {
     });
 
     it('offers no SDK directory for a run that carried only the plugin', async () => {
-      const artifacts = new PortalArtifacts(new CodeSampleCatalogs([]), new Map(), downloaded('c.zip', 'PK plugin'));
+      const artifacts = new PortalArtifacts(
+        new CodeSampleCatalogs([]),
+        new Map(),
+        new Map(),
+        downloaded('c.zip', 'PK plugin')
+      );
 
       (await service.prepare(project, sourceFor(), artifacts))._unsafeUnwrap();
 
@@ -339,6 +346,26 @@ describe('PortalProjectService', () => {
 
       expect(readConfig().downloadsDir).to.be.null;
       expect(fs.existsSync(downloadsFile())).to.be.false;
+    });
+  });
+
+  // Beside the generated pages rather than among them, where each would be taken for a page.
+  describe('the Markdown the generated pages include', () => {
+    const includesFile = (...parts: string[]) =>
+      fs.readFileSync(path.join(project.toString(), GENERATED_INCLUDES_DIRECTORY_NAME, ...parts), 'utf8');
+
+    it("writes each language's SDK docs", async () => {
+      const artifacts = new PortalArtifacts(
+        new CodeSampleCatalogs([]),
+        new Map(),
+        new Map([['typescript', '## Installation\n\nnpm install calc']]),
+        undefined
+      );
+
+      (await service.prepare(project, sourceFor(), artifacts))._unsafeUnwrap();
+
+      expect(includesFile('sdk-docs', 'typescript.md')).to.equal('## Installation\n\nnpm install calc\n');
+      expect(generatedFiles()).to.not.include('sdk-docs/typescript.md');
     });
   });
 
@@ -415,10 +442,10 @@ describe('PortalProjectService', () => {
       (await service.prepare(project, sourceFor(), NO_ARTIFACTS))._unsafeUnwrap();
       const config = sourceFor().config;
 
-      const applied = await service.applyConfig(project, settingsFor(config, pagesFor({ typescript: {}, go: {} })));
+      const applied = await service.applyConfig(project, settingsFor(config, pagesFor({ typescript: {}, python: {} })));
 
       expect(applied._unsafeUnwrap()).to.be.true;
-      expect(generatedFiles()).to.include('sdks/go.mdx');
+      expect(generatedFiles()).to.include('sdks/python.mdx');
     });
 
     it('writes the context plugin folder for a plugin block added, and removes it with the block', async () => {

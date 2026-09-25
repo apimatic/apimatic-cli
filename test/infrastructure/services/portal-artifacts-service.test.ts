@@ -123,9 +123,18 @@ describe('PortalArtifactsService', () => {
       artifactsZip = await artifactsZipOf({
         'sdk/csharp.zip': 'PK csharp-sdk',
         'sdk/typescript.zip': 'PK typescript-sdk',
+        'docs/csharp.json': JSON.stringify({ gettingStarted: '## Installation\n\ndotnet add package Calc\n' }),
+        'docs/typescript.json': JSON.stringify({ gettingStarted: '## Installation\n\nnpm install calc\n' }),
         'code-samples/csharp.json': JSON.stringify(CATALOG),
         'plugin.zip': 'PK plugin'
       });
+    });
+
+    it("reads each language's SDK docs, keyed as its SDK is", async () => {
+      const artifacts = (await generate())._unsafeUnwrap();
+
+      expect([...artifacts.sdkDocs.keys()].sort()).to.deep.equal(['csharp', 'typescript']);
+      expect(artifacts.sdkDocs.get('typescript')).to.equal('## Installation\n\nnpm install calc\n');
     });
 
     it('reads a catalog per language into the samples the build merges', async () => {
@@ -167,6 +176,7 @@ describe('PortalArtifactsService', () => {
 
       expect(artifacts.codeSampleCatalogs.samplesFor(new Endpoint('GET', '/payments'))).to.be.empty;
       expect(artifacts.sdks.size).to.equal(0);
+      expect(artifacts.sdkDocs.size).to.equal(0);
       expect(artifacts.plugin).to.be.undefined;
     });
   });
@@ -252,6 +262,15 @@ describe('PortalArtifactsService', () => {
       artifactsZip = await artifactsZipOf({ 'code-samples/csharp.json': '{ not json' });
 
       expect((await generate())._unsafeUnwrapErr()).to.equal(ServiceError.InvalidResponse);
+    });
+
+    // The language's page would otherwise be published without its getting-started text.
+    it('refuses SDK docs it cannot read, rather than leaving them out', async () => {
+      for (const docs of ['{ not json', JSON.stringify({ title: 'Calc' }), JSON.stringify({ gettingStarted: 7 })]) {
+        artifactsZip = await artifactsZipOf({ 'sdk/python.zip': 'PK python-sdk', 'docs/python.json': docs });
+
+        expect((await generate())._unsafeUnwrapErr(), docs).to.equal(ServiceError.InvalidResponse);
+      }
     });
   });
 

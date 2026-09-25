@@ -7,7 +7,7 @@ Domain events live at `src/types/events/` and represent something that **already
 ### Naming
 
 - **Class name must be past tense** — the event describes something that occurred: `QuickstartCompleted`, `SdkChangesSaved`, `SdkConflictsResolved`. Never present tense (`SdkSaveChanges`) or imperative (`SaveChanges`).
-- **File name** — lowercase hyphenated, matching the class name: `quickstart-completed.ts`, `sdk-changes-saved.ts`.
+- **File name** — lowercase hyphenated, matching the class name: `quickstart-completed.ts`, `sdk-publish-validation-failed.ts`.
 - **Class name suffix** — always `Event`: `QuickstartCompletedEvent`, `SdkChangesSavedEvent`.
 
 ### Structure
@@ -102,9 +102,7 @@ export class {PascalName}Event extends DomainEvent {
 |---|---|
 | Self-contained success event (no payload) | `src/types/events/quickstart-completed.ts` |
 | Self-contained initiation event (no payload) | `src/types/events/quickstart-initiated.ts` |
-| Success event with payload (`language`) | `src/types/events/sdk-changes-saved.ts` |
-| Success event with payload (`language`) | `src/types/events/sdk-conflicts-resolved.ts` |
 | Failure event (dynamic message + flags) | `src/types/events/sdk-publish-validation-failed.ts` |
 | DomainEvent base class | `src/types/events/domain-event.ts` |
 | Firing from Command (success + failure) | `src/commands/quickstart.ts` |
-| Firing from Command (failure only) | `src/commands/sdk/save-changes.ts` |
+| Firing from Command (failure only) | `src/commands/sdk/publish.ts` |
