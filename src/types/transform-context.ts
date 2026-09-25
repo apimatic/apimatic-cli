@@ -9,17 +9,19 @@ import { FilePath } from './file/filePath.js';
 /** Where `api transform` writes, inside the `--destination` it is given. */
 export const TRANSFORMATIONS_DIRECTORY_NAME = 'transformations';
 
+/** What `api transform` names its output: the input's name, then the format and its extension. */
+export function transformedFileName(file: FilePath, format: ExportFormats): FileName {
+  const extension: string = DestinationFormats[format as keyof typeof DestinationFormats];
+  return new FileName(`${getFileNameFromPath(file.toString())}_${format}.${extension}`);
+}
+
 export class TransformContext {
   private readonly fileService = new FileService();
 
   private readonly transformedApi: FileName;
 
   constructor(specFilePath: FilePath, format: ExportFormats, private readonly destinationDirectory: DirectoryPath) {
-    this.transformedApi = this.parseFileName(format, specFilePath);
-  }
-
-  public transformedFile(): FilePath {
-    return new FilePath(this.destinationDirectory, this.transformedApi);
+    this.transformedApi = transformedFileName(specFilePath, format);
   }
 
   public async exists(): Promise<boolean> {
@@ -32,9 +34,7 @@ export class TransformContext {
     return this.transformedFile();
   }
 
-  private parseFileName(format: string, file: FilePath): FileName {
-    const destinationFileExt: string = DestinationFormats[format as keyof typeof DestinationFormats];
-    const destinationFilePrefix = getFileNameFromPath(file.toString());
-    return new FileName(`${destinationFilePrefix}_${format}.${destinationFileExt}`);
+  private transformedFile(): FilePath {
+    return new FilePath(this.destinationDirectory, this.transformedApi);
   }
 }

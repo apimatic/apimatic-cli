@@ -66,6 +66,8 @@ export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
   /** Vite's CLI entry point, resolved from the CLI's own dependencies. */
   viteBinary: FilePath;
+  /** The source's `content/`, which the project's copy stands in for; null where the source has none. */
+  contentSource: DirectoryPath | null;
 }
 
 /** `portal.config.json`, which the template reads as `BuildPaths`; a test holds the two to one shape. */
@@ -138,7 +140,8 @@ export class PortalProjectService {
 
     return ok({
       projectDirectory,
-      viteBinary: new FilePath(viteDirectory.join('bin'), new FileName('vite.js'))
+      viteBinary: new FilePath(viteDirectory.join('bin'), new FileName('vite.js')),
+      contentSource: source.contentDirectory
     });
   }
 
@@ -267,18 +270,18 @@ export class PortalProjectService {
   ): Promise<void> {
     const specs: Record<string, string> = {};
     for (const spec of source.specs) {
-      specs[spec.slug] = this.toPosix(spec.file.toString());
+      specs[spec.slug] = spec.file.toPosix();
     }
 
     // Everything here addresses this machine, so it stays behind `portal.server.ts` and the
     // build's own config files.
     const configuration: PortalBuildPaths = {
       specs,
-      codeSamples: codeSamples === null ? null : this.toPosix(codeSamples.toString()),
-      contentDir: this.toPosix(contentDirectory.toString()),
-      generatedDir: this.toPosix(projectDirectory.join(GENERATED_DIRECTORY_NAME).toString()),
-      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString()),
-      downloadsDir: downloads === null ? null : this.toPosix(downloads.toString())
+      codeSamples: codeSamples === null ? null : codeSamples.toPosix(),
+      contentDir: contentDirectory.toPosix(),
+      generatedDir: projectDirectory.join(GENERATED_DIRECTORY_NAME).toPosix(),
+      staticDir: source.staticDirectory === null ? null : source.staticDirectory.toPosix(),
+      downloadsDir: downloads === null ? null : downloads.toPosix()
     };
 
     await this.fileService.writeContents(
@@ -395,9 +398,5 @@ export class PortalProjectService {
       }
     }
     return undefined;
-  }
-
-  private toPosix(value: string): string {
-    return value.split(path.sep).join('/');
   }
 }

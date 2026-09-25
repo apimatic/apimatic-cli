@@ -13,11 +13,12 @@ describe('PortalBuildService', () => {
   let root: string;
   let project: DirectoryPath;
 
-  const failingWith = (output: string) => {
+  const failingWith = (output: string, contentSource: DirectoryPath | null) => {
     fs.writeFileSync(path.join(root, 'fake-vite.js'), `console.error(${JSON.stringify(output)}); process.exit(1);`);
     return {
       projectDirectory: project,
-      viteBinary: new FilePath(new DirectoryPath(root), new FileName('fake-vite.js'))
+      viteBinary: new FilePath(new DirectoryPath(root), new FileName('fake-vite.js')),
+      contentSource
     };
   };
 
@@ -38,10 +39,11 @@ describe('PortalBuildService', () => {
     const failure = failingWith(
       `error during build:\n${copy.split(path.sep).join('/')}/index.mdx 5:40: Could not parse expression\nat ${copy}${
         path.sep
-      }guide.md`
+      }guide.md`,
+      source
     );
 
-    const log = (await new PortalBuildService().build(failure, source))._unsafeUnwrapErr().log;
+    const log = (await new PortalBuildService().build(failure))._unsafeUnwrapErr().log;
 
     expect(log).to.contain(`${source.toString().split(path.sep).join('/')}/index.mdx 5:40`);
     expect(log).to.contain(`${source.toString()}${path.sep}guide.md`);
@@ -49,9 +51,9 @@ describe('PortalBuildService', () => {
   });
 
   it('leaves the log as it was for a source without pages', async () => {
-    const failure = failingWith('error during build:\nsomething else');
+    const failure = failingWith('error during build:\nsomething else', null);
 
-    const log = (await new PortalBuildService().build(failure, null))._unsafeUnwrapErr().log;
+    const log = (await new PortalBuildService().build(failure))._unsafeUnwrapErr().log;
 
     expect(log).to.contain('something else');
   });

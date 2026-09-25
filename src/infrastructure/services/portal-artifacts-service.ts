@@ -19,6 +19,7 @@ import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import { FileService } from '../file-service.js';
 import {
+  bulleted,
   GenerationTimings,
   pollUntilCompleted,
   TIMING_DEFAULTS,
@@ -336,5 +337,5 @@ const formatPortalArtifactsError: ValidationErrorFormatter = (errors) => {
   const lines = entries.flatMap(([subject, messages]) =>
     messages.map((message) => `${SUBJECTS[subject] ?? subject}: ${message}`)
   );
-  return 'Portal artifacts could not be generated.\n- ' + lines.join('\n- ');
+  return 'Portal artifacts could not be generated.\n' + bulleted(lines);
 };

@@ -22,6 +22,10 @@ export type PluginConfigState =
   | { state: 'unreadable'; reason: string; path: FilePath }
   | PluginConfig;
 
+/** The config of a project set up for a plugin, whose identity is recorded so it is generated unasked; else null. */
+export const setUpConfig = (state: PluginConfigState): PluginConfig | null =>
+  state.state === 'present' && state.hasMetadata() ? state : null;
+
 export class PluginConfig {
   public readonly state = 'present' as const;
 

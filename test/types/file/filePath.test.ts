@@ -34,6 +34,15 @@ describe('FilePath', () => {
     });
   });
 
+  describe('toPosix', () => {
+    it('spells the directory and the name with forward slashes between them', () => {
+      const spelt = new FilePath(new DirectoryPath(os.tmpdir(), 'project', 'src'), new FileName('api.json')).toPosix();
+
+      expect(spelt.endsWith('/project/src/api.json')).to.equal(true);
+      expect(spelt).to.not.contain('\\');
+    });
+  });
+
   describe('resolve', () => {
     const root = new DirectoryPath(os.tmpdir(), 'project');
     const relative = (file: FilePath) => file.relativeTo(root);

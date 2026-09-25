@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { execa } from 'execa';
 import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
@@ -24,10 +23,7 @@ export class PortalBuildService {
   private readonly fileService = new FileService();
   private readonly projectService = new PortalProjectService();
 
-  public async build(
-    project: PortalProjectPaths,
-    contentSource: DirectoryPath | null
-  ): Promise<Result<PortalBuildResult, PortalBuildFailure>> {
+  public async build(project: PortalProjectPaths): Promise<Result<PortalBuildResult, PortalBuildFailure>> {
     const distDirectory = project.projectDirectory.join('dist');
     await this.fileService.deleteDirectory(distDirectory);
 
@@ -40,7 +36,7 @@ export class PortalBuildService {
       reject: false
     });
 
-    const log = contentSource === null ? result.all ?? '' : namingSource(result.all ?? '', project, contentSource);
+    const log = namingSource(result.all ?? '', project);
     if (result.exitCode !== 0) {
       return err({ message: 'The portal build failed.', log });
     }
@@ -73,12 +69,10 @@ export class PortalBuildService {
 }
 
 // The build reads a copy of the pages, in a temporary directory; a reader knows each page by its place in the source.
-function namingSource(log: string, project: PortalProjectPaths, contentSource: DirectoryPath): string {
-  const spellings = (directory: DirectoryPath) => [
-    directory.toString(),
-    directory.toString().split(path.sep).join('/')
-  ];
-  const [copy, copyPosix] = spellings(project.projectDirectory.join(CONTENT_COPY_DIRECTORY_NAME));
-  const [source, sourcePosix] = spellings(contentSource);
-  return log.replaceAll(copy, source).replaceAll(copyPosix, sourcePosix);
+function namingSource(log: string, { projectDirectory, contentSource }: PortalProjectPaths): string {
+  if (contentSource === null) {
+    return log;
+  }
+  const copy = projectDirectory.join(CONTENT_COPY_DIRECTORY_NAME);
+  return log.replaceAll(copy.toString(), contentSource.toString()).replaceAll(copy.toPosix(), contentSource.toPosix());
 }

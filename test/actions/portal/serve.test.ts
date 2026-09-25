@@ -464,7 +464,11 @@ describe('PortalServeAction', () => {
           projectDirectory = directory;
           fs.mkdirSync(path.join(directory.toString(), 'src/styles'), { recursive: true });
           (await new PortalProjectService().applyConfig(directory, portal))._unsafeUnwrap();
-          return ok({ projectDirectory: directory, viteBinary: new FilePath(directory, new FileName('vite.js')) });
+          return ok({
+            projectDirectory: directory,
+            viteBinary: new FilePath(directory, new FileName('vite.js')),
+            contentSource: portal.contentDirectory
+          });
         }
       );
 

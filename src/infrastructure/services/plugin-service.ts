@@ -13,6 +13,7 @@ import {
 import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import {
+  formatValidationErrors,
   GenerationTimings,
   pollUntilCompleted,
   TIMING_DEFAULTS,
@@ -159,12 +160,12 @@ export class PluginService {
   }
 }
 
-const formatPluginValidationError: ValidationErrorFormatter = (errors) => {
-  const messages = Object.entries(errors).flatMap(([path, pathMessages]) =>
-    pathMessages.map((message) => qualify(path, message))
+const formatPluginValidationError: ValidationErrorFormatter = (errors) =>
+  formatValidationErrors(
+    Object.fromEntries(
+      Object.entries(errors).map(([path, messages]) => [path, messages.map((message) => qualify(path, message))])
+    )
   );
-  return 'One or more validation errors occurred.' + (messages.length ? '\n- ' + messages.join('\n- ') : '');
-};
 
 const qualify = (path: string, message: string): string => {
   if (!path) return message;

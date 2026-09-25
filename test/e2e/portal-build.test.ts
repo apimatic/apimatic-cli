@@ -80,7 +80,7 @@ async function buildFixture(name: string, delivered: Delivered = {}): Promise<Bu
   expect(source.generatedPages.missingFrom(artifacts), 'the artifacts back every page').to.be.null;
   const prepared = (await new PortalProjectService().prepare(project, source, artifacts))._unsafeUnwrap();
 
-  const build = await new PortalBuildService().build(prepared, source.contentDirectory);
+  const build = await new PortalBuildService().build(prepared);
   if (build.isErr()) {
     throw new Error(`${build.error.message}\n${build.error.log.split('\n').slice(-20).join('\n')}`);
   }

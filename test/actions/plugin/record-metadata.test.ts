@@ -32,7 +32,8 @@ describe('PluginRecordMetadataAction', () => {
   let sourceDirectory: string;
   let action: PluginRecordMetadataAction;
 
-  const execute = () => action.execute(ProjectContext.in(new DirectoryPath(path.dirname(sourceDirectory))));
+  const project = () => ProjectContext.in(new DirectoryPath(path.dirname(sourceDirectory)));
+  const execute = () => action.execute(project(), { state: 'missing' });
 
   const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   /** The plugin block as written: what this action owns in the file. */
@@ -68,6 +69,19 @@ describe('PluginRecordMetadataAction', () => {
 
     expect(result.isSuccess()).to.be.true;
     expect(writtenPlugin()).to.include({ ...ANSWERS, license: 'MIT' });
+  });
+
+  // `plugin generate` asks a set-up project for nothing; its identity stays as recorded.
+  it('hands a project set up already back as it is, without asking', async () => {
+    await fsExtra.writeJson(configPath(), { plugin: SUGGESTED_DEFAULTS, languages: {} });
+    const setUp = await project().pluginConfig().getPluginConfigState();
+    const input = answers();
+
+    const result = await action.execute(project(), setUp);
+
+    expect(result.isSuccess()).to.be.true;
+    expect(input.called).to.be.false;
+    expect(writtenPlugin()).to.deep.equal(SUGGESTED_DEFAULTS);
   });
 
   it('records the author from the account', async () => {

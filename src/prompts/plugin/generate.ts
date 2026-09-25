@@ -91,6 +91,9 @@ export class PluginGeneratePrompts {
   }
 
   public recordedLanguagesIncluded(languages: readonly Language[]) {
+    if (languages.length === 0) {
+      return;
+    }
     log.info(
       `The plugin covers ${listedInProse(languages.map(languageLabel))}, as ${f.var(APIMATIC_CONFIG_FILE_NAME)} ` +
         `records them. Edit its ${f.var('languages')} block to change that.`
@@ -133,16 +136,15 @@ export class PluginGeneratePrompts {
     );
   }
 
-  public publishFirstRecommended() {
+  // A recommendation, then a confirm, never a fork; a set-up project, asked nothing, gets the recommendation alone.
+  public async confirmLocalPlugin(unattended: boolean): Promise<boolean> {
     log.warn(
       `You have a publishing profile set up.\n` +
         `We recommend publishing your SDK first for a better plugin experience.`
     );
-  }
-
-  // A recommendation and a confirm, never a fork: having a profile is not wanting to publish now.
-  public async confirmLocalPlugin(): Promise<boolean> {
-    this.publishFirstRecommended();
+    if (unattended) {
+      return true;
+    }
 
     const proceed = await confirm({
       message: 'Do you still want to continue with a local plugin?',

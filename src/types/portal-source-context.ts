@@ -32,7 +32,7 @@ import {
   SpecConversion
 } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
-import { TRANSFORMATIONS_DIRECTORY_NAME, TransformContext } from './transform-context.js';
+import { TRANSFORMATIONS_DIRECTORY_NAME, transformedFileName } from './transform-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
@@ -445,7 +445,7 @@ export class PortalSourceContext {
 
   private conversion(file: FilePath, format: string | null, others: number): SpecConversion {
     const into = this.specDirectory.join(TRANSFORMATIONS_DIRECTORY_NAME);
-    const converted = new TransformContext(file, ExportFormats.Openapi3Yaml, into).transformedFile();
+    const converted = new FilePath(into, transformedFileName(file, ExportFormats.Openapi3Yaml));
     return { file, format, converted, others };
   }
 

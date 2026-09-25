@@ -495,7 +495,7 @@ describe('PluginGenerateAction', () => {
         const result = await execute();
 
         expect(result.isSuccess()).to.be.true;
-        expect(prompts.confirm.called).to.be.true;
+        expect(prompts.confirm.calledOnceWith(false)).to.be.true;
         expect(generatePlugin.called).to.be.true;
         expect(prompts.preview.called).to.be.true;
       });
@@ -545,17 +545,15 @@ describe('PluginGenerateAction', () => {
         expect(prompts.preview.called).to.be.false;
       });
 
-      // Nothing is asked of a project set up for a plugin, so the recommendation stands on its own.
+      // Nothing is asked of a project set up for a plugin, which the prompt is told, so the recommendation stands alone.
       it('recommends publishing first without asking when the languages come from the config', async () => {
         await writeConfig({ plugin: METADATA, languages: { csharp: {} } });
         hasProfile();
         const prompts = stubProfilePrompts();
-        const recommended = sinon.stub(PluginGeneratePrompts.prototype, 'publishFirstRecommended');
         const generatePlugin = generated();
 
         expect((await execute()).isSuccess()).to.be.true;
-        expect(prompts.confirm.called).to.be.false;
-        expect(recommended.calledOnce).to.be.true;
+        expect(prompts.confirm.calledOnceWith(true)).to.be.true;
         expect(prompts.preview.called).to.be.true;
         expect(generatePlugin.called).to.be.true;
       });
