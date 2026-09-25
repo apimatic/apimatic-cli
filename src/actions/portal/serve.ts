@@ -40,8 +40,7 @@ export class PortalServeAction {
     sourceDirectory: DirectoryPath,
     port: number,
     openInBrowser: boolean,
-    /** Said once the preview is up, for a caller whose own last word belongs after it. */
-    onAfterServe?: () => void
+    onServing?: () => void
   ): Promise<ActionResult> => {
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
@@ -80,8 +79,8 @@ export class PortalServeAction {
         if (openInBrowser) {
           await this.launcherService.openUrlInBrowser(server.value.url);
         }
-        if (onAfterServe) {
-          onAfterServe();
+        if (onServing) {
+          onServing();
         }
 
         const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);
