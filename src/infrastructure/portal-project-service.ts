@@ -40,6 +40,9 @@ export const TEMPLATE_DEPENDENCIES = [
   'vite'
 ];
 
+// Copied, not linked: Tailwind rebases their `url()`s onto the project, and no relative path crosses drives.
+const COPIED_DEPENDENCIES = new Set(['@fontsource-variable/geist', '@fontsource-variable/geist-mono']);
+
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
 
 /** Beside `portal.config.json`; `src/lib/portal.ts` imports it. */
@@ -97,7 +100,7 @@ export class PortalProjectService {
     }
 
     await this.fileService.copyDirectoryContents(template, projectDirectory);
-    await this.linkDependencies(projectDirectory);
+    await this.installDependencies(projectDirectory);
     await this.writeConfiguration(projectDirectory, source, await this.writeCodeSamples(projectDirectory, codeSamples));
 
     const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
@@ -158,7 +161,7 @@ export class PortalProjectService {
     return file;
   }
 
-  private async linkDependencies(projectDirectory: DirectoryPath): Promise<void> {
+  private async installDependencies(projectDirectory: DirectoryPath): Promise<void> {
     const modules = projectDirectory.join('node_modules');
     await this.fileService.createDirectoryIfNotExists(modules);
 
@@ -167,12 +170,21 @@ export class PortalProjectService {
       if (target === undefined) {
         continue;
       }
-      const link = modules.join(dependency);
+      const destination = modules.join(dependency);
+      if (COPIED_DEPENDENCIES.has(dependency)) {
+        await this.fileService.createDirectoryIfNotExists(destination);
+        await this.fileService.copyDirectoryContents(target, destination);
+        continue;
+      }
       if (dependency.includes('/')) {
-        await this.fileService.createDirectoryIfNotExists(new DirectoryPath(path.dirname(link.toString())));
+        await this.fileService.createDirectoryIfNotExists(new DirectoryPath(path.dirname(destination.toString())));
       }
       // A junction is the only link type Windows grants without elevation.
-      await fsExtra.symlink(target.toString(), link.toString(), process.platform === 'win32' ? 'junction' : 'dir');
+      await fsExtra.symlink(
+        target.toString(),
+        destination.toString(),
+        process.platform === 'win32' ? 'junction' : 'dir'
+      );
     }
   }
 

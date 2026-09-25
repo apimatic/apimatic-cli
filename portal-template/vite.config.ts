@@ -1,23 +1,13 @@
-import { realpathSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
-import { defineConfig, searchForWorkspaceRoot } from 'vite';
+import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { generatedPagesReload } from './generated-pages-reload.ts';
 import { readPortalConfig, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
-
-const require = createRequire(import.meta.url);
-
-// Where the font files really are: in the CLI's own install, outside this project.
-const fontPackages = ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'].map((name) =>
-  realpathSync.native(path.dirname(require.resolve(`${name}/package.json`)))
-);
 
 export default defineConfig(async () => {
   const [portalConfig, identity] = await Promise.all([readPortalConfig(), readPortalIdentity()]);
@@ -56,9 +46,6 @@ export default defineConfig(async () => {
     // listens on `::1` alone, a connect that stalls under load falls back to 127.0.0.1 and is
     // refused, failing the build; binding IPv4 leaves the fetch a single address to reach.
     preview: { host: '127.0.0.1' },
-    // The dev server refuses files outside the project unless an import reached them, and the
-    // stylesheet reaches the fonts through `url()`, which does not count.
-    server: { fs: { allow: [searchForWorkspaceRoot(process.cwd()), ...fontPackages] } },
     resolve: {
       tsconfigPaths: true,
       alias: [

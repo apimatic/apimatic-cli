@@ -122,6 +122,17 @@ describe('PortalProjectService', () => {
       }
     });
 
+    // Linked, their `url()`s would resolve from the CLI's install, which may be on another drive.
+    it('copies the font packages into the project instead of linking them', async () => {
+      (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
+
+      for (const name of ['@fontsource-variable/geist', '@fontsource-variable/geist-mono']) {
+        const directory = path.join(project.toString(), 'node_modules', name);
+        expect(fs.lstatSync(directory).isSymbolicLink(), `${name} is linked`).to.be.false;
+        expect(fs.readdirSync(path.join(directory, 'files')).some((file) => file.endsWith('.woff2'))).to.be.true;
+      }
+    });
+
     it('copies the template rather than moving it', async () => {
       (await service.prepare(project, sourceFor(), NO_SAMPLES))._unsafeUnwrap();
 

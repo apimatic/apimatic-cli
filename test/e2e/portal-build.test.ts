@@ -347,6 +347,7 @@ const stylesheetOf = (output: DirectoryPath) => {
     expect(read('index.html')).not.to.contain('fonts.googleapis.com');
     expect(css).to.contain('--default-font-family:"Geist Variable"');
     expect(css).to.match(/url\(\/assets\/geist-latin-wght-normal-[\w-]+\.woff2\)/);
+    expect(css).to.match(/url\(\/assets\/geist-mono-latin-wght-normal-[\w-]+\.woff2\)/);
     // The theme's light primary, which nothing in the fixture overrides.
     expect(css).to.match(/--color-fd-primary:#171717/);
   });
