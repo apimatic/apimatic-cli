@@ -30,7 +30,7 @@ describe('PortalArtifactsService', () => {
   let service: PortalArtifactsService;
 
   /** What the endpoint will answer the download with, built fresh per test. */
-  let bundle: Buffer;
+  let artifactsZip: Buffer;
   let respondToStatus: (res: http.ServerResponse) => void;
   let postedBodyBytes: number;
 
@@ -41,9 +41,9 @@ describe('PortalArtifactsService', () => {
 
   const statusBody = (body: unknown) => (res: http.ServerResponse) => json(res, 200, body);
 
-  /** Lays a bundle out on disk exactly as the endpoint does, then zips it. */
-  const bundleOf = async (entries: Record<string, string>): Promise<Buffer> => {
-    const staging = path.join(workDir, `bundle-${Math.random().toString(36).slice(2)}`);
+  /** Lays a artifactsZip out on disk exactly as the endpoint does, then zips it. */
+  const artifactsZipOf = async (entries: Record<string, string>): Promise<Buffer> => {
+    const staging = path.join(workDir, `artifacts-${Math.random().toString(36).slice(2)}`);
     for (const [entry, contents] of Object.entries(entries)) {
       const file = path.join(staging, entry);
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -79,7 +79,7 @@ describe('PortalArtifactsService', () => {
 
       if (url.endsWith('/download')) {
         res.writeHead(200, { 'Content-Type': 'application/zip' });
-        res.end(bundle);
+        res.end(artifactsZip);
         return;
       }
 
@@ -115,12 +115,12 @@ describe('PortalArtifactsService', () => {
 
   beforeEach(async () => {
     respondToStatus = statusBody({ status: 'Completed' });
-    bundle = await bundleOf({});
+    artifactsZip = await artifactsZipOf({});
   });
 
   describe('a run that delivers everything', () => {
     beforeEach(async () => {
-      bundle = await bundleOf({
+      artifactsZip = await artifactsZipOf({
         'sdk/csharp.zip': 'PK csharp-sdk',
         'sdk/typescript.zip': 'PK typescript-sdk',
         'code-samples/csharp.json': JSON.stringify(CATALOG),
@@ -176,7 +176,7 @@ describe('PortalArtifactsService', () => {
   // deployed service, which never sends a status body saying the run is done.
   describe('a run the gateway reports by redirecting', () => {
     beforeEach(async () => {
-      bundle = await bundleOf({ 'sdk/typescript.zip': 'PK typescript-sdk', 'plugin.zip': 'PK plugin' });
+      artifactsZip = await artifactsZipOf({ 'sdk/typescript.zip': 'PK typescript-sdk', 'plugin.zip': 'PK plugin' });
       respondToStatus = (res) => {
         res.writeHead(302, { Location: `/portal-artifacts/${GENERATION_ID}/download` });
         res.end();
@@ -243,13 +243,13 @@ describe('PortalArtifactsService', () => {
     });
 
     it('refuses a catalog for a language it cannot read, rather than leaving it out', async () => {
-      bundle = await bundleOf({ 'code-samples/cobol.json': JSON.stringify(CATALOG) });
+      artifactsZip = await artifactsZipOf({ 'code-samples/cobol.json': JSON.stringify(CATALOG) });
 
       expect((await generate())._unsafeUnwrapErr()).to.equal(ServiceError.InvalidResponse);
     });
 
     it('refuses a catalog that is not a catalog', async () => {
-      bundle = await bundleOf({ 'code-samples/csharp.json': '{ not json' });
+      artifactsZip = await artifactsZipOf({ 'code-samples/csharp.json': '{ not json' });
 
       expect((await generate())._unsafeUnwrapErr()).to.equal(ServiceError.InvalidResponse);
     });

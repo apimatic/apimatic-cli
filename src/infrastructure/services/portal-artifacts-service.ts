@@ -38,8 +38,8 @@ const TIMING_DEFAULTS = {
 /** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
 export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
-/** The entries the bundle is made of, as the endpoint lays them out. */
-const BUNDLE = {
+/** The entries the portal artifacts zip is made of, as the endpoint lays them out. */
+const ARTIFACTS_ZIP = {
   sdkDirectory: 'sdk',
   codeSamplesDirectory: 'code-samples',
   plugin: 'plugin.zip'
@@ -101,12 +101,12 @@ export class PortalArtifactsService {
       return err(completed.error);
     }
 
-    const bundle = await this.download(generationId, commandMetadata.shell, token);
-    if (bundle.isErr()) {
-      return err(bundle.error);
+    const zip = await this.download(generationId, commandMetadata.shell, token);
+    if (zip.isErr()) {
+      return err(zip.error);
     }
 
-    return await this.unpack(bundle.value, into);
+    return await this.unpack(zip.value, into);
   }
 
   private async initiateGeneration(
@@ -196,34 +196,34 @@ export class PortalArtifactsService {
   /**
    * The archive holds `sdk/<language>.zip`, `code-samples/<language>.json` and, when the config
    * asked for one, `plugin.zip`. Everything is optional: a portal that declares no languages and
-   * no plugin is a valid run that delivers an empty bundle.
+   * no plugin is a valid run that delivers an empty zip.
    */
   private async unpack(
-    bundle: NodeJS.ReadableStream,
+    zip: NodeJS.ReadableStream,
     into: DirectoryPath
   ): Promise<Result<PortalArtifacts, ServiceError>> {
     const archive = new FilePath(into, new FileName('portal-artifacts.zip'));
     const contents = into.join('artifacts');
 
     try {
-      await this.fileService.writeFile(archive, bundle);
+      await this.fileService.writeFile(archive, zip);
       await this.fileService.createDirectoryIfNotExists(contents);
       await this.zipService.unArchive(archive, contents);
     } catch {
       return err(ServiceError.InvalidResponse);
     }
 
-    const codeSampleCatalogs = await this.readCodeSampleCatalogs(contents.join(BUNDLE.codeSamplesDirectory));
+    const codeSampleCatalogs = await this.readCodeSampleCatalogs(contents.join(ARTIFACTS_ZIP.codeSamplesDirectory));
     if (codeSampleCatalogs.isErr()) {
       return err(codeSampleCatalogs.error);
     }
 
-    const plugin = new FilePath(contents, new FileName(BUNDLE.plugin));
+    const plugin = new FilePath(contents, new FileName(ARTIFACTS_ZIP.plugin));
 
     return ok(
       new PortalArtifacts(
         codeSampleCatalogs.value,
-        await this.readSdks(contents.join(BUNDLE.sdkDirectory)),
+        await this.readSdks(contents.join(ARTIFACTS_ZIP.sdkDirectory)),
         (await this.fileService.fileExists(plugin)) ? plugin : undefined
       )
     );
