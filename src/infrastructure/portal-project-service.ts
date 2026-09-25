@@ -35,6 +35,7 @@ export const TEMPLATE_DEPENDENCIES = [
   'lucide-react',
   'react',
   'react-dom',
+  'rehype-raw',
   'shiki',
   'tailwindcss',
   'tslib',

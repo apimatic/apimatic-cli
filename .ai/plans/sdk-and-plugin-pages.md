@@ -335,7 +335,7 @@ the theme's `fd-*` tokens, so a portal's brand colour reaches them unchanged:
 - `sdk-actions.tsx`: the button row. Download is a plain `<a download>`, not a
   router link, since the zip is not a route. Source and package open in a new
   tab (`rel="noopener"`), labelled with the registry ("View on npm").
-- `sdk-cards.tsx`: `SdkCards` (the grid) and `SdkCard` (logo, name → page,
+- `sdk-cards.tsx`: `SdkCards` (one card per row) and `SdkCard` (logo, name → page,
   `package · vVersion`, `SdkActions`).
 - `plugin-install.tsx`: the resolved command in a copyable code block
   (section 4).
@@ -484,9 +484,24 @@ committed without asking.
    (section 2, Fragments);
    `PortalProjectService.prepare` and `applyConfig`; `portal serve` refusing a
    language added after the preview started.
-4. **Components.** Section 6, with the logos and their NOTICE entry, the heading
+4. **Components.** *Done 2026-09-25.* Section 6, with the logos and their NOTICE entry, the heading
    shift and `rehype-raw`; template unit tests for `installAddress` and the
-   shift.
+   shift. What the build and headless Chrome showed, in light and dark and at
+   1280 and 520 px:
+   - The cards became one full-width row each (logo and name on the left,
+     buttons on the right, stacked below `sm`). Two to a row left no room for
+     three buttons, which wrapped.
+   - The install command is a plain Fumadocs `CodeBlock`, since an MDX page has
+     no highlighter to hand, as the API pages do. Its text sits in a `.line`
+     span, which is what the block pads.
+   - The logos are vendored from Devicon 2.17.0 (MIT) for the languages, and
+     from Simple Icons 16.32.0 (CC0, drawn in `currentColor`) for the platforms,
+     with the paths checked verbatim against the downloads. Python's drop
+     shadow is left out, and its gradient ids come from `useId`.
+   - No console errors. The browser swaps in its own origin for the plugin
+     address, and nothing of the collection's MDX options reaches the browser
+     bundle.
+   - The template type-checks as the e2e test checks it.
 5. **Templates.** The three `.mdx` files and their copy; `PortalPagesService`
    tests rendering each with every language and both plugin forms. Run end to
    end against the stand-in.
