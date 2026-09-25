@@ -22,3 +22,9 @@ export class PortalArtifacts {
     return new PortalArtifacts(new CodeSampleCatalogs([]), new Map(), undefined);
   }
 }
+
+/** What stops a run's artifacts reaching the build, short of the service call failing. */
+export type PortalArtifactsProblem =
+  | { kind: 'sourceNotZipped' }
+  | { kind: 'unreadableArchive' }
+  | { kind: 'unreadableCatalog'; language: string };
