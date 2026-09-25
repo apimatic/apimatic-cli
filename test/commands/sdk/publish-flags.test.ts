@@ -54,8 +54,8 @@ describe('sdk publish flags', () => {
     expect(metadata.flags.stability?.setFromDefault).to.not.equal(true);
   });
 
-  // The level a language offers is the only one its generator accepts, so the flag carries no
-  // default of its own: absent means unchosen, and the run resolves it per language.
+  // What a language offers is per language, so the flag carries no default of its own: absent
+  // means unchosen, and the run resolves it against that language's own levels.
   it('leaves stability unset when it was not asked for', async () => {
     const { flags } = (await parse([])) as never as { flags: Record<string, unknown> };
 

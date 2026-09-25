@@ -4,7 +4,7 @@ import { defaultStability, Language, Stability } from './generate.js';
 export class StabilityChoice {
   private constructor(private readonly level: Stability, private readonly chosen: boolean) {}
 
-  /** An absent flag is not a level: the language's own is the only one its generator accepts. */
+  /** An absent flag is not a level: what the language offers first is what an unasked run sends. */
   public static for(language: Language, flagValue: string | undefined): StabilityChoice {
     return flagValue === undefined
       ? new StabilityChoice(defaultStability(language), false)

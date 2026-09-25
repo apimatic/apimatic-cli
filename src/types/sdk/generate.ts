@@ -84,9 +84,18 @@ export class CodegenOption {
 
 /** The generator and level together, because neither is a choice the other can be made without. */
 export const CODEGEN_OPTIONS: Readonly<Partial<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>>> = {
-  [Language.CSHARP]: [CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
-  [Language.TYPESCRIPT]: [CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
-  [Language.PYTHON]: [CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)]
+  [Language.CSHARP]: [
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.STABLE),
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
+  ],
+  [Language.TYPESCRIPT]: [
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.STABLE),
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
+  ],
+  [Language.PYTHON]: [
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.STABLE),
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
+  ]
 };
 
 /** The keys of the table above: a language is available exactly when something can generate it. */
@@ -110,7 +119,7 @@ export function stabilityLevelsFor(language: Language): readonly Stability[] {
   return codegenOptionsFor(language).map((option) => option.stabilityLevel());
 }
 
-/** What a flow that never asks sends: the only level a language offers, until there are two. */
+/** What a flow that never asks sends: the first level a language offers. */
 export function defaultStability(language: Language): Stability {
   return stabilityLevelsFor(language)[0] ?? Stability.STABLE;
 }
