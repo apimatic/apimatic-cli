@@ -13,7 +13,15 @@ import { GENERATED_SECTIONS, GeneratedPages } from './portal/generated-pages.js'
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
-import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation } from './portal/portal-navigation.js';
+import {
+  API_REFERENCE_NAME,
+  GROUP_FOLDER,
+  INDEX_NAME,
+  NAVIGATION_FILE_NAME,
+  NavigationContext,
+  NavigationSettings,
+  PortalNavigation
+} from './portal/portal-navigation.js';
 import {
   MissingStaticFile,
   PortalScaffoldProblem,
@@ -23,6 +31,7 @@ import {
   PortalSpec,
   ReservedAddressPage
 } from './portal/portal-source.js';
+import { frontMatterTitle, PortalTab, sharedTabNames, TabOwner, untitledTabName } from './portal/portal-tabs.js';
 import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
@@ -50,14 +59,24 @@ const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
 /** Extensions the docs collection compiles, and so the ones an entry can address. */
 const PAGE_EXTENSIONS = ['.md', '.mdx'];
 
-/** A `(group)` folder, which the content source leaves out of a page's address. */
-const GROUP_FOLDER = /^\(.+\)$/;
+/** The order the tabs take when the root `nav.json` names none, which a report lists them in. */
+const TAB_ORDER: TabOwner['kind'][] = ['home', 'folder', 'generated', 'apiReference'];
 
 /** What one walk of the content tree found: see `PortalSourceContext.navigation`. */
 interface NavigationScan {
   errors: string[];
   ignoredFiles: FilePath[];
+  /** Every tab a directory of the content tree makes, named. */
+  tabs: PortalTab[];
 }
+
+/** A `nav.json` the walk found valid, with what it says. */
+interface CheckedNavigation {
+  file: FilePath;
+  settings: NavigationSettings;
+}
+
+type DirectoryPlace = Pick<NavigationContext, 'isContentRoot' | 'isApiDirectory' | 'isTopLevel'>;
 
 /** A page in the content tree, with its path from the content directory split into segments. */
 interface ContentPage {
@@ -161,7 +180,8 @@ export class PortalSourceContext {
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
       hiddenPages: PortalSourceContext.hiddenPages(contentPages, specs),
-      ignoredNavigationFiles: navigation.ignoredFiles
+      ignoredNavigationFiles: navigation.ignoredFiles,
+      sharedTabNames: sharedTabNames(PortalSourceContext.allTabs(navigation.tabs, settings.value.generatedPages))
     });
   }
 
@@ -319,10 +339,11 @@ export class PortalSourceContext {
    */
   private async navigation(contentTree: Directory | null, specs: PortalSpec[]): Promise<NavigationScan> {
     if (contentTree === null) {
-      return { errors: [], ignoredFiles: [] };
+      return { errors: [], ignoredFiles: [], tabs: [] };
     }
 
     const ignoredFiles: FilePath[] = [];
+    const tabs: PortalTab[] = [];
 
     // Children first, because a directory counts as one of its parent's children only when
     // a page sits somewhere beneath it, and the walk below already has to find out. Each
@@ -338,6 +359,7 @@ export class PortalSourceContext {
       const childErrors: string[] = [];
       let holdsPage = false;
       let navigationFile: FileName | undefined;
+      let indexPage: FilePath | undefined;
 
       for (const item of directory.items) {
         // A directory with no page anywhere beneath it becomes no node in the page tree, so
@@ -374,6 +396,9 @@ export class PortalSourceContext {
           childNames.push(pageName);
           pageNames.add(pageName);
           holdsPage = true;
+          if (pageName === INDEX_NAME) {
+            indexPage ??= new FilePath(directory.directoryPath, item.fileName);
+          }
         }
       }
 
@@ -400,6 +425,7 @@ export class PortalSourceContext {
       }
 
       const errors: string[] = [];
+      let navigation: CheckedNavigation | undefined;
       if (navigationFile !== undefined) {
         const file = new FilePath(directory.directoryPath, navigationFile);
         const label = file.relativeTo(this.sourceDirectory);
@@ -427,15 +453,80 @@ export class PortalSourceContext {
           });
           if (checked.isErr()) {
             errors.push(...checked.error);
+          } else {
+            navigation = { file, settings: checked.value };
           }
         }
+      }
+
+      const tab = await this.tabOf({ isContentRoot, isApiDirectory, isTopLevel }, navigation, indexPage);
+      if (tab !== undefined) {
+        tabs.push(tab);
       }
 
       return { holdsPage, errors: [...errors, ...childErrors] };
     };
 
     const root = await visit(contentTree, true, false, false);
-    return { errors: root.errors, ignoredFiles };
+    return { errors: root.errors, ignoredFiles, tabs };
+  }
+
+  /** The tab a directory makes, if any, by the name the template gives it. */
+  private async tabOf(
+    place: DirectoryPlace,
+    navigation: CheckedNavigation | undefined,
+    indexPage: FilePath | undefined
+  ): Promise<PortalTab | undefined> {
+    const owner = PortalSourceContext.tabOwner(place, navigation);
+    if (owner === undefined) {
+      return undefined;
+    }
+    if (navigation?.settings.title !== undefined) {
+      return { owner, name: navigation.settings.title, namedBy: navigation.file };
+    }
+    // The content root's index page is the home page, which names no tab.
+    if (owner.kind !== 'home' && indexPage !== undefined) {
+      const pageTitle = await this.pageTitle(indexPage);
+      if (pageTitle !== undefined) {
+        return { owner, name: pageTitle, namedBy: indexPage };
+      }
+    }
+    return { owner, name: untitledTabName(owner), namedBy: null };
+  }
+
+  private static tabOwner(place: DirectoryPlace, navigation: CheckedNavigation | undefined): TabOwner | undefined {
+    if (place.isContentRoot) {
+      return { kind: 'home' };
+    }
+    if (place.isApiDirectory) {
+      return { kind: 'apiReference' };
+    }
+    if (place.isTopLevel && navigation?.settings.isTab === true) {
+      return { kind: 'folder', navigation: navigation.file };
+    }
+    return undefined;
+  }
+
+  /** The content directory's tabs with the ones no directory backs, in `TAB_ORDER`. */
+  private static allTabs(contentTabs: PortalTab[], generatedPages: GeneratedPages): PortalTab[] {
+    const always: TabOwner[] = [{ kind: 'home' }, { kind: 'apiReference' }];
+    const unbacked = always.filter((owner) => !contentTabs.some((tab) => tab.owner.kind === owner.kind));
+    const generated = generatedPages.sections().map((section): TabOwner => ({ kind: 'generated', section }));
+    const untitled = [...unbacked, ...generated].map(
+      (owner): PortalTab => ({ owner, name: untitledTabName(owner), namedBy: null })
+    );
+    return [...contentTabs, ...untitled].sort(
+      (left, right) => TAB_ORDER.indexOf(left.owner.kind) - TAB_ORDER.indexOf(right.owner.kind)
+    );
+  }
+
+  // A page that cannot be read or parsed fails the build on its own, with the build's message.
+  private async pageTitle(file: FilePath): Promise<string | undefined> {
+    try {
+      return frontMatterTitle(await this.fileService.getContents(file));
+    } catch {
+      return undefined;
+    }
   }
 
   /**

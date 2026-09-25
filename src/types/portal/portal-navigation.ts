@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
-import { quotedList } from './config/fields.js';
+import { listedInProse } from './config/fields.js';
 import { GENERATED_SECTIONS, GeneratedSection } from './generated-pages.js';
 import { unknownFieldErrors } from './unknown-fields.js';
 
@@ -21,6 +21,9 @@ export const API_REFERENCE_NAME = 'api';
 
 /** The page a folder below the content root links to, which is never one of its children. */
 export const INDEX_NAME = 'index';
+
+/** A `(group)` folder, which a page's address leaves out and a folder's name leaves unbracketed. */
+export const GROUP_FOLDER = /^\((.+)\)$/;
 
 export const NAVIGATION_FILE_NAME = 'nav.json';
 
@@ -50,6 +53,14 @@ export interface NavigationContext {
   childNames: string[];
 }
 
+/** What a valid `nav.json` says about its directory, beyond the order of its pages. */
+export interface NavigationSettings {
+  /** The name it gives its folder, or at the content root the Home tab. */
+  title: string | undefined;
+  /** Whether its directory is a tab of its own, which the API reference always is. */
+  isTab: boolean;
+}
+
 /**
  * The rules of a `nav.json`, applied to one file. The template re-reads the file itself and
  * orders the page tree from it, so nothing here travels into the build: this exists to
@@ -57,7 +68,7 @@ export interface NavigationContext {
  * entry it cannot resolve without a word, which is why the CLI validates instead.
  */
 export class PortalNavigation {
-  public static validate(json: string, context: NavigationContext): Result<void, string[]> {
+  public static validate(json: string, context: NavigationContext): Result<NavigationSettings, string[]> {
     const document = PortalNavigation.parseObject(json, context);
     if (document.isErr()) {
       return err(document.error);
@@ -73,12 +84,14 @@ export class PortalNavigation {
       ...PortalNavigation.rootErrors(document.value.root, context)
     ];
     const isTab = context.isApiDirectory || PortalNavigation.isTab(document.value.root, context);
+    const title = document.value.title;
+    const settings = { title: typeof title === 'string' ? title.trim() : undefined, isTab };
 
     const pages = document.value.pages;
     if (pages === undefined) {
       // A file with no `pages` orders nothing, which is odd but not wrong. It may still name
       // the folder, which is why the title is checked above rather than alongside the entries.
-      return settingErrors.length > 0 ? err(settingErrors) : ok(undefined);
+      return settingErrors.length > 0 ? err(settingErrors) : ok(settings);
     }
     if (!Array.isArray(pages) || pages.some((entry) => typeof entry !== 'string')) {
       return err([...settingErrors, `${context.label}: 'pages' must be an array of strings.`]);
@@ -113,7 +126,7 @@ export class PortalNavigation {
       }
     }
 
-    return errors.length > 0 ? err(errors) : ok(undefined);
+    return errors.length > 0 ? err(errors) : ok(settings);
   }
 
   private static checkEntry(entry: string, context: NavigationContext, isTab: boolean): Result<void, string> {
@@ -185,7 +198,7 @@ export class PortalNavigation {
     if (!TOKENS.includes(entry)) {
       return err(
         `${context.label}: '${entry}' is not a ${NAVIGATION_FILE_NAME} token. ` +
-          `The tokens are ${quotedList(TOKENS.slice(0, -1))} and '${TOKENS[TOKENS.length - 1]}'.`
+          `The tokens are ${listedInProse(TOKENS.map((token) => `'${token}'`))}.`
       );
     }
 
@@ -300,9 +313,8 @@ export class PortalNavigation {
 
   private static describeUnknownField(field: string, context: NavigationContext): string {
     // Listed from the same set the check uses, so a setting added later is named here too.
-    const settings = [...KNOWN_FIELDS].map((name) => `'${name}'`);
-    const listed = `${settings.slice(0, -1).join(', ')} and ${settings[settings.length - 1]}`;
-    return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. The settings are ${listed}.`;
+    const settings = listedInProse([...KNOWN_FIELDS].map((name) => `'${name}'`));
+    return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. The settings are ${settings}.`;
   }
 
   /** A near miss is nearly always a typo or a forgotten extension, so name the candidate. */

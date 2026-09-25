@@ -10,6 +10,7 @@ import { FileService } from '../../src/infrastructure/file-service';
 import { APIMATIC_SCHEMA_URL } from '../../src/types/apimatic-config/document';
 import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalSettings, PortalSource, PortalSourceProblem } from '../../src/types/portal/portal-source';
+import { PortalTab } from '../../src/types/portal/portal-tabs';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { FileName } from '../../src/types/file/fileName';
 import { FilePath } from '../../src/types/file/filePath';
@@ -1006,6 +1007,111 @@ describe('PortalSourceContext', () => {
       const source = (await resolve())._unsafeUnwrap();
 
       expect(ignored(source)).to.deep.equal([]);
+    });
+  });
+
+  describe('tab names', () => {
+    beforeEach(() => {
+      writeConfig({ site: { name: 'Calc' } });
+      write('spec/api.json', OPENAPI);
+      write('content/index.md', '---\ntitle: Welcome\n---\n');
+    });
+
+    /** A tab as its kind and, when a file names it, that file. */
+    const described = ({ owner, namedBy }: PortalTab) =>
+      namedBy === null ? owner.kind : `${owner.kind} ${namedBy.relativeTo(new DirectoryPath(root))}`;
+
+    /** Each name more than one tab shares, with its tabs described and sorted. */
+    const shared = async (): Promise<[string, string[]][]> => {
+      const source = (await resolve())._unsafeUnwrap();
+      return source.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(described).sort()]);
+    };
+
+    /** A folder directly under `content/` that its `nav.json` makes a tab. */
+    const folderTab = (directory: string, settings: object, indexTitle?: string) => {
+      write(`content/${directory}/first.md`, '---\ntitle: First\n---\n');
+      write(`content/${directory}/nav.json`, JSON.stringify({ root: true, ...settings }));
+      if (indexTitle !== undefined) {
+        write(`content/${directory}/index.md`, `---\ntitle: ${indexTitle}\n---\n`);
+      }
+    };
+
+    it('finds none when every tab has a name of its own', async () => {
+      folderTab('tutorials', { title: 'Tutorials' });
+
+      expect(await shared()).to.deep.equal([]);
+    });
+
+    it('finds a folder tab titled like the Home tab', async () => {
+      folderTab('start', { title: 'Home' });
+
+      expect(await shared()).to.deep.equal([['Home', ['folder content/start/nav.json', 'home']]]);
+    });
+
+    it('finds the Home tab titled like a folder tab its index page names', async () => {
+      write('content/nav.json', JSON.stringify({ title: 'Guides' }));
+      folderTab('guides', {}, 'Guides');
+
+      expect(await shared()).to.deep.equal([['Guides', ['folder content/guides/index.md', 'home content/nav.json']]]);
+    });
+
+    it('names a folder tab after its directory when nothing else does', async () => {
+      write('content/nav.json', JSON.stringify({ title: 'Getting started' }));
+      folderTab('getting-started', {});
+
+      expect(await shared()).to.deep.equal([['Getting started', ['folder', 'home content/nav.json']]]);
+    });
+
+    it('prefers the title in a folder tab’s nav.json to its index page’s', async () => {
+      folderTab('guides', { title: 'Learn' }, 'Home');
+
+      expect(await shared()).to.deep.equal([]);
+    });
+
+    it('finds a folder tab titled like the API reference, which no directory has to back', async () => {
+      folderTab('reference', { title: 'API Reference' });
+
+      expect(await shared()).to.deep.equal([['API Reference', ['apiReference', 'folder content/reference/nav.json']]]);
+    });
+
+    it('names the API reference by content/api/nav.json, then by its index page', async () => {
+      folderTab('guides', { title: 'Guides' });
+      folderTab('tutorials', { title: 'Tutorials' });
+      write('content/api/index.md', '---\ntitle: Tutorials\n---\n');
+      write('content/api/nav.json', JSON.stringify({ title: 'Guides' }));
+
+      expect(await shared()).to.deep.equal([
+        ['Guides', ['apiReference content/api/nav.json', 'folder content/guides/nav.json']]
+      ]);
+
+      fs.rmSync(path.join(root, 'content/api/nav.json'));
+
+      expect(await shared()).to.deep.equal([
+        ['Tutorials', ['apiReference content/api/index.md', 'folder content/tutorials/nav.json']]
+      ]);
+    });
+
+    it('finds a folder tab titled like a generated tab', async () => {
+      folderTab('downloads', { title: 'SDKs' });
+
+      expect(await shared()).to.deep.equal([['SDKs', ['folder content/downloads/nav.json', 'generated']]]);
+    });
+
+    it('counts the context plugin’s tab only when there is a plugin block', async () => {
+      folderTab('assistant', { title: 'Context Plugin' });
+
+      expect(await shared()).to.deep.equal([]);
+
+      write('apimatic.json', JSON.stringify({ portal: { site: { name: 'Calc' } }, languages: LANGUAGES, plugin: {} }));
+
+      expect(await shared()).to.deep.equal([['Context Plugin', ['folder content/assistant/nav.json', 'generated']]]);
+    });
+
+    it('does not count a folder that is no tab of its own', async () => {
+      write('content/start/first.md', '---\ntitle: First\n---\n');
+      write('content/start/nav.json', JSON.stringify({ title: 'Home' }));
+
+      expect(await shared()).to.deep.equal([]);
     });
   });
 

@@ -362,6 +362,11 @@ under `portal serve` as they do today, tabs included, with no config watcher.
 - The root-`title` refusal message names `portal.site.name` instead of
   `portal.title`. *(Amended 2026-09-25: the root `title` is accepted and names
   the Home tab, section 5.)*
+- *(Added 2026-09-25.)* Tabs that would show the same name -- a folder tab
+  titled "Home" or "SDKs", or Home renamed after a folder tab -- are reported as
+  a warning, since the build succeeds. Each tab is named as the template names
+  it: its `nav.json` `title`, then its index page's front-matter `title`, then
+  "Home", "API Reference" or the directory's name as Fumadocs spells it.
 - `PortalSourceContext.navigation`'s `visit` gains a flag for "directly under
   the content root", beside the `isContentRoot` and `isApiDirectory` it already
   passes, and `PortalNavigation.validate`'s context gains the same field. Today

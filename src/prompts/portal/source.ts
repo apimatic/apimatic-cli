@@ -1,7 +1,9 @@
 import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { listedInProse } from '../../types/portal/config/fields.js';
 import { PortalSourceProblem, ReservedAddressPage } from '../../types/portal/portal-source.js';
+import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
@@ -134,6 +136,37 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
   log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
+}
+
+export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath): void {
+  if (shared.length === 0) {
+    return;
+  }
+  const relative = (file: FilePath) => f.var(file.relativeTo(sourceDirectory));
+  const describe = ({ owner, namedBy }: PortalTab): string => {
+    const titledIn = namedBy === null ? '' : ` (titled in ${relative(namedBy)})`;
+    switch (owner.kind) {
+      case 'home':
+        return `the Home tab${titledIn}`;
+      case 'apiReference':
+        return `the API reference${titledIn}`;
+      case 'generated':
+        return `the tab of ${owner.section.description}`;
+      case 'folder': {
+        const makes = `the tab ${relative(owner.navigation)} makes`;
+        if (namedBy === null) {
+          return `${makes} (named after its directory)`;
+        }
+        return namedBy.isEqual(owner.navigation) ? `${makes} (titled there)` : `${makes}${titledIn}`;
+      }
+    }
+  };
+  log.warn('More than one tab has the same name, so the tab bar cannot tell them apart:');
+  log.message(shared.map(({ name, tabs }) => `  • ${f.var(name)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
+  log.message(
+    `Give all but one of each a name of its own with a ${f.var('title')} in its folder's ${f.var('nav.json')}, ` +
+      `or in ${f.var('content/nav.json')} for the Home tab.`
+  );
 }
 
 export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryPath): void {

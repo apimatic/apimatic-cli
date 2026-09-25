@@ -63,6 +63,7 @@ describe('PortalProjectService', () => {
     shadowedFiles: [],
     hiddenPages: [],
     ignoredNavigationFiles: [],
+    sharedTabNames: [],
     ...overrides
   });
 

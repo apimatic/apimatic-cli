@@ -5,6 +5,7 @@ import { Endpoint } from './endpoint.js';
 import { SuggestedSite } from './config/site-config.js';
 import { GeneratedPages, GeneratedSection } from './generated-pages.js';
 import { PortalConfig } from './portal-config.js';
+import { SharedTabName } from './portal-tabs.js';
 
 /** An OpenAPI document found in `src/spec/`, with the slug its section is mounted at. */
 export interface PortalSpec {
@@ -41,6 +42,8 @@ export interface PortalSource extends PortalSettings {
    * so read by nothing. Reported rather than left to sit there doing nothing.
    */
   ignoredNavigationFiles: FilePath[];
+  /** Names more than one tab would show, which the build accepts and a reader cannot tell apart. */
+  sharedTabNames: SharedTabName[];
 }
 
 /** Why a source directory could not be written; each variant maps to its own message. */

@@ -6,8 +6,15 @@ import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { SharedTabName } from '../../types/portal/portal-tabs.js';
 import { generateArtifacts, reportUnplacedSamples } from './code-samples.js';
-import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
+import {
+  reportHiddenPages,
+  reportIgnoredNavigationFiles,
+  reportShadowedFiles,
+  reportSharedTabNames,
+  reportSourceProblem
+} from './source.js';
 
 /** What both `portal generate` and `portal serve` say while the project they share is prepared. */
 export class PreparePortalProjectPrompts {
@@ -29,6 +36,10 @@ export class PreparePortalProjectPrompts {
 
   public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
     reportIgnoredNavigationFiles(files, sourceDirectory);
+  }
+
+  public sharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath) {
+    reportSharedTabNames(shared, sourceDirectory);
   }
 
   public unplacedSamples(endpoints: string[]) {

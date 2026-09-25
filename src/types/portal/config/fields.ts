@@ -84,6 +84,11 @@ export function quotedList(values: readonly string[]): string {
   return values.map((value) => `'${value}'`).join(', ');
 }
 
+/** The items as a sentence lists them: `a`, `a and b`, `a, b and c`. */
+export function listedInProse(items: readonly string[]): string {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
 export function nonEmptyString(value: unknown, path: string): Parsed<string> {
   return typeof value === 'string' && value.trim().length > 0
     ? ok(value.trim())

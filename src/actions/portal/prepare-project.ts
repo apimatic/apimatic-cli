@@ -57,6 +57,7 @@ export class PreparePortalProjectAction {
       this.prompts.filesShadowedByStatic(source.value.shadowedFiles);
       this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
       this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
+      this.prompts.sharedTabNames(source.value.sharedTabNames, sourceDirectory);
 
       this.prompts.unplacedSamples(
         artifacts.value.codeSampleCatalogs.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints))

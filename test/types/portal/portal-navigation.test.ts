@@ -250,6 +250,14 @@ describe('PortalNavigation', () => {
       expect(PortalNavigation.validate('{"title":"Overview","pages":["index"]}', contextFor()).isOk()).to.be.true;
     });
 
+    // What the CLI names the tabs by, to find two of the same name, as the template trims it.
+    it('answers with the name it gives, trimmed', () => {
+      const title = (json: string) => PortalNavigation.validate(json, contextFor(nested))._unsafeUnwrap().title;
+
+      expect(title('{"title":"  Developer Guides "}')).to.equal('Developer Guides');
+      expect(title('{"pages":["intro"]}')).to.be.undefined;
+    });
+
     // The Home tab gets a fallback home page, so it has something to name without any page.
     it('accepts a name at the content root even with no page in the content directory', () => {
       const context = contextFor({ becomesFolder: false, childNames: ['api'] });
@@ -287,8 +295,14 @@ describe('PortalNavigation', () => {
       PortalNavigation.validate(JSON.stringify({ root }), contextFor(overrides));
 
     it('makes a folder directly under the content root a tab', () => {
-      expect(rootErrors(true, tutorials).isOk()).to.be.true;
-      expect(rootErrors(false, tutorials).isOk()).to.be.true;
+      expect(rootErrors(true, tutorials)._unsafeUnwrap().isTab).to.be.true;
+      expect(rootErrors(false, tutorials)._unsafeUnwrap().isTab).to.be.false;
+    });
+
+    it('answers that the API reference is a tab without the setting', () => {
+      const api = { ...tutorials, label: 'content/api/nav.json', isApiDirectory: true };
+
+      expect(PortalNavigation.validate('{}', contextFor(api))._unsafeUnwrap().isTab).to.be.true;
     });
 
     // The template lists a tab's index page first, whatever the file says, so the entry would

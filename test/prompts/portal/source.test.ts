@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
-import { reportSourceProblem } from '../../../src/prompts/portal/source.js';
+import { reportSharedTabNames, reportSourceProblem } from '../../../src/prompts/portal/source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
@@ -144,5 +144,86 @@ describe('reportSourceProblem', () => {
       );
       expect(printed()).to.contain('Rename or move each page.');
     });
+  });
+});
+
+describe('reportSharedTabNames', () => {
+  const source = new DirectoryPath('project').join('src');
+  const content = source.join('content');
+  const guidesNavigation = new FilePath(content.join('guides'), new FileName('nav.json'));
+  let lines: string[];
+
+  const printed = () => lines.join('\n');
+
+  beforeEach(() => {
+    lines = [];
+    const record = (text?: string | string[]) => {
+      lines.push(stripVTControlCharacters(String(text)));
+    };
+    sinon.stub(log, 'warn').callsFake(record);
+    sinon.stub(log, 'message').callsFake(record);
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when no two tabs share a name', () => {
+    reportSharedTabNames([], source);
+
+    expect(printed()).to.equal('');
+  });
+
+  it('names each tab by what gives it the name, and says how to rename it', () => {
+    reportSharedTabNames(
+      [
+        {
+          name: 'Guides',
+          tabs: [
+            { owner: { kind: 'home' }, name: 'Guides', namedBy: new FilePath(content, new FileName('nav.json')) },
+            { owner: { kind: 'folder', navigation: guidesNavigation }, name: 'Guides', namedBy: guidesNavigation },
+            {
+              owner: { kind: 'apiReference' },
+              name: 'Guides',
+              namedBy: new FilePath(content.join('api'), new FileName('index.md'))
+            }
+          ]
+        },
+        {
+          name: 'SDKs',
+          tabs: [
+            {
+              owner: { kind: 'folder', navigation: new FilePath(content.join('sdk-docs'), new FileName('nav.json')) },
+              name: 'SDKs',
+              namedBy: new FilePath(content.join('sdk-docs'), new FileName('index.md'))
+            },
+            { owner: { kind: 'generated', section: SDK_SECTION }, name: 'SDKs', namedBy: null }
+          ]
+        },
+        {
+          name: 'Home',
+          tabs: [
+            { owner: { kind: 'home' }, name: 'Home', namedBy: null },
+            {
+              owner: { kind: 'folder', navigation: new FilePath(content.join('home'), new FileName('nav.json')) },
+              name: 'Home',
+              namedBy: null
+            }
+          ]
+        }
+      ],
+      source
+    );
+
+    expect(printed().split('\n')).to.deep.equal([
+      'More than one tab has the same name, so the tab bar cannot tell them apart:',
+      "  • 'Guides': the Home tab (titled in 'content/nav.json'), the tab 'content/guides/nav.json' makes " +
+        "(titled there) and the API reference (titled in 'content/api/index.md')",
+      "  • 'SDKs': the tab 'content/sdk-docs/nav.json' makes (titled in 'content/sdk-docs/index.md') and the tab " +
+        'of the SDK pages',
+      "  • 'Home': the Home tab and the tab 'content/home/nav.json' makes (named after its directory)",
+      "Give all but one of each a name of its own with a 'title' in its folder's 'nav.json', or in " +
+        "'content/nav.json' for the Home tab."
+    ]);
   });
 });

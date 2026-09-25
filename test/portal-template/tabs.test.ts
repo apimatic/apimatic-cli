@@ -10,6 +10,11 @@ import {
   tabsTransformer
 } from '../../portal-template/src/lib/navigation';
 import { portalTabs } from '../../portal-template/src/lib/tabs';
+import { frontmatter } from 'fumadocs-core/content/md/frontmatter';
+import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { FileName } from '../../src/types/file/fileName';
+import { FilePath } from '../../src/types/file/filePath';
+import { frontMatterTitle, untitledTabName } from '../../src/types/portal/portal-tabs';
 
 /**
  * The tabs the transformers make of a real `loader()`'s tree, and the list the layouts are
@@ -404,6 +409,48 @@ describe('tabsTransformer', () => {
       const docs = [page('(start)/index.mdx', 'Welcome'), meta('(start)/nav.json', { title: 'Start', root: true })];
 
       expect(tabNames({ docs, openapi: API })).to.deep.equal(['Start', 'API Reference']);
+    });
+  });
+
+  // The CLI warns about tabs that share a name, so it has to name each as the template does.
+  describe('the names the CLI expects', () => {
+    const folderNamed = (directory: string) =>
+      untitledTabName({
+        kind: 'folder',
+        navigation: new FilePath(new DirectoryPath('content', directory), new FileName('nav.json'))
+      });
+
+    it('gives the tabs no title names the names the CLI gives them', () => {
+      expect(tabNames({ docs: CONTENT, openapi: API })).to.deep.equal([
+        untitledTabName({ kind: 'home' }),
+        untitledTabName({ kind: 'apiReference' })
+      ]);
+    });
+
+    it('names a folder tab after its directory as the CLI does', () => {
+      const docs = [
+        ...CONTENT,
+        page('getting-started/first.mdx', 'First'),
+        meta('getting-started/nav.json', { root: true }),
+        page('(learn-more)/deep.mdx', 'Deep'),
+        meta('(learn-more)/nav.json', { root: true })
+      ];
+
+      expect(tabNames({ docs })).to.include.members([folderNamed('getting-started'), folderNamed('(learn-more)')]);
+    });
+
+    // fumadocs-mdx hands the loader what `frontmatter` parses, the parser the CLI reads a page with.
+    it('names a folder tab after its index page as the CLI reads the page', () => {
+      const markdown = '---\ntitle: Learn the API\n--- \n# Learn';
+      const data = frontmatter(markdown).data as File['data'];
+      const docs: File[] = [
+        ...CONTENT,
+        { type: 'page', path: 'tutorials/index.mdx', data },
+        page('tutorials/first.mdx', 'First'),
+        meta('tutorials/nav.json', { root: true })
+      ];
+
+      expect(tabNames({ docs })).to.include(frontMatterTitle(markdown));
     });
   });
 });
