@@ -73,6 +73,8 @@ export class PortalServeAction {
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
       {
+        // So the browser keeps showing what a build would accept while an edit is half done.
+        content: 'copy',
         onPrepared: async (project, source, artifacts) => {
           const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
@@ -91,7 +93,12 @@ export class PortalServeAction {
 
           // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
           let generatedPages = source.generatedPages;
-          const contentWatch = this.watchContent(source, () => generatedPages, sourceDirectory);
+          const contentWatch = this.watchContent(
+            source,
+            () => generatedPages,
+            project.projectDirectory,
+            sourceDirectory
+          );
           const configWatch = this.watchConfig(
             source,
             artifacts,
@@ -198,12 +205,14 @@ export class PortalServeAction {
   }
 
   /**
-   * The preview drops what a build would refuse without a word, so each save is checked as a
-   * build would check it, and what a build would warn of is said on the save that brings it about.
+   * Held to the rules a build applies, as `apimatic.json` is: a save a build would refuse is
+   * reported as `portal generate` would report it, and the preview keeps what it last accepted.
+   * What a build would warn of is said on the save that brings it about.
    */
   private watchContent(
     source: PortalSource,
     generatedPages: () => GeneratedPages,
+    projectDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
     const contentDirectory = source.contentDirectory;
@@ -220,7 +229,12 @@ export class PortalServeAction {
         this.prompts.contentRejected(checked.error, sourceDirectory);
         return;
       }
-      const shown = preview.show(checked.value);
+      const applied = await this.projectService.applyContent(projectDirectory, contentDirectory, checked.value.files);
+      if (applied.isErr()) {
+        this.prompts.contentNotApplied(applied.error, sourceDirectory);
+        return;
+      }
+      const shown = preview.show(checked.value.notices);
       if (shown.fixed) {
         this.prompts.contentAccepted(sourceDirectory);
       }

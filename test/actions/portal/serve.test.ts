@@ -191,6 +191,7 @@ describe('PortalServeAction', () => {
     let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
     let closeWatch: sinon.SinonStub;
     let recheck: sinon.SinonStub;
+    let applyContent: sinon.SinonStub;
 
     const writeNavigation = (contents: string) =>
       fs.writeFileSync(path.join(source.toString(), 'content/guides/nav.json'), contents);
@@ -216,6 +217,7 @@ describe('PortalServeAction', () => {
 
       closeWatch = sinon.stub().resolves();
       recheck = sinon.stub();
+      applyContent = sinon.stub(PortalProjectService.prototype, 'applyContent').resolves(ok(undefined));
       watched = new Promise((resolve) => {
         watchTree.callsFake(
           (directory: DirectoryPath, onChange: () => Promise<void>, onFailed: (reason: string) => void) => {
@@ -261,6 +263,44 @@ describe('PortalServeAction', () => {
 
         expect(prompts.contentRejected.calledOnce).to.be.true;
         expect(prompts.contentAccepted.calledOnce).to.be.true;
+      });
+    });
+
+    // The dev server reads the copy, so a save a build would refuse never reaches the browser.
+    it('prepares the preview to read a copy of the content', async () => {
+      interrupt();
+
+      await execute(source);
+
+      expect(shared.prepare.firstCall.args[3]).to.equal('copy');
+    });
+
+    it('brings the copy in line with a save a build accepts, as checked, and not with one it refuses', async () => {
+      await whileServing(async (save) => {
+        await save('{ "pages": [');
+        expect(applyContent.called).to.be.false;
+
+        const fixed = JSON.stringify({ title: 'Guides', pages: ['intro'] });
+        await save(fixed);
+
+        const [projectDirectory, contentDirectory, files] = applyContent.firstCall.args;
+        const checked = files.find(
+          ({ file }: { file: FilePath }) => file.relativeTo(source) === 'content/guides/nav.json'
+        );
+        expect(projectDirectory.toString()).to.equal(shared.prepare.firstCall.args[0].toString());
+        expect(contentDirectory.toString()).to.equal(source.join('content').toString());
+        expect(checked.contents).to.equal(fixed);
+      });
+    });
+
+    it('says when a save it accepted could not be applied to the preview, and gives no notice for it', async () => {
+      applyContent.resolves(err('EACCES: permission denied'));
+
+      await whileServing(async (save) => {
+        await save(JSON.stringify({ title: 'Overview', pages: ['intro'] }));
+
+        expect(prompts.contentNotApplied.calledOnceWith('EACCES: permission denied')).to.be.true;
+        expect(prompts.contentNotices.called).to.be.false;
       });
     });
 

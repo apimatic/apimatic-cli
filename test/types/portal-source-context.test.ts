@@ -920,15 +920,35 @@ describe('PortalSourceContext', () => {
       write('content/guides/Nav.json', JSON.stringify({ pages: ['intro'] }));
       const source = (await resolve())._unsafeUnwrap();
 
-      const notices = await new PortalSourceContext(new DirectoryPath(root)).resolveContent(
+      const accepted = await new PortalSourceContext(new DirectoryPath(root)).resolveContent(
         source.specs,
         source.generatedPages
       );
 
-      expect(notices._unsafeUnwrap()).to.deep.equal(source.contentNotices);
+      expect(accepted._unsafeUnwrap().notices).to.deep.equal(source.contentNotices);
       expect(hidden(source)).to.deep.equal(['content/api/api/notes.md']);
       expect(ignored(source)).to.deep.equal(['content/guides/Nav.json']);
       expect(source.contentNotices.folderTabs.map((folder) => folder.leafName())).to.deep.equal(['guides']);
+    });
+
+    // What `portal serve` writes into the preview's copy, since a save made after it read them went unchecked.
+    it('gives each page and nav.json it accepted, as it read them', async () => {
+      write('content/guides/intro.md', page('Intro'));
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'guides'] }));
+      write('content/logo.png', 'x');
+      const { specs, generatedPages } = (await resolve())._unsafeUnwrap();
+
+      const { files } = (
+        await new PortalSourceContext(new DirectoryPath(root)).resolveContent(specs, generatedPages)
+      )._unsafeUnwrap();
+
+      expect(
+        files.map(({ file, contents }) => [file.relativeTo(new DirectoryPath(root)), contents]).sort()
+      ).to.deep.equal([
+        ['content/guides/intro.md', page('Intro')],
+        ['content/index.md', page('Home')],
+        ['content/nav.json', JSON.stringify({ pages: ['index', 'guides'] })]
+      ]);
     });
 
     // `portal serve` passes the generated pages the preview shows, which an edit to apimatic.json changes.
@@ -942,7 +962,9 @@ describe('PortalSourceContext', () => {
       const context = new PortalSourceContext(new DirectoryPath(root));
 
       const names = async (generatedPages: GeneratedPages) =>
-        (await context.resolveContent(specs, generatedPages))._unsafeUnwrap().sharedTabNames.map(({ name }) => name);
+        (await context.resolveContent(specs, generatedPages))
+          ._unsafeUnwrap()
+          .notices.sharedTabNames.map(({ name }) => name);
 
       expect(await names(withoutPlugin)).to.deep.equal([]);
       expect(await names(withPlugin)).to.deep.equal(['Context Plugin']);

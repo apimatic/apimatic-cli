@@ -1,4 +1,8 @@
-import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import {
+  PortalProjectPaths,
+  PortalProjectService,
+  ProjectContent
+} from '../../infrastructure/portal-project-service.js';
 import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
@@ -13,6 +17,8 @@ import { ActionResult } from '../action-result.js';
 export interface PreparationSteps {
   /** Asked once the source is read, before the artifacts are fetched; false cancels the run. */
   confirm?: () => Promise<boolean>;
+  /** A preview reads a copy of `content/`, which it updates only with what a build would accept. */
+  content?: ProjectContent;
   onPrepared: (project: PortalProjectPaths, source: PortalSource, artifacts: PortalArtifacts) => Promise<ActionResult>;
 }
 
@@ -39,7 +45,7 @@ export class PreparePortalProjectAction {
    */
   public readonly execute = async (
     sourceDirectory: DirectoryPath,
-    { confirm = async () => true, onPrepared }: PreparationSteps
+    { confirm = async () => true, content = 'source', onPrepared }: PreparationSteps
   ): Promise<ActionResult> => {
     // Ahead of the server run, which can take minutes: a mistake or a question should not wait on it.
     const source = await new PortalSourceContext(sourceDirectory).resolve();
@@ -81,7 +87,7 @@ export class PreparePortalProjectAction {
       }
 
       return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {
-        const project = await this.projectService.prepare(tempDirectory, source.value, artifacts.value);
+        const project = await this.projectService.prepare(tempDirectory, source.value, artifacts.value, content);
         if (project.isErr()) {
           this.prompts.runtimeUnsupported(project.error);
           return ActionResult.failed();

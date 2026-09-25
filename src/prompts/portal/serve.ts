@@ -58,8 +58,8 @@ export class PortalServePrompts {
             'plugin'
           )} block removed, which removes the Context Plugin tab. A mistake in ${f.var(
             'apimatic.json'
-          )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a page ` +
-          `or a ${f.var('nav.json')} is reported when you save it too, while the preview shows what it can.`,
+          )}, a page or a ${f.var('nav.json')} is reported when you save it, and the preview keeps what it ` +
+          `last accepted.`,
         '',
         `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
           `starts, adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
@@ -120,8 +120,14 @@ export class PortalServePrompts {
   public contentRejected(problems: ContentProblem[], sourceDirectory: DirectoryPath) {
     reportContentProblems(problems, sourceDirectory);
     log.message(
-      `The preview may show the pages wrongly, or not at all, until ${f.path(sourceDirectory.join('content'))} ` +
-        `is fixed; a build would stop here.`
+      `The preview keeps showing what it last accepted until ${f.path(sourceDirectory.join('content'))} is ` +
+        `fixed; a build would stop here.`
+    );
+  }
+
+  public contentNotApplied(reason: string, sourceDirectory: DirectoryPath) {
+    log.warn(
+      `The changes to ${f.path(sourceDirectory.join('content'))} could not be applied to the preview: ${reason}`
     );
   }
 

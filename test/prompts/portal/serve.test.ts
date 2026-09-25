@@ -44,8 +44,11 @@ describe('PortalServePrompts', () => {
       );
     });
 
-    it('says a mistake in a page or a nav.json is reported when it is saved', () => {
-      expect(printed()).to.contain("A mistake in a page or a 'nav.json' is reported when you save it too");
+    it('says a mistake in a page or a nav.json is reported when it is saved, and kept from the preview', () => {
+      expect(printed()).to.contain(
+        "A mistake in 'apimatic.json', a page or a 'nav.json' is reported when you save it, and the preview " +
+          'keeps what it last accepted.'
+      );
     });
   });
 

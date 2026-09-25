@@ -32,6 +32,18 @@ export interface ContentFile {
   contents: string | undefined;
 }
 
+/** A page or `nav.json` a build would accept, as the checks read it. */
+export interface CheckedFile {
+  file: FilePath;
+  contents: string;
+}
+
+/** A tree a build would accept: what the user should hear of it, and its files as checked. */
+export interface AcceptedContent {
+  notices: ContentNotices;
+  files: CheckedFile[];
+}
+
 /** A page in the content tree, with its path from the content directory split into segments. */
 interface ContentPage {
   file: FilePath;

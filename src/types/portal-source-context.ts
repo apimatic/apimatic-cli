@@ -8,8 +8,7 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
-import { ContentNotices } from './portal/content-notices.js';
-import { ContentFile, ContentTree } from './portal/content-tree.js';
+import { AcceptedContent, ContentFile, ContentTree } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
 import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
@@ -96,9 +95,9 @@ export class PortalSourceContext {
       : null;
     const contentDirectory = await this.existingContentDirectory();
 
-    const content = await this.content(contentDirectory, specs, settings.value.generatedPages);
-    if (content.isErr()) {
-      return err({ kind: 'invalidContent', problems: content.error });
+    const accepted = await this.content(contentDirectory, specs, settings.value.generatedPages);
+    if (accepted.isErr()) {
+      return err({ kind: 'invalidContent', problems: accepted.error });
     }
 
     return ok({
@@ -108,7 +107,7 @@ export class PortalSourceContext {
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
-      contentNotices: content.value
+      contentNotices: accepted.value.notices
     });
   }
 
@@ -119,7 +118,7 @@ export class PortalSourceContext {
   public async resolveContent(
     specs: PortalSpec[],
     generatedPages: GeneratedPages
-  ): Promise<Result<ContentNotices, ContentProblem[]>> {
+  ): Promise<Result<AcceptedContent, ContentProblem[]>> {
     return await this.content(await this.existingContentDirectory(), specs, generatedPages);
   }
 
@@ -132,7 +131,7 @@ export class PortalSourceContext {
     contentDirectory: DirectoryPath | null,
     specs: PortalSpec[],
     generatedPages: GeneratedPages
-  ): Promise<Result<ContentNotices, ContentProblem[]>> {
+  ): Promise<Result<AcceptedContent, ContentProblem[]>> {
     // Walked once, and every check reads the one tree: `getDirectory` stats every entry in it.
     // Not swallowed: a tree that cannot be walked would otherwise pass as one with no files,
     // and a `nav.json` in it would go unvalidated to a build that drops bad entries silently.
@@ -151,7 +150,14 @@ export class PortalSourceContext {
       pages: await this.read(content.pages()),
       navigationFiles: await this.read(content.navigationFiles())
     };
-    return await content.check(read, specs, generatedPages);
+    const checked = await content.check(read, specs, generatedPages);
+    return checked.map((notices) => ({
+      notices,
+      // Each was read, or the check would have refused the page it could not.
+      files: [...read.pages, ...read.navigationFiles].flatMap(({ file, contents }) =>
+        contents === undefined ? [] : [{ file, contents }]
+      )
+    }));
   }
 
   // A file that cannot be read is reported by the check rather than thrown out of `resolve`.

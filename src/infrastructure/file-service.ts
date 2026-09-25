@@ -315,6 +315,23 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
+  /**
+   * Copies unless the destination has the source's size and time of change, which the copy keeps,
+   * so a watcher of the destination hears of nothing that did not change. Whole milliseconds are
+   * compared, since that is all a copied time keeps.
+   */
+  public async copyIfChanged(source: FilePath, destination: FilePath): Promise<boolean> {
+    const [from, to] = await Promise.all([
+      fsExtra.stat(source.toString()),
+      fsExtra.stat(destination.toString()).catch(() => undefined)
+    ]);
+    if (to !== undefined && to.size === from.size && Math.trunc(to.mtimeMs) === Math.trunc(from.mtimeMs)) {
+      return false;
+    }
+    await fsExtra.copy(source.toString(), destination.toString(), { preserveTimestamps: true });
+    return true;
+  }
+
   public async copyToDir(source: FilePath, destination: DirectoryPath) {
     await fsExtra.copyFile(source.toString(), source.replaceDirectory(destination).toString());
   }
