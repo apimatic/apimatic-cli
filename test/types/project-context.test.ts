@@ -23,7 +23,7 @@ describe('ProjectContext.upsertGitignore', () => {
   it('writes the generated paths into a project that has no gitignore', async () => {
     await ignore();
 
-    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/plugin/']);
+    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/sdk/', '/portal/', '/plugin/']);
   });
 
   // `plugin publish` turns /plugin into its own repository; a parent tracking it would nest one
@@ -49,7 +49,7 @@ describe('ProjectContext.upsertGitignore', () => {
 
     await ignore();
 
-    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['node_modules/', '/plugin/']);
+    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['node_modules/', '/sdk/', '/portal/', '/plugin/']);
   });
 
   // Re-running quickstart in an adopted project must not stack duplicates.
@@ -67,6 +67,6 @@ describe('ProjectContext.upsertGitignore', () => {
 
     await ignore();
 
-    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/plugin/']);
+    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/plugin/', '/sdk/', '/portal/']);
   });
 });

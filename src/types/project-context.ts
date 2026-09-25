@@ -6,16 +6,13 @@ import { FilePath } from './file/filePath.js';
 const GITIGNORE = '.gitignore';
 
 /**
- * What the CLI generates into a project, which a repository should not carry.
- *
- * Only `/plugin/` now. The SDK and plugin archives a portal offers as downloads are built into
- * the throwaway project the portal is compiled from, and leave with it; they were written into
- * `src/static/` when quickstart first learned to ignore them.
+ * What the CLI generates into a project, which a repository should not carry: where
+ * `sdk generate`, `portal generate` and `plugin generate` write by default.
  *
  * `/plugin/` matters most. `plugin publish` runs `git init` inside that directory and pushes it
  * as its own repository, so a parent tracking it would nest one repository inside another.
  */
-const GENERATED: readonly string[] = ['/plugin/'];
+const GENERATED: readonly string[] = ['/sdk/', '/portal/', '/plugin/'];
 
 export class ProjectContext {
   private readonly fileService = new FileService();
