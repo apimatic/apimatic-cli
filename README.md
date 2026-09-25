@@ -54,12 +54,13 @@ Documentation portals are now built on your machine from a `src/` directory, and
   it. Each folder the file lists becomes a tab of its own after Home, in the file's order,
   and so do the tabs the CLI makes, placed with `apimatic:sdks`, `apimatic:plugin` and
   `apimatic:api`.
-- The SDKs tab lists a card per language in the `languages` block, offering its download, and
-  its source repository and package once `sdk publish` records them, and gives each language a
-  page carrying its SDK's getting-started docs. The Context Plugin tab, with the plugin's install
-  command, appears when there is a `plugin` block, or a `pluginUrl` in the `portal` block for a
-  plugin hosted elsewhere. Their addresses, `/sdks` and `/context-plugin`, are kept for them, so
-  a page in `src/content/` that would be served there is refused.
+- The SDKs tab lists a card per language in the `languages` block, offering its download and,
+  once `sdk publish` records a release, its install command, source repository and package, and
+  gives each language a page carrying its SDK's getting-started docs. The Context Plugin tab,
+  with the plugin's install command, appears when there is a `plugin` block, or a `pluginUrl` in
+  the `portal` block for a plugin hosted elsewhere. Their addresses, `/sdks` and
+  `/context-plugin`, are kept for them, so a page in `src/content/` that would be served there
+  is refused.
 - `portal toc new`, `portal recipe new` and `portal copilot` are gone, and `portal serve` no
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
