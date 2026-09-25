@@ -34,7 +34,7 @@ export class PluginRecordMetadataAction {
     this.authKey = authKey;
   }
 
-  public readonly execute = async (buildDirectory: DirectoryPath): Promise<ActionResult<PluginConfig>> => {
+  public readonly execute = async (sourceDirectory: DirectoryPath): Promise<ActionResult<PluginConfig>> => {
     const input = await this.prompts.inputPluginMetadata(DEFAULT_METADATA);
     if ('cancelled' in input) {
       this.prompts.metadataCancelled(input.cancelled);
@@ -50,7 +50,7 @@ export class PluginRecordMetadataAction {
     }
 
     const author = account.isOk() ? authorOf(account.value) : undefined;
-    const writeResult = await new PluginConfigContext(buildDirectory).upsertMetadata(metadata, author);
+    const writeResult = await new PluginConfigContext(sourceDirectory).upsertMetadata(metadata, author);
     if (writeResult.isErr()) {
       switch (writeResult.error) {
         case 'unreadable':

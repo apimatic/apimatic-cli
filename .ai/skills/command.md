@@ -202,7 +202,7 @@ export default class {PascalName} extends Command {
     //
     // For DirectoryPath input:
     //   const workingDirectory = DirectoryPath.createInput(input);
-    //   const buildDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
+    //   const sourceDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
     //   const outputDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("{artifact}");
     //
     // For ResourceInput:
@@ -264,9 +264,9 @@ export class {PascalName}Action {
     /* parameters matching what Command passes */
   ): Promise<ActionResult> => {
     // 1. Input validation via Context objects
-    //    const buildContext = new BuildContext(buildDirectory);
+    //    const buildContext = new BuildContext(sourceDirectory);
     //    if (!(await buildContext.validate())) {
-    //      this.prompts.directoryEmpty(buildDirectory);
+    //      this.prompts.directoryEmpty(sourceDirectory);
     //      return ActionResult.failed();
     //    }
 
@@ -280,7 +280,7 @@ export class {PascalName}Action {
     // 3. Business logic (wrap in withDirPath if temp dirs needed)
     //    return await withDirPath(async (tempDirectory) => {
     //      const tempContext = new TempContext(tempDirectory);
-    //      const zipPath = await tempContext.zip(buildDirectory);
+    //      const zipPath = await tempContext.zip(sourceDirectory);
     //
     //      const response = await this.prompts.spinnerMethod(
     //        this.someService.doSomething(zipPath, this.configDir, this.commandMetadata, this.authKey)

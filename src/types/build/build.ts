@@ -27,7 +27,7 @@ export class BuildConfig {
     return this.data.generateVersionedPortal != null;
   }
 
-  /** Directory holding the versioned builds, relative to the build directory. Defaults to "versioned_docs". */
+  /** Directory holding the versioned builds, relative to the source directory. Defaults to "versioned_docs". */
   public versionsPath(): string {
     return this.data.versionsPath ?? 'versioned_docs';
   }

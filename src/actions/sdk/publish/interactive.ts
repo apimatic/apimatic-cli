@@ -32,12 +32,12 @@ export class SdkPublishInteractiveAction {
       await this.prompts.noInputDirectoryProvided();
       return ActionResult.cancelled();
     }
-    const buildDirectory = workingDirectory.join('src');
+    const sourceDirectory = workingDirectory.join('src');
 
     const defaultSdkDirectory = workingDirectory.join('sdk');
     const sdkDirectory = await this.prompts.inputSdkDirectory(
       defaultSdkDirectory,
-      SdkPublishInteractiveAction.sdkDirectoryValidator(buildDirectory)
+      SdkPublishInteractiveAction.sdkDirectoryValidator(sourceDirectory)
     );
     if (!sdkDirectory) {
       await this.prompts.noSdkDirectoryProvided();
@@ -119,7 +119,7 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfileItem);
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
-      buildDirectory,
+      sourceDirectory,
       sdkDirectory,
       language,
       publishTypes,
@@ -142,7 +142,7 @@ export class SdkPublishInteractiveAction {
 
     if (await this.prompts.confirmRecordSdk()) {
       await new PluginRecordSdkAction().execute(
-        buildDirectory,
+        sourceDirectory,
         language,
         publishingProfile,
         publishTypes,
@@ -168,11 +168,11 @@ export class SdkPublishInteractiveAction {
   }
 
   public static sdkDirectoryValidator(
-    buildDirectory: DirectoryPath
+    sourceDirectory: DirectoryPath
   ): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
-      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(buildDirectory))
+      if (new DirectoryPath(removeQuotes(value.trim())).isEqual(sourceDirectory))
         return 'SDK directory must be different from the src directory.';
     };
   }
