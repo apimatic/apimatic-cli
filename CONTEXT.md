@@ -10,6 +10,10 @@ The command-line client that validates API specifications, generates SDKs, and b
 The user's `src/` directory — `apimatic.json`, `spec/`, `content/`, `static/` — taken as the input to every portal and SDK run, and never written to.
 _Avoid_: Project, workspace, source folder
 
+**Portal project**:
+The throwaway site assembled for one portal run from the portal template, the build directory and the portal artifacts, and discarded once the run ends.
+_Avoid_: Build directory, build project, build tree
+
 **Spec**:
 One API description in `spec/`, in any format APIMatic can transform (OpenAPI 3.x, Swagger, Postman Collections, RAML, API Blueprint, etc.), which becomes one section of reference pages in the portal.
 _Avoid_: Specification file, API definition
