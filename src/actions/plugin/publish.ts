@@ -8,10 +8,10 @@ export class PluginPublishAction {
   private readonly prompts: PluginPublishPrompts = new PluginPublishPrompts();
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     pluginDirectory: DirectoryPath
   ): Promise<ActionResult> => {
-    if (buildDirectory.isEqual(pluginDirectory)) {
+    if (sourceDirectory.isEqual(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
       return ActionResult.failed();
     }
@@ -22,14 +22,14 @@ export class PluginPublishAction {
       return ActionResult.failed();
     }
 
-    const configState = await new PluginConfigContext(buildDirectory).getPluginConfigState();
+    const configState = await new PluginConfigContext(sourceDirectory).getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
       return ActionResult.failed();
     }
 
     if (configState.state === 'missing') {
-      this.prompts.pluginConfigMissing(buildDirectory);
+      this.prompts.pluginConfigMissing(sourceDirectory);
       return ActionResult.failed();
     }
 

@@ -16,9 +16,9 @@ export class TempContext {
     return new FilePath(this.tempDirectory, new FileName(`${uuid}`));
   }
 
-  public async zip(buildDirectory: DirectoryPath): Promise<FilePath> {
+  public async zip(directory: DirectoryPath): Promise<FilePath> {
     const tempFile = this.getTempFileName;
-    await this.zipService.archive(buildDirectory, tempFile);
+    await this.zipService.archive(directory, tempFile);
     return tempFile;
   }
 

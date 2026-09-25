@@ -13,14 +13,14 @@ export class SaveChangesAction {
 
   public readonly execute = async (
     workingDirectory: DirectoryPath,
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     sdkDirectory: DirectoryPath | undefined,
     language: Language,
     apiVersion?: string
   ): Promise<ActionResult> => {
-    const rootBuildContext = new BuildContext(buildDirectory);
+    const rootBuildContext = new BuildContext(sourceDirectory);
     if (!(await rootBuildContext.exists())) {
-      this.prompts.srcDirectoryEmpty(buildDirectory);
+      this.prompts.sourceDirectoryEmpty(sourceDirectory);
       return ActionResult.failed();
     }
 
@@ -30,31 +30,31 @@ export class SaveChangesAction {
         return { version: undefined, buildContext: rootBuildContext };
       }
 
-      const versionedBuildDirectory = await rootBuildContext.getVersionedBuildDirectory();
-      if (!versionedBuildDirectory) {
-        this.prompts.invalidVersionedDocsDirectory(buildDirectory);
+      const versionedSourceDirectory = await rootBuildContext.getVersionedSourceDirectory();
+      if (!versionedSourceDirectory) {
+        this.prompts.invalidVersionedDocsDirectory(sourceDirectory);
         return ActionResult.failed();
       }
 
-      const singleVersionedBuildDirectory = await rootBuildContext.getSingleVersionedBuildDirectory();
-      if (!apiVersion && singleVersionedBuildDirectory) {
+      const singleVersionedSourceDirectory = await rootBuildContext.getSingleVersionedSourceDirectory();
+      if (!apiVersion && singleVersionedSourceDirectory) {
         return {
-          version: singleVersionedBuildDirectory.leafName(),
-          buildContext: new BuildContext(singleVersionedBuildDirectory)
+          version: singleVersionedSourceDirectory.leafName(),
+          buildContext: new BuildContext(singleVersionedSourceDirectory)
         };
       }
 
-      const selectedVersionedBuildDirectory = await rootBuildContext.getSelectedVersionedBuildDirectory(
+      const selectedVersionedSourceDirectory = await rootBuildContext.getSelectedVersionedSourceDirectory(
         apiVersion ? async () => apiVersion : this.prompts.selectVersion
       );
-      if (!selectedVersionedBuildDirectory) {
+      if (!selectedVersionedSourceDirectory) {
         this.prompts.versionNotFound();
         return ActionResult.failed();
       }
 
       return {
-        version: selectedVersionedBuildDirectory.leafName(),
-        buildContext: new BuildContext(selectedVersionedBuildDirectory)
+        version: selectedVersionedSourceDirectory.leafName(),
+        buildContext: new BuildContext(selectedVersionedSourceDirectory)
       };
     };
     

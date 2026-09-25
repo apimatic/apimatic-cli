@@ -8,30 +8,30 @@ import { TempContext } from './temp-context.js';
 
 export class BuildContext {
   private readonly fileService = new FileService();
-  private readonly buildDirectory: DirectoryPath;
+  private readonly sourceDirectory: DirectoryPath;
 
-  constructor(buildDirectory: DirectoryPath) {
-    this.buildDirectory = buildDirectory;
+  constructor(sourceDirectory: DirectoryPath) {
+    this.sourceDirectory = sourceDirectory;
   }
 
   private get buildFile(): FilePath {
     // TODO: add checks for build file path
-    return new FilePath(this.buildDirectory, new FileName('APIMATIC-BUILD.json'));
+    return new FilePath(this.sourceDirectory, new FileName('APIMATIC-BUILD.json'));
   }
 
   public async validate(): Promise<boolean> {
     // TODO: add more checks here
-    if (!(await this.fileService.directoryExists(this.buildDirectory))) return false;
+    if (!(await this.fileService.directoryExists(this.sourceDirectory))) return false;
 
     return await this.fileService.fileExists(this.buildFile);
   }
 
   public async exists(): Promise<boolean> {
-    return await this.fileService.directoryExists(this.buildDirectory);
+    return await this.fileService.directoryExists(this.sourceDirectory);
   }
 
   public existsSync(): boolean {
-    return this.fileService.directoryExistsSync(this.buildDirectory);
+    return this.fileService.directoryExistsSync(this.sourceDirectory);
   }
 
   public async getBuildFileContents(): Promise<BuildConfig> {
@@ -41,20 +41,20 @@ export class BuildContext {
 
   public async getBuildZipPath(tempDir: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {
     const tempContext = new TempContext(tempDir);
-    const tempBuildDir = tempDir.join('build');
-    await this.fileService.copyDirectoryContents(this.buildDirectory, tempBuildDir);
+    const stagedSourceDirectory = tempDir.join('build');
+    await this.fileService.copyDirectoryContents(this.sourceDirectory, stagedSourceDirectory);
     if (packageSettingsDirectory) {
-      await this.fileService.copyDirectoryContents(packageSettingsDirectory, tempBuildDir.join('package-settings'));
+      await this.fileService.copyDirectoryContents(packageSettingsDirectory, stagedSourceDirectory.join('package-settings'));
     }
-    return await tempContext.zip(tempBuildDir);
+    return await tempContext.zip(stagedSourceDirectory);
   }
 
   public getSpecContext(): SpecContext {
-    return new SpecContext(this.buildDirectory.join('spec'));
+    return new SpecContext(this.sourceDirectory.join('spec'));
   }
 
   public async hasSdkSourceTree(language: string): Promise<boolean> {
-    const sourceTreePath = FilePath.create(this.buildDirectory.join('sdk-source-tree').join(`.${language}`).toString());
+    const sourceTreePath = FilePath.create(this.sourceDirectory.join('sdk-source-tree').join(`.${language}`).toString());
     if (!sourceTreePath) {
       return false;
     }
@@ -62,7 +62,7 @@ export class BuildContext {
   }
 
   public getSdkSourceTree(language: string): FilePath {
-    return FilePath.create(this.buildDirectory.join('sdk-source-tree').join(`.${language}`).toString())!;
+    return FilePath.create(this.sourceDirectory.join('sdk-source-tree').join(`.${language}`).toString())!;
   }
 
   public async isVersionedBuild(): Promise<boolean> {
@@ -72,12 +72,12 @@ export class BuildContext {
     return (await this.getBuildFileContents()).isVersioned();
   }
 
-  public async getVersionedBuildDirectory(): Promise<DirectoryPath | undefined> {
+  public async getVersionedSourceDirectory(): Promise<DirectoryPath | undefined> {
     const buildConfig = await this.getBuildFileContents();
     if (!buildConfig.isVersioned()) {
       return undefined;
     }
-    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
+    const versionsDirectory = this.sourceDirectory.join(buildConfig.versionsPath());
     if (!(await this.fileService.directoryExists(versionsDirectory))) {
       return undefined;
     }
@@ -85,12 +85,12 @@ export class BuildContext {
     return versionsDirs.length > 0 ? versionsDirectory : undefined;
   }
 
-  public async getSingleVersionedBuildDirectory(): Promise<DirectoryPath | undefined> {
+  public async getSingleVersionedSourceDirectory(): Promise<DirectoryPath | undefined> {
     const buildConfig = await this.getBuildFileContents();
     if (!buildConfig.isVersioned()) {
       return undefined;
     }
-    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
+    const versionsDirectory = this.sourceDirectory.join(buildConfig.versionsPath());
     if (!(await this.fileService.directoryExists(versionsDirectory))) {
       return undefined;
     }
@@ -98,14 +98,14 @@ export class BuildContext {
     return versionsDirs.length === 1 ? versionsDirs[0] : undefined;
   }
 
-  public async getSelectedVersionedBuildDirectory(
+  public async getSelectedVersionedSourceDirectory(
     versionSelector: (versions: string[]) => Promise<string | undefined>
   ): Promise<DirectoryPath | undefined> {
     const buildConfig = await this.getBuildFileContents();
     if (!buildConfig.isVersioned()) {
       return undefined;
     }
-    const versionsDirectory = this.buildDirectory.join(buildConfig.versionsPath());
+    const versionsDirectory = this.sourceDirectory.join(buildConfig.versionsPath());
     if (!(await this.fileService.directoryExists(versionsDirectory))) {
       return undefined;
     }

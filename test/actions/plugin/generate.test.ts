@@ -27,7 +27,7 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shel
 
 describe('PluginGenerateAction', () => {
   let tmpDirResult: DirectoryResult;
-  let buildDirectory: string;
+  let sourceDirectory: string;
   let pluginDirectory: string;
   let action: PluginGenerateAction;
 
@@ -43,7 +43,7 @@ describe('PluginGenerateAction', () => {
   const PLUGIN = { pluginId: 'acme-payments', pluginName: 'Acme Payments' };
   const LANGUAGES = { csharp: { publishing: { source: { repositoryUrl: 'https://github.com/acme/acme-csharp' } } } };
 
-  const configPath = () => path.join(buildDirectory, 'apimatic.json');
+  const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   const writeConfig = (config: object) => fsExtra.writeJson(configPath(), config);
   const writtenConfig = () => fsExtra.readJsonSync(configPath());
 
@@ -51,7 +51,7 @@ describe('PluginGenerateAction', () => {
   const uploadedConfig = () => JSON.parse(uploaded['apimatic.json']);
 
   const execute = (force = false) =>
-    action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(pluginDirectory), force);
+    action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(pluginDirectory), force);
 
   // The action expands what the service returns, so the stubbed payload has to be a genuine zip.
   // The upload is read while the stub runs: the temporary directory it sits in is gone once the
@@ -70,7 +70,7 @@ describe('PluginGenerateAction', () => {
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     const workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
-    buildDirectory = path.join(workingDirectory, 'src');
+    sourceDirectory = path.join(workingDirectory, 'src');
     pluginDirectory = path.join(workingDirectory, 'plugin');
     uploaded = {};
     const archiveSource = path.join(tmpDirResult.path, 'archive-source');
@@ -80,8 +80,8 @@ describe('PluginGenerateAction', () => {
     await new ZipService().archive(new DirectoryPath(archiveSource), archivePath);
     pluginArchive = await fsExtra.readFile(archivePath.toString());
 
-    await fsExtra.ensureDir(buildDirectory);
-    await fsExtra.writeJson(path.join(buildDirectory, 'APIMATIC-BUILD.json'), {});
+    await fsExtra.ensureDir(sourceDirectory);
+    await fsExtra.writeJson(path.join(sourceDirectory, 'APIMATIC-BUILD.json'), {});
     await writeConfig({ plugin: PLUGIN, languages: LANGUAGES });
 
     // The spinner would render to stdout; pass the underlying promise straight through.
@@ -107,7 +107,7 @@ describe('PluginGenerateAction', () => {
     it('fails when the build and plugin directories are the same', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
-      const result = await action.execute(new DirectoryPath(buildDirectory), new DirectoryPath(buildDirectory), false);
+      const result = await action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(sourceDirectory), false);
 
       expect(result.isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
@@ -115,7 +115,7 @@ describe('PluginGenerateAction', () => {
 
     it('fails when the src directory does not exist', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
-      await fsExtra.remove(buildDirectory);
+      await fsExtra.remove(sourceDirectory);
 
       expect((await execute()).isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;
@@ -123,7 +123,7 @@ describe('PluginGenerateAction', () => {
 
     it('generates without an APIMATIC-BUILD.json, which only portal and v3 SDK builds need', async () => {
       const generatePlugin = generated();
-      await fsExtra.remove(path.join(buildDirectory, 'APIMATIC-BUILD.json'));
+      await fsExtra.remove(path.join(sourceDirectory, 'APIMATIC-BUILD.json'));
 
       expect((await execute()).isSuccess()).to.be.true;
       expect(generatePlugin.called).to.be.true;
@@ -187,7 +187,7 @@ describe('PluginGenerateAction', () => {
       await execute();
 
       expect(uploaded).to.not.have.property('plugin-config.json');
-      expect(fsExtra.existsSync(path.join(buildDirectory, 'plugin-config.json'))).to.be.false;
+      expect(fsExtra.existsSync(path.join(sourceDirectory, 'plugin-config.json'))).to.be.false;
     });
 
     // The CLI reads past a mark an editor left at the front of the file, but the server parses

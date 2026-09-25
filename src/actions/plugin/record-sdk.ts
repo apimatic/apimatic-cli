@@ -16,7 +16,7 @@ export class PluginRecordSdkAction {
   private readonly prompts: PluginRecordSdkPrompts = new PluginRecordSdkPrompts();
 
   public readonly execute = async (
-    buildDirectory: DirectoryPath,
+    sourceDirectory: DirectoryPath,
     language: Language,
     publishingProfile: PublishingProfile,
     publishTypes: PublishType[],
@@ -35,7 +35,7 @@ export class PluginRecordSdkAction {
       publishTypes.includes(PublishType.PackagePublishing) ? packageVersion : undefined
     );
 
-    const pluginConfigContext = new PluginConfigContext(buildDirectory);
+    const pluginConfigContext = new PluginConfigContext(sourceDirectory);
     const configState = await pluginConfigContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason);

@@ -157,9 +157,9 @@ export class {PascalName}Action {
     */
   ): Promise<ActionResult> => {
     // 1. Input validation via Context objects
-    //    const buildContext = new BuildContext(buildDirectory);
+    //    const buildContext = new BuildContext(sourceDirectory);
     //    if (!(await buildContext.validate())) {
-    //      this.prompts.invalidBuildDirectory(buildDirectory);
+    //      this.prompts.invalidSourceDirectory(sourceDirectory);
     //      return ActionResult.failed();
     //    }
 
