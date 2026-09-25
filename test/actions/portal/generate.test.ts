@@ -155,6 +155,18 @@ describe('GenerateAction', () => {
     expect(build.called).to.be.false;
   });
 
+  it('reports a source problem before asking to overwrite the destination', async () => {
+    writeOldPortal();
+    const empty = new DirectoryPath(root).join('empty');
+    fs.mkdirSync(empty.toString());
+
+    const result = await execute(empty);
+
+    expect(result.isFailed()).to.be.true;
+    expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
+    expect(prompts.overwritePortal.called).to.be.false;
+  });
+
   it('asks before overwriting a destination that is not empty, and stops when declined', async () => {
     writeOldPortal();
     prompts.overwritePortal.resolves(false);

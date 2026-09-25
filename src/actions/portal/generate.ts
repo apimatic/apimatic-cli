@@ -58,14 +58,15 @@ export class GenerateAction {
     }
 
     const portalContext = new PortalContext(portalDirectory);
-    if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
-      this.prompts.portalDirectoryNotEmpty();
-      return ActionResult.cancelled();
-    }
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
       async (project) => {
+        if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
+          this.prompts.portalDirectoryNotEmpty();
+          return ActionResult.cancelled();
+        }
+
         const build = await this.prompts.buildPortal(this.buildService.build(project));
 
         if (build.isErr()) {
