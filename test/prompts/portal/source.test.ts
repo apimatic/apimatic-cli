@@ -3,7 +3,12 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
-import { reportFolderTabs, reportSharedTabNames, reportSourceProblem } from '../../../src/prompts/portal/source.js';
+import {
+  reportFolderTabs,
+  reportShadowedFiles,
+  reportSharedTabNames,
+  reportSourceProblem
+} from '../../../src/prompts/portal/source.js';
 import { ContentProblem } from '../../../src/types/portal/portal-source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
@@ -231,6 +236,34 @@ describe('reportSourceProblem', () => {
     expect(headings[0]).to.match(/^The front matter of pages in .+ would fail the build:$/);
     expect(headings[1]).to.match(/^The page order in .+ could not be applied:$/);
     expect(printed()).to.contain("  • content/nav.json: 'missing' is not a page or folder in this directory.");
+  });
+});
+
+describe('reportShadowedFiles', () => {
+  let warn: sinon.SinonStub;
+
+  beforeEach(() => {
+    warn = sinon.stub(log, 'warn');
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  const printed = () => stripVTControlCharacters(String(warn.firstCall.args[0]));
+
+  it('names one file that replaces a generated one', () => {
+    reportShadowedFiles([new FileName('robots.txt')]);
+
+    expect(printed()).to.equal("'robots.txt' in 'static' replaces the file the portal would have generated.");
+  });
+
+  it('lists the files that replace generated ones as a sentence would', () => {
+    reportShadowedFiles([new FileName('robots.txt'), new FileName('sitemap.xml'), new FileName('llms.txt')]);
+
+    expect(printed()).to.equal(
+      "'robots.txt', 'sitemap.xml' and 'llms.txt' in 'static' replace the files the portal would have generated."
+    );
   });
 });
 

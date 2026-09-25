@@ -71,14 +71,14 @@ describe('PortalLanguages', () => {
   // Only three languages can be generated for today; the rest are named as coming, not as typos.
   it('refuses a language that is not available yet, naming the ones that are', () => {
     expect(read({ languages: { typescript: {}, java: {}, go: {} } })._unsafeUnwrapErr()).to.deep.equal([
-      "'languages.java' is not available yet; the portal supports 'csharp', 'typescript', 'python' today.",
-      "'languages.go' is not available yet; the portal supports 'csharp', 'typescript', 'python' today."
+      "'languages.java' is not available yet; the portal supports 'csharp', 'typescript' and 'python' today.",
+      "'languages.go' is not available yet; the portal supports 'csharp', 'typescript' and 'python' today."
     ]);
   });
 
   it('refuses a key that is no SDK language, naming the ones it could be', () => {
     expect(read({ languages: { typescipt: {} } })._unsafeUnwrapErr()).to.deep.equal([
-      "'languages.typescipt' is not an SDK language; name one of 'csharp', 'typescript', 'python'."
+      "'languages.typescipt' is not an SDK language; name one of 'csharp', 'typescript' or 'python'."
     ]);
   });
 

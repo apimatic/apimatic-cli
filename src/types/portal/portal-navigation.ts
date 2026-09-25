@@ -1,6 +1,6 @@
 import { err, ok, Result } from 'neverthrow';
 import { isJsonObject } from '../../utils/json-utils.js';
-import { listedInProse } from '../../utils/string-utils.js';
+import { quotedList } from './config/fields.js';
 import { GENERATED_SECTIONS, GeneratedSection } from './generated-pages.js';
 import { unknownFieldErrors } from './unknown-fields.js';
 
@@ -204,7 +204,7 @@ export class PortalNavigation {
     if (!TOKENS.includes(entry)) {
       return err(
         `${context.label}: '${entry}' is not a ${NAVIGATION_FILE_NAME} token. ` +
-          `The tokens are ${listedInProse(TOKENS.map((token) => `'${token}'`))}.`
+          `The tokens are ${quotedList(TOKENS)}.`
       );
     }
 
@@ -270,7 +270,7 @@ export class PortalNavigation {
 
   private static describeUnknownField(field: string, context: NavigationContext): string {
     // Listed from the same set the check uses, so a setting added later is named here too.
-    const settings = listedInProse([...KNOWN_FIELDS].map((name) => `'${name}'`));
+    const settings = quotedList([...KNOWN_FIELDS]);
     return `${context.label}: '${field}' is not a ${NAVIGATION_FILE_NAME} setting. The settings are ${settings}.`;
   }
 

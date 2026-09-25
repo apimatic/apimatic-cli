@@ -303,7 +303,7 @@ describe('PortalConfig', () => {
           .mode()
       ).to.equal('dark');
       expect(errorsOf({ brand: { colorMode: 'auto' } })).to.deep.equal([
-        "'portal.brand.colorMode' must be one of 'light', 'dark', 'both'."
+        "'portal.brand.colorMode' must be one of 'light', 'dark' or 'both'."
       ]);
     });
   });

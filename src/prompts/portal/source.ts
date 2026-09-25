@@ -188,15 +188,16 @@ export function reportShadowedFiles(shadowed: FileName[]): void {
   if (shadowed.length === 0) {
     return;
   }
-  const names = shadowed.map((fileName) => f.var(fileName.toString())).join(', ');
-  log.warn(`${names} in ${f.var('static')} replaces the file the portal would have generated.`);
+  const names = listedInProse(shadowed.map((fileName) => f.var(fileName.toString())));
+  const replaces = shadowed.length === 1 ? 'replaces the file' : 'replace the files';
+  log.warn(`${names} in ${f.var('static')} ${replaces} the portal would have generated.`);
 }
 
 export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath): void {
   if (files.length === 0) {
     return;
   }
-  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
+  const names = listedInProse(files.map((file) => f.var(file.relativeTo(sourceDirectory))));
   const verb = files.length === 1 ? 'is' : 'are';
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
@@ -253,7 +254,7 @@ export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryP
   if (files.length === 0) {
     return;
   }
-  const names = files.map((file) => f.var(file.relativeTo(sourceDirectory))).join(', ');
+  const names = listedInProse(files.map((file) => f.var(file.relativeTo(sourceDirectory))));
   const [verb, pronoun] = files.length === 1 ? ['sits', 'it'] : ['sit', 'them'];
   log.warn(
     `${names} ${verb} inside a specification's section under ${f.var('content/api')}, which lists only ` +
