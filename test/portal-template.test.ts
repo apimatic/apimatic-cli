@@ -3,7 +3,11 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { createRequire } from 'node:module';
 import { expect } from 'chai';
-import { GENERATED_DIRECTORY_NAME, TEMPLATE_DEPENDENCIES } from '../src/infrastructure/portal-project-service';
+import {
+  COPIED_DEPENDENCIES,
+  GENERATED_DIRECTORY_NAME,
+  TEMPLATE_DEPENDENCIES
+} from '../src/infrastructure/portal-project-service';
 import { PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
 import { PortalIdentity } from '../src/types/portal/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
@@ -17,9 +21,9 @@ const templateRoot = path.join(repositoryRoot, 'portal-template');
 const manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
 
 /** Every package specifier the template imports, from its modules and its stylesheet. */
-function templateImports(): string[] {
+function templateImports(files: RegExp = /\.(tsx?|css)$/): string[] {
   const specifiers: string[] = [];
-  for (const file of templateFiles().filter((name) => /\.(tsx?|css)$/.test(name))) {
+  for (const file of templateFiles().filter((name) => files.test(name))) {
     const source = fs.readFileSync(path.join(templateRoot, file), 'utf8');
     const patterns = file.endsWith('.css')
       ? [/@import\s+['"]([^'"]+)['"]/g]
@@ -46,30 +50,48 @@ function templateFiles(): string[] {
     .map((entry) => path.relative(templateRoot, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'));
 }
 
+/** Subpath exports such as `fumadocs-ui/mdx` resolve through their own package. */
+function packageNameOf(specifier: string): string {
+  return specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
+}
+
 /**
- * The template is built inside a temp project whose node_modules holds one link per entry in
- * TEMPLATE_DEPENDENCIES, not one per dependency the CLI declares. Anything unlinked still
+ * The template is built inside a temp project whose node_modules holds one package per entry in
+ * TEMPLATE_DEPENDENCIES, not one per dependency the CLI declares. Anything missing still
  * resolves here, where every package is installed, and fails only on a user's machine.
  */
 describe('portal template packaging', () => {
-  it('imports only packages the temp project links', () => {
-    const linked = new Set(TEMPLATE_DEPENDENCIES);
-    const offenders = new Set<string>();
+  it('imports only packages the temp project installs', () => {
+    const installed = new Set(TEMPLATE_DEPENDENCIES);
+    const offenders = new Set(
+      templateImports()
+        .map(packageNameOf)
+        .filter((name) => !installed.has(name))
+    );
 
-    for (const specifier of templateImports()) {
-      // Subpath exports such as `fumadocs-ui/mdx` resolve through their own package.
-      const packageName = specifier.startsWith('@')
-        ? specifier.split('/').slice(0, 2).join('/')
-        : specifier.split('/')[0];
-      if (!linked.has(packageName)) offenders.add(packageName);
-    }
-
-    expect([...offenders], 'template imports packages the temp project does not link').to.be.empty;
+    expect([...offenders], 'template imports packages the temp project does not install').to.be.empty;
   });
 
-  // The converse: a linked package that the CLI stops depending on would be missing at build
-  // time for everyone, with nothing here to notice.
-  it('links only packages the CLI declares as dependencies', () => {
+  // CI keeps the CLI and the build on one drive, where a linked `url()` still resolves, so only this catches it.
+  it('reaches no stylesheet with a url() through a linked package', () => {
+    const cssFiles = (name: string) =>
+      fs
+        .readdirSync(path.join(repositoryRoot, 'node_modules', name), { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.css'))
+        .map((entry) => path.join(entry.parentPath, entry.name));
+    const linked = new Set(templateImports(/\.css$/).map(packageNameOf));
+    for (const name of COPIED_DEPENDENCIES) linked.delete(name);
+
+    const offenders = [...linked].filter((name) =>
+      cssFiles(name).some((file) => fs.readFileSync(file, 'utf8').includes('url('))
+    );
+
+    expect(offenders, 'copy these into the project (COPIED_DEPENDENCIES) instead of linking them').to.be.empty;
+  });
+
+  // The converse: a package the CLI stops depending on would be missing at build time for
+  // everyone, with nothing here to notice.
+  it('installs only packages the CLI declares as dependencies', () => {
     const declared = new Set(Object.keys(manifest.dependencies));
 
     expect(TEMPLATE_DEPENDENCIES.filter((name) => !declared.has(name))).to.be.empty;

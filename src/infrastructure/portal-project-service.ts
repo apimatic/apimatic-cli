@@ -14,12 +14,14 @@ import { envInfo } from './env-info.js';
 import { FileService } from './file-service.js';
 import { PortalPagesService } from './portal-pages-service.js';
 
-// Linked one by one rather than through a single link to the CLI's `node_modules`: under a
-// pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
-// single link also lets Vite write its scratch files into the CLI's own install directory.
+// Copied, not linked: Tailwind rebases their `url()`s onto the project, and no relative path crosses drives.
+export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'];
+
+// The rest are linked one by one rather than through a single link to the CLI's `node_modules`:
+// under a pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and
+// a single link also lets Vite write its scratch files into the CLI's own install directory.
 export const TEMPLATE_DEPENDENCIES = [
-  '@fontsource-variable/geist',
-  '@fontsource-variable/geist-mono',
+  ...COPIED_DEPENDENCIES,
   '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',
@@ -39,9 +41,6 @@ export const TEMPLATE_DEPENDENCIES = [
   'tslib',
   'vite'
 ];
-
-// Copied, not linked: Tailwind rebases their `url()`s onto the project, and no relative path crosses drives.
-const COPIED_DEPENDENCIES = new Set(['@fontsource-variable/geist', '@fontsource-variable/geist-mono']);
 
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
 
@@ -171,8 +170,7 @@ export class PortalProjectService {
         continue;
       }
       const destination = modules.join(dependency);
-      if (COPIED_DEPENDENCIES.has(dependency)) {
-        await this.fileService.createDirectoryIfNotExists(destination);
+      if (COPIED_DEPENDENCIES.includes(dependency)) {
         await this.fileService.copyDirectoryContents(target, destination);
         continue;
       }
