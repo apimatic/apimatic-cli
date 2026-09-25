@@ -2,7 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
-import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, defaultStability, Language, Stability } from '../../types/sdk/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
@@ -71,8 +71,17 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
         stability,
         'auth-key': authKey,
         'api-version': apiVersion
-      }
+      },
+      metadata
     } = await this.parse(SdkGenerate);
+
+    // The flag's own default is the same string for every language, and v4 renders all three it
+    // can at beta: sending `stable` unasked is a refusal the caller did nothing to earn. What a
+    // caller typed is sent as typed; what they left alone is what the language actually offers.
+    const level =
+      metadata.flags.stability?.setFromDefault === true
+        ? defaultStability(language as Language)
+        : (stability as Stability);
 
     const workingDirectory = DirectoryPath.createInput(input);
     const buildDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
@@ -89,7 +98,7 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
       buildDirectory,
       sdkDirectory,
       language as Language,
-      stability as Stability,
+      level,
       force,
       zipSdk,
       apiVersion
