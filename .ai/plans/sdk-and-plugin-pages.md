@@ -75,7 +75,7 @@ primitives.
 | `pluginUrl` | `portal.pluginUrl`, exactly as asked: the first top-level key of `portal` outside its four namespaces (`site`, `brand`, `navigation`, `ai`). Optional, absolute, `https://` only. |
 | Plugin page condition | A `plugin` block **or** `portal.pluginUrl`. Either one creates the page (today only the block does). |
 | Plugin install address | `pluginUrl` when set; otherwise the fixed relative `/__downloads/plugin.zip`, where #361 places the bundled plugin. The backend skips generating and bundling the plugin when `pluginUrl` is set. |
-| Relative address | Resolved in the browser against `window.location.origin`, so it is right on any host (staging, previews, `portal serve`). The prerendered HTML and the `.md` twin use `siteUrl` when configured, else the relative path. |
+| Relative address | Resolved in the browser against `window.location.origin`, so it is right on any host (staging, previews, `portal serve`). The prerendered HTML uses `siteUrl` when configured, else the relative path. The `.md` twin prints the component's attribute as written, the relative path, since an absolute one there would also be what the browser installs from. *(Corrected 2026-09-25: this row first said the twin used `siteUrl` too.)* |
 | Install command | `npx` only, one copyable code block. |
 | Supported languages | The source directory's `languages`, in the block's order. They are all plugin languages now. |
 | Supported platforms | Claude Code, Cursor, GitHub Copilot, with their logos. Fixed in the template. |
