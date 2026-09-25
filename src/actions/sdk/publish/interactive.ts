@@ -21,12 +21,12 @@ export class SdkPublishInteractiveAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    defaultBuildDirectory: DirectoryPath,
+    defaultProjectDirectory: DirectoryPath,
     onPublishSdkError: (errorMessage: string) => void
   ): Promise<ActionResult> => {
     const workingDirectory = await this.prompts.inputWorkingDirectory(
-      defaultBuildDirectory,
-      SdkPublishInteractiveAction.workingDirectoryValidator(defaultBuildDirectory)
+      defaultProjectDirectory,
+      SdkPublishInteractiveAction.workingDirectoryValidator(defaultProjectDirectory)
     );
     if (!workingDirectory) {
       await this.prompts.noInputDirectoryProvided();
@@ -154,11 +154,11 @@ export class SdkPublishInteractiveAction {
   };
 
   public static workingDirectoryValidator(
-    defaultBuildDirectory: DirectoryPath
+    defaultProjectDirectory: DirectoryPath
   ): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) {
-        if (!new BuildContext(defaultBuildDirectory.join('src')).existsSync())
+        if (!new BuildContext(defaultProjectDirectory.join('src')).existsSync())
           return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
         return;
       }
