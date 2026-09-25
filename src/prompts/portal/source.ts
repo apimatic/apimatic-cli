@@ -64,11 +64,13 @@ function reportSpecConversion({ file, format, converted, others }: SpecConversio
     f.flag('file', f.relative(file)),
     f.flag('destination', f.relative(file.directory()))
   ]);
+  const convert = format === null ? `If ${name} is an API definition in another format, convert` : 'Convert';
+  const documents = others === 1 ? 'document' : `${others} documents`;
   log.message(
-    `${format === null ? `If ${name} is an API definition in another format, convert` : 'Convert'} it with:\n` +
+    `${convert} it with:\n` +
       `  ${command}\n` +
       `then move ${f.relativePath(converted)} up into ${specPath(sourceDirectory)}, which is the only folder read.` +
-      (others === 0 ? '' : ` Convert the other ${others === 1 ? 'document' : `${others} documents`} the same way.`)
+      (others === 0 ? '' : ` Convert the other ${documents} the same way.`)
   );
 }
 

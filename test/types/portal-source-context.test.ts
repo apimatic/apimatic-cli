@@ -439,9 +439,21 @@ describe('PortalSourceContext', () => {
       ]);
     });
 
-    it('names the first file when no document says what it is', async () => {
+    it('names a document that says nothing of its format ahead of any other file', async () => {
+      write('spec/README.md', '# Specs');
       write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
       write('spec/postman.json', JSON.stringify({ info: { schema: 'postman' }, item: [] }));
+
+      expect(await conversion()).to.deep.equal([
+        'spec/postman.json',
+        null,
+        'spec/transformations/postman_OpenApi3Yaml.yaml',
+        0
+      ]);
+    });
+
+    it('names the first file when nothing the portal reads is there', async () => {
+      write('spec/api.raml', '#%RAML 1.0\ntitle: Calc\n');
 
       expect(await conversion()).to.deep.equal([
         'spec/api.raml',

@@ -97,7 +97,6 @@ export interface SpecConversion {
   format: string | null;
   /** Where `api transform --destination` of `spec/` writes it, which is one folder too deep. */
   converted: FilePath;
-  /** How many more documents there are to convert the same way. */
   others: number;
 }
 

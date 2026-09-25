@@ -26,7 +26,8 @@ export function SdkCards({ children }: Readonly<{ children?: ReactNode }>) {
 export function SdkCard({ language, name, page, packageName, version, ...actions }: Readonly<SdkCardProps>) {
   const release = version ? `${packageName} · v${version.replace(/^v/i, '')}` : null;
   if (asMarkdown()) {
-    return [`- [${name}](${page})${release ? ` (${release})` : ''}: `, <SdkActions key="actions" {...actions} />];
+    const releaseNote = release ? ` (${release})` : '';
+    return [`- [${name}](${page})${releaseNote}: `, <SdkActions key="actions" {...actions} />];
   }
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-fd-card p-4 text-fd-card-foreground shadow-sm sm:flex-row sm:items-center sm:justify-between">

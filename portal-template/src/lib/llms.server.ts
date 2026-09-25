@@ -11,7 +11,7 @@ type ReferencePage = Extract<PortalPage, { type: 'openapi' }>;
 const index = llms(source);
 
 export async function renderPage(page: PortalPage): Promise<string> {
-  return page.type === 'openapi' ? renderReference(page, true) : await renderContent(page);
+  return await render(page, true);
 }
 
 export function renderIndex(): string {
@@ -20,10 +20,12 @@ export function renderIndex(): string {
 
 // The specifications stay out: each page's would repeat every schema it shares with the others.
 export async function renderFull(): Promise<string> {
-  const pages = await Promise.all(
-    source.getPages().map((page) => (page.type === 'openapi' ? renderReference(page, false) : renderContent(page)))
-  );
+  const pages = await Promise.all(source.getPages().map((page) => render(page, false)));
   return pages.join('\n\n');
+}
+
+async function render(page: PortalPage, withSpecification: boolean): Promise<string> {
+  return page.type === 'openapi' ? renderReference(page, withSpecification) : await renderContent(page);
 }
 
 export function renderHome(): string {

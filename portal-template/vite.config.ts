@@ -23,7 +23,7 @@ export default defineConfig(async () => {
       // `/images/logo.png` is read from the static directory, and a remote image is never fetched for its size.
       fumadocsMdx({
         globalOptions: {
-          mdxOptions: { remarkImageOptions: { publicDir: paths.staticDir ?? undefined, external: false } }
+          mdxOptions: { remarkImageOptions: { publicDir: publicDir || undefined, external: false } }
         }
       }),
       specReload(paths.specs),

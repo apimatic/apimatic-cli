@@ -145,6 +145,13 @@ describe('portal template packaging', () => {
     }
   });
 
+  // Named to Tailwind from `src/styles/`; a rename that missed it would cost every utility class in a page, silently.
+  it('has Tailwind scan the copy of the pages, by its relative name', () => {
+    const stylesheet = fs.readFileSync(path.join(templateRoot, 'src/styles/app.css'), 'utf8');
+
+    expect(stylesheet).to.contain(`@source '../../${CONTENT_COPY_DIRECTORY_NAME}';`);
+  });
+
   it('registers the plugin that reloads the generated pages under portal serve', () => {
     const config = fs.readFileSync(path.join(templateRoot, 'vite.config.ts'), 'utf8');
 

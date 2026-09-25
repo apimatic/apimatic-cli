@@ -434,9 +434,10 @@ export class PortalSourceContext {
 
     if (first === undefined) {
       const [convertible] = otherFormats;
+      // No document declares its format: one the portal would read, by extension, is named before any other file.
       const conversion =
         convertible === undefined
-          ? this.conversion(new FilePath(this.specDirectory, fileNames[0]), null, 0)
+          ? this.conversion(new FilePath(this.specDirectory, documentNames[0] ?? fileNames[0]), null, 0)
           : this.conversion(convertible.file, convertible.format, otherFormats.length - 1);
       return err({ kind: 'noOpenApiSpec', conversion });
     }
