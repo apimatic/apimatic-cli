@@ -104,11 +104,7 @@ export class ContentTree {
       .filter((file) => file.name().compare(NAVIGATION_FILE) === 0 && !this.isSkipped(file));
   }
 
-  /**
-   * Every problem the build would refuse the tree for, or what it accepts but the user should
-   * hear of. `pages` and `navigationFiles` hold what was read of the files named by the methods
-   * of the same names.
-   */
+  /** Every problem a build would refuse the tree for, or what it would warn of, from the files named above. */
   public async check(
     read: { pages: ContentFile[]; navigationFiles: ContentFile[] },
     specs: PortalSpec[],

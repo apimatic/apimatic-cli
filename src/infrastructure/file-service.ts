@@ -315,11 +315,7 @@ export class FileService {
     await fsExtra.copyFile(source.toString(), destination.toString());
   }
 
-  /**
-   * Copies unless the destination has the source's size and time of change, which the copy keeps,
-   * so a watcher of the destination hears of nothing that did not change. Whole milliseconds are
-   * compared, since that is all a copied time keeps.
-   */
+  /** Skipped when the destination has the source's size and time, to the millisecond a copy keeps. */
   public async copyIfChanged(source: FilePath, destination: FilePath): Promise<boolean> {
     const [from, to] = await Promise.all([
       fsExtra.stat(source.toString()),

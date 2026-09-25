@@ -328,10 +328,8 @@ export class PortalProjectService {
   }
 
   /**
-   * Brings the copy of `content/` that a project prepared with one reads in line with
-   * `contentDirectory`: the `checked` pages and `nav.json` files as the checks read them, since a
-   * save made after cannot have been checked, every other file as it is on disk, and nothing the
-   * source no longer has. Only what changed is written, so the dev server reloads only that.
+   * Brings the project's copy of `content/` in line: `checked` files as checked, since a later save went
+   * unchecked, the rest as on disk, nothing the source lost, and only what changed, so little reloads.
    */
   public async applyContent(
     projectDirectory: DirectoryPath,

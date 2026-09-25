@@ -204,11 +204,7 @@ export class PortalServeAction {
     );
   }
 
-  /**
-   * Held to the rules a build applies, as `apimatic.json` is: a save a build would refuse is
-   * reported as `portal generate` would report it, and the preview keeps what it last accepted.
-   * What a build would warn of is said on the save that brings it about.
-   */
+  /** Held to a build's rules, as `apimatic.json` is: a refused save is reported, and the preview kept as it was. */
   private watchContent(
     source: PortalSource,
     generatedPages: () => GeneratedPages,
@@ -267,8 +263,7 @@ export class PortalServeAction {
     handle: () => Promise<void>,
     report: { notWatched: (reason: string) => void; thrown: (reason: string) => void }
   ): FileWatch | undefined {
-    // The watch drops whatever its handler throws, so a fault no Result carries, such as a file
-    // turning unreadable mid-check, would otherwise leave the preview stale without a word.
+    // The watch drops whatever its handler throws, which would leave the preview stale without a word.
     const onChange = async () => {
       try {
         await handle();
