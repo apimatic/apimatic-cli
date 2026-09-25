@@ -2,6 +2,7 @@ import { log } from '@clack/prompts';
 import { once } from 'node:events';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { CONTENT, SPEC, STATIC } from '../../types/portal-source-context.js';
 import { UrlPath } from '../../types/file/urlPath.js';
 import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
@@ -50,7 +51,7 @@ export class PortalServePrompts {
     // without a word, which is why the note warns that a mistake typed later is ignored.
     noteWrapped(
       [
-        `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
+        `Edits to the Markdown pages in ${f.path(sourceDirectory.join(CONTENT))}, to the order and ` +
           `folder titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
             'apimatic.json'
           )} appear in the browser automatically, and so does a language removed from its ${f.var(
@@ -65,9 +66,9 @@ export class PortalServePrompts {
           `refuse is ignored here.`,
         '',
         `Adding a language or a ${f.var('plugin')} block, whose SDK or plugin is fetched when the preview ` +
-          `starts, adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
-            sourceDirectory.join('static')
-          )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+          `starts, adding or removing a page in ${f.path(sourceDirectory.join(CONTENT))}, creating ${f.path(
+            sourceDirectory.join(STATIC)
+          )}, or changing which documents are in ${f.path(sourceDirectory.join(SPEC))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),
@@ -101,7 +102,7 @@ export class PortalServePrompts {
   /** Vite reads its public directory once, and a missing one is served as none. */
   public staticDirectoryNotServed(sourceDirectory: DirectoryPath) {
     const message =
-      `${f.path(sourceDirectory.join('static'))} did not exist when the preview started, so the files ` +
+      `${f.path(sourceDirectory.join(STATIC))} did not exist when the preview started, so the files ` +
       `in it are not served. Restart the preview to show them.`;
     log.warn(message);
   }

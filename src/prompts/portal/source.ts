@@ -1,6 +1,7 @@
 import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { CONTENT, SPEC } from '../../types/portal-source-context.js';
 import { PortalSourceProblem, ReservedAddressPage } from '../../types/portal/portal-source.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
@@ -50,7 +51,7 @@ export function reportSourceProblem(
     }
     case 'unreadableContent': {
       log.error(
-        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
+        `${f.path(sourceDirectory.join(CONTENT))} could not be read. Check that it and every ` +
           `directory beneath it can be listed.`
       );
       return;
@@ -89,14 +90,14 @@ export function reportSourceProblem(
     }
     case 'emptySpecDirectory': {
       const message =
-        `${f.path(sourceDirectory.join('spec'))} has no files. Add your OpenAPI 3.x document to it as a ` +
+        `${f.path(sourceDirectory.join(SPEC))} has no files. Add your OpenAPI 3.x document to it as a ` +
         `${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
       log.error(message);
       return;
     }
     case 'noOpenApiSpec': {
       const message =
-        `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join('spec'))}. ` + convertToOpenApi3();
+        `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join(SPEC))}. ` + convertToOpenApi3();
       log.error(message);
       return;
     }
