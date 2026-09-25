@@ -77,6 +77,6 @@ export type PortalSourceProblem =
   | { kind: 'reservedAddresses'; pages: ReservedAddressPage[] }
   | { kind: 'unreadableContent' }
   | { kind: 'unreadableSpec'; fileName: FileName }
-  | { kind: 'unsupportedSpec'; fileName: FileName; format: string }
-  | { kind: 'noSpecs' }
+  | { kind: 'emptySpecDirectory' }
+  | { kind: 'noOpenApiSpec' }
   | { kind: 'missingStaticFiles'; files: MissingStaticFile[] };

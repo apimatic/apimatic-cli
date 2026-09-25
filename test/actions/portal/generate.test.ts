@@ -8,26 +8,34 @@ import { GenerateAction } from '../../../src/actions/portal/generate';
 import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
-import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
-import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
+import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
+import { CodeSampleCatalog, CodeSampleCatalogs } from '../../../src/types/portal/code-samples';
+import { Language } from '../../../src/types/sdk/generate';
 import { FileService } from '../../../src/infrastructure/file-service';
+import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
-import { FileName } from '../../../src/types/file/fileName';
-import { FilePath } from '../../../src/types/file/filePath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
+import { stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
 const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
 
+/** The catalogs the merged fixture expects, read the way the service reads them. */
+const samplesFromFixture = (): CodeSampleCatalogs => {
+  const json = JSON.parse(fs.readFileSync('test/resources/code-samples.json', 'utf8')) as Record<string, unknown>;
+  return new CodeSampleCatalogs(
+    Object.entries(json).map(([language, catalog]) => CodeSampleCatalog.fromJson(language as Language, catalog)!)
+  );
+};
+
 describe('GenerateAction', () => {
   let root: string;
   let portalDirectory: DirectoryPath;
   let prompts: sinon.SinonStubbedInstance<PortalGeneratePrompts>;
-  let runtimeProblem: sinon.SinonStub;
+  let shared: ReturnType<typeof stubPreparePortalProject>;
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
-  let prepare: sinon.SinonStub;
 
   const execute = (source = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
@@ -54,19 +62,14 @@ describe('GenerateAction', () => {
     fs.writeFileSync(path.join(builtSite.toString(), 'index.html'), '<html></html>');
     fs.writeFileSync(path.join(builtSite.toString(), '_shell.html'), '<html></html>');
 
+    shared = stubPreparePortalProject();
+
     prompts = sinon.stub(PortalGeneratePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.buildPortal.callsFake((fn) => fn);
-    prompts.generateCodeSamples.callsFake((fn) => fn);
     prompts.savePortal.callsFake((fn) => fn);
     prompts.overwritePortal.resolves(true);
 
-    runtimeProblem = sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null);
-    prepare = sinon
-      .stub(PortalProjectService.prototype, 'prepare')
-      .callsFake(async (projectDirectory) =>
-        ok({ projectDirectory, viteBinary: new FilePath(projectDirectory, new FileName('vite.js')) })
-      );
     authorize = sinon.stub(PortalAuthorizationService.prototype, 'authorize').resolves(ok(undefined));
     build = sinon.stub(PortalBuildService.prototype, 'build').resolves(ok({ output: builtSite, pageCount: 3 }));
   });
@@ -76,8 +79,8 @@ describe('GenerateAction', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('fails without building when the code samples cannot be generated', async () => {
-    sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(err({ file: 'code-samples.json', problem: { kind: 'missing' as const } }));
+  it('fails without building when the artifacts cannot be generated', async () => {
+    shared.artifacts.resolves(err(ServiceError.ServerError));
 
     const result = await execute();
 
@@ -87,15 +90,15 @@ describe('GenerateAction', () => {
   });
 
   it("builds from the user's own specs, handing the project their code samples", async () => {
-    process.env.APIMATIC_CODE_SAMPLES_PATH = 'test/resources/code-samples.json';
+    shared.artifacts.resolves(ok(new PortalArtifacts(samplesFromFixture(), new Map(), undefined)));
 
-    const result = await execute(CODE_SAMPLES_FIXTURE).finally(() => delete process.env.APIMATIC_CODE_SAMPLES_PATH);
+    const result = await execute(CODE_SAMPLES_FIXTURE);
 
     expect(result.isSuccess()).to.be.true;
-    const [, source, codeSamples] = prepare.firstCall.args;
+    const [, source, artifacts] = shared.prepare.firstCall.args;
     expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
-    expect(codeSamples.isEmpty()).to.be.false;
-    expect(prompts.unplacedSamples.calledOnceWith([])).to.be.true;
+    expect(artifacts.codeSampleCatalogs.isEmpty()).to.be.false;
+    expect(shared.prompts.unplacedSamples.calledOnceWith([])).to.be.true;
   });
 
   it('fails when the source and destination are the same directory', async () => {
@@ -119,7 +122,7 @@ describe('GenerateAction', () => {
   });
 
   it('stops before anything else when the installation cannot build a portal', async () => {
-    runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
+    shared.runtimeProblem.returns("The portal build dependency 'vite' is missing from this installation.");
 
     const result = await execute();
 
@@ -147,9 +150,21 @@ describe('GenerateAction', () => {
     const result = await execute(empty);
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.sourceProblem.calledOnce).to.be.true;
-    expect(prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
+    expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
+    expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
     expect(build.called).to.be.false;
+  });
+
+  it('reports a source problem before asking to overwrite the destination', async () => {
+    writeOldPortal();
+    const empty = new DirectoryPath(root).join('empty');
+    fs.mkdirSync(empty.toString());
+
+    const result = await execute(empty);
+
+    expect(result.isFailed()).to.be.true;
+    expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
+    expect(prompts.overwritePortal.called).to.be.false;
   });
 
   it('asks before overwriting a destination that is not empty, and stops when declined', async () => {
@@ -262,6 +277,6 @@ describe('GenerateAction', () => {
     const result = await execute(source);
 
     expect(result.isSuccess()).to.be.true;
-    expect(prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);
+    expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);
   });
 });

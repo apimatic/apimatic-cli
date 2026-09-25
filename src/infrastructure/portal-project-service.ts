@@ -5,7 +5,8 @@ import { err, ok, Result } from 'neverthrow';
 import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
-import { CodeSamples } from '../types/portal/code-samples.js';
+import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
+import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
 import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
@@ -52,9 +53,12 @@ const STYLESHEET_FILE_NAME = 'theme.css';
 
 /**
  * Where the generated pages are written, inside the project: `src/lib/source.ts` names it as a
- * relative literal, which the browser bundle carries, so the build directory is never published.
+ * relative literal, which the browser bundle carries, so the portal project's location is never published.
  */
 export const GENERATED_DIRECTORY_NAME = 'generated';
+
+/** Where the SDKs and the context plugin are laid out as the site serves them, inside the project. */
+export const DOWNLOADS_DIRECTORY_NAME = 'downloads';
 
 export interface PortalProjectPaths {
   projectDirectory: DirectoryPath;
@@ -84,7 +88,7 @@ export class PortalProjectService {
   public async prepare(
     projectDirectory: DirectoryPath,
     source: PortalSource,
-    codeSamples: CodeSamples
+    artifacts: PortalArtifacts
   ): Promise<Result<PortalProjectPaths, string>> {
     const template = this.templateDirectory();
     if (template === undefined) {
@@ -100,7 +104,12 @@ export class PortalProjectService {
 
     await this.fileService.copyDirectoryContents(template, projectDirectory);
     await this.installDependencies(projectDirectory);
-    await this.writeConfiguration(projectDirectory, source, await this.writeCodeSamples(projectDirectory, codeSamples));
+    await this.writeConfiguration(
+      projectDirectory,
+      source,
+      await this.writeCodeSamples(projectDirectory, artifacts.codeSampleCatalogs),
+      await this.writeDownloads(projectDirectory, artifacts)
+    );
 
     const pages = await this.pagesService.write(projectDirectory.join(GENERATED_DIRECTORY_NAME), source.generatedPages);
     if (pages.isErr()) {
@@ -151,13 +160,36 @@ export class PortalProjectService {
   }
 
   // The template places the samples on the specs as it bundles them, so the specs are read where they are.
-  private async writeCodeSamples(projectDirectory: DirectoryPath, codeSamples: CodeSamples): Promise<FilePath | null> {
-    if (codeSamples.isEmpty()) {
+  private async writeCodeSamples(
+    projectDirectory: DirectoryPath,
+    codeSampleCatalogs: CodeSampleCatalogs
+  ): Promise<FilePath | null> {
+    if (codeSampleCatalogs.isEmpty()) {
       return null;
     }
     const file = new FilePath(projectDirectory, new FileName('code-samples.json'));
-    await this.fileService.writeContents(file, JSON.stringify(codeSamples.toJson()));
+    await this.fileService.writeContents(file, JSON.stringify(codeSampleCatalogs.toJson()));
     return file;
+  }
+
+  private async writeDownloads(
+    projectDirectory: DirectoryPath,
+    artifacts: PortalArtifacts
+  ): Promise<DirectoryPath | null> {
+    if (artifacts.sdks.size === 0 && artifacts.plugin === undefined) {
+      return null;
+    }
+    const downloads = projectDirectory.join(DOWNLOADS_DIRECTORY_NAME);
+    await this.fileService.createDirectoryIfNotExists(downloads);
+    for (const [language, archive] of artifacts.sdks) {
+      const sdks = downloads.join('sdk');
+      await this.fileService.createDirectoryIfNotExists(sdks);
+      await this.fileService.copy(archive, new FilePath(sdks, new FileName(`${language}.zip`)));
+    }
+    if (artifacts.plugin !== undefined) {
+      await this.fileService.copy(artifacts.plugin, new FilePath(downloads, new FileName('plugin.zip')));
+    }
+    return downloads;
   }
 
   private async installDependencies(projectDirectory: DirectoryPath): Promise<void> {
@@ -189,7 +221,8 @@ export class PortalProjectService {
   private async writeConfiguration(
     projectDirectory: DirectoryPath,
     source: PortalSource,
-    codeSamples: FilePath | null
+    codeSamples: FilePath | null,
+    downloads: DirectoryPath | null
   ): Promise<void> {
     const contentDirectory = source.contentDirectory ?? projectDirectory.join('content');
     if (source.contentDirectory === null) {
@@ -208,7 +241,8 @@ export class PortalProjectService {
       codeSamples: codeSamples === null ? null : this.toPosix(codeSamples.toString()),
       contentDir: this.toPosix(contentDirectory.toString()),
       generatedDir: this.toPosix(projectDirectory.join(GENERATED_DIRECTORY_NAME).toString()),
-      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString())
+      staticDir: source.staticDirectory === null ? null : this.toPosix(source.staticDirectory.toString()),
+      downloadsDir: downloads === null ? null : this.toPosix(downloads.toString())
     };
 
     await this.fileService.writeContents(
