@@ -6,6 +6,7 @@ import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { isSkippedByGlob } from '../../types/portal/content-tree.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSettings, PortalSource } from '../../types/portal/portal-source.js';
@@ -228,8 +229,12 @@ export class PortalServeAction {
 
     return this.startWatch(
       (onChange) =>
-        this.fileWatchService.watchTree(contentDirectory, onChange, (reason) =>
-          this.prompts.contentWatchFailed(reason, sourceDirectory)
+        this.fileWatchService.watchTree(
+          contentDirectory,
+          onChange,
+          (reason) => this.prompts.contentWatchFailed(reason, sourceDirectory),
+          // What the build never reads, as an editor's swap file, would only have the check run again.
+          isSkippedByGlob
         ),
       check,
       {

@@ -30,6 +30,8 @@ export interface FileWatch {
 type StartWatch = (notify: () => void, fail: (error: unknown) => void) => () => void;
 
 export class FileWatchService {
+  public constructor(private readonly platform: NodeJS.Platform = process.platform) {}
+
   /**
    * Calls `onChange` once each save of the file has settled, and never twice at once. Saves
    * that land while one is being handled are handled once more when it finishes, however many
@@ -56,22 +58,29 @@ export class FileWatchService {
     });
   }
 
-  /** As `watch`, for a save of any file at any depth below `directory`. */
+  /**
+   * As `watch`, for a save of any file at any depth below `directory`, but for one whose name or
+   * a folder on whose way `isIgnored` answers true for, such as an editor's swap file.
+   */
   public watchTree(
     directory: DirectoryPath,
     onChange: () => Promise<void>,
     onFailed: (reason: string) => void,
-    platform: NodeJS.Platform = process.platform
+    isIgnored: (name: string) => boolean = () => false
   ): Result<FileWatch, string> {
     return settledWatch(onChange, onFailed, (notify, fail) => {
       const root = realPath(directory);
       // Elsewhere Node watches each file, and loses one an editor saves by renaming a new one over it.
-      if (platform === 'win32' || platform === 'darwin') {
-        const watcher = fs.watch(root, { recursive: true }, notify);
+      if (this.platform === 'win32' || this.platform === 'darwin') {
+        const watcher = fs.watch(root, { recursive: true }, (_event, changed) => {
+          if (changed === null || !changed.toString().split(/[\\/]/).some(isIgnored)) {
+            notify();
+          }
+        });
         watcher.on('error', fail);
         return () => watcher.close();
       }
-      return watchEachDirectory(root, notify, fail);
+      return watchEachDirectory(root, isIgnored, notify, fail);
     });
   }
 }
@@ -145,7 +154,12 @@ function settledWatch(
 }
 
 /** One watch per directory, as `watch` keeps on its one, since a directory's watch hears a file renamed over. */
-function watchEachDirectory(root: string, notify: () => void, fail: (error: unknown) => void): () => void {
+function watchEachDirectory(
+  root: string,
+  isIgnored: (name: string) => boolean,
+  notify: () => void,
+  fail: (error: unknown) => void
+): () => void {
   const watchers = new Map<string, fs.FSWatcher>();
 
   const unwatch = (directory: string) => {
@@ -155,6 +169,9 @@ function watchEachDirectory(root: string, notify: () => void, fail: (error: unkn
 
   const watchDirectory = (directory: string) => {
     const watcher = fs.watch(directory, (_event, changed) => {
+      if (changed !== null && isIgnored(changed.toString())) {
+        return;
+      }
       try {
         // Windows goes on reporting a watched directory that was taken away until its watch closes.
         if (!fs.existsSync(directory)) {
@@ -178,7 +195,7 @@ function watchEachDirectory(root: string, notify: () => void, fail: (error: unkn
     }
     watchDirectory(directory);
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
+      if (entry.isDirectory() && !isIgnored(entry.name)) {
         watchTreeBelow(path.join(directory, entry.name));
       }
     }

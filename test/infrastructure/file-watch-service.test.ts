@@ -283,14 +283,14 @@ describe('FileWatchService', () => {
 
       const watchTree = async () => {
         calls = 0;
-        watch = service
+        watch = new FileWatchService(platform)
           .watchTree(
             new DirectoryPath(root),
             async () => {
               calls += 1;
             },
             () => undefined,
-            platform
+            (name) => name.startsWith('.')
           )
           ._unsafeUnwrap();
         await pause(SETTLE_MS * 2);
@@ -357,6 +357,35 @@ describe('FileWatchService', () => {
         expect(calls - settledCalls, 'reports after the removal settled').to.equal(reports);
         expect(reports).to.equal(1);
       });
+    });
+
+    // An editor's swap file, or a folder the caller has no use for, would only run its check again.
+    // Kept to the top, and apart from the tree above: Windows reports a folder changed when a file
+    // in it is, and late enough that a folder made before the watch can still be heard of.
+    it(`reports no save of a file, or in a folder, that it is told to ignore, ${mode}`, async () => {
+      fs.mkdirSync(path.join(root, '.drafts'));
+      await settled();
+      let calls = 0;
+      watch = new FileWatchService(platform)
+        .watchTree(
+          new DirectoryPath(root),
+          async () => {
+            calls += 1;
+          },
+          () => undefined,
+          (name) => name.startsWith('.')
+        )
+        ._unsafeUnwrap();
+      await pause(SETTLE_MS * 2);
+
+      fs.writeFileSync(path.join(root, '.apimatic.json.swp'), 'swap');
+      fs.writeFileSync(path.join(root, '.drafts', 'notes.md'), 'draft');
+      fs.mkdirSync(path.join(root, '.later', 'deeper'), { recursive: true });
+      await settled();
+      fs.writeFileSync(path.join(root, '.later', 'deeper', 'notes.md'), 'later');
+      await settled();
+
+      expect(calls).to.equal(0);
     });
   }
 });

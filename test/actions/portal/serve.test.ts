@@ -310,6 +310,16 @@ describe('PortalServeAction', () => {
       });
     });
 
+    // An editor's swap file would only have the content checked again for nothing.
+    it('leaves out of the watch what the build never reads', async () => {
+      await whileServing(async () => {
+        const isIgnored: (name: string) => boolean = watchTree.firstCall.args[3];
+
+        expect(['.intro.md.swp', '.drafts', 'node_modules'].every(isIgnored)).to.be.true;
+        expect(isIgnored('intro.md')).to.be.false;
+      });
+    });
+
     // The content is checked before the preview starts, which can take a minute.
     it('checks the content again once it is watched, and stops watching when the preview stops', async () => {
       await whileServing(async () => {
