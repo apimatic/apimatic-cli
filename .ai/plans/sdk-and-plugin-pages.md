@@ -469,7 +469,17 @@ committed without asking.
    `portal-template/downloads.ts`. The schema test gains a documented
    exception: the schema still lists all seven languages until #359 narrows
    it.
-3. **Artifacts and writer.** `docs/<language>.json` in `PortalArtifactsService`
+3. **Artifacts and writer.** *Done 2026-09-25.* One rule serves both commands:
+   `GeneratedPages.missingFrom(artifacts)` names each language whose SDK zip or
+   SDK docs were not delivered, and a bundled plugin with no `plugin.zip`. At
+   startup, `PreparePortalProjectAction` fails on it before preparing. Under
+   `portal serve`, an edit that trips it is refused with a restart message, which
+   covers a language added, a `plugin` block added, and `pluginUrl` removed while
+   the block stays (decided the same day). A hosted plugin added applies live.
+   The fragments come from `pageFragments(description, sdkDocs)`. Run end to end
+   against the stand-in: it succeeds, and with Python's docs left out of the zip
+   it fails before building, naming them.
+   `docs/<language>.json` in `PortalArtifactsService`
    and `PortalArtifacts.sdkDocs`; `generated-includes/` written once at prepare
    (section 2, Fragments);
    `PortalProjectService.prepare` and `applyConfig`; `portal serve` refusing a

@@ -6,6 +6,7 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
+import { PageFragment, pageFragments } from '../types/portal/page-fragments.js';
 import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
 import { PLUGIN_DOWNLOAD, SDK_DOWNLOADS_FOLDER, sdkDownload } from '../types/portal/portal-downloads.js';
@@ -53,6 +54,13 @@ const STYLESHEET_FILE_NAME = 'theme.css';
  * relative literal, which the browser bundle carries, so the portal project's location is never published.
  */
 export const GENERATED_DIRECTORY_NAME = 'generated';
+
+/**
+ * Where the Markdown the generated pages include is written, inside the project and beside the
+ * generated directory rather than in it, where the collection and the prerender pass would each
+ * take a fragment for a page of its own.
+ */
+export const GENERATED_INCLUDES_DIRECTORY_NAME = 'generated-includes';
 
 /** Where the SDKs and the context plugin are laid out as the site serves them, inside the project. */
 export const DOWNLOADS_DIRECTORY_NAME = 'downloads';
@@ -112,6 +120,11 @@ export class PortalProjectService {
     if (pages.isErr()) {
       return err(pages.error);
     }
+    // Once: they change only with the specs and the artifacts, which a preview reads when it starts.
+    await this.writeFragments(
+      projectDirectory.join(GENERATED_INCLUDES_DIRECTORY_NAME),
+      pageFragments(source.specDescription, artifacts.sdkDocs)
+    );
 
     return ok({
       projectDirectory,
@@ -167,6 +180,14 @@ export class PortalProjectService {
     const file = new FilePath(projectDirectory, new FileName('code-samples.json'));
     await this.fileService.writeContents(file, JSON.stringify(codeSampleCatalogs.toJson()));
     return file;
+  }
+
+  private async writeFragments(directory: DirectoryPath, fragments: PageFragment[]): Promise<void> {
+    for (const { folder, fileName, contents } of fragments) {
+      const target = folder === null ? directory : directory.join(folder);
+      await this.fileService.createDirectoryIfNotExists(target);
+      await this.fileService.writeContents(new FilePath(target, fileName), contents);
+    }
   }
 
   private async writeDownloads(

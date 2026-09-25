@@ -5,6 +5,7 @@ import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
@@ -66,7 +67,7 @@ export class PortalServeAction {
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
-      async (project, source) => {
+      async (project, source, artifacts) => {
         const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
         if (server.isErr()) {
@@ -79,7 +80,7 @@ export class PortalServeAction {
           await this.launcherService.openUrlInBrowser(server.value.url);
         }
 
-        const configWatch = this.watchConfig(source, project.projectDirectory, sourceDirectory);
+        const configWatch = this.watchConfig(source, artifacts, project.projectDirectory, sourceDirectory);
 
         this.clearStandardInput();
 
@@ -110,10 +111,12 @@ export class PortalServeAction {
 
   /**
    * Held to the rules a build applies: an edit a build would refuse is reported as `portal
-   * generate` would report it, and the preview keeps what it last accepted.
+   * generate` would report it, and the preview keeps what it last accepted. So is an edit that
+   * needs artifacts the preview was not started with, which only a restart fetches.
    */
   private watchConfig(
     source: PortalSource,
+    artifacts: PortalArtifacts,
     projectDirectory: DirectoryPath,
     sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
@@ -129,6 +132,13 @@ export class PortalServeAction {
       }
       const settings = reloaded.value;
       const { config } = settings;
+
+      const missing = settings.generatedPages.missingFrom(artifacts);
+      if (missing !== null) {
+        preview.refuse();
+        this.prompts.editNeedsRestart(missing);
+        return;
+      }
 
       if (preview.staticDirectoryNotServed(config)) {
         this.prompts.staticDirectoryNotServed(sourceDirectory);

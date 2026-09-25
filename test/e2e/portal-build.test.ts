@@ -48,7 +48,7 @@ async function buildFixture(name: string, codeSampleCatalogs = new CodeSampleCat
     await new PortalProjectService().prepare(
       project,
       source,
-      new PortalArtifacts(codeSampleCatalogs, new Map(), undefined)
+      new PortalArtifacts(codeSampleCatalogs, new Map(), new Map(), undefined)
     )
   )._unsafeUnwrap();
 

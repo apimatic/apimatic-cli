@@ -15,6 +15,7 @@ import {
 } from '../../types/portal/generation-status.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { Language } from '../../types/sdk/generate.js';
+import { isJsonObject } from '../../utils/json-utils.js';
 import { discardStreamBody } from '../../utils/utils.js';
 import { envInfo } from '../env-info.js';
 import { FileService } from '../file-service.js';
@@ -41,6 +42,7 @@ export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 /** The entries the portal artifacts zip is made of, as the endpoint lays them out. */
 const ARTIFACTS_ZIP = {
   sdkDirectory: 'sdk',
+  sdkDocsDirectory: 'docs',
   codeSamplesDirectory: 'code-samples',
   plugin: 'plugin.zip'
 } as const;
@@ -194,9 +196,9 @@ export class PortalArtifactsService {
   }
 
   /**
-   * The archive holds `sdk/<language>.zip`, `code-samples/<language>.json` and, when the config
-   * asked for one, `plugin.zip`. Everything is optional: a portal that declares no languages and
-   * no plugin is a valid run that delivers an empty zip.
+   * The archive holds `sdk/<language>.zip`, `docs/<language>.json`, `code-samples/<language>.json`
+   * and, when the config asked for one, `plugin.zip`. Everything is optional: a portal that declares
+   * no languages and no plugin is a valid run that delivers an empty zip.
    */
   private async unpack(
     zip: NodeJS.ReadableStream,
@@ -218,15 +220,50 @@ export class PortalArtifactsService {
       return err(codeSampleCatalogs.error);
     }
 
+    const sdkDocs = await this.readSdkDocs(contents.join(ARTIFACTS_ZIP.sdkDocsDirectory));
+    if (sdkDocs.isErr()) {
+      return err(sdkDocs.error);
+    }
+
     const plugin = new FilePath(contents, new FileName(ARTIFACTS_ZIP.plugin));
 
     return ok(
       new PortalArtifacts(
         codeSampleCatalogs.value,
         await this.readSdks(contents.join(ARTIFACTS_ZIP.sdkDirectory)),
+        sdkDocs.value,
         (await this.fileService.fileExists(plugin)) ? plugin : undefined
       )
     );
+  }
+
+  /**
+   * Keyed by the file's stem, as the SDKs are. A file this CLI cannot read is an error, as an
+   * unreadable catalog is: the page it belongs to would otherwise be published without its docs.
+   */
+  private async readSdkDocs(directory: DirectoryPath): Promise<Result<ReadonlyMap<string, string>, ServiceError>> {
+    const docs = new Map<string, string>();
+    if (!(await this.fileService.directoryExists(directory))) {
+      return ok(docs);
+    }
+
+    for (const fileName of await this.fileService.getFileNames(directory)) {
+      const name = fileName.toString();
+      if (!name.endsWith('.json')) {
+        continue;
+      }
+      let json: unknown;
+      try {
+        json = JSON.parse(await this.fileService.getContents(new FilePath(directory, fileName)));
+      } catch {
+        return err(ServiceError.InvalidResponse);
+      }
+      if (!isJsonObject(json) || typeof json.gettingStarted !== 'string') {
+        return err(ServiceError.InvalidResponse);
+      }
+      docs.set(name.slice(0, -'.json'.length), json.gettingStarted);
+    }
+    return ok(docs);
   }
 
   /**

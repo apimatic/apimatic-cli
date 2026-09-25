@@ -1,7 +1,8 @@
 import { FileName } from '../file/fileName.js';
 import { UrlPath } from '../file/urlPath.js';
-import { LANGUAGE_NAMES } from '../sdk/generate.js';
+import { Language, LANGUAGE_NAMES } from '../sdk/generate.js';
 import { PageRecord, PageValues } from './page-template.js';
+import { PortalArtifacts } from './portal-artifacts.js';
 import { PLUGIN_DOWNLOAD_ADDRESS, sdkDownloadAddress } from './portal-downloads.js';
 import { PortalLanguages } from './portal-languages.js';
 import { PortalSdk } from './portal-sdk.js';
@@ -56,6 +57,14 @@ export interface GeneratedPage {
  */
 export type PluginSource = { kind: 'bundled' } | { kind: 'hosted'; url: UrlPath };
 
+/** What the pages link to or include that the portal artifacts did not deliver. */
+export interface MissingArtifacts {
+  /** The languages whose SDK, or whose SDK docs, are not among them. */
+  sdks: Language[];
+  /** Whether the plugin the page installs from the portal is not among them. */
+  plugin: boolean;
+}
+
 /** A section's `nav.json`, which names its tab and orders its pages. */
 export interface GeneratedNavigation {
   section: GeneratedSection;
@@ -105,6 +114,19 @@ export class GeneratedPages {
         2
       )}\n`
     }));
+  }
+
+  /**
+   * Null when the artifacts back every page: each language's page includes its SDK docs and
+   * offers its SDK, and a bundled plugin is offered from the portal. A page backed by nothing
+   * would fail the build, or link to a download the portal does not have.
+   */
+  public missingFrom(artifacts: PortalArtifacts): MissingArtifacts | null {
+    const sdks = this.sdks
+      .map((sdk) => sdk.language)
+      .filter((language) => !artifacts.sdks.has(language) || !artifacts.sdkDocs.has(language));
+    const plugin = this.plugin?.kind === 'bundled' && artifacts.plugin === undefined;
+    return sdks.length > 0 || plugin ? { sdks, plugin } : null;
   }
 
   // Every language the portal supports can be carried by a plugin, so the page lists them all.

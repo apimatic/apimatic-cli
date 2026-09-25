@@ -1,6 +1,11 @@
 import { expect } from 'chai';
+import { DirectoryPath } from '../../../src/types/file/directoryPath';
+import { FileName } from '../../../src/types/file/fileName';
+import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
+import { CodeSampleCatalogs } from '../../../src/types/portal/code-samples';
 import { GeneratedPages, PLUGIN_SECTION, PluginSource, SDK_SECTION } from '../../../src/types/portal/generated-pages';
+import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
 import { PortalLanguages } from '../../../src/types/portal/portal-languages';
 import { Language, LANGUAGE_NAMES } from '../../../src/types/sdk/generate';
 
@@ -138,6 +143,49 @@ describe('GeneratedPages', () => {
       const plugin = pagesFor({ typescript: {} }, { kind: 'hosted', url }).pages().at(-1);
 
       expect(plugin?.data.installPath).to.equal('https://plugins.acme.test/calc.zip');
+    });
+  });
+
+  describe('what the artifacts leave out', () => {
+    const delivered = new DirectoryPath('artifacts');
+    const artifactsWith = (sdks: string[], docs: string[], plugin: boolean) =>
+      new PortalArtifacts(
+        new CodeSampleCatalogs([]),
+        new Map(sdks.map((language) => [language, new FilePath(delivered, new FileName(`${language}.zip`))])),
+        new Map(docs.map((language) => [language, '## Installation'])),
+        plugin ? new FilePath(delivered, new FileName('plugin.zip')) : undefined
+      );
+
+    it('is nothing when every page is backed', () => {
+      const pages = pagesFor({ typescript: {}, python: {} }, { kind: 'bundled' });
+
+      expect(pages.missingFrom(artifactsWith(['typescript', 'python'], ['typescript', 'python'], true))).to.be.null;
+    });
+
+    it('names each language whose SDK or SDK docs are missing, in order', () => {
+      const pages = pagesFor({ csharp: {}, typescript: {}, python: {} });
+
+      expect(pages.missingFrom(artifactsWith(['csharp', 'python'], ['csharp', 'typescript'], false))).to.deep.equal({
+        sdks: ['typescript', 'python'],
+        plugin: false
+      });
+    });
+
+    it('names a bundled plugin the portal has no copy of, but needs none for a hosted one', () => {
+      const hosted: PluginSource = { kind: 'hosted', url: new UrlPath('https://plugins.acme.test/calc.zip') };
+      const artifacts = artifactsWith(['typescript'], ['typescript'], false);
+
+      expect(pagesFor({ typescript: {} }, { kind: 'bundled' }).missingFrom(artifacts)).to.deep.equal({
+        sdks: [],
+        plugin: true
+      });
+      expect(pagesFor({ typescript: {} }, hosted).missingFrom(artifacts)).to.be.null;
+    });
+
+    // What `/portal-artifacts` delivers beyond the pages, such as a language removed since, backs nothing.
+    it('ignores what the artifacts carry that no page asks for', () => {
+      expect(pagesFor({ typescript: {} }).missingFrom(artifactsWith(['typescript', 'go'], ['typescript', 'go'], true)))
+        .to.be.null;
     });
   });
 

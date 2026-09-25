@@ -18,8 +18,9 @@ import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { PortalSource } from '../../../src/types/portal/portal-source';
+import { Language } from '../../../src/types/sdk/generate';
 import { PortalSourceContext } from '../../../src/types/portal-source-context';
-import { stubPreparePortalProject } from './prepare-project-stubs';
+import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
@@ -310,17 +311,63 @@ describe('PortalServeAction', () => {
       });
     });
 
-    it('writes the pages of a language and a plugin block added, and says the edit was applied', async () => {
-      await whileServing(async () => {
-        const config = originalConfig();
-        config.languages.python = {};
-        config.plugin = { pluginId: 'calc', pluginVersion: '0.1.0' };
+    describe('against the artifacts the preview started with', () => {
+      const projectHas = (relative: string) => fs.existsSync(path.join(projectDirectory.toString(), relative));
 
-        await save(config);
+      // What a run for the fixture delivers: its one language, and no plugin.
+      beforeEach(() => shared.artifacts.resolves(ok(completeArtifacts(['typescript'], { plugin: false }))));
 
-        expect(readProject('generated/sdks/python.mdx')).to.contain('title: "Python"');
-        expect(readProject('generated/context-plugin/index.mdx')).to.contain('Context Plugin');
-        expect(prompts.configApplied.calledOnce).to.be.true;
+      it('refuses a language added, which needs its SDK fetched, and hears it accepted once removed again', async () => {
+        await whileServing(async () => {
+          const config = originalConfig();
+          config.languages.python = {};
+
+          await save(config);
+
+          expect(prompts.editNeedsRestart.calledOnceWith({ sdks: [Language.PYTHON], plugin: false })).to.be.true;
+          expect(projectHas('generated/sdks/python.mdx')).to.be.false;
+          expect(prompts.configApplied.called).to.be.false;
+
+          await save(originalConfig());
+
+          expect(prompts.configApplied.calledOnce).to.be.true;
+        });
+      });
+
+      it('refuses a plugin block added, whose plugin the preview has no copy of', async () => {
+        await whileServing(async () => {
+          await save({ ...originalConfig(), plugin: { pluginId: 'calc', pluginVersion: '0.1.0' } });
+
+          expect(prompts.editNeedsRestart.calledOnceWith({ sdks: [], plugin: true })).to.be.true;
+          expect(projectHas('generated/context-plugin/index.mdx')).to.be.false;
+        });
+      });
+
+      it('applies a plugin hosted elsewhere, which needs nothing fetched', async () => {
+        await whileServing(async () => {
+          const config = originalConfig();
+          config.portal.pluginUrl = 'https://plugins.acme.test/calc.zip';
+
+          await save(config);
+
+          expect(readProject('generated/context-plugin/index.mdx')).to.contain('Context Plugin');
+          expect(prompts.editNeedsRestart.called).to.be.false;
+          expect(prompts.configApplied.calledOnce).to.be.true;
+        });
+      });
+
+      it('applies a language removed, deleting its page', async () => {
+        shared.artifacts.resolves(ok(completeArtifacts(['typescript', 'python'], { plugin: false })));
+        writeConfig({ ...originalConfig(), languages: { typescript: {}, python: {} } });
+
+        await whileServing(async () => {
+          expect(projectHas('generated/sdks/python.mdx')).to.be.true;
+
+          await save(originalConfig());
+
+          expect(projectHas('generated/sdks/python.mdx')).to.be.false;
+          expect(prompts.configApplied.calledOnce).to.be.true;
+        });
       });
     });
 
