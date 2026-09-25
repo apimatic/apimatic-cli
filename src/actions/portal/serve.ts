@@ -1,3 +1,4 @@
+import { Result } from 'neverthrow';
 import { PortalServePrompts } from '../../prompts/portal/serve.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -5,11 +6,11 @@ import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { PortalSourceContext } from '../../types/portal-source-context.js';
-import { noticesSince } from '../../types/portal/content-notices.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSettings, PortalSource } from '../../types/portal/portal-source.js';
 import { PreviewConfig } from '../../types/portal/preview-config.js';
+import { PreviewContent } from '../../types/portal/preview-content.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
@@ -182,31 +183,17 @@ export class PortalServeAction {
       onApplied(settings);
     };
 
-    // The watch drops whatever its handler throws, so a fault no Result carries, such as the
-    // static directory turning unreadable mid-check, would otherwise leave the preview stale
-    // without a word.
-    const reapply = async () => {
-      try {
-        await applyEdit();
-      } catch (error) {
-        this.prompts.configNotApplied(errorMessage(error));
+    return this.startWatch(
+      (onChange) =>
+        this.fileWatchService.watch(sourceDirectory, new FileName(APIMATIC_CONFIG_FILE_NAME), onChange, (reason) =>
+          this.prompts.configWatchFailed(reason)
+        ),
+      applyEdit,
+      {
+        notWatched: (reason) => this.prompts.configNotWatched(reason),
+        thrown: (reason) => this.prompts.configNotApplied(reason)
       }
-    };
-
-    const watch = this.fileWatchService.watch(
-      sourceDirectory,
-      new FileName(APIMATIC_CONFIG_FILE_NAME),
-      reapply,
-      (reason) => this.prompts.configWatchFailed(reason)
     );
-    if (watch.isErr()) {
-      this.prompts.configNotWatched(watch.error);
-      return undefined;
-    }
-    // The file was read before the preview started, which can take a minute, and a save made
-    // in the meantime reached no watch.
-    watch.value.recheck();
-    return watch.value;
   }
 
   /**
@@ -218,46 +205,65 @@ export class PortalServeAction {
     generatedPages: () => GeneratedPages,
     sourceDirectory: DirectoryPath
   ): FileWatch | undefined {
-    if (source.contentDirectory === null) {
+    const contentDirectory = source.contentDirectory;
+    if (contentDirectory === null) {
       return undefined;
     }
     const sourceContext = new PortalSourceContext(sourceDirectory);
-    let rejected = false;
-    let reported = source.contentNotices;
+    const preview = new PreviewContent(source.contentNotices);
 
     const check = async () => {
       const checked = await sourceContext.resolveContent(source.specs, generatedPages());
       if (checked.isErr()) {
-        rejected = true;
+        preview.refuse();
         this.prompts.contentRejected(checked.error, sourceDirectory);
         return;
       }
-      if (rejected) {
-        rejected = false;
+      const shown = preview.show(checked.value);
+      if (shown.fixed) {
         this.prompts.contentAccepted(sourceDirectory);
       }
-      this.prompts.contentNotices(noticesSince(checked.value, reported), sourceDirectory);
-      reported = checked.value;
-    };
-    // As for `apimatic.json`: the watch drops whatever its handler throws.
-    const onSave = async () => {
-      try {
-        await check();
-      } catch (error) {
-        this.prompts.contentNotChecked(errorMessage(error), sourceDirectory);
-      }
+      this.prompts.contentNotices(shown.notices, sourceDirectory);
     };
 
-    const watch = this.fileWatchService.watchTree(source.contentDirectory, onSave, (reason) =>
-      this.prompts.contentWatchFailed(reason, sourceDirectory)
+    return this.startWatch(
+      (onChange) =>
+        this.fileWatchService.watchTree(contentDirectory, onChange, (reason) =>
+          this.prompts.contentWatchFailed(reason, sourceDirectory)
+        ),
+      check,
+      {
+        notWatched: (reason) => this.prompts.contentNotWatched(reason, sourceDirectory),
+        thrown: (reason) => this.prompts.contentNotChecked(reason, sourceDirectory)
+      }
     );
-    if (watch.isErr()) {
-      this.prompts.contentNotWatched(watch.error, sourceDirectory);
+  }
+
+  /**
+   * Runs `handle` on each save the watch reports, and once at the start: what it handles was read
+   * before the preview started, which can take a minute, and a save made meanwhile reached no watch.
+   */
+  private startWatch(
+    watch: (onChange: () => Promise<void>) => Result<FileWatch, string>,
+    handle: () => Promise<void>,
+    report: { notWatched: (reason: string) => void; thrown: (reason: string) => void }
+  ): FileWatch | undefined {
+    // The watch drops whatever its handler throws, so a fault no Result carries, such as a file
+    // turning unreadable mid-check, would otherwise leave the preview stale without a word.
+    const onChange = async () => {
+      try {
+        await handle();
+      } catch (error) {
+        report.thrown(errorMessage(error));
+      }
+    };
+    const started = watch(onChange);
+    if (started.isErr()) {
+      report.notWatched(started.error);
       return undefined;
     }
-    // As for `apimatic.json`: a save made while the preview started reached no watch.
-    watch.value.recheck();
-    return watch.value;
+    started.value.recheck();
+    return started.value;
   }
 
   // Clack leaves stdin in raw mode, which swallows CTRL+C until it is released.
