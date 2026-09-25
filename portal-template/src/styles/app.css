@@ -2,8 +2,7 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
-/* Bundled rather than linked from Google Fonts: a stylesheet on another origin holds up the
-   first paint, and every React commit after hydration, until it arrives. */
+/* Bundled, not linked from Google Fonts: a cross-origin stylesheet holds up paint and hydration. */
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/geist-mono';
 /* Written by the CLI from the 'portal' block of apimatic.json: the colour overrides. Imported
