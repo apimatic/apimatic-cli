@@ -12,7 +12,7 @@ import {
 import { portalTabs } from '../../portal-template/src/lib/tabs';
 import { frontmatter } from 'fumadocs-core/content/md/frontmatter';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
-import { PageFrontMatter } from '../../src/types/portal/page-front-matter';
+import { parsePageFrontMatter } from '../../src/types/portal/page-front-matter';
 import { untitledTabName } from '../../src/types/portal/portal-tabs';
 
 /**
@@ -456,7 +456,7 @@ describe('tabsTransformer', () => {
     });
 
     // fumadocs-mdx hands the loader what `frontmatter` parses, the parser the CLI reads a page with.
-    it('names a folder tab after its index page as the CLI reads the page', () => {
+    it('names a folder tab after its index page as the CLI reads the page', async () => {
       const markdown = '---\ntitle: Learn the API\n--- \n# Learn';
       const data = frontmatter(markdown).data as File['data'];
       const docs: File[] = [
@@ -466,7 +466,9 @@ describe('tabsTransformer', () => {
         listing('index', 'tutorials')
       ];
 
-      expect(tabNames({ docs })).to.include(PageFrontMatter.title(markdown, 'tutorials/index.mdx')._unsafeUnwrap());
+      const { title } = (await parsePageFrontMatter(markdown, 'tutorials/index.mdx'))._unsafeUnwrap();
+
+      expect(tabNames({ docs })).to.include(title);
     });
   });
 });

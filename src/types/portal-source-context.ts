@@ -12,7 +12,7 @@ import { ContentNotices } from './portal/content-notices.js';
 import { Endpoint } from './portal/endpoint.js';
 import { GENERATED_SECTIONS, GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
-import { PageFrontMatter } from './portal/page-front-matter.js';
+import { parsePageFrontMatter } from './portal/page-front-matter.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
 import {
@@ -648,8 +648,8 @@ export class PortalSourceContext {
         const label = file.relativeTo(this.sourceDirectory);
         const markdown = await this.fileService.getContents(file).catch(() => undefined);
         const title =
-          markdown === undefined ? err([`${label} could not be read.`]) : PageFrontMatter.title(markdown, label);
-        return title.map((name): TitledPage => ({ file, title: name }));
+          markdown === undefined ? err([`${label} could not be read.`]) : await parsePageFrontMatter(markdown, label);
+        return title.map(({ title: name }): TitledPage => ({ file, title: name }));
       })
     );
     return Result.combineWithAllErrors(titled).mapErr((errors) => errors.flat());
