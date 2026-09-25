@@ -27,6 +27,14 @@ import { SpecContext } from './spec-context.js';
 
 const SPEC_EXTENSIONS = ['.json', '.yaml', '.yml'];
 
+/**
+ * What a source directory is made of. Named here because the prompts name these directories to
+ * the user, and a prompt spelling one differently would send them somewhere that does not exist.
+ */
+export const SPEC = 'spec';
+export const CONTENT = 'content';
+export const STATIC = 'static';
+
 // Empty on purpose: the portal's own routes under /api/ are files with extensions --
 // /api/search.json -- so none can collide with a spec section, which is always a directory.
 // Pages the user puts under content/api/ share the directory, and `hiddenPages` reports the
@@ -85,15 +93,15 @@ export class PortalSourceContext {
   }
 
   private get specDirectory(): DirectoryPath {
-    return this.sourceDirectory.join('spec');
+    return this.sourceDirectory.join(SPEC);
   }
 
   private get contentDirectory(): DirectoryPath {
-    return this.sourceDirectory.join('content');
+    return this.sourceDirectory.join(CONTENT);
   }
 
   private get staticDirectory(): DirectoryPath {
-    return this.sourceDirectory.join('static');
+    return this.sourceDirectory.join(STATIC);
   }
 
   /** Reads and validates the whole source directory, or reports the first problem found. */

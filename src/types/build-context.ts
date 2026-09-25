@@ -3,6 +3,7 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FilePath } from './file/filePath.js';
 import { FileName } from './file/fileName.js';
 import { BuildConfig } from './build/build.js';
+import { SPEC } from './portal-source-context.js';
 import { SpecContext } from './spec-context.js';
 import { TempContext } from './temp-context.js';
 
@@ -50,7 +51,7 @@ export class BuildContext {
   }
 
   public getSpecContext(): SpecContext {
-    return new SpecContext(this.sourceDirectory.join('spec'));
+    return new SpecContext(this.sourceDirectory.join(SPEC));
   }
 
   public async isVersionedBuild(): Promise<boolean> {
