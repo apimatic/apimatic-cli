@@ -291,23 +291,41 @@ describe('PortalServeAction', () => {
       });
     });
 
-    // `sdk publish` and `plugin generate` rewrite the whole file to change their own block.
-    // What `sdk publish` writes: the generated pages show a language, not where it was published.
+    // `sdk publish` and `plugin generate` rewrite the whole file to change their own block, and a
+    // key kept by hand beside a language is read by nothing the preview shows.
     it('applies nothing, and says nothing, for a change outside what the preview shows', async () => {
       await whileServing(async () => {
         const before = [readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')];
-        const config = originalConfig();
-        config.languages.typescript = {
-          publishing: { package: { name: 'calc', version: '1.0.0' }, codegenVersion: 'v4' }
-        };
 
-        await save(config);
+        await save({ ...originalConfig(), languages: { typescript: { notes: 'kept by hand' } } });
 
         expect([readProject('portal.identity.json'), readProject('generated/sdks/typescript.mdx')]).to.deep.equal(
           before
         );
         expect(prompts.configApplied.called).to.be.false;
         expect(prompts.configRejected.called).to.be.false;
+      });
+    });
+
+    // What `sdk publish` writes: where the SDK went, which its card and page show.
+    it('shows a release recorded while it runs', async () => {
+      await whileServing(async () => {
+        const config = originalConfig();
+        config.languages.typescript = {
+          publishing: {
+            source: { repositoryUrl: 'https://github.com/acme/calc-ts' },
+            package: { version: '1.0.0' },
+            packageConfiguration: { name: 'calc' }
+          }
+        };
+
+        await save(config);
+
+        expect(readProject('generated/sdks/typescript.mdx')).to.contain(
+          'packageUrl="https://www.npmjs.com/package/calc"'
+        );
+        expect(readProject('generated/sdks/index.mdx')).to.contain('version="1.0.0"');
+        expect(prompts.configApplied.calledOnce).to.be.true;
       });
     });
 

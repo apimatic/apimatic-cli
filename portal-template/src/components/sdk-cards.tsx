@@ -22,18 +22,21 @@ export function SdkCards({ children }: Readonly<{ children?: ReactNode }>) {
 export function SdkCard({ language, name, page, packageName, version, ...actions }: Readonly<SdkCardProps>) {
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-fd-card p-4 text-fd-card-foreground shadow-sm sm:flex-row sm:items-center sm:justify-between">
-      <Link href={page} className="group flex items-center gap-3">
+      {/* The buttons keep their row beside it; a long package name is cut short instead. */}
+      <Link href={page} className="group flex min-w-0 items-center gap-3">
         <LanguageLogo language={language} className="size-10 shrink-0" />
-        <span className="flex flex-col">
+        <span className="flex min-w-0 flex-col">
           <span className="font-medium group-hover:underline">{name}</span>
           {version ? (
-            <span className="text-sm text-fd-muted-foreground">
+            <span className="truncate text-sm text-fd-muted-foreground" title={`${packageName} v${version}`}>
               {packageName} · v{version}
             </span>
           ) : null}
         </span>
       </Link>
-      <SdkActions {...actions} />
+      <div className="sm:shrink-0">
+        <SdkActions {...actions} />
+      </div>
     </div>
   );
 }

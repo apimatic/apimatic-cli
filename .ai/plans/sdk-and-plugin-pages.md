@@ -502,9 +502,16 @@ committed without asking.
      address, and nothing of the collection's MDX options reaches the browser
      bundle.
    - The template type-checks as the e2e test checks it.
-5. **Templates.** The three `.mdx` files and their copy; `PortalPagesService`
+5. **Templates.** *Done 2026-09-25.* The three `.mdx` files and their copy; `PortalPagesService`
    tests rendering each with every language and both plugin forms. Run end to
-   end against the stand-in.
+   end against the stand-in: `portal generate` built the three pages from the
+   templates, with the SDK docs, the shifted description, the resolved install
+   command, and no console errors. A version holding a `"` renders as written,
+   so MDX decodes the `&quot;` the CLI writes for it. The `.md` twin prints the
+   cards as JSX with plain attributes, leaving out the empty ones. A long
+   package line truncates, with the whole of it in a tooltip, so the buttons
+   keep their row. The serve test that took a publishing record for an edit no
+   page shows now finds it applied, since the cards show it.
 6. **Surfacing.** e2e: cards and buttons on `/sdks`; a language page carrying a
    fixture's SDK docs with its headings in the TOC; the SDKs page's
    description split around the cards with its H1 shifted; the plugin page

@@ -1,6 +1,28 @@
 ---
 title: "Context Plugin"
-description: "Teach an AI coding assistant to use this API's SDKs."
+description: "Give your AI coding assistant working knowledge of this API's SDKs."
 ---
 
-How to install the context plugin will be documented here.
+The context plugin teaches your AI coding assistant how to use this API's SDKs, so the code it writes for you calls the API the way the SDKs are meant to be used.
+
+## Install
+
+Run this in a terminal:
+
+<PluginInstall path="{{installPath}}" />
+
+## What it does
+
+Once the plugin is installed, describe what you want to build and your assistant works from the SDK for your language: how to install it and create a client, how to authenticate, and which methods and types to use for each call. You spend less time correcting code written from guesses about the API.
+
+## Supported languages
+
+<PluginLanguages>
+{{#languages}}
+<PluginLanguage language="{{language}}" name="{{name}}" />
+{{/languages}}
+</PluginLanguages>
+
+## Supported platforms
+
+<PluginPlatforms />
