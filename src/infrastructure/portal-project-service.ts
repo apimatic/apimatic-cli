@@ -62,9 +62,9 @@ const STYLESHEET_FILE_NAME = 'theme.css';
 export const GENERATED_DIRECTORY_NAME = 'generated';
 
 /**
- * Where the Markdown the generated pages include is written, inside the project and beside the
- * generated directory rather than in it, where the collection and the prerender pass would each
- * take a fragment for a page of its own.
+ * Where the Markdown the generated pages include is written, inside the portal project and beside
+ * the generated directory rather than in it, where the collection and the prerender pass would
+ * each take a fragment for a page of its own.
  */
 export const GENERATED_INCLUDES_DIRECTORY_NAME = 'generated-includes';
 

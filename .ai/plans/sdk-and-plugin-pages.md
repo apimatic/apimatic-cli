@@ -15,8 +15,8 @@ Follows on from `.ai/plans/generated-pages.md` (PR #360), which shipped the flow
 and left section 10's "real templates" and "backend data" to later PRs. This is
 both: the pages, the components they need, and the data that fills them.
 
-Terms follow `CONTEXT.md`: **build directory**, **spec**, **portal artifacts**,
-**SDK docs**.
+Terms follow `CONTEXT.md`: **source directory**, **portal project**, **spec**,
+**portal artifacts**, **SDK docs**.
 
 ## 1. Goal and scope
 
@@ -65,11 +65,11 @@ primitives.
 | View package | Shown when a release is recorded (`publishing.package.version`) and the configuration names the package. Always the public registry: npm, PyPI, NuGet (section 5). |
 | Card contents | Language logo, name linking to `/sdks/<language>`, `package · vVersion` when released, the buttons. No install one-liner on the card; the SDK docs carry it. |
 | Logos | Brand logos as inline SVG, for the three languages and the three platforms, vendored from an MIT or CC0 icon set into small components, with no new dependency. Attribution goes in `portal-template/NOTICE`. |
-| SDKs page text | The spec's full `info.description`, when the build directory has exactly one spec and it has one; otherwise a fixed sentence that names no portal. This matches the rule `suggestedSite` already follows ("with several specifications … no one of them speaks for the portal"). Its first paragraph goes above the cards and the rest below them. |
+| SDKs page text | The spec's full `info.description`, when the source directory has exactly one spec and it has one; otherwise a fixed sentence that names no portal. This matches the rule `suggestedSite` already follows ("with several specifications … no one of them speaks for the portal"). Its first paragraph goes above the cards and the rest below them. |
 | SDKs page headings | Shifted so the description's top heading is H2, since spec authors write `# Authentication` and no backend controls it. Done by a remark step in the template, scoped by a `<ShiftHeadings>` wrapper in `sdks.mdx` (section 4). |
 | Raw HTML in fragments | Rendered, through `rehype-raw` on the generated collection (section 4). Without it, any HTML in an included fragment fails the build (step 1). |
 | Template data | Components take plain string attributes, which print cleanly in the `.md` twin and `llms-full.txt`. Lists (the SDK cards, the plugin's languages) are mustache sections, so `PageTemplate` moves onto `mustache` with escaping off (section 4). Decided after step 1 showed JSON props printing as entity-escaped blobs. |
-| Fragments | Written once, when the project is prepared, from the spec description and the artifacts' SDK docs; `applyConfig` leaves them alone. They could only change on a restart anyway: the specs and the artifacts are read once, and a language added under `portal serve` is refused. The fallback intro names no portal, so no edit to the site name leaves it stale (decided after step 2). |
+| Fragments | Written once, when the portal project is prepared, from the spec description and the artifacts' SDK docs; `applyConfig` leaves them alone. They could only change on a restart anyway: the specs and the artifacts are read once, and a language added under `portal serve` is refused. The fallback intro names no portal, so no edit to the site name leaves it stale (decided after step 2). |
 | A language added under `portal serve` | Refused like any edit a build would refuse, with a message to restart `portal serve`, since the artifacts (its SDK docs and zip) are fetched once when the preview starts. The preview keeps what it last accepted. Removing a language still applies live. |
 | Language page | Title "<Language> SDK" (so its sidebar row reads the same), the buttons right under the title, then the SDK docs. |
 | `pluginUrl` | `portal.pluginUrl`, exactly as asked: the first top-level key of `portal` outside its four namespaces (`site`, `brand`, `navigation`, `ai`). Optional, absolute, `https://` only. |
@@ -77,9 +77,9 @@ primitives.
 | Plugin install address | `pluginUrl` when set; otherwise the fixed relative `/__downloads/plugin.zip`, where #361 places the bundled plugin. The backend skips generating and bundling the plugin when `pluginUrl` is set. |
 | Relative address | Resolved in the browser against `window.location.origin`, so it is right on any host (staging, previews, `portal serve`). The prerendered HTML and the `.md` twin use `siteUrl` when configured, else the relative path. |
 | Install command | `npx` only, one copyable code block. |
-| Supported languages | The project's `languages`, in the block's order. They are all plugin languages now. |
+| Supported languages | The source directory's `languages`, in the block's order. They are all plugin languages now. |
 | Supported platforms | Claude Code, Cursor, GitHub Copilot, with their logos. Fixed in the template. |
-| Local testing | The backend does not return `docs/` in the new shape yet, so `portal serve` runs against a scratchpad stand-in for `/portal-artifacts` (section 8). Automated tests build `PortalArtifacts` directly, as the e2e test does today. |
+| Local testing | The backend does not return `docs/` in the new shape yet, so `portal serve` runs against a scratchpad stand-in for `/portal-artifacts` (section 8). Automated tests build `PortalArtifacts` directly, as the e2e test does today. *(Amended 2026-09-25: the shape is live on the dev environment; section 8 says how to run against it.)* |
 | Base | `dev` after #361 (first decided as "wait for #361"; it merged the same day). |
 
 Rejected, with reasons:
@@ -437,6 +437,22 @@ On `dev` as it stands (before this PR reads `docs/`), `portal generate` against
 it fetched the artifacts, built 9 pages and wrote `__downloads/plugin.zip` and
 `__downloads/sdk/{csharp,python,typescript}.zip`.
 
+**Amended 2026-09-25.** The backend's `docs/` shape is live on APIMatic's dev
+environment, so the stand-in is no longer needed. Point the CLI at it, log in
+there (dev has its own accounts), and run as usual:
+
+```
+$env:APIMATIC_BASE_URL = "https://app.dev.apimatic.io/api;https://auth.dev.apimatic.io;https://api.package-publishing.dev.apimatic.io/api"
+pnpm apimatic auth login
+pnpm apimatic portal generate -i <dir containing src/> --force
+```
+
+Against it, a source directory with the three languages and a `plugin` block
+built in 31 s: real SDKs, SDK docs with H2 and H3 headings, and a real
+`plugin.zip`. The service refuses a `plugin` block without `pluginId`,
+`pluginName` and `pluginVersion`, which the stand-in had accepted; the schema
+now requires all three.
+
 ## 9. Implementation steps
 
 Each step ends with build, lint on the touched files, and the affected tests
@@ -444,7 +460,7 @@ green; review; and an explicit go-ahead before the next step. Nothing is
 committed without asking.
 
 1. **Spike, and the local stand-in.** *Done 2026-09-25; section 10.* In a
-   prepared project: an `<include>` of
+   prepared portal project: an `<include>` of
    a `.md` fragment outside `generated/`. Check that `{` and `<path>` in prose
    survive, the TOC lists its headings, search indexes it, the `.md` twin and
    `llms-full.txt` carry its text, prerender ignores it, and under

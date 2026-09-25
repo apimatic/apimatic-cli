@@ -1,7 +1,7 @@
 import { FileName } from '../file/fileName.js';
 
 /**
- * Where the portal offers what the portal artifacts delivered. The build project lays the files
+ * Where the portal offers what the portal artifacts delivered. The portal project lays the files
  * out under these names, and `portal-template/downloads.ts` serves that directory at this address,
  * so the pages that link to a download and the directory that holds it agree by construction.
  */
