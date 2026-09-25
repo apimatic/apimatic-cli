@@ -4,19 +4,20 @@ import path from 'path';
 import sinon from 'sinon';
 import { expect } from 'chai';
 import { err, ok } from 'neverthrow';
-import { PortalQuickstartAction } from '../../../src/actions/portal/quickstart';
-import { PortalQuickstartPrompts } from '../../../src/prompts/portal/quickstart';
-import { ApiValidatePrompts } from '../../../src/prompts/api/validate';
-import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
-import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
-import { ValidationService } from '../../../src/infrastructure/services/validation-service';
-import { DirectoryPath } from '../../../src/types/file/directoryPath';
-import { FileName } from '../../../src/types/file/fileName';
-import { FilePath } from '../../../src/types/file/filePath';
-import { CommandMetadata } from '../../../src/types/common/command-metadata';
-import { Language } from '../../../src/types/sdk/generate';
-import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
-import { PortalArtifacts } from '../../../src/types/portal/portal-artifacts';
+import { QuickstartAction } from '../../src/actions/quickstart';
+import { PortalQuickstartPrompts } from '../../src/prompts/portal/quickstart';
+import { QuickstartPrompts } from '../../src/prompts/quickstart';
+import { ApiValidatePrompts } from '../../src/prompts/api/validate';
+import { PortalAuthorizationService } from '../../src/infrastructure/services/portal-authorization-service';
+import { PortalProjectService } from '../../src/infrastructure/portal-project-service';
+import { ValidationService } from '../../src/infrastructure/services/validation-service';
+import { DirectoryPath } from '../../src/types/file/directoryPath';
+import { FileName } from '../../src/types/file/fileName';
+import { FilePath } from '../../src/types/file/filePath';
+import { CommandMetadata } from '../../src/types/common/command-metadata';
+import { Language } from '../../src/types/sdk/generate';
+import { PortalArtifactsService } from '../../src/infrastructure/services/portal-artifacts-service';
+import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
 const SPEC = new FilePath(
@@ -26,14 +27,14 @@ const SPEC = new FilePath(
 
 const PASSED = { isSuccess: true, blocking: [], errors: [], warnings: [], information: [] };
 
-describe('PortalQuickstartAction', () => {
+describe('QuickstartAction', () => {
   let root: string;
   let project: DirectoryPath;
   let prompts: sinon.SinonStubbedInstance<PortalQuickstartPrompts>;
   let runtimeProblem: sinon.SinonStub;
   let authorize: sinon.SinonStub;
 
-  const execute = () => new PortalQuickstartAction(new DirectoryPath(root), COMMAND_METADATA).execute();
+  const execute = () => new QuickstartAction(new DirectoryPath(root), COMMAND_METADATA).execute();
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-quickstart-'));
@@ -43,6 +44,7 @@ describe('PortalQuickstartAction', () => {
     fs.mkdirSync(project.toString());
 
     prompts = sinon.stub(PortalQuickstartPrompts.prototype);
+    sinon.stub(QuickstartPrompts.prototype, 'welcomeMessage');
     prompts.specPathPrompt.resolves(SPEC);
     prompts.inputDirectoryPathPrompt.resolves(project);
 
