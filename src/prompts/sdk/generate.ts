@@ -5,6 +5,7 @@ import { Result } from 'neverthrow';
 import { withSpinner } from '../prompt.js';
 import { ServiceError } from '../../infrastructure/service-error.js';
 import { AVAILABLE_LANGUAGES, Language, languageLabel, UPCOMING_LANGUAGES } from '../../types/sdk/generate.js';
+import { VersionProblem } from '../../types/project-context.js';
 
 const names = (languages: readonly Language[]) => languages.map(languageLabel).join(', ');
 
@@ -64,18 +65,16 @@ export class SdkGeneratePrompts {
     log.error(serviceError.errorMessage);
   }
 
-  public invalidVersionedDocsDirectory(directory: DirectoryPath) {
-    const message = `The ${f.var('versioned_docs')} directory is either empty or invalid: ${f.path(directory)}`;
-    log.error(message);
+  public noVersionToBuild(problem: VersionProblem, sourceDirectory: DirectoryPath) {
+    const messages: Record<VersionProblem, string> = {
+      noVersions: `The ${f.var('versioned_docs')} directory is either empty or invalid: ${f.path(sourceDirectory)}`,
+      versionNotFound: 'The selected API version is invalid.'
+    };
+    log.error(messages[problem]);
   }
 
   public apiVersionOnlyApplicableWithVersionedBuild() {
     log.warn(`The ${f.flag('api-version')} is only applicable with a versioned build.`);
-  }
-
-  public versionNotFound() {
-    const message = `The selected API version is invalid.`;
-    log.error(message);
   }
 
   public async selectVersion(versions: string[]): Promise<string | undefined> {

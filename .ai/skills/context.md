@@ -20,7 +20,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 ### Encapsulation — DON'T
 
 - **DON'T** expose internal paths as public getters — no `public get outputDirectory()` or `public get filePath()`. If a caller needs a path, it should come as a return value from an operation.
-  - The one exception: a context whose domain *is* a layout may answer with a directory it **derives**, for a prompt that names it, a service that uploads it, or a check that a destination leaves it alone — never with its own constructor parameter. `ProjectContext` answers `sourceDirectory()` and its output directories, and never the project directory it was made from.
+  - The one exception: a context whose domain *is* a layout may answer with a directory it **derives**, for a prompt that names it or a service that works on it. Checks against that directory stay in the context (`isSourceDirectory()`, `isSourceWithin()`). `ProjectContext` answers `sourceDirectory()` and its output directories, never the project directory it was made from.
 - **DON'T** return raw config objects — don't return parsed JSON/YAML for callers to manipulate directly. Wrap reads/writes in domain methods (e.g., `getCopilotConfig()` instead of `getBuildFileContents()`).
 - **DON'T** expose derived file names — methods like `getScriptFileName()` leak internal naming logic.
 - **DON'T** add public properties for internal state — constructor parameters are `private readonly`, not exposed.

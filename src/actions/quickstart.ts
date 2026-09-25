@@ -12,6 +12,7 @@ import { CommandMetadata } from '../types/common/command-metadata.js';
 import { ValidateAction } from './api/validate.js';
 import { SpecContext } from '../types/spec-context.js';
 import { OpenApiDocument, SpecFormat } from '../types/portal/openapi-document.js';
+import { PortalScaffoldProblem } from '../types/portal/portal-source.js';
 import { PortalAuthorizationService } from '../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../infrastructure/portal-project-service.js';
@@ -20,14 +21,6 @@ import { schemaUrlFor } from '../types/apimatic-config/document.js';
 import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
 import { ProjectContext } from '../types/project-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
-
-/** What the wizard writes into, and the specification it builds the portal from. */
-interface Project {
-  projectDirectory: DirectoryPath;
-  specPath: FilePath;
-  /** True when the project arrived with its own `src/`, which is left where it is. */
-  adopted: boolean;
-}
 
 export class QuickstartAction {
   private readonly prompts: QuickstartPrompts = new QuickstartPrompts();
@@ -80,16 +73,57 @@ export class QuickstartAction {
   };
 
   private async runWizard(workingDirectory: DirectoryPath, tempDirectory: DirectoryPath): Promise<ActionResult> {
-    const found = await this.findProject(workingDirectory, tempDirectory);
-    if (found.isErr()) {
-      return found.error;
-    }
-    const { projectDirectory, specPath, adopted } = found.value;
-    const schemaUrl = schemaUrlFor(envInfo.getCLIVersion());
+    const here = ProjectContext.in(workingDirectory);
+    const adoptedSpec = await here.portalSource().primarySpec();
+    return adoptedSpec === null
+      ? await this.startProject(tempDirectory)
+      : await this.adoptProject(here, workingDirectory, adoptedSpec, tempDirectory);
+  }
 
+  // A build downloaded from the platform arrives with its specification in `src/spec/`, so it is not asked for again.
+  private async adoptProject(
+    project: ProjectContext,
+    projectDirectory: DirectoryPath,
+    specPath: FilePath,
+    tempDirectory: DirectoryPath
+  ): Promise<ActionResult> {
+    this.prompts.importSpecStepAdopted(project.sourceDirectory());
+    const validated = await this.validate(specPath, tempDirectory, true);
+    if (validated.isErr()) {
+      return validated.error;
+    }
+
+    this.prompts.createPortalStep();
+    const scaffolded = await project.portalSource().adopt(validated.value, schemaUrlFor(envInfo.getCLIVersion()));
+    return await this.completeProject(project, projectDirectory, scaffolded);
+  }
+
+  private async startProject(tempDirectory: DirectoryPath): Promise<ActionResult> {
+    this.prompts.importSpecStep();
+    const imported = await this.importSpec(tempDirectory);
+    if (imported === undefined) {
+      return ActionResult.cancelled();
+    }
+    const validated = await this.validate(imported, tempDirectory, false);
+    if (validated.isErr()) {
+      return validated.error;
+    }
+
+    this.prompts.createPortalStep();
+    const projectDirectory = await this.chooseProjectDirectory();
+    if (projectDirectory === undefined) {
+      return ActionResult.cancelled();
+    }
     const project = ProjectContext.in(projectDirectory);
-    const source = project.portalSource();
-    const scaffolded = adopted ? await source.adopt(specPath, schemaUrl) : await source.scaffold(specPath, schemaUrl);
+    const scaffolded = await project.portalSource().scaffold(validated.value, schemaUrlFor(envInfo.getCLIVersion()));
+    return await this.completeProject(project, projectDirectory, scaffolded);
+  }
+
+  private async completeProject(
+    project: ProjectContext,
+    projectDirectory: DirectoryPath,
+    scaffolded: Result<FilePath, PortalScaffoldProblem>
+  ): Promise<ActionResult> {
     const sourceDirectory = project.sourceDirectory();
     if (scaffolded.isErr()) {
       this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
@@ -129,45 +163,6 @@ export class QuickstartAction {
     );
 
     return result.isFailed() ? ActionResult.failed() : ActionResult.success();
-  }
-
-  /**
-   * A build downloaded from the platform arrives with its specification already in `src/spec/`,
-   * so that project is adopted where it stands rather than asked for a second time.
-   */
-  private async findProject(
-    workingDirectory: DirectoryPath,
-    tempDirectory: DirectoryPath
-  ): Promise<Result<Project, ActionResult>> {
-    const here = ProjectContext.in(workingDirectory);
-    const adoptedSpec = await here.portalSource().primarySpec();
-
-    if (adoptedSpec !== null) {
-      this.prompts.importSpecStepAdopted(here.sourceDirectory());
-      const validated = await this.validate(adoptedSpec, tempDirectory, true);
-      if (validated.isErr()) {
-        return err(validated.error);
-      }
-      this.prompts.createPortalStep();
-      return ok({ projectDirectory: workingDirectory, specPath: validated.value, adopted: true });
-    }
-
-    this.prompts.importSpecStep();
-    const imported = await this.importSpec(tempDirectory);
-    if (imported === undefined) {
-      return err(ActionResult.cancelled());
-    }
-    const validated = await this.validate(imported, tempDirectory, false);
-    if (validated.isErr()) {
-      return err(validated.error);
-    }
-
-    this.prompts.createPortalStep();
-    const projectDirectory = await this.chooseProjectDirectory();
-    if (projectDirectory === undefined) {
-      return err(ActionResult.cancelled());
-    }
-    return ok({ projectDirectory, specPath: validated.value, adopted: false });
   }
 
   private async importSpec(tempDirectory: DirectoryPath): Promise<FilePath | undefined> {

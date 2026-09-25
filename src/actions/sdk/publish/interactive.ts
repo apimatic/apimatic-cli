@@ -161,7 +161,7 @@ export class SdkPublishInteractiveAction {
   public static sdkDirectoryValidator(project: ProjectContext): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) return;
-      if (DirectoryPath.fromUserInput(value).isEqual(project.sourceDirectory()))
+      if (project.isSourceDirectory(DirectoryPath.fromUserInput(value)))
         return 'SDK directory must be different from the src directory.';
     };
   }

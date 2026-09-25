@@ -52,6 +52,14 @@ export class ProjectContext {
     return this.source;
   }
 
+  public isSourceDirectory(directory: DirectoryPath): boolean {
+    return this.source.isEqual(directory);
+  }
+
+  public isSourceWithin(directory: DirectoryPath): boolean {
+    return directory.contains(this.source);
+  }
+
   public sdkDirectory(destination?: string): DirectoryPath {
     return this.outputDirectory(OUTPUT_DIRECTORY_NAMES.sdk, destination);
   }
@@ -96,7 +104,7 @@ export class ProjectContext {
     ask: (versions: string[]) => Promise<string | undefined>
   ): Promise<Result<ProjectContext, VersionProblem>> {
     const buildConfig = await this.buildConfig();
-    if (buildConfig === undefined || !buildConfig.isVersioned()) {
+    if (!buildConfig?.isVersioned()) {
       return ok(this);
     }
 
@@ -111,7 +119,7 @@ export class ProjectContext {
       return ok(this.reading(versions[0]));
     }
 
-    const chosen = apiVersion ? apiVersion : await ask(versions.map((version) => version.leafName()));
+    const chosen = apiVersion || (await ask(versions.map((version) => version.leafName())));
     const version = versions.find((directory) => directory.leafName() === chosen);
     return version === undefined ? err('versionNotFound') : ok(this.reading(version));
   }

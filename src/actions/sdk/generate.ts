@@ -37,7 +37,7 @@ export class GenerateAction {
     }
 
     const sourceDirectory = project.sourceDirectory();
-    if (sourceDirectory.isEqual(sdkDirectory)) {
+    if (project.isSourceDirectory(sdkDirectory)) {
       this.prompts.sameSourceAndSdkDir(sourceDirectory);
       return ActionResult.failed();
     }
@@ -53,16 +53,8 @@ export class GenerateAction {
 
     const toBuild = await project.versionToBuild(apiVersion, this.prompts.selectVersion);
     if (toBuild.isErr()) {
-      switch (toBuild.error) {
-        case 'noVersions':
-          this.prompts.invalidVersionedDocsDirectory(sourceDirectory);
-          return ActionResult.failed();
-        case 'versionNotFound':
-          this.prompts.versionNotFound();
-          return ActionResult.failed();
-        default:
-          throw toBuild.error satisfies never;
-      }
+      this.prompts.noVersionToBuild(toBuild.error, sourceDirectory);
+      return ActionResult.failed();
     }
     const buildFrom = toBuild.value;
 

@@ -57,6 +57,16 @@ describe('ProjectContext', () => {
   });
 
   describe('the source', () => {
+    it('is told apart from a destination that is it, or that holds it', () => {
+      const source = new DirectoryPath(inProject('src'));
+
+      expect(project().isSourceDirectory(source)).to.be.true;
+      expect(project().isSourceDirectory(new DirectoryPath(inProject('sdk')))).to.be.false;
+      expect(project().isSourceWithin(new DirectoryPath(projectDirectory))).to.be.true;
+      expect(project().isSourceWithin(source)).to.be.true;
+      expect(project().isSourceWithin(new DirectoryPath(inProject('portal')))).to.be.false;
+    });
+
     it('exists once the source directory does', async () => {
       expect(await project().sourceExists()).to.be.false;
       expect(project().sourceExistsSync()).to.be.false;

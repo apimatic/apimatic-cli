@@ -8,7 +8,7 @@ export class PluginPublishAction {
   private readonly prompts: PluginPublishPrompts = new PluginPublishPrompts();
 
   public readonly execute = async (project: ProjectContext, pluginDirectory: DirectoryPath): Promise<ActionResult> => {
-    if (project.sourceDirectory().isEqual(pluginDirectory)) {
+    if (project.isSourceDirectory(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
       return ActionResult.failed();
     }

@@ -446,6 +446,12 @@ name derivation, destination overrides); the seven action suites and
 - The interactive `sdk publish` still takes the default project directory as
   a `DirectoryPath`: it is the default a prompt offers, and the project is made
   once the user answers.
+- Follow-up from the PR review, per #372's "Project and BuildContext need to
+  be deleted": quickstart's `Project` record is gone. The wizard runs as its
+  two flows, adopting a downloaded project or starting one, with the rest
+  shared. The source-directory checks moved into the context as
+  `isSourceDirectory()` and `isSourceWithin()`, so `sourceDirectory()` is
+  back to serving prompts and services only.
 - Deferred in review: step 9 (the gitignore/`--destination` gap, to a ticket)
   and the `leafName()` rider. Left as is in review: `SdkPublishAction` zips
   `outputDirectory.join(language)`, re-deriving `SdkContext`'s layout, which a

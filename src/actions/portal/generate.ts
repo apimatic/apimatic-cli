@@ -27,16 +27,15 @@ export class GenerateAction {
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
-    const sourceDirectory = project.sourceDirectory();
-    if (sourceDirectory.isEqual(portalDirectory)) {
+    if (project.isSourceDirectory(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
       return ActionResult.failed();
     }
 
     // The destination is emptied before the site is written, so a destination that holds
     // the source would delete the very files being built from.
-    if (portalDirectory.contains(sourceDirectory)) {
-      this.prompts.destinationContainsSource(sourceDirectory, portalDirectory);
+    if (project.isSourceWithin(portalDirectory)) {
+      this.prompts.destinationContainsSource(project.sourceDirectory(), portalDirectory);
       return ActionResult.failed();
     }
 

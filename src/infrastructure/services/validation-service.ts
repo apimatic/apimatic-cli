@@ -1,3 +1,4 @@
+import { ReadStream } from 'node:fs';
 import fsExtra from 'fs-extra';
 import {
   ApiResponse,
@@ -34,9 +35,10 @@ export class ValidationService {
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const controller = new ApiValidationV2ExternalApisController(client);
-    const fileStream = fsExtra.createReadStream(file.toString());
 
+    let fileStream: ReadStream | undefined;
     try {
+      fileStream = fsExtra.createReadStream(file.toString());
       const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
         new FileWrapper(fileStream)
@@ -45,7 +47,7 @@ export class ValidationService {
     } catch (error) {
       return err(await this.handleValidationErrors(error));
     } finally {
-      fileStream.close();
+      fileStream?.close();
     }
   }
 

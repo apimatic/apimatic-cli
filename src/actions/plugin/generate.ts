@@ -34,7 +34,7 @@ export class PluginGenerateAction {
     force: boolean
   ): Promise<ActionResult> => {
     const sourceDirectory = project.sourceDirectory();
-    if (sourceDirectory.isEqual(pluginDirectory)) {
+    if (project.isSourceDirectory(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
       return ActionResult.failed();
     }

@@ -35,7 +35,7 @@ export class SdkPublishNonInteractiveAction {
     profileId?: string,
     version?: string
   ): Promise<ActionResult> => {
-    if (project.sourceDirectory().isEqual(sdkDirectory)) {
+    if (project.isSourceDirectory(sdkDirectory)) {
       this.prompts.directoryCannotBeSame(sdkDirectory);
       return ActionResult.failed();
     }
