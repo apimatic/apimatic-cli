@@ -75,8 +75,7 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfile = PublishingProfile.create(publishingProfileItem);
 
-    // The profile can enable a language the v4 generator does not render yet. Offering it would
-    // end the run at generation, after the version and the confirmation had already been asked for.
+    // Offering one v4 cannot render would end the run after the version was already asked for.
     const offered = publishingProfile.getEnabledLanguages().filter((enabled) => AVAILABLE_LANGUAGES.includes(enabled));
     if (offered.length === 0) {
       this.prompts.noAvailableLanguageOnProfile(publishingProfile.getEnabledLanguages());
@@ -89,7 +88,6 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    // One level is not a question. The moment a language offers both, this asks.
     const levels = stabilityLevelsFor(language);
     const stability = levels.length === 1 ? levels[0] : await this.prompts.selectStability(levels);
     if (!stability) {
@@ -147,8 +145,6 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    // Bookkeeping, not a decision: nobody publishes an SDK and then wants their plugin to keep
-    // describing a local copy. It happens, and says so.
     await new PluginRecordSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, version);
 
     return ActionResult.success();

@@ -81,7 +81,7 @@ Use when creating a new Prompts class. Choose the variant that matches the comma
 ### What to determine
 
 1. **Topic** — folder path matching the action (e.g., `auth`, `api`, `sdk`, `portal`, `sdk/publish`)
-2. **Name** — file name, lowercase hyphenated (e.g., `login`, `generate`, `save-changes`)
+2. **Name** — file name, lowercase hyphenated (e.g., `login`, `generate`, `record-sdk`)
 3. **Class name** — PascalCase with `Prompts` suffix (e.g., `LoginPrompts`, `SdkGeneratePrompts`)
 4. **Variant** — one of:
    - `simple` — log methods and optional spinner; no interactive prompts

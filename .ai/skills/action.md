@@ -93,7 +93,7 @@ Use when creating a new Action class. Choose the variant that matches the action
 ### What to determine
 
 1. **Topic** — action group folder (e.g., `api`, `sdk`, `portal`). Can be nested: `sdk/publish`, `publishing/profile`
-2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `save-changes`)
+2. **Action name** — file name, lowercase hyphenated (e.g., `validate`, `generate`, `record-sdk`)
 3. **Class name** — PascalCase with `Action` suffix (e.g., `ValidateAction`, `PortalNewTocAction`)
 4. **Variant** — one of:
    - `standard` — full constructor with configDir, commandMetadata, authKey; services, withDirPath, prompts

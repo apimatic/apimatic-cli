@@ -50,12 +50,6 @@ Documentation portals are now built on your machine from a `src/` directory, and
   longer takes `--destination` or `--no-reload`. Run `apimatic autocomplete --refresh-cache`
   to drop the removed commands from shell completion.
 
-# SDK languages
-
-SDKs are generated with version 4 of the code generator, which renders C#, TypeScript and
-Python. `--language` still accepts Java, Ruby, Go and PHP; each is refused by name until it
-reaches version 4.
-
 # Usage
 <!-- usage -->
 ```sh-session
@@ -445,7 +439,7 @@ FLAGS
       --api-version=<value>       Version of the API to use for SDK generation (if multiple versions exist)
       --codegen-version=<option>  [default: v4] Version of the code generator to use
                                   <options: v4>
-      --stability=<option>        [default: stable] Stability level of the generated SDK
+      --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
       --zip                       Download the generated SDK as a .zip archive
 
@@ -490,7 +484,7 @@ FLAGS
       --publish-type=<option>...  One or more publishing targets: 'package' for a package registry, 'sourcecode' for a
                                   git repository.
                                   <options: package|sourcecode>
-      --stability=<option>        [default: stable] Stability level of the generated SDK
+      --stability=<option>        Stability level of the generated SDK. Defaults to the level the language offers.
                                   <options: stable|beta>
 
 DESCRIPTION

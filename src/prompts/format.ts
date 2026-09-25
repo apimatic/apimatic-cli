@@ -1,4 +1,3 @@
-import nodePath from 'node:path';
 import pc from 'picocolors';
 import { intro as i, outro as o } from '@clack/prompts';
 import { ActionResult } from '../actions/action-result.js';
@@ -9,17 +8,7 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
-  /**
-   * A location as a reader would type it from where they are: `./sdk/typescript` for something
-   * beside them, the full path for anything else. `DirectoryPath` resolves on construction, so
-   * without this even the directory the command was run in prints as an absolute path.
-   */
-  relative: (target: DirectoryPath | FilePath) => {
-    const here = nodePath.relative(process.cwd(), String(target));
-    return here === '' || here.startsWith('..') || nodePath.isAbsolute(here)
-      ? String(target)
-      : `./${here.split(nodePath.sep).join('/')}`;
-  },
+  relative: (target: DirectoryPath | FilePath) => target.asTypedFrom(DirectoryPath.workingDirectory()),
   relativePath: (target: DirectoryPath | FilePath) => pc.cyan(`'${format.relative(target)}'`),
   cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map((arg) => pc.dim(arg)).join(' ')}`,
   cmdAlt: (cmd: string, ...args: string[]) =>

@@ -16,10 +16,8 @@ export class SdkGeneratePrompts {
    */
   public languageNotAvailable(language: Language) {
     log.error(
-      `${languageLabel(language)} isn't available yet.
-` +
-        `Available now: ${names(AVAILABLE_LANGUAGES)}
-` +
+      `${languageLabel(language)} isn't available yet.\n` +
+        `Available now: ${names(AVAILABLE_LANGUAGES)}\n` +
         `Coming soon: ${names(UPCOMING_LANGUAGES)}`
     );
   }

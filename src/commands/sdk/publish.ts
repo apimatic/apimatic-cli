@@ -1,7 +1,8 @@
 import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
-import { CodeGenerationVersion, defaultStability, Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
@@ -45,17 +46,14 @@ export default class SdkPublish extends Command {
       default: false,
       description: 'Generate the SDK locally for review without publishing.'
     }),
-    // One value today. It stays a flag so the switch to the next generator is a value a caller
-    // passes rather than a release that silently changes what they get.
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
       options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
       default: CodeGenerationVersion.V4
     }),
     stability: Flags.string({
-      description: 'Stability level of the generated SDK',
-      options: Object.values(Stability).map((s) => s.valueOf()),
-      default: Stability.STABLE
+      description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
+      options: Object.values(Stability).map((s) => s.valueOf())
     })
   };
 
@@ -93,8 +91,7 @@ export default class SdkPublish extends Command {
         'dry-run': dryRun,
         stability,
         'codegen-version': codegenVersion
-      },
-      metadata
+      }
     } = await this.parse(SdkPublish);
 
     const publishTypes = [...new Set(publishType)] as PublishType[];
@@ -140,10 +137,7 @@ export default class SdkPublish extends Command {
           publishTypes,
           force,
           dryRun,
-          metadata.flags.stability?.setFromDefault === true
-            ? defaultStability(language as Language)
-            : (stability as Stability),
-          metadata.flags.stability?.setFromDefault !== true,
+          StabilityChoice.for(language as Language, stability),
           onPublishSdkError,
           profileId,
           version

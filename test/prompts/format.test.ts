@@ -25,9 +25,16 @@ describe('format.relative', () => {
     expect(format.relative(outside)).to.equal(String(outside));
   });
 
-  it('leaves the current directory itself absolute, having nothing shorter to say', () => {
+  it('names the directory the command was run in as the one you are standing in', () => {
     const cwd = new DirectoryPath(process.cwd());
 
-    expect(format.relative(cwd)).to.equal(String(cwd));
+    expect(format.relative(cwd)).to.equal('.');
+  });
+
+  // `..cache` is a child, not a sibling: only a whole `..` segment leaves the directory.
+  it('keeps a child whose name merely begins with dots relative', () => {
+    const dotted = new DirectoryPath(process.cwd()).join('..cache');
+
+    expect(format.relative(dotted)).to.equal('./..cache');
   });
 });

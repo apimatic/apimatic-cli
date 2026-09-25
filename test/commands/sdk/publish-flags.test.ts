@@ -54,16 +54,18 @@ describe('sdk publish flags', () => {
     expect(metadata.flags.stability?.setFromDefault).to.not.equal(true);
   });
 
-  // The summary names the level only when the user picked it, which is read from oclif's parse
-  // metadata rather than the value — `--stability stable` and the default are the same string.
-  it('reports a stability level that only came from the default', async () => {
-    const { flags, metadata } = (await parse([])) as never as {
-      flags: Record<string, unknown>;
-      metadata: { flags: Record<string, { setFromDefault?: boolean } | undefined> };
-    };
+  // The level a language offers is the only one its generator accepts, so the flag carries no
+  // default of its own: absent means unchosen, and the run resolves it per language.
+  it('leaves stability unset when it was not asked for', async () => {
+    const { flags } = (await parse([])) as never as { flags: Record<string, unknown> };
 
-    expect(flags.stability).to.equal(Stability.STABLE);
-    expect(metadata.flags.stability?.setFromDefault).to.equal(true);
+    expect(flags.stability).to.be.undefined;
+  });
+
+  it('keeps a stability the caller did ask for', async () => {
+    const { flags } = (await parse(['--stability', 'beta'])) as never as { flags: Record<string, unknown> };
+
+    expect(flags.stability).to.equal(Stability.BETA);
   });
 
   it('still parses the flags a publish is actually made of', async () => {

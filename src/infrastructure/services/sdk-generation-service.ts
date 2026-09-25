@@ -74,7 +74,7 @@ export class SdkGenerationService {
     const statusResult = await pollUntilCompleted({
       pollIntervalMs: this.timings.pollIntervalMs,
       fetchStatus: () =>
-        this.getV4SdkGenerationStatus(generationId, commandMetadata.shell, this.resolveToken(authInfo, authKey)),
+        this.getSdkGenerationStatus(generationId, commandMetadata.shell, this.resolveToken(authInfo, authKey)),
       timeout: { budgetMs: this.timings.generationTimeoutMs, label: 'SDK generation' }
     });
     if (statusResult.isErr()) {
@@ -97,7 +97,7 @@ export class SdkGenerationService {
     return overrideAuthKey || authInfo?.authKey;
   };
 
-  private async getV4SdkGenerationStatus(
+  private async getSdkGenerationStatus(
     requestId: string,
     shell: string,
     token: string | undefined

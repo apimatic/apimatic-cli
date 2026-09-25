@@ -1,3 +1,4 @@
+import { NonEmptyArray } from '../utils.js';
 export enum Language {
   CSHARP = 'csharp',
   JAVA = 'java',
@@ -8,10 +9,7 @@ export enum Language {
   GO = 'go'
 }
 
-/**
- * The versions this CLI can generate with. v3 is retired, so v4 is the only one — but it stays an
- * enum rather than a constant because the next one is a line here and nothing else.
- */
+/** An enum, not a constant, so the next generator is a line here and nothing else. */
 export enum CodeGenerationVersion {
   V4 = 'v4'
 }
@@ -63,48 +61,58 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
   Language.GO
 ].map((value) => ({ label: LANGUAGE_NAMES[value], value }));
 
-/**
- * The languages the v4 code generator renders. With v3 retired these are the only SDKs the CLI can
- * produce, so a language outside this list is refused before anything is uploaded — and a plugin
- * cannot carry one whatever its config says.
- */
-export const AVAILABLE_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
+/** What each generator offers for a language. A language absent from it cannot be generated. */
+export class CodegenOption {
+  private constructor(private readonly version: CodeGenerationVersion, private readonly stability: Stability) {}
 
-/**
- * Everything v4 does not render yet, which is the rest of the enum. Derived rather than listed,
- * so a language cannot end up named by both or by neither when one of them changes -- adding a
- * renderer is then one edit, to the list above.
- *
- * They are named in the refusal rather than left out of it: a user whose language is coming back
- * reads something different from one who mistyped. The order is the one every other list shows.
- */
+  public static create(version: CodeGenerationVersion, stability: Stability): CodegenOption {
+    return new CodegenOption(version, stability);
+  }
+
+  public codeGenerationVersion(): CodeGenerationVersion {
+    return this.version;
+  }
+
+  public stabilityLevel(): Stability {
+    return this.stability;
+  }
+
+  public toString(): string {
+    return `${this.version.toUpperCase()} (${this.stability})`;
+  }
+}
+
+/** The generator and level together, because neither is a choice the other can be made without. */
+export const CODEGEN_OPTIONS: Readonly<Partial<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>>> = {
+  [Language.CSHARP]: [CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
+  [Language.TYPESCRIPT]: [CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
+  [Language.PYTHON]: [CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)]
+};
+
+/** The keys of the table above: a language is available exactly when something can generate it. */
+export const AVAILABLE_LANGUAGES: readonly Language[] = Object.keys(CODEGEN_OPTIONS) as Language[];
+
+/** The rest of the enum, so a language cannot be named by both lists or by neither. */
 export const UPCOMING_LANGUAGES: readonly Language[] = LANGUAGE_CHOICES.map((choice) => choice.value).filter(
   (language) => !AVAILABLE_LANGUAGES.includes(language)
 );
 
-/** Takes a string because config files name their languages, and a file may name anything. */
+/** Takes a string because a config file names its own languages, and may name anything. */
 export function isAvailableLanguage(language: string): language is Language {
   return AVAILABLE_LANGUAGES.includes(language as Language);
 }
 
-/**
- * What v4 offers per language. Every renderer is beta today, but they reach stable one at a time,
- * so this is a table rather than a constant: a language with both levels is one a user picks
- * between, and the interactive flow asks as soon as there is something to ask.
- */
-const V4_STABILITY_LEVELS: Partial<Record<Language, readonly Stability[]>> = {
-  [Language.CSHARP]: [Stability.BETA],
-  [Language.TYPESCRIPT]: [Stability.BETA],
-  [Language.PYTHON]: [Stability.BETA]
-};
-
-export function stabilityLevelsFor(language: Language): readonly Stability[] {
-  return V4_STABILITY_LEVELS[language] ?? [Stability.STABLE];
+export function codegenOptionsFor(language: Language): readonly CodegenOption[] {
+  return CODEGEN_OPTIONS[language] ?? [];
 }
 
-/** What a flow that never asks should send: the only level, until there is more than one. */
+export function stabilityLevelsFor(language: Language): readonly Stability[] {
+  return codegenOptionsFor(language).map((option) => option.stabilityLevel());
+}
+
+/** What a flow that never asks sends: the only level a language offers, until there are two. */
 export function defaultStability(language: Language): Stability {
-  return stabilityLevelsFor(language)[0];
+  return stabilityLevelsFor(language)[0] ?? Stability.STABLE;
 }
 
 /** The name a language is shown under everywhere, so one reads the same in every message. */

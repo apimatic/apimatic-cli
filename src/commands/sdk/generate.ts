@@ -2,7 +2,8 @@ import { Command, Flags } from '@oclif/core';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { GenerateAction } from '../../actions/sdk/generate.js';
-import { CodeGenerationVersion, defaultStability, Language, Stability } from '../../types/sdk/generate.js';
+import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
+import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
@@ -35,17 +36,14 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
       default: false,
       description: 'Download the generated SDK as a .zip archive'
     }),
-    // One value today. It stays a flag so the switch to the next generator is a value a caller
-    // passes rather than a release that silently changes what they get.
     'codegen-version': Flags.string({
       description: 'Version of the code generator to use',
       options: Object.values(CodeGenerationVersion).map((v) => v.valueOf()),
       default: CodeGenerationVersion.V4
     }),
     stability: Flags.string({
-      description: 'Stability level of the generated SDK',
-      options: Object.values(Stability).map((s) => s.valueOf()),
-      default: Stability.STABLE
+      description: 'Stability level of the generated SDK. Defaults to the level the language offers.',
+      options: Object.values(Stability).map((s) => s.valueOf())
     }),
     ...FlagsProvider.input,
     ...FlagsProvider.force,
@@ -71,17 +69,8 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
         stability,
         'auth-key': authKey,
         'api-version': apiVersion
-      },
-      metadata
+      }
     } = await this.parse(SdkGenerate);
-
-    // The flag's own default is the same string for every language, and v4 renders all three it
-    // can at beta: sending `stable` unasked is a refusal the caller did nothing to earn. What a
-    // caller typed is sent as typed; what they left alone is what the language actually offers.
-    const level =
-      metadata.flags.stability?.setFromDefault === true
-        ? defaultStability(language as Language)
-        : (stability as Stability);
 
     const workingDirectory = DirectoryPath.createInput(input);
     const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
@@ -98,7 +87,7 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
       sourceDirectory,
       sdkDirectory,
       language as Language,
-      level,
+      StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,
       zipSdk,
       apiVersion

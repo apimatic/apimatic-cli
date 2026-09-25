@@ -153,8 +153,7 @@ export class SdkPublishInteractivePrompts {
   public noAvailableLanguageOnProfile(enabled: readonly Language[]) {
     log.error(
       `This publishing profile is configured for ${enabled.map(languageLabel).join(', ')}, ` +
-        `and none of those can be generated yet.
-` +
+        `and none of those can be generated yet.\n` +
         `Available now: ${AVAILABLE_LANGUAGES.map(languageLabel).join(', ')}`
     );
   }

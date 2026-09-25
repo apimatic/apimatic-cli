@@ -119,8 +119,7 @@ const recorded = (
 const keepsRecord = (language: string, entry: PluginLanguageEntry<Language> | undefined): boolean =>
   !isAvailableLanguage(language) || isPublished(entry);
 
-/** In the upload only the covered languages remain, beside the ones a plugin never carries. */
-const isNotPluginLanguage = (language: string): boolean => !isAvailableLanguage(language);
+const isUnavailableLanguage = (language: string): boolean => !isAvailableLanguage(language);
 
 export class PluginConfigContext {
   private readonly configContext: ApimaticConfigContext;
@@ -183,7 +182,7 @@ export class PluginConfigContext {
 
     const config = new ApimaticConfigContext(staged);
     const covered = await config.merge(OWNED_BLOCKS, (document) =>
-      document.with('languages', recorded(document, languages, isNotPluginLanguage))
+      document.with('languages', recorded(document, languages, isUnavailableLanguage))
     );
 
     // The merge writes nothing when it changes nothing, so a mark on the copy can outlive it —

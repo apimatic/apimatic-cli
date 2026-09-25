@@ -32,8 +32,6 @@ export class GenerateAction {
     apiVersion?: string,
     packageSettingsDirectory?: DirectoryPath
   ): Promise<ActionResult> => {
-    // Refused here rather than by the flag parser, so the answer names what is coming back instead
-    // of listing the values the flag happens to accept.
     if (!isAvailableLanguage(language)) {
       this.prompts.languageNotAvailable(language);
       return ActionResult.failed();

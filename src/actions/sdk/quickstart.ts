@@ -12,7 +12,7 @@ import { ValidateAction } from '../api/validate.js';
 import { FileDownloadService } from '../../infrastructure/services/file-download-service.js';
 import { FileService } from '../../infrastructure/file-service.js';
 import { GenerateAction } from './generate.js';
-import { defaultStability, Language, mapLanguages } from '../../types/sdk/generate.js';
+import { defaultStability, isAvailableLanguage, Language, mapLanguages } from '../../types/sdk/generate.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { ZipService } from '../../infrastructure/zip-service.js';
 import { FileName } from '../../types/file/fileName.js';
@@ -56,9 +56,10 @@ export class SdkQuickstartAction {
         this.prompts.accountInfoFetchFailed(accountInfo.error);
         return ActionResult.failed();
       }
-      // An SDK needs a language; with none on the plan (e.g. the free plan) there's
-      // nothing to generate, so stop before importing or pruning a spec.
-      if (mapLanguages(accountInfo.value.allowedLanguages).length === 0) {
+      // A language the plan allows but v4 cannot render yet would walk the user through four
+      // steps to a refusal, so only what both permit counts as something to generate.
+      const offered = mapLanguages(accountInfo.value.allowedLanguages).filter(isAvailableLanguage);
+      if (offered.length === 0) {
         this.prompts.noLanguagesAvailableOnPlan();
         return ActionResult.cancelled();
       }
@@ -146,7 +147,7 @@ export class SdkQuickstartAction {
 
       // Step 3/4
       this.prompts.selectLanguageStep();
-      const language = await this.prompts.selectLanguagePrompt(mapLanguages(accountInfo.value.allowedLanguages));
+      const language = await this.prompts.selectLanguagePrompt(offered);
       if (!language) {
         this.prompts.noLanguageSelected();
         return ActionResult.cancelled();
