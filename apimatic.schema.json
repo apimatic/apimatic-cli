@@ -176,13 +176,19 @@
               "description": "Whether each page offers to open itself in an external AI assistant."
             }
           }
+        },
+        "pluginUrl": {
+          "type": "string",
+          "description": "Where the context plugin is hosted, starting with 'https://' and with no spaces. The Context Plugin page installs it from here, and the portal carries no copy of its own.",
+          "pattern": "^[hH][tT][tT][pP][sS]://[^\\s/?#]+(?:[/?#]\\S*)?$"
         }
       }
     },
     "plugin": {
       "type": "object",
-      "description": "The context plugin's identity, which 'apimatic plugin generate' records.",
+      "description": "The context plugin's identity, which 'apimatic plugin generate' records. Its ID, name and version are required to generate the plugin.",
       "additionalProperties": true,
+      "required": ["pluginId", "pluginName", "pluginVersion"],
       "properties": {
         "pluginId": {
           "type": "string",
@@ -190,7 +196,12 @@
           "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
         },
         "pluginName": {
-          "type": "string"
+          "allOf": [
+            {
+              "$ref": "#/definitions/nonBlank"
+            }
+          ],
+          "description": "The name the plugin is shown by, for example 'Acme Payments'."
         },
         "pluginVersion": {
           "allOf": [

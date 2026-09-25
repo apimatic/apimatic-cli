@@ -27,32 +27,67 @@ describe('PortalLanguages', () => {
   it('counts a language that is wanted but not yet published', () => {
     const languages = read({ languages: { typescript: {} } })._unsafeUnwrap();
 
-    expect(languages.all()).to.deep.equal([Language.TYPESCRIPT]);
+    expect(languages.listed().map((sdk) => sdk.language)).to.deep.equal([Language.TYPESCRIPT]);
   });
 
   it('counts published and unpublished languages alike, in the order written', () => {
     const languages = read({
       languages: {
-        python: { publishing: { package: { name: 'calc', version: '1.0.0' }, codegenVersion: 'v4' } },
-        java: { publishing: { codegenVersion: 'v3' } }
+        python: { publishing: { package: { version: '1.0.0' }, packageConfiguration: { name: 'calc' } } },
+        csharp: {},
+        typescript: { publishing: { source: { repositoryUrl: 'https://github.com/acme/calc-ts' } } }
       }
     })._unsafeUnwrap();
 
-    expect(languages.all()).to.deep.equal([Language.PYTHON, Language.JAVA]);
+    expect(languages.listed().map((sdk) => sdk.language)).to.deep.equal([
+      Language.PYTHON,
+      Language.CSHARP,
+      Language.TYPESCRIPT
+    ]);
   });
 
-  it('refuses a key that is no SDK language', () => {
+  it("keeps what each language's publishing record says", () => {
+    const [python, csharp] = read({
+      languages: {
+        python: {
+          publishing: {
+            source: { repositoryUrl: 'https://github.com/acme/calc-py' },
+            package: { version: '1.0.0' },
+            packageConfiguration: { name: 'calc' }
+          }
+        },
+        csharp: {}
+      }
+    })
+      ._unsafeUnwrap()
+      .listed();
+
+    expect(`${python.sourceRepository()}`).to.equal('https://github.com/acme/calc-py');
+    expect(python.release()?.version).to.equal('1.0.0');
+    expect(csharp.sourceRepository()).to.be.null;
+    expect(csharp.release()).to.be.null;
+  });
+
+  // Only three languages can be generated for today; the rest are named as coming, not as typos.
+  it('refuses a language that is not available yet, naming the ones that are', () => {
+    expect(read({ languages: { typescript: {}, java: {}, go: {} } })._unsafeUnwrapErr()).to.deep.equal([
+      "'languages.java' is not available yet; the portal supports 'csharp', 'typescript', 'python' today.",
+      "'languages.go' is not available yet; the portal supports 'csharp', 'typescript', 'python' today."
+    ]);
+  });
+
+  it('refuses a key that is no SDK language, naming the ones it could be', () => {
     expect(read({ languages: { typescipt: {} } })._unsafeUnwrapErr()).to.deep.equal([
-      "'languages.typescipt' is not an SDK language; name one of 'csharp', 'java', 'php', 'python', 'ruby', 'typescript', 'go'."
+      "'languages.typescipt' is not an SDK language; name one of 'csharp', 'typescript', 'python'."
     ]);
   });
 
   // The document's own shape checks already say what is wrong, so nothing is added to them.
   it('reports a block or an entry of the wrong shape as the document found it', () => {
     expect(read({ languages: 'typescript' })._unsafeUnwrapErr()).to.deep.equal(["'languages' is not a JSON object."]);
-    expect(read({ languages: { go: 'yes', ruby: { publishing: 1 } } })._unsafeUnwrapErr()).to.deep.equal([
-      "'languages.go' is not a JSON object.",
-      "'languages.ruby.publishing' is not a JSON object."
+    expect(read({ languages: { csharp: 'yes', python: { publishing: 1 } } })._unsafeUnwrapErr()).to.deep.equal([
+      "'languages.csharp' is not a JSON object.",
+      "'languages.python.publishing' is not a JSON object."
     ]);
   });
 });

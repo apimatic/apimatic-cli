@@ -9,7 +9,7 @@ import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
 import { Endpoint } from './portal/endpoint.js';
-import { GENERATED_SECTIONS, GeneratedPages } from './portal/generated-pages.js';
+import { GENERATED_SECTIONS, GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
@@ -229,8 +229,17 @@ export class PortalSourceContext {
     }
     return ok({
       config: config.value,
-      generatedPages: GeneratedPages.of(languages.value, document.plugin() !== undefined)
+      generatedPages: GeneratedPages.of(languages.value, PortalSourceContext.pluginSource(config.value, document))
     });
+  }
+
+  /** A hosted plugin is installed from its address, whatever the block says; otherwise the block's is bundled. */
+  private static pluginSource(config: PortalConfig, document: ApimaticConfigDocument): PluginSource | null {
+    const url = config.pluginUrl();
+    if (url !== null) {
+      return { kind: 'hosted', url };
+    }
+    return document.plugin() === undefined ? null : { kind: 'bundled' };
   }
 
   private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {

@@ -1,6 +1,16 @@
+import { posix } from 'node:path';
 import { FileName } from '../file/fileName.js';
+import { UrlPath } from '../file/urlPath.js';
 import { Language, LANGUAGE_NAMES } from '../sdk/generate.js';
+import { sdkDocsPath } from './page-fragments.js';
+import { PageRecord, PageValues } from './page-template.js';
+import { PortalArtifacts } from './portal-artifacts.js';
+import { PLUGIN_DOWNLOAD_ADDRESS, sdkDownloadAddress } from './portal-downloads.js';
 import { PortalLanguages } from './portal-languages.js';
+import { PortalSdk } from './portal-sdk.js';
+
+// `src/lib/source.ts` names it as a relative literal, so the browser bundle never carries the project's location.
+export const GENERATED_DIRECTORY_NAME = 'generated';
 
 /** A set of pages the CLI writes into the portal, which the portal shows as a tab of its own. */
 export interface GeneratedSection {
@@ -19,6 +29,8 @@ export const SDK_SECTION: GeneratedSection = {
   title: 'SDKs',
   description: 'the SDK pages'
 };
+
+const SDK_PAGES_DIRECTORY = posix.join(GENERATED_DIRECTORY_NAME, SDK_SECTION.folder);
 
 export const PLUGIN_SECTION: GeneratedSection = {
   folder: 'context-plugin',
@@ -42,7 +54,18 @@ export interface GeneratedPage {
   section: GeneratedSection;
   fileName: FileName;
   template: PageTemplateName;
-  data: Readonly<Record<string, string>>;
+  data: PageValues;
+}
+
+/** A hosted plugin is installed from `portal.pluginUrl`, and the portal artifacts carry none. */
+export type PluginSource = { kind: 'bundled' } | { kind: 'hosted'; url: UrlPath };
+
+/** What the pages link to or include that the portal artifacts did not deliver. */
+export interface MissingArtifacts {
+  sdks: Language[];
+  sdkDocs: Language[];
+  /** Whether the plugin the page installs from the portal is not among them. */
+  plugin: boolean;
 }
 
 /** A section's `nav.json`, which names its tab and orders its pages. */
@@ -53,35 +76,32 @@ export interface GeneratedNavigation {
 
 /**
  * The pages `apimatic.json` calls for: the SDKs page and one page per language, in the order
- * the `languages` block lists them, and the context plugin page when there is a `plugin` block.
+ * the `languages` block lists them, and the context plugin page when there is a plugin to install.
  */
 export class GeneratedPages {
-  private constructor(private readonly languages: readonly Language[], private readonly plugin: boolean) {}
+  private constructor(private readonly sdks: readonly PortalSdk[], private readonly plugin: PluginSource | null) {}
 
-  public static of(languages: PortalLanguages, plugin: boolean): GeneratedPages {
-    return new GeneratedPages(languages.all(), plugin);
+  public static of(languages: PortalLanguages, plugin: PluginSource | null): GeneratedPages {
+    return new GeneratedPages(languages.listed(), plugin);
   }
 
   public sections(): GeneratedSection[] {
-    return this.plugin ? [SDK_SECTION, PLUGIN_SECTION] : [SDK_SECTION];
+    return this.plugin === null ? [SDK_SECTION] : [SDK_SECTION, PLUGIN_SECTION];
   }
 
   public pages(): GeneratedPage[] {
-    const languagePages = this.languages.map(
-      (language): GeneratedPage => ({
+    const languagePages = this.sdks.map(
+      (sdk): GeneratedPage => ({
         section: SDK_SECTION,
-        fileName: new FileName(`${language}.mdx`),
+        fileName: new FileName(`${sdk.language}.mdx`),
         template: 'sdk',
-        data: { language, name: LANGUAGE_NAMES[language] }
+        data: { ...card(sdk), docs: posix.relative(SDK_PAGES_DIRECTORY, sdkDocsPath(sdk.language)) }
       })
     );
-    const pluginPages: GeneratedPage[] = this.plugin
-      ? [{ section: PLUGIN_SECTION, fileName: INDEX_PAGE, template: 'context-plugin', data: {} }]
-      : [];
     return [
-      { section: SDK_SECTION, fileName: INDEX_PAGE, template: 'sdks', data: {} },
+      { section: SDK_SECTION, fileName: INDEX_PAGE, template: 'sdks', data: { sdks: this.sdks.map(card) } },
       ...languagePages,
-      ...pluginPages
+      ...(this.plugin === null ? [] : [this.pluginPage(this.plugin)])
     ];
   }
 
@@ -90,10 +110,56 @@ export class GeneratedPages {
     return this.sections().map((section) => ({
       section,
       contents: `${JSON.stringify(
-        section === SDK_SECTION ? { title: section.title, pages: this.languages } : { title: section.title },
+        section === SDK_SECTION
+          ? { title: section.title, pages: this.sdks.map((sdk) => sdk.language) }
+          : { title: section.title },
         null,
         2
       )}\n`
     }));
   }
+
+  /** Null when the artifacts back every page; a page backed by nothing fails the build or links nowhere. */
+  public missingFrom(artifacts: PortalArtifacts): MissingArtifacts | null {
+    const languages = this.sdks.map((sdk) => sdk.language);
+    const sdks = languages.filter((language) => !artifacts.sdks.has(language));
+    const sdkDocs = languages.filter((language) => !artifacts.sdkDocs.has(language));
+    const plugin = this.plugin?.kind === 'bundled' && artifacts.plugin === undefined;
+    return sdks.length > 0 || sdkDocs.length > 0 || plugin ? { sdks, sdkDocs, plugin } : null;
+  }
+
+  // Every language the portal supports can be carried by a plugin, so the page lists them all.
+  private pluginPage(plugin: PluginSource): GeneratedPage {
+    return {
+      section: PLUGIN_SECTION,
+      fileName: INDEX_PAGE,
+      template: 'context-plugin',
+      data: {
+        installPath: plugin.kind === 'hosted' ? attribute(plugin.url) : PLUGIN_DOWNLOAD_ADDRESS,
+        languages: this.sdks.map((sdk) => ({ language: sdk.language, name: LANGUAGE_NAMES[sdk.language] }))
+      }
+    };
+  }
+}
+
+/** Every field is present, empty when nothing is recorded, so a template's attribute list is fixed. */
+function card(sdk: PortalSdk): PageRecord {
+  const release = sdk.release();
+  const source = sdk.sourceRepository();
+  return {
+    language: sdk.language,
+    name: LANGUAGE_NAMES[sdk.language],
+    page: `/${SDK_SECTION.folder}/${sdk.language}`,
+    download: sdkDownloadAddress(sdk.language),
+    source: source === null ? '' : attribute(source),
+    version: release === null ? '' : attribute(release.version),
+    packageName: release === null ? '' : attribute(release.package.name),
+    packageUrl: release === null ? '' : attribute(release.package.url),
+    registry: release === null ? '' : release.package.registry
+  };
+}
+
+// A double-quoted JSX attribute, whose entities MDX decodes: `&` first, so an `&amp;` in a value survives.
+function attribute(value: string | UrlPath): string {
+  return `${value}`.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }

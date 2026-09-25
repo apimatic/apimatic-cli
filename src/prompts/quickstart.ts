@@ -30,7 +30,6 @@ Portal, SDKs and Context Plugins.
 Let's get started!`);
   }
 
-
   public importSpecStep() {
     log.info(`Step 1 of 3: Import your OpenAPI Definition`);
   }

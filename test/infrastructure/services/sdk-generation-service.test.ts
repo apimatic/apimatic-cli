@@ -108,7 +108,8 @@ describe('SdkGenerationService generation status polling', () => {
   const errorFrom = (result: { _unsafeUnwrapErr(): unknown }) => result._unsafeUnwrapErr() as ServiceError;
 
   describe('generateSdk', () => {
-    const generateSdk = () => service.generateSdk(buildPath, Language.TYPESCRIPT, Stability.BETA, configDir, metadata, AUTH_KEY);
+    const generateSdk = () =>
+      service.generateSdk(buildPath, Language.TYPESCRIPT, Stability.BETA, configDir, metadata, AUTH_KEY);
 
     it('polls the v4 status path and downloads once complete', async () => {
       respondToStatus = (res) => redirectToDownload(res);
@@ -143,7 +144,14 @@ describe('SdkGenerationService generation status polling', () => {
     });
 
     it('bounds sdk generation', async () => {
-      const result = await impatient().generateSdk(buildPath, Language.TYPESCRIPT, Stability.BETA, configDir, metadata, AUTH_KEY);
+      const result = await impatient().generateSdk(
+        buildPath,
+        Language.TYPESCRIPT,
+        Stability.BETA,
+        configDir,
+        metadata,
+        AUTH_KEY
+      );
 
       expect(errorFrom(result).code).to.equal(ServiceErrorCode.Timeout);
       expect(errorFrom(result).errorMessage).to.equal('SDK generation timed out.');
@@ -156,7 +164,14 @@ describe('SdkGenerationService generation status polling', () => {
 
       const bounded = new SdkGenerationService({ pollIntervalMs: 1, generationTimeoutMs: 5_000, requestTimeoutMs: 30 });
 
-      const result = await bounded.generateSdk(buildPath, Language.TYPESCRIPT, Stability.BETA, configDir, metadata, AUTH_KEY);
+      const result = await bounded.generateSdk(
+        buildPath,
+        Language.TYPESCRIPT,
+        Stability.BETA,
+        configDir,
+        metadata,
+        AUTH_KEY
+      );
 
       expect(errorFrom(result).code).to.equal(ServiceErrorCode.NetworkError);
     });

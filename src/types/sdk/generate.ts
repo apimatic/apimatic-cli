@@ -111,6 +111,9 @@ export function isAvailableLanguage(language: string): language is Language {
   return AVAILABLE_LANGUAGES.includes(language as Language);
 }
 
+// The portal artifacts can be generated for these today; the rest of `Language` comes later.
+export const PORTAL_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
+
 export function codegenOptionsFor(language: Language): readonly CodegenOption[] {
   return CODEGEN_OPTIONS[language] ?? [];
 }

@@ -142,7 +142,13 @@ export class SdkPublishNonInteractiveAction {
     if (dryRun) {
       this.prompts.dryRunPluginConfigNotice();
     } else {
-      await new RecordPublishedSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, semVersion);
+      await new RecordPublishedSdkAction().execute(
+        sourceDirectory,
+        language,
+        publishingProfile,
+        publishTypes,
+        semVersion
+      );
     }
 
     return ActionResult.success();

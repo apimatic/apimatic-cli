@@ -1,9 +1,12 @@
 import { err, ok, Result } from 'neverthrow';
 import { ConfigFinding, findingSentences } from '../apimatic-config/document.js';
-import { Language } from '../sdk/generate.js';
+import { Language, PORTAL_LANGUAGES } from '../sdk/generate.js';
 import { quotedList } from './config/fields.js';
+import { PortalSdk } from './portal-sdk.js';
 
 const KNOWN_LANGUAGES: readonly string[] = Object.values(Language);
+
+const SUPPORTED_LANGUAGES: readonly string[] = PORTAL_LANGUAGES;
 
 export const LANGUAGES_EXAMPLE = '"languages": { "typescript": {} }';
 
@@ -19,7 +22,7 @@ const REQUIRED =
  * `publishing` record counts: it is a language the project wants and has not published yet.
  */
 export class PortalLanguages {
-  private constructor(private readonly languages: readonly Language[]) {}
+  private constructor(private readonly sdks: readonly PortalSdk[]) {}
 
   /** `findings` already covers a block or an entry of the wrong shape, so neither is checked here. */
   public static fromBlock(
@@ -27,20 +30,25 @@ export class PortalLanguages {
     findings: readonly ConfigFinding[]
   ): Result<PortalLanguages, string[]> {
     const errors = findingSentences(findings);
-    const keys = Object.keys(block ?? {});
-    if (keys.length === 0 && findings.length === 0) {
+    const entries = Object.entries(block ?? {});
+    if (entries.length === 0 && findings.length === 0) {
       errors.push(REQUIRED);
     }
-    for (const key of keys.filter((key) => !KNOWN_LANGUAGES.includes(key))) {
-      errors.push(`'languages.${key}' is not an SDK language; name one of ${quotedList(KNOWN_LANGUAGES)}.`);
+    for (const [key] of entries.filter(([key]) => !SUPPORTED_LANGUAGES.includes(key))) {
+      errors.push(
+        KNOWN_LANGUAGES.includes(key)
+          ? `'languages.${key}' is not available yet; the portal supports ${quotedList(SUPPORTED_LANGUAGES)} today.`
+          : `'languages.${key}' is not an SDK language; name one of ${quotedList(SUPPORTED_LANGUAGES)}.`
+      );
     }
     if (errors.length > 0) {
       return err(errors);
     }
-    return ok(new PortalLanguages(keys as Language[]));
+    return ok(new PortalLanguages(entries.map(([key, entry]) => PortalSdk.fromEntry(key as Language, entry))));
   }
 
-  public all(): Language[] {
-    return [...this.languages];
+  /** In the order the block lists them. */
+  public listed(): PortalSdk[] {
+    return [...this.sdks];
   }
 }

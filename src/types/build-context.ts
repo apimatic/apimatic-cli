@@ -44,7 +44,10 @@ export class BuildContext {
     const stagedSourceDirectory = tempDir.join('build');
     await this.fileService.copyDirectoryContents(this.sourceDirectory, stagedSourceDirectory);
     if (packageSettingsDirectory) {
-      await this.fileService.copyDirectoryContents(packageSettingsDirectory, stagedSourceDirectory.join('package-settings'));
+      await this.fileService.copyDirectoryContents(
+        packageSettingsDirectory,
+        stagedSourceDirectory.join('package-settings')
+      );
     }
     return await tempContext.zip(stagedSourceDirectory);
   }

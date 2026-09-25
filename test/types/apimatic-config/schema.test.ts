@@ -104,7 +104,9 @@ describe('apimatic.schema.json', () => {
       ['a link with an http address', { navigation: { links: [{ label: 'Old', url: 'http://old.test/docs' }] } }],
       ['a link with a query and a fragment', { navigation: { links: [{ label: 'Tab', url: '/start?tab=1#top' }] } }],
       ['a link through a parent segment', { navigation: { links: [{ label: 'Start', url: '/guides/../start' }] } }],
-      ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }]
+      ['a link with two slashes in its query', { navigation: { links: [{ label: 'Next', url: '/start?next=//x' }] } }],
+      ['a context plugin hosted elsewhere', { pluginUrl: 'https://plugins.acme.test/calc.zip?v=2' }],
+      ['a plugin address with several query parameters', { pluginUrl: 'https://s3.test/calc.zip?a=1&b=2' }]
     ];
 
     const invalid: [string, object][] = [
@@ -186,7 +188,13 @@ describe('apimatic.schema.json', () => {
       ['an empty link', { navigation: { links: [{ label: 'x', url: '' }] } }],
       ['a blank link label', { navigation: { links: [{ label: ' ', url: '/' }] } }],
       ['a link with an unknown key', { navigation: { links: [{ label: 'x', url: '/', icon: 'x' }] } }],
-      ['page actions that are not a boolean', { ai: { pageActions: 'no' } }]
+      ['page actions that are not a boolean', { ai: { pageActions: 'no' } }],
+      ['a plugin address over http', { pluginUrl: 'http://plugins.acme.test/calc.zip' }],
+      ['a plugin address on the portal itself', { pluginUrl: '/__downloads/plugin.zip' }],
+      ['a plugin address without a host', { pluginUrl: 'https://' }],
+      ['a plugin address that is not a string', { pluginUrl: 7 }],
+      ['a plugin address with a space', { pluginUrl: 'https://plugins.acme.test/my plugin.zip' }],
+      ['a plugin address with trailing whitespace', { pluginUrl: 'https://plugins.acme.test/calc.zip ' }]
     ];
 
     for (const [label, block] of valid) {
@@ -267,15 +275,15 @@ describe('apimatic.schema.json', () => {
       ],
       [
         'keys this CLI does not model, beside and inside the record',
-        { java: { publishing: { future: 1 }, notes: 'x' } }
+        { csharp: { publishing: { future: 1 }, notes: 'x' } }
       ]
     ];
 
     const invalid: [string, unknown][] = [
       ['a block that is not an object', 'typescript'],
       ['a key that is no SDK language', { typescipt: {} }],
-      ['an entry that is not an object', { go: 'yes' }],
-      ['a publishing record that is not an object', { ruby: { publishing: 1 } }]
+      ['an entry that is not an object', { csharp: 'yes' }],
+      ['a publishing record that is not an object', { python: { publishing: 1 } }]
     ];
 
     for (const [label, languages] of valid) {
@@ -299,8 +307,18 @@ describe('apimatic.schema.json', () => {
       expect(languagesAccepted({})).to.be.false;
     });
 
-    // The portal reads only which languages there are; the record is typed for the editor.
-    it('types the publishing record, which the portal does not read', () => {
+    // The block is shared with the SDK and plugin commands, whose schema entry still lists every
+    // language; the portal refuses those it cannot be generated for yet.
+    it('leaves a language that is not available yet to the portal command', () => {
+      const languages = { java: {} };
+
+      expect(schemaVerdict({ languages }).valid).to.be.true;
+      expect(languagesAccepted(languages)).to.be.false;
+    });
+
+    // The portal reads the record leniently, as not recorded where it has the wrong shape; the
+    // schema types it for the editor.
+    it('types the publishing record, which the portal reads leniently', () => {
       const languages = { csharp: { publishing: { source: 'github.com/acme/calc' } } };
 
       expect(languagesAccepted(languages)).to.be.true;
@@ -314,6 +332,8 @@ describe('apimatic.schema.json', () => {
       ApimaticConfigDocument.parse(JSON.stringify(file))._unsafeUnwrap().findingsFor('root', 'plugin', 'languages')
         .length === 0;
 
+    const identity = { pluginId: 'acme-payments', pluginName: 'Acme Payments', pluginVersion: '0.1.0' };
+
     const cases: [string, object, boolean][] = [
       [
         'unknown root keys and unknown plugin fields',
@@ -322,7 +342,7 @@ describe('apimatic.schema.json', () => {
           schemaVersion: 1,
           future: { anything: true },
           portal: {},
-          plugin: { pluginId: 'acme-payments', pluginVersion: '0.1.0', notes: 'kept' },
+          plugin: { ...identity, notes: 'kept' },
           languages: { typescript: {} }
         },
         true
@@ -330,8 +350,8 @@ describe('apimatic.schema.json', () => {
       ['a file whose only language entry is empty', { languages: { typescript: {} } }, true],
       ['a file with nothing in it', {}, true],
       ['another schema version', { schemaVersion: 2 }, false],
-      ['a plugin ID with spaces', { plugin: { pluginId: 'Acme Payments' } }, false],
-      ['a plugin version that is not major.minor.patch', { plugin: { pluginVersion: '1.0' } }, false]
+      ['a plugin ID with spaces', { plugin: { ...identity, pluginId: 'Acme Payments' } }, false],
+      ['a plugin version that is not major.minor.patch', { plugin: { ...identity, pluginVersion: '1.0' } }, false]
     ];
 
     for (const [label, file, accepted] of cases) {
@@ -339,6 +359,23 @@ describe('apimatic.schema.json', () => {
         expect(documentAccepts(file), 'document').to.equal(accepted);
         const verdict = schemaVerdict(file);
         expect(verdict.valid, verdict.errors || 'schema').to.equal(accepted);
+      });
+    }
+
+    // The service generates no plugin without its ID, name and version, so the editor asks for
+    // them. The file is still read without them: `plugin generate` asks for a missing ID or name.
+    const incomplete: [string, object][] = [
+      ['an empty plugin block', {}],
+      ['a plugin without an ID', { pluginName: identity.pluginName, pluginVersion: identity.pluginVersion }],
+      ['a plugin without a name', { pluginId: identity.pluginId, pluginVersion: identity.pluginVersion }],
+      ['a plugin with a blank name', { ...identity, pluginName: ' ' }],
+      ['a plugin without a version', { pluginId: identity.pluginId, pluginName: identity.pluginName }]
+    ];
+
+    for (const [label, plugin] of incomplete) {
+      it(`asks for the identity in ${label}, which the file is still read without`, () => {
+        expect(documentAccepts({ plugin }), 'document').to.be.true;
+        expect(schemaVerdict({ plugin }).valid, 'schema').to.be.false;
       });
     }
   });

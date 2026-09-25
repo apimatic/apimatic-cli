@@ -6,8 +6,11 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
+import { GENERATED_DIRECTORY_NAME } from '../types/portal/generated-pages.js';
+import { GENERATED_INCLUDES_DIRECTORY_NAME, PageFragment, pageFragments } from '../types/portal/page-fragments.js';
 import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
 import { PortalConfig } from '../types/portal/portal-config.js';
+import { PLUGIN_DOWNLOAD, SDK_DOWNLOADS_FOLDER, sdkDownload } from '../types/portal/portal-downloads.js';
 import { PortalSettings, PortalSource } from '../types/portal/portal-source.js';
 import { PortalStylesheet } from '../types/portal/portal-stylesheet.js';
 import { errorMessage } from '../utils/error-utils.js';
@@ -36,6 +39,7 @@ export const LINKED_DEPENDENCIES = [
   'lucide-react',
   'react',
   'react-dom',
+  'rehype-raw',
   'shiki',
   'tailwindcss',
   'tslib',
@@ -51,12 +55,6 @@ const IDENTITY_FILE_NAME = 'portal.identity.json';
 
 /** In `src/styles/`, beside `app.css`, which imports it. */
 const STYLESHEET_FILE_NAME = 'theme.css';
-
-/**
- * Where the generated pages are written, inside the project: `src/lib/source.ts` names it as a
- * relative literal, which the browser bundle carries, so the portal project's location is never published.
- */
-export const GENERATED_DIRECTORY_NAME = 'generated';
 
 /** Where the SDKs and the context plugin are laid out as the site serves them, inside the project. */
 export const DOWNLOADS_DIRECTORY_NAME = 'downloads';
@@ -117,6 +115,11 @@ export class PortalProjectService {
     if (pages.isErr()) {
       return err(pages.error);
     }
+    // Once: they change only with the artifacts, which a preview fetches when it starts.
+    await this.writeFragments(
+      projectDirectory.join(GENERATED_INCLUDES_DIRECTORY_NAME),
+      pageFragments(artifacts.sdkDocs)
+    );
 
     return ok({
       projectDirectory,
@@ -174,6 +177,14 @@ export class PortalProjectService {
     return file;
   }
 
+  private async writeFragments(directory: DirectoryPath, fragments: PageFragment[]): Promise<void> {
+    for (const { folder, fileName, contents } of fragments) {
+      const target = directory.join(folder);
+      await this.fileService.createDirectoryIfNotExists(target);
+      await this.fileService.writeContents(new FilePath(target, fileName), contents);
+    }
+  }
+
   private async writeDownloads(
     projectDirectory: DirectoryPath,
     artifacts: PortalArtifacts
@@ -184,12 +195,12 @@ export class PortalProjectService {
     const downloads = projectDirectory.join(DOWNLOADS_DIRECTORY_NAME);
     await this.fileService.createDirectoryIfNotExists(downloads);
     for (const [language, archive] of artifacts.sdks) {
-      const sdks = downloads.join('sdk');
+      const sdks = downloads.join(SDK_DOWNLOADS_FOLDER);
       await this.fileService.createDirectoryIfNotExists(sdks);
-      await this.fileService.copy(archive, new FilePath(sdks, new FileName(`${language}.zip`)));
+      await this.fileService.copy(archive, new FilePath(sdks, sdkDownload(language)));
     }
     if (artifacts.plugin !== undefined) {
-      await this.fileService.copy(artifacts.plugin, new FilePath(downloads, new FileName('plugin.zip')));
+      await this.fileService.copy(artifacts.plugin, new FilePath(downloads, PLUGIN_DOWNLOAD));
     }
     return downloads;
   }

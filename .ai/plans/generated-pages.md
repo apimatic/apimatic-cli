@@ -8,6 +8,11 @@ section 2, section 14 records what an adversarial review of the first draft
 changed, section 15 records the later decision to give the context plugin page
 a tab of its own, and section 16 what the step 1 spike changed.
 
+**Amended 2026-09-25:** the real templates, the components they use and the
+data that fills them landed as `.ai/plans/sdk-and-plugin-pages.md` planned, on
+top of PR #361's portal artifacts. The notes marked *Amended* in sections 2, 3
+and 10 point at what changed.
+
 Follows on from `.ai/plans/portal-navigation.md`, whose section 4 specified "the
 injected SDK page" and whose section 11 deferred its shape, and from
 `.ai/plans/portal-config.md`, which renamed the token to `apimatic:sdks`,
@@ -59,11 +64,11 @@ gains no key; and quickstart, which writes nothing new.
 | Tokens | `apimatic:sdks` positions the SDKs tab and `apimatic:plugin` the Context Plugin tab; each claims its own section's folder, `sdks` and `context-plugin`. The token takes the word the `apimatic.json` block and the `apimatic plugin` commands use, which is what the portal's author writes; the address takes the product's name, which is what the portal's readers see. Both are accepted in the root `nav.json` whether or not the page exists, as `apimatic:sdks` is in #355 while nothing is generated, so removing the `plugin` block never forces an edit to `nav.json` as well. |
 | Default position | An unnamed section collects at today's anchor, before the API reference and after the user's pages, in a fixed order: SDKs, then Context Plugin. Fumadocs orders the root's folders by path, which would put `context-plugin` first, so the transformer orders the band itself. No `nav.json` at all gives Home, Guides, SDKs, Context Plugin, API Reference. |
 | Tab labels | "SDKs" and "Context Plugin", fixed, as portal-config section 2 decided for the tabs the CLI names. Set by `title` in each folder's generated `nav.json`, which the transformer already applies to any folder below the root, so the labels are the CLI's whatever the design team titles the index pages. |
-| Plugin page condition | The `plugin` key holds a JSON object, which is what `ApimaticConfigDocument.plugin()` answers; a bare `{}` counts. Nothing in the block is read or checked: the backend validates the file on the coming `portal generate` call and refuses an empty or invalid block, so an object gets the page whatever it holds, a malformed `pluginId` included, and is left to that call. Only a `plugin` key that is not an object is treated as absent. |
+| Plugin page condition | The `plugin` key holds a JSON object, which is what `ApimaticConfigDocument.plugin()` answers; a bare `{}` counts. Nothing in the block is read or checked: the backend validates the file on the coming `portal generate` call and refuses an empty or invalid block, so an object gets the page whatever it holds, a malformed `pluginId` included, and is left to that call. Only a `plugin` key that is not an object is treated as absent. *Amended 2026-09-25:* a `portal.pluginUrl` gets the page too, with or without the block, and is where it installs from (sdk-and-plugin-pages, section 2). |
 | Language order | As written in the `languages` block. `sdk publish` appends, and the user reorders by editing the file. |
 | Reserved addresses | `/sdks` and `/context-plugin`, each with everything below it, are the CLI's. A content page whose slugs begin with either name is refused by `PortalSourceContext.resolve()` naming each file: `content/sdks.md`, `content/sdks.mdx`, anything under `content/sdks/`, the same for `context-plugin`, and the same behind a `(group)` folder, which the content source drops from the address (`getSlugs('(intro)/sdks.mdx')` is `['sdks']`). Without the refusal, two pages at one address would fail the build with Fumadocs' opaque `Duplicated slugs` error, or, when one of them is an index page, move it to `…/index` without a word (the slugs plugin of `fumadocs-core@16.15.8`, read on 2026-09-24). `/context-plugin` is reserved with or without a `plugin` block, so adding the block never starts refusing a page that built the day before. A root `nav.json` entry `sdks` or `context-plugin` is refused as today, with a hint naming the token, and so is `plugin` when no page of that name exists, since the token invites the guess. |
-| Templates | Three `.mdx` files in a new top-level `portal-pages/` directory, shipped in the npm package beside `portal-template/`. Dynamic text is `{{key}}`. A renderer of a few lines substitutes flat string keys and refuses an unknown or unfilled key, so a template and its data cannot drift silently. No dependency today; mustache, whose `{{key}}` is the same, is adopted when the real templates need sections (section 10). Rendering happens before MDX compilation, so the braces never reach MDX. |
-| Data today | `sdks.mdx` and `context-plugin.mdx` take `{}`. `sdk.mdx` takes `{ language, name }`, the enum value and a display name, so the per-language pages have distinct titles and sidebar rows. Everything else waits for the backend data. |
+| Templates | Three `.mdx` files in a new top-level `portal-pages/` directory, shipped in the npm package beside `portal-template/`. Dynamic text is `{{key}}`. A renderer of a few lines substitutes flat string keys and refuses an unknown or unfilled key, so a template and its data cannot drift silently. No dependency today; mustache, whose `{{key}}` is the same, is adopted when the real templates need sections (section 10). Rendering happens before MDX compilation, so the braces never reach MDX. *Amended 2026-09-25:* mustache is adopted with escaping off, and `PageTemplate` checks every tag against the page's values first, sections included (sdk-and-plugin-pages, section 4). |
+| Data today | `sdks.mdx` and `context-plugin.mdx` take `{}`. `sdk.mdx` takes `{ language, name }`, the enum value and a display name, so the per-language pages have distinct titles and sidebar rows. Everything else waits for the backend data. *Amended 2026-09-25:* see sdk-and-plugin-pages, section 5. |
 | Display names | One `Record<Language, string>`, `LANGUAGE_NAMES` in `src/types/sdk/generate.ts`: `csharp` C#, `go` Go, `java` Java, `php` PHP, `python` Python, `ruby` Ruby, `typescript` TypeScript. First written beside `GeneratedPages`, with `LANGUAGE_CHOICES` left spelling "Typescript" for the quickstart prompt; the review of PR #360 had the two tables made one, so the prompt's labels are read from it and say "TypeScript" too. |
 | `portal serve` | The watcher that re-applies the `portal` block also regenerates the pages: a language added or removed, or the `plugin` block added or removed, rewrites `generated/` (changed files written, stale files and emptied directories deleted) and Vite reloads, so the Context Plugin tab appears and disappears with the block. Step 1 found that an edited generated file reaches the preview on its own but an added or removed one does not, and that a removed one fails every request until a restart (section 16). A serve-only Vite plugin in the template makes adds and removes reach it as edits do (section 4), so no case needs a restart. |
 | Prerender | `prerender-pages.ts` enumerates the generated directory as it enumerates the content directory. `portal.config.json` gains `generatedDir`, absolute and server-only, as `contentDir` is. |
@@ -220,6 +225,11 @@ Rules the renderer holds them to, which the design team's pages inherit:
 | `sdks.mdx` | `{}` | The languages with their names and page URLs, for the cards; needs a section, hence mustache. |
 | `sdk.mdx` | `{ language: 'typescript', name: 'TypeScript' }` | Package name, version, install command, source repository, from the `publishing` record and the backend. |
 | `context-plugin.mdx` | `{}` | Plugin id, name, version, install instructions, from the `plugin` block and the backend. |
+
+*Amended 2026-09-25:* the pages now take a card per language, from each
+`publishing` record, and the plugin's install path and languages. The SDK docs
+are Markdown fragments the pages include, rather than values
+(sdk-and-plugin-pages, sections 3 to 5).
 
 ## 4. Mechanism
 
@@ -643,7 +653,7 @@ address; the reservation is exact-case, as `content/api/` is.
 
 ## 10. Later PRs, and the seams left for them
 
-- **The real templates.** Replace the three files in `portal-pages/`. If they
+- **The real templates.** *Done 2026-09-25, in sdk-and-plugin-pages.* Replace the three files in `portal-pages/`. If they
   need a loop (the cards on the SDKs page will), add `mustache` (stable for
   years, so clear of `minimumReleaseAge`) and swap `PageTemplate.render` to it
   with escaping turned off; the `{{key}}` forms stay as they are. Any component
@@ -654,7 +664,10 @@ address; the reservation is exact-case, as `content/api/` is.
   (including the `plugin` block) and answers with what the pages show.
   `GeneratedPages.of(languages, plugin)` gains that answer as its data source,
   and each template's data object fills out (section 3). How `portal serve`
-  refreshes that data on an edit is decided then.
+  refreshes that data on an edit is decided then. *Done 2026-09-25:* the call is
+  PR #361's `/portal-artifacts`, and the SDK docs come from its `docs/`. Under
+  `portal serve` the artifacts are fetched once, and an edit that needs more of
+  them is refused with a restart message (sdk-and-plugin-pages, section 2).
 - **More plugin pages.** Should the plugin need a page per assistant or per
   install route, they go into `context-plugin/` beside the index and its
   `nav.json` gains `pages`; the tab, its token and `/context-plugin` stay as

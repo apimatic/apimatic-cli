@@ -1,4 +1,9 @@
 import { defineDocs } from 'fumadocs-mdx/macro';
+import { applyMdxPreset } from 'fumadocs-mdx/config';
+import rehypeRaw from 'rehype-raw';
+
+// What `rehype-raw` must hand on untouched, being MDX's own nodes rather than HTML.
+const MDX_NODE_TYPES = ['mdxFlowExpression', 'mdxJsxFlowElement', 'mdxJsxTextElement', 'mdxTextExpression', 'mdxjsEsm'];
 
 // The macro only accepts a string literal here; the CLI substitutes the placeholder
 // with the absolute path of the project's content directory when it prepares the build.
@@ -20,6 +25,14 @@ export const docs = defineDocs({
 // would publish the build machine's directory with every portal.
 export const generated = defineDocs({
   dir: 'generated',
-  docs: { async: true, postprocess: { includeProcessedMarkdown: true } },
+  docs: {
+    async: true,
+    postprocess: { includeProcessedMarkdown: true },
+    // Options given here replace Fumadocs' defaults, hence the preset.
+    mdxOptions: applyMdxPreset({
+      // The SDK docs' HTML fails the build unrendered; not sanitized, as it comes from the owner's own spec.
+      rehypePlugins: (defaults) => [[rehypeRaw, { passThrough: MDX_NODE_TYPES }], ...defaults]
+    })
+  },
   meta: { files: ['**/nav.json'] }
 });

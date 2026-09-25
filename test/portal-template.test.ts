@@ -5,11 +5,10 @@ import { createRequire } from 'node:module';
 import { expect } from 'chai';
 import {
   COPIED_DEPENDENCIES,
-  GENERATED_DIRECTORY_NAME,
   LINKED_DEPENDENCIES,
   TEMPLATE_DEPENDENCIES
 } from '../src/infrastructure/portal-project-service';
-import { PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
+import { GENERATED_DIRECTORY_NAME, PAGE_TEMPLATES } from '../src/types/portal/generated-pages';
 import { PortalIdentity } from '../src/types/portal/portal-config';
 import type { Portal } from '../portal-template/src/lib/portal-types';
 

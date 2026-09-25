@@ -393,6 +393,68 @@ describe('PortalConfig', () => {
     });
   });
 
+  describe('pluginUrl', () => {
+    const REFUSED =
+      "'portal.pluginUrl' must be an address starting with 'https://', with no spaces, for example " +
+      "'https://example.com/acme-plugin.zip'.";
+
+    it('is absent unless the block gives one, so the plugin is bundled', () => {
+      expect(config({}).pluginUrl()).to.be.null;
+    });
+
+    it('keeps an https address where the plugin is hosted', () => {
+      expect(`${config({ pluginUrl: 'https://plugins.acme.test/calc.zip' }).pluginUrl()}`).to.equal(
+        'https://plugins.acme.test/calc.zip'
+      );
+    });
+
+    // It is handed to `npx context-plugins install`, which fetches and runs what it finds.
+    it('refuses anything but an https address', () => {
+      for (const pluginUrl of [
+        'http://plugins.acme.test/calc.zip',
+        '/__downloads/plugin.zip',
+        'https://',
+        'https:x.test',
+        '',
+        7
+      ]) {
+        expect(errorsOf({ pluginUrl }), JSON.stringify(pluginUrl)).to.deep.equal([REFUSED]);
+      }
+    });
+
+    // A space would split the address in the install command a reader pastes into a shell.
+    it('refuses an address with whitespace anywhere in it', () => {
+      for (const pluginUrl of [
+        'https://plugins.acme.test/my plugin.zip',
+        'https://plugins.acme.test/calc.zip ',
+        ' https://plugins.acme.test/calc.zip',
+        'https://plugins.acme.test/calc.zip\n'
+      ]) {
+        expect(errorsOf({ pluginUrl }), JSON.stringify(pluginUrl)).to.deep.equal([REFUSED]);
+      }
+    });
+
+    it('keeps the address as it parses: a query of several parameters whole, and a quote encoded', () => {
+      const presigned = 'https://bucket.s3.amazonaws.com/calc.zip?X-Amz-Credential=a%2Fb&X-Amz-Signature=c';
+
+      expect(`${config({ pluginUrl: presigned }).pluginUrl()}`).to.equal(presigned);
+      expect(`${config({ pluginUrl: 'https://Plugins.Acme.test/"calc".zip' }).pluginUrl()}`).to.equal(
+        'https://plugins.acme.test/%22calc%22.zip'
+      );
+    });
+
+    it('is kept out of what the browser is told', () => {
+      expect(config({ pluginUrl: 'https://plugins.acme.test/calc.zip' }).identity()).to.not.have.property('pluginUrl');
+    });
+
+    it('is serialised only when the block gives one', () => {
+      expect(JSON.parse(JSON.stringify(config({ pluginUrl: 'https://p.test/a.zip' }))).pluginUrl).to.equal(
+        'https://p.test/a.zip'
+      );
+      expect(JSON.parse(JSON.stringify(config({})))).to.not.have.property('pluginUrl');
+    });
+  });
+
   describe('identity', () => {
     it('resolves every file to its site URL and the address to its origin', () => {
       const portal = config({
