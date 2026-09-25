@@ -23,11 +23,7 @@ describe('ProjectContext.ignoreGeneratedFiles', () => {
   it('writes the generated paths into a project that has no gitignore', async () => {
     await ignore();
 
-    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal([
-      '/plugin/',
-      'src/static/sdk/',
-      'src/static/plugin.zip'
-    ]);
+    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/plugin/']);
   });
 
   // `plugin publish` turns /plugin into its own repository; a parent tracking it would nest one
@@ -53,12 +49,7 @@ describe('ProjectContext.ignoreGeneratedFiles', () => {
 
     await ignore();
 
-    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal([
-      'node_modules/',
-      '/plugin/',
-      'src/static/sdk/',
-      'src/static/plugin.zip'
-    ]);
+    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['node_modules/', '/plugin/']);
   });
 
   // Re-running quickstart in an adopted project must not stack duplicates.
@@ -76,10 +67,6 @@ describe('ProjectContext.ignoreGeneratedFiles', () => {
 
     await ignore();
 
-    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal([
-      '/plugin/',
-      'src/static/sdk/',
-      'src/static/plugin.zip'
-    ]);
+    expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/plugin/']);
   });
 });
