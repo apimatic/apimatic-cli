@@ -9,6 +9,7 @@ import { PortalSourceContext } from '../../src/types/portal-source-context';
 import { PortalContext } from '../../src/types/portal-context';
 import { DirectoryPath } from '../../src/types/file/directoryPath';
 import { CodeSampleCatalog, CodeSamples } from '../../src/types/portal/code-samples';
+import { PortalArtifacts } from '../../src/types/portal/portal-artifacts';
 import { Language } from '../../src/types/sdk/generate';
 import { ensureBuildDirectoryBase, removeBuildDirectoryBase } from '../../src/infrastructure/tmp-extensions';
 
@@ -40,7 +41,9 @@ async function buildFixture(name: string, codeSamples = new CodeSamples([])): Pr
 
   const project = new DirectoryPath(root).join('build');
   fs.mkdirSync(project.toString(), { recursive: true });
-  const prepared = (await new PortalProjectService().prepare(project, source, codeSamples))._unsafeUnwrap();
+  const prepared = (
+    await new PortalProjectService().prepare(project, source, new PortalArtifacts(codeSamples, new Map(), undefined))
+  )._unsafeUnwrap();
 
   const build = await new PortalBuildService().build(prepared);
   if (build.isErr()) {

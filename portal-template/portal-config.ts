@@ -12,6 +12,8 @@ export interface PortalConfig {
   /** Absolute, inside this project: the pages the CLI generates, which `src/lib/source.ts` compiles. */
   generatedDir: string;
   staticDir: string | null;
+  /** Absolute, inside this project: the SDKs and the context plugin, laid out as the site serves them under `/__downloads/`. */
+  downloadsDir: string | null;
 }
 
 export async function readPortalConfig(): Promise<PortalConfig> {

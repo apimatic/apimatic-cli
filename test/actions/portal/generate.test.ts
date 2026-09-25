@@ -95,9 +95,9 @@ describe('GenerateAction', () => {
     const result = await execute(CODE_SAMPLES_FIXTURE);
 
     expect(result.isSuccess()).to.be.true;
-    const [, source, codeSamples] = shared.prepare.firstCall.args;
+    const [, source, artifacts] = shared.prepare.firstCall.args;
     expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
-    expect(codeSamples.isEmpty()).to.be.false;
+    expect(artifacts.codeSamples.isEmpty()).to.be.false;
     expect(shared.prompts.unplacedSamples.calledOnceWith([])).to.be.true;
   });
 
