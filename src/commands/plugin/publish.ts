@@ -31,11 +31,10 @@ export default class PluginPublish extends Command {
     } = await this.parse(PluginPublish);
 
     const project = ProjectContext.at(input);
-    const sourceDirectory = project.sourceDirectory();
     const pluginDirectory = project.pluginDirectory(destination);
 
     intro('Publish Context Plugin');
-    const result = await new PluginPublishAction().execute(sourceDirectory, pluginDirectory);
+    const result = await new PluginPublishAction().execute(project, pluginDirectory);
     outro(result);
   }
 }

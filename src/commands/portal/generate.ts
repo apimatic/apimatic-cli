@@ -38,7 +38,6 @@ The portal is built on your machine and written as static files you can host any
     } = await this.parse(PortalGenerate);
 
     const project = ProjectContext.at(input);
-    const sourceDirectory = project.sourceDirectory();
     const portalDirectory = project.portalDirectory(destination);
     const commandMetadata: CommandMetadata = {
       commandName: PortalGenerate.id,
@@ -47,7 +46,7 @@ The portal is built on your machine and written as static files you can host any
 
     intro('Generate Portal');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(sourceDirectory, portalDirectory, force, zipPortal);
+    const result = await action.execute(project, portalDirectory, force, zipPortal);
     outro(result);
   }
 

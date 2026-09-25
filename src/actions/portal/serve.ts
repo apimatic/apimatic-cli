@@ -1,6 +1,7 @@
 import { PortalServePrompts } from '../../prompts/portal/serve.js';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
@@ -38,11 +39,12 @@ export class PortalServeAction {
   }
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     port: number,
     openInBrowser: boolean,
     onServing?: () => void
   ): Promise<ActionResult> => {
+    const sourceDirectory = project.sourceDirectory();
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
       this.prompts.runtimeUnsupported(runtimeProblem);
@@ -67,9 +69,9 @@ export class PortalServeAction {
     }
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      sourceDirectory,
-      async (project, source, artifacts) => {
-        const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
+      project,
+      async (portalProject, source, artifacts) => {
+        const server = await this.prompts.startPreview(this.devServerService.start(portalProject, servePort));
 
         if (server.isErr()) {
           this.prompts.startFailed(server.error.log);
@@ -84,7 +86,7 @@ export class PortalServeAction {
           onServing();
         }
 
-        const configWatch = this.watchConfig(source, artifacts, project.projectDirectory, sourceDirectory);
+        const configWatch = this.watchConfig(source, artifacts, portalProject.projectDirectory, sourceDirectory);
 
         this.clearStandardInput();
 

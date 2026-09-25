@@ -1,9 +1,12 @@
 # Plan: `ProjectContext` as the one place that knows a project's layout
 
-Status: written and executed 2026-09-25 on `feat/journey-command-updates`, after
-`dev` was merged into it (`cc6b974`). Steps 1, 2 and 5 landed as written; step 4
-landed smaller than planned and step 3 was **withdrawn on contact with the code**
-— see section 6, which records what each step actually did and why.
+Status: executed 2026-09-25 on `refactor/project-context-layout` (PR #372).
+
+**Step 3 was withdrawn in the first round and then done in the second, because the
+withdrawal was wrong.** Review said `BuildContext` had to go and only
+`ProjectContext` remain; the reason step 3 looked impossible was that the actions
+took a source directory, and that was the thing to change rather than a constraint
+to plan around. Section 6 records both rounds rather than hiding the first.
 
 Vocabulary is CONTEXT.md's: **source directory** is the user's `src/`, **project
 directory** is the directory that contains it.
@@ -16,7 +19,7 @@ directory** is the directory that contains it.
 whichever command or action needs it. This plan makes `ProjectContext` the one
 object that knows the layout and hands out the contexts that read it, following
 the composite pattern the context skill already names as good
-(`BuildContext.getSpecContext()` hands back a `SpecContext`, not a path).
+(a context handing back another context rather than a path).
 
 Out of scope: the temp and output contexts that are not tied to the layout —
 `TempContext`, `ResourceContext`, `TransformContext`, `PackageSettingsContext`.
@@ -96,7 +99,7 @@ export class ProjectContext {
   public source(): PortalSourceContext;
   public config(): ApimaticConfigContext;
   public pluginConfig(): PluginConfigContext;
-  public build(): BuildContext;
+  public specsExist(): Promise<boolean>;
 
   // Outputs. `destination` is the `--destination` flag, which overrides the default.
   public sdk(destination?: string): SdkContext;
@@ -120,7 +123,7 @@ The constructor goes private and `at()` becomes the only way in, which settles
 | `PortalSourceContext` | Unchanged. Constructed by `ProjectContext.source()` instead of by callers. |
 | `ApimaticConfigContext` | Unchanged. Still constructed internally by the two contexts that wrap it; `ProjectContext.config()` serves the third caller. |
 | `PluginConfigContext` | Unchanged. Constructed by `ProjectContext.pluginConfig()`. |
-| `BuildContext` | Unchanged, except `getSpecContext()` — see below. |
+| `BuildContext` | **Deleted.** Its behaviour is `ProjectContext`'s; see section 6, step 3. |
 | `SpecContext`, `PluginContext`, `PortalContext`, `SdkContext` | Unchanged; reached through `ProjectContext`. |
 | `ProjectContext` | Gains the layout. Keeps `upsertGitignore()`. |
 | `TempContext`, `ResourceContext`, `TransformContext`, `PackageSettingsContext` | Untouched. |
@@ -129,10 +132,6 @@ The constructor goes private and `at()` becomes the only way in, which settles
 a real domain — it is that *callers* assemble them from paths they derive
 themselves. This plan moves the assembly, not the responsibilities.
 
-`BuildContext.getSpecContext()` is the one overlap: it derives `spec/` off the
-source directory, which `PortalSourceContext` also does privately. Leave it. The
-two read the same directory for different purposes and merging them is a separate
-question from this one.
 
 ## 5. The tension with the context skill, and how it resolves
 
@@ -181,20 +180,27 @@ description, because two of them did not survive contact with the code.
    `--destination` override. Convert the five command sites. Derive `GENERATED`
    from the same names so §2.2 is structural.
    *Done as written, in `569fe30`.*
-3. **The context accessors.** Add `source()`, `config()`, `pluginConfig()`,
-   `build()`.
-   ***Withdrawn.*** The actions that construct these contexts are handed a
-   **source** directory by their command, not a project directory, so the
-   accessors would have had no caller without changing eight action signatures to
-   take a `ProjectContext` — option (a) of §5, which §5 rejected as too large.
-   And `BuildContext` settles it outright: `actions/sdk/generate.ts:67,81`
-   construct it over *versioned* subdirectories discovered inside the build
-   (`getSingleVersionedSourceDirectory`), which no project layout can derive. A
-   `ProjectContext.build()` could not have replaced them.
-   What §2.3 describes is therefore not redundancy to remove: three contexts over
-   one `apimatic.json`, each owning different blocks, is the design. Only the
-   *assembly* looked duplicated, and the assembly is in the commands, which do
-   not construct these contexts at all.
+3. **The contexts themselves.** `BuildContext` is deleted and its behaviour is
+   `ProjectContext`'s; `portalSource()`, `pluginConfig()` and `config()` hand back
+   the rest. Every action takes a `ProjectContext` instead of a directory.
+
+   *Withdrawn in the first round, then done. The withdrawal was wrong, twice over:*
+
+   - It argued the accessors would have no caller, because actions are handed a
+     source directory. That was true and was the thing to change, not a reason not
+     to. Option (a) of §5 was dismissed as too large without being costed; it is
+     about 20 files and no behaviour change.
+   - It claimed `BuildContext` could not be folded in, because
+     `actions/sdk/generate.ts` constructs it over *versioned* subdirectories that
+     no project layout derives. That is a real constraint and the wrong conclusion:
+     a project can **narrow** to a version, answering another `ProjectContext` that
+     reads that directory and writes where the project already writes. One private
+     constructor taking both directories covers both cases, and the versioned
+     branch of `sdk generate` reads better for it — `versionToBuild` returns the
+     project to build from, rather than a `{ version, buildContext }` pair.
+
+   `ProjectContext.at('x')` never means a versioned directory; only narrowing
+   produces one, so nothing outside can construct the odd case by accident.
 4. **The prompts.** Delete the eight re-derivations.
    *Done smaller, in `3670734`.* Passing the paths in would have required public
    path accessors on `PortalSourceContext` — the getter §5 argued against, in the
@@ -206,10 +212,26 @@ description, because two of them did not survive contact with the code.
    its reference table.
    *Done as written.*
 
-Steps 1 and 2 were where the silent-drift risk lived, and they are the ones that
-landed whole.
+### What `sourceDirectory()` is still for
+
+Eleven callers, all inside actions, and all of them hand the path to a **prompt**
+that names the directory to the reader, or to `PortalArtifactsService`, which
+uploads it. No caller derives anything from it any more, and nothing outside
+`ProjectContext` joins `src` onto anything.
+
+That is the floor without making prompts take contexts, which would put file
+system objects in the layer whose whole job is text. If review would rather have
+that, it is a separate change and a larger one.
 
 ## 7. What this does not fix, deliberately
+
+**`PortalSourceContext` is not folded in.** It is 630 lines of portal resolution —
+specs, content tree, navigation, static files — against `ProjectContext`'s 200.
+Inlining it would make one class that both knows a layout and validates a docs
+site, and the context skill's own rule about every method touching domain state
+would stop holding. It is handed back by `portalSource()` instead, which is the
+composite pattern the skill already blesses. Same for `PluginConfigContext` and
+`ApimaticConfigContext`, which are views of different blocks of one file.
 
 **`--destination` escapes `.gitignore`.** `plugin generate --destination ./out`
 writes a plugin to `./out`, which `.gitignore` does not name, so `plugin publish`'s

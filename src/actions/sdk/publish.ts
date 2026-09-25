@@ -11,6 +11,7 @@ import { SemVersion } from '../../types/publish/version.js';
 import { Language, Stability } from '../../types/sdk/generate.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { PackageSettingsContext } from '../../types/package-settings-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { TempContext } from '../../types/temp-context.js';
 import { ActionResult } from '../action-result.js';
 import { GenerateAction } from './generate.js';
@@ -25,7 +26,7 @@ export class SdkPublishAction {
   public constructor(private readonly configDir: DirectoryPath, private readonly commandMetadata: CommandMetadata) {}
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     outputDirectory: DirectoryPath,
     language: Language,
     publishType: PublishType[],
@@ -50,7 +51,7 @@ export class SdkPublishAction {
 
       const sdkGenerateAction = new GenerateAction(this.configDir, this.commandMetadata);
       const sdkGenerationResult = await sdkGenerateAction.execute(
-        sourceDirectory,
+        project,
         outputDirectory,
         language,
         stability,

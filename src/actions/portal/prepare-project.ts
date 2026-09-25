@@ -4,7 +4,7 @@ import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tm
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
 import { ActionResult } from '../action-result.js';
@@ -31,11 +31,12 @@ export class PreparePortalProjectAction {
    * and the preview goes on reading them until the user stops it.
    */
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     onPrepared: (project: PortalProjectPaths, source: PortalSource, artifacts: PortalArtifacts) => Promise<ActionResult>
   ): Promise<ActionResult> => {
     // The artifacts live in this directory for as long as the caller needs them, so it wraps
     // everything that reads them rather than being opened and closed around the call.
+    const sourceDirectory = project.sourceDirectory();
     return await withDirPath(async (artifactsDirectory) => {
       const artifacts = await this.prompts.generateArtifacts(
         this.artifactsService.generate(
@@ -50,7 +51,7 @@ export class PreparePortalProjectAction {
         return ActionResult.failed();
       }
 
-      const source = await new PortalSourceContext(sourceDirectory).resolve();
+      const source = await project.portalSource().resolve();
       if (source.isErr()) {
         this.prompts.sourceProblem(source.error, sourceDirectory);
         return ActionResult.failed();

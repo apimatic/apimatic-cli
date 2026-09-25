@@ -15,6 +15,7 @@ import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { PluginService } from '../../../src/infrastructure/services/plugin-service.js';
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { ProjectContext } from '../../../src/types/project-context';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
 import { ZipService } from '../../../src/infrastructure/zip-service.js';
@@ -27,6 +28,7 @@ const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shel
 
 describe('PluginGenerateAction', () => {
   let tmpDirResult: DirectoryResult;
+  let workingDirectory: string;
   let sourceDirectory: string;
   let pluginDirectory: string;
   let action: PluginGenerateAction;
@@ -51,7 +53,7 @@ describe('PluginGenerateAction', () => {
   const uploadedConfig = () => JSON.parse(uploaded['apimatic.json']);
 
   const execute = (force = false) =>
-    action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(pluginDirectory), force);
+    action.execute(ProjectContext.in(new DirectoryPath(workingDirectory)), new DirectoryPath(pluginDirectory), force);
 
   // The action expands what the service returns, so the stubbed payload has to be a genuine zip.
   // The upload is read while the stub runs: the temporary directory it sits in is gone once the
@@ -69,7 +71,7 @@ describe('PluginGenerateAction', () => {
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
-    const workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
+    workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
     sourceDirectory = path.join(workingDirectory, 'src');
     pluginDirectory = path.join(workingDirectory, 'plugin');
     uploaded = {};
@@ -107,7 +109,11 @@ describe('PluginGenerateAction', () => {
     it('fails when the build and plugin directories are the same', async () => {
       const generatePlugin = sinon.stub(PluginService.prototype, 'generatePlugin');
 
-      const result = await action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(sourceDirectory), false);
+      const result = await action.execute(
+        ProjectContext.in(new DirectoryPath(workingDirectory)),
+        new DirectoryPath(sourceDirectory),
+        false
+      );
 
       expect(result.isFailed()).to.be.true;
       expect(generatePlugin.called).to.be.false;

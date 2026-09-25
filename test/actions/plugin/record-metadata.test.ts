@@ -10,6 +10,7 @@ import { ApiService } from '../../../src/infrastructure/services/api-service.js'
 import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { ProjectContext } from '../../../src/types/project-context';
 import { PluginIdentityData } from '../../../src/types/plugin/plugin-config.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 
@@ -28,10 +29,11 @@ const ACCOUNT = {
 
 describe('PluginRecordMetadataAction', () => {
   let tmpDirResult: DirectoryResult;
+  let workingDirectory: string;
   let sourceDirectory: string;
   let action: PluginRecordMetadataAction;
 
-  const execute = () => action.execute(new DirectoryPath(sourceDirectory));
+  const execute = () => action.execute(ProjectContext.in(new DirectoryPath(workingDirectory)));
 
   const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   /** The plugin block as written: what this action owns in the file. */
@@ -39,7 +41,8 @@ describe('PluginRecordMetadataAction', () => {
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
-    sourceDirectory = path.join(tmpDirResult.path, 'some-project-folder', 'src');
+    workingDirectory = path.join(tmpDirResult.path, 'some-project-folder');
+    sourceDirectory = path.join(workingDirectory, 'src');
     await fsExtra.ensureDir(sourceDirectory);
 
     // The spinner would render to stdout; pass the underlying promise straight through.

@@ -4,6 +4,7 @@ import { PortalAuthorizationService } from '../../infrastructure/services/portal
 import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { PortalContext } from '../../types/portal-context.js';
 import { ActionResult } from '../action-result.js';
 import { PreparePortalProjectAction } from './prepare-project.js';
@@ -24,11 +25,12 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     portalDirectory: DirectoryPath,
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
+    const sourceDirectory = project.sourceDirectory();
     if (sourceDirectory.isEqual(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
       return ActionResult.failed();
@@ -60,7 +62,7 @@ export class GenerateAction {
     const portalContext = new PortalContext(portalDirectory);
 
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      sourceDirectory,
+      project,
       async (project) => {
         if (!force && (await portalContext.exists()) && !(await this.prompts.overwritePortal(portalDirectory))) {
           this.prompts.portalDirectoryNotEmpty();

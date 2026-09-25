@@ -6,17 +6,19 @@ import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
 import { PluginPublishAction } from '../../../src/actions/plugin/publish.js';
 import { PluginPublishPrompts } from '../../../src/prompts/plugin/publish.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
+import { ProjectContext } from '../../../src/types/project-context';
 import { PluginContents } from '../../../src/types/plugin/plugin-contents.js';
 import { PluginReleaseData } from '../../../src/types/plugin-config-context.js';
 
 describe('PluginPublishAction', () => {
   let tmpDirResult: DirectoryResult;
+  let workingDirectory: string;
   let sourceDirectory: string;
   let pluginDirectory: string;
   let action: PluginPublishAction;
 
   const execute = (plugin = pluginDirectory) =>
-    action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(plugin));
+    action.execute(ProjectContext.in(new DirectoryPath(workingDirectory)), new DirectoryPath(plugin));
 
   const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   const writeConfig = (config: unknown) => fsExtra.writeJson(configPath(), config);
@@ -29,7 +31,7 @@ describe('PluginPublishAction', () => {
 
   beforeEach(async () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
-    const workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
+    workingDirectory = path.join(tmpDirResult.path, 'acme-payments');
     sourceDirectory = path.join(workingDirectory, 'src');
     pluginDirectory = path.join(workingDirectory, 'plugin');
 

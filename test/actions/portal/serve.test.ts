@@ -13,6 +13,7 @@ import { FileWatchService } from '../../../src/infrastructure/file-watch-service
 import { NetworkService } from '../../../src/infrastructure/network-service';
 import { LauncherService } from '../../../src/infrastructure/launcher-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
+import { ProjectContext } from '../../../src/types/project-context';
 import { FileName } from '../../../src/types/file/fileName';
 import { FilePath } from '../../../src/types/file/filePath';
 import { UrlPath } from '../../../src/types/file/urlPath';
@@ -23,7 +24,7 @@ import { PortalSourceContext } from '../../../src/types/portal-source-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
-const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
+const FIXTURE = ProjectContext.in(new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default'));
 const PORT = 23513;
 const SERVER_URL = new UrlPath('http://127.0.0.1:23513');
 
@@ -105,7 +106,7 @@ describe('PortalServeAction', () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
-    const result = await execute(empty);
+    const result = await execute(ProjectContext.in(empty));
 
     expect(result.isFailed()).to.be.true;
     expect(shared.prompts.sourceProblem.firstCall.args[0].kind).to.equal('missingConfig');
@@ -146,7 +147,7 @@ describe('PortalServeAction', () => {
 
     await execute();
 
-    expect(prompts.portalServed.calledOnceWith(SERVER_URL, FIXTURE)).to.be.true;
+    expect(prompts.portalServed.calledOnceWith(SERVER_URL, FIXTURE.sourceDirectory())).to.be.true;
   });
 
   it('opens the browser only when asked', async () => {
@@ -187,20 +188,21 @@ describe('PortalServeAction', () => {
    */
   describe('re-applying apimatic.json', () => {
     let source: DirectoryPath;
+    let project: ProjectContext;
     let save: (config: object) => Promise<void>;
     let watched: Promise<{ onChange: () => Promise<void>; onFailed: (reason: string) => void }>;
     let closeWatch: sinon.SinonStub;
     let recheck: sinon.SinonStub;
     let projectDirectory: DirectoryPath;
 
-    const originalConfig = () => JSON.parse(fs.readFileSync(path.join(FIXTURE.toString(), 'apimatic.json'), 'utf8'));
+    const originalConfig = () => JSON.parse(fs.readFileSync(path.join(FIXTURE.sourceDirectory().toString(), 'apimatic.json'), 'utf8'));
     const readProject = (relative: string) => fs.readFileSync(path.join(projectDirectory.toString(), relative), 'utf8');
     const writeConfig = (config: object) =>
       fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
     const whileServing = async (body: () => Promise<void>) => {
-      const running = execute(source);
+      const running = execute(project);
       const { onChange } = await watched;
       save = async (config: object) => {
         writeConfig(config);
@@ -215,8 +217,9 @@ describe('PortalServeAction', () => {
     };
 
     beforeEach(() => {
-      source = new DirectoryPath(root).join('src');
-      fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
+      project = ProjectContext.in(new DirectoryPath(root));
+      source = project.sourceDirectory();
+      fs.cpSync(FIXTURE.sourceDirectory().toString(), source.toString(), { recursive: true });
 
       // `prepare` is stubbed above; this one writes the files an edit can change, as a real one
       // would, so the test can see what an edit changes.
@@ -519,7 +522,7 @@ describe('PortalServeAction', () => {
       watch.returns(err('EMFILE: too many open files'));
       interrupt();
 
-      const result = await execute(source);
+      const result = await execute(project);
 
       expect(prompts.configNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
       expect(result.isCancelled()).to.be.true;

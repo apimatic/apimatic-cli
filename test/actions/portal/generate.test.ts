@@ -13,12 +13,15 @@ import { Language } from '../../../src/types/sdk/generate';
 import { FileService } from '../../../src/infrastructure/file-service';
 import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
+import { ProjectContext } from '../../../src/types/project-context';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
-const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
-const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
+const FIXTURE = ProjectContext.in(new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default'));
+const CODE_SAMPLES_FIXTURE = ProjectContext.in(
+  new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples')
+);
 
 /** The catalogs the merged fixture expects, read the way the service reads them. */
 const samplesFromFixture = (): CodeSampleCatalogs => {
@@ -109,7 +112,7 @@ describe('GenerateAction', () => {
 
     expect(result.isSuccess()).to.be.true;
     const [, source, artifacts] = shared.prepare.firstCall.args;
-    expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
+    expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.sourceDirectory().toString());
     expect(artifacts.codeSampleCatalogs.isEmpty()).to.be.false;
     expect(shared.prompts.unplacedSamples.calledOnceWith([])).to.be.true;
   });
@@ -117,7 +120,7 @@ describe('GenerateAction', () => {
   it('fails when the source and destination are the same directory', async () => {
     const action = new GenerateAction(new DirectoryPath(root), COMMAND_METADATA);
 
-    const result = await action.execute(FIXTURE, FIXTURE, false, false);
+    const result = await action.execute(FIXTURE, FIXTURE.sourceDirectory(), false, false);
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.directoryCannotBeSame.calledOnce).to.be.true;
@@ -127,7 +130,7 @@ describe('GenerateAction', () => {
   it('refuses a destination that contains the source, which it would empty', async () => {
     const source = portalDirectory.join('src');
 
-    const result = await execute(source);
+    const result = await execute(ProjectContext.in(portalDirectory));
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.destinationContainsSource.calledOnceWith(source, portalDirectory)).to.be.true;
@@ -160,7 +163,7 @@ describe('GenerateAction', () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
-    const result = await execute(empty);
+    const result = await execute(ProjectContext.in(empty));
 
     expect(result.isFailed()).to.be.true;
     expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
@@ -173,7 +176,7 @@ describe('GenerateAction', () => {
     const empty = new DirectoryPath(root).join('empty');
     fs.mkdirSync(empty.toString());
 
-    const result = await execute(empty);
+    const result = await execute(ProjectContext.in(empty));
 
     expect(result.isFailed()).to.be.true;
     expect(shared.prompts.sourceProblem.calledOnce).to.be.true;
@@ -283,11 +286,12 @@ describe('GenerateAction', () => {
   });
 
   it('warns about static files that replace generated ones, and builds anyway', async () => {
-    const source = new DirectoryPath(root).join('shadowing');
-    fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
+    const project = ProjectContext.in(new DirectoryPath(root).join('shadowing'));
+    const source = project.sourceDirectory();
+    fs.cpSync(FIXTURE.sourceDirectory().toString(), source.toString(), { recursive: true });
     fs.writeFileSync(path.join(source.toString(), 'static', 'robots.txt'), 'User-agent: *\n');
 
-    const result = await execute(source);
+    const result = await execute(project);
 
     expect(result.isSuccess()).to.be.true;
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);

@@ -20,7 +20,7 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 ### Encapsulation — DON'T
 
 - **DON'T** expose internal paths as public getters — no `public get outputDirectory()` or `public get filePath()`. If a caller needs a path, it should come as a return value from an operation.
-  - **Exception, and only this one:** a context whose domain *is* the layout may answer with a directory it derives, as `ProjectContext.sourceDirectory()` does. The rule exists so a caller cannot reassemble a context's internals; here the derivation is the thing being asked for, and withholding it only sends the caller back to the string literal the context exists to replace. It still must be a derivation, never the constructor parameter itself — `ProjectContext` answers `sourceDirectory()` and never `projectDirectory()`.
+  - **Exception, and only this one:** a context whose domain *is* the layout may answer with a directory it derives, as `ProjectContext.sourceDirectory()` does, and only for a caller that hands the path to a prompt or a service. A caller that wants to *read* the directory asks the context to read it. It must be a derivation, never the constructor parameter itself — `ProjectContext` answers `sourceDirectory()` and never `projectDirectory()`.
 - **DON'T** return raw config objects — don't return parsed JSON/YAML for callers to manipulate directly. Wrap reads/writes in domain methods (e.g., `getCopilotConfig()` instead of `getBuildFileContents()`).
 - **DON'T** expose derived file names — methods like `getScriptFileName()` leak internal naming logic.
 - **DON'T** add public properties for internal state — constructor parameters are `private readonly`, not exposed.
@@ -83,10 +83,9 @@ Context objects live at `src/types/` and encapsulate path derivation, validation
 | Input context (validate + file ops) | `src/types/spec-context.ts` | Good — zip detection internal |
 | Temp context (zip + save stream) | `src/types/temp-context.ts` | Good — UUID naming internal |
 | Temp context (download + resolve) | `src/types/resource-context.ts` | Good — URL/file decision internal |
-| Composite (delegates to other contexts) | `src/types/build-context.ts` | Good — hands back a SpecContext, not a path |
 | Output context (leaky — avoid pattern) | `src/types/sdk-context.ts` | Avoid — exposes `sdkLanguageDirectory`, has methods that only use infrastructure services without touching domain state |
 | Input context (validate + typed result) | `src/types/portal-source-context.ts` | Good — reports problems, exposes no paths |
-| Layout context (derives directories, hands out none of its own) | `src/types/project-context.ts` | Good — answers derived directories, never its own constructor parameter |
+| Layout context (owns the layout, hands back the contexts that read it) | `src/types/project-context.ts` | Good — commands and actions take this and nothing else; it answers derived directories, never its own constructor parameter |
 
 ---
 

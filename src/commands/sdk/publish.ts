@@ -104,7 +104,6 @@ export default class SdkPublish extends Command {
 
     const projectDirectory = DirectoryPath.createInput(input);
     const project = ProjectContext.in(projectDirectory);
-    const sourceDirectory = project.sourceDirectory();
     const sdkDirectory = project.sdkDirectory(destination);
 
     const configDir = this.getConfigDir();
@@ -133,7 +132,7 @@ export default class SdkPublish extends Command {
     const result = interactive
       ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(projectDirectory, onPublishSdkError)
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
-          sourceDirectory,
+          project,
           sdkDirectory,
           language as Language,
           publishTypes,

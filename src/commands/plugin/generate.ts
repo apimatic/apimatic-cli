@@ -32,7 +32,6 @@ export default class PluginGenerate extends Command {
     } = await this.parse(PluginGenerate);
 
     const project = ProjectContext.at(input);
-    const sourceDirectory = project.sourceDirectory();
     const pluginDirectory = project.pluginDirectory(destination);
     const commandMetadata: CommandMetadata = {
       commandName: PluginGenerate.id,
@@ -41,7 +40,7 @@ export default class PluginGenerate extends Command {
 
     intro('Generate Context Plugin');
     const action = new PluginGenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(sourceDirectory, pluginDirectory, force);
+    const result = await action.execute(project, pluginDirectory, force);
     outro(result);
   }
 

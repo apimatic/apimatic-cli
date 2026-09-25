@@ -264,7 +264,7 @@ export class {PascalName}Action {
     /* parameters matching what Command passes */
   ): Promise<ActionResult> => {
     // 1. Input validation via Context objects
-    //    const buildContext = new BuildContext(sourceDirectory);
+    //    const source = await project.portalSource().resolve();
     //    if (!(await buildContext.validate())) {
     //      this.prompts.directoryEmpty(sourceDirectory);
     //      return ActionResult.failed();

@@ -74,7 +74,6 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
     } = await this.parse(SdkGenerate);
 
     const project = ProjectContext.at(input);
-    const sourceDirectory = project.sourceDirectory();
     const sdkDirectory = project.sdkDirectory(destination);
 
     const commandMetadata: CommandMetadata = {
@@ -85,7 +84,7 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
     intro('Generate SDK');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
-      sourceDirectory,
+      project,
       sdkDirectory,
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),

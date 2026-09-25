@@ -10,7 +10,6 @@ import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
 import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
-import { BuildContext } from '../../../types/build-context.js';
 import { ProjectContext } from '../../../types/project-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
 import { removeQuotes } from '../../../utils/string-utils.js';
@@ -127,7 +126,7 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfileId = ProfileId.createFromPublishingProfileItem(publishingProfileItem);
     const publishResult = await new SdkPublishAction(this.configDir, this.commandMetadata).execute(
-      sourceDirectory,
+      project,
       sdkDirectory,
       language,
       publishTypes,
@@ -157,12 +156,12 @@ export class SdkPublishInteractiveAction {
   ): (value: string | undefined) => string | undefined {
     return (value) => {
       if (!value) {
-        if (!new BuildContext(ProjectContext.in(defaultProjectDirectory).sourceDirectory()).existsSync())
+        if (!ProjectContext.in(defaultProjectDirectory).sourceExistsSync())
           return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
         return;
       }
       const named = new DirectoryPath(removeQuotes(value.trim()));
-      if (!new BuildContext(ProjectContext.in(named).sourceDirectory()).existsSync())
+      if (!ProjectContext.in(named).sourceExistsSync())
         return "The 'src' directory does not exist at the provided location. Please check the path and try again.";
     };
   }

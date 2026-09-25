@@ -4,10 +4,10 @@ import { withDirPath } from '../../infrastructure/tmp-extensions.js';
 import { PluginService } from '../../infrastructure/services/plugin-service.js';
 import { PublishingApiService } from '../../infrastructure/services/publishing-api-service.js';
 import { PluginGeneratePrompts } from '../../prompts/plugin/generate.js';
-import { BuildContext } from '../../types/build-context.js';
+import { PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PluginConfigContext, PluginConfigWriteFailure } from '../../types/plugin-config-context.js';
 import { PluginContext } from '../../types/plugin-context.js';
 import { PublishingProfiles } from '../../types/publish/publishing-profiles.js';
 import { TempContext } from '../../types/temp-context.js';
@@ -29,16 +29,17 @@ export class PluginGenerateAction {
   }
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     pluginDirectory: DirectoryPath,
     force: boolean
   ): Promise<ActionResult> => {
+    const sourceDirectory = project.sourceDirectory();
     if (sourceDirectory.isEqual(pluginDirectory)) {
       this.prompts.directoryCannotBeSame(pluginDirectory);
       return ActionResult.failed();
     }
 
-    if (!(await new BuildContext(sourceDirectory).exists())) {
+    if (!(await project.sourceExists())) {
       this.prompts.sourceDirectoryDoesNotExist(sourceDirectory);
       return ActionResult.failed();
     }
@@ -49,7 +50,7 @@ export class PluginGenerateAction {
       return ActionResult.cancelled();
     }
 
-    const configContext = new PluginConfigContext(sourceDirectory);
+    const configContext = project.pluginConfig();
     const configState = await configContext.getPluginConfigState();
     if (configState.state === 'unreadable') {
       this.prompts.pluginConfigUnreadable(configState.reason, configState.path);
@@ -59,9 +60,7 @@ export class PluginGenerateAction {
     const identified =
       configState.state === 'present' && configState.hasMetadata()
         ? ActionResult.success(configState)
-        : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(
-            sourceDirectory
-          );
+        : await new PluginRecordMetadataAction(this.configDir, this.commandMetadata, this.authKey).execute(project);
     if (!identified.isSuccess()) {
       return identified.discardValue();
     }

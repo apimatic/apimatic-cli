@@ -12,21 +12,20 @@ import { CommandMetadata } from '../types/common/command-metadata.js';
 import { ValidateAction } from './api/validate.js';
 import { SpecContext } from '../types/spec-context.js';
 import { OpenApiDocument, SpecFormat } from '../types/portal/openapi-document.js';
-import { PortalSourceContext } from '../types/portal-source-context.js';
 import { PortalAuthorizationService } from '../infrastructure/services/portal-authorization-service.js';
 import { FileDownloadService } from '../infrastructure/services/file-download-service.js';
 import { PortalProjectService } from '../infrastructure/portal-project-service.js';
 import { envInfo } from '../infrastructure/env-info.js';
 import { schemaUrlFor } from '../types/apimatic-config/document.js';
-import { PluginConfigContext } from '../types/plugin-config-context.js';
 import { PLACEHOLDER_METADATA } from '../types/plugin/plugin-config.js';
 import { ProjectContext } from '../types/project-context.js';
 import { DEFAULT_PORTAL_PORT, PortalServeAction } from './portal/serve.js';
 
 /** What the wizard writes into, and the specification it builds the portal from. */
-interface Project {
+interface Chosen {
+  project: ProjectContext;
+  /** Held rather than asked of the context: the wizard is what chose it. */
   projectDirectory: DirectoryPath;
-  source: PortalSourceContext;
   specPath: FilePath;
   /** True when the project arrived with its own `src/`, which is left where it is. */
   adopted: boolean;
@@ -87,11 +86,12 @@ export class QuickstartAction {
     if (project.isErr()) {
       return project.error;
     }
-    const { projectDirectory, source, specPath, adopted } = project.value;
+    const { project: chosen, projectDirectory, specPath, adopted } = project.value;
     const schemaUrl = schemaUrlFor(envInfo.getCLIVersion());
 
+    const source = chosen.portalSource();
     const scaffolded = adopted ? await source.adopt(specPath, schemaUrl) : await source.scaffold(specPath, schemaUrl);
-    const sourceDirectory = projectDirectory.join('src');
+    const sourceDirectory = chosen.sourceDirectory();
     if (scaffolded.isErr()) {
       this.prompts.scaffoldFailed(scaffolded.error, sourceDirectory);
       return ActionResult.failed();
@@ -103,7 +103,7 @@ export class QuickstartAction {
       return ActionResult.cancelled();
     }
 
-    const pluginConfig = new PluginConfigContext(sourceDirectory);
+    const pluginConfig = chosen.pluginConfig();
     const languagesRecorded = await pluginConfig.recordLanguages(selection);
     const pluginConfigRecorded = languagesRecorded.isErr()
       ? languagesRecorded
@@ -114,7 +114,7 @@ export class QuickstartAction {
     }
 
     // Reported rather than fatal: what Git tracks does not decide whether a portal can be built.
-    const ignored = await ProjectContext.in(projectDirectory).upsertGitignore();
+    const ignored = await chosen.upsertGitignore();
     if (ignored.isErr()) {
       this.prompts.gitignoreNotUpdated(ignored.error, projectDirectory);
     }
@@ -123,7 +123,7 @@ export class QuickstartAction {
     this.prompts.printDirectoryStructure(projectDirectory, structure);
 
     const result = await new PortalServeAction(this.configDir, this.commandMetadata, null).execute(
-      sourceDirectory,
+      chosen,
       DEFAULT_PORTAL_PORT,
       true,
       () => this.prompts.nextSteps(scaffolded.value)
@@ -139,18 +139,18 @@ export class QuickstartAction {
   private async findProject(
     workingDirectory: DirectoryPath,
     tempDirectory: DirectoryPath
-  ): Promise<Result<Project, ActionResult>> {
-    const hereSource = new PortalSourceContext(workingDirectory.join('src'));
-    const adoptedSpec = await hereSource.primarySpec();
+  ): Promise<Result<Chosen, ActionResult>> {
+    const here = ProjectContext.in(workingDirectory);
+    const adoptedSpec = await here.portalSource().primarySpec();
 
     if (adoptedSpec !== null) {
-      this.prompts.importSpecStepAdopted(workingDirectory.join('src'));
+      this.prompts.importSpecStepAdopted(here.sourceDirectory());
       const validated = await this.validate(adoptedSpec, tempDirectory, true);
       if (validated.isErr()) {
         return err(validated.error);
       }
       this.prompts.createPortalStep();
-      return ok({ projectDirectory: workingDirectory, source: hereSource, specPath: validated.value, adopted: true });
+      return ok({ project: here, projectDirectory: workingDirectory, specPath: validated.value, adopted: true });
     }
 
     this.prompts.importSpecStep();
@@ -169,8 +169,8 @@ export class QuickstartAction {
       return err(ActionResult.cancelled());
     }
     return ok({
+      project: ProjectContext.in(projectDirectory),
       projectDirectory,
-      source: new PortalSourceContext(projectDirectory.join('src')),
       specPath: validated.value,
       adopted: false
     });

@@ -45,7 +45,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
       flags: { input, port, open, 'auth-key': authKey }
     } = await this.parse(PortalServe);
 
-    const sourceDirectory = ProjectContext.at(input).sourceDirectory();
+    const project = ProjectContext.at(input);
     const commandMetadata: CommandMetadata = {
       commandName: PortalServe.id,
       shell: this.config.shell
@@ -53,7 +53,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
 
     intro('Portal Serve');
     const action = new PortalServeAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(sourceDirectory, port, open);
+    const result = await action.execute(project, port, open);
     outro(result);
   }
 
