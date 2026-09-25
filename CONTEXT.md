@@ -6,12 +6,16 @@ The command-line client that validates API specifications, generates SDKs, and b
 
 ### Portal build
 
-**Build directory**:
+**Source directory**:
 The user's `src/` directory — `apimatic.json`, `spec/`, `content/`, `static/` — taken as the input to every portal and SDK run, and never written to.
-_Avoid_: Project, workspace, source folder
+_Avoid_: Build directory, project, workspace, source folder
+
+**Build directory**:
+The directory that contains the source directory.
+_Avoid_: Project root, project directory
 
 **Portal project**:
-The throwaway site assembled for one portal run from the portal template, the build directory and the portal artifacts, and discarded once the run ends.
+The throwaway site assembled for one portal run from the portal template, the source directory and the portal artifacts, and discarded once the run ends.
 _Avoid_: Build directory, build project, build tree
 
 **Spec**:
@@ -33,7 +37,7 @@ One language's documentation pages, such as "Getting Started", written for that 
 _Avoid_: Language guide, language docs, docs
 
 **Code-sample catalog**:
-One language's code samples for every endpoint of the build directory, keyed by endpoint then by example id.
+One language's code samples for every endpoint of the source directory, keyed by endpoint then by example id.
 _Avoid_: Snippet file, samples JSON
 
 **Code sample**:
@@ -45,5 +49,5 @@ The key of an OpenAPI `examples:` entry — the request body's, else the first p
 _Avoid_: Example name, variant
 
 **Unplaced sample**:
-A code sample whose endpoint no spec in the build directory declares.
+A code sample whose endpoint no spec in the source directory declares.
 _Avoid_: Orphan sample, missing operation
