@@ -10,11 +10,12 @@
    last, so what it sets outranks the theme and presets above. */
 @import './theme.css';
 
+/* The `font-sans` and `font-mono` classes read these, and the page defaults derive from them. */
 @theme {
-  --default-font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --default-mono-font-family: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', 'Courier New', monospace;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
 }
 
 @source not '../../dist';

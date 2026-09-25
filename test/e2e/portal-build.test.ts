@@ -345,7 +345,9 @@ const stylesheetOf = (output: DirectoryPath) => {
     const css = stylesheetOf(output);
 
     expect(read('index.html')).not.to.contain('fonts.googleapis.com');
-    expect(css).to.contain('--default-font-family:"Geist Variable"');
+    // Fumadocs' type tables and playground output use the `font-mono` class, which reads `--font-mono`.
+    expect(css).to.contain('--font-sans:"Geist Variable"');
+    expect(css).to.contain('--font-mono:"Geist Mono Variable"');
     expect(css).to.match(/url\(\/assets\/geist-latin-wght-normal-[\w-]+\.woff2\)/);
     expect(css).to.match(/url\(\/assets\/geist-mono-latin-wght-normal-[\w-]+\.woff2\)/);
     // The theme's light primary, which nothing in the fixture overrides.
