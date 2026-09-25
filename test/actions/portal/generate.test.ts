@@ -141,7 +141,9 @@ describe('GenerateAction', () => {
 
     expect(result.isFailed()).to.be.true;
     expect(
-      prompts.runtimeUnsupported.calledOnceWith("The portal build dependency 'vite' is missing from this installation.")
+      shared.prompts.runtimeUnsupported.calledOnceWith(
+        "The portal build dependency 'vite' is missing from this installation."
+      )
     ).to.be.true;
     expect(authorize.called).to.be.false;
   });
@@ -152,7 +154,7 @@ describe('GenerateAction', () => {
     const result = await execute();
 
     expect(result.isFailed()).to.be.true;
-    expect(prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled' })).to.be.true;
+    expect(shared.prompts.authorizationFailed.calledOnceWith({ kind: 'notEntitled' })).to.be.true;
     expect(build.called).to.be.false;
   });
 

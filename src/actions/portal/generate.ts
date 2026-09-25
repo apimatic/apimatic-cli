@@ -1,6 +1,5 @@
 import { PortalBuildService } from '../../infrastructure/portal-build-service.js';
-import { PortalProjectPaths, PortalProjectService } from '../../infrastructure/portal-project-service.js';
-import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
+import { PortalProjectPaths } from '../../infrastructure/portal-project-service.js';
 import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
@@ -10,8 +9,6 @@ import { PreparePortalProjectAction } from './prepare-project.js';
 
 export class GenerateAction {
   private readonly prompts: PortalGeneratePrompts = new PortalGeneratePrompts();
-  private readonly authorizationService = new PortalAuthorizationService();
-  private readonly projectService = new PortalProjectService();
   private readonly buildService = new PortalBuildService();
   private readonly configDir: DirectoryPath;
   private readonly commandMetadata: CommandMetadata;
@@ -38,22 +35,6 @@ export class GenerateAction {
     // the source would delete the very files being built from.
     if (portalDirectory.contains(sourceDirectory)) {
       this.prompts.destinationContainsSource(sourceDirectory, portalDirectory);
-      return ActionResult.failed();
-    }
-
-    const runtimeProblem = this.projectService.runtimeProblem();
-    if (runtimeProblem !== null) {
-      this.prompts.runtimeUnsupported(runtimeProblem);
-      return ActionResult.failed();
-    }
-
-    const authorization = await this.authorizationService.authorize(
-      this.configDir,
-      this.commandMetadata.shell,
-      this.authKey
-    );
-    if (authorization.isErr()) {
-      this.prompts.authorizationFailed(authorization.error);
       return ActionResult.failed();
     }
 

@@ -67,13 +67,12 @@ export class ValidationService {
     const authorizationHeader = this.createAuthorizationHeader(authInfo, authKey ?? null);
     const client = apiClientFactory.createApiClient(authorizationHeader, commandMetadata.shell);
     const controller = new ApiValidationV2ExternalApisController(client);
+    const fileStream = fsExtra.createReadStream(file.toString());
 
     try {
-      const fileDescriptor = new FileWrapper(fsExtra.createReadStream(file.toString()));
-
       const validation: ApiResponse<ValidateApiResult> = await controller.validateApiViaFileV2(
         ContentType.EnumMultipartformdata,
-        fileDescriptor
+        new FileWrapper(fileStream)
       );
 
       const headerValue = validation.headers?.['x-unallowed-features'];
@@ -92,6 +91,8 @@ export class ValidationService {
       });
     } catch (error) {
       return err(await this.handleValidationErrors(error));
+    } finally {
+      fileStream.close();
     }
   }
 
@@ -180,9 +181,6 @@ export class ValidationService {
       errorMessage = errorBody || errorMessage;
     }
 
-    return {
-      message: errorMessage,
-      statusCode: response.status
-    } as unknown as ServiceError;
+    return ServiceError.invalidResponse(errorMessage);
   }
 }

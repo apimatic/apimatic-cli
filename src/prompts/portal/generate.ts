@@ -1,13 +1,11 @@
 import { isCancel, confirm, log } from '@clack/prompts';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FilePath } from '../../types/file/filePath.js';
-import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalBuildFailure, PortalBuildResult } from '../../infrastructure/portal-build-service.js';
 import { NOT_FOUND_FILE_NAME, PortalSaveProblem, ZIP_FILE_NAME } from '../../types/portal-context.js';
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
-import { reportAuthorizationFailure } from './authorization.js';
 
 function describeSaveProblem(problem: PortalSaveProblem): string {
   switch (problem.kind) {
@@ -53,14 +51,6 @@ export class PortalGeneratePrompts {
       `generated portal. Choose a destination outside it, such as ` +
       `${f.flag('destination', './portal')}.`;
     log.error(message);
-  }
-
-  public authorizationFailed(failure: PortalAuthorizationFailure) {
-    reportAuthorizationFailure(failure);
-  }
-
-  public runtimeUnsupported(reason: string) {
-    log.error(reason);
   }
 
   /**

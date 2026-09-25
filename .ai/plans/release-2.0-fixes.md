@@ -1,9 +1,9 @@
 # Plan: the pre-release fix batches for 2.0
 
-Status: PR 1 implemented on `saeedjamshaid/one-home-per-concept` (see §3.8 for
-where it departed from this plan); PRs 2 and 3 proposed. Three PRs against
-`dev`, landed before the release PR is cut. Grounded in `dev` at `ecf76668`;
-every file:line below was verified there.
+Status: batches 1 and 2 implemented as commits of one PR (#374) on
+`saeedjamshaid/one-home-per-concept`, batch 3 to follow there; §3.8 and §4.6
+record where each departed from this plan. Grounded in `dev` at `ecf76668`; every file:line
+below was verified there.
 
 ## 1. Goal and scope
 
@@ -299,6 +299,23 @@ no mock-fs), all cases cross-platform — no chmod tricks:
    returns `null` when `writeContents` rejects (`:84-92`).
 
 ~180 lines, one new file.
+
+### 4.6 As implemented — departures from the above
+
+- 4.2: the CLI type is `PortalBuildPaths`, not `PortalProjectConfig`, so the
+  two sides of one contract read as one name (`BuildPaths` in the template);
+  the template's reader became `readBuildPaths()`. The implementer check: the
+  template is never type-checked as a whole — `tsc -p test/tsconfig.json`
+  compiles only the template modules a test imports, and `portal.server.ts` is
+  not one — which is why its import of the absent JSON never failed.
+  `portal.server.ts` now casts once, as `portal.ts` does. `APIMATIC_E2E=1`
+  (two real Vite builds) passes.
+- 4.3: `stripUnallowedFeatures` has no caller on `dev` — quickstart used it on
+  `main` to prune a spec's unallowed features, and #363 removed the call. The
+  fix is applied; whether to delete the method or restore the pruning is an
+  open question for the release PR.
+- 4.5: ten cases rather than seven — `exists()`'s three and `saveBuildLog`'s
+  two are separate `it`s.
 
 ---
 

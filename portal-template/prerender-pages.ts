@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSlugs, loader } from 'fumadocs-core/source';
-import type { PortalConfig } from './portal-config.ts';
+import type { BuildPaths } from './portal-config.ts';
 import { openApiSection } from './src/lib/openapi-section.server';
 
 const CONTENT_EXTENSIONS = new Set(['.md', '.mdx']);
@@ -14,7 +14,7 @@ const isSkippedByGlob = (segment: string) => segment.startsWith('.') || segment 
  * collapsed sidebar folders and never sees the `.md` URLs the page actions fetch, so
  * the list is computed here from the same sources the site is built from.
  */
-export async function prerenderPages(config: PortalConfig, siteUrl: string | null): Promise<{ path: string }[]> {
+export async function prerenderPages(config: BuildPaths, siteUrl: string | null): Promise<{ path: string }[]> {
   const urls = new Set<string>(['/', '/api/search.json', '/llms.txt', '/llms-full.txt']);
   // Both need absolute URLs, so they are only emitted for a portal that declares its address.
   if (siteUrl) {

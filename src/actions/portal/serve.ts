@@ -15,7 +15,6 @@ import { PreviewContent } from '../../types/portal/preview-content.js';
 import { FileWatch, FileWatchService } from '../../infrastructure/file-watch-service.js';
 import { NetworkService } from '../../infrastructure/network-service.js';
 import { LauncherService } from '../../infrastructure/launcher-service.js';
-import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
 import { errorMessage } from '../../utils/error-utils.js';
@@ -27,7 +26,6 @@ export class PortalServeAction {
   private readonly prompts: PortalServePrompts = new PortalServePrompts();
   private readonly networkService: NetworkService = new NetworkService();
   private readonly launcherService: LauncherService = new LauncherService();
-  private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
   private readonly devServerService = new PortalDevServerService();
   private readonly fileWatchService = new FileWatchService();
@@ -47,35 +45,17 @@ export class PortalServeAction {
     openInBrowser: boolean,
     onServing?: () => void
   ): Promise<ActionResult> => {
-    const runtimeProblem = this.projectService.runtimeProblem();
-    if (runtimeProblem !== null) {
-      this.prompts.runtimeUnsupported(runtimeProblem);
-      return ActionResult.failed();
-    }
-
-    // Checked once, at startup: the preview then runs unattended for as long as the user
-    // keeps editing, and re-checking on every reload would be a request per keystroke.
-    const authorization = await this.authorizationService.authorize(
-      this.configDir,
-      this.commandMetadata.shell,
-      this.authKey
-    );
-    if (authorization.isErr()) {
-      this.prompts.authorizationFailed(authorization.error);
-      return ActionResult.failed();
-    }
-
-    const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-    if (servePort !== port) {
-      this.prompts.usingFallbackPort(port, servePort);
-    }
-
     return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
       sourceDirectory,
       {
         // So the browser keeps showing what a build would accept while an edit is half done.
         content: 'copy',
         onPrepared: async (project, source, artifacts) => {
+          const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
+          if (servePort !== port) {
+            this.prompts.usingFallbackPort(port, servePort);
+          }
+
           const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
 
           if (server.isErr()) {

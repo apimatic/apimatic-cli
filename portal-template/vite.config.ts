@@ -6,22 +6,22 @@ import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { downloads } from './downloads.ts';
 import { generatedPagesReload } from './generated-pages-reload.ts';
-import { readPortalConfig, readPortalIdentity } from './portal-config.ts';
+import { readBuildPaths, readPortalIdentity } from './portal-config.ts';
 import { prerenderPages } from './prerender-pages.ts';
 import { specReload } from './spec-reload.ts';
 
 export default defineConfig(async () => {
-  const [portalConfig, identity] = await Promise.all([readPortalConfig(), readPortalIdentity()]);
-  const pages = await prerenderPages(portalConfig, identity.siteUrl);
-  const publicDir: string | false = portalConfig.staticDir ?? false;
+  const [paths, identity] = await Promise.all([readBuildPaths(), readPortalIdentity()]);
+  const pages = await prerenderPages(paths, identity.siteUrl);
+  const publicDir: string | false = paths.staticDir ?? false;
 
   return {
     publicDir,
     plugins: [
       generatedPagesReload(),
-      downloads(portalConfig.downloadsDir),
+      downloads(paths.downloadsDir),
       fumadocsMdx(),
-      specReload(portalConfig.specs),
+      specReload(paths.specs),
       tailwindcss(),
       tanstackStart({
         // Without a mask path the shell is rendered at "/" and no index.html is written;

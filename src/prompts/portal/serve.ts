@@ -3,7 +3,6 @@ import { once } from 'node:events';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { UrlPath } from '../../types/file/urlPath.js';
-import { PortalAuthorizationFailure } from '../../infrastructure/services/portal-authorization-service.js';
 import { ContentNotices } from '../../types/portal/content-notices.js';
 import { MissingArtifacts } from '../../types/portal/generated-pages.js';
 import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
@@ -12,19 +11,10 @@ import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/po
 import { Result } from 'neverthrow';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
-import { reportAuthorizationFailure } from './authorization.js';
 import { describeMissingArtifacts } from './artifacts.js';
 import { reportContentNotices, reportContentProblems, reportSourceProblem } from './source.js';
 
 export class PortalServePrompts {
-  public authorizationFailed(failure: PortalAuthorizationFailure) {
-    reportAuthorizationFailure(failure);
-  }
-
-  public runtimeUnsupported(reason: string) {
-    log.error(reason);
-  }
-
   public usingFallbackPort(requestedPort: number, availablePort: number) {
     const message =
       `Port ${f.var(requestedPort.toString())} is already in use. ` +

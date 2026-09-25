@@ -1,8 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { Portal } from './src/lib/portal-types';
 
-/** Written by the CLI next to this file before every build or dev-server start. */
-export interface PortalConfig {
+/**
+ * Where the build finds what it is built from on this machine: `portal.config.json`, which the
+ * CLI writes next to this file before every build or dev-server start.
+ */
+export interface BuildPaths {
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;
   /** Absolute path of the code samples, keyed by path then method; null when there are none. */
@@ -16,8 +19,8 @@ export interface PortalConfig {
   downloadsDir: string | null;
 }
 
-export async function readPortalConfig(): Promise<PortalConfig> {
-  return (await readJson('./portal.config.json')) as PortalConfig;
+export async function readBuildPaths(): Promise<BuildPaths> {
+  return (await readJson('./portal.config.json')) as BuildPaths;
 }
 
 /** The part of what the browser is told that the build set-up reads too. */
