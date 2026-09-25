@@ -21,9 +21,9 @@ const templateRoot = path.join(repositoryRoot, 'portal-template');
 const manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
 
 /** Every package specifier the template imports, from its modules and its stylesheet. */
-function templateImports(files: RegExp = /\.(tsx?|css)$/): string[] {
+function templateImports(): string[] {
   const specifiers: string[] = [];
-  for (const file of templateFiles().filter((name) => files.test(name))) {
+  for (const file of templateFiles().filter((name) => /\.(tsx?|css)$/.test(name))) {
     const source = fs.readFileSync(path.join(templateRoot, file), 'utf8');
     const patterns = file.endsWith('.css')
       ? [/@import\s+['"]([^'"]+)['"]/g]
@@ -73,17 +73,17 @@ describe('portal template packaging', () => {
   });
 
   // CI keeps the CLI and the build on one drive, where a linked `url()` still resolves, so only this catches it.
-  it('reaches no stylesheet with a url() through a linked package', () => {
+  it('links no package whose stylesheets use a relative url()', () => {
     const cssFiles = (name: string) =>
       fs
         .readdirSync(path.join(repositoryRoot, 'node_modules', name), { recursive: true, withFileTypes: true })
         .filter((entry) => entry.isFile() && entry.name.endsWith('.css'))
         .map((entry) => path.join(entry.parentPath, entry.name));
-    const linked = new Set(templateImports(/\.css$/).map(packageNameOf));
-    for (const name of COPIED_DEPENDENCIES) linked.delete(name);
+    // Data URIs, absolute URLs and root-relative paths are left as written, so they resolve anywhere.
+    const relativeUrl = /url\(\s*['"]?(?![a-z][\w+.-]*:|\/|#)/i;
 
-    const offenders = [...linked].filter((name) =>
-      cssFiles(name).some((file) => fs.readFileSync(file, 'utf8').includes('url('))
+    const offenders = TEMPLATE_DEPENDENCIES.filter((name) => !COPIED_DEPENDENCIES.includes(name)).filter((name) =>
+      cssFiles(name).some((file) => relativeUrl.test(fs.readFileSync(file, 'utf8')))
     );
 
     expect(offenders, 'copy these into the project (COPIED_DEPENDENCIES) instead of linking them').to.be.empty;
