@@ -9,6 +9,7 @@ import { PortalGeneratePrompts } from '../../../src/prompts/portal/generate';
 import { PortalAuthorizationService } from '../../../src/infrastructure/services/portal-authorization-service';
 import { PortalBuildService } from '../../../src/infrastructure/portal-build-service';
 import { PortalProjectService } from '../../../src/infrastructure/portal-project-service';
+import { PortalArtifactsService } from '../../../src/infrastructure/services/portal-artifacts-service';
 import { FileService } from '../../../src/infrastructure/file-service';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { FileName } from '../../../src/types/file/fileName';
@@ -17,6 +18,7 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
+const CODE_SAMPLES_FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/code-samples');
 
 describe('GenerateAction', () => {
   let root: string;
@@ -25,6 +27,7 @@ describe('GenerateAction', () => {
   let runtimeProblem: sinon.SinonStub;
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
+  let prepare: sinon.SinonStub;
 
   const execute = (source = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
@@ -54,11 +57,12 @@ describe('GenerateAction', () => {
     prompts = sinon.stub(PortalGeneratePrompts.prototype);
     // The spinner would render to stdout; pass the underlying promise straight through.
     prompts.buildPortal.callsFake((fn) => fn);
+    prompts.generateCodeSamples.callsFake((fn) => fn);
     prompts.savePortal.callsFake((fn) => fn);
     prompts.overwritePortal.resolves(true);
 
     runtimeProblem = sinon.stub(PortalProjectService.prototype, 'runtimeProblem').returns(null);
-    sinon
+    prepare = sinon
       .stub(PortalProjectService.prototype, 'prepare')
       .callsFake(async (projectDirectory) =>
         ok({ projectDirectory, viteBinary: new FilePath(projectDirectory, new FileName('vite.js')) })
@@ -70,6 +74,28 @@ describe('GenerateAction', () => {
   afterEach(() => {
     sinon.restore();
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('fails without building when the code samples cannot be generated', async () => {
+    sinon.stub(PortalArtifactsService.prototype, 'generate').resolves(err({ file: 'code-samples.json', problem: { kind: 'missing' as const } }));
+
+    const result = await execute();
+
+    expect(result.isFailed()).to.be.true;
+    expect(build.called).to.be.false;
+    expect(fs.existsSync(portalDirectory.toString())).to.be.false;
+  });
+
+  it("builds from the user's own specs, handing the project their code samples", async () => {
+    process.env.APIMATIC_CODE_SAMPLES_PATH = 'test/resources/code-samples.json';
+
+    const result = await execute(CODE_SAMPLES_FIXTURE).finally(() => delete process.env.APIMATIC_CODE_SAMPLES_PATH);
+
+    expect(result.isSuccess()).to.be.true;
+    const [, source, codeSamples] = prepare.firstCall.args;
+    expect(source.specs[0].file.toString()).to.contain(CODE_SAMPLES_FIXTURE.toString());
+    expect(codeSamples.isEmpty()).to.be.false;
+    expect(prompts.unplacedSamples.calledOnceWith([])).to.be.true;
   });
 
   it('fails when the source and destination are the same directory', async () => {

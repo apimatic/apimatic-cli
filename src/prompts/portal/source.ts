@@ -1,7 +1,7 @@
 import { log } from '@clack/prompts';
 import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PortalSourceProblem } from '../../types/portal/portal-source.js';
+import { PortalSourceProblem, ReservedAddressPage } from '../../types/portal/portal-source.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
 import { format as f } from '../format.js';
@@ -39,6 +39,10 @@ export function reportSourceProblem(
       log.message(problem.errors.map((error) => `  • ${error}`).join('\n'));
       return;
     }
+    case 'reservedAddresses': {
+      reportReservedAddresses(problem.pages, sourceDirectory);
+      return;
+    }
     case 'unreadableContent': {
       log.error(
         `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
@@ -48,14 +52,6 @@ export function reportSourceProblem(
     }
     case 'unreadableSpec': {
       log.error(`${f.var(problem.fileName.toString())} could not be read as JSON or YAML.`);
-      return;
-    }
-    case 'unsupportedSpec': {
-      const message =
-        `${f.var(problem.fileName.toString())} is ${problem.format}. ` +
-        `Portals are generated from OpenAPI 3.x documents; convert it with ` +
-        `${f.cmdAlt('apimatic', 'api', 'transform')} first.`;
-      log.error(message);
       return;
     }
     case 'missingStaticFiles': {
@@ -86,14 +82,39 @@ export function reportSourceProblem(
       }
       return;
     }
-    case 'noSpecs': {
+    case 'emptySpecDirectory': {
+      const message =
+        `${f.path(sourceDirectory.join('spec'))} has no files. Add your OpenAPI 3.x document to it as a ` +
+        `${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
+      log.error(message);
+      return;
+    }
+    case 'noOpenApiSpec': {
       const message =
         `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join('spec'))}. ` +
-        `Add at least one ${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
+        `Try ${f.cmdAlt('apimatic', 'api', 'transform')} to convert your spec to OpenAPI 3.x first.`;
       log.error(message);
       return;
     }
   }
+}
+
+function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: DirectoryPath): void {
+  const one = pages.length === 1;
+  const lines = pages.map(({ file, address, section }) => {
+    const kept = `/${section.folder}`;
+    const within = address === kept ? '' : `, under ${f.var(kept)}`;
+    return `  • ${f.var(file.relativeTo(sourceDirectory))}, at ${f.var(address)}${within}, which is kept for ${
+      section.description
+    }`;
+  });
+  log.error(
+    one
+      ? `A page in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
+      : `Pages in ${f.path(sourceDirectory)} would be served where the portal puts the pages it generates:`
+  );
+  log.message(lines.join('\n'));
+  log.message(one ? 'Rename or move the page.' : 'Rename or move each page.');
 }
 
 export function reportShadowedFiles(shadowed: FileName[]): void {

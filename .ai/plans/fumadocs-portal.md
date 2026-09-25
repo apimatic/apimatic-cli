@@ -106,6 +106,12 @@ last. Inside the reference there is one section per spec file in filename
 order, grouped by tag — except for a single specification, whose section level
 is inlined. See `.ai/plans/portal-navigation.md`.
 
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`): the top level is shown as
+tabs, and two of them are pages the CLI generates: SDKs, an SDKs page and one
+page per language in the `languages` block, positioned by `apimatic:sdks`; and
+Context Plugin, when there is a `plugin` block, positioned by `apimatic:plugin`.
+Unnamed, both sit before the API reference.
+
 ## 4. Template (`portal-template/`)
 
 Shipped inside the npm package (add to `files`). Derived from the spike, which
@@ -126,6 +132,14 @@ release cuts the preset, the fonts and the layout. `app.css` imports
 `neutral.css` again and sets Geist and Geist Mono in `@theme`, `__root.tsx`
 links their Google Fonts stylesheet, the generated `theme.css` holds only the
 primary colour's two rules, and `layout.tsx` renders the notebook layout alone.
+
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`, sections 4 and 6):
+`src/lib/source.ts` declares a second collection over the relative literal
+`'generated'`, where the CLI writes the SDK and context plugin pages from the
+templates in the package's `portal-pages/`; `source.server.ts` passes it to
+`loader()` under the `generated` key, and `vite.config.ts` registers a
+serve-only plugin that reloads the collection when a generated page is added
+or removed.
 
 - `vite.config.ts`: `fumadocsMdx()`, `tailwindcss()`, `react()`, and
   `tanstackStart({ spa: { enabled: true, maskPath: '/spa-shell', prerender: { enabled: true } }, pages: [...], prerender: { crawlLinks: false }, importProtection: { behavior: 'error' } })`.
@@ -165,10 +179,11 @@ primary colour's two rules, and `layout.tsx` renders the notebook layout alone.
   reach. Without this every page carried the whole specification twice (inlined
   router state plus the server-function cache file), so output grew with
   pages x document size: 150 Stripe operations produced 812 MB.
-- Request samples: only curl is generated (`createOpenAPIPage({ codeUsages })` with a
-  registry holding the curl generator alone, `src/components/api-page.tsx`). Other
-  languages will come from `x-codeSamples` on each operation, added to the spec by a
-  later PR; the tabs already render those beside the generated one (verified).
+- Request samples: fumadocs generates cURL only (`createOpenAPIPage({ codeUsages })` with an
+  empty registry, `src/components/api-page.tsx`). Every language comes from
+  `x-apimatic-codeSamples`, which the template places on each operation as it bundles the
+  spec, from the `code-samples.json` the CLI writes; `src/components/usage-tabs.tsx` renders
+  a cURL tab, then one tab per language, following the example selector.
 - Per-route `head()` with title, meta description (frontmatter or operation summary) and canonical URL.
 - Static Orama search index (`server.staticGET()`), `llms.txt` with a cheap per-page renderer (never serialize the spec per page).
 - Reads `portal.config.json` written by the CLI into the build directory (title, description, logo URL, absolute spec paths, absolute static dir); the content dir is the generated literal described above.

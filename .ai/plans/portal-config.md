@@ -51,6 +51,8 @@ Out of scope:
 - The generated SDK page and its content. `apimatic:sdks` is reserved and
   resolves to nothing until that page exists, so no SDKs tab renders in this
   release (section 5). The page is the navigation plan's second change.
+  *(2026-09-24: landed, with a context plugin page beside it;
+  `.ai/plans/generated-pages.md`.)*
 - Writing `languages` for a portal project. For now the user adds it to
   `src/apimatic.json` by hand; a quickstart step that writes it is a separate
   PR (section 12).
@@ -66,8 +68,8 @@ Delivered as **one PR** (section 11).
 | Where navigation lives | The root `src/content/nav.json`. Its entries, in order, decide the tabs and their order (section 5). `apimatic.json` carries no tab order and no section list. |
 | Tabs | Always on. Each top-level node belongs to exactly one tab; there is no flat-sidebar mode. |
 | Content tabs | A folder directly under `content/` becomes its own tab when its own `nav.json` sets `"root": true` — Fumadocs' own key for the same thing. Otherwise it stays a group in the Guides sidebar. |
-| Tab labels | Fixed for the three tabs no folder backs: "Home", "Guides", "SDKs". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. Only root-level tabs are affected; nothing nested changes. |
-| Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. |
+| Tab labels | Fixed for the three tabs no folder backs: "Home", "Guides", "SDKs". A folder tab takes its `nav.json` `title`, then its index page's title, then the folder name; the API tab takes `content/api/nav.json`'s `title`, then a `content/api/index` page, then "API Reference" — both as `dev` already does. Only root-level tabs are affected; nothing nested changes. *(Amended 2026-09-24: SDKs is now a generated folder rather than a tab no folder backs, and "Context Plugin" joins it; both labels stay fixed, set by the generated folders' `nav.json` titles. `.ai/plans/generated-pages.md`.)* |
+| Tokens | `apimatic:api` stays and places the API tab. `apimatic:pages` is renamed `apimatic:sdks` and places the SDKs tab; the old name is reported as an unknown entry. A later AI section gets its own token rather than sharing a group, because each generated section is its own tab. *(Amended 2026-09-24: `apimatic:plugin` places the Context Plugin tab, a generated section given its own token by this rule; the AI section is still to come.)* |
 | Home | `content/index.md` rendered in the docs layout, in its own Home tab. The Home tab is first unless the root `nav.json` names `index` explicitly, in which case it sits where `index` sits. |
 | `languages` | The shared top-level block `sdk publish` writes. Required for the portal: at least one entry, each keyed by a `Language` enum value and holding an object. Its `publishing` record (#350) is optional: an entry without one is a language that is wanted but not yet published, and counts. An unknown language key is an error on the portal path (the plugin path stays lenient and preserves it). |
 | Layout | Fumadocs' notebook layout with the tabs in the header, fixed (section 15). |
@@ -263,6 +265,13 @@ Defaults follow from the existing ordering rules with no new ones: no
 `nav.json` at all gives Home, Guides, SDKs, API; an unnamed `apimatic:api`
 keeps the API last; an unnamed `apimatic:sdks` keeps the SDKs before the API.
 
+*Amended 2026-09-24* (`.ai/plans/generated-pages.md`, section 5): the
+"injected page → SDKs" row above is now "a generated folder → its own tab,
+labelled by its `nav.json`", the SDKs folder and the context plugin's; the
+synthetic `/tab/sdks` is gone, so the fixed ids below are `/tab/home` and
+`/tab/guides`. No `nav.json` at all gives Home, Guides, SDKs, Context Plugin,
+API, and the unnamed sections keep that order before the API.
+
 ### Mechanism
 
 A second transformer, `tabsTransformer`, registered after `navigationTransformer`,
@@ -304,6 +313,8 @@ hook), and regroups the children into one `Folder` per tab with `root: true`:
   is an index page: without one, the entry names a folder of that name.
 - A tab with no nodes is not created. In this release SDKs is therefore never
   created, and Guides is absent when every top-level node is in a folder tab.
+  *(2026-09-24: no longer so for SDKs, which is the generated SDKs folder and
+  always exists; Context Plugin exists with a `plugin` block.)*
 - The fallback home page gets a tree node. `$.tsx` already renders a landing
   page at `/` when the content has no `index.md`, but that page has no node in
   the tree, so it would sit outside every root folder and show no tabs. When no

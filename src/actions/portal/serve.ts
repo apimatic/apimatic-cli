@@ -14,6 +14,7 @@ import { LauncherService } from '../../infrastructure/launcher-service.js';
 import { PortalAuthorizationService } from '../../infrastructure/services/portal-authorization-service.js';
 import { PortalDevServerService } from '../../infrastructure/portal-dev-server-service.js';
 import { PortalProjectService } from '../../infrastructure/portal-project-service.js';
+import { PortalArtifactsService } from '../../infrastructure/services/portal-artifacts-service.js';
 import { errorMessage } from '../../utils/error-utils.js';
 
 export const DEFAULT_PORTAL_PORT = 23513;
@@ -24,6 +25,7 @@ export class PortalServeAction {
   private readonly launcherService: LauncherService = new LauncherService();
   private readonly authorizationService = new PortalAuthorizationService();
   private readonly projectService = new PortalProjectService();
+  private readonly artifactsService = new PortalArtifactsService();
   private readonly devServerService = new PortalDevServerService();
   private readonly fileWatchService = new FileWatchService();
   private readonly configDir: DirectoryPath;
@@ -71,13 +73,21 @@ export class PortalServeAction {
     this.prompts.pagesHiddenBySpecs(source.value.hiddenPages, sourceDirectory);
     this.prompts.ignoredNavigationFiles(source.value.ignoredNavigationFiles, sourceDirectory);
 
+    const generated = await this.prompts.generateCodeSamples(this.artifactsService.generate());
+    if (generated.isErr()) {
+      return ActionResult.failed();
+    }
+    const codeSamples = generated.value.samples;
+    this.prompts.ignoredSampleKeys(generated.value.ignoredKeys);
+    this.prompts.unplacedSamples(codeSamples.unplacedIn(source.value.specs.flatMap((spec) => spec.endpoints)));
+
     const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
     if (servePort !== port) {
       this.prompts.usingFallbackPort(port, servePort);
     }
 
     return await withBuildDirectory(sourceDirectory, async (tempDirectory) => {
-      const project = await this.projectService.prepare(tempDirectory, source.value);
+      const project = await this.projectService.prepare(tempDirectory, source.value, codeSamples);
       if (project.isErr()) {
         this.prompts.runtimeUnsupported(project.error);
         return ActionResult.failed();
@@ -144,19 +154,20 @@ export class PortalServeAction {
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const applyEdit = async () => {
-      const reloaded = await sourceContext.resolveConfig(source.suggestedSite);
+      const reloaded = await sourceContext.resolveSettings(source.suggestedSite);
       if (reloaded.isErr()) {
         preview.refuse();
         this.prompts.configRejected(reloaded.error, sourceDirectory);
         return;
       }
-      const config = reloaded.value;
+      const settings = reloaded.value;
+      const { config } = settings;
 
       if (preview.staticDirectoryNotServed(config)) {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
-      const applied = await this.projectService.applyConfig(projectDirectory, config);
+      const applied = await this.projectService.applyConfig(projectDirectory, settings);
       if (applied.isErr()) {
         this.prompts.configNotApplied(applied.error);
         return;

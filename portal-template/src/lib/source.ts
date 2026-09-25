@@ -14,3 +14,12 @@ export const docs = defineDocs({
   // does not name, the transformer could not put those pages back.
   meta: { files: ['**/nav.json'] }
 });
+
+// The pages the CLI writes into this project, resolved against the Vite root. Relative, unlike
+// the content directory's: the literal is embedded in the browser bundle, and an absolute one
+// would publish the build machine's directory with every portal.
+export const generated = defineDocs({
+  dir: 'generated',
+  docs: { async: true, postprocess: { includeProcessedMarkdown: true } },
+  meta: { files: ['**/nav.json'] }
+});

@@ -8,6 +8,8 @@ import { DirectoryPath } from './file/directoryPath.js';
 import { FileName } from './file/fileName.js';
 import { FilePath } from './file/filePath.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
+import { Endpoint } from './portal/endpoint.js';
+import { GENERATED_SECTIONS, GeneratedPages } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
@@ -15,9 +17,11 @@ import { API_REFERENCE_NAME, INDEX_NAME, NAVIGATION_FILE_NAME, PortalNavigation 
 import {
   MissingStaticFile,
   PortalScaffoldProblem,
+  PortalSettings,
   PortalSource,
   PortalSourceProblem,
-  PortalSpec
+  PortalSpec,
+  ReservedAddressPage
 } from './portal/portal-source.js';
 import { SpecContext } from './spec-context.js';
 
@@ -45,6 +49,9 @@ const NAVIGATION_FILE = new FileName(NAVIGATION_FILE_NAME);
 
 /** Extensions the docs collection compiles, and so the ones an entry can address. */
 const PAGE_EXTENSIONS = ['.md', '.mdx'];
+
+/** A `(group)` folder, which the content source leaves out of a page's address. */
+const GROUP_FOLDER = /^\(.+\)$/;
 
 /** What one walk of the content tree found: see `PortalSourceContext.navigation`. */
 interface NavigationScan {
@@ -104,9 +111,9 @@ export class PortalSourceContext {
     }
     const { specs, suggested } = discovered.value;
 
-    const config = await this.configFrom(document.value, suggested);
-    if (config.isErr()) {
-      return err(config.error);
+    const settings = await this.settingsFrom(document.value, suggested);
+    if (settings.isErr()) {
+      return err(settings.error);
     }
 
     const staticDirectory = (await this.fileService.directoryExists(this.staticDirectory))
@@ -129,6 +136,16 @@ export class PortalSourceContext {
       }
     }
 
+    const contentPages = contentTree === null ? [] : PortalSourceContext.contentPages(contentTree);
+
+    // Refused before the navigation scan, which would otherwise answer an entry naming such a
+    // page as if it were an ordinary one. In the build, the user's page and the generated one
+    // would compete for the address.
+    const reserved = PortalSourceContext.reservedAddressPages(contentPages);
+    if (reserved.length > 0) {
+      return err({ kind: 'reservedAddresses', pages: reserved });
+    }
+
     // Validated here rather than in the template: Fumadocs drops an entry it cannot resolve
     // without a word, so a typo would otherwise reach the user as a quietly wrong sidebar.
     const navigation = await this.navigation(contentTree, specs);
@@ -137,48 +154,45 @@ export class PortalSourceContext {
     }
 
     return ok({
-      config: config.value,
+      ...settings.value,
       suggestedSite: suggested,
       specs,
       contentDirectory,
       staticDirectory,
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
-      hiddenPages:
-        contentTree === null
-          ? []
-          : PortalSourceContext.hiddenPages(PortalSourceContext.contentPages(contentTree), specs),
+      hiddenPages: PortalSourceContext.hiddenPages(contentPages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles
     });
   }
 
   /**
-   * The config half of `resolve`, for `portal serve` to run on every edit, so an edit is
-   * accepted exactly when a build would accept it. `suggested` is what `resolve` found in the
+   * The `apimatic.json` half of `resolve`, for `portal serve` to run on every edit, so an edit
+   * is accepted exactly when a build would accept it. `suggested` is what `resolve` found in the
    * specifications, which are not read again; changing them needs a restart anyway.
    */
-  public async resolveConfig(suggested: SuggestedSite | null): Promise<Result<PortalConfig, PortalSourceProblem>> {
+  public async resolveSettings(suggested: SuggestedSite | null): Promise<Result<PortalSettings, PortalSourceProblem>> {
     const document = await this.readConfigDocument();
     if (document.isErr()) {
       return err(document.error);
     }
-    return this.configFrom(document.value, suggested);
+    return this.settingsFrom(document.value, suggested);
   }
 
-  private async configFrom(
+  private async settingsFrom(
     document: ApimaticConfigDocument,
     suggested: SuggestedSite | null
-  ): Promise<Result<PortalConfig, PortalSourceProblem>> {
-    const config = PortalSourceContext.parseConfig(document, suggested);
-    if (config.isErr()) {
-      return err(config.error);
+  ): Promise<Result<PortalSettings, PortalSourceProblem>> {
+    const settings = PortalSourceContext.parseSettings(document, suggested);
+    if (settings.isErr()) {
+      return err(settings.error);
     }
     // The block checks the shape of each path, not that the file is there -- and a missing
     // logo renders as a broken image on every page of a build that otherwise reports success.
-    const missingFiles = await this.missingStaticFiles(config.value);
+    const missingFiles = await this.missingStaticFiles(settings.value.config);
     if (missingFiles.length > 0) {
       return err({ kind: 'missingStaticFiles', files: missingFiles });
     }
-    return ok(config.value);
+    return ok(settings.value);
   }
 
   private async readConfigDocument(): Promise<Result<ApimaticConfigDocument, PortalSourceProblem>> {
@@ -194,13 +208,14 @@ export class PortalSourceContext {
 
   /**
    * The root and the `languages` block are this command's to judge as well, since the portal
-   * documents the project's SDK languages; a malformed `plugin` block belongs to the plugin
-   * commands and must not fail a build.
+   * documents the project's SDK languages. The `plugin` block is the plugin commands' to judge,
+   * so it never fails a build and nothing in it is read: an object gets the context plugin page
+   * whatever it holds, and anything else counts as no block.
    */
-  private static parseConfig(
+  private static parseSettings(
     document: ApimaticConfigDocument,
     suggested: SuggestedSite | null
-  ): Result<PortalConfig, PortalSourceProblem> {
+  ): Result<PortalSettings, PortalSourceProblem> {
     const block = document.portal();
     const config = PortalConfig.fromBlock(block, suggested);
     const languages = PortalLanguages.fromBlock(document.languages(), document.findingsFor('languages'));
@@ -209,10 +224,13 @@ export class PortalSourceContext {
       ...(config.isErr() ? config.error : []),
       ...(languages.isErr() ? languages.error : [])
     ];
-    if (config.isErr() || errors.length > 0) {
+    if (config.isErr() || languages.isErr() || errors.length > 0) {
       return err({ kind: 'invalidConfig', errors, missingPortal: block === undefined });
     }
-    return ok(config.value);
+    return ok({
+      config: config.value,
+      generatedPages: GeneratedPages.of(languages.value, document.plugin() !== undefined)
+    });
   }
 
   private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {
@@ -468,6 +486,26 @@ export class PortalSourceContext {
       .map(({ file }) => file);
   }
 
+  /**
+   * Pages served at a generated section's address or below it, whether or not `apimatic.json`
+   * calls for the section. Judged by the address, as the content source computes it, rather
+   * than by the directories as written: a page in a `(group)` folder is served as if the folder
+   * were not there, and a folder's index page at the folder's own address.
+   */
+  private static reservedAddressPages(pages: ContentPage[]): ReservedAddressPage[] {
+    return pages.flatMap(({ file, segments }) => {
+      const slugs = PortalSourceContext.slugs(segments);
+      const section = GENERATED_SECTIONS.find((candidate) => candidate.folder === slugs[0]);
+      return section === undefined ? [] : [{ file, address: `/${slugs.join('/')}`, section }];
+    });
+  }
+
+  private static slugs(segments: string[]): string[] {
+    const folders = segments.slice(0, -1).filter((segment) => !GROUP_FOLDER.test(segment));
+    const name = PortalSourceContext.pageName(new FileName(segments[segments.length - 1]));
+    return name === undefined || name === INDEX_NAME ? folders : [...folders, name];
+  }
+
   private static contentPages(contentTree: Directory): ContentPage[] {
     return contentTree
       .getAllFiles()
@@ -485,34 +523,33 @@ export class PortalSourceContext {
     let first: OpenApiDocument | undefined;
     const usedSlugs = new Set<string>(RESERVED_SPEC_SLUGS);
 
-    for (const fileName of await this.specFileNames()) {
+    const fileNames = await this.specDirectoryFileNames();
+    if (fileNames.length === 0) {
+      return err({ kind: 'emptySpecDirectory' });
+    }
+
+    const documentNames = fileNames.filter((name) => SPEC_EXTENSIONS.some((extension) => name.hasExtension(extension)));
+    for (const fileName of documentNames) {
       const file = new FilePath(this.specDirectory, fileName);
       const document = await this.readDocument(file);
       if (document === undefined) {
         return err({ kind: 'unreadableSpec', fileName });
       }
-
-      // A document without a version key is not a spec at all (APIMATIC-META.json, a `$ref`
-      // target); those are skipped silently. A recognisable but unsupported format is named.
-      const format = document.format();
-      if (!format.supported) {
-        if (format.format === null) {
-          continue;
-        }
-        return err({ kind: 'unsupportedSpec', fileName, format: format.format });
+      if (!document.format().supported) {
+        continue;
       }
 
-      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file });
+      specs.push({ slug: this.uniqueSlug(fileName, usedSlugs), file, endpoints: await this.endpoints(document, file) });
       first ??= document;
     }
 
     if (first === undefined) {
-      return err({ kind: 'noSpecs' });
+      return err({ kind: 'noOpenApiSpec' });
     }
     return ok({ specs, suggested: specs.length === 1 ? first.suggestedSite() : null });
   }
 
-  private async specFileNames(): Promise<FileName[]> {
+  private async specDirectoryFileNames(): Promise<FileName[]> {
     if (!(await this.fileService.directoryExists(this.specDirectory))) {
       return [];
     }
@@ -521,8 +558,18 @@ export class PortalSourceContext {
     // keeps it, and which document becomes the default server.
     return directory.items
       .flatMap((item) => ('fileName' in item ? [item.fileName] : []))
-      .filter((fileName) => SPEC_EXTENSIONS.some((extension) => fileName.hasExtension(extension)))
       .sort((left, right) => left.compare(right));
+  }
+
+  // A path item in another file is read from it; one that file refers on to again is not followed.
+  private async endpoints(document: OpenApiDocument, file: FilePath): Promise<Endpoint[]> {
+    const referenced = await Promise.all(
+      document.pathItemReferences(file.directory()).map(async ({ path, file: target, pointer }) => {
+        const targetDocument = await this.readDocument(target);
+        return targetDocument?.endpointsAt(path, pointer) ?? [];
+      })
+    );
+    return [...document.endpoints(), ...referenced.flat()];
   }
 
   private async readDocument(file: FilePath): Promise<OpenApiDocument | undefined> {

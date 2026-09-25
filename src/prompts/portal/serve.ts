@@ -9,10 +9,15 @@ import { PortalAuthorizationFailure } from '../../infrastructure/services/portal
 import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { PortalDevServer, PortalDevServerFailure } from '../../infrastructure/portal-dev-server-service.js';
 import { Result } from 'neverthrow';
+import {
+  CodeSamplesFileFailure,
+  GeneratedCodeSamples
+} from '../../infrastructure/services/portal-artifacts-service.js';
 import { format as f } from '../format.js';
 import { logTail, noteWrapped, withSpinner } from '../prompt.js';
 import { reportAuthorizationFailure } from './authorization.js';
 import { reportHiddenPages, reportIgnoredNavigationFiles, reportShadowedFiles, reportSourceProblem } from './source.js';
+import { generateCodeSamples, reportIgnoredSampleKeys, reportUnplacedSamples } from './code-samples.js';
 
 export class PortalServePrompts {
   public sourceProblem(problem: PortalSourceProblem, sourceDirectory: DirectoryPath) {
@@ -29,6 +34,18 @@ export class PortalServePrompts {
 
   public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
     reportIgnoredNavigationFiles(files, sourceDirectory);
+  }
+
+  public generateCodeSamples(fn: Promise<Result<GeneratedCodeSamples, CodeSamplesFileFailure>>) {
+    return generateCodeSamples(fn);
+  }
+
+  public ignoredSampleKeys(keys: string[]) {
+    reportIgnoredSampleKeys(keys);
+  }
+
+  public unplacedSamples(endpoints: string[]) {
+    reportUnplacedSamples(endpoints);
   }
 
   public authorizationFailed(failure: PortalAuthorizationFailure) {
@@ -69,15 +86,20 @@ export class PortalServePrompts {
         `Edits to the Markdown pages in ${f.path(sourceDirectory.join('content'))}, to the order and ` +
           `folder titles in a ${f.var('nav.json')}, and to the ${f.var('portal')} block of ${f.var(
             'apimatic.json'
-          )} appear in the browser automatically. A mistake in ${f.var(
+          )} appear in the browser automatically, and so does a language added to or removed from its ${f.var(
+            'languages'
+          )} block, which updates the SDK pages, or its ${f.var(
+            'plugin'
+          )} block added or removed, which adds or removes the Context Plugin tab. A mistake in ${f.var(
             'apimatic.json'
           )} is reported when you save it, and the preview keeps what it last accepted. A mistake in a ${f.var(
             'nav.json'
           )} is only reported when the preview starts; until then an entry or a title that the build would ` +
           `refuse is ignored here.`,
         '',
-        `Adding or removing a page, creating ${f.path(sourceDirectory.join('static'))}, or changing which ` +
-          `documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
+        `Adding or removing a page in ${f.path(sourceDirectory.join('content'))}, creating ${f.path(
+          sourceDirectory.join('static')
+        )}, or changing which documents are in ${f.path(sourceDirectory.join('spec'))} needs the preview restarted.`,
         '',
         'Press CTRL+C to stop the server.'
       ].join('\n'),

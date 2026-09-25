@@ -1,6 +1,6 @@
 import { createFileRoute, getRouteApi, isNotFound, isRedirect, notFound } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
-import { docs } from '@/lib/source';
+import { docs, generated } from '@/lib/source';
 import { source } from '@/lib/source.server';
 import { PortalLayout } from '@/lib/layout';
 import { getPageMarkdownUrl } from '@/lib/shared';
@@ -23,6 +23,12 @@ import { slimOpenAPIPageProps } from '@/lib/openapi-slim';
 
 const rootRoute = getRouteApi('__root__');
 
+/**
+ * The collections a Markdown page is compiled into, by the loader source it came from. A
+ * page's `path` is relative to its own collection's directory, so it is looked up there.
+ */
+const collections = { docs, generated };
+
 export const Route = createFileRoute('/$')({
   component: Page,
   loader: async ({ params }) => {
@@ -30,7 +36,7 @@ export const Route = createFileRoute('/$')({
     const data = await loadPage(slugs);
 
     if (data.type === 'docs') {
-      await docs.getPage(data.path)?.preload();
+      await collections[data.collection].getPage(data.path)?.preload();
     }
     return data;
   },
@@ -74,7 +80,7 @@ const serverLoader = createServerFn({
       throw notFound();
     }
 
-    if (page.type !== 'docs') {
+    if (page.type === 'openapi') {
       return {
         type: 'openapi' as const,
         title: page.data.title,
@@ -85,6 +91,7 @@ const serverLoader = createServerFn({
 
     return {
       type: 'docs' as const,
+      collection: page.type,
       title: page.data.title,
       description: page.data.description ?? null,
       path: page.path,
@@ -116,8 +123,12 @@ async function loadPage(slugs: string[]) {
   }
 }
 
-function Content({ path, markdownUrl }: Readonly<{ path: string; markdownUrl: string }>) {
-  const page = docs.getPage(path);
+function Content({
+  collection,
+  path,
+  markdownUrl
+}: Readonly<{ collection: keyof typeof collections; path: string; markdownUrl: string }>) {
+  const page = collections[collection].getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
 
   const { toc } = use(page.load());
@@ -172,7 +183,7 @@ function Page() {
   } else {
     content = (
       <Suspense>
-        <Content path={page.path} markdownUrl={page.markdownUrl} />
+        <Content collection={page.collection} path={page.path} markdownUrl={page.markdownUrl} />
       </Suspense>
     );
   }

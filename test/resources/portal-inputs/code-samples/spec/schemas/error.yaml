@@ -1,0 +1,8 @@
+type: object
+required: [code, message]
+properties:
+  code:
+    type: string
+    example: payment_not_found
+  message:
+    type: string
