@@ -11,16 +11,17 @@ import { FilePath } from './file/filePath.js';
 import { NOT_FOUND_FILE_NAME, SHELL_FILE_NAME } from './portal-context.js';
 import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from './project-layout.js';
 import { PLACEHOLDER_SITE, SuggestedSite } from './portal/config/site-config.js';
-import { AcceptedContent, ContentFile, ContentTree, isSkippedByGlob } from './portal/content-tree.js';
+import { AcceptedContent, ContentFile, ContentTree, ReadPage } from './portal/content-tree.js';
 import { Endpoint } from './portal/endpoint.js';
 import { GeneratedPages, PluginSource } from './portal/generated-pages.js';
 import { OpenApiDocument } from './portal/openapi-document.js';
-import { PageImage, pageImages } from './portal/page-images.js';
+import { parsePage } from './portal/page.js';
 import { PortalConfig } from './portal/portal-config.js';
 import { PortalLanguages } from './portal/portal-languages.js';
 import { NAVIGATION_FILE_NAME } from './portal/portal-navigation.js';
 import {
   ContentProblem,
+  MissingFile,
   MissingImage,
   MissingStaticFile,
   PortalScaffoldProblem,
@@ -149,59 +150,53 @@ export class PortalSourceContext {
     }
 
     const content = new ContentTree(tree, this.sourceDirectory);
+    const pages = await this.readPages(content.pages());
     const read = {
-      pages: await this.read(content.pages()),
-      navigationFiles: await this.read(content.navigationFiles())
+      pages,
+      navigationFiles: await this.read(content.navigationFiles()),
+      missingImages: await this.missingImages(pages, content)
     };
-    const checked = await content.check(read, specs, generatedPages);
-    const images = await this.missingImages(read.pages);
-    if (checked.isErr() || images.length > 0) {
-      return err([
-        ...(checked.isErr() ? checked.error : []),
-        ...(images.length > 0 ? [{ kind: 'missingImages' as const, images }] : [])
-      ]);
-    }
-    return ok({
-      notices: checked.value,
+    return content.check(read, specs, generatedPages).map((notices) => ({
+      notices,
       // Each was read, or the check would have refused the page it could not.
       files: [...read.pages, ...read.navigationFiles].flatMap(({ file, contents }) =>
         contents === undefined ? [] : [{ file, contents }]
       )
-    });
+    }));
+  }
+
+  private async readPages(files: FilePath[]): Promise<ReadPage[]> {
+    const read = await this.read(files);
+    return await Promise.all(
+      read.map(async ({ file, contents }) => ({
+        file,
+        contents,
+        parsed:
+          contents === undefined
+            ? undefined
+            : await parsePage(contents, file.name(), file.relativeTo(this.sourceDirectory))
+      }))
+    );
   }
 
   // The build imports each one, and fails as a whole over one it cannot find, naming no page.
-  private async missingImages(pages: ContentFile[]): Promise<MissingImage[]> {
+  private async missingImages(pages: ReadPage[], content: ContentTree): Promise<MissingImage[]> {
     const missing: MissingImage[] = [];
-    for (const { file: page, contents } of pages) {
-      const images = contents === undefined ? [] : await pageImages(contents, page.name().hasExactExtension('.mdx'));
-      for (const image of images) {
-        const file = this.imageFile(page, image);
-        const root = image.from === 'static' ? this.staticDirectory : this.contentDirectory;
-        const found = file === null ? null : await this.fileService.spelledOnDisk(root, file);
-        if (file === null || !found?.isEqual(file)) {
-          missing.push({ page, line: image.line, url: image.url, file, foundAs: found });
+    for (const { file: page, parsed } of pages) {
+      for (const { url, line, from, path } of parsed?.images ?? []) {
+        const file = FilePath.resolve(from === 'static' ? this.staticDirectory : page.directory(), path);
+        // One beside its page that `content/`'s copy leaves out is never looked for.
+        if (from === 'page' && !content.holds(file)) {
+          missing.push({ page, line, url, missing: null });
+          continue;
+        }
+        const missingFile = await this.missingFile(file);
+        if (missingFile !== null) {
+          missing.push({ page, line, url, missing: missingFile });
         }
       }
     }
     return missing;
-  }
-
-  /** Where the build reads the image from, or null for one beside its page that `content/`'s copy leaves out. */
-  private imageFile(page: FilePath, { from, path }: PageImage): FilePath | null {
-    const segments = path.split('/');
-    const name = segments.pop() ?? '';
-    const file = new FilePath(
-      (from === 'static' ? this.staticDirectory : page.directory()).resolve(segments.join('/')),
-      new FileName(name)
-    );
-    if (from === 'static') {
-      return file;
-    }
-    const withinContent =
-      this.contentDirectory.contains(file.directory()) &&
-      !file.relativeTo(this.contentDirectory).split('/').some(isSkippedByGlob);
-    return withinContent ? file : null;
   }
 
   // A file that cannot be read is reported by the check rather than thrown out of `resolve`.
@@ -291,13 +286,18 @@ export class PortalSourceContext {
   private async missingStaticFiles(config: PortalConfig): Promise<MissingStaticFile[]> {
     const missing: MissingStaticFile[] = [];
     for (const asset of config.staticFiles()) {
-      const file = asset.resolveIn(this.sourceDirectory);
-      const found = await this.fileService.spelledOnDisk(this.sourceDirectory, file);
-      if (!found?.isEqual(file)) {
-        missing.push({ setting: asset.settingPath(), file, foundAs: found });
+      const missingFile = await this.missingFile(asset.resolveIn(this.sourceDirectory));
+      if (missingFile !== null) {
+        missing.push({ setting: asset.settingPath(), ...missingFile });
       }
     }
     return missing;
+  }
+
+  /** How the build would miss `file`: not there, or there in another case; null when it is there as spelt. */
+  private async missingFile(file: FilePath): Promise<MissingFile | null> {
+    const found = await this.fileService.spelledOnDisk(this.sourceDirectory, file);
+    return found?.isEqual(file) ? null : { file, foundAs: found };
   }
 
   /**

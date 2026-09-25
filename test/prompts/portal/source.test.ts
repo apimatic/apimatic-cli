@@ -98,6 +98,62 @@ describe('reportSourceProblem', () => {
     expect(printed()).to.not.contain('spelt');
   });
 
+  describe('images the build cannot find', () => {
+    const content = source.join('content');
+    const images = source.join('static').join('images');
+    const page = new FilePath(content, new FileName('index.md'));
+
+    it('names each by its page and line, with where the build looked and the spelling on disk', () => {
+      reportContent({
+        kind: 'missingImages',
+        images: [
+          {
+            page,
+            line: 4,
+            url: '/images/Logo.png',
+            missing: {
+              file: new FilePath(images, new FileName('Logo.png')),
+              foundAs: new FilePath(images, new FileName('logo.png'))
+            }
+          },
+          {
+            page,
+            line: 6,
+            url: './missing.png',
+            missing: { file: new FilePath(content, new FileName('missing.png')), foundAs: null }
+          },
+          { page, line: 8, url: '../secret.png', missing: null }
+        ]
+      });
+
+      expect(printed()).to.contain(
+        "'content/index.md', line 4: '/images/Logo.png', but the file is spelt 'static/images/logo.png' on disk"
+      );
+      expect(printed()).to.contain(
+        "'content/index.md', line 6: './missing.png', but there is no 'content/missing.png'"
+      );
+      expect(printed()).to.contain("'content/index.md', line 8: '../secret.png' points outside 'content'");
+      expect(printed()).to.contain('Names are matched exactly');
+    });
+
+    it('says nothing of spelling when no image is there in another case', () => {
+      reportContent({
+        kind: 'missingImages',
+        images: [
+          {
+            page,
+            line: 4,
+            url: './missing.png',
+            missing: { file: new FilePath(content, new FileName('missing.png')), foundAs: null }
+          }
+        ]
+      });
+
+      expect(printed()).to.contain('there is no');
+      expect(printed()).to.not.contain('spelt');
+    });
+  });
+
   describe('a spec directory the portal reads no document from', () => {
     const spec = source.join('spec');
     const conversion = (format: string | null, others = 0) => ({

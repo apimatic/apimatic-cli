@@ -6,7 +6,7 @@ import { DirectoryPath } from '../types/file/directoryPath.js';
 import { FileName } from '../types/file/fileName.js';
 import { FilePath } from '../types/file/filePath.js';
 import { CodeSampleCatalogs } from '../types/portal/code-samples.js';
-import { CheckedFile, isSkippedByGlob } from '../types/portal/content-tree.js';
+import { CheckedFile, isSkippedWithin } from '../types/portal/content-tree.js';
 import { GENERATED_DIRECTORY_NAME } from '../types/portal/generated-pages.js';
 import { GENERATED_INCLUDES_DIRECTORY_NAME, PageFragment, pageFragments } from '../types/portal/page-fragments.js';
 import { PortalArtifacts } from '../types/portal/portal-artifacts.js';
@@ -357,7 +357,7 @@ export class PortalProjectService {
     }
     return (await this.fileService.getDirectory(directory))
       .getAllFiles()
-      .filter((file) => !file.relativeTo(directory).split('/').some(isSkippedByGlob));
+      .filter((file) => !isSkippedWithin(file, directory));
   }
 
   private async writeAppearance(projectDirectory: DirectoryPath, config: PortalConfig): Promise<void> {

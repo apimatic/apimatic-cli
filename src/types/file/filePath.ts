@@ -50,6 +50,12 @@ export class FilePath {
     return asTypedFrom(this.toString(), from);
   }
 
+  /** The file `relativePath` names from `directory`, with `/` between its segments as a page or a setting writes it. */
+  public static resolve(directory: DirectoryPath, relativePath: string): FilePath {
+    const resolved = path.resolve(directory.toString(), relativePath);
+    return new FilePath(new DirectoryPath(path.dirname(resolved)), new FileName(path.basename(resolved)));
+  }
+
   public static create(filePath: string): FilePath | undefined {
     if (!filePath) {
       return undefined;

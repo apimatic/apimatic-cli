@@ -1119,11 +1119,11 @@ describe('PortalSourceContext', () => {
         throw new Error(`expected missing images, got '${problem.kind}'`);
       }
       const relative = (file: FilePath | null) => (file === null ? null : file.relativeTo(new DirectoryPath(root)));
-      return problem.images.map(({ page, line, url, file, foundAs }) => [
+      return problem.images.map(({ page, line, url, missing }) => [
         `${relative(page)}:${line}`,
         url,
-        relative(file),
-        relative(foundAs)
+        relative(missing?.file ?? null),
+        relative(missing?.foundAs ?? null)
       ]);
     };
 

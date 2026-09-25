@@ -33,4 +33,28 @@ describe('FilePath', () => {
       expect(file('static', 'logo.png').isEqual(file('images', 'logo.png'))).to.equal(false);
     });
   });
+
+  describe('resolve', () => {
+    const root = new DirectoryPath(os.tmpdir(), 'project');
+    const relative = (file: FilePath) => file.relativeTo(root);
+
+    it('names a file below the directory by a path with forward slashes, as a page writes it', () => {
+      expect(relative(FilePath.resolve(root.join('static'), 'images/team photo.png'))).to.equal(
+        'static/images/team photo.png'
+      );
+    });
+
+    it('follows a path that climbs out of the directory', () => {
+      expect(relative(FilePath.resolve(root.join('content', 'guides'), '../shared/diagram.png'))).to.equal(
+        'content/shared/diagram.png'
+      );
+    });
+
+    it('splits the name from its directory', () => {
+      const file = FilePath.resolve(root, 'a/b.png');
+
+      expect(file.name().toString()).to.equal('b.png');
+      expect(file.directory().isEqual(root.join('a'))).to.equal(true);
+    });
+  });
 });

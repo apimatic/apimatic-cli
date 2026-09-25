@@ -6,6 +6,7 @@ import { ContentNotices } from '../../types/portal/content-notices.js';
 import { NAVIGATION_FILE_NAME } from '../../types/portal/portal-navigation.js';
 import {
   ContentProblem,
+  MissingFile,
   MissingImage,
   PortalSourceProblem,
   ReservedAddressPage,
@@ -30,6 +31,21 @@ export const contentPath = (sourceDirectory: DirectoryPath): string =>
 
 export const staticPath = (sourceDirectory: DirectoryPath): string =>
   f.path(sourceDirectory.join(STATIC_DIRECTORY_NAME));
+
+const relative = (file: FilePath, sourceDirectory: DirectoryPath): string => f.var(file.relativeTo(sourceDirectory));
+
+const spelt = (found: FilePath, sourceDirectory: DirectoryPath): string =>
+  `spelt ${relative(found, sourceDirectory)} on disk`;
+
+// Found by this machine's file system, which ignores case, and lost by the host.
+function reportSpellings(files: MissingFile[]): void {
+  if (files.some(({ foundAs }) => foundAs !== null)) {
+    log.message(
+      'Names are matched exactly, as the servers a portal is published to match them, so write each name as the ' +
+        'file is spelt.'
+    );
+  }
+}
 
 const transformCommand = (flags: string[]): string =>
   [f.cmdAlt('apimatic', 'api', 'transform'), f.flag('format', 'openapi3yaml'), ...flags].join(' ');
@@ -98,11 +114,10 @@ export function reportSourceProblem(
       const heading = `${subject} named in ${f.var(APIMATIC_CONFIG_FILE_NAME)} ${verb} not in ${f.path(
         sourceDirectory
       )}:`;
-      const relative = (file: FilePath) => f.var(file.relativeTo(sourceDirectory));
       const lines = problem.files.map(
         ({ setting, file, foundAs }) =>
-          `  • ${relative(file)}, named by ${f.var(setting)}` +
-          (foundAs === null ? '' : `, which is spelt ${relative(foundAs)} on disk`)
+          `  • ${relative(file, sourceDirectory)}, named by ${f.var(setting)}` +
+          (foundAs === null ? '' : `, which is ${spelt(foundAs, sourceDirectory)}`)
       );
       log.error(heading);
       log.message(lines.join('\n'));
@@ -111,13 +126,7 @@ export function reportSourceProblem(
           ? 'Add the file there, or remove the setting that names it.'
           : 'Add each file there, or remove the setting that names it.'
       );
-      // Found by this machine's file system, which ignores case, and lost by the host.
-      if (problem.files.some(({ foundAs }) => foundAs !== null)) {
-        log.message(
-          'Names are matched exactly, as the servers a portal is published to match them, ' +
-            'so spell the setting as the file is spelt.'
-        );
-      }
+      reportSpellings(problem.files);
       return;
     }
     case 'emptySpecDirectory': {
@@ -155,7 +164,7 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
       return;
     }
     case 'groupNamedPages': {
-      const names = listedInProse(problem.pages.map((page) => f.var(page.relativeTo(sourceDirectory))));
+      const names = listedInProse(problem.pages.map((page) => relative(page, sourceDirectory)));
       const one = problem.pages.length === 1;
       log.error(
         `${names} ${one ? 'is' : 'are'} named like a ${f.var('(group)')} folder, which is left out of every ` +
@@ -190,15 +199,14 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
 }
 
 function reportMissingImages(images: MissingImage[], sourceDirectory: DirectoryPath): void {
-  const relative = (file: FilePath) => f.var(file.relativeTo(sourceDirectory));
-  const lines = images.map(({ page, line, url, file, foundAs }) => {
-    const where = `  • ${relative(page)}, line ${line}: ${f.var(url)}`;
-    if (file === null) {
+  const lines = images.map(({ page, line, url, missing }) => {
+    const where = `  • ${relative(page, sourceDirectory)}, line ${line}: ${f.var(url)}`;
+    if (missing === null) {
       return `${where} points outside ${f.var(CONTENT_DIRECTORY_NAME)}, or into a folder the build skips`;
     }
-    return foundAs === null
-      ? `${where}, but there is no ${relative(file)}`
-      : `${where}, but the file is spelt ${relative(foundAs)} on disk`;
+    return missing.foundAs === null
+      ? `${where}, but there is no ${relative(missing.file, sourceDirectory)}`
+      : `${where}, but the file is ${spelt(missing.foundAs, sourceDirectory)}`;
   });
   log.error(
     images.length === 1
@@ -208,8 +216,9 @@ function reportMissingImages(images: MissingImage[], sourceDirectory: DirectoryP
   log.message(lines.join('\n'));
   log.message(
     `An image written as ${f.var('/images/logo.png')} is read from ${staticPath(sourceDirectory)}, and any ` +
-      `other from beside its page in ${contentPath(sourceDirectory)}. Names are matched exactly.`
+      `other from beside its page in ${contentPath(sourceDirectory)}.`
   );
+  reportSpellings(images.flatMap(({ missing }) => (missing === null ? [] : [missing])));
 }
 
 function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: DirectoryPath): void {
@@ -217,7 +226,7 @@ function reportReservedAddresses(pages: ReservedAddressPage[], sourceDirectory: 
   const lines = pages.map(({ file, address, section }) => {
     const kept = `/${section.folder}`;
     const within = address === kept ? '' : `, under ${f.var(kept)}`;
-    return `  • ${f.var(file.relativeTo(sourceDirectory))}, at ${f.var(address)}${within}, which is kept for ${
+    return `  • ${relative(file, sourceDirectory)}, at ${f.var(address)}${within}, which is kept for ${
       section.description
     }`;
   });
@@ -234,7 +243,7 @@ function reportSharedAddresses(addresses: SharedAddress[], sourceDirectory: Dire
   const one = addresses.length === 1;
   const lines = addresses.map(
     ({ address, pages }) =>
-      `  • ${f.var(address)}: ${listedInProse(pages.map((page) => f.var(page.relativeTo(sourceDirectory))))}`
+      `  • ${f.var(address)}: ${listedInProse(pages.map((page) => relative(page, sourceDirectory)))}`
   );
   log.error(
     `Pages in ${f.path(sourceDirectory)} would share ${one ? 'an address' : 'addresses'}, but only one page ` +
@@ -261,7 +270,7 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   if (files.length === 0) {
     return;
   }
-  const names = listedInProse(files.map((file) => f.var(file.relativeTo(sourceDirectory))));
+  const names = listedInProse(files.map((file) => relative(file, sourceDirectory)));
   const verb = files.length === 1 ? 'is' : 'are';
   // Not "rename it": on a case-sensitive filesystem a correctly named file may already sit
   // beside it, and the two would then need merging rather than renaming.
@@ -289,9 +298,8 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   if (shared.length === 0) {
     return;
   }
-  const relative = (file: FilePath) => f.var(file.relativeTo(sourceDirectory));
   const describe = ({ owner, namedBy }: PortalTab): string => {
-    const titledIn = namedBy === null ? '' : ` (titled in ${relative(namedBy)})`;
+    const titledIn = namedBy === null ? '' : ` (titled in ${relative(namedBy, sourceDirectory)})`;
     switch (owner.kind) {
       case 'home':
         return `the Home tab${titledIn}`;
@@ -320,7 +328,7 @@ export function reportHiddenPages(files: FilePath[], sourceDirectory: DirectoryP
   if (files.length === 0) {
     return;
   }
-  const names = listedInProse(files.map((file) => f.var(file.relativeTo(sourceDirectory))));
+  const names = listedInProse(files.map((file) => relative(file, sourceDirectory)));
   const [verb, pronoun] = files.length === 1 ? ['sits', 'it'] : ['sit', 'them'];
   log.warn(
     `${names} ${verb} inside a specification's section under ${f.var('content/api')}, which lists only ` +

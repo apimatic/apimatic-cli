@@ -42,14 +42,19 @@ export type PortalScaffoldProblem =
   // `reason` is the message of whatever the file service raised, which nothing here can narrow.
   | { kind: 'sourceUnwritable'; reason: string };
 
-export interface MissingStaticFile {
-  setting: string;
+/** A file the build reads and cannot find. */
+export interface MissingFile {
   file: FilePath;
   /**
    * The same file in another case, when there is one. Found here because Windows and macOS
    * ignore case, but a link in it 404s on the hosts portals are published to, which do not.
    */
   foundAs: FilePath | null;
+}
+
+/** A file `apimatic.json` names, by the setting that names it. */
+export interface MissingStaticFile extends MissingFile {
+  setting: string;
 }
 
 /** A page of the user's served at an address the CLI keeps for the pages it generates. */
@@ -71,10 +76,8 @@ export interface MissingImage {
   page: FilePath;
   line: number;
   url: string;
-  /** Where the build looks; null for an image beside its page that points out of `content/`. */
-  file: FilePath | null;
-  /** The file in another case, as `MissingStaticFile` has it. */
-  foundAs: FilePath | null;
+  /** Null for an image beside its page that points out of `content/`'s copy, which the build never looks for. */
+  missing: MissingFile | null;
 }
 
 /** Why `content/` cannot be built; each variant maps to its own message. */
