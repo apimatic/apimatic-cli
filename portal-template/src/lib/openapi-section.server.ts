@@ -1,5 +1,5 @@
 import { createOpenAPI } from 'fumadocs-openapi/server';
-import { bundleSpecification } from './openapi-bundle.server';
+import { bundleSpec } from './openapi-bundle.server';
 import { placeCodeSamples, readCodeSampleCatalogs } from './code-samples.server';
 import { withoutInternalOperations } from './openapi-filter';
 import { apiBaseDir } from './shared';
@@ -12,7 +12,7 @@ import { apiBaseDir } from './shared';
  */
 export async function openApiSection(slug: string, file: string, codeSampleCatalogsFile: string | null) {
   const load = async () =>
-    placeCodeSamples(withoutInternalOperations(await bundleSpecification(file)), await readCodeSampleCatalogs(codeSampleCatalogsFile));
+    placeCodeSamples(withoutInternalOperations(await bundleSpec(file)), await readCodeSampleCatalogs(codeSampleCatalogsFile));
   const section = await createOpenAPI({ input: { [slug]: load } }).staticSource({
     baseDir: `${apiBaseDir}/${slug}`,
     groupBy: 'tag',

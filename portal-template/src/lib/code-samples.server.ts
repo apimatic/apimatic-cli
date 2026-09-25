@@ -19,8 +19,8 @@ export async function readCodeSampleCatalogs(file: string | null): Promise<CodeS
 export function placeCodeSamples(document: Document, samples: CodeSampleCatalogs): Document {
   const paths = (document as JsonObject).paths;
   if (!isJsonObject(paths)) return document;
-  for (const [route, item] of Object.entries(paths)) {
-    if (isJsonObject(item)) paths[route] = pathItemWithSamples(item, samples[route] ?? {});
+  for (const [path, item] of Object.entries(paths)) {
+    if (isJsonObject(item)) paths[path] = pathItemWithSamples(item, samples[path] ?? {});
   }
   return document;
 }

@@ -71,7 +71,7 @@ const UPGRADER_SCHEMA_SEGMENTS = new Set([
  * upgrader recognises a document by its own `openapi` key, so given a path it upgrades the
  * root file alone and leaves `example`, `nullable` and the rest in every referenced file.
  */
-export async function bundleSpecification(file: string): Promise<Document> {
+export async function bundleSpec(file: string): Promise<Document> {
   const unresolved: string[] = [];
   let document: JsonObject;
   try {
@@ -109,7 +109,7 @@ export async function bundleSpecification(file: string): Promise<Document> {
 function inlinePathItems(document: JsonObject): void {
   const paths = document.paths;
   if (!isJsonObject(paths)) return;
-  for (const [route, item] of Object.entries(paths)) paths[route] = dereference(document, item, new Set());
+  for (const [path, item] of Object.entries(paths)) paths[path] = dereference(document, item, new Set());
 }
 
 // Siblings of a `$ref` override what it points to, as OpenAPI 3.1 has it.
