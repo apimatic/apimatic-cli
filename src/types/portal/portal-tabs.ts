@@ -1,5 +1,6 @@
 import { frontmatter } from 'fumadocs-core/content/md/frontmatter';
 import { isJsonObject } from '../../utils/json-utils.js';
+import { DirectoryPath } from '../file/directoryPath.js';
 import { FilePath } from '../file/filePath.js';
 import { GeneratedSection } from './generated-pages.js';
 import { GROUP_FOLDER } from './portal-navigation.js';
@@ -7,8 +8,8 @@ import { GROUP_FOLDER } from './portal-navigation.js';
 /** One tab of the portal's tab bar. */
 export type TabOwner =
   | { kind: 'home' }
-  // A folder directly under `content/`, made a tab by its own `nav.json`, which `navigation` is.
-  | { kind: 'folder'; navigation: FilePath }
+  // A folder directly under `content/` that `content/nav.json` lists.
+  | { kind: 'folder'; directory: DirectoryPath }
   | { kind: 'apiReference' }
   | { kind: 'generated'; section: GeneratedSection };
 
@@ -44,7 +45,7 @@ export function untitledTabName(owner: TabOwner): string {
     case 'generated':
       return owner.section.title;
     case 'folder':
-      return directoryTabName(owner.navigation.directory().leafName());
+      return directoryTabName(owner.directory.leafName());
   }
 }
 

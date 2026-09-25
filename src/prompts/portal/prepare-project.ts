@@ -9,6 +9,7 @@ import { PortalSourceProblem } from '../../types/portal/portal-source.js';
 import { SharedTabName } from '../../types/portal/portal-tabs.js';
 import { generateArtifacts, reportUnplacedSamples } from './code-samples.js';
 import {
+  reportFolderTabs,
   reportHiddenPages,
   reportIgnoredNavigationFiles,
   reportShadowedFiles,
@@ -36,6 +37,10 @@ export class PreparePortalProjectPrompts {
 
   public ignoredNavigationFiles(files: FilePath[], sourceDirectory: DirectoryPath) {
     reportIgnoredNavigationFiles(files, sourceDirectory);
+  }
+
+  public folderTabs(folders: DirectoryPath[]) {
+    reportFolderTabs(folders);
   }
 
   public sharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath) {

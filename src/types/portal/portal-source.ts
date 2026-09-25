@@ -42,6 +42,8 @@ export interface PortalSource extends PortalSettings {
    * so read by nothing. Reported rather than left to sit there doing nothing.
    */
   ignoredNavigationFiles: FilePath[];
+  /** The folders `content/nav.json` makes tabs of, in its order; listing one is all it takes. */
+  folderTabs: DirectoryPath[];
   /** Names more than one tab would show, which the build accepts and a reader cannot tell apart. */
   sharedTabNames: SharedTabName[];
 }

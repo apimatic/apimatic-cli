@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { log } from '@clack/prompts';
 import { PortalServePrompts } from '../../../src/prompts/portal/serve.js';
-import { reportSharedTabNames, reportSourceProblem } from '../../../src/prompts/portal/source.js';
+import { reportFolderTabs, reportSharedTabNames, reportSourceProblem } from '../../../src/prompts/portal/source.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { FileName } from '../../../src/types/file/fileName.js';
 import { FilePath } from '../../../src/types/file/filePath.js';
@@ -147,6 +147,34 @@ describe('reportSourceProblem', () => {
   });
 });
 
+describe('reportFolderTabs', () => {
+  let info: sinon.SinonStub;
+
+  beforeEach(() => {
+    info = sinon.stub(log, 'info');
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('says nothing when the root nav.json lists no folder', () => {
+    reportFolderTabs([]);
+
+    expect(info.called).to.be.false;
+  });
+
+  // Listing a folder is all it takes to make a tab, so the output names each one it made.
+  it('names each folder the root nav.json makes a tab of, in its order', () => {
+    const content = new DirectoryPath('project', 'src', 'content');
+    reportFolderTabs([content.join('tutorials'), content.join('guides')]);
+
+    expect(stripVTControlCharacters(String(info.firstCall.args[0]))).to.equal(
+      "'content/nav.json' makes a tab of each folder it lists: 'tutorials' and 'guides'."
+    );
+  });
+});
+
 describe('reportSharedTabNames', () => {
   const source = new DirectoryPath('project').join('src');
   const content = source.join('content');
@@ -181,7 +209,7 @@ describe('reportSharedTabNames', () => {
           name: 'Guides',
           tabs: [
             { owner: { kind: 'home' }, name: 'Guides', namedBy: new FilePath(content, new FileName('nav.json')) },
-            { owner: { kind: 'folder', navigation: guidesNavigation }, name: 'Guides', namedBy: guidesNavigation },
+            { owner: { kind: 'folder', directory: content.join('guides') }, name: 'Guides', namedBy: guidesNavigation },
             {
               owner: { kind: 'apiReference' },
               name: 'Guides',
@@ -193,7 +221,7 @@ describe('reportSharedTabNames', () => {
           name: 'SDKs',
           tabs: [
             {
-              owner: { kind: 'folder', navigation: new FilePath(content.join('sdk-docs'), new FileName('nav.json')) },
+              owner: { kind: 'folder', directory: content.join('sdk-docs') },
               name: 'SDKs',
               namedBy: new FilePath(content.join('sdk-docs'), new FileName('index.md'))
             },
@@ -205,7 +233,7 @@ describe('reportSharedTabNames', () => {
           tabs: [
             { owner: { kind: 'home' }, name: 'Home', namedBy: null },
             {
-              owner: { kind: 'folder', navigation: new FilePath(content.join('home'), new FileName('nav.json')) },
+              owner: { kind: 'folder', directory: content.join('home') },
               name: 'Home',
               namedBy: null
             }
@@ -217,11 +245,11 @@ describe('reportSharedTabNames', () => {
 
     expect(printed().split('\n')).to.deep.equal([
       'More than one tab has the same name, so the tab bar cannot tell them apart:',
-      "  • 'Guides': the Home tab (titled in 'content/nav.json'), the tab 'content/guides/nav.json' makes " +
-        "(titled there) and the API reference (titled in 'content/api/index.md')",
-      "  • 'SDKs': the tab 'content/sdk-docs/nav.json' makes (titled in 'content/sdk-docs/index.md') and the tab " +
-        'of the SDK pages',
-      "  • 'Home': the Home tab and the tab 'content/home/nav.json' makes (named after its directory)",
+      "  • 'Guides': the Home tab (titled in 'content/nav.json'), the tab of the 'guides' folder (titled in " +
+        "'content/guides/nav.json') and the API reference (titled in 'content/api/index.md')",
+      "  • 'SDKs': the tab of the 'sdk-docs' folder (titled in 'content/sdk-docs/index.md') and the tab of the " +
+        'SDK pages',
+      "  • 'Home': the Home tab and the tab of the 'home' folder (named after the folder)",
       "Give all but one of each a name of its own with a 'title' in its folder's 'nav.json', or in " +
         "'content/nav.json' for the Home tab."
     ]);

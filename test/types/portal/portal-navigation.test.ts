@@ -5,11 +5,10 @@ describe('PortalNavigation', () => {
   const contextFor = (overrides: Partial<NavigationContext> = {}): NavigationContext => ({
     label: 'content/nav.json',
     isContentRoot: true,
-    isTopLevel: false,
     isApiDirectory: false,
     becomesFolder: true,
-    servesHomePage: false,
     childNames: ['index', 'authentication', 'guides'],
+    homePageFolders: [],
     ...overrides
   });
 
@@ -176,7 +175,7 @@ describe('PortalNavigation', () => {
 
     it('names an unknown setting and lists the settings there are', () => {
       expect(PortalNavigation.validate('{"colour":"red"}', contextFor())._unsafeUnwrapErr()).to.deep.equal([
-        "content/nav.json: 'colour' is not a nav.json setting. The settings are 'pages', 'title' and 'root'."
+        "content/nav.json: 'colour' is not a nav.json setting. The settings are 'pages' and 'title'."
       ]);
     });
   });
@@ -210,8 +209,10 @@ describe('PortalNavigation', () => {
 
       const errors = errorsFor(['index', 'intro'], nested);
 
-      expect(errors).to.have.lengthOf(1);
-      expect(errors[0]).to.contain("'index' is the page this folder links to");
+      expect(errors).to.deep.equal([
+        "content/guides/nav.json: 'index' is the page this folder opens on, so it cannot be positioned among its " +
+          'pages. Remove the entry; the folder itself is positioned by the nav.json one level up.'
+      ]);
     });
 
     it('does not stop the other entries of that file being checked', () => {
@@ -284,119 +285,39 @@ describe('PortalNavigation', () => {
     });
   });
 
-  describe('the tab setting', () => {
-    const tutorials = {
-      label: 'content/tutorials/nav.json',
-      isContentRoot: false,
-      isTopLevel: true,
-      childNames: ['index', 'first-call']
-    };
-
-    const rootErrors = (root: unknown, overrides: Partial<NavigationContext>) =>
-      PortalNavigation.validate(JSON.stringify({ root }), contextFor(overrides));
-
-    it('makes a folder directly under the content root a tab', () => {
-      expect(rootErrors(true, tutorials)._unsafeUnwrap().isTab).to.be.true;
-      expect(rootErrors(false, tutorials)._unsafeUnwrap().isTab).to.be.false;
+  describe('the tabs', () => {
+    // The walk makes a tab of each folder the content root's entries name.
+    it('answers with its entries, trimmed', () => {
+      expect(validate(['  index ', 'guides'])._unsafeUnwrap().pages).to.deep.equal(['index', 'guides']);
+      expect(PortalNavigation.validate('{}', contextFor())._unsafeUnwrap().pages).to.deep.equal([]);
     });
 
     // The home page belongs to the Home tab, which opens on it.
     it('refuses to make a tab of a folder that serves the home page', () => {
-      const start = { ...tutorials, label: 'content/(start)/nav.json', servesHomePage: true };
+      const withStart = { childNames: ['index', '(start)'], homePageFolders: ['(start)'] };
 
-      expect(rootErrors(true, start)._unsafeUnwrapErr()).to.deep.equal([
-        "content/(start)/nav.json: 'root' makes a folder a tab of its own, but a page in it is served at '/', " +
-          'the home page, which the Home tab holds. Move the page out of the folder, or remove the setting.'
+      expect(errorsFor(['index', '(start)'], withStart)).to.deep.equal([
+        "content/nav.json: '(start)' serves the home page, which belongs to the Home tab, so it cannot be a tab " +
+          'of its own. Remove the entry, or move the page out of the folder.'
       ]);
     });
 
-    it('answers that the API reference is a tab without the setting', () => {
-      const api = { ...tutorials, label: 'content/api/nav.json', isApiDirectory: true };
+    // Listing the folder in the content root's file is what makes a tab now.
+    it('reports the root setting that used to make one as unknown', () => {
+      const tutorials = { label: 'content/tutorials/nav.json', isContentRoot: false, childNames: ['first-call'] };
 
-      expect(PortalNavigation.validate('{}', contextFor(api))._unsafeUnwrap().isTab).to.be.true;
-    });
-
-    // The template lists a tab's index page first, whatever the file says, so the entry would
-    // position nothing -- in the reference's tab as in any other.
-    it('refuses the index page in a tab, which always opens on it', () => {
-      const tabFile = JSON.stringify({ root: true, pages: ['first-call', 'index'] });
-      const api = { ...tutorials, label: 'content/api/nav.json', isApiDirectory: true };
-
-      expect(PortalNavigation.validate(tabFile, contextFor(tutorials))._unsafeUnwrapErr()).to.deep.equal([
-        "content/tutorials/nav.json: 'index' is the page this tab opens on, which is always listed first, so it cannot be positioned here. Remove the entry."
-      ]);
-      expect(
-        PortalNavigation.validate(JSON.stringify({ pages: ['index'] }), contextFor(api))._unsafeUnwrapErr()[0]
-      ).to.contain("'index' is the page this tab opens on");
-    });
-
-    it('calls the index page the folder’s own link when the tab setting is itself refused', () => {
-      const nested = { ...tutorials, label: 'content/guides/deep/nav.json', isTopLevel: false };
-      const errors = PortalNavigation.validate(
-        JSON.stringify({ root: true, pages: ['index'] }),
-        contextFor(nested)
-      )._unsafeUnwrapErr();
-
-      expect(errors).to.have.lengthOf(2);
-      expect(errors[1]).to.contain("'index' is the page this folder links to");
-    });
-
-    it('refuses it at the content root, which holds every tab', () => {
-      expect(rootErrors(true, {})._unsafeUnwrapErr()).to.deep.equal([
-        "content/nav.json: 'root' makes a folder a tab of its own, and this file orders the content root, which holds every tab. Set it in the nav.json of a folder directly under 'content'."
+      expect(PortalNavigation.validate('{"root":true}', contextFor(tutorials))._unsafeUnwrapErr()).to.deep.equal([
+        "content/tutorials/nav.json: 'root' is not a nav.json setting. The settings are 'pages' and 'title'."
       ]);
     });
 
-    // A second tab bar inside a tab is not something the layouts can show.
-    it('refuses it on a nested folder', () => {
-      const nested = { ...tutorials, label: 'content/tutorials/advanced/nav.json', isTopLevel: false };
+    // A tab lists its index page first whatever the file says, so the entry would position
+    // nothing -- in the reference's tab as in any other folder.
+    it('refuses the index page in the API reference too', () => {
+      const api = { label: 'content/api/nav.json', isContentRoot: false, isApiDirectory: true, childNames: ['index'] };
 
-      expect(rootErrors(true, nested)._unsafeUnwrapErr()).to.deep.equal([
-        "content/tutorials/advanced/nav.json: 'root' makes a folder a tab of its own, and only a folder directly under 'content' can be one. Set it in the nav.json of the top-level folder this one sits in, or remove it."
-      ]);
+      expect(errorsFor(['index'], api)[0]).to.contain("'index' is the page this folder opens on");
     });
-
-    // Every folder is already no tab there, so the advice for `true` would mislead.
-    it('calls false a setting that sets nothing wherever a folder cannot be a tab', () => {
-      const places: Partial<NavigationContext>[] = [
-        {},
-        { ...tutorials, label: 'content/tutorials/advanced/nav.json', isTopLevel: false },
-        { ...tutorials, label: 'content/api/nav.json', isApiDirectory: true },
-        { ...tutorials, becomesFolder: false }
-      ];
-
-      for (const place of places) {
-        expect(rootErrors(false, place)._unsafeUnwrapErr(), place.label).to.deep.equal([
-          `${place.label ?? 'content/nav.json'}: 'root' is false, which sets nothing here. Remove the setting.`
-        ]);
-      }
-    });
-
-    it('refuses it on the API reference, which is always a tab', () => {
-      const api = { ...tutorials, label: 'content/api/nav.json', isApiDirectory: true };
-
-      expect(rootErrors(true, api)._unsafeUnwrapErr()).to.deep.equal([
-        "content/api/nav.json: 'root' makes a folder a tab of its own, and the API reference is always one. Remove the setting."
-      ]);
-    });
-
-    it('refuses it in a directory that becomes no folder', () => {
-      expect(rootErrors(true, { ...tutorials, becomesFolder: false })._unsafeUnwrapErr()[0]).to.contain(
-        'a directory with no page in it or below it is no folder in the sidebar'
-      );
-    });
-
-    for (const [description, root] of [
-      ['a string', 'yes'],
-      ['a number', 1],
-      ['null', null]
-    ] as const) {
-      it(`refuses ${description}`, () => {
-        expect(rootErrors(root, tutorials)._unsafeUnwrapErr()).to.deep.equal([
-          "content/tutorials/nav.json: 'root' must be true or false."
-        ]);
-      });
-    }
   });
 
   // `JSON.parse` will happily hand back a document keyed by a prototype member.
@@ -406,7 +327,7 @@ describe('PortalNavigation', () => {
         const errors = PortalNavigation.validate(`{"${field}":"x"}`, contextFor())._unsafeUnwrapErr();
 
         expect(errors).to.deep.equal([
-          `content/nav.json: '${field}' is not a nav.json setting. The settings are 'pages', 'title' and 'root'.`
+          `content/nav.json: '${field}' is not a nav.json setting. The settings are 'pages' and 'title'.`
         ]);
         expect(errors[0]).to.not.contain('native code');
       });

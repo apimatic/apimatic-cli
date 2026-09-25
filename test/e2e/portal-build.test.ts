@@ -239,11 +239,11 @@ const stylesheetOf = (output: DirectoryPath) => {
   });
 
   // The only end-to-end proof that `nav.json` reaches the build: the Vite glob, the macro's
-  // `meta.files` restriction and the transformer over real on-disk storage. Fumadocs' own
-  // order would put the page above the folder, and the defaults the SDKs above the reference.
+  // `meta.files` restriction and the transformer over real on-disk storage. The folder is a tab
+  // only because the file lists it, and the defaults would put the SDKs above the reference.
   it('orders the sidebar by nav.json, with the SDKs and the API reference where their tokens name them', () => {
     const tree = read(treeCacheFiles()[0]);
-    const order = ['Welcome', 'Developer Guides', 'Authentication', 'API Reference', 'SDKs'].map((name) =>
+    const order = ['Welcome', 'Authentication', 'Developer Guides', 'API Reference', 'SDKs'].map((name) =>
       tree.indexOf(`"${name}"`)
     );
 
@@ -310,6 +310,7 @@ const stylesheetOf = (output: DirectoryPath) => {
       page.search(new RegExp(`href="${href}"[^>]*><span[^>]*>${name}</span></a>`));
     const positions = [
       tab('/', 'Overview'),
+      tab('/guides/intro', 'Developer Guides'),
       tab('/api/apimatic-calculator/simple-calculator/Calculate', 'API Reference'),
       tab('/sdks', 'SDKs')
     ];

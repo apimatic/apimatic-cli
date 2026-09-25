@@ -110,17 +110,11 @@ export function navigationTransformer<S extends ContentStorage>(): PageTreeTrans
 }
 
 /**
- * A tab is a root folder, which is how Fumadocs builds a tab bar: a top-level folder whose
- * `nav.json` sets `"root": true` becomes one, as do the API reference and each folder the CLI
- * generates, and the index page and every other loose node are gathered into Home, which the
- * root `nav.json`'s `title` names. The tabs keep the root's order, except that Home leads
- * unless the file places the index page, which puts it there. Tabs change no address: URLs
- * come from slugs.
- *
- * Fumadocs never reads `root` itself: it takes a folder's metadata from `meta.json`, which the
- * content collection does not load. So only this decides which folders become tabs, which is
- * also what keeps a `root` the CLI refuses -- on a nested folder, the reference, or a folder that
- * serves the home page -- from making one.
+ * A tab is a root folder, which is how Fumadocs builds a tab bar. Each folder the root
+ * `nav.json` lists becomes one, as do the API reference and each folder the CLI generates; the
+ * pages, and the folders the file does not list, are gathered into Home, which the file's `title`
+ * names. The tabs keep the root's order, except that Home leads unless the file places the index
+ * page, which puts it there. Tabs change no address: URLs come from slugs.
  */
 export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer<S> {
   return {
@@ -135,8 +129,6 @@ export function tabsTransformer<S extends ContentStorage>(): PageTreeTransformer
 interface NavigationSettings {
   pages: string[] | undefined;
   title: string | undefined;
-  /** Only an actual `true` counts: a half-typed value makes no tab. */
-  root: boolean;
 }
 
 function readSettings(context: NavigationContext, folderPath: string): NavigationSettings | undefined {
@@ -150,30 +142,30 @@ function readSettings(context: NavigationContext, folderPath: string): Navigatio
     return undefined;
   }
 
-  const { pages, title, root } = file.data as { pages?: unknown; title?: unknown; root?: unknown };
+  const { pages, title } = file.data as { pages?: unknown; title?: unknown };
   // A half-typed title reloads to here as an empty string, which would blank the folder in
   // the sidebar with nothing to click. The CLI refuses one; the preview keeps the default
   // name until the file is worth reading again.
   const named = typeof title === 'string' ? title.trim() : '';
   return {
     pages: Array.isArray(pages) ? pages.filter((entry): entry is string => typeof entry === 'string') : undefined,
-    title: named.length > 0 ? named : undefined,
-    root: root === true
+    title: named.length > 0 ? named : undefined
   };
 }
 
-function isTabFolder(context: NavigationContext, folder: Folder): boolean {
+function isTabFolder(rootSettings: NavigationSettings | undefined, folder: Folder): boolean {
   const folderPath = folder.$ref?.folder;
   return (
     folderPath !== undefined &&
     folderPath !== apiBaseDir &&
-    readSettings(context, folderPath)?.root === true &&
+    (rootSettings?.pages?.some((entry) => entry.trim() === folderPath) ?? false) &&
     // The home page is the Home tab's, whichever `(group)` folder serves it.
     !containsUrl([folder], HOME_URL)
   );
 }
 
 function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
+  const settings = readSettings(context, '');
   const tabs: Folder[] = [];
   const loose: Node[] = [];
   let tabsBeforeIndex: number | undefined;
@@ -181,7 +173,7 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
   for (const child of children) {
     if (
       child.type === 'folder' &&
-      (isApiReference(child) || isTabFolder(context, child) || isInjected(context, child))
+      (isApiReference(child) || isTabFolder(settings, child) || isInjected(context, child))
     ) {
       tabs.push(asTab(child));
     } else {
@@ -200,7 +192,6 @@ function groupIntoTabs(context: NavigationContext, children: Node[]): Node[] {
     delete tab.$ref;
   }
 
-  const settings = readSettings(context, '');
   const home: Folder = {
     type: 'folder',
     $id: HOME_TAB_ID,

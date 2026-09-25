@@ -31,7 +31,7 @@ export const NAVIGATION_FILE_NAME = 'nav.json';
 // sidebar in its default order with nothing said, so every unknown field is reported. The
 // file has so few settings that a misspelling is answered by listing them all rather than
 // guessing at the one it meant.
-const KNOWN_FIELDS = new Set(['pages', 'title', 'root']);
+const KNOWN_FIELDS = new Set(['pages', 'title']);
 
 /** Where a `nav.json` sits, and what its entries are allowed to address. */
 export interface NavigationContext {
@@ -39,8 +39,6 @@ export interface NavigationContext {
   label: string;
   /** Every `apimatic:` token resolves to a node that lives at the content root. */
   isContentRoot: boolean;
-  /** Directly under the content root: the only place a folder can be a tab of its own. */
-  isTopLevel: boolean;
   /** `content/api/`, where the reference is mounted, which is always a tab. */
   isApiDirectory: boolean;
   /**
@@ -49,18 +47,18 @@ export interface NavigationContext {
    * `nav.json`, so a title here would name nothing.
    */
   becomesFolder: boolean;
-  /** Whether a page in or below it is served at `/`, which only one in a `(group)` folder can be. */
-  servesHomePage: boolean;
   /** Pages and subfolders in the same directory; page names carry no extension. */
   childNames: string[];
+  /** Subfolders that serve the home page, as a `(group)` folder's index page can at the content root. */
+  homePageFolders: string[];
 }
 
-/** What a valid `nav.json` says about its directory, beyond the order of its pages. */
+/** What a valid `nav.json` says about its directory. */
 export interface NavigationSettings {
   /** The name it gives its folder, or at the content root the Home tab. */
   title: string | undefined;
-  /** Whether its directory is a tab of its own, which the API reference always is. */
-  isTab: boolean;
+  /** Its entries, trimmed; at the content root, each folder they name is a tab. */
+  pages: string[];
 }
 
 /**
@@ -80,24 +78,19 @@ export class PortalNavigation {
       PortalNavigation.describeUnknownField(field, context)
     );
 
-    const settingErrors = [
-      ...unknownFields,
-      ...PortalNavigation.titleErrors(document.value.title, context),
-      ...PortalNavigation.rootErrors(document.value.root, context)
-    ];
-    const isTab = context.isApiDirectory || PortalNavigation.isTab(document.value.root, context);
-    const title = document.value.title;
-    const settings = { title: typeof title === 'string' ? title.trim() : undefined, isTab };
+    const settingErrors = [...unknownFields, ...PortalNavigation.titleErrors(document.value.title, context)];
+    const title = typeof document.value.title === 'string' ? document.value.title.trim() : undefined;
 
     const pages = document.value.pages;
     if (pages === undefined) {
       // A file with no `pages` orders nothing, which is odd but not wrong. It may still name
       // the folder, which is why the title is checked above rather than alongside the entries.
-      return settingErrors.length > 0 ? err(settingErrors) : ok(settings);
+      return settingErrors.length > 0 ? err(settingErrors) : ok({ title, pages: [] });
     }
     if (!Array.isArray(pages) || pages.some((entry) => typeof entry !== 'string')) {
       return err([...settingErrors, `${context.label}: 'pages' must be an array of strings.`]);
     }
+    const entries = (pages as string[]).map((entry) => entry.trim());
 
     // Every bad entry is reported at once rather than stopping at the first, so one edit
     // fixes the file.
@@ -108,8 +101,7 @@ export class PortalNavigation {
     // twice would have the template honour whichever came first without a word.
     const seen = new Map<string, string>();
 
-    for (const raw of pages as string[]) {
-      const entry = raw.trim();
+    for (const entry of entries) {
       const node = context.isContentRoot && entry === API_REFERENCE_NAME ? API_REFERENCE_TOKEN : entry;
       const earlier = seen.get(node);
       if (earlier !== undefined) {
@@ -122,16 +114,16 @@ export class PortalNavigation {
       }
       seen.set(node, entry);
 
-      const checked = PortalNavigation.checkEntry(entry, context, isTab);
+      const checked = PortalNavigation.checkEntry(entry, context);
       if (checked.isErr()) {
         errors.push(checked.error);
       }
     }
 
-    return errors.length > 0 ? err(errors) : ok(settings);
+    return errors.length > 0 ? err(errors) : ok({ title, pages: entries });
   }
 
-  private static checkEntry(entry: string, context: NavigationContext, isTab: boolean): Result<void, string> {
+  private static checkEntry(entry: string, context: NavigationContext): Result<void, string> {
     if (entry === REST_TOKEN) {
       return ok(undefined);
     }
@@ -178,18 +170,22 @@ export class PortalNavigation {
       );
     }
 
-    // Only below the content root: there, the index page is what the folder itself links to
-    // rather than one of its children, so no position among them would be honoured. A tab
-    // lists it first instead, for the same reason. The content root is a root folder, which
-    // gets no such page and lists `index` as an ordinary child.
+    // Only below the content root: there, the index page is the folder's own -- the page it
+    // links to, or as a tab opens on first -- so no position among its pages would be
+    // honoured. The content root lists `index` as an ordinary child.
     if (entry === INDEX_NAME && !context.isContentRoot) {
       return err(
-        isTab
-          ? `${context.label}: '${INDEX_NAME}' is the page this tab opens on, which is always listed first, ` +
-              `so it cannot be positioned here. Remove the entry.`
-          : `${context.label}: '${INDEX_NAME}' is the page this folder links to rather than one of ` +
-              `its pages, so it cannot be positioned here. Remove the entry; the folder itself is ` +
-              `positioned by the ${NAVIGATION_FILE_NAME} one level up.`
+        `${context.label}: '${INDEX_NAME}' is the page this folder opens on, so it cannot be positioned ` +
+          `among its pages. Remove the entry; the folder itself is positioned by the ${NAVIGATION_FILE_NAME} ` +
+          `one level up.`
+      );
+    }
+
+    // Each folder the content root lists is a tab, and the home page is the Home tab's.
+    if (context.homePageFolders.includes(entry)) {
+      return err(
+        `${context.label}: '${entry}' serves the home page, which belongs to the Home tab, so it cannot ` +
+          `be a tab of its own. Remove the entry, or move the page out of the folder.`
       );
     }
 
@@ -244,8 +240,8 @@ export class PortalNavigation {
 
   /**
    * A folder is named after its directory, or after the title of its index page; `title`
-   * outranks both. At the content root it names the Home tab, which holds the index page and
-   * every page and folder that is not a tab of its own.
+   * outranks both. At the content root it names the Home tab, which holds the pages there and
+   * the folders the file does not list.
    */
   private static titleErrors(title: unknown, context: NavigationContext): string[] {
     if (title === undefined) {
@@ -263,60 +259,6 @@ export class PortalNavigation {
       return [`${context.label}: 'title' must be a non-empty string.`];
     }
     return [];
-  }
-
-  /**
-   * `root` makes a folder directly under the content root a tab of its own; anywhere else it
-   * would set nothing, or nest one tab bar inside another. The template ignores it wherever
-   * it is refused here, so the preview never shows a tab the build would reject.
-   */
-  private static rootErrors(root: unknown, context: NavigationContext): string[] {
-    if (root === undefined) {
-      return [];
-    }
-    if (root === false && !PortalNavigation.mayBeTab(context)) {
-      return [`${context.label}: 'root' is false, which sets nothing here. Remove the setting.`];
-    }
-    const setting = `${context.label}: 'root' makes a folder a tab of its own`;
-    if (context.isContentRoot) {
-      return [
-        `${setting}, and this file orders the content root, which holds every tab. Set it in the ` +
-          `${NAVIGATION_FILE_NAME} of a folder directly under 'content'.`
-      ];
-    }
-    if (context.isApiDirectory) {
-      return [`${setting}, and the API reference is always one. Remove the setting.`];
-    }
-    if (!context.isTopLevel) {
-      return [
-        `${setting}, and only a folder directly under 'content' can be one. Set it in the ` +
-          `${NAVIGATION_FILE_NAME} of the top-level folder this one sits in, or remove it.`
-      ];
-    }
-    if (!context.becomesFolder) {
-      return [
-        `${setting}, but a directory with no page in it or below it is no folder in the sidebar. ` +
-          `Add a page, or remove the setting.`
-      ];
-    }
-    if (context.servesHomePage) {
-      return [
-        `${setting}, but a page in it is served at '/', the home page, which the Home tab holds. ` +
-          `Move the page out of the folder, or remove the setting.`
-      ];
-    }
-    if (typeof root !== 'boolean') {
-      return [`${context.label}: 'root' must be true or false.`];
-    }
-    return [];
-  }
-
-  private static isTab(root: unknown, context: NavigationContext): boolean {
-    return root === true && PortalNavigation.mayBeTab(context);
-  }
-
-  private static mayBeTab(context: NavigationContext): boolean {
-    return context.isTopLevel && !context.isApiDirectory && context.becomesFolder && !context.servesHomePage;
   }
 
   private static describeUnknownField(field: string, context: NavigationContext): string {

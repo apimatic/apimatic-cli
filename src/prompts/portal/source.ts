@@ -138,6 +138,14 @@ export function reportIgnoredNavigationFiles(files: FilePath[], sourceDirectory:
   log.warn(`${names} ${verb} not read. Only a file named ${f.var('nav.json')}, in lower case, orders the pages.`);
 }
 
+export function reportFolderTabs(folders: DirectoryPath[]): void {
+  if (folders.length === 0) {
+    return;
+  }
+  const names = listedInProse(folders.map((folder) => f.var(folder.leafName())));
+  log.info(`${f.var('content/nav.json')} makes a tab of each folder it lists: ${names}.`);
+}
+
 export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath): void {
   if (shared.length === 0) {
     return;
@@ -153,11 +161,8 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
       case 'generated':
         return `the tab of ${owner.section.description}`;
       case 'folder': {
-        const makes = `the tab ${relative(owner.navigation)} makes`;
-        if (namedBy === null) {
-          return `${makes} (named after its directory)`;
-        }
-        return namedBy.isEqual(owner.navigation) ? `${makes} (titled there)` : `${makes}${titledIn}`;
+        const folder = `the tab of the ${f.var(owner.directory.leafName())} folder`;
+        return namedBy === null ? `${folder} (named after the folder)` : `${folder}${titledIn}`;
       }
     }
   };

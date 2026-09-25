@@ -19,7 +19,9 @@ things here, each also noted where it applies:
   each generated section is its own tab, and a later one gets its own token.
 - The root `nav.json`'s entries now decide the portal's tabs, in the order
   their first nodes appear (portal-config section 5). A `nav.json` directly
-  under `content/` may set `"root": true` to make its folder a tab.
+  under `content/` may set `"root": true` to make its folder a tab. *(Amended
+  2026-09-25: `root` is gone; a folder the root `nav.json` lists is a tab,
+  portal-config section 5.)*
 - The `languages` requirement of section 4 lands with that PR, before the SDK
   page, which answers open question 2 of section 11.
 - The fallback home page of section 6 now exists and gets a node in the tree.

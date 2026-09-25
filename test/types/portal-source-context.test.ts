@@ -788,24 +788,27 @@ describe('PortalSourceContext', () => {
       expect((await resolve()).isOk()).to.be.true;
     });
 
-    // The walk is what tells a top-level folder from a nested one, which only it can know.
-    it('makes a tab of a folder directly under content, and of no folder deeper down', async () => {
+    // Listing a folder in the content root's file is what makes it a tab.
+    it('refuses the root setting that used to make a tab, wherever it is written', async () => {
       write('content/tutorials/first-call.md', '# First call');
       write('content/tutorials/nav.json', JSON.stringify({ root: true }));
-      write('content/tutorials/advanced/retries.md', '# Retries');
-      write('content/tutorials/advanced/nav.json', JSON.stringify({ root: true }));
-      write('content/api/overview.md', '# Overview');
-      write('content/api/nav.json', JSON.stringify({ root: true }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
-      expect(errors).to.have.lengthOf(2);
-      expect(errors.find((error) => error.startsWith('content/api/nav.json: '))).to.contain(
-        'and the API reference is always one'
-      );
-      expect(errors.find((error) => error.startsWith('content/tutorials/advanced/nav.json: '))).to.contain(
-        "only a folder directly under 'content' can be one"
-      );
+      expect(errors).to.deep.equal([
+        "content/tutorials/nav.json: 'root' is not a nav.json setting. The settings are 'pages' and 'title'."
+      ]);
+    });
+
+    it('makes a tab of each folder the root nav.json lists, in its order, and of no other', async () => {
+      write('content/tutorials/first-call.md', '# First call');
+      write('content/guides/intro.md', '# Intro');
+      write('content/concepts/pets.md', '# Pets');
+      write('content/nav.json', JSON.stringify({ pages: ['index', 'tutorials', 'guides', '...'] }));
+
+      const folders = (await resolve())._unsafeUnwrap().folderTabs.map((folder) => folder.leafName());
+
+      expect(folders).to.deep.equal(['tutorials', 'guides']);
     });
 
     it('refuses a name shared by a page and a folder, since only the folder could be positioned', async () => {
@@ -893,7 +896,7 @@ describe('PortalSourceContext', () => {
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
       expect(errors).to.have.lengthOf(1);
-      expect(errors[0]).to.contain("content/guides/nav.json: 'index' is the page this folder links to");
+      expect(errors[0]).to.contain("content/guides/nav.json: 'index' is the page this folder opens on");
     });
 
     it('refuses a page named in the wrong directory', async () => {
@@ -958,19 +961,23 @@ describe('PortalSourceContext', () => {
     it('refuses to make a tab of a (group) folder that serves the home page, however deep', async () => {
       fs.rmSync(path.join(root, 'content/index.md'));
       write('content/(start)/(welcome)/index.md', '# Welcome');
-      write('content/(start)/nav.json', JSON.stringify({ root: true }));
+      write('content/nav.json', JSON.stringify({ pages: ['(start)', 'authentication'] }));
 
       const errors = navigationErrors((await resolve())._unsafeUnwrapErr());
 
       expect(errors).to.have.lengthOf(1);
-      expect(errors[0]).to.match(/^content\/\(start\)\/nav\.json: 'root' makes a folder a tab of its own, but a page/);
+      expect(errors[0]).to.match(
+        /^content\/nav\.json: '\(start\)' serves the home page, which belongs to the Home tab/
+      );
     });
 
     it('makes a tab of a (group) folder that does not serve the home page', async () => {
       write('content/(start)/intro/index.md', '# Intro');
-      write('content/(start)/nav.json', JSON.stringify({ root: true }));
+      write('content/nav.json', JSON.stringify({ pages: ['index', '(start)'] }));
 
-      expect((await resolve()).isOk()).to.be.true;
+      expect((await resolve())._unsafeUnwrap().folderTabs.map((folder) => folder.leafName())).to.deep.equal([
+        '(start)'
+      ]);
     });
 
     it('accepts a directory whose pages are nested below it', async () => {
@@ -1045,56 +1052,70 @@ describe('PortalSourceContext', () => {
       return source.sharedTabNames.map(({ name, tabs }) => [name, tabs.map(described).sort()]);
     };
 
-    /** A folder directly under `content/` that its `nav.json` makes a tab. */
-    const folderTab = (directory: string, settings: object, indexTitle?: string) => {
+    /** A folder directly under `content/`, which `listFolders` makes a tab. */
+    const folder = (directory: string, title?: string, indexTitle?: string) => {
       write(`content/${directory}/first.md`, '---\ntitle: First\n---\n');
-      write(`content/${directory}/nav.json`, JSON.stringify({ root: true, ...settings }));
+      if (title !== undefined) {
+        write(`content/${directory}/nav.json`, JSON.stringify({ title }));
+      }
       if (indexTitle !== undefined) {
         write(`content/${directory}/index.md`, `---\ntitle: ${indexTitle}\n---\n`);
       }
     };
 
+    /** The root `nav.json`, listing these folders and so making each a tab, and naming Home if given a title. */
+    const listFolders = (folders: string[], title?: string) =>
+      write(
+        'content/nav.json',
+        JSON.stringify({ ...(title === undefined ? {} : { title }), pages: ['index', ...folders] })
+      );
+
     it('finds none when every tab has a name of its own', async () => {
-      folderTab('tutorials', { title: 'Tutorials' });
+      folder('tutorials', 'Tutorials');
+      listFolders(['tutorials']);
 
       expect(await shared()).to.deep.equal([]);
     });
 
     it('finds a folder tab titled like the Home tab', async () => {
-      folderTab('start', { title: 'Home' });
+      folder('start', 'Home');
+      listFolders(['start']);
 
       expect(await shared()).to.deep.equal([['Home', ['folder content/start/nav.json', 'home']]]);
     });
 
     it('finds the Home tab titled like a folder tab its index page names', async () => {
-      write('content/nav.json', JSON.stringify({ title: 'Guides' }));
-      folderTab('guides', {}, 'Guides');
+      folder('guides', undefined, 'Guides');
+      listFolders(['guides'], 'Guides');
 
       expect(await shared()).to.deep.equal([['Guides', ['folder content/guides/index.md', 'home content/nav.json']]]);
     });
 
     it('names a folder tab after its directory when nothing else does', async () => {
-      write('content/nav.json', JSON.stringify({ title: 'Getting started' }));
-      folderTab('getting-started', {});
+      folder('getting-started');
+      listFolders(['getting-started'], 'Getting started');
 
       expect(await shared()).to.deep.equal([['Getting started', ['folder', 'home content/nav.json']]]);
     });
 
     it('prefers the title in a folder tab’s nav.json to its index page’s', async () => {
-      folderTab('guides', { title: 'Learn' }, 'Home');
+      folder('guides', 'Learn', 'Home');
+      listFolders(['guides']);
 
       expect(await shared()).to.deep.equal([]);
     });
 
     it('finds a folder tab titled like the API reference, which no directory has to back', async () => {
-      folderTab('reference', { title: 'API Reference' });
+      folder('reference', 'API Reference');
+      listFolders(['reference']);
 
       expect(await shared()).to.deep.equal([['API Reference', ['apiReference', 'folder content/reference/nav.json']]]);
     });
 
     it('names the API reference by content/api/nav.json, then by its index page', async () => {
-      folderTab('guides', { title: 'Guides' });
-      folderTab('tutorials', { title: 'Tutorials' });
+      folder('guides', 'Guides');
+      folder('tutorials', 'Tutorials');
+      listFolders(['guides', 'tutorials']);
       write('content/api/index.md', '---\ntitle: Tutorials\n---\n');
       write('content/api/nav.json', JSON.stringify({ title: 'Guides' }));
 
@@ -1110,13 +1131,15 @@ describe('PortalSourceContext', () => {
     });
 
     it('finds a folder tab titled like a generated tab', async () => {
-      folderTab('downloads', { title: 'SDKs' });
+      folder('downloads', 'SDKs');
+      listFolders(['downloads']);
 
       expect(await shared()).to.deep.equal([['SDKs', ['folder content/downloads/nav.json', 'generated']]]);
     });
 
     it('counts the context plugin’s tab only when there is a plugin block', async () => {
-      folderTab('assistant', { title: 'Context Plugin' });
+      folder('assistant', 'Context Plugin');
+      listFolders(['assistant']);
 
       expect(await shared()).to.deep.equal([]);
 
@@ -1125,9 +1148,9 @@ describe('PortalSourceContext', () => {
       expect(await shared()).to.deep.equal([['Context Plugin', ['folder content/assistant/nav.json', 'generated']]]);
     });
 
-    it('does not count a folder that is no tab of its own', async () => {
-      write('content/start/first.md', '---\ntitle: First\n---\n');
-      write('content/start/nav.json', JSON.stringify({ title: 'Home' }));
+    it('does not count a folder the root nav.json does not list, which stays in Home', async () => {
+      folder('start', 'Home');
+      listFolders([]);
 
       expect(await shared()).to.deep.equal([]);
     });

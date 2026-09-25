@@ -20,10 +20,11 @@ describe('portal tabs', () => {
     const home: PortalTab = { owner: { kind: 'home' }, name: 'Home', namedBy: null };
     const api: PortalTab = { owner: { kind: 'apiReference' }, name: 'API Reference', namedBy: null };
     const sdks: PortalTab = { owner: { kind: 'generated', section: SDK_SECTION }, name: 'SDKs', namedBy: null };
-    const folder = (name: string): PortalTab => {
-      const navigation = navigationOf(name.toLowerCase());
-      return { owner: { kind: 'folder', navigation }, name, namedBy: navigation };
-    };
+    const folder = (name: string): PortalTab => ({
+      owner: { kind: 'folder', directory: new DirectoryPath('content', name.toLowerCase()) },
+      name,
+      namedBy: navigationOf(name.toLowerCase())
+    });
 
     it('finds nothing when every tab has a name of its own', () => {
       expect(sharedTabNames([home, folder('Tutorials'), api, sdks])).to.deep.equal([]);
@@ -50,7 +51,7 @@ describe('portal tabs', () => {
       [{ kind: 'home' }, 'Home'],
       [{ kind: 'apiReference' }, 'API Reference'],
       [{ kind: 'generated', section: PLUGIN_SECTION }, 'Context Plugin'],
-      [{ kind: 'folder', navigation: navigationOf('getting-started') }, 'Getting started']
+      [{ kind: 'folder', directory: new DirectoryPath('content', 'getting-started') }, 'Getting started']
     ] as [TabOwner, string][]) {
       it(`names the ${owner.kind} tab '${name}'`, () => {
         expect(untitledTabName(owner)).to.equal(name);

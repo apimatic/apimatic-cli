@@ -530,11 +530,10 @@ describe('navigationTransformer', () => {
       PortalNavigation.validate(JSON.stringify({ pages: [entry, 'index'] }), {
         label: 'content/nav.json',
         isContentRoot: true,
-        isTopLevel: false,
         isApiDirectory: false,
         becomesFolder: true,
-        servesHomePage: false,
-        childNames: ['index', 'authentication']
+        childNames: ['index', 'authentication'],
+        homePageFolders: []
       }).isOk();
 
     it('accepts and applies the rest token', () => {

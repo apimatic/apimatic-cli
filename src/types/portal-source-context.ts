@@ -18,7 +18,6 @@ import {
   GROUP_FOLDER,
   INDEX_NAME,
   NAVIGATION_FILE_NAME,
-  NavigationContext,
   NavigationSettings,
   PortalNavigation
 } from './portal/portal-navigation.js';
@@ -76,8 +75,6 @@ interface CheckedNavigation {
   settings: NavigationSettings;
 }
 
-type DirectoryPlace = Pick<NavigationContext, 'isContentRoot' | 'isApiDirectory' | 'isTopLevel'>;
-
 /** A page in the content tree, with its path from the content directory split into segments. */
 interface ContentPage {
   file: FilePath;
@@ -90,6 +87,9 @@ interface DirectoryScan {
   holdsPage: boolean;
   /** Whether a page beneath it is served at its own address: its index page, or a `(group)`'s. */
   servesOwnAddress: boolean;
+  /** Its valid `nav.json` and its index page, whose titles name it as a tab, in that order. */
+  navigation: CheckedNavigation | undefined;
+  indexPage: FilePath | undefined;
   errors: string[];
 }
 
@@ -183,6 +183,7 @@ export class PortalSourceContext {
       shadowedFiles: staticDirectory === null ? [] : await this.shadowedFiles(staticDirectory),
       hiddenPages: PortalSourceContext.hiddenPages(contentPages, specs),
       ignoredNavigationFiles: navigation.ignoredFiles,
+      folderTabs: navigation.tabs.flatMap(({ owner }) => (owner.kind === 'folder' ? [owner.directory] : [])),
       sharedTabNames: sharedTabNames(PortalSourceContext.allTabs(navigation.tabs, settings.value.generatedPages))
     });
   }
@@ -353,14 +354,14 @@ export class PortalSourceContext {
     const visit = async (
       directory: Directory,
       isContentRoot: boolean,
-      isApiDirectory: boolean,
-      isTopLevel: boolean
+      isApiDirectory: boolean
     ): Promise<DirectoryScan> => {
       const childNames: string[] = [];
       const pageNames = new Set<string>();
       const childErrors: string[] = [];
+      const subfolders = new Map<string, { directory: DirectoryPath; scan: DirectoryScan }>();
+      const homePageFolders: string[] = [];
       let holdsPage = false;
-      let groupServesOwnAddress = false;
       let navigationFile: FileName | undefined;
       let indexPage: FilePath | undefined;
 
@@ -369,18 +370,20 @@ export class PortalSourceContext {
         // naming it would resolve to nothing. Fumadocs would build one for a directory that
         // holds only a `nav.json`, but the template drops it again to keep to this rule.
         if (item instanceof Directory) {
-          const isApiChild = isContentRoot && item.directoryPath.leafName() === API_REFERENCE_NAME;
-          const child = await visit(item, false, isApiChild, isContentRoot);
+          const name = item.directoryPath.leafName();
+          const isApiChild = isContentRoot && name === API_REFERENCE_NAME;
+          const child = await visit(item, false, isApiChild);
           childErrors.push(...child.errors);
-          if (child.servesOwnAddress && GROUP_FOLDER.test(item.directoryPath.leafName())) {
-            groupServesOwnAddress = true;
+          if (child.servesOwnAddress && GROUP_FOLDER.test(name)) {
+            homePageFolders.push(name);
           }
           if (child.holdsPage) {
             holdsPage = true;
             // The reference's own directory is listed below instead: it is a child of the
             // content root whether or not the user keeps pages in it.
             if (!isApiChild) {
-              childNames.push(item.directoryPath.leafName());
+              childNames.push(name);
+              subfolders.set(name, { directory: item.directoryPath, scan: child });
             }
           }
           continue;
@@ -430,7 +433,6 @@ export class PortalSourceContext {
         }
       }
 
-      const servesOwnAddress = indexPage !== undefined || groupServesOwnAddress;
       const errors: string[] = [];
       let navigation: CheckedNavigation | undefined;
       if (navigationFile !== undefined) {
@@ -453,11 +455,10 @@ export class PortalSourceContext {
           const checked = PortalNavigation.validate(contents, {
             label,
             isContentRoot,
-            isTopLevel,
             isApiDirectory,
             becomesFolder,
-            servesHomePage: isTopLevel && servesOwnAddress && GROUP_FOLDER.test(directory.directoryPath.leafName()),
-            childNames
+            childNames,
+            homePageFolders: isContentRoot ? homePageFolders : []
           });
           if (checked.isErr()) {
             errors.push(...checked.error);
@@ -467,52 +468,44 @@ export class PortalSourceContext {
         }
       }
 
-      const tab = await this.tabOf({ isContentRoot, isApiDirectory, isTopLevel }, navigation, indexPage);
-      if (tab !== undefined) {
-        tabs.push(tab);
+      if (isContentRoot) {
+        // The home page is the content root's index page, which names no tab.
+        tabs.push(await this.namedTab({ kind: 'home' }, navigation, undefined));
+        for (const entry of navigation?.settings.pages ?? []) {
+          const subfolder = subfolders.get(entry);
+          if (subfolder !== undefined) {
+            const { navigation: own, indexPage: index } = subfolder.scan;
+            tabs.push(await this.namedTab({ kind: 'folder', directory: subfolder.directory }, own, index));
+          }
+        }
+      } else if (isApiDirectory) {
+        tabs.push(await this.namedTab({ kind: 'apiReference' }, navigation, indexPage));
       }
 
-      return { holdsPage, servesOwnAddress, errors: [...errors, ...childErrors] };
+      const servesOwnAddress = indexPage !== undefined || homePageFolders.length > 0;
+      return { holdsPage, servesOwnAddress, navigation, indexPage, errors: [...errors, ...childErrors] };
     };
 
-    const root = await visit(contentTree, true, false, false);
+    const root = await visit(contentTree, true, false);
     return { errors: root.errors, ignoredFiles, tabs };
   }
 
-  /** The tab a directory makes, if any, by the name the template gives it. */
-  private async tabOf(
-    place: DirectoryPlace,
+  /** A tab by the name the template gives it: its `nav.json` title, else its index page's. */
+  private async namedTab(
+    owner: TabOwner,
     navigation: CheckedNavigation | undefined,
     indexPage: FilePath | undefined
-  ): Promise<PortalTab | undefined> {
-    const owner = PortalSourceContext.tabOwner(place, navigation);
-    if (owner === undefined) {
-      return undefined;
-    }
+  ): Promise<PortalTab> {
     if (navigation?.settings.title !== undefined) {
       return { owner, name: navigation.settings.title, namedBy: navigation.file };
     }
-    // The content root's index page is the home page, which names no tab.
-    if (owner.kind !== 'home' && indexPage !== undefined) {
+    if (indexPage !== undefined) {
       const pageTitle = await this.pageTitle(indexPage);
       if (pageTitle !== undefined) {
         return { owner, name: pageTitle, namedBy: indexPage };
       }
     }
     return { owner, name: untitledTabName(owner), namedBy: null };
-  }
-
-  private static tabOwner(place: DirectoryPlace, navigation: CheckedNavigation | undefined): TabOwner | undefined {
-    if (place.isContentRoot) {
-      return { kind: 'home' };
-    }
-    if (place.isApiDirectory) {
-      return { kind: 'apiReference' };
-    }
-    if (place.isTopLevel && navigation?.settings.isTab === true) {
-      return { kind: 'folder', navigation: navigation.file };
-    }
-    return undefined;
   }
 
   /** The content directory's tabs with the ones no directory backs, in `TAB_ORDER`. */
