@@ -1,5 +1,18 @@
 import * as path from 'path';
 
+/** How a reader standing in `from` would type `target`: `./sdk` beside them, else the full path. */
+export function asTypedFrom(target: string, from: DirectoryPath): string {
+  const here = path.relative(from.toString(), target);
+  if (here === '') {
+    return '.';
+  }
+  // A sibling starts with `..`, and so does a child called `..cache`: only the segment counts.
+  if (path.isAbsolute(here) || here === '..' || here.startsWith(`..${path.sep}`)) {
+    return target;
+  }
+  return `./${here.split(path.sep).join('/')}`;
+}
+
 export class DirectoryPath {
   private readonly directoryPath: string;
 
@@ -23,6 +36,10 @@ export class DirectoryPath {
 
   public toString(): string {
     return this.directoryPath;
+  }
+
+  public asTypedFrom(from: DirectoryPath): string {
+    return asTypedFrom(this.directoryPath, from);
   }
 
   public join(...subPath: string[]) {

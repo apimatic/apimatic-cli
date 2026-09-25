@@ -273,7 +273,7 @@
       "properties": {
         "publishing": {
           "type": "object",
-          "description": "Where the SDK is published, and which generator produced it.",
+          "description": "Where the SDK is published.",
           "additionalProperties": true,
           "properties": {
             "source": {
@@ -290,9 +290,6 @@
             },
             "package": {
               "type": "object"
-            },
-            "codegenVersion": {
-              "enum": ["v3", "v4"]
             }
           }
         }

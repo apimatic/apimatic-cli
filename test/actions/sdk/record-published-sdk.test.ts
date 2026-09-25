@@ -4,10 +4,10 @@ import sinon from 'sinon';
 import { expect } from 'chai';
 import { err } from 'neverthrow';
 import { dir as tmpDir, DirectoryResult } from 'tmp-promise';
-import { PluginRecordSdkAction } from '../../../src/actions/plugin/record-sdk.js';
-import { PluginRecordSdkPrompts } from '../../../src/prompts/plugin/record-sdk.js';
+import { RecordPublishedSdkAction } from '../../../src/actions/sdk/record-published-sdk.js';
+import { RecordPublishedSdkPrompts } from '../../../src/prompts/sdk/record-published-sdk.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
-import { PluginConfigContext } from '../../../src/types/plugin-config-context.js';
+import { ApimaticConfigContext } from '../../../src/types/apimatic-config-context.js';
 import { PluginIdentityData, PluginLanguages } from '../../../src/types/plugin/plugin-config.js';
 import { PublishType } from '../../../src/types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../src/types/publish/publishing-profile.js';
@@ -42,10 +42,10 @@ interface WrittenDocument {
   languages: PluginLanguages;
 }
 
-describe('PluginRecordSdkAction', () => {
+describe('RecordPublishedSdkAction', () => {
   let tmpDirResult: DirectoryResult;
   let sourceDirectory: string;
-  let action: PluginRecordSdkAction;
+  let action: RecordPublishedSdkAction;
   let noSourceRepository: sinon.SinonStub;
 
   const configPath = () => path.join(sourceDirectory, 'apimatic.json');
@@ -59,9 +59,9 @@ describe('PluginRecordSdkAction', () => {
     tmpDirResult = await tmpDir({ unsafeCleanup: true });
     sourceDirectory = path.join(tmpDirResult.path, 'acme-payments', 'src');
     await fsExtra.ensureDir(sourceDirectory);
-    sinon.stub(PluginRecordSdkPrompts.prototype, 'sdkRecorded');
-    noSourceRepository = sinon.stub(PluginRecordSdkPrompts.prototype, 'noSourceRepository');
-    action = new PluginRecordSdkAction();
+    sinon.stub(RecordPublishedSdkPrompts.prototype, 'sdkRecorded');
+    noSourceRepository = sinon.stub(RecordPublishedSdkPrompts.prototype, 'noSourceRepository');
+    action = new RecordPublishedSdkAction();
   });
 
   afterEach(async () => {
@@ -177,8 +177,8 @@ describe('PluginRecordSdkAction', () => {
   });
 
   it('warns when the config cannot be written', async () => {
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(err('unwritable'));
-    const notWritten = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigNotWritten');
+    sinon.stub(ApimaticConfigContext.prototype, 'merge').resolves(err('unwritable'));
+    const notWritten = sinon.stub(RecordPublishedSdkPrompts.prototype, 'configNotWritten');
 
     const result = await execute(profileWith(GIT_CONFIG));
 
@@ -187,39 +187,33 @@ describe('PluginRecordSdkAction', () => {
   });
 
   it('reports a config that became unreadable before the write', async () => {
-    sinon.stub(PluginConfigContext.prototype, 'upsertLanguage').resolves(err('unreadable'));
-    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+    sinon.stub(ApimaticConfigContext.prototype, 'merge').resolves(err('unreadable'));
+    const configUnreadable = sinon.stub(RecordPublishedSdkPrompts.prototype, 'configUnreadable');
 
     await execute(profileWith(GIT_CONFIG));
 
-    expect(pluginConfigUnreadable.calledOnce).to.be.true;
-  });
-
-  it('records on the --update-plugin-config path', async () => {
-    await execute(profileWith(GIT_CONFIG, { packageId: 'Acme.Payments.Sdk' }));
-
-    expect(Object.keys(writtenConfig().languages)).to.deep.equal(['csharp']);
+    expect(configUnreadable.calledOnce).to.be.true;
   });
 
   it('warns and records nothing when the config cannot be read', async () => {
     await fsExtra.writeFile(configPath(), '{ not json');
-    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+    const configUnreadable = sinon.stub(RecordPublishedSdkPrompts.prototype, 'configUnreadable');
 
     const result = await execute(profileWith(GIT_CONFIG));
 
     expect(result.isFailed()).to.be.true;
-    expect(pluginConfigUnreadable.called).to.be.true;
+    expect(configUnreadable.called).to.be.true;
     expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal('{ not json');
   });
 
   it('tells the user why the config could not be read', async () => {
     const contents = JSON.stringify({ languages: 'csharp' });
     await fsExtra.writeFile(configPath(), contents);
-    const pluginConfigUnreadable = sinon.stub(PluginRecordSdkPrompts.prototype, 'pluginConfigUnreadable');
+    const configUnreadable = sinon.stub(RecordPublishedSdkPrompts.prototype, 'configUnreadable');
 
     await execute(profileWith(GIT_CONFIG));
 
-    expect(pluginConfigUnreadable.firstCall.args[0]).to.equal(`its 'languages' is not a JSON object`);
+    expect(configUnreadable.firstCall.args[0]).to.equal(`its 'languages' is not a JSON object`);
     expect(fsExtra.readFileSync(configPath(), 'utf-8')).to.equal(contents);
   });
 

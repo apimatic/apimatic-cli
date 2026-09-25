@@ -8,11 +8,15 @@ export const format = {
   // Core element types
   var: (text: string) => pc.magenta(`'${text}'`),
   path: (text: DirectoryPath | FilePath) => pc.cyan(`'${text}'`),
+  relative: (target: DirectoryPath | FilePath) => target.asTypedFrom(DirectoryPath.workingDirectory()),
+  relativePath: (target: DirectoryPath | FilePath) => pc.cyan(`'${format.relative(target)}'`),
   cmd: (cmd: string, ...args: string[]) => `${pc.blueBright(cmd)} ${args.map((arg) => pc.dim(arg)).join(' ')}`,
   cmdAlt: (cmd: string, ...args: string[]) =>
     `${pc.dim(pc.blueBright(cmd))} ${args.map((arg) => pc.blueBright(arg)).join(' ')}`,
   link: (text: string) => pc.underline(pc.blueBright(text)),
   description: (text: string) => pc.greenBright(`${text}`),
+  /** Secondary text that sits under an answer rather than competing with it. */
+  hint: (text: string) => pc.gray(text),
   flag: (name: string, value: string | undefined = undefined) => {
     if (value) {
       const sanitizedValue = value.includes(' ') ? `'${value}'` : value;

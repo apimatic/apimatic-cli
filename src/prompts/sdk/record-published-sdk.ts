@@ -1,9 +1,9 @@
 import { log } from '@clack/prompts';
+import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 import { Language } from '../../types/sdk/generate.js';
 import { format as f } from '../format.js';
-import { APIMATIC_CONFIG_FILE_NAME } from '../../types/apimatic-config/document.js';
 
-export class PluginRecordSdkPrompts {
+export class RecordPublishedSdkPrompts {
   public sdkRecorded(language: Language, configExists: boolean) {
     const message =
       (configExists
@@ -20,7 +20,7 @@ export class PluginRecordSdkPrompts {
     log.warn(message);
   }
 
-  public pluginConfigUnreadable(reason?: string) {
+  public configUnreadable(reason?: string) {
     const cause = reason ? `: ${reason}` : '';
     const message =
       `${f.var(
@@ -29,7 +29,7 @@ export class PluginRecordSdkPrompts {
     log.warn(message);
   }
 
-  public pluginConfigNotWritten() {
+  public configNotWritten() {
     log.warn(
       `${f.var(APIMATIC_CONFIG_FILE_NAME)} could not be written, so this published SDK's details were not added to it.`
     );

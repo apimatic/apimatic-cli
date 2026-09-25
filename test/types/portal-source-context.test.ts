@@ -1213,5 +1213,45 @@ describe('PortalSourceContext', () => {
         });
       });
     });
+
+    // What a build downloaded from the platform arrives as: `spec/` filled, and nothing else.
+    describe('adopt', () => {
+      const writeSourceSpec = (name: string, info: Record<string, unknown>): FilePath => {
+        write(path.join('project', 'src', 'spec', name), JSON.stringify({ openapi: '3.0.0', info, paths: {} }));
+        return new FilePath(source.join('spec'), new FileName(name));
+      };
+
+      it('writes the tree around a specification already in the source directory', async () => {
+        const specPath = writeSourceSpec('petstore.json', { title: 'Petstore', version: '1' });
+
+        (await new PortalSourceContext(source).adopt(specPath, APIMATIC_SCHEMA_URL))._unsafeUnwrap();
+        addLanguages();
+
+        const resolved = (await new PortalSourceContext(source).resolve())._unsafeUnwrap();
+        expect(resolved.config.siteTitle()).to.equal('Petstore');
+        // The one that was there, and no copy of it beside itself.
+        expect(fs.readdirSync(path.join(source.toString(), 'spec'))).to.deep.equal(['petstore.json']);
+      });
+
+      it('finds the document the portal speaks for, sorted as every other list sorts it', async () => {
+        writeSourceSpec('zebra.yaml', { title: 'Zebra', version: '1' });
+        writeSourceSpec('alpha.json', { title: 'Alpha', version: '1' });
+        write(path.join('project', 'src', 'spec', 'README.md'), '# not a specification');
+
+        const found = await new PortalSourceContext(source).primarySpec();
+
+        expect(found?.name().toString()).to.equal('alpha.json');
+      });
+
+      it('finds nothing in a project with no source directory', async () => {
+        expect(await new PortalSourceContext(source).primarySpec()).to.be.null;
+      });
+
+      it('finds nothing when the specification directory holds no document', async () => {
+        write(path.join('project', 'src', 'spec', 'notes.txt'), 'nothing here');
+
+        expect(await new PortalSourceContext(source).primarySpec()).to.be.null;
+      });
+    });
   });
 });

@@ -5,10 +5,10 @@ import { DirectoryPath } from '../../../types/file/directoryPath.js';
 import { PublishType } from '../../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../../types/publish/publishing-profile.js';
 import { PublishingProfiles } from '../../../types/publish/publishing-profiles.js';
-import { getCodegenOptions } from '../../../types/sdk/generate.js';
+import { AVAILABLE_LANGUAGES, stabilityLevelsFor } from '../../../types/sdk/generate.js';
 import { formatPublishingDetails } from '../../../prompts/sdk/publish.js';
 import { ActionResult } from '../../action-result.js';
-import { PluginRecordSdkAction } from '../../plugin/record-sdk.js';
+import { RecordPublishedSdkAction } from '../record-published-sdk.js';
 import { SdkPublishAction } from '../publish.js';
 import { BuildContext } from '../../../types/build-context.js';
 import { ProfileId } from '../../../types/publish/profile-id.js';
@@ -75,18 +75,24 @@ export class SdkPublishInteractiveAction {
 
     const publishingProfile = PublishingProfile.create(publishingProfileItem);
 
-    const language = await this.prompts.selectLanguage(publishingProfile);
+    // Offering one v4 cannot render would end the run after the version was already asked for.
+    const offered = publishingProfile.getEnabledLanguages().filter((enabled) => AVAILABLE_LANGUAGES.includes(enabled));
+    if (offered.length === 0) {
+      this.prompts.noAvailableLanguageOnProfile(publishingProfile.getEnabledLanguages());
+      return ActionResult.failed();
+    }
+
+    const language = await this.prompts.selectLanguage(publishingProfile, offered);
     if (!language) {
       this.prompts.noLanguageSelected();
       return ActionResult.cancelled();
     }
 
-    const codegenOptions = getCodegenOptions(language);
-    const codegenOption = codegenOptions.length === 1 ? codegenOptions[0]
-      : await this.prompts.selectCodegenVersion(codegenOptions);
-    if (!codegenOption) {
-        this.prompts.noCodegenVersionSelected();
-        return ActionResult.cancelled();
+    const levels = stabilityLevelsFor(language);
+    const stability = levels.length === 1 ? levels[0] : await this.prompts.selectStability(levels);
+    if (!stability) {
+      this.prompts.noStabilitySelected();
+      return ActionResult.cancelled();
     }
 
     const version = await this.prompts.inputVersion();
@@ -102,7 +108,7 @@ export class SdkPublishInteractiveAction {
       language,
       version,
       publishType: publishTypes,
-      codegenOption: codegenOptions.length === 1 ? undefined : codegenOption
+      stability: levels.length === 1 ? undefined : stability
     });
 
     this.prompts.publishingSummary(publishingSummary);
@@ -128,8 +134,7 @@ export class SdkPublishInteractiveAction {
       version,
       publishingProfile,
       false,
-      codegenOption,
-      false,
+      stability,
       publishingSummary,
       onPublishSdkError
     );
@@ -140,15 +145,7 @@ export class SdkPublishInteractiveAction {
       return ActionResult.cancelled();
     }
 
-    if (await this.prompts.confirmRecordSdk()) {
-      await new PluginRecordSdkAction().execute(
-        sourceDirectory,
-        language,
-        publishingProfile,
-        publishTypes,
-        version
-      );
-    }
+    await new RecordPublishedSdkAction().execute(sourceDirectory, language, publishingProfile, publishTypes, version);
 
     return ActionResult.success();
   };

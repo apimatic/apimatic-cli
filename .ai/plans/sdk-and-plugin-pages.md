@@ -281,11 +281,11 @@ refuses the other four `Language` values separately from unknown keys:
 "'languages.java' is not available yet; the portal supports 'csharp', 'python'
 and 'typescript' today." The list is `PORTAL_LANGUAGES` in
 `src/types/sdk/generate.ts`, its own constant rather than the plugin's, since
-the two change for different reasons (after review). PR #359 (open) replaces
-`PLUGIN_LANGUAGES` with an `AVAILABLE_LANGUAGES` derived from the code
-generators, so the portal's list keeps a name of its own.
-`apimatic.schema.json` keeps its seven-language enum, which is #359's to
-narrow.
+the two change for different reasons (after review). PR #359, merged into
+this branch on 2026-09-25, replaced `PLUGIN_LANGUAGES` with an
+`AVAILABLE_LANGUAGES` derived from the code generators, so the portal's list
+keeps a name of its own. #359 left `apimatic.schema.json`'s seven-language
+enum as it was, so the schema test's exception for the portal still stands.
 
 `PortalLanguages` also keeps each language's `publishing` record beside its key
 (today it keeps the keys alone).

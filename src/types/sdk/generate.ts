@@ -1,5 +1,4 @@
 import { NonEmptyArray } from '../utils.js';
-
 export enum Language {
   CSHARP = 'csharp',
   JAVA = 'java',
@@ -10,8 +9,8 @@ export enum Language {
   GO = 'go'
 }
 
+/** An enum, not a constant, so the next generator is a line here and nothing else. */
 export enum CodeGenerationVersion {
-  V3 = 'v3',
   V4 = 'v4'
 }
 
@@ -62,42 +61,20 @@ export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }>
   Language.GO
 ].map((value) => ({ label: LANGUAGE_NAMES[value], value }));
 
-// java, php, ruby and go have no v4 renderer, so a plugin cannot carry them whatever the config says.
-export const PLUGIN_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
-
-export function isPluginLanguage(language: string): language is Language {
-  return PLUGIN_LANGUAGES.includes(language as Language);
-}
-
-// The portal artifacts can be generated for these today; the rest of `Language` comes later.
-export const PORTAL_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
-
+/** What each generator offers for a language. A language absent from it cannot be generated. */
 export class CodegenOption {
-  public static readonly v3 = new CodegenOption(CodeGenerationVersion.V3, Stability.STABLE);
-
   private constructor(private readonly version: CodeGenerationVersion, private readonly stability: Stability) {}
 
   public static create(version: CodeGenerationVersion, stability: Stability): CodegenOption {
-    if (version === CodeGenerationVersion.V3) {
-      return CodegenOption.v3;
-    }
     return new CodegenOption(version, stability);
-  }
-
-  public isV3(): boolean {
-    return this.version === CodeGenerationVersion.V3;
-  }
-
-  public isV4(): boolean {
-    return this.version === CodeGenerationVersion.V4;
-  }
-
-  public stabilityLevel(): Stability {
-    return this.stability;
   }
 
   public codeGenerationVersion(): CodeGenerationVersion {
     return this.version;
+  }
+
+  public stabilityLevel(): Stability {
+    return this.stability;
   }
 
   public toString(): string {
@@ -105,20 +82,55 @@ export class CodegenOption {
   }
 }
 
-/**
- * For validating only interactive `sdk publish/generate` commands.
- * Non-interactive validation is handled server-side by codegen API.
- */
-export const CODEGEN_OPTIONS: Readonly<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>> = {
-  [Language.CSHARP]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
-  [Language.GO]: [CodegenOption.v3],
-  [Language.JAVA]: [CodegenOption.v3],
-  [Language.PHP]: [CodegenOption.v3],
-  [Language.PYTHON]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)],
-  [Language.RUBY]: [CodegenOption.v3],
-  [Language.TYPESCRIPT]: [CodegenOption.v3, CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)]
+/** The generator and level together, because neither is a choice the other can be made without. */
+export const CODEGEN_OPTIONS: Readonly<Partial<Record<Language, Readonly<NonEmptyArray<CodegenOption>>>>> = {
+  [Language.CSHARP]: [
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.STABLE),
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
+  ],
+  [Language.TYPESCRIPT]: [
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.STABLE),
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
+  ],
+  [Language.PYTHON]: [
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.STABLE),
+    CodegenOption.create(CodeGenerationVersion.V4, Stability.BETA)
+  ]
 };
 
-export function getCodegenOptions(language: Language): Readonly<NonEmptyArray<CodegenOption>> {
-  return CODEGEN_OPTIONS[language];
+/** The keys of the table above: a language is available exactly when something can generate it. */
+export const AVAILABLE_LANGUAGES: readonly Language[] = Object.keys(CODEGEN_OPTIONS) as Language[];
+
+/** The rest of the enum, so a language cannot be named by both lists or by neither. */
+export const UPCOMING_LANGUAGES: readonly Language[] = LANGUAGE_CHOICES.map((choice) => choice.value).filter(
+  (language) => !AVAILABLE_LANGUAGES.includes(language)
+);
+
+/** Takes a string because a config file names its own languages, and may name anything. */
+export function isAvailableLanguage(language: string): language is Language {
+  return AVAILABLE_LANGUAGES.includes(language as Language);
+}
+
+// The portal artifacts can be generated for these today; the rest of `Language` comes later.
+export const PORTAL_LANGUAGES: readonly Language[] = [Language.CSHARP, Language.TYPESCRIPT, Language.PYTHON];
+
+export function codegenOptionsFor(language: Language): readonly CodegenOption[] {
+  return CODEGEN_OPTIONS[language] ?? [];
+}
+
+export function stabilityLevelsFor(language: Language): readonly Stability[] {
+  return codegenOptionsFor(language).map((option) => option.stabilityLevel());
+}
+
+/** What a flow that never asks sends: the first level a language offers. */
+export function defaultStability(language: Language): Stability {
+  return stabilityLevelsFor(language)[0] ?? Stability.STABLE;
+}
+
+/**
+ * The name a language is shown under everywhere, so one reads the same in every message.
+ * Takes a string because a config file names its own languages, and may name anything.
+ */
+export function languageLabel(language: string): string {
+  return LANGUAGE_NAMES[language as Language] ?? language;
 }
