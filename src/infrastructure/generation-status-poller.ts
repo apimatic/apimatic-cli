@@ -4,21 +4,13 @@ import { REQUEST_TIMEOUT_MS } from '../config/axios-config.js';
 import { ServiceError } from './service-error.js';
 import { sleep } from './timer-extensions.js';
 
-/** How every generation service polls: a request per interval, each bounded, the run bounded as a whole. */
 export const TIMING_DEFAULTS = {
   pollIntervalMs: 3000,
-  /**
-   * Set well clear of any plausible run: it exists to end a generation that is stuck, not to
-   * cap a slow one. `/portal-artifacts` gives a run 25 minutes and reports the overrun itself,
-   * and this sits clear of that so the message a user reads is the server's, which names what
-   * actually ran long. No duration data exists for real runs, so this is the number to revisit
-   * if a legitimate generation ever reports a timeout.
-   */
+  // Past `/portal-artifacts`' own 25-minute limit, so the user reads the server's overrun message.
   generationTimeoutMs: 30 * 60 * 1000,
   requestTimeoutMs: REQUEST_TIMEOUT_MS
 };
 
-/** Overridable so tests are not paced by the production defaults; nothing else overrides them. */
 export type GenerationTimings = Partial<typeof TIMING_DEFAULTS>;
 
 export interface GenerationStatus {

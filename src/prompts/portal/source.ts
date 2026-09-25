@@ -18,10 +18,8 @@ import { format as f } from '../format.js';
 
 const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
 
-/** The root `nav.json`, named as a reader standing in the source directory would find it. */
 const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
 
-/** A directory of the source directory, as a message shows it. */
 export const specPath = (sourceDirectory: DirectoryPath): string => f.path(sourceDirectory.join(SPEC_DIRECTORY_NAME));
 
 export const contentPath = (sourceDirectory: DirectoryPath): string =>

@@ -19,10 +19,7 @@ const OUTPUT_TAIL_BYTES = 64 * 1024;
 /** How long the last of a dead server's output is waited for before reporting what arrived. */
 const DRAIN_TIMEOUT_MS = 2000;
 
-// Vite bolds the port inside the URL, so colour codes have to come out before this reads as
-// one address. The trailing newline proves the line is whole, not a half-delivered chunk, which
-// is why the codes come out through `stripVTControlCharacters`: `stripAnsi` in utils drops the
-// newline too.
+// Read after Vite's colour codes are stripped but not the line end, which proves the URL arrived whole.
 const LOCAL_URL_PATTERN = /Local:\s*(https?:\/\/\S+?)\/?[ \t]*[\r\n]/i;
 
 export interface PortalDevServer {

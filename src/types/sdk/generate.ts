@@ -45,7 +45,7 @@ export const LANGUAGE_NAMES: Readonly<Record<Language, string>> = {
   [Language.TYPESCRIPT]: 'TypeScript'
 };
 
-/** Every language in display order, which is the order `UPCOMING_LANGUAGES` lists them in. */
+/** In display order, which `UPCOMING_LANGUAGES` inherits. */
 export const LANGUAGE_CHOICES: ReadonlyArray<{ label: string; value: Language }> = [
   Language.TYPESCRIPT,
   Language.RUBY,

@@ -30,7 +30,6 @@ describe('DirectoryPath.relativeTo', () => {
   });
 });
 
-// A path dragged from a file manager into a terminal arrives quoted, and often padded.
 describe('DirectoryPath.fromUserInput', () => {
   const typed = path.join('/', 'projects', 'petstore api');
 

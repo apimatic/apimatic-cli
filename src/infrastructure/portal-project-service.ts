@@ -72,10 +72,7 @@ export interface PortalProjectPaths {
   viteBinary: FilePath;
 }
 
-/**
- * `portal.config.json`: where the build finds what it is built from on this machine, as absolute
- * posix paths. The template declares it as `BuildPaths`, and a test holds the two to one shape.
- */
+/** `portal.config.json`, which the template reads as `BuildPaths`; a test holds the two to one shape. */
 export interface PortalBuildPaths {
   specs: Record<string, string>;
   codeSamples: string | null;

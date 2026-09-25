@@ -27,12 +27,6 @@ export interface PreparationSteps {
   ) => Promise<ActionResult>;
 }
 
-/**
- * The run `portal generate` and `portal serve` share: check that this installation can build a
- * portal and the account may, read the source, fetch what `/portal-artifacts` builds from it, and
- * prepare the Vite project both of them then run. Only what happens to that project differs — one
- * builds it to disk, the other serves it.
- */
 export class PreparePortalProjectAction {
   private readonly prompts: PreparePortalProjectPrompts = new PreparePortalProjectPrompts();
   private readonly projectService = new PortalProjectService();
@@ -45,11 +39,7 @@ export class PreparePortalProjectAction {
     private readonly authKey: string | null = null
   ) {}
 
-  /**
-   * Takes the caller's next step rather than returning the portal project, because the artifacts
-   * and that project live in temporary directories that have to outlive this call: the build reads
-   * them, and the preview goes on reading them until the user stops it.
-   */
+  /** Takes the caller's next step rather than returning, because its temporary directories must outlive this call. */
   public readonly execute = async (
     project: ProjectContext,
     { confirm = async () => true, content = 'source', onPrepared }: PreparationSteps
@@ -62,8 +52,6 @@ export class PreparePortalProjectAction {
       return ActionResult.failed();
     }
 
-    // Checked once, at the start: a preview then runs unattended for as long as the user keeps
-    // editing, and re-checking on every reload would be a request per keystroke.
     const authorization = await this.authorizationService.authorize(
       this.configDir,
       this.commandMetadata.shell,

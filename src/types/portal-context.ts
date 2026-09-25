@@ -6,13 +6,11 @@ import { FileName } from './file/fileName.js';
 import { ZipService } from '../infrastructure/zip-service.js';
 import { errorMessage } from '../utils/error-utils.js';
 
-/** The SPA shell, which the build emits even when nothing else is: on its own it means a failed build. */
+/** Emitted even by a failed build, so it never counts as a page. */
 export const SHELL_FILE_NAME = '_shell.html';
 
-/** A copy of the shell, which static hosts serve for any unknown path; the shell then routes it client-side. */
 export const NOT_FOUND_FILE_NAME = '404.html';
 
-/** What the portal directory holds, alone, when the site is saved as an archive. */
 export const ZIP_FILE_NAME = 'portal.zip';
 
 const STAGING_DIRECTORY = '.apimatic-staging';

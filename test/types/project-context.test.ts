@@ -41,7 +41,6 @@ describe('ProjectContext', () => {
       expect(project().pluginDirectory().toString()).to.equal(inProject('plugin'));
     });
 
-    // A destination flag is relative to where the CLI runs, like every other path the user types.
     it('writes where the destination flag says instead, when it says anywhere', () => {
       expect(project().sdkDirectory('elsewhere').toString()).to.equal(path.resolve('elsewhere'));
       expect(project().portalDirectory('').toString()).to.equal(inProject('portal'));
@@ -52,7 +51,6 @@ describe('ProjectContext', () => {
       expect(ProjectContext.at(undefined).sourceDirectory().toString()).to.equal(path.resolve('src'));
     });
 
-    // Derived from the names the outputs are written under, so a rename reaches both.
     it('ignores exactly the directories it writes by default', () => {
       expect(GENERATED).to.deep.equal(['/sdk/', '/portal/', '/plugin/']);
     });
@@ -164,7 +162,6 @@ describe('ProjectContext', () => {
       );
     });
 
-    // Narrowed to read one version, the project still writes where it always writes.
     it('writes a version where the project writes, the SDK under the version it was built from', async () => {
       versionedBuild();
       fs.mkdirSync(inProject('src', 'versioned_docs', 'v1'), { recursive: true });
@@ -199,8 +196,6 @@ describe('ProjectContext', () => {
       expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/sdk/', '/portal/', '/plugin/']);
     });
 
-    // `plugin publish` turns /plugin into its own repository; a parent tracking it would nest one
-    // repository inside another.
     it('names the plugin directory', async () => {
       await ignore();
 
@@ -243,8 +238,7 @@ describe('ProjectContext', () => {
       expect(gitignore().split('\n').filter(Boolean)).to.deep.equal(['/plugin/', '/sdk/', '/portal/']);
     });
 
-    // The caller is a wizard that has already written a portal, so a `.gitignore` it cannot write
-    // has to come back as an answer it can report rather than as a throw through the whole run.
+    // The wizard has already written a portal by then, so it reports the failure and carries on.
     it('reports a path it cannot write rather than throwing', async () => {
       fs.mkdirSync(gitignorePath());
 

@@ -1,10 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Portal } from './src/lib/portal-types';
 
-/**
- * Where the build finds what it is built from on this machine: `portal.config.json`, which the
- * CLI writes next to this file before every build or dev-server start.
- */
+/** Written by the CLI next to this file before every build or dev-server start. */
 export interface BuildPaths {
   /** Section slug -> absolute path of an OpenAPI document. */
   specs: Record<string, string>;

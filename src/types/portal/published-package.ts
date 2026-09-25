@@ -11,7 +11,6 @@ export interface PublishedPackage {
 
 interface PackageRegistry<L extends Language> {
   name: string;
-  /** The `packageConfiguration` field that holds the package's name, as the profile types it. */
   nameField: keyof PackageConfigurationForLanguage[L] & string;
   address: (packageName: string) => string;
 }

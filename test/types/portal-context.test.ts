@@ -49,7 +49,6 @@ describe('PortalContext', () => {
       expect(await new PortalContext(portal).exists()).to.be.true;
     });
 
-    // Hidden, but it may hold the only complete copy of the site a failed save left behind.
     it('is true when all that is there is a staging directory a save could not finish', async () => {
       write(staging(), 'index.html');
 
@@ -86,7 +85,6 @@ describe('PortalContext', () => {
       expect(entries(portal)).to.deep.equal(['docs', 'index.html']);
     });
 
-    // Nothing of the previous portal is touched until the new one is staged in full.
     it('keeps the previous portal as it was when the site cannot be staged', async () => {
       write(portal, 'old.html', 'previous');
 
@@ -99,7 +97,6 @@ describe('PortalContext', () => {
       expect(fs.existsSync(staging().toString())).to.be.false;
     });
 
-    // The previous portal is already gone by then, so the staged copy is the only one left.
     it('keeps the staged site, and says where, when the swap fails part-way', async () => {
       write(portal, 'old.html');
       sinon.stub(FileService.prototype, 'moveDirectoryContents').rejects(new Error('EBUSY: resource busy or locked'));

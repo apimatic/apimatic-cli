@@ -48,10 +48,6 @@ const GENERATED_ROOT_FILES = [
   SHELL_FILE_NAME
 ];
 
-/**
- * The source directory, as a portal run reads it: the `portal` block of `apimatic.json`, the
- * OpenAPI documents in `spec/`, and the optional `content/` and `static/` directories.
- */
 export class PortalSourceContext {
   private readonly fileService = new FileService();
   private readonly configContext: ApimaticConfigContext;

@@ -15,30 +15,14 @@ import { TempContext } from './temp-context.js';
 
 export const GITIGNORE = '.gitignore';
 
-/**
- * What the CLI generates into a project, which a repository should not carry: where
- * `sdk generate`, `portal generate` and `plugin generate` write by default.
- *
- * `/plugin/` matters most. `plugin publish` runs `git init` inside that directory and pushes it
- * as its own repository, so a parent tracking it would nest one repository inside another.
- */
+// `plugin publish` runs `git init` in /plugin/, so a repository tracking it would nest one inside another.
 export const GENERATED: readonly string[] = Object.values(OUTPUT_DIRECTORY_NAMES).map((name) => `/${name}/`);
 
 /** Neither stops a portal being built, so the wizard says so and carries on. */
 export type GitignoreFailure = 'unreadable' | 'unwritable';
 
-/** Why a versioned build has no version to build from. */
 export type VersionProblem = 'noVersions' | 'versionNotFound';
 
-/**
- * A project: the directory holding the source directory and, beside it, what the CLI generates
- * from it. The one place that knows that layout — no caller joins `src` or an output name onto
- * anything.
- *
- * A versioned build is built from one version's directory under the source directory. The
- * project narrows to it rather than a second kind of project being made: the same project,
- * reading that version and writing where it always writes.
- */
 export class ProjectContext {
   private readonly fileService = new FileService();
 
@@ -48,12 +32,10 @@ export class ProjectContext {
     private readonly version?: string
   ) {}
 
-  /** The project the `--input` flag names, or, without one, the directory the CLI was run in. */
   public static at(input: string | undefined): ProjectContext {
     return ProjectContext.in(DirectoryPath.createInput(input));
   }
 
-  /** The project in a directory the user was asked for. */
   public static in(projectDirectory: DirectoryPath): ProjectContext {
     return new ProjectContext(projectDirectory, projectDirectory.join(SOURCE_DIRECTORY_NAME));
   }
@@ -66,15 +48,10 @@ export class ProjectContext {
     return new FilePath(this.projectDirectory, new FileName(GITIGNORE));
   }
 
-  /**
-   * For a prompt that names the source directory, a service that uploads it, and a check that a
-   * destination leaves it alone. Nothing derives a directory from it: that is this context's job.
-   */
   public sourceDirectory(): DirectoryPath {
     return this.source;
   }
 
-  /** Where `sdk generate` writes: `destination` when the flag gave one, else the project's own. */
   public sdkDirectory(destination?: string): DirectoryPath {
     return this.outputDirectory(OUTPUT_DIRECTORY_NAMES.sdk, destination);
   }
@@ -91,7 +68,7 @@ export class ProjectContext {
     return await this.fileService.directoryExists(this.source);
   }
 
-  /** For a prompt's validator, which cannot wait. */
+  /** For a prompt validator, which cannot await. */
   public sourceExistsSync(): boolean {
     return this.fileService.directoryExistsSync(this.source);
   }
@@ -100,7 +77,6 @@ export class ProjectContext {
     return await new SpecContext(this.source.join(SPEC_DIRECTORY_NAME)).validate();
   }
 
-  /** The source directory as the generators take it: zipped, with the profile's package settings when given. */
   public async buildZip(tempDirectory: DirectoryPath, packageSettingsDirectory?: DirectoryPath): Promise<FilePath> {
     const staged = tempDirectory.join('build');
     await this.fileService.copyDirectoryContents(this.source, staged);
@@ -115,11 +91,6 @@ export class ProjectContext {
     return buildConfig !== undefined && buildConfig.isVersioned();
   }
 
-  /**
-   * The project an SDK is built from. An unversioned build is this project. A versioned one is
-   * this project narrowed to a version: the only one there is when `apiVersion` names none,
-   * otherwise the one `apiVersion` names or, without it, the one `ask` picks.
-   */
   public async versionToBuild(
     apiVersion: string | undefined,
     ask: (versions: string[]) => Promise<string | undefined>
@@ -145,7 +116,6 @@ export class ProjectContext {
     return version === undefined ? err('versionNotFound') : ok(this.reading(version));
   }
 
-  /** The SDK this project generates into `sdkDirectory`, under its version when it was narrowed to one. */
   public sdk(language: Language, sdkDirectory: DirectoryPath): SdkContext {
     return new SdkContext(language, sdkDirectory, this.version);
   }
@@ -199,7 +169,6 @@ export class ProjectContext {
     return destination ? new DirectoryPath(destination) : this.projectDirectory.join(name);
   }
 
-  /** Undefined without a source directory or a build file, which is an unversioned build. */
   private async buildConfig(): Promise<BuildConfig | undefined> {
     if (!(await this.fileService.fileExists(this.buildFile))) {
       return undefined;

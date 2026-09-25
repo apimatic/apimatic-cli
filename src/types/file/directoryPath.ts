@@ -35,7 +35,6 @@ export class DirectoryPath {
     return new DirectoryPath(input);
   }
 
-  /** A path typed at a prompt, trimmed and out of the quotes a path pasted from a file manager carries. */
   public static fromUserInput(input: string): DirectoryPath {
     return new DirectoryPath(removeQuotes(input.trim()));
   }
