@@ -42,9 +42,10 @@ export default defineConfig(async () => {
       }),
       react()
     ],
-    // The prerender pass fetches every page from a preview server on `localhost`. Where that
-    // listens on `::1` alone, a connect that stalls under load falls back to 127.0.0.1 and is
-    // refused, failing the build; binding IPv4 leaves the fetch a single address to reach.
+    // The prerender pass fetches every page from the preview server's first local URL. On the
+    // default host that URL is `localhost` while the server listens on `::1` alone, so a connect
+    // that stalls under load falls back to 127.0.0.1 and is refused. Vite uses a literal host
+    // for both the bind and that URL, so no name is resolved and both ends are IPv4.
     preview: { host: '127.0.0.1' },
     resolve: {
       tsconfigPaths: true,
