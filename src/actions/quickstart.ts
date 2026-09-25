@@ -114,7 +114,7 @@ export class QuickstartAction {
     }
 
     // Reported rather than fatal: what Git tracks does not decide whether a portal can be built.
-    const ignored = await new ProjectContext(projectDirectory).upsertGitignore();
+    const ignored = await ProjectContext.in(projectDirectory).upsertGitignore();
     if (ignored.isErr()) {
       this.prompts.gitignoreNotUpdated(ignored.error, projectDirectory);
     }

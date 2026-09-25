@@ -6,25 +6,67 @@ import { FilePath } from './file/filePath.js';
 
 export const GITIGNORE = '.gitignore';
 
+const SOURCE = 'src';
+
+/** Where `sdk generate`, `portal generate` and `plugin generate` write when told nothing else. */
+const OUTPUTS = ['sdk', 'portal', 'plugin'] as const;
+
+type Output = (typeof OUTPUTS)[number];
+
 /**
- * What the CLI generates into a project, which a repository should not carry: where
- * `sdk generate`, `portal generate` and `plugin generate` write by default.
+ * What the CLI generates into a project, which a repository should not carry. Derived from the
+ * directories above, so the two cannot name different places.
  *
  * `/plugin/` matters most. `plugin publish` runs `git init` inside that directory and pushes it
  * as its own repository, so a parent tracking it would nest one repository inside another.
  */
-export const GENERATED: readonly string[] = ['/sdk/', '/portal/', '/plugin/'];
+export const GENERATED: readonly string[] = OUTPUTS.map((name) => `/${name}/`);
 
 /** Neither stops a portal being built, so the wizard says so and carries on. */
 export type GitignoreFailure = 'unreadable' | 'unwritable';
 
+/**
+ * The directory that contains a source directory: what every command is pointed at, and the one
+ * place that knows where a project keeps its source and its output.
+ */
 export class ProjectContext {
   private readonly fileService = new FileService();
 
-  constructor(private readonly projectDirectory: DirectoryPath) {}
+  private constructor(private readonly projectDirectory: DirectoryPath) {}
+
+  /** What a command has: an `--input` flag that may be absent, which then means where it was run. */
+  public static at(input: string | undefined): ProjectContext {
+    return new ProjectContext(DirectoryPath.createInput(input));
+  }
+
+  /** For a caller that was handed the directory rather than a flag naming it. */
+  public static in(projectDirectory: DirectoryPath): ProjectContext {
+    return new ProjectContext(projectDirectory);
+  }
 
   private get gitignore(): FilePath {
     return new FilePath(this.projectDirectory, new FileName(GITIGNORE));
+  }
+
+  /** A `--destination` names the directory outright; without one the project's own is used. */
+  private output(name: Output, destination: string | undefined): DirectoryPath {
+    return destination === undefined ? this.projectDirectory.join(name) : new DirectoryPath(destination);
+  }
+
+  public sourceDirectory(): DirectoryPath {
+    return this.projectDirectory.join(SOURCE);
+  }
+
+  public sdkDirectory(destination?: string): DirectoryPath {
+    return this.output('sdk', destination);
+  }
+
+  public portalDirectory(destination?: string): DirectoryPath {
+    return this.output('portal', destination);
+  }
+
+  public pluginDirectory(destination?: string): DirectoryPath {
+    return this.output('plugin', destination);
   }
 
   /**

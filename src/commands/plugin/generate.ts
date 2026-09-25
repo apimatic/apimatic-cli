@@ -2,6 +2,7 @@ import { Command } from '@oclif/core';
 import { PluginGenerateAction } from '../../actions/plugin/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
@@ -30,9 +31,9 @@ export default class PluginGenerate extends Command {
       flags: { input, destination, force, 'auth-key': authKey }
     } = await this.parse(PluginGenerate);
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = workingDirectory.join('src');
-    const pluginDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('plugin');
+    const project = ProjectContext.at(input);
+    const sourceDirectory = project.sourceDirectory();
+    const pluginDirectory = project.pluginDirectory(destination);
     const commandMetadata: CommandMetadata = {
       commandName: PluginGenerate.id,
       shell: this.config.shell

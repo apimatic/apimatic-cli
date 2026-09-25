@@ -1,6 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { PluginPublishAction } from '../../actions/plugin/publish.js';
-import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
@@ -30,9 +30,9 @@ export default class PluginPublish extends Command {
       flags: { input, destination }
     } = await this.parse(PluginPublish);
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = workingDirectory.join('src');
-    const pluginDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('plugin');
+    const project = ProjectContext.at(input);
+    const sourceDirectory = project.sourceDirectory();
+    const pluginDirectory = project.pluginDirectory(destination);
 
     intro('Publish Context Plugin');
     const result = await new PluginPublishAction().execute(sourceDirectory, pluginDirectory);
