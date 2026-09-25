@@ -377,6 +377,7 @@ the new-layout branch in the sample repository.
    `--destination` and `--no-reload`. Release notes also mention
    `apimatic autocomplete --refresh-cache`, the deferred `$ref` file-read risk
    (section 9) and that generated sites load Geist from Google Fonts.
+   *Amended 2026-09-25:* drop the Google Fonts line; the fonts are bundled with the site (PR #366).
 3. **Sample repository** `sample-docs-as-code-portal`: done 2026-09-17. `v2` is a
    permanent branch for the CLI 2 layout (`54d2cb3`: spec renamed
    `spec/petstore.json`, deploy workflow pinned to `@apimatic/cli@2`, artifact
@@ -435,3 +436,4 @@ the new-layout branch in the sample repository.
   `discriminator.mapping` and JSON-pointer-escaped names.
 - Section 9 items stand: `$ref` file-read/SSRF deferred, Google Fonts at
   runtime, try-it playground needs CORS on the customer's API.
+  *Amended 2026-09-25:* the Google Fonts item is closed; the fonts are bundled (PR #366).

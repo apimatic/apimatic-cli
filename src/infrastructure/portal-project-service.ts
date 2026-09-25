@@ -18,11 +18,10 @@ import { PortalPagesService } from './portal-pages-service.js';
 // Copied, not linked: Tailwind rebases their `url()`s onto the project, and no relative path crosses drives.
 export const COPIED_DEPENDENCIES = ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'];
 
-// The rest are linked one by one rather than through a single link to the CLI's `node_modules`:
-// under a pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and
-// a single link also lets Vite write its scratch files into the CLI's own install directory.
-export const TEMPLATE_DEPENDENCIES = [
-  ...COPIED_DEPENDENCIES,
+// Linked one by one rather than through a single link to the CLI's `node_modules`: under a
+// pnpm global install, `npx` or `pnpm dlx` the package has no nested `node_modules`, and a
+// single link also lets Vite write its scratch files into the CLI's own install directory.
+export const LINKED_DEPENDENCIES = [
   '@fumadocs/api-docs',
   '@scalar/json-magic',
   '@tailwindcss/vite',
@@ -42,6 +41,8 @@ export const TEMPLATE_DEPENDENCIES = [
   'tslib',
   'vite'
 ];
+
+export const TEMPLATE_DEPENDENCIES = [...COPIED_DEPENDENCIES, ...LINKED_DEPENDENCIES];
 
 const CONTENT_DIRECTORY_PLACEHOLDER = "'__APIMATIC_CONTENT_DIR__'";
 
@@ -103,7 +104,8 @@ export class PortalProjectService {
     }
 
     await this.fileService.copyDirectoryContents(template, projectDirectory);
-    await this.installDependencies(projectDirectory);
+    await this.linkDependencies(projectDirectory);
+    await this.copyDependencies(projectDirectory);
     await this.writeConfiguration(
       projectDirectory,
       source,
@@ -192,29 +194,30 @@ export class PortalProjectService {
     return downloads;
   }
 
-  private async installDependencies(projectDirectory: DirectoryPath): Promise<void> {
+  private async linkDependencies(projectDirectory: DirectoryPath): Promise<void> {
     const modules = projectDirectory.join('node_modules');
     await this.fileService.createDirectoryIfNotExists(modules);
 
-    for (const dependency of TEMPLATE_DEPENDENCIES) {
+    for (const dependency of LINKED_DEPENDENCIES) {
       const target = this.packageDirectory(dependency);
       if (target === undefined) {
         continue;
       }
-      const destination = modules.join(dependency);
-      if (COPIED_DEPENDENCIES.includes(dependency)) {
-        await this.fileService.copyDirectoryContents(target, destination);
-        continue;
-      }
+      const link = modules.join(dependency);
       if (dependency.includes('/')) {
-        await this.fileService.createDirectoryIfNotExists(new DirectoryPath(path.dirname(destination.toString())));
+        await this.fileService.createDirectoryIfNotExists(new DirectoryPath(path.dirname(link.toString())));
       }
       // A junction is the only link type Windows grants without elevation.
-      await fsExtra.symlink(
-        target.toString(),
-        destination.toString(),
-        process.platform === 'win32' ? 'junction' : 'dir'
-      );
+      await fsExtra.symlink(target.toString(), link.toString(), process.platform === 'win32' ? 'junction' : 'dir');
+    }
+  }
+
+  private async copyDependencies(projectDirectory: DirectoryPath): Promise<void> {
+    for (const dependency of COPIED_DEPENDENCIES) {
+      const target = this.packageDirectory(dependency);
+      if (target !== undefined) {
+        await this.fileService.copyDirectoryContents(target, projectDirectory.join('node_modules', dependency));
+      }
     }
   }
 

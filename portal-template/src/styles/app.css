@@ -2,7 +2,7 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
-/* Bundled, not linked from Google Fonts: a cross-origin stylesheet holds up paint and hydration. */
+/* Served with the site: a cross-origin font stylesheet would hold up first paint and hydration. */
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/geist-mono';
 /* Written by the CLI from the 'portal' block of apimatic.json: the colour overrides. Imported
