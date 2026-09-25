@@ -11,6 +11,7 @@ import { ServiceError } from '../../../src/infrastructure/service-error.js';
 import { SubscriptionInfo } from '../../../src/types/api/account.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PluginIdentityData } from '../../../src/types/plugin/plugin-config.js';
+import { ProjectContext } from '../../../src/types/project-context.js';
 import { CommandMetadata } from '../../../src/types/common/command-metadata.js';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'plugin generate', shell: 'test' };
@@ -31,7 +32,7 @@ describe('PluginRecordMetadataAction', () => {
   let sourceDirectory: string;
   let action: PluginRecordMetadataAction;
 
-  const execute = () => action.execute(new DirectoryPath(sourceDirectory));
+  const execute = () => action.execute(ProjectContext.in(new DirectoryPath(path.dirname(sourceDirectory))));
 
   const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   /** The plugin block as written: what this action owns in the file. */

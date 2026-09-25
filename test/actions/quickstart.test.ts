@@ -20,7 +20,7 @@ import { completeArtifacts } from './portal/prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal quickstart', shell: 'test' };
 const SPEC = new FilePath(
-  new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/spec'),
+  new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src/spec'),
   new FileName('Apimatic-Calculator.json')
 );
 

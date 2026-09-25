@@ -20,10 +20,12 @@ import { CommandMetadata } from '../../../src/types/common/command-metadata';
 import { PortalSource } from '../../../src/types/portal/portal-source';
 import { Language } from '../../../src/types/sdk/generate';
 import { PortalSourceContext } from '../../../src/types/portal-source-context';
+import { ProjectContext } from '../../../src/types/project-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal serve', shell: 'test' };
 const FIXTURE = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
+const FIXTURE_SOURCE = FIXTURE.join('src');
 const PORT = 23513;
 const SERVER_URL = new UrlPath('http://127.0.0.1:23513');
 
@@ -43,8 +45,12 @@ describe('PortalServeAction', () => {
   /** Stands in for the preview process dying, with what it printed on the way out. */
   let exit: (output: string) => void;
 
-  const execute = (source = FIXTURE, openInBrowser = false) =>
-    new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(source, PORT, openInBrowser);
+  const execute = (projectDirectory = FIXTURE, openInBrowser = false) =>
+    new PortalServeAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
+      ProjectContext.in(projectDirectory),
+      PORT,
+      openInBrowser
+    );
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-serve-'));
@@ -110,7 +116,7 @@ describe('PortalServeAction', () => {
 
   it('reports a source directory it cannot serve, without asking for the artifacts', async () => {
     const empty = new DirectoryPath(root).join('empty');
-    fs.mkdirSync(empty.toString());
+    fs.mkdirSync(empty.join('src').toString(), { recursive: true });
 
     const result = await execute(empty);
 
@@ -154,7 +160,7 @@ describe('PortalServeAction', () => {
 
     await execute();
 
-    expect(prompts.portalServed.calledOnceWith(SERVER_URL, FIXTURE)).to.be.true;
+    expect(prompts.portalServed.calledOnceWith(SERVER_URL, FIXTURE_SOURCE)).to.be.true;
   });
 
   it('opens the browser only when asked', async () => {
@@ -201,7 +207,7 @@ describe('PortalServeAction', () => {
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
     const whileServing = async (body: (save: (contents: string) => Promise<void>) => Promise<void>) => {
-      const running = execute(source);
+      const running = execute(new DirectoryPath(root));
       const { onChange } = await watched;
       try {
         await body(async (contents) => {
@@ -216,7 +222,7 @@ describe('PortalServeAction', () => {
 
     beforeEach(() => {
       source = new DirectoryPath(root).join('src');
-      fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
+      fs.cpSync(FIXTURE_SOURCE.toString(), source.toString(), { recursive: true });
 
       closeWatch = sinon.stub().resolves();
       recheck = sinon.stub();
@@ -273,7 +279,7 @@ describe('PortalServeAction', () => {
     it('prepares the preview to read a copy of the content', async () => {
       interrupt();
 
-      await execute(source);
+      await execute(new DirectoryPath(root));
 
       expect(shared.prepare.firstCall.args[3]).to.equal('copy');
     });
@@ -377,7 +383,7 @@ describe('PortalServeAction', () => {
       watchTree.returns(err('EMFILE: too many open files'));
       interrupt();
 
-      const result = await execute(source);
+      const result = await execute(new DirectoryPath(root));
 
       expect(prompts.contentNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
       expect(result.isCancelled()).to.be.true;
@@ -403,7 +409,7 @@ describe('PortalServeAction', () => {
 
     // A check still running would otherwise report after the terminal says the preview stopped.
     it('stops watching before saying that the preview stopped on its own', async () => {
-      const running = execute(source);
+      const running = execute(new DirectoryPath(root));
       await watched;
       exit('Error: out of memory');
 
@@ -415,7 +421,7 @@ describe('PortalServeAction', () => {
       fs.rmSync(path.join(source.toString(), 'content'), { recursive: true });
       interrupt();
 
-      await execute(source);
+      await execute(new DirectoryPath(root));
 
       expect(watchTree.called).to.be.false;
     });
@@ -434,14 +440,15 @@ describe('PortalServeAction', () => {
     let recheck: sinon.SinonStub;
     let projectDirectory: DirectoryPath;
 
-    const originalConfig = () => JSON.parse(fs.readFileSync(path.join(FIXTURE.toString(), 'apimatic.json'), 'utf8'));
+    const originalConfig = () =>
+      JSON.parse(fs.readFileSync(path.join(FIXTURE_SOURCE.toString(), 'apimatic.json'), 'utf8'));
     const readProject = (relative: string) => fs.readFileSync(path.join(projectDirectory.toString(), relative), 'utf8');
     const writeConfig = (config: object) =>
       fs.writeFileSync(path.join(source.toString(), 'apimatic.json'), JSON.stringify(config));
 
     /** Runs the preview until `body` is done with it, then stops it as CTRL+C would. */
     const whileServing = async (body: () => Promise<void>) => {
-      const running = execute(source);
+      const running = execute(new DirectoryPath(root));
       const { onChange } = await watched;
       save = async (config: object) => {
         writeConfig(config);
@@ -457,7 +464,7 @@ describe('PortalServeAction', () => {
 
     beforeEach(() => {
       source = new DirectoryPath(root).join('src');
-      fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
+      fs.cpSync(FIXTURE_SOURCE.toString(), source.toString(), { recursive: true });
 
       // `prepare` is stubbed above; this one writes the files an edit can change, as a real one
       // would, so the test can see what an edit changes.
@@ -760,7 +767,7 @@ describe('PortalServeAction', () => {
       watch.returns(err('EMFILE: too many open files'));
       interrupt();
 
-      const result = await execute(source);
+      const result = await execute(new DirectoryPath(root));
 
       expect(prompts.configNotWatched.calledOnceWith('EMFILE: too many open files')).to.be.true;
       expect(result.isCancelled()).to.be.true;

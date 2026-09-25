@@ -14,6 +14,7 @@ import { FileService } from '../../../src/infrastructure/file-service';
 import { ServiceError } from '../../../src/infrastructure/service-error';
 import { DirectoryPath } from '../../../src/types/file/directoryPath';
 import { CommandMetadata } from '../../../src/types/common/command-metadata';
+import { ProjectContext } from '../../../src/types/project-context';
 import { completeArtifacts, stubPreparePortalProject } from './prepare-project-stubs';
 
 const COMMAND_METADATA: CommandMetadata = { commandName: 'portal generate', shell: 'test' };
@@ -36,9 +37,9 @@ describe('GenerateAction', () => {
   let authorize: sinon.SinonStub;
   let build: sinon.SinonStub;
 
-  const execute = (source = FIXTURE, force = false, zip = false) =>
+  const execute = (projectDirectory = FIXTURE, force = false, zip = false) =>
     new GenerateAction(new DirectoryPath(root), COMMAND_METADATA, 'auth-key').execute(
-      source,
+      ProjectContext.in(projectDirectory),
       portalDirectory,
       force,
       zip
@@ -117,7 +118,7 @@ describe('GenerateAction', () => {
   it('fails when the source and destination are the same directory', async () => {
     const action = new GenerateAction(new DirectoryPath(root), COMMAND_METADATA);
 
-    const result = await action.execute(FIXTURE, FIXTURE, false, false);
+    const result = await action.execute(ProjectContext.in(FIXTURE), FIXTURE.join('src'), false, false);
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.directoryCannotBeSame.calledOnce).to.be.true;
@@ -127,7 +128,7 @@ describe('GenerateAction', () => {
   it('refuses a destination that contains the source, which it would empty', async () => {
     const source = portalDirectory.join('src');
 
-    const result = await execute(source);
+    const result = await execute(portalDirectory);
 
     expect(result.isFailed()).to.be.true;
     expect(prompts.destinationContainsSource.calledOnceWith(source, portalDirectory)).to.be.true;
@@ -161,7 +162,7 @@ describe('GenerateAction', () => {
   // A source the build would refuse should not cost the artifacts run, which can take minutes.
   it('reports a source directory it cannot build from, without asking for the artifacts', async () => {
     const empty = new DirectoryPath(root).join('empty');
-    fs.mkdirSync(empty.toString());
+    fs.mkdirSync(empty.join('src').toString(), { recursive: true });
 
     const result = await execute(empty);
 
@@ -175,7 +176,7 @@ describe('GenerateAction', () => {
   it('reports a source problem before asking to overwrite the destination', async () => {
     writeOldPortal();
     const empty = new DirectoryPath(root).join('empty');
-    fs.mkdirSync(empty.toString());
+    fs.mkdirSync(empty.join('src').toString(), { recursive: true });
 
     const result = await execute(empty);
 
@@ -297,11 +298,11 @@ describe('GenerateAction', () => {
   });
 
   it('warns about static files that replace generated ones, and builds anyway', async () => {
-    const source = new DirectoryPath(root).join('shadowing');
-    fs.cpSync(FIXTURE.toString(), source.toString(), { recursive: true });
-    fs.writeFileSync(path.join(source.toString(), 'static', 'robots.txt'), 'User-agent: *\n');
+    const project = new DirectoryPath(root).join('shadowing');
+    fs.cpSync(FIXTURE.toString(), project.toString(), { recursive: true });
+    fs.writeFileSync(path.join(project.toString(), 'src', 'static', 'robots.txt'), 'User-agent: *\n');
 
-    const result = await execute(source);
+    const result = await execute(project);
 
     expect(result.isSuccess()).to.be.true;
     expect(shared.prompts.filesShadowedByStatic.firstCall.args[0].map(String)).to.deep.equal(['robots.txt']);

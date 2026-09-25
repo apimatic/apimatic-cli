@@ -9,9 +9,9 @@ import { withPortalProjectDirectory, withDirPath } from '../../infrastructure/tm
 import { PreparePortalProjectPrompts } from '../../prompts/portal/prepare-project.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
-import { PortalSourceContext } from '../../types/portal-source-context.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
 import { PortalSource } from '../../types/portal/portal-source.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 
 /** What the caller does within the shared run, in the order the run does it. */
@@ -20,7 +20,11 @@ export interface PreparationSteps {
   confirm?: () => Promise<boolean>;
   /** A preview reads a copy of `content/`, which it updates only with what a build would accept. */
   content?: ProjectContent;
-  onPrepared: (project: PortalProjectPaths, source: PortalSource, artifacts: PortalArtifacts) => Promise<ActionResult>;
+  onPrepared: (
+    portalProject: PortalProjectPaths,
+    source: PortalSource,
+    artifacts: PortalArtifacts
+  ) => Promise<ActionResult>;
 }
 
 /**
@@ -42,14 +46,16 @@ export class PreparePortalProjectAction {
   ) {}
 
   /**
-   * Takes the caller's next step rather than returning the project, because the artifacts and the
-   * project live in temporary directories that have to outlive this call: the build reads them,
-   * and the preview goes on reading them until the user stops it.
+   * Takes the caller's next step rather than returning the portal project, because the artifacts
+   * and that project live in temporary directories that have to outlive this call: the build reads
+   * them, and the preview goes on reading them until the user stops it.
    */
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     { confirm = async () => true, content = 'source', onPrepared }: PreparationSteps
   ): Promise<ActionResult> => {
+    const sourceDirectory = project.sourceDirectory();
+
     const runtimeProblem = this.projectService.runtimeProblem();
     if (runtimeProblem !== null) {
       this.prompts.runtimeUnsupported(runtimeProblem);
@@ -69,7 +75,7 @@ export class PreparePortalProjectAction {
     }
 
     // Ahead of the server run, which can take minutes: a mistake or a question should not wait on it.
-    const source = await new PortalSourceContext(sourceDirectory).resolve();
+    const source = await project.portalSource().resolve();
     if (source.isErr()) {
       this.prompts.sourceProblem(source.error, sourceDirectory);
       return ActionResult.failed();
@@ -108,13 +114,13 @@ export class PreparePortalProjectAction {
       }
 
       return await withPortalProjectDirectory(sourceDirectory, async (tempDirectory) => {
-        const project = await this.projectService.prepare(tempDirectory, source.value, artifacts.value, content);
-        if (project.isErr()) {
-          this.prompts.runtimeUnsupported(project.error);
+        const portalProject = await this.projectService.prepare(tempDirectory, source.value, artifacts.value, content);
+        if (portalProject.isErr()) {
+          this.prompts.runtimeUnsupported(portalProject.error);
           return ActionResult.failed();
         }
 
-        return await onPrepared(project.value, source.value, artifacts.value);
+        return await onPrepared(portalProject.value, source.value, artifacts.value);
       });
     });
   };

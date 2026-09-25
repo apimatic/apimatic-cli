@@ -4,6 +4,7 @@ import { FlagsProvider } from '../../types/flags-provider.js';
 import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { TelemetryService } from '../../infrastructure/services/telemetry-service.js';
@@ -101,9 +102,7 @@ export default class SdkPublish extends Command {
       shell: this.config.shell
     };
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
+    const project = ProjectContext.at(input);
 
     const configDir = this.getConfigDir();
     const telemetryService = new TelemetryService(configDir);
@@ -129,10 +128,13 @@ export default class SdkPublish extends Command {
 
     intro('Publish SDK');
     const result = interactive
-      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(workingDirectory, onPublishSdkError)
+      ? await new SdkPublishInteractiveAction(configDir, commandMetadata).execute(
+          DirectoryPath.createInput(input),
+          onPublishSdkError
+        )
       : await new SdkPublishNonInteractiveAction(configDir, commandMetadata).execute(
-          sourceDirectory,
-          sdkDirectory,
+          project,
+          project.sdkDirectory(destination),
           language as Language,
           publishTypes,
           force,

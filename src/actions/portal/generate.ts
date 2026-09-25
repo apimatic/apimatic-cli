@@ -4,6 +4,7 @@ import { PortalGeneratePrompts } from '../../prompts/portal/generate.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { PortalContext } from '../../types/portal-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { ActionResult } from '../action-result.js';
 import { PreparePortalProjectAction } from './prepare-project.js';
 
@@ -21,11 +22,12 @@ export class GenerateAction {
   }
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     portalDirectory: DirectoryPath,
     force: boolean,
     zipPortal: boolean
   ): Promise<ActionResult> => {
+    const sourceDirectory = project.sourceDirectory();
     if (sourceDirectory.isEqual(portalDirectory)) {
       this.prompts.directoryCannotBeSame(portalDirectory);
       return ActionResult.failed();
@@ -39,13 +41,10 @@ export class GenerateAction {
     }
 
     const portalContext = new PortalContext(portalDirectory);
-    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      sourceDirectory,
-      {
-        confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
-        onPrepared: (project) => this.build(project, portalContext, portalDirectory, zipPortal)
-      }
-    );
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+      confirm: () => this.confirmOverwrite(portalContext, portalDirectory, force),
+      onPrepared: (portalProject) => this.build(portalProject, portalContext, portalDirectory, zipPortal)
+    });
   };
 
   private async confirmOverwrite(
@@ -61,12 +60,12 @@ export class GenerateAction {
   }
 
   private async build(
-    project: PortalProjectPaths,
+    portalProject: PortalProjectPaths,
     portalContext: PortalContext,
     portalDirectory: DirectoryPath,
     zipPortal: boolean
   ): Promise<ActionResult> {
-    const build = await this.prompts.buildPortal(this.buildService.build(project));
+    const build = await this.prompts.buildPortal(this.buildService.build(portalProject));
 
     if (build.isErr()) {
       // Written before the temp directory is removed, so the log outlives the build.

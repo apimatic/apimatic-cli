@@ -1,8 +1,7 @@
 import { RecordPublishedSdkPrompts } from '../../prompts/sdk/record-published-sdk.js';
-import { ApimaticConfigContext } from '../../types/apimatic-config-context.js';
 import { ConfigBlockName, findingClause } from '../../types/apimatic-config/document.js';
 import { buildLanguageEntry, languagesOf, withLanguage } from '../../types/apimatic-config/languages-block.js';
-import { DirectoryPath } from '../../types/file/directoryPath.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { PublishType } from '../../types/publish-api/publishing-profile-item.js';
 import { PublishingProfile } from '../../types/publish/publishing-profile.js';
 import { SemVersion } from '../../types/publish/version.js';
@@ -20,7 +19,7 @@ export class RecordPublishedSdkAction {
   private readonly prompts: RecordPublishedSdkPrompts = new RecordPublishedSdkPrompts();
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     language: Language,
     publishingProfile: PublishingProfile,
     publishTypes: PublishType[],
@@ -37,7 +36,7 @@ export class RecordPublishedSdkAction {
       publishTypes.includes(PublishType.PackagePublishing) ? packageVersion : undefined
     );
 
-    const config = new ApimaticConfigContext(sourceDirectory);
+    const config = project.config();
     const state = await config.read();
     if (state.state === 'unparseable') {
       this.prompts.configUnreadable(findingClause(state.findings));

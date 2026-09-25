@@ -68,7 +68,7 @@ function deliveredInto(
 
 /** Resolves, prepares, builds and saves a fixture as `portal generate` does. */
 async function buildFixture(name: string, delivered: Delivered = {}): Promise<BuiltPortal> {
-  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name);
+  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs').join(name).join('src');
   const base = await ensurePortalProjectDirectoryBase(fixture);
   const root = fs.mkdtempSync(path.join(base, 'portal-e2e-'));
 
@@ -144,7 +144,7 @@ const stylesheetOf = (output: DirectoryPath) => {
 (enabled ? describe : describe.skip)('portal build (end to end)', function () {
   this.timeout(10 * 60 * 1000);
 
-  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default');
+  const fixture = new DirectoryPath(process.cwd()).join('test/resources/portal-inputs/default/src');
 
   let built: BuiltPortal | undefined;
   let project: DirectoryPath;

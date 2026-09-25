@@ -5,6 +5,7 @@ import { GenerateAction } from '../../actions/sdk/generate.js';
 import { CodeGenerationVersion, Language, Stability } from '../../types/sdk/generate.js';
 import { StabilityChoice } from '../../types/sdk/stability-choice.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
 export default class SdkGenerate extends Command {
@@ -72,9 +73,7 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
       }
     } = await this.parse(SdkGenerate);
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = input ? new DirectoryPath(input, 'src') : workingDirectory.join('src');
-    const sdkDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('sdk');
+    const project = ProjectContext.at(input);
 
     const commandMetadata: CommandMetadata = {
       commandName: SdkGenerate.id,
@@ -84,8 +83,8 @@ C#, TypeScript and Python are available; Java, Ruby, Go and PHP are on their way
     intro('Generate SDK');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
     const result = await action.execute(
-      sourceDirectory,
-      sdkDirectory,
+      project,
+      project.sdkDirectory(destination),
       language as Language,
       StabilityChoice.for(language as Language, stability).stabilityLevel(),
       force,

@@ -5,7 +5,7 @@ import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FileName } from '../../types/file/fileName.js';
 import { ActionResult } from '../action-result.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
-import { PortalSourceContext } from '../../types/portal-source-context.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { isSkippedByGlob } from '../../types/portal/content-tree.js';
 import { GeneratedPages } from '../../types/portal/generated-pages.js';
 import { PortalArtifacts } from '../../types/portal/portal-artifacts.js';
@@ -40,89 +40,75 @@ export class PortalServeAction {
   }
 
   public readonly execute = async (
-    sourceDirectory: DirectoryPath,
+    project: ProjectContext,
     port: number,
     openInBrowser: boolean,
     onServing?: () => void
   ): Promise<ActionResult> => {
-    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(
-      sourceDirectory,
-      {
-        // So the browser keeps showing what a build would accept while an edit is half done.
-        content: 'copy',
-        onPrepared: async (project, source, artifacts) => {
-          const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
-          if (servePort !== port) {
-            this.prompts.usingFallbackPort(port, servePort);
+    return await new PreparePortalProjectAction(this.configDir, this.commandMetadata, this.authKey).execute(project, {
+      // So the browser keeps showing what a build would accept while an edit is half done.
+      content: 'copy',
+      onPrepared: async (portalProject, source, artifacts) => {
+        const servePort = await this.networkService.getServerPort([port, 3000, 3001, 3002]);
+        if (servePort !== port) {
+          this.prompts.usingFallbackPort(port, servePort);
+        }
+
+        const server = await this.prompts.startPreview(this.devServerService.start(portalProject, servePort));
+
+        if (server.isErr()) {
+          this.prompts.startFailed(server.error.log);
+          return ActionResult.failed();
+        }
+
+        this.prompts.portalServed(server.value.url, project.sourceDirectory());
+        if (openInBrowser) {
+          await this.launcherService.openUrlInBrowser(server.value.url);
+        }
+        if (onServing) {
+          onServing();
+        }
+
+        // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
+        let generatedPages = source.generatedPages;
+        const contentWatch = this.watchContent(project, source, () => generatedPages, portalProject.projectDirectory);
+        const configWatch = this.watchConfig(project, source, artifacts, portalProject.projectDirectory, (settings) => {
+          const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
+          generatedPages = settings.generatedPages;
+          if (tabsChanged) {
+            contentWatch?.recheck();
           }
+        });
+        const closeWatches = async () => {
+          await configWatch?.close();
+          await contentWatch?.close();
+        };
 
-          const server = await this.prompts.startPreview(this.devServerService.start(project, servePort));
+        this.clearStandardInput();
 
-          if (server.isErr()) {
-            this.prompts.startFailed(server.error.log);
+        try {
+          // Whichever comes first: the user stopping the preview, or the preview stopping on its
+          // own. Waiting only on the signal left a crashed server advertised as running.
+          const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
+          const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
+          const outcome = await Promise.race([interrupted, stopped]);
+          // First, so a save still being handled is not reported after the preview says it stops.
+          await closeWatches();
+
+          if (outcome.kind === 'exited') {
+            this.prompts.previewStopped(outcome.output);
             return ActionResult.failed();
           }
 
-          this.prompts.portalServed(server.value.url, sourceDirectory);
-          if (openInBrowser) {
-            await this.launcherService.openUrlInBrowser(server.value.url);
-          }
-          if (onServing) {
-            onServing();
-          }
-
-          // The content's tab names are checked against the generated tabs, which apimatic.json adds and removes.
-          let generatedPages = source.generatedPages;
-          const contentWatch = this.watchContent(
-            source,
-            () => generatedPages,
-            project.projectDirectory,
-            sourceDirectory
-          );
-          const configWatch = this.watchConfig(
-            source,
-            artifacts,
-            project.projectDirectory,
-            sourceDirectory,
-            (settings) => {
-              const tabsChanged = !settings.generatedPages.makesSameTabsAs(generatedPages);
-              generatedPages = settings.generatedPages;
-              if (tabsChanged) {
-                contentWatch?.recheck();
-              }
-            }
-          );
-          const closeWatches = async () => {
-            await configWatch?.close();
-            await contentWatch?.close();
-          };
-
-          this.clearStandardInput();
-
-          try {
-            // Whichever comes first: the user stopping the preview, or the preview stopping on its
-            // own. Waiting only on the signal left a crashed server advertised as running.
-            const interrupted = this.prompts.blockExecution().then(() => ({ kind: 'interrupted' as const }));
-            const stopped = server.value.exited.then((output) => ({ kind: 'exited' as const, output }));
-            const outcome = await Promise.race([interrupted, stopped]);
-            // First, so a save still being handled is not reported after the preview says it stops.
-            await closeWatches();
-
-            if (outcome.kind === 'exited') {
-              this.prompts.previewStopped(outcome.output);
-              return ActionResult.failed();
-            }
-
-            this.prompts.stopping();
-            await server.value.stop();
-            return ActionResult.stopped();
-          } finally {
-            // Before the portal project goes: a save being handled writes into it.
-            await closeWatches();
-          }
+          this.prompts.stopping();
+          await server.value.stop();
+          return ActionResult.stopped();
+        } finally {
+          // Before the portal project goes: a save being handled writes into it.
+          await closeWatches();
         }
       }
-    );
+    });
   };
 
   /**
@@ -130,13 +116,14 @@ export class PortalServeAction {
    * generate` would report it, and the preview keeps what it last accepted.
    */
   private watchConfig(
+    project: ProjectContext,
     source: PortalSource,
     artifacts: PortalArtifacts,
-    projectDirectory: DirectoryPath,
-    sourceDirectory: DirectoryPath,
+    portalProjectDirectory: DirectoryPath,
     onApplied: (settings: PortalSettings) => void
   ): FileWatch | undefined {
-    const sourceContext = new PortalSourceContext(sourceDirectory);
+    const sourceDirectory = project.sourceDirectory();
+    const sourceContext = project.portalSource();
     const preview = new PreviewConfig(source.config, source.staticDirectory !== null);
 
     const applyEdit = async () => {
@@ -160,7 +147,7 @@ export class PortalServeAction {
         this.prompts.staticDirectoryNotServed(sourceDirectory);
       }
 
-      const applied = await this.projectService.applyConfig(projectDirectory, settings);
+      const applied = await this.projectService.applyConfig(portalProjectDirectory, settings);
       if (applied.isErr()) {
         this.prompts.configNotApplied(applied.error);
         return;
@@ -186,16 +173,17 @@ export class PortalServeAction {
 
   /** Held to a build's rules, as `apimatic.json` is: a refused save is reported, and the preview kept as it was. */
   private watchContent(
+    project: ProjectContext,
     source: PortalSource,
     generatedPages: () => GeneratedPages,
-    projectDirectory: DirectoryPath,
-    sourceDirectory: DirectoryPath
+    portalProjectDirectory: DirectoryPath
   ): FileWatch | undefined {
     const contentDirectory = source.contentDirectory;
     if (contentDirectory === null) {
       return undefined;
     }
-    const sourceContext = new PortalSourceContext(sourceDirectory);
+    const sourceDirectory = project.sourceDirectory();
+    const sourceContext = project.portalSource();
     const preview = new PreviewContent(source.contentNotices);
 
     const check = async () => {
@@ -205,7 +193,11 @@ export class PortalServeAction {
         this.prompts.contentRejected(checked.error, sourceDirectory);
         return;
       }
-      const applied = await this.projectService.applyContent(projectDirectory, contentDirectory, checked.value.files);
+      const applied = await this.projectService.applyContent(
+        portalProjectDirectory,
+        contentDirectory,
+        checked.value.files
+      );
       if (applied.isErr()) {
         this.prompts.contentNotApplied(applied.error, sourceDirectory);
         return;

@@ -1,8 +1,8 @@
 # Plan: the pre-release fix batches for 2.0
 
-Status: batches 1 and 2 implemented as commits of one PR (#374) on
-`saeedjamshaid/one-home-per-concept`, batch 3 to follow there; §3.8 and §4.6
-record where each departed from this plan. Grounded in `dev` at `ecf76668`; every file:line
+Status: all three batches implemented as three commits of one PR (#374) on
+`saeedjamshaid/one-home-per-concept`; §3.8, §4.6 and §5.6 record where each
+departed from this plan. Open: the gitignore/`--destination` decision (§5.2). Grounded in `dev` at `ecf76668`; every file:line
 below was verified there.
 
 ## 1. Goal and scope
@@ -418,6 +418,32 @@ name derivation, destination overrides); the seven action suites and
 | Fixture move breaks a hardcoded path | One step; the four referencing files are the complete grep list. |
 | Windows path semantics | Proven equivalent from `DirectoryPath`'s resolve/join; no new fs.watch/8.3 surface. |
 | Prompt validators wanting contexts | Construction stays in the action, as today — validators receive a closure. |
+
+### 5.6 As implemented — departures from the above
+
+- The versioned walk is one method, `versionToBuild(apiVersion, ask)`,
+  answering `Result<ProjectContext, 'noVersions' | 'versionNotFound'>`, rather
+  than `hasVersions()`/`onlyVersion()`/`chosenVersion()`. The narrowed
+  project's version stays private: `sdk(language, sdkDirectory)` hands back the
+  `SdkContext` that files the SDK under it. The `--api-version` warning stays in
+  the action (`apiVersion && !isVersioned()`), where the prompt is.
+- `sourceExistsSync()` joins the API for the interactive publish's validator,
+  which clack cannot await.
+- The names live in a leaf module, `types/project-layout.ts`, not in
+  `project-context.ts`: `PortalSourceContext` reads them and `ProjectContext`
+  imports `PortalSourceContext`, so one module holding both would be a cycle.
+- Prompts show the source directory's children through `specPath()`,
+  `contentPath()` and `staticPath()` in `prompts/portal/source.ts`, which kept
+  the eleven messages readable under prettier.
+- In the portal actions the temporary Vite project is now `portalProject`,
+  the glossary's name for it, since `project` is the user's.
+- The interactive `sdk publish` still takes the default project directory as
+  a `DirectoryPath`: it is the default a prompt offers, and the project is made
+  once the user answers.
+- Not done, for review: step 9 (the gitignore/`--destination` decision above);
+  the `leafName()` rider. Noticed, not fixed: `SdkPublishAction` zips
+  `outputDirectory.join(language)`, re-deriving `SdkContext`'s layout, which a
+  versioned project writes one level deeper — pre-existing on `main`.
 
 ---
 

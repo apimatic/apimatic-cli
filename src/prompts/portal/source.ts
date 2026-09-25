@@ -13,9 +13,22 @@ import {
 import { PortalTab, SharedTabName } from '../../types/portal/portal-tabs.js';
 import { FileName } from '../../types/file/fileName.js';
 import { FilePath } from '../../types/file/filePath.js';
+import { CONTENT_DIRECTORY_NAME, SPEC_DIRECTORY_NAME, STATIC_DIRECTORY_NAME } from '../../types/project-layout.js';
 import { format as f } from '../format.js';
 
 const TITLE_EXAMPLE = ['---', 'title: Getting started', '---'].join('\n');
+
+/** The root `nav.json`, named as a reader standing in the source directory would find it. */
+const ROOT_NAVIGATION_FILE = `${CONTENT_DIRECTORY_NAME}/${NAVIGATION_FILE_NAME}`;
+
+/** A directory of the source directory, as a message shows it. */
+export const specPath = (sourceDirectory: DirectoryPath): string => f.path(sourceDirectory.join(SPEC_DIRECTORY_NAME));
+
+export const contentPath = (sourceDirectory: DirectoryPath): string =>
+  f.path(sourceDirectory.join(CONTENT_DIRECTORY_NAME));
+
+export const staticPath = (sourceDirectory: DirectoryPath): string =>
+  f.path(sourceDirectory.join(STATIC_DIRECTORY_NAME));
 
 // Quickstart refuses a spec for the same reason, and has to point at the same fix.
 export const convertToOpenApi3 = (): string =>
@@ -88,14 +101,13 @@ export function reportSourceProblem(
     }
     case 'emptySpecDirectory': {
       const message =
-        `${f.path(sourceDirectory.join('spec'))} has no files. Add your OpenAPI 3.x document to it as a ` +
+        `${specPath(sourceDirectory)} has no files. Add your OpenAPI 3.x document to it as a ` +
         `${f.var('.json')}, ${f.var('.yaml')} or ${f.var('.yml')} file.`;
       log.error(message);
       return;
     }
     case 'noOpenApiSpec': {
-      const message =
-        `No OpenAPI 3.x document found in ${f.path(sourceDirectory.join('spec'))}. ` + convertToOpenApi3();
+      const message = `No OpenAPI 3.x document found in ${specPath(sourceDirectory)}. ` + convertToOpenApi3();
       log.error(message);
       return;
     }
@@ -113,7 +125,7 @@ function reportContentProblem(problem: ContentProblem, sourceDirectory: Director
   switch (problem.kind) {
     case 'unreadableContent': {
       log.error(
-        `${f.path(sourceDirectory.join('content'))} could not be read. Check that it and every ` +
+        `${contentPath(sourceDirectory)} could not be read. Check that it and every ` +
           `directory beneath it can be listed.`
       );
       return;
@@ -219,7 +231,7 @@ export function reportFolderTabs(folders: DirectoryPath[]): void {
     return;
   }
   const names = listedInProse(folders.map((folder) => f.var(folder.leafName())));
-  log.info(`${f.var('content/nav.json')} makes a tab of each folder it lists: ${names}.`);
+  log.info(`${f.var(ROOT_NAVIGATION_FILE)} makes a tab of each folder it lists: ${names}.`);
 }
 
 export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: DirectoryPath): void {
@@ -248,7 +260,7 @@ export function reportSharedTabNames(shared: SharedTabName[], sourceDirectory: D
   log.message(shared.map(({ tabs }) => `  • ${spellings(tabs)}: ${listedInProse(tabs.map(describe))}`).join('\n'));
   log.message(
     `Rename all but one tab of each name with a ${f.var('title')} in its folder's ` +
-      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var('content/nav.json')} for the Home tab; the tabs of the ` +
+      `${f.var(NAVIGATION_FILE_NAME)}, or in ${f.var(ROOT_NAVIGATION_FILE)} for the Home tab; the tabs of the ` +
       `SDK pages and the context plugin keep their names.`
   );
 }

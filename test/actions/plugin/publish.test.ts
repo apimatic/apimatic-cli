@@ -8,6 +8,7 @@ import { PluginPublishPrompts } from '../../../src/prompts/plugin/publish.js';
 import { DirectoryPath } from '../../../src/types/file/directoryPath.js';
 import { PluginContents } from '../../../src/types/plugin/plugin-contents.js';
 import { PluginReleaseData } from '../../../src/types/plugin-config-context.js';
+import { ProjectContext } from '../../../src/types/project-context.js';
 
 describe('PluginPublishAction', () => {
   let tmpDirResult: DirectoryResult;
@@ -16,7 +17,7 @@ describe('PluginPublishAction', () => {
   let action: PluginPublishAction;
 
   const execute = (plugin = pluginDirectory) =>
-    action.execute(new DirectoryPath(sourceDirectory), new DirectoryPath(plugin));
+    action.execute(ProjectContext.in(new DirectoryPath(path.dirname(sourceDirectory))), new DirectoryPath(plugin));
 
   const configPath = () => path.join(sourceDirectory, 'apimatic.json');
   const writeConfig = (config: unknown) => fsExtra.writeJson(configPath(), config);

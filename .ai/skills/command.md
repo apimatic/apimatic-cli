@@ -147,7 +147,8 @@ Use when creating a new command triple (Command + Action + Prompts).
 4. **Description** — multi-line description (template literal)
 5. **Input type** — one of:
    - `ResourceInput` — adds `file` + `url` flags, uses `createResourceInput(file, url)`
-   - `DirectoryPath` — adds `FlagsProvider.input`, uses `DirectoryPath.createInput(input)`
+   - `Project` — adds `FlagsProvider.input`, uses `ProjectContext.at(input)`; the action takes the `ProjectContext`
+   - `DirectoryPath` — adds `FlagsProvider.input`, uses `DirectoryPath.createInput(input)`, for a directory that is not a project
    - `None` — no input flags
 6. **Needs API auth** — adds `FlagsProvider.authKey`, passes `authKey` to Action constructor
 7. **Needs force flag** — adds `FlagsProvider.force` for overwrite confirmation
@@ -165,6 +166,8 @@ For nested topics like `publishing/profile`, add one more `../` to all relative 
 import { Command, Flags } from "@oclif/core";
 import { DirectoryPath } from "../../types/file/directoryPath.js";
 import { FlagsProvider } from "../../types/flags-provider.js";
+// If a project input:
+// import { ProjectContext } from "../../types/project-context.js";
 // If ResourceInput:
 // import { createResourceInput } from "../../types/file/resource-input.js";
 import { {PascalName}Action } from "../../actions/{topic}/{name}.js";
@@ -200,10 +203,9 @@ export default class {PascalName} extends Command {
 
     // Build typed paths from raw flag strings:
     //
-    // For DirectoryPath input:
-    //   const workingDirectory = DirectoryPath.createInput(input);
-    //   const sourceDirectory = input ? new DirectoryPath(input, "src") : workingDirectory.join("src");
-    //   const outputDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join("{artifact}");
+    // For a project input (the --input flag and a src/ inside it), never join "src" here:
+    //   const project = ProjectContext.at(input);
+    //   const outputDirectory = project.sdkDirectory(destination); // or portalDirectory / pluginDirectory
     //
     // For ResourceInput:
     //   const resourceInput = createResourceInput(file, url);
@@ -264,9 +266,8 @@ export class {PascalName}Action {
     /* parameters matching what Command passes */
   ): Promise<ActionResult> => {
     // 1. Input validation via Context objects
-    //    const buildContext = new BuildContext(sourceDirectory);
-    //    if (!(await buildContext.validate())) {
-    //      this.prompts.directoryEmpty(sourceDirectory);
+    //    if (!(await project.sourceExists())) {
+    //      this.prompts.directoryEmpty(project.sourceDirectory());
     //      return ActionResult.failed();
     //    }
 

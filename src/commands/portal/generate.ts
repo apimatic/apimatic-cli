@@ -4,6 +4,7 @@ import { GenerateAction } from '../../actions/portal/generate.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { format, intro, outro } from '../../prompts/format.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ProjectContext } from '../../types/project-context.js';
 
 export default class PortalGenerate extends Command {
   static readonly summary = 'Generate a static API Documentation Portal.';
@@ -36,9 +37,7 @@ The portal is built on your machine and written as static files you can host any
       flags: { input, destination, force, zip: zipPortal, 'auth-key': authKey }
     } = await this.parse(PortalGenerate);
 
-    const workingDirectory = DirectoryPath.createInput(input);
-    const sourceDirectory = workingDirectory.join('src');
-    const portalDirectory = destination ? new DirectoryPath(destination) : workingDirectory.join('portal');
+    const project = ProjectContext.at(input);
     const commandMetadata: CommandMetadata = {
       commandName: PortalGenerate.id,
       shell: this.config.shell
@@ -46,7 +45,7 @@ The portal is built on your machine and written as static files you can host any
 
     intro('Generate Portal');
     const action = new GenerateAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(sourceDirectory, portalDirectory, force, zipPortal);
+    const result = await action.execute(project, project.portalDirectory(destination), force, zipPortal);
     outro(result);
   }
 

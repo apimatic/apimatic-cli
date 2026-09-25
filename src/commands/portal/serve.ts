@@ -3,6 +3,7 @@ import { DEFAULT_PORTAL_PORT, PortalServeAction } from '../../actions/portal/ser
 import { DirectoryPath } from '../../types/file/directoryPath.js';
 import { FlagsProvider } from '../../types/flags-provider.js';
 import { CommandMetadata } from '../../types/common/command-metadata.js';
+import { ProjectContext } from '../../types/project-context.js';
 import { format, intro, outro } from '../../prompts/format.js';
 
 const defaultPortText = String(DEFAULT_PORTAL_PORT);
@@ -44,7 +45,6 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
       flags: { input, port, open, 'auth-key': authKey }
     } = await this.parse(PortalServe);
 
-    const sourceDirectory = DirectoryPath.createInput(input).join('src');
     const commandMetadata: CommandMetadata = {
       commandName: PortalServe.id,
       shell: this.config.shell
@@ -52,7 +52,7 @@ Nothing is written to disk; run 'apimatic portal generate' to produce the static
 
     intro('Portal Serve');
     const action = new PortalServeAction(this.getConfigDir(), commandMetadata, authKey);
-    const result = await action.execute(sourceDirectory, port, open);
+    const result = await action.execute(ProjectContext.at(input), port, open);
     outro(result);
   }
 
